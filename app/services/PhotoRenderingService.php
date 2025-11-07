@@ -83,15 +83,25 @@ public function renderApplyMap(
         [$rT, $gT, $bT] = $this->hexToRgb($hex6);
         [$Lt, $at, $bt] = $this->rgbToLab($rT, $gT, $bT);
 
-        // ---- Auto-normalization params (per role) ----
-        // Treat the role as if it had been prepped to a consistent mid-gray,
-        // then paint the target color while preserving texture.
-        $LbRole    = $this->averageLUnderMask($baseIm, $maskIm);  // mean L* under this role
-        $Lneutral  = 60.0;   // “prepared gray” mean
-        $kNorm     = 0.70;   // keep % of local contrast during normalization
+        $auto     = $this->autoParamsForRole($pid, $role, $Lt);
+        $lmix     = $this->clamp01($auto['lmix'] ?? 0.35);
+        $alphaForRole = $this->clamp01($auto['alpha'] ?? $alpha);
+        $LbAuto   = $auto['Lb'] ?? null;
+        [$detailKeep, $alphaCap] = $this->perColorDetailControl($hex6, $Lt);
 
-        // Painting contrast keep (% deviating around the mean) – tuned by lightness
-        $kPaint = ($Lt >= 85.0) ? 0.55 : (($Lt <= 30.0) ? 0.85 : 0.70);
+        [$kCal, $bCal] = $this->getDeltaLCalib($role, $hex6, null);
+
+        // Measure the prepared base directly for safety (handles fresh uploads)
+        $LbRole = $this->averageLUnderMask($baseIm, $maskIm);
+        $LbRef  = $LbAuto ?? $LbRole ?? 60.0;
+
+        $deltaAgainstRef = abs($Lt - $LbRef);
+        if ($deltaAgainstRef >= 35.0) {
+            $lmix         = min(1.0, $lmix + 0.25);
+            $alphaForRole = min(1.0, $alphaForRole + 0.15);
+        }
+
+        $effectiveAlpha = $this->clamp01($alphaForRole * $alpha * $alphaCap);
 
         // 4) Per-pixel
         for ($y = 0; $y < $H; $y++) {
@@ -101,7 +111,7 @@ public function renderApplyMap(
                 $ma = ($m & 0x7F000000) >> 24;
                 if ($ma >= 127) continue;
 
-                $coverage = $this->clamp01((1.0 - ($ma / 127.0)) * $alpha);
+                $coverage = $this->clamp01((1.0 - ($ma / 127.0)) * $effectiveAlpha);
 
                 // Base pixel
                 $p  = imagecolorat($baseIm, $x, $y);
@@ -112,20 +122,17 @@ public function renderApplyMap(
                 } else {
                     // Base Lab
                     [$L0, $a0, $b0lab] = $this->rgbToLab($r0, $g0, $b0);
+                    $deltaL             = ($Lt - $L0) * $lmix;
+                    $deltaL             = $deltaL * $kCal + $bCal;
+                    $Lnew               = $this->clamp($L0 + $deltaL, -1.0, 101.0);
 
-                    // A) Normalize this role to mid-gray, preserving texture
-                    // shift role mean to Lneutral; keep kNorm of local contrast
-                    $offsetNorm = $Lneutral - $LbRole;
-                    $Lnorm      = ($L0 + $offsetNorm) + $kNorm * ($L0 - $LbRole);
+                    // Allow intentional pushes to full white/black without banding
+                    if ($Lt >= 95.0) $Lnew = min(100.0, max($Lnew, 96.5));
+                    if ($Lt <= 5.0)  $Lnew = max(0.0,  min($Lnew,  3.5));
 
-                    // B) Paint target: move mean to Lt; keep kPaint of local contrast
-                    $offsetPaint = $Lt - $Lneutral;
-                    $Lnew = ($Lnorm + $offsetPaint) + $kPaint * ($Lnorm - $Lneutral);
-
-                    // Gentle caps to keep whites and blacks believable
-                    if ($Lt > 85.0) $Lnew = min($Lnew, 97.0);  // protect highlights
-                    if ($Lt < 30.0) $Lnew = max($Lnew,  8.0);  // avoid full crush
-                    $Lnew = max(0.0, min(100.0, $Lnew));
+                    if ($detailKeep > 0.0) {
+                        $Lnew = ($Lnew * (1.0 - $detailKeep)) + ($L0 * $detailKeep);
+                    }
 
                     // Back to RGB
                     [$r1, $g1, $b1] = $this->labToRgb($Lnew, $at, $bt);
@@ -164,11 +171,11 @@ public function renderApplyMap(
 
 
 // Per-color (optionally per-role) calibration for ΔL = raw_dL * k + b
-private function getDeltaLCalib(string $role, string $hex6, ?int $colorId): array {
-    // Defaults = neutral (no change)
-    $k = 1.00; $b = 0.0;
+    private function getDeltaLCalib(string $role, string $hex6, ?int $colorId): array {
+        // Defaults = neutral (no change)
+        $k = 1.00; $b = 0.0;
 
-    // Temporary guardrails you can tweak immediately:
+        // Temporary guardrails you can tweak immediately:
     // Push “pure black” darker, lift “pure white” a touch
     if (!$colorId) {
         if ($hex6 === '000000') { $k = 1.30; $b = -3.0; }
@@ -178,8 +185,44 @@ private function getDeltaLCalib(string $role, string $hex6, ?int $colorId): arra
     // When you’re ready, swap this for a repo lookup:
     // if ($colorId) { [$k,$b] = $this->calibRepo->getCalibForColor($colorId, $role); }
 
-    return [$k, $b];
-}
+        return [$k, $b];
+    }
+
+    /** Returns [detailKeep, alphaCap] per target color (higher detailKeep => more base shading retained). */
+    private function perColorDetailControl(string $hex6, float $Lt): array {
+        $hex6 = strtoupper($hex6);
+
+        $detailKeep = 0.0;
+        $alphaCap   = 1.0;
+
+        // Heuristic tiers by perceived lightness; override with explicit map if needed.
+        if ($Lt >= 92.0) {
+            $detailKeep = 0.28;
+            $alphaCap   = 0.88;
+        } elseif ($Lt >= 82.0) {
+            $detailKeep = 0.18;
+            $alphaCap   = 0.93;
+        } elseif ($Lt <= 8.0) {
+            $detailKeep = 0.25;
+            $alphaCap   = 0.90;
+        } elseif ($Lt <= 20.0) {
+            $detailKeep = 0.15;
+            $alphaCap   = 0.94;
+        }
+
+        // Exact per-color overrides (edit as needed)
+        $overrides = [
+            'FFFFFF' => ['detailKeep' => 0.30, 'alphaCap' => 0.85],
+            'FFF9F0' => ['detailKeep' => 0.26, 'alphaCap' => 0.88],
+            '000000' => ['detailKeep' => 0.28, 'alphaCap' => 0.88],
+        ];
+        if (isset($overrides[$hex6])) {
+            $detailKeep = $overrides[$hex6]['detailKeep'];
+            $alphaCap   = $overrides[$hex6]['alphaCap'];
+        }
+
+        return [$this->clamp01($detailKeep), $this->clamp01($alphaCap)];
+    }
 
 // Per-photo/role one-off offset for prepared quirks (defaults to 0.0)
 private function getPhotoRoleOffset(int $photoId, string $role): float {
@@ -274,34 +317,41 @@ private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float 
         int $photoId,
         string $role,
         float $Lt,
-        float $fallbackLmix = 0.25,
-        float $fallbackAlpha = 0.90
+        float $fallbackLmix = 0.30,
+        float $fallbackAlpha = 0.92
     ): array {
         $stats = $this->getRoleStatsByRole($photoId);
         $Lb    = isset($stats[$role]['l_avg01']) ? (float)$stats[$role]['l_avg01'] : null;
 
         if ($Lb === null || $Lb <= 0.0) {
-            return ['lmix' => $this->clamp01($fallbackLmix), 'alpha' => $this->clamp01($fallbackAlpha)];
+            $magGuess = abs($Lt - 60.0);
+            $lmixGuess = min(1.0, max(0.18, 0.18 + 0.015 * $magGuess));
+            $alphaGuess = ($Lt >= 92.0 || $Lt <= 8.0) ? 0.98 : $fallbackAlpha;
+            return [
+                'lmix' => $this->clamp01($lmixGuess),
+                'alpha' => $this->clamp01($alphaGuess),
+                'Lb' => null,
+            ];
         }
 
         $d   = $Lt - $Lb;
         $mag = abs($d);
 
-        // Scale by how different the target is
-        $lmix = 0.15 + 0.02 * $mag;        // ΔL 10 → ~0.35; ΔL 20 → ~0.55
-        $lmix = max(0.12, min(0.55, $lmix));
+        // Scale pull strength by how different the target is
+        $lmix = 0.18 + 0.015 * $mag;          // ΔL 30 → ~0.63
+        if ($mag >= 35.0) $lmix = min(1.0, $lmix + 0.20);
+        $lmix = $this->clamp01(max($fallbackLmix, $lmix));
 
-        // Bright whites: avoid bleaching texture
-        if ($Lt >= 85.0) $lmix = min($lmix, 0.18);
-        // Very light base being darkened a lot — allow stronger pull
-        if ($Lb >= 75.0 && $d < -12.0) $lmix = max($lmix, 0.40);
-        // Very dark target over much lighter base — bump
-        if ($Lt < 30.0 && $mag > 15.0) $lmix = max($lmix, 0.45);
+        // Whites and blacks can go nearly full strength
+        if ($Lt >= 90.0 && $mag >= 20.0) $lmix = min(1.0, max($lmix, 0.85));
+        if ($Lt <= 10.0 && $mag >= 20.0) $lmix = min(1.0, max($lmix, 0.90));
 
-        $alpha = $fallbackAlpha - ($mag >= 20.0 ? 0.05 : 0.0);
-        $alpha = max(0.80, min(0.95, $alpha));
+        $alpha = 0.82 + min(0.15, $mag * 0.005);
+        if ($mag >= 35.0) $alpha = 1.0;
+        if ($Lt >= 92.0 || $Lt <= 8.0) $alpha = max($alpha, 0.98);
+        $alpha = $this->clamp01(max($fallbackAlpha, $alpha));
 
-        return ['lmix' => $lmix, 'alpha' => $alpha];
+        return ['lmix' => $lmix, 'alpha' => $alpha, 'Lb' => $Lb];
     }
 
     /* =======================================================================
