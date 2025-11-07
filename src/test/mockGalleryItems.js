@@ -1,0 +1,23 @@
+const mockGalleryItems = [
+  { id: 1, type: 'swatch', name: 'Blue Spruce', hex: '#4A646C' },
+  { id: 2, type: 'swatch', name: 'Sequoia', hex: '#7E4B3A' },
+  { id: 3, type: 'swatch', name: 'Midnight Blue', hex: '#2C3E50' },
+  { id: 4, type: 'swatch', name: 'Victorian Pewter', hex: '#5E6972' },
+  { id: 5, type: 'swatch', name: 'Silver City', hex: '#C4C5C3' },
+  { id: 6, type: 'swatch', name: 'Country Redwood', hex: '#7B3F3F' },
+  { id: 7, type: 'swatch', name: 'Distant Gray', hex: '#EDEDED' },
+  { id: 8, type: 'swatch', name: 'Charcoal Slate', hex: '#5A5E60' },
+  { id: 9, type: 'swatch', name: 'Sage Leaf', hex: '#9AA193' },
+  { id: 10, type: 'swatch', name: 'Cottage Red', hex: '#914E45' },
+  { id: 11, type: 'swatch', name: 'Deep Pine', hex: '#2E4D3B' },
+  { id: 12, type: 'swatch', name: 'Ocean Fog', hex: '#A5B6C0' },
+  { id: 13, type: 'swatch', name: 'Bone White', hex: '#E8DFD6' },
+  { id: 14, type: 'swatch', name: 'Antique Gold', hex: '#C9A659' },
+  { id: 15, type: 'swatch', name: 'Ash Violet', hex: '#938C9E' },
+  { id: 16, type: 'swatch', name: 'Dusty Coral', hex: '#D29B91' },
+  { id: 17, type: 'swatch', name: 'Muted Teal', hex: '#5A828A' },
+  { id: 18, type: 'swatch', name: 'Warm Taupe', hex: '#A38A7D' },
+  { id: 19, type: 'swatch', name: 'Icy Mint', hex: '#C6E4DC' },
+  { id: 20, type: 'swatch', name: 'Foggy Lavender', hex: '#D0C8DC' },
+];
+export default mockGalleryItems;

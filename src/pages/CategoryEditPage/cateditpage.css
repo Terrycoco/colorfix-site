@@ -1,0 +1,33 @@
+/* keep the same look whether idle, disabled, or busy */
+.recalc-btn {
+  background: #e67e22;   /* your orange */
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* when running or disabled, keep the orange */
+.recalc-btn[disabled],
+.recalc-btn:disabled,
+.recalc-btn[aria-busy="true"] {
+  background: #e67e22 !important;
+  color: #fff !important;
+  opacity: 0.85;          /* optional dim */
+  cursor: progress;
+}
+
+/* spinner stays visible on orange */
+.recalc-btn .spinner {
+  display: inline-block;
+  width: 1em; height: 1em;
+  margin-right: 0.5em;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  vertical-align: -2px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

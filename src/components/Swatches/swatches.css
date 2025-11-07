@@ -1,0 +1,274 @@
+/* ========= Fresh .pals-* swatch styles (proportional, conservative) ========= */
+
+.pals-swatch {
+  /* proportional spacing & controls */
+  --pad: clamp(8px, 2cqw, 14px);
+  /* --btn: clamp(24px, 6cqw, 34px); */
+
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 4;
+  container-type: inline-size;           /* enables cqw scaling */
+  box-sizing: border-box;
+  cursor: pointer;
+  overflow: visible;
+  perspective: 900px;                    /* enables subtle 3D tilt */
+  perspective-origin: 80% 20%;           /* emphasize top-right corner */
+}
+
+/* fill block */
+.pals-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  outline: 1px solid rgba(0,0,0,.08);    /* visible even on white */
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
+  z-index: 1;                             /* above faux shadows */
+  transform-origin: 85% 15%;              /* pivot near top-right */
+  transform-style: preserve-3d;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  will-change: transform, filter;
+}
+
+/* Keep UI above the overlays */
+.pals-fill .pals-label,
+.pals-fill .pals-btn {
+  position: relative;
+  z-index: 3;
+}
+
+/* label area */
+.pals-label {
+  position: absolute;
+  left: var(--pad);
+  right: calc(var(--pad) + var(--btn) + var(--pad));
+  bottom: calc(var(--pad) + 6px);
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.pals-chip-num{
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  font: 400 12px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-size: .7rem;
+  width: auto;
+  letter-spacing: .02em;
+  pointer-events: none;                /* don't block swatch clicks */
+  user-select: none;
+}
+
+/* NAME — smaller ceiling so it won’t shout */
+.pals-name {
+  font-family: "Lato", Georgia, serif;
+  font-weight: 700;
+  line-height: 1.12;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(0.80rem, 2.2cqw, 1.10rem);
+  letter-spacing: -0.01em;
+}
+
+/* META — single line, smaller ceiling too */
+.pals-meta {
+  font-family: 'Open Sans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  margin-top: 0.15em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: clamp(0.58rem, 1.3cqw, 0.80rem);
+  line-height: 1.2;
+}
+
+/* button */
+.pals-btn {
+  all: unset;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.pals-btn:hover { background: none; }
+
+/* SVG icon inside the button */
+.pals-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.pals-btn:hover .pals-icon {
+  transform: scale(1.15);
+  opacity: 0.85;
+}
+
+@media (max-width: 760px) {
+  .pals-btn {
+    all: unset;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+  .pals-icon { width: 18px; height: 18px; }
+}
+
+/* === Always-on seat shadow + hover corner lift (non-destructive) === */
+
+.pals-swatch::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -10px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at center,
+              rgba(0,0,0,.18) 0%,
+              rgba(0,0,0,.08) 45%,
+              rgba(0,0,0,0) 70%);
+  filter: blur(7px);
+  opacity: .85;
+}
+
+/* Subtle corner accent */
+.pals-swatch::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: -6px;
+  width: 42px;
+  height: 12px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at center,
+              rgba(0,0,0,.22) 0%,
+              rgba(0,0,0,0) 70%);
+  filter: blur(6px);
+  transform: rotate(7deg);
+  opacity: .55;
+}
+
+/* Hover: lift the top-right corner a bit more for 3D feel */
+.pals-swatch:hover .pals-fill {
+  transform: translateY(-1px) rotateX(0.6deg) rotateY(-1.8deg);
+}
+
+.pals-swatch:hover::after {
+  opacity: .85;
+  transform: translate(2px, -1px) rotate(9deg) scale(1.05);
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  .pals-fill { transition: none; }
+}
+
+/* ===========================================================================
+   STAINS: real wood look (substrate + tint)
+   ---------------------------------------------------------------------------
+   - ::before paints a wood substrate (light wood + strong grain).
+   - ::after lays a semi-transparent color tint (multiply blend).
+   - We forcibly clear the base background color for stains to show wood.
+   ==========================================================================*/
+
+/* For stains, ensure the base is transparent so wood shows through.
+   This will override inline rgb() from React. */
+.pals-fill[data-is-stain="1"] {
+  background-color: transparent !important;
+  /* sensible defaults; can be overridden per size */
+  --wood-size: clamp(120px, 38%, 240px);
+  --stain-alpha: .9; /* how much color coats the wood */
+}
+
+/* Layer 1: WOOD SUBSTRATE (underlay) */
+.pals-fill[data-is-stain="1"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: var(--wood-size) var(--wood-size);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e3caa1'/><g stroke='%236b4528' stroke-width='1.6' fill='none' opacity='.45'><path d='M0,26 C75,8 125,44 200,26'/><path d='M0,52 C65,38 135,64 200,52'/><path d='M0,78 C85,100 115,60 200,78'/><path d='M0,104 C70,126 130,86 200,104'/><path d='M0,130 C65,152 135,112 200,130'/><path d='M0,156 C70,178 130,138 200,156'/></g><g stroke='%236b4528' stroke-width='1.2' fill='none' opacity='.35'><ellipse cx='60' cy='90' rx='18' ry='10'/><ellipse cx='60' cy='90' rx='28' ry='16'/><ellipse cx='148' cy='140' rx='14' ry='8'/><ellipse cx='148' cy='140' rx='22' ry='12'/></g></svg>");
+  filter: contrast(1.08) saturate(1.05);
+}
+
+/* Layer 2: COLOR TINT (multiply) */
+.pals-fill[data-is-stain="1"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), var(--stain-alpha));
+  mix-blend-mode: multiply;
+}
+
+/* global stain tuning — paste near the end */
+.pals-fill[data-is-stain="1"]{
+  --wood-size: 160px;   /* smaller = denser grain (quick global dial) */
+  --stain-alpha: .9;   /* higher = heavier coat */
+}
+
+
+/* Dark stains: slightly reduce alpha so grain reads more */
+.pals-fill[data-is-stain="1"][data-stain-tone="dark"]::after {
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), .78);
+}
+
+/* Optional: quick knobs for density per swatch size (if you have size classes) */
+/*
+.pals-swatch.sm  .pals-fill { --wood-size: 140px; --stain-alpha: .90; }
+.pals-swatch.md  .pals-fill { --wood-size: 180px; }
+.pals-swatch.lg  .pals-fill { --wood-size: 240px; --stain-alpha: .85; }
+*/
+
+
+
+
+/* Pin palette toggle to UPPER LEFT (overrides earlier rule) */
+.pals-fill .pals-btn {
+  position: absolute !important;
+  top: 6px;
+  left: 6px;
+  right: auto;
+  z-index: 4; /* above wood/tint & label */
+}
+
+.pals-btn.palette {
+  left: 6px;
+}
+
+
+
+@media (max-width: 760px){
+  .pals-fill .pals-btn{
+    top: 3px;
+    left: 3px;
+  }
+
+
+}

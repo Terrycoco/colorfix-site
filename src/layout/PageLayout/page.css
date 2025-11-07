@@ -1,0 +1,8 @@
+ .page {
+  padding-top: var(--sticky-palette-bar-height); /* alows for palettebar & room at bottom */
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin-top: 1rem;
+  display: block; /* override any flex or grid */
+  height: auto;
+ }

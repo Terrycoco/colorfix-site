@@ -1,0 +1,31 @@
+.palette-icon {
+  color: white; /* default stroke color */
+  cursor: pointer;
+  transition: color 0.2s ease;
+  width: 24px;
+  height: 24px;
+}
+
+.palette-fill {
+  /* start transparent; turn white on hover */
+  fill: transparent;
+  transition: fill 0.2s ease;
+}
+
+.palette-outline {
+  fill: none; /* outline only */
+}
+
+.palette-dot {
+  stroke: currentColor; /* default follows .palette-icon color (white) */
+  transition: stroke 0.2s ease;
+}
+
+/* Hover: fill turns white, dots flip to black, outline stays white */
+.palette-icon:hover .palette-fill {
+  fill: white;
+}
+
+.palette-icon:hover .palette-dot {
+  stroke: black;
+}

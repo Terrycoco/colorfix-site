@@ -1,0 +1,394 @@
+:root {
+  --bp-bg: #ffffff;
+  --bp-text: #111827;
+  --bp-muted: #6b7280;
+  --bp-border: #e5e7eb;
+  --bp-accent: #0f62fe;
+  --bp-accent-contrast: #ffffff;
+
+  /* desktop input widths */
+  --bp-color-width: 320px;
+  --bp-family-width: 180px;
+
+  /* palette sizing */
+  --bp-swatch: 60px;        /* desktop swatch size */
+  --bp-swatch-gap: 8px;     /* space between colors */
+  --bp-card-gap: 14px;      /* space between rows/cards */
+
+  /* z-index ladder */
+  --z-base: 0;
+  --z-controls: 100;    /* sticky header/controls */
+  --z-dropdown: 200;    /* fuzzy results dropdowns/menus */
+  --z-toast: 400;
+  --z-modal: 5000;      /* PaletteInspector etc. */
+}
+
+@media (max-width: 640px){
+  :root { --bp-swatch: 38px; --bp-swatch-gap: 8px; }
+}
+@media (min-width: 1280px){
+  :root { --bp-swatch: 80px; }
+}
+
+/* ================= Page & Heading ================ */
+.bpv1-page {
+  background: var(--bp-bg);
+  color: var(--bp-text);
+  min-height: 100%;
+}
+.bpv1-page > h3 {
+  margin: 0;
+  padding: 16px;
+  padding-bottom: 8px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+/* ================= Toolbar ======================= */
+.bpv1-toolbar {
+  position: sticky; /* overridden within controls wrapper */
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: end;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--bp-border);
+}
+.bpv1-field   { flex: 0 0 auto; min-width: 0; }
+.bpv1-actions { flex: 0 0 auto; }
+
+.bpv1-toolbar .fuzzy-dropdown { width: var(--bp-color-width); }
+.bpv1-toolbar select          { width: var(--bp-family-width); }
+
+.bpv1-toolbar .fuzzy-dropdown input[type="search"],
+.bpv1-toolbar select,
+.bpv1-go { height: 40px; }
+
+/* Go */
+.bpv1-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--bp-accent);
+  color: var(--bp-accent-contrast);
+  padding: 0 18px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.bpv1-go:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Mobile toolbar layout */
+@media (max-width: 600px) {
+  .bpv1-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "color  color"
+      "family go";
+    gap: 12px;
+  }
+  .bpv1-field:first-of-type { grid-area: color; }
+  .bpv1-field:nth-of-type(2){ grid-area: family; }
+  .bpv1-actions            { grid-area: go; }
+
+  .bpv1-toolbar .fuzzy-dropdown,
+  .bpv1-toolbar select { width: 100%; }
+  .bpv1-go { width: 100%; }
+}
+
+/* ============== Messages ============== */
+.bpv1-error {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #991b1b;
+  border-radius: 8px;
+}
+
+/* ================= Results (shared) ======================= */
+.bpv1-results { padding: 16px; }
+
+/* One palette per line */
+.bpv1-chipcard{
+  width: 100%;
+  display: block;
+  padding: 0;
+  margin: 0;
+  background: #fff;
+  border: 1px solid var(--bp-border);
+  border-radius: 12px;
+}
+
+/* Swatch strip */
+.bpv1-row{
+  display: flex;
+  gap: var(--bp-swatch-gap);
+  justify-content: flex-start;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+/* Swatch */
+.bpv1-mini{
+  width: var(--bp-swatch);
+  height: var(--bp-swatch);
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.08);
+}
+
+/* Optional +N chip */
+.bpv1-more{
+  align-self: center;
+  font-size: 12px;
+  color: #374151;
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f9fafb;
+}
+
+/* Legacy caption line off */
+.bpv1-meta { display: none; }
+
+/* ============== Inline groups ============== */
+.bpv1-group { margin: 16px 0 24px; display: block; }
+.bpv1-group-title {
+  margin: 0 0 10px;
+  padding-left: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--bp-text);
+}
+.bpv1-group-title .bpv1-count { color: var(--bp-muted); margin-left: 6px; }
+
+.bpv1-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bp-card-gap);
+  width: 100%;
+}
+
+/* ============== Skeleton Loader ============== */
+.bpv1-skel { position: relative; overflow: hidden; }
+.bpv1-skel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #f8fafc 0%, #eef2f7 50%, #f8fafc 100%);
+  animation: bpv1-shine 1.2s infinite;
+}
+@keyframes bpv1-shine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ================= Accordion ================= */
+.bpv1-acc {
+  display: block;
+  margin: 16px 0 24px;
+  grid-column: 1 / -1;
+  width: 100%;
+}
+.bpv1-acc-header {
+  all: unset;
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--bp-text);
+  border: 1px solid var(--bp-border);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.bpv1-acc-header:hover { background: #fafafa; }
+.bpv1-acc-header:active { background: #f5f5f5; }
+.bpv1-acc-header:focus-visible {
+  outline: 2px solid var(--bp-accent);
+  outline-offset: 2px;
+}
+.bpv1-caret { transition: transform .18s ease; font-size: 14px; line-height: 1; }
+.bpv1-acc.is-open .bpv1-caret { transform: rotate(90deg); }
+
+.bpv1-acc-panel { display: block; width: 100%; padding-top: 10px; }
+.bpv1-acc-panel[hidden] { display: none !important; }
+
+.bpv1-acc-panel .bpv1-group-list{
+  display: flex;
+  flex-direction: column;
+  gap: var(--bp-card-gap);
+  width: 100%;
+  margin: 0;
+}
+.bpv1-acc-panel .bpv1-chipcard{ width: 100%; margin: 0; }
+.bpv1-acc-panel .bpv1-row{ justify-content: flex-start; }
+
+/* ================= Hard overrides ================= */
+.bpv1-results { display: block !important; }
+.bpv1-results .bpv1-grid {
+  display: block !important;
+  grid-template-columns: none !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+.bpv1-sec { display: block !important; grid-template-columns: none !important; }
+.bpv1-sec-head, .bpv1-sec-list { display: block !important; }
+.bpv1-group, .bpv1-group-list, .bpv1-chipcard, .bpv1-row, .bpv1-acc, .bpv1-acc-panel {
+  float: none !important;
+  text-align: left !important;
+  margin-left: 0 !important;
+}
+
+/* ================= Z-INDEX ladder use ================= */
+.results { z-index: var(--z-dropdown) !important; }
+
+/* ================= Collapsible Controls ================= */
+.bpv1-controls {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-controls);
+  background: #fff;
+  border-bottom: 1px solid var(--bp-border);
+}
+
+/* Collapsible content area */
+.bpv1-control-panels {
+  overflow: hidden;
+  transition: max-height .2s ease, padding .2s ease;
+}
+.bpv1-controls.is-open  .bpv1-control-panels { padding-bottom: 6px; max-height: 1000px; }
+.bpv1-controls.is-closed .bpv1-control-panels { max-height: 0; padding: 0; }
+
+/* Inner toolbars inside the panel (no extra stickiness in the rows) */
+.bpv1-controls .bpv1-toolbar {
+  position: static; top: auto; z-index: auto;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--bp-border);
+}
+.bpv1-controls .bpv1-toolbar:last-of-type { border-bottom: none; }
+
+/* Desktop toggle (below panels). Hidden on mobile; mobile uses FAB portal. */
+.bpv1-controls-toggle {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 16px;
+  cursor: pointer;
+  background: #fff;
+}
+.bpv1-controls-toggle:focus-visible { outline: 2px solid var(--bp-accent); outline-offset: 2px; }
+.bpv1-controls-label { font-weight: 600; color: var(--bp-text); font-size: 14px; }
+.bpv1-controls-caret {
+  width: 12px; height: 12px;
+  border-right: 2px solid var(--bp-text);
+  border-bottom: 2px solid var(--bp-text);
+  transform: rotate(45deg); transition: transform .18s ease;
+}
+.bpv1-controls.is-open  .bpv1-controls-caret { transform: rotate(225deg); }
+
+@media (max-width: 600px) {
+  .bpv1-controls-toggle { display: none; } /* mobile uses the FAB only */
+}
+
+/* ================= Floating Show Filters pill (mobile only, via portal) ================= */
+.bpv1-filters-fab {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-controls) + 2); /* ensure visible above content/sticky */
+  padding: 6px 12px;
+  background: #fff;
+  color: var(--bp-text);
+  border: 1px solid var(--bp-border);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+@media (min-width: 601px) {
+  .bpv1-filters-fab { display: none; }
+}
+
+/* ================= Modals above all ================= */
+.PaletteInspector, .palette-inspector-root {
+  z-index: var(--z-modal) !important;
+  position: fixed;
+}
+
+
+.bpv1-summary {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .75rem;
+  margin: .5rem 0 1rem;
+  background: var(--panel, #f7f7f8);
+  border-radius: 10px;
+  font-size: .95rem;
+}
+.bpv1-summary-counts { opacity: .75; }
+.bpv1-summary-edit { margin-left: auto; }
+
+
+/* Split swatches (left) | details (right) on wide screens */
+.bpv1-rowline {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 340px;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .bpv1-rowline {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+/* Right column */
+.bpv1-details { display: flex; flex-direction: column; gap: 6px; }
+.bpv1-titleline { display: flex; align-items: center; gap: 8px; }
+.bpv1-nickname { font-weight: 600; font-size: 14px; }
+.bpv1-heart { color: #d62828; font-size: 14px; line-height: 1; }
+
+/* Terry says line (subtle, clamps long text) */
+.bpv1-terry {
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Chips */
+.bpv1-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.bpv1-tagchip {
+  font-size: 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.04);
+  white-space: nowrap;
+}

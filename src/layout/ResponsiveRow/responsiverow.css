@@ -1,0 +1,16 @@
+/* Base: mobile */
+.responsive-row {
+  display: flex;
+  flex-direction: column;
+  align-items: space-evenly; /* ← centers all children horizontally */
+  gap: 2rem;  /* gap between items up and down */
+}
+
+/* Desktop: side by side */
+@media (min-width: 768px) {
+  .responsive-row {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 2rem;
+  }
+}

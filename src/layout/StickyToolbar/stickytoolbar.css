@@ -1,0 +1,19 @@
+
+.sticky-toolbar {
+  position: sticky;
+  min-height: var(--dashboard-height);
+  height: auto; /* allows growth */
+  width: 100vw;
+  top: 0;
+  z-index: 1000; /* Make sure it's above scrolling content */
+  background: #eee;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center !important;
+  justify-content: flex-start;
+  border-bottom: 1px solid #ccc;
+  margin-top: 0;
+  padding: .25rem .5rem;
+  column-gap: .5rem; /* horizontal spacing */
+  row-gap: 0.25rem;  /* tighter vertical spacing */
+}

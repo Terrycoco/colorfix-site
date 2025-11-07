@@ -1,0 +1,79 @@
+/* Backdrop */
+.bf-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 999999; /* above sticky bars */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Modal container */
+.bf-modal {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.25);
+  width: min(560px, 92vw);
+  max-height: min(80dvh, 80vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* keep rounded corners */
+  border: 1px solid #e6e6e6;
+}
+
+/* Mobile bottom sheet */
+@media (max-width: 900px) {
+  .bf-backdrop { align-items: flex-end; }
+  .bf-modal {
+    width: 100vw;
+    max-height: min(90dvh, 90vh);
+    border-radius: 16px 16px 0 0;
+  }
+}
+
+/* Header */
+.bf-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+}
+.bf-title { margin: 0; font-size: 16px; font-weight: 700; }
+
+/* Body (scrollable) */
+.bf-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 10px 12px;
+  /* extra bottom padding so last items scroll above sticky footer + gesture bar */
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + 84px);
+}
+
+/* List + rows */
+.bf-list { list-style: none; margin: 0; padding: 0; }
+.bf-item { margin: 6px 0; }
+.bf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e6e6e6;
+  border-radius: 10px;
+  background: #fafafa;
+}
+.bf-row.is-checked { border-color: #bcd4ff; background: #eef5ff; }
+.bf-checkbox { width: 16px; height: 16px; }
+.bf-brand { font-size: 14px; }
+
+/* Sticky footer (buttons inherit your global styles) */
+.bf-footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #fff;
+  border-top: 1px solid #eee;
+  box-shadow: 0 -6px 12px rgba(0,0,0,.06);
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}

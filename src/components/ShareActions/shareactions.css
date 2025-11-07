@@ -1,0 +1,107 @@
+.share-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8px 0 0;
+}
+.share-actions .btn,
+.share-actions .btn-secondary {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.share-sms { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.share-sms-input { padding:8px 10px; border:1px solid #ddd; border-radius:10px; min-width:220px; }
+
+
+
+
+
+
+
+
+.share-menu .share-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: #0f172a; /* force readable */
+}
+.share-menu .share-menu-item:hover { background: #f8fafc; }
+.share-menu .share-menu-item.danger { color: #6b7280; font-weight: 500; }
+
+/* container */
+.share-menu {
+  position: relative;
+  display: inline-block;
+}
+
+/* trigger can keep your .btn styles */
+.share-menu__trigger {}
+
+/* popover sheet — LIGHT ONLY */
+.share-menu__sheet {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 260px;
+  z-index: 9999;
+
+  background: #ffffff !important;   /* force white */
+  color: #111827;                    /* gray-900 text */
+  border: 1px solid #e5e7eb;         /* slate-200 */
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.14);
+  padding: 8px;
+
+  transform-origin: 90% 0;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transition: opacity .15s ease, transform .15s ease;
+
+  /* tell Safari/Chrome not to auto-darken form/UI colors */
+  color-scheme: light;
+}
+
+/* entrance */
+.share-menu[data-open="true"] .share-menu__sheet {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* items */
+.share-menu__item {
+  width: 100%;
+  display: block;
+  background: transparent;
+  border: 0;
+  padding: 10px 12px;
+  text-align: left;
+  font: inherit;
+  color: #111827;                   /* explicit text color */
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.share-menu__item:hover,
+.share-menu__item:focus {
+  background: #f8fafc;              /* slate-50 */
+  outline: none;
+}
+
+.share-menu__item--danger {
+  color: #b91c1c;                    /* red-700 */
+}
+
+.share-menu__divider {
+  height: 1px;
+  margin: 6px 0;
+  background: #f1f5f9;               /* slate-100 */
+}

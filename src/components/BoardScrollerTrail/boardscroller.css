@@ -1,0 +1,70 @@
+.board-scroller {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: black;
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+.board-scroller::-webkit-scrollbar {
+  display: none; /* for Chrome, Safari, and Opera */
+}
+
+ 
+.board-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: white;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  line-height: 1;         /* 🔥 This removes extra height from links */
+  height: 2.5rem;         /* 🔥 Force consistent height across elements */
+  box-sizing: border-box; /* 🔥 Ensure padding doesn't break size */
+}
+
+
+.board-tab:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.board-tab.active {
+  color: orange;
+}
+
+
+.board-tab,
+.board-tab:link,
+.board-tab:visited {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: white;
+  text-decoration: none;
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1;
+  height: 2.5rem;
+  box-sizing: border-box;
+}

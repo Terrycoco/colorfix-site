@@ -1,0 +1,79 @@
+/* login-minimal.css */
+
+:root{
+  --accent: #f28a17;
+  --field-h: 44px;      /* avoids iOS zoom */
+}
+
+/* plain, centered form */
+.login-form{
+  font-family: 'Open Sans', sans-serif;
+  width: clamp(240px, 40vw, 540px);
+  margin: clamp(30px, 6vh, 120px) auto;  /* center horizontally, nice top space */
+  padding: 0;                             /* no card look */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* heading + labels */
+.login-form h2{
+  margin: 0 0 12px;
+  font-size: 28px;
+  line-height: 1.1;
+  color: #222;
+}
+.login-form label{
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* inputs */
+.login-form input[type="email"],
+.login-form input[type="password"]{
+  display: block;
+  width: 100%;
+  height: var(--field-h);
+  padding: 10px 12px;
+  font-size: 16px;              /* prevent iPhone zoom */
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  background: #fff;
+  color: #111;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.login-form input:focus{
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242,138,23,.22);
+}
+
+/* submit */
+.login-form button[type="submit"]{
+  width: 100%;
+  height: var(--field-h);
+  margin-top: 18px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: filter .15s ease, transform 80ms ease;
+}
+.login-form button:hover{ filter: brightness(1.05); }
+.login-form button:active{ transform: translateY(1px); }
+
+/* errors if you show them */
+.login-form .error{
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: #fff2f2;
+  border: 1px solid #ffb3b3;
+  color: #8a1111;
+  border-radius: 10px;
+  font-size: 14px;
+}

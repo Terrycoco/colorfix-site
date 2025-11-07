@@ -1,0 +1,105 @@
+/* MOBILE-FIRST, COMPACT, iOS-SAFE */
+
+:root { --bottom-h: 48px; }
+
+.friends-capture {
+  /* lock to visual viewport to stop page bounce on iOS */
+  height: 100dvh;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #111;
+  overflow: hidden; /* only inner scroller moves */
+}
+
+/* Scroll container that holds the list + sticky input */
+.fc-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0 calc(var(--bottom-h) + 12px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Swatch list: tight, full-width bars starting near top */
+.fc-list { padding: 0; margin: 0; }
+
+.fc-item {
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(0,0,0,.08);
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+.fc-item + .fc-item { margin-top: 6px; }
+
+.fc-item__text {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fc-item__name { font-weight: 700; }
+.fc-item__brand { opacity: .85; }
+
+/* Sticky input sits above footer; leaves room for dropdown to expand downward */
+.fc-input {
+  position: sticky;
+  bottom: calc(var(--bottom-h) + 8px);
+  background: #fff;
+  padding-top: 6px;
+  z-index: 950; /* above list, below footer */
+}
+
+/* Fixed compact footer with the action button */
+.fc-bottom {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+  height: var(--bottom-h);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  z-index: 1000;
+}
+
+/* Submit button — compact */
+.fc-submit {
+  appearance: none;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  height: 36px;
+}
+.fc-submit[disabled] { opacity: .5; }
+
+/* Prevent iOS zoom on focus */
+.friends-capture input,
+.friends-capture select,
+.friends-capture textarea {
+  font-size: 16px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+
+/* kill any default page margin that causes a top gap (esp. on iOS) */
+html, body, #root { margin: 0; padding: 0; }
+
+/* make swatches visually full-bleed */
+.fc-item { border-radius: 0; border-left: 0; border-right: 0; }
+
+/* ensure the very first swatch hugs the top */
+.fc-list { margin-top: 0; padding-top: 0; }

@@ -1,0 +1,27 @@
+.inline-autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  font-family: monospace;
+}
+
+.autocomplete-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 6px 8px;
+  color: #aaa;
+  pointer-events: none;
+  white-space: pre;
+}
+
+.autocomplete-input {
+  position: relative;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  color: black;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  z-index: 1;
+}

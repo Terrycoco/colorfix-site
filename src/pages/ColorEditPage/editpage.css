@@ -1,0 +1,30 @@
+.page-content {
+
+}
+
+.color-cats {
+   font-weight: bold;
+}
+
+
+.info {
+  font-size: .75rem;
+}
+
+.form-column {
+    padding: 0 1rem;
+}
+.swatch-column {
+    padding-top: 1rem;
+}
+.wheel-column {
+  padding-top: 1rem;
+}
+
+
+//smaller screens
+@media (max-width: 768px) {
+    .page-content {
+        padding: .5rem .5rem;
+    }
+}

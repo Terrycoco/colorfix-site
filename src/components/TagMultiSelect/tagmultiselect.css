@@ -1,0 +1,31 @@
+.tag-select { position: relative; }
+.tag-dropdown {
+  position: absolute;
+  top: 100%; left: 0; right: 0;
+  background: white;
+  border: 1px solid #ccc;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10;
+}
+.tag-suggestion {
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+}
+.tag-suggestion:hover { background: #f3f3f3; }
+.tag-suggestion.is-selected { background: #e6f7ff; }
+.tag-chips {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-chip {
+  background: #ddd;
+  border-radius: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.9em;
+}

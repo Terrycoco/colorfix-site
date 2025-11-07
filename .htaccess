@@ -1,0 +1,32 @@
+# Serve SPA entry point for all routes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /colorfix/
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /colorfix/index.html [L]
+</IfModule>
+
+# Caching rules
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  # Cache JS/CSS and images for 1 year (fingerprinted filenames should change per build)
+  ExpiresByType text/javascript "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+
+  # HTML should NOT be cached (forces index.html to reload on revisit)
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>
+
+# Gzip compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript
+</IfModule>

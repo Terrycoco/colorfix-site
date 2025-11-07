@@ -1,0 +1,362 @@
+/* ===== Base page bits ===== */
+
+#top { position:absolute; top:0; left:0; height:1px; width:1px; overflow:hidden; }
+
+.myp-title{
+  width:100%;
+  margin:8px auto 16px;
+  text-align:center;
+  font-weight:700;
+  font-size:1.3rem;
+}
+
+section.myp-top{ display:flex; flex-direction:column; align-items:center; }
+
+.myp-row{
+  width:100%;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:flex-start;
+  justify-content:center;
+  box-sizing:border-box;
+}
+
+.myp-empty{ color:#666; font-size:14px; height:150px; }
+
+/* ===== Actions (desktop) ===== */
+
+.myp-actions{ width:100%; padding:16px; background:#fefefe; }
+
+.controls-grid{
+  display:grid;
+  grid-template-columns:
+    1fr                      /* fuzzy (flex) */
+    minmax(220px, 280px)     /* colors */
+    minmax(220px, 280px)     /* same/opposite */
+    minmax(220px, 280px);    /* brands */
+  grid-template-areas:
+    "fuzzy     colors     same      brands"
+    "include   neutrals   opposite  brands2";
+  gap:14px 16px;
+  align-items:end;           /* bottom align rows so fuzzy label sits above */
+}
+
+/* area bindings */
+.area-fuzzy    { grid-area:fuzzy; }
+.area-include  { grid-area:include; }
+.area-colors   { grid-area:colors; }
+.area-neutrals { grid-area:neutrals; }
+.area-same     { grid-area:same; }
+.area-opposite { grid-area:opposite; }
+.area-brands   { grid-area:brands; }
+.area-brands-2 { grid-area:brands2; }
+
+.myp-fuzzy{ width:100%; }
+
+/* make columns 2–4 stretch evenly */
+.area-colors,
+.area-neutrals,
+.area-same,
+.area-opposite,
+.area-brands,
+.area-brands-2{ justify-self:stretch; }
+
+.controls-grid button{ width:100%; }
+
+/* button + tolerance input side-by-side */
+.hue-stack{
+  display:grid;
+  grid-template-columns:1fr 72px; /* button | input */
+  gap:8px;
+  width:100%;
+}
+.hue-tolerance{
+  height:36px;
+  padding:6px 8px;
+  text-align:center;
+}
+
+/* include checkbox (slightly smaller text) */
+.include-close{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:.95rem;
+  font-weight:600;
+  cursor:pointer;
+}
+.include-close input{ width:18px; height:18px; margin:0; }
+
+/* ===== Compact sizing (applies to all, keeps desktop tidy) ===== */
+
+:root{
+  --ctl-font: .92rem;
+  --ctl-font-sm: .84rem;
+  --btn-h: 38px;
+  --btn-pad-y: 8px;
+  --btn-pad-x: 12px;
+  --tol-w: 60px;
+  --gap: 12px;
+}
+
+.myp-actions .controls-grid{ gap:var(--gap) var(--gap); }
+
+.myp-actions button{
+  height:var(--btn-h);
+  padding:var(--btn-pad-y) var(--btn-pad-x);
+  font-size:var(--ctl-font);
+  line-height:1.1;
+}
+
+.hue-stack{ grid-template-columns:1fr var(--tol-w); }
+.hue-tolerance{
+  height:var(--btn-h);
+  width:var(--tol-w);
+  font-size:var(--ctl-font);
+  padding:4px 6px;
+}
+
+.include-close{ font-size:var(--ctl-font-sm); gap:6px; }
+.include-close input{ width:16px; height:16px; }
+
+/* Try to shrink fuzzy input as well (React Select or native) */
+.myp-fuzzy input,
+.myp-fuzzy input[type="text"],
+.myp-fuzzy .react-select__control{
+  min-height:var(--btn-h) !important;
+  height:var(--btn-h) !important;
+  font-size:var(--ctl-font) !important;
+}
+
+/* ===== Mobile fixes ===== */
+
+@media (max-width: 720px){
+  /* Two-column mobile layout so buttons aren’t giant stacked bars */
+  .controls-grid{
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "fuzzy fuzzy"
+      "include include"
+      "colors same"
+      "neutrals opposite"
+      "brands brands2";
+    gap:10px;
+    align-items:stretch;
+  }
+
+  /* Smaller buttons/inputs on mobile */
+  .myp-actions button {
+    height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 0.85rem !important;
+  }
+  .hue-tolerance{
+    height:34px !important;
+    width:56px !important;
+    font-size:0.82rem !important;
+  }
+
+  .myp-fuzzy input,
+  .myp-fuzzy .react-select__control{
+    height:34px !important;
+    min-height:34px !important;
+    font-size:0.9rem !important;
+  }
+}
+
+/* ===== “Also checked close colors” addendum ===== */
+
+.neighbors-addendum{
+  width:100%;
+  margin:24px 0 8px;
+  padding:12px 16px;
+  border-radius:12px;
+  background:#fafafa;
+  box-shadow:0 1px 2px rgba(0,0,0,.05) inset;
+}
+
+/* Force label on its own line; chips start below */
+.neighbors-addendum .na-row {
+  display: grid;
+  grid-template-columns: 1fr;   /* single column */
+  align-items: start;
+}
+
+.neighbors-addendum .na-label {
+  margin: 0 0 8px;              /* space under the label */
+}
+
+/* make sure chips wrap naturally */
+.neighbors-addendum .na-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+
+
+
+
+.na-title{
+  margin:0 0 10px;
+  font-size:0.95rem;
+  font-weight:700;
+  color:#111;
+}
+.na-row{
+  display:grid;
+  grid-template-columns:180px 1fr;
+  gap:8px 12px;
+  align-items:start;
+  padding:6px 0;
+  border-top:1px solid #eee;
+}
+.na-row:first-child{ border-top:0; }
+.na-label{ font-size:0.9rem; color:#444; white-space:nowrap; }
+
+.na-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  align-items:center;
+}
+
+/* chips size to content */
+.na-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid #e6e6e6;
+  box-shadow:0 1px 1px rgba(0,0,0,.04);
+  font-size:0.88rem;
+  flex:0 0 auto;
+  width:auto;
+  white-space:nowrap;
+}
+.na-swatch{
+  width:14px; height:14px; border-radius:50%;
+  box-shadow:0 0 0 1px rgba(0,0,0,.08) inset;
+}
+.na-de{ font-size:.75rem; opacity:.75; }
+
+@media (max-width: 720px){
+  .na-row{ grid-template-columns:1fr; }
+  .na-label{ margin-bottom:2px; }
+}
+@media (max-width: 720px) {
+  .myp-fuzzy input,
+  .myp-fuzzy .react-select__control {
+    height: 32px !important;
+    min-height: 32px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* Header bar: tiny clear button on the left, title centered, spacer on right */
+.myp-header {
+  display: flex;
+  align-items: space-between;
+  width: 100%;
+  margin: 6px 0 12px;
+}
+
+.myp-title {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+
+/* Make the clear X a bit bigger and orange */
+
+.myp-clear-btn{
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 28px;          /* controls height */
+  padding: 0 10px;       /* controls width */
+  min-width: 0;
+
+
+  border: 0;
+  border-radius: 999px;
+  line-height: 1;
+  font-size: .8rem;
+  font-weight: 400;
+}
+.myp-clear-btn:disabled{ visibility: hidden; }
+
+
+
+
+
+/* ---------- Mobile layout fix for My Palette Page ---------- */
+/* ---------- Mobile tidy-up for "Enter A Color" section ---------- */
+@media (max-width: 720px) {
+  /* Give the whole action block a card look */
+  .myp-actions {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 18px 14px 20px;
+    margin: 0 auto 24px;
+    width: calc(100% - 24px);
+  }
+
+  /* Headline spacing and contrast */
+  .myp-actions h2,
+  .myp-actions h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #111;
+  }
+
+  /* Input: white box look, full width, good tap size */
+  .myp-fuzzy input,
+  .myp-fuzzy .react-select__control {
+    height: 44px !important;
+    min-height: 44px !important;
+    font-size: 17px !important;  /* prevents iPhone zoom */
+    border-radius: 8px !important;
+    background: #fff !important;
+    box-shadow: inset 0 0 0 1px #ccc !important;
+  }
+
+  /* Checkbox row spacing */
+  .include-close {
+    font-size: 15px;
+    padding: 6px 0;
+  }
+
+  /* Buttons: bright orange, rounded, consistent sizing */
+  .myp-actions button {
+    background: #ff7a00 !important;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 16px;
+    height: 42px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  }
+  .myp-actions button:active {
+    filter: brightness(1.1);
+  }
+
+  /* Two-column grid keeps pairs aligned */
+  .controls-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+}
+
+

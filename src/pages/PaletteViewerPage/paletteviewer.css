@@ -1,0 +1,90 @@
+:root { --pv-bg:#0b0c10; --pv-fg:#e6e7ea; --pv-muted:#9aa3ad; --pv-accent:#4ea1ff; --pv-surface:#14161b; --pv-border:#232733; }
+.pv-root { color:var(--pv-fg); background:var(--pv-bg); min-height:100vh; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial; }
+
+/* Header */
+.pv-header { display:flex; align-items:flex-end; gap:16px; padding:20px 24px; border-bottom:1px solid var(--pv-border); position:sticky; top:0; background:rgba(11,12,16,0.92); backdrop-filter: blur(4px); z-index:5; }
+.pv-title { margin:0; font-size:20px; font-weight:700; letter-spacing:0.3px; }
+.pv-search { position:relative; display:flex; gap:8px; align-items:center; flex:1; max-width:760px; }
+.pv-input { flex:1; background:var(--pv-surface); color:var(--pv-fg); border:1px solid var(--pv-border); border-radius:8px; padding:10px 12px; font-size:14px; }
+.pv-btn { background:var(--pv-accent); color:#081019; border:none; border-radius:8px; padding:10px 14px; font-weight:600; cursor:pointer; }
+.pv-btn--ghost { background:transparent; border:1px solid var(--pv-border); color:var(--pv-fg); }
+.pv-hint { color:var(--pv-muted); font-size:12px; }
+.pv-results { position:absolute; top:44px; left:0; right:0; background:#0f1116; border:1px solid var(--pv-border); border-radius:10px; padding:6px; max-height:300px; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,0.35); }
+.pv-result { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; }
+.pv-result:hover { background:#161a22; }
+.pv-result__txt { flex:1; font-size:13px; color:#d8dbe0; }
+.pv-result__id { font-size:12px; color:var(--pv-muted); }
+
+/* Controls */
+.pv-controls { display:flex; gap:16px; align-items:center; padding:12px 24px; border-bottom:1px solid var(--pv-border); flex-wrap:wrap; }
+.pv-current { display:flex; align-items:center; gap:10px; min-height:40px; }
+.pv-current__txt { line-height:1.25; }
+.pv-current__name { font-weight:700; font-size:13px; }
+.pv-current__id { color:var(--pv-muted); font-size:12px; }
+
+.pv-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+.pv-pill { border:1px solid var(--pv-border); background:var(--pv-surface); color:var(--pv-fg); border-radius:999px; padding:8px 12px; font-weight:600; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px; }
+.pv-pill--active { background:#182133; border-color:#2a3750; color:#cfe5ff; }
+.pv-count { background:#1f2633; border:1px solid #2b3547; color:#c0cad6; font-size:11px; padding:1px 6px; border-radius:999px; }
+
+.pv-sort { margin-left:auto; display:flex; align-items:center; gap:8px; }
+.pv-label { font-size:12px; color:var(--pv-muted); }
+.pv-select { background:var(--pv-surface); color:var(--pv-fg); border:1px solid var(--pv-border); border-radius:8px; padding:8px 10px; }
+
+/* List */
+.pv-list { padding:16px 24px 64px; display:flex; flex-direction:column; gap:14px; }
+.pv-placeholder { color:var(--pv-muted); padding:24px 0; }
+.pv-error { color:#ff6e6e; background:#2a1212; border:1px solid #5f2121; padding:8px 10px; border-radius:8px; }
+.pv-loading { color:#c3ceda; padding:10px 0; }
+
+.pv-rowbtn { text-align:left; padding:0; border:none; background:transparent; cursor:pointer; }
+.pv-row { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:14px; border:1px solid var(--pv-border); border-radius:14px; background:linear-gradient(180deg, #0f1218, #0c0e13); }
+.pv-row:hover { border-color:#2a3344; box-shadow:0 8px 18px rgba(0,0,0,0.25); }
+
+.pv-row__left { display:flex; align-items:center; gap:12px; }
+.pv-row__swatches { display:flex; flex-wrap:wrap; gap:12px; }
+
+.pv-swatch-chip {
+  display:inline-block;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); 
+}
+
+/* Large preview overflow badge */
+.pv-morebadge {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:96px; height:96px;
+  border-radius:10px; border:1px dashed var(--pv-border);
+  color:#cfe5ff; background:#0f141d; font-weight:700;
+}
+
+.pv-row__meta { display:flex; align-items:center; gap:14px; margin-left:auto; }
+.pv-row__badges { display:flex; gap:6px; }
+.pv-badge { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; font-size:12px; font-weight:700; border-radius:6px; color:#d5e6ff; background:#1c2740; border:1px solid #2b3b5e; }
+.pv-row__counts { display:flex; gap:10px; font-size:13px; color:#bdc6d1; }
+.pv-row__size { font-size:12px; color:#9dadc3; }
+.pv-morewrap { display:flex; justify-content:center; padding:10px 0 0; }
+
+@media (max-width: 980px) {
+  .pv-row { flex-direction: column; }
+  .pv-row__meta { width:100%; justify-content: space-between; }
+}
+
+/* Modal / detail */
+.pv-modal { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; padding:24px; z-index:20; }
+.pv-modal__panel { width:min(1100px, 95vw); max-height:90vh; overflow:auto; background:#0f1217; border:1px solid var(--pv-border); border-radius:14px; box-shadow:0 30px 80px rgba(0,0,0,0.45); }
+.pv-modal__head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--pv-border); }
+.pv-iconbtn { background:transparent; color:var(--pv-fg); border:1px solid var(--pv-border); border-radius:8px; padding:6px 10px; cursor:pointer; }
+.pv-modal__body { padding:16px; }
+
+.pv-detail__swatches { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:14px; }
+.pv-detail__swatch { display:flex; gap:12px; align-items:center; border:1px solid var(--pv-border); border-radius:12px; padding:10px; background:#0d0f14; }
+.pv-detail__chip { width:120px; height:120px; border-radius:12px; border:1px solid rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+.pv-detail__meta { display:flex; flex-direction:column; line-height:1.25; }
+.pv-detail__brand { font-size:12px; color:#aab7c7; font-weight:600; }
+.pv-detail__name { font-size:14px; font-weight:700; }
+.pv-detail__hex { font-size:12px; color:#8fa2b9; }
+
+/* Footer */
+.pv-footer { padding:12px 24px 24px; color:#8b97a5; font-size:12px; border-top:1px solid var(--pv-border); }

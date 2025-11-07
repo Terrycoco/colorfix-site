@@ -1,0 +1,14 @@
+.flex-col {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    flex-grow: 1;
+}
+
+/* FlexRow utility class */
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

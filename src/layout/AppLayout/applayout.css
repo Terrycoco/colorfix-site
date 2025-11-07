@@ -1,0 +1,34 @@
+.app-layout{
+  --cap: 1320px;                 /* site max width */
+  --gutter-x: clamp(16px,4vw,32px); /* side padding / safe area */
+}
+
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; }
+
+.app-layout {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden; /* avoid iPad horizontal jiggle */
+  background: var(--app-bg, #fff);
+}
+
+/* TEMP: show page center */
+.app-layout::before{
+  content:""; position: fixed; inset:0; left:50%;
+  border-left:1px dashed #ff7a00; pointer-events:none; z-index:9999;
+}
+
+
+
+
+
+/*small screens */
+@media (max-width: 600px) {
+  .app-layout {
+    overflow-x: hidden;
+  }
+}

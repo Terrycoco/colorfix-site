@@ -1,0 +1,125 @@
+@import 'tailwindcss';
+
+@layer base {
+:root {
+  --app-background: #f8f8f8;
+  --brand-color: #ff6600; /* Bright orange example */
+  --brand-accent: #ffaa33;
+  --button-color:  #f57c00; /*orange */
+  --button-background:  #f57c00; /*orange */
+  --button-hover: #e66400;  /* deeper orange */
+  --btn-fs: 12px;
+  --text-dark: #222;
+  --text-light: #f8f8f8;
+  --background-light: #ffffff;
+  --background-dark: #1e1e1e;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 2rem;
+  --font-primary: 'Inter', sans-serif;
+  --navbar-bg: #333;
+  --palettebar-bg: #888;
+  --menu-links: white;
+  --navbar-height: 4rem;
+  --dashboard-height: 4rem;
+  --working-height: 5rem;
+  --navbar-zindex: 4000;
+  --dashboard-zindex: 2000;
+  --palette-zindex: 4001;
+  --board-scroller-height: 40px;
+  --search-item-background: #cdd8e0;
+  --search-item-background-hover: #B9C7D3;
+  --sticky-palette-bar-height: 70px;
+}
+}
+
+
+
+/*smaller screens */
+
+@media (max-width: 768px) {
+
+  html, body {
+    overscroll-behavior-y: none;
+  }
+
+}
+
+
+/* iOS-only: prevent Safari auto-zoom on focus */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea {
+    font-size: 16px !important; /* key: >=16px */
+    line-height: 1.25;          /* avoid clipping */
+  }
+
+  /* If your control is inside a wrapper like .myp-fuzzy, scope it tighter: */
+  .myp-fuzzy input,
+  .myp-fuzzy select,
+  .myp-fuzzy textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS sanity defaults */
+html, body { height: 100%; }
+.page { min-height: 100dvh; background: #fff; }
+.fixed-footer {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 1000;
+}
+.scroll-area {
+  overflow-y: auto;
+  padding-bottom: calc(var(--footer-h) + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
+}
+/* ===== iOS anti-zoom baseline ===== */
+html, body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Any text input/select/textarea/button at least 16px everywhere */
+input, select, textarea, button {
+  font-size: 16px !important;   /* key for iOS zoom prevention */
+  line-height: 1.25;
+}
+
+/* Placeholders must also be 16px or iOS will zoom */
+input::placeholder, textarea::placeholder {
+  font-size: 16px !important;
+}
+
+/* Options in <select> must be 16px on iOS too */
+select, select option {
+  font-size: 16px !important;
+}
+
+/* Make tap targets comfy to avoid double-tap zoom heuristics */
+button, .button, [role="button"], label, a {
+  touch-action: manipulation;
+}
+
+/* Your Browse Palettes controls—belt and suspenders */
+.bpv1-controls input,
+.bpv1-controls select,
+.bpv1-controls textarea,
+.bpv1-controls button {
+  font-size: 16px !important;
+  line-height: 1.25;
+}
+
+/* Fuzzy input specifically */
+.fuzzy-input-wrap input[type="search"],
+.fuzzy-input-wrap input[type="search"]::placeholder {
+  font-size: 16px !important;
+}
+
+/* iOS feature-detect block (okay to keep) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea, button {
+    -webkit-text-size-adjust: 100% !important;
+  }
+}
+

@@ -1,0 +1,33 @@
+/* Layout */
+.aup-container { max-width: 900px; margin: 24px auto; padding: 16px; margin-bottom: 30px;}
+.aup-hr { border: 0; height: 1px; background: #0002; margin: 18px 0; }
+
+/* Typography / helpers */
+.aup-label { display: block; font-weight: 600; margin-top: 12px; }
+.aup-help { font-size: 12px; opacity: 0.7; }
+.aup-error { color: #b00020; margin-top: 12px; }
+.aup-card { margin-top: 12px; background: #1112; padding: 12px; border-radius: 8px; }
+
+/* Grid */
+.aup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.aup-span-2 { grid-column: 1 / span 2; }
+
+/* Inputs */
+.aup-input { width: 300px; box-sizing: border-box; background: #fff;}
+.aup-textarea { width: 100%; min-height: 64px; resize: vertical; box-sizing: border-box; }
+
+/* Button */
+.aup-button { margin-top: 16px; margin-bottom: 60px; padding: 10px 16px; font-weight: 600; cursor: pointer; }
+.aup-button[disabled] { opacity: 0.6; cursor: not-allowed; }
+
+
+.prep-uploader { max-width: 720px; margin: 0 auto; padding: 16px; }
+.prep-uploader h2 { margin: 0 0 12px; }
+.prep-form .row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+.prep-form .group { border-top: 1px solid var(--border, #ccc); padding-top: 12px; margin-top: 12px; }
+.prep-form input[type="text"],
+.prep-form textarea { width: 100%; padding: 8px; }
+.prep-form .actions { margin-top: 14px; display: flex; gap: 12px; }
+.prep-form button { padding: 8px 14px; cursor: pointer; }
+.result { margin-top: 16px; background: var(--bg-soft, #1112); padding: 12px; border-radius: 6px; }
+.error { margin-top: 12px; color: #d33; }

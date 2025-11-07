@@ -1,0 +1,153 @@
+/* ---- PaletteGallery sizing knobs ---- */
+.palette-gallery {
+  /* smaller min = more columns when space allows */
+  --pg-min: 280px;   /* was 280px */
+  --pg-gap: 14px;
+  --pg-pad: 12px;
+  --pg-rad: 14px;
+  --pg-chip-h: 180px;
+
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--pg-min), 1fr));
+  gap: var(--pg-gap);
+}
+
+.pg-card {
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: var(--pg-rad);
+  padding: var(--pg-pad);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+.pg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pg-title {
+  font-size: 15px;         /* was 14 */
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pg-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;                 /* was 4 */
+  height: var(--pg-chip-h);
+}
+
+.pg-chip {
+  flex: 1 1 0;
+  height: var(--pg-chip-h);
+  width: var(--pg-chip-h);
+  border-radius: calc(var(--pg-rad) - 8px);
+  background: #ccc;         /* overwritten by inline backgroundColor per chip */
+}
+
+/* Mobile: 3 across with space */
+@media (max-width: 480px) {
+  .palette-gallery {
+    --pg-min: 120px;   /* ~3 across on phones */
+    --pg-chip-h: 32px;
+    --pg-gap: 12px;
+  }
+}
+
+
+.pg-card { transition: box-shadow 120ms ease; }
+.pg-card.is-open { box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+
+.pg-body {
+  overflow: hidden;
+  max-height: 0;
+  padding: 0 12px;
+  transition: max-height 220ms ease, padding 180ms ease;
+}
+.pg-card.is-open .pg-body {
+  max-height: 900px;            /* big enough to reveal content */
+  padding: 12px;                 /* adds inner spacing when open */
+}
+.pg-sg { margin-top: 8px; }
+.pg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.pg-empty { color: #777; font-size: 13px; padding: 16px 4px; }
+
+/* make gallery a grid (likely already there) */
+.palette-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+/* expand-in-place effect */
+.pg-card { transition: box-shadow 140ms ease, transform 140ms ease; }
+.pg-card.is-open {
+  grid-column: 1 / -1;             /* span full row */
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+  transform: translateZ(0);        /* promote for smoother anim */
+}
+
+/* when open, hide the chip strip visually (we also replace it with body) */
+.pg-strip { transition: opacity 120ms ease; }
+.pg-card.is-open .pg-strip { opacity: 0; height: 0; padding: 0; margin: 0; overflow: hidden; }
+
+/* expanded content */
+.pg-body { padding: 12px; }
+.pg-sg { margin-top: 8px; }
+.pg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.pg-empty { color: #777; font-size: 13px; padding: 16px 4px; }
+
+
+.palette-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.pg-card {
+  position: relative;
+  border: 1px solid #e4e4e4;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+  transition: box-shadow 160ms ease, transform 160ms ease;
+  cursor: pointer;
+  outline: none;
+}
+.pg-card.is-open {
+  grid-column: 1 / -1; /* span full row */
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
+
+.pg-head { padding: 12px 12px 8px; }
+.pg-title { font-weight: 700; font-size: 18px; }
+
+.pg-strip {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px 12px;
+  transition: opacity 120ms ease, height 120ms ease, margin 120ms ease, padding 120ms ease;
+}
+.pg-chip {
+  aspect-ratio: 5 / 4;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,.07);
+}
+
+.pg-card.is-open .pg-strip {
+  opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden;
+}
+
+.pg-body { padding: 12px; }
+.pg-sg { margin-top: 6px; }
+.pg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.pg-empty { color: #777; font-size: 13px; padding: 16px 4px; }
+
+
+.pg-card.is-open { grid-column: 1 / -1; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.pg-strip { transition: opacity 120ms ease, height 120ms ease, margin 120ms ease, padding 120ms ease; }
+.pg-card.is-open .pg-strip { opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden; }
+.pg-body { padding: 12px; }

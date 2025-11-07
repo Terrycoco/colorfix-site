@@ -1,0 +1,315 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Mini REST Client</title>
+<style>
+  :root { --b:#e5e7eb; --t:#111827; --g:#6b7280; --ok:#10b981; --err:#ef4444; --bg:#ffffff; }
+  html, body { height:100%; }
+  body {
+    margin:0; color:var(--t);
+    font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:grid; grid-template-rows:auto 1fr; background:var(--bg);
+  }
+
+  /* Header */
+  header {
+    padding:14px 16px; border-bottom:1px solid var(--b);
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+    background:#fff;
+  }
+  header input, header select, header button {
+    padding:8px 10px; border:1px solid var(--b); border-radius:8px;
+  }
+  header input.url { flex:1; min-width:360px; }
+  header button { cursor:pointer; background:#f9fafb; }
+  .muted { color:var(--g); font-size:12px; }
+
+  /* Main split: left (inputs) | right (response) */
+  main {
+    display:grid; grid-template-columns: 1.05fr 1.25fr; gap:12px; padding:12px;
+    min-height:0; /* allow children to flex */
+    overflow:hidden;
+  }
+  .col {
+    display:flex; flex-direction:column; gap:12px; min-height:0; overflow:hidden;
+  }
+
+  /* Panels */
+  section {
+    border:1px solid var(--b); border-radius:10px; overflow:hidden;
+    display:flex; flex-direction:column; min-height:0; background:#fff;
+  }
+  h3 {
+    margin:0; padding:10px 12px; background:#f9fafb;
+    border-bottom:1px solid var(--b); font-size:13px; color:var(--g);
+  }
+  .content { padding:10px 12px; display:grid; gap:8px; overflow:auto; min-height:0; }
+
+  /* Key/Value rows */
+  .kv { display:grid; grid-template-columns: 1fr 1fr auto; gap:6px; align-items:center; }
+  .kv input { padding:7px 8px; border:1px solid var(--b); border-radius:8px; }
+  .kv button { border:1px solid var(--b); border-radius:8px; padding:6px 8px; background:#fff; cursor:pointer; }
+
+  /* Body textarea */
+  textarea {
+    width:100%; min-height:140px; resize:vertical;
+    font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    padding:8px; border:1px solid var(--b); border-radius:8px;
+  }
+
+  /* Response panel (right column) */
+  #respWrap { display:flex; flex-direction:column; min-height:0; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .status { font-weight:600; }
+  .status.ok { color:var(--ok); }
+  .status.err { color:var(--err); }
+  pre {
+    margin:0; padding:12px; background:#0b1020; color:#e5e7eb;
+    overflow:auto; flex:1; border-top:1px solid var(--b); border-radius:8px;
+  }
+  .tools { display:flex; gap:8px; }
+  .tools button { padding:6px 10px; border:1px solid var(--b); border-radius:8px; background:#f9fafb; cursor:pointer; }
+</style>
+
+<header>
+  <select id="method">
+    <option>GET</option>
+    <option>POST</option>
+    <option>PUT</option>
+    <option>PATCH</option>
+    <option>DELETE</option>
+  </select>
+
+  <input id="url" class="url" placeholder="/api/v2/closest-by-brand.php" />
+  <button id="send">Send</button>
+
+  <select id="presets">
+    <option value="">— Presets —</option>
+    <option value="gallery">Gallery (GET)</option>
+    <option value="closestByBrand">Closest by Brand (GET)</option>
+    <option value="swatchGet">Admin · Swatch Get (GET)</option>
+    <option value="swatchSave">Admin · Color Save (POST)</option>
+  </select>
+  <button id="loadPreset">Load</button>
+
+  <span class="muted" id="meta"></span>
+</header>
+
+<main>
+  <!-- LEFT: Inputs -->
+  <div class="col">
+    <section>
+      <h3>Params (query string)</h3>
+      <div class="content" id="params"></div>
+    </section>
+
+    <section>
+      <h3>Headers</h3>
+      <div class="content" id="headers"></div>
+    </section>
+
+    <section>
+      <h3>Body (for POST/PUT/PATCH/DELETE)</h3>
+      <div class="content">
+        <textarea id="body" placeholder='{"name":"Admin Test","brand":"ppg","hex6":"EFEFEF"}'></textarea>
+        <div class="muted">If valid JSON, it will be sent as <code>application/json</code>. Otherwise it’s sent as raw text.</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- RIGHT: Response -->
+  <div class="col">
+    <section id="respWrap">
+      <h3>Response</h3>
+      <div class="content" style="display:flex; flex-direction:column;">
+        <div class="row" style="justify-content:space-between;">
+          <div class="row">
+            <span id="status" class="status">—</span>
+            <span class="muted" id="timing"></span>
+          </div>
+          <div class="tools">
+            <button id="copy">Copy</button>
+            <button id="clear">Clear</button>
+          </div>
+        </div>
+        <pre id="out">—</pre>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const paramsBox = $('params');
+const headersBox = $('headers');
+const out = $('out');
+const LAST_KEY = 'mini-rest-client';
+
+const PRESETS = {
+  gallery: {
+    method: 'GET',
+    url: '/api/v2/gallery.php',
+    params: { seed_id: '1829' },
+    headers: {},
+    body: ''
+  },
+  closestByBrand: {
+    method: 'GET',
+    url: '/api/v2/closest-by-brand.php',
+    params: { seed_id: '1829', brands: 'ppg,sw,behr,de', metric: 'white' },
+    headers: {},
+    body: ''
+  },
+  swatchGet: {
+    method: 'GET',
+    url: '/api/v2/admin/swatch-get.php',
+    params: { id: '1829' },
+    headers: {},
+    body: ''
+  },
+colorSave: {
+  method: 'POST',
+  url: '/api/v2/admin/color-save.php',
+  params: {},
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    name: 'Admin Test White',
+    brand: 'ppg',
+    code: 'TEST',
+    hex6: 'EFEFEF'
+  }, null, 2)
+}
+};
+
+function addKVRow(container, key='', val='') {
+  const row = document.createElement('div');
+  row.className = 'kv';
+  row.innerHTML = `
+    <input placeholder="key" value="${key}"/>
+    <input placeholder="value" value="${val}"/>
+    <button title="Remove">✕</button>
+  `;
+  row.querySelector('button').onclick = () => container.removeChild(row);
+  container.appendChild(row);
+}
+function kvToObj(container) {
+  const obj = {};
+  [...container.querySelectorAll('.kv')].forEach(row => {
+    const [kEl, vEl] = row.querySelectorAll('input');
+    const k = kEl.value.trim();
+    const v = vEl.value;
+    if (k) obj[k] = v;
+  });
+  return obj;
+}
+function setKV(container, obj) {
+  container.innerHTML = '';
+  Object.entries(obj || {}).forEach(([k,v]) => addKVRow(container, k, v));
+  if (!Object.keys(obj || {}).length) { addKVRow(container); addKVRow(container); }
+}
+
+function saveState() {
+  const state = {
+    method: $('method').value,
+    url: $('url').value,
+    params: kvToObj(paramsBox),
+    headers: kvToObj(headersBox),
+    body: $('body').value,
+  };
+  localStorage.setItem(LAST_KEY, JSON.stringify(state));
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LAST_KEY);
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    $('method').value = s.method || 'GET';
+    $('url').value = s.url || '';
+    setKV(paramsBox, s.params || {});
+    setKV(headersBox, s.headers || {});
+    $('body').value = s.body || '';
+    return true;
+  } catch { return false; }
+}
+
+function buildUrl(base, params) {
+  const u = new URL(base, window.location.origin);
+  Object.entries(params).forEach(([k,v]) => {
+    if (v !== '') u.searchParams.set(k, v);
+  });
+  return u.toString();
+}
+
+async function send() {
+  const method = $('method').value;
+  const baseUrl = $('url').value.trim();
+  const params = kvToObj(paramsBox);
+  const headers = kvToObj(headersBox);
+  const bodyText = $('body').value;
+
+  if (!baseUrl) { alert('Enter a URL'); return; }
+
+  const url = buildUrl(baseUrl, params);
+  const opts = { method, headers: {...headers} };
+
+  if (!['GET','HEAD'].includes(method)) {
+    let isJson = false, payload = bodyText;
+    try { payload = JSON.stringify(JSON.parse(bodyText)); isJson = true; } catch {}
+    if (isJson && !Object.keys(opts.headers).some(h => h.toLowerCase()==='content-type')) {
+      opts.headers['Content-Type'] = 'application/json';
+    }
+    opts.body = payload;
+  }
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, opts);
+    const ct = res.headers.get('content-type') || '';
+    let text;
+    if (ct.includes('application/json')) {
+      const json = await res.json();
+      text = JSON.stringify(json, null, 2);
+    } else {
+      text = await res.text();
+    }
+    const t1 = performance.now();
+
+    $('status').textContent = `${res.status} ${res.statusText}`;
+    $('status').className = 'status ' + (res.ok ? 'ok' : 'err');
+    $('timing').textContent = `· ${Math.round(t1 - t0)} ms`;
+    out.textContent = text;
+  } catch (err) {
+    $('status').textContent = 'Request failed';
+    $('status').className = 'status err';
+    $('timing').textContent = '';
+    out.textContent = String(err);
+  }
+
+  saveState();
+}
+
+function loadPreset() {
+  const key = $('presets').value;
+  if (!key || !PRESETS[key]) return;
+  const p = PRESETS[key];
+  $('method').value = p.method;
+  $('url').value = p.url;
+  setKV(paramsBox, p.params);
+  setKV(headersBox, p.headers);
+  $('body').value = p.body || '';
+  saveState();
+}
+
+/* Wire buttons */
+$('send').onclick = send;
+$('loadPreset').onclick = loadPreset;
+$('copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(out.textContent || ''); } catch {}
+};
+$('clear').onclick = () => { out.textContent = '—'; $('status').textContent='—'; $('timing').textContent=''; };
+
+/* Init */
+if (!loadState()) {
+  $('presets').value = 'closestByBrand';
+  loadPreset();
+}
+</script>

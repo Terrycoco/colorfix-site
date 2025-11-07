@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generated Palette Viewer</title>
+  <style>
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .role-block {
+      width: 120px;
+      text-align: center;
+      font-family: sans-serif;
+    }
+    .swatch {
+      width: 80px;
+      height: 80px;
+      border: 1px solid #ccc;
+      margin: 0 auto 5px;
+    }
+    .missing .swatch {
+      background: repeating-linear-gradient(
+        45deg,
+        #eee,
+        #eee 5px,
+        #ccc 5px,
+        #ccc 10px
+      );
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Original Recipe Palette</h1>
+  <div id="original" class="palette"></div>
+
+  <h1>Generated Palette</h1>
+  <div id="generated" class="palette"></div>
+
+<script>
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const colorId = urlParams.get('anchor_id') || 492; // fallback
+
+  fetch(`https://colorfix.terrymarr.com/api/test-recipe.php?color_id=${colorId}&c_tol=1&l_tol=1`)
+    .then(res => res.json())
+    .then(data => {
+      const originalDiv = document.getElementById('original');
+      const generatedDiv = document.getElementById('generated');
+
+      // Original Palette
+      console.log('🎨 Original Palette:', data.original_palette);
+      data.original_palette.forEach(entry => {
+        console.log('entry:', entry);
+        const swatchColor = entry ? `rgb(${entry.r}, ${entry.g}, ${entry.b})` : '#eee';
+
+        const div = document.createElement('div');
+        div.className = 'role-block';
+        console.log(`🧪 Role for ${entry?.name}:`, entry?.role);
+        div.innerHTML = `
+          <div class="swatch" style="background-color: ${swatchColor};"></div>
+          <strong>${entry.role}</strong><br>
+          ${entry ? entry.name : 'Unknown'}
+        `;
+        originalDiv.appendChild(div);
+      });
+
+      // Generated Palette
+      console.log('📦 Matches:', data.matches);
+      data.matches.forEach(entry => {
+        console.log('entry for gen:', entry);
+   
+        const swatchColor = entry ? `rgb(${entry.r}, ${entry.g}, ${entry.b})` : '#fff';
+
+        const div = document.createElement('div');
+        div.className = `role-block${entry ? '' : ' missing'}`;
+        div.innerHTML = `
+          <div class="swatch" style="background-color: ${swatchColor};"></div>
+          <strong>${entry.role}</strong><br>
+          ${entry ? entry.name : '<span style="color:red;">❌ No match</span>'}
+        `;
+        generatedDiv.appendChild(div);
+      });
+    });
+</script>
+
+
+</body>
+</html>

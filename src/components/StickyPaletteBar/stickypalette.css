@@ -1,0 +1,131 @@
+.palette-bar {
+  position: sticky;
+  bottom: 0;
+  height: var(--sticky-palette-bar-height);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #eee;
+  padding: 4px 1.5rem 0 4px;
+  z-index: 100;
+  border-bottom: 1px solid #efefef;
+}
+
+.palette-bar-side {
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.palette-bar-swatches {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: flex-end;
+  justify-content: center;
+
+  /* key bits for horizontal scroll */
+  flex: 1 1 auto;
+  min-width: 0;            /* allow flex item to shrink so overflow can scroll */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+
+  padding: 0;              /* tweak if you want a little side inset */
+  margin: 0;
+}
+
+.palette-bar-tile {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+}
+
+.palette-bar-swatch {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  border: 2px solid #888;
+}
+
+.palette-remove-button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #888;
+  color: white;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+
+
+.palette-bar-tile.active-swatch {
+ border-bottom: 3px solid #444;
+}
+
+.palette-bar-label {
+  display: none;
+}
+
+
+
+
+
+
+.remove-button:hover {
+  background: #c00;
+}
+
+.clear-palette-button {
+  background: transparent;
+  color: var(--button-color);
+  border: 1px solid var(--button-color);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+}
+
+.clear-palette-button:hover {
+  background: var(--button-hover);
+  color: white;
+}
+
+
+
+.palette-bar-label-area {
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  
+}
+
+.palette-bar-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  margin-bottom: 2px;
+  color: var(--text-muted); /* Or any muted gray tone you're using */
+  border: 1px solid black;
+}
+
+.my-palette {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ccc;
+  white-space: nowrap;
+}

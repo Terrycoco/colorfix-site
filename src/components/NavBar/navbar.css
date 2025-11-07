@@ -1,0 +1,92 @@
+
+.navbar {
+  background-color: var(--navbar-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: 100%; /* take parents height */
+  width: 100%;  
+}
+
+
+/* Dropdown menu */
+.nav-links {
+  display: flex;
+  gap: 1rem;
+}
+
+
+
+.hamburger {
+  display: none;
+  font-size: 2rem;
+  background: none;
+  border: none;
+  color: white;
+}
+
+
+.nav-brand {
+  color: var(--brand-color);
+  font-weight: bold;
+  font-size: 1.5rem;
+  text-decoration: none;
+}
+
+.nav-brand:hover {
+  color: var(--brand-color);
+  text-decoration: none;
+}
+
+.nav-links a,
+.nav-links button {
+  color: var(--menu-links);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: color 0.2s ease;
+}
+
+.nav-links a:hover,
+.nav-links button:hover {
+  color: var(--brand-color);
+}
+
+
+
+@media (max-width: 768px) {
+  .nav-links {
+    position: absolute;
+    top: 100%;
+    width: 200px;
+    right: 0;
+    background-color: var(--navbar-bg);
+    color: var(--menu-links);
+    flex-direction: column;
+    display: none;
+    padding: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    align-items: flex-start; /* <-- This aligns the links to the right */
+    text-align: left;     
+  }
+
+  .nav-links.open {
+      display: flex;
+      text-align: left;        /* ⬅️ aligns text inside the block */
+      padding-left: 1rem;      /* optional: adds some nice breathing room */
+  }
+
+  .hamburger {
+    display: block;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+  }
+}
+
+
+

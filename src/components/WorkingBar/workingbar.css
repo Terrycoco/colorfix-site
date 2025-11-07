@@ -1,0 +1,126 @@
+.workingbar {
+  background: var(--palettebar-bg);
+  z-index: 2000;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  overflow: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+  .working-placeholder {
+      color: white;
+      font-style: italic;
+      font-size: 0.9rem;
+      padding: 0.5rem;
+      border: 1px dashed #ccc;
+      border-radius: 8px;
+      text-align: center;
+}
+
+.workingbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.working-swatch-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.working-swatch {
+  width: 60px;
+  height: 60px;
+  border: 2px solid white;
+  border-radius: 4px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.working-swatch.selected {
+  outline: 2px solid #007acc;
+  box-shadow: 0 0 0 2px rgba(0,122,204,0.2);
+}
+
+.swatch-checkmark {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 0.75rem;
+  background: white;
+  border-radius: 50%;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.working-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.4rem;
+}
+@media (max-width: 600px) {
+  .workingbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: .5rem;
+  }
+
+   .working-placeholder {
+      width: 100%;
+      font-size: 0.9rem;
+      padding: 0.5rem;
+      border: 1px dashed #ccc;
+      border-radius: 8px;
+      text-align: center;
+}
+
+
+
+  .workingbar-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .working-swatch-list {
+    display: grid;
+    grid-template-columns: repeat(5, 40px);
+    grid-template-rows: repeat(2, 40px);
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .working-swatch {
+    width: 40px;
+    height: 40px;
+    border: 2px solid white;
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .swatch-checkmark {
+    font-size: 0.7rem;
+    bottom: 2px;
+    right: 2px;
+  }
+
+  .working-toolbar {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    margin-left: 0.5rem;
+  }
+}

@@ -1,0 +1,12 @@
+/* your existing .main-layout stays as-is */
+
+.admin-layout.layout--no-gutters {
+  /* edge-to-edge for admin */
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  --gutter-x: 0;        /* if you reference this var elsewhere */
+  --cap: 100vw;         /* optional: let admin content span full width */
+}
+
+/* (optional) avoid horizontal scroll if other ancestors add padding */
+html, body { overflow-x: hidden; }

@@ -1,0 +1,201 @@
+/* ===== Advanced Search (asp-) ===== */
+
+/* Scope vars to the component so global/dark mode can't hijack them */
+.asp-container {
+  --asp-gap: 12px;
+  --asp-radius: 10px;
+  --asp-border: #d7d7d7;
+  --asp-muted: #6b6b6b;
+  --asp-ink: #1b1b1b;
+  --asp-bg: #ffffff;
+  --asp-panel: #fafafa;
+  --asp-shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.06);
+
+   max-width: 750px;
+  color: var(--asp-ink);
+  padding: 8px;
+  padding-bottom: 5rem;
+  padding-top: 2rem;
+}
+/* All selects: consistent size + look */
+.asp-container select {
+  font-size: 16px;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d7d7d7;
+  border-radius: 10px;
+  background: #fff;
+}
+
+button {
+    min-width: 100px;
+}
+
+/* title */
+.asp-container h3 {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+}
+
+/* panel */
+.asp-hcl-block {
+  background: var(--asp-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--asp-gap);
+  color: var(--asp-ink);
+}
+
+/* fields */
+.asp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.asp-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--asp-ink);
+}
+
+/* inputs/selects */
+.asp-field input[type="number"],
+.asp-hcl-block select {
+  font-size: 16px;
+  padding: 10px 6px;
+  border: 1px solid var(--asp-border);
+  border-radius: 8px;
+  background: var(--asp-bg);
+  color: var(--asp-ink);
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.asp-field input[type="number"]:focus,
+.asp-hcl-block select:focus {
+  border-color: #999;
+  box-shadow: 0 0 0 3px rgba(0,0,0,.06);
+}
+
+.asp-field input:disabled {
+  background: #f3f3f3;
+  color: #898989;
+}
+
+/* number steppers */
+.asp-field input[type="number"]::-webkit-outer-spin-button,
+.asp-field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.asp-field input[type="number"] { -moz-appearance: textfield; }
+
+.asp-dropdown-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+}
+
+
+/* min/max row */
+.asp-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--asp-gap);
+}
+
+/* wheel */
+.asp-wheel {
+  margin-top: 6px;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+.asp-wheel > * { max-width: 100%; }
+/* ===== Advanced Search: add-ons (paste at end) ===== */
+.asp-controls { display: flex; flex-direction: column; gap: 12px; }
+
+.asp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } /* if you already have this, it's fine to duplicate */
+
+.asp-range { display: flex; flex-direction: column; gap: 6px; }
+.asp-range-label { font-size: 14px; font-weight: 600; }
+
+.asp-range-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* inputs to match your existing style */
+.asp-range-fields input {
+  font-size: 16px;
+  padding: 10px 12px;
+  border: 1px solid #d7d7d7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* keep the wheel centered */
+.asp-wheel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.asp-wheel > * { max-width: 100%; display: block; }
+
+/* link-style toggle, no ugly button chrome */
+.asp-wheel-toggle {
+  display: flex;
+  justify-content: flex-start;
+  margin: 8px 0 6px;
+  font-size: .8rem;
+  color: var(--button-color);
+}
+
+.asp-linkbtn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  border-radius: 0;
+}
+.asp-wheel-toggle:hover {  text-decoration: underline; }
+
+
+.asp-actionbar {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-around;
+
+}
+
+ 
+/* desktop-only width caps for inputs/selects */
+@media (min-width: 960px) {
+  /* cap form fields */
+  .asp-field input[type="number"],
+  .asp-field select,
+  .asp-range-fields input,
+  .asp-controls select {
+    width: 100%;
+    max-width: 320px;         /* tweak to taste (280–360) */
+  }
+
+  /* make the two-column rows fit the caps nicely */
+  .asp-row,
+  .asp-range-fields,
+  .asp-grid-2 {
+    grid-template-columns: 320px 320px;  /* matches the max-width above */
+    column-gap: 16px;
+    justify-content: start;              /* don’t stretch to full row */
+  }
+}/* Mobile: full width; Desktop: fixed standard width */
+@media (min-width: 960px) {
+  .asp-container select {
+    width: 260px;   /* standard size for all dropdowns */
+  }
+}

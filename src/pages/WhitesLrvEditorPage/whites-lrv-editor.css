@@ -1,0 +1,18 @@
+.lrv-editor { padding: 16px; }
+.lrv-header { margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.brand-row { display: flex; align-items: center; gap: 8px; }
+.refresh { padding: 6px 10px; }
+.hint { color: #666; }
+
+.table-wrap { overflow: auto; border: 1px solid #ddd; border-radius: 8px; }
+.lrv-table { width: 100%; border-collapse: collapse; }
+.lrv-table th, .lrv-table td { border-bottom: 1px solid #eee; padding: 8px; }
+.lrv-table thead th { background: #fafafa; text-align: left; font-weight: 600; }
+
+.swatch { width: 24px; height: 24px; border-radius: 4px; border: 1px solid rgba(0,0,0,.15); }
+
+.lrv-input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+.footer-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px; }
+.save { padding: 8px 12px; font-weight: 600; }

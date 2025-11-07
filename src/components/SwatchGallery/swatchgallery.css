@@ -1,0 +1,140 @@
+/* swatchgallery.css */
+
+/* Root wrapper */
+.sg-root { width: 100%; }
+
+/* Empty state */
+.sg-empty {
+  padding: 10px 12px;
+  border: 1px dashed #ddd;
+  border-radius: 10px;
+  color: #666;
+  background: #fafafa;
+  text-align: center;
+}
+
+/* Base grid (defaults; can be overridden by CSS variables from the component) */
+.sg-grid {
+  --sg-gap: 12px;          /* legacy/default gap variable (general) */
+  --sg-min: 140px;         /* default minimum tile width */
+  --sg-max: 280px;         /* default maximum tile width for desktop */
+  --sg-gap-desktop: 12px;  /* desktop-only gap; set by component via style */
+  --sg-aspect: 5 / 4;      /* default aspect ratio for card shells */
+
+  display: grid;
+  gap: var(--sg-gap);      /* base gap (mobile for non-results) */
+}
+
+/* Auto-fit by min width (used when no explicit columns) */
+.sg-auto-fit {
+  grid-template-columns: repeat(auto-fit, minmax(var(--sg-min), 1fr));
+}
+
+/* Each item wraps your swatch and gives a consistent box */
+.sg-item { width: 100%; }
+
+/* Card shell enforces aspect ratio without touching your swatch code */
+.sg-card-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--sg-aspect);
+  border-radius: 16px;   /* visual polish */
+}
+
+/* If your swatch root is .ps-swatch-item, scale it to fill the shell */
+.sg-card-shell > .ps-swatch-item {
+  height: 100%;
+  width: 100%;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.sg-card-shell > .ps-swatch-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+
+/* Make PaletteSwatch fill the gallery’s aspect box */
+.sg-card-shell { position: relative; }
+.sg-card-shell > .pals-swatch { position: absolute; inset: 0; }
+.pals-spacer { display: none; } /* we’re using the shell’s aspect, not the spacer */
+
+/* ===================== Results Gallery (Translation page, etc.) ===================== */
+
+/* Mobile: ALWAYS 2-up, fixed gap; desktop props do not affect this block */
+.sg-results .sg-grid {
+  justify-content: start;   /* left align leftover space */
+  justify-items: start;     /* left align items within tracks */
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;                 /* mobile-only spacing; stays constant */
+}
+
+/* Desktop+: use props from component for sizing and gap */
+@media (min-width: 560px) {
+  .sg-results .sg-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(var(--sg-min, 140px), var(--sg-max, 280px))
+    );
+    gap: var(--sg-gap-desktop, 12px); /* desktop-only gap from props */
+  }
+}
+
+/* ===================== Palette Grid (your existing layout) ===================== */
+
+.sg-palette .sg-grid {
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* mobile & tablet */
+}
+
+@media (min-width: 1024px) {
+  .sg-palette .sg-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)); /* desktop */
+  }
+}
+
+/* Make PaletteSwatch fill the gallery’s aspect box (palette too) */
+.sg-palette .sg-card-shell { position: relative; }
+.sg-palette .sg-card-shell > .pals-swatch { position: absolute; inset: 0; }
+.pals-spacer { display: none; } /* we’re using the shell’s aspect, not the spacer */
+
+/* Taller aspect ratio on mobile for bigger swatches in the palette */
+.sg-palette .sg-card-shell { aspect-ratio: 4 / 3; }
+@media (min-width: 700px) {
+  .sg-palette .sg-card-shell { aspect-ratio: 5 / 4; }
+}
+
+/* ---- Grouped headers (between sections) ---- */
+.sg-group-header {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--sg-gap) * 1.5);
+}
+
+.sg-group-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.sg-group-title {
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #111;
+}
+
+.sg-group-count {
+  font-size: 11px;
+  opacity: 0.7;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.06);
+}
+
+/* Optional: a little extra space before the first group */
+.sg-root .sg-group-header:first-child {
+  margin-top: 0;
+}

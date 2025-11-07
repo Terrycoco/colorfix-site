@@ -1,0 +1,91 @@
+.palette-control-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
+}
+
+
+
+/* ADD TO PALETTE BUTTON */
+.btn-add {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(128,128,128,.2);
+  color: #111;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* hover/focus states (desktop) */
+@media (hover: hover) and (pointer: fine) {
+  .btn-add:hover { background-color: white; transform: translateY(-1px); }
+}
+.btn-add:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+/* small screens: ensure tappable target */
+@media (max-width: 700px) {
+  .btn-add { width: 20px; height: 20px; top: 8px; right: 8px; }
+}
+
+
+
+/* Detail swatch stain overlay (real “stain” look) */
+.detail-swatch { position: relative; overflow: hidden; }
+
+/* Make sure wood shows through for stains */
+.detail-swatch[data-is-stain="1"] {
+  background-color: transparent !important;
+}
+
+/* Layer 1: wood substrate */
+.detail-swatch[data-is-stain="1"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: var(--wood-size, 200px) var(--wood-size, 200px);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e3caa1'/><g stroke='%236b4528' stroke-width='1.6' fill='none' opacity='.45'><path d='M0,26 C75,8 125,44 200,26'/><path d='M0,52 C65,38 135,64 200,52'/><path d='M0,78 C85,100 115,60 200,78'/><path d='M0,104 C70,126 130,86 200,104'/><path d='M0,130 C65,152 135,112 200,130'/><path d='M0,156 C70,178 130,138 200,156'/></g><g stroke='%236b4528' stroke-width='1.2' fill='none' opacity='.35'><ellipse cx='60' cy='90' rx='18' ry='10'/><ellipse cx='60' cy='90' rx='28' ry='16'/><ellipse cx='148' cy='140' rx='14' ry='8'/><ellipse cx='148' cy='140' rx='22' ry='12'/></g></svg>");
+  filter: contrast(1.08) saturate(1.05);
+}
+
+/* Layer 2: color tint (multiply) */
+.detail-swatch[data-is-stain="1"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), var(--stain-alpha, .9));
+  mix-blend-mode: multiply;
+}
+
+/* Dark stains: let the grain push through a bit more */
+.detail-swatch[data-is-stain="1"][data-stain-tone="dark"]::after {
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), .78);
+}
+
+/* Keep the palette toggle above overlays (upper-left pin) */
+.detail-swatch .pals-btn{
+  position: absolute;
+  z-index: 3;
+  top: 6px; left: 6px;
+}
+@media (max-width: 760px){
+  .detail-swatch .pals-btn{ top: 3px; left: 3px; }
+}

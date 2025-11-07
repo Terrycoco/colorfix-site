@@ -1,0 +1,171 @@
+/* =========================
+   Fuzzy Search Dropdown
+   ========================= */
+
+/* Container */
+.fuzzy-dropdown {
+  position: relative;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Label */
+.dropdown-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Input wrapper positions custom clear */
+.fuzzy-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* Input */
+.fuzzy-input-wrap input[type="search"] {
+  width: 100%;
+  font-size: 16px;        /* avoid iOS zoom */
+  line-height: 1.25;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #000;
+
+  /* Reserve space so clear button never overlaps caret/text */
+  padding-right: 40px;
+}
+
+/* Placeholder sizing keeps iOS calm */
+.fuzzy-input-wrap input[type="search"]::placeholder {
+  font-size: 16px;
+}
+
+/* Hide native WebKit clear (we provide our own) */
+.fuzzy-input-wrap input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* iOS-only guard */
+@supports (-webkit-touch-callout: none) {
+  .fuzzy-input-wrap input[type="search"],
+  .fuzzy-input-wrap input[type="search"]::placeholder {
+    font-size: 16px !important;
+    line-height: 1.25;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Custom clear “×” (text-only), confined to right padding zone */
+.fuzzy-clear-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 28px;            /* fits inside the 40px padding */
+  height: 28px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+
+  font-size: 20px;
+  line-height: 1;
+  color: inherit;         /* matches input text color */
+  cursor: pointer;
+  z-index: 2;             /* above input, but only in the padding zone */
+  touch-action: manipulation;
+}
+
+@media (pointer: coarse) {
+  .fuzzy-clear-btn {
+    width: 32px;
+    height: 32px;
+    right: 10px;
+  }
+}
+
+/* =========================
+   Results List
+   ========================= */
+
+.results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+
+  background: #fff;
+  border: 1px solid #ccc;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 20000;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.5rem;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.result-item:hover {
+  background: #e0e0e0;
+}
+
+.result-item.highlighted {
+  background: #eee;
+  border-left: 3px solid #1c87c9;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid #aaa;
+  flex-shrink: 0;
+}
+
+.color-name {
+  font-size: 0.8rem;
+}
+
+.color-brand {
+  font-size: 0.65rem;
+  color: #666;
+}
+/* Guard the fuzzy control from global button styles */
+.controls-grid .myp-fuzzy button,
+.myp-fuzzy button {
+  width: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  height: auto !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+/* If your global CSS sets display: block or flex on buttons, reset it */
+.myp-fuzzy .fuzzy-clear-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

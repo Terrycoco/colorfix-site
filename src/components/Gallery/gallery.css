@@ -1,0 +1,164 @@
+.gallery {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: 5rem;
+  padding-top: 1rem;
+}
+
+
+.gallery-grid {
+  display: block;
+  width: 100%;
+  column-gap: 0.5rem;
+  column-count: 2;
+  margin-bottom: 64px;
+}
+
+@media (min-width: 500px) {
+  .gallery-grid {
+    column-count: 2;
+  }
+}
+
+@media (min-width: 800px) {
+  .gallery-grid {
+    column-count: 3;
+  }
+}
+
+.gallery-item {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  break-inside: avoid;
+  overflow: hidden;       /* ✅ clip any overflow from kids */
+  margin-bottom: 0.5rem; /* vertical spacing between items */
+  box-sizing: border-box;
+  border-radius: 12px;
+}
+
+/* Make sure children can fill it */
+.gallery-item > * {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gallery-item.span-2 {
+  grid-column: span 2;
+}
+
+.gallery-masonry {
+  display: flex;
+  margin-left: 0;  /* gutter size offset */
+  width: 100%;           /* ✅ constrains to screen width */
+  overflow-x: hidden;    /* ✅ safety net */
+}
+.gallery-column {
+  padding-left: 0.5rem; /* gutter size */
+  box-sizing: border-box; 
+}
+
+
+
+
+.gallery-group-block {
+  margin-bottom: 3rem;
+}
+
+.gallery-group-header {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 2rem 1rem;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 0.25rem;
+  text-align: center;  
+}
+
+.section-head {
+  scroll-margin-top: 2.3rem;
+    margin-top: 2rem;   
+}
+
+
+/* JUMP BAR - pinned to bottom instead of top */
+.footer-section {
+  background-color: var(--app-background);
+  padding: 0.5rem 1rem;
+   
+  border-top: 1px solid #ccc; /* optional: visual divider */
+}
+
+.jump-link {
+  color: var(--link-color);  /* or just blue */
+  text-decoration: underline;
+  cursor: pointer;
+  margin-right: 0.5rem;
+}
+
+
+
+.jump-bar-inner {
+  max-width: 72rem; 
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+}
+.jump-bar-inner a {
+  margin-top: .5rem;
+  margin-right: 0.75rem;
+  text-decoration: none;
+}
+.jump-bar-inner a:hover {
+  text-decoration: underline;
+}
+
+
+/* CATEGORY DISCLAIMER NOTE only on bigger screens */
+.category-disclaimer {
+  font-size: 0.7rem;
+  color: gray;
+  background: var(--app-background);
+  display: block;
+  text-align: left;
+}
+
+@media (max-width: 700px) {
+  .category-disclaimer {
+    display: none;
+  }
+}
+
+
+/* ----- Gallery toggle buttons ----- */
+.gallery-controls .btn {
+  appearance: none;
+  border: 1px solid #d6dbe1;
+  background: #f3f6f9;
+  color: #222;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+  box-shadow: 0 1px 0 rgba(0,0,0,.04) inset;
+}
+
+.gallery-controls .btn:hover {
+  background: #e9eef5;
+}
+
+.gallery-controls .btn:focus-visible {
+  outline: 3px solid rgba(255,159,26,.5); /* matches ColorFix orange vibe */
+  outline-offset: 2px;
+}
+
+/* Active state — works with either the class or aria-pressed */
+.gallery-controls .btn-active,
+.gallery-controls .btn[aria-pressed="true"] {
+  background: #ff9f1a;
+  color: #fff;
+  border-color: #ff9f1a;
+  box-shadow: none;
+}

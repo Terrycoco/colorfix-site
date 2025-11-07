@@ -1,0 +1,42 @@
+.dropdown-container {
+  font-size: 16px !important;
+  align-self: center;
+  z-index: 500;
+
+}
+
+
+
+ select {
+
+  font-size: 16px !important;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: white;
+  color: #333;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  appearance: none; /* Removes default OS arrow styling */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path fill="%23999" d="M0 0l5 6 5-6z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 10px 6px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+}
+
+option {
+  font-size: 16px !important;
+}
+
+select:focus {
+  border-color: #f97316; /* Tailwind-style orange (ColorFix theme) */
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.3);
+}
+
+label {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}

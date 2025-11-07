@@ -1,0 +1,374 @@
+/* Layout */
+.analysis {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  box-sizing: border-box;
+
+}
+
+.analysis .grid {
+  table-layout: fixed;
+  border-collapse: collapse;
+  width: 100%;
+
+  /* master knobs */
+  --w-hex:   110px;                         /* Anchor/Friend chip+hex */
+  --w-num:    64px;                         /* H / C / L / Δ columns */
+  --w-count:  84px;                         /* Count */
+  --w-catN:  clamp(160px, 18vw, 300px);     /* A/B neutral_cats */
+  --w-hue:   clamp(120px, 14vw, 220px);     /* A/B hue_cats */
+}
+
+.col-hex-head {
+  width: 127px;
+}
+
+.analysis__controls {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.analysis__title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  gap: 6px;
+}
+
+.field.inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field label {
+  font-size: 12px;
+  color: #444;
+}
+
+.field select,
+.field input[type="number"] {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: .8rem;
+  background: #fff;
+}
+
+.field input[type="number"] {
+    max-width: 50px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #bbb;
+  background: var(--button-background);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn:hover { background: var(--button-hover); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn.ghost {
+  background: transparent;
+  color: black;
+}
+
+.meta {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #555;
+}
+
+.meta code {
+  display: block;
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid #eee;
+  background: #fff;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  word-break: break-all;
+}
+
+/* Main */
+.analysis__main {
+  min-width: 0;
+}
+
+.error {
+  padding: 12px;
+  border: 1px solid #f3b1b1;
+  background: #fff4f4;
+  color: #7a1f1f;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+/* ——— Layout (keep your existing above this) ——— */
+
+.tableScroller {
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* ——— Analysis grid (clean, single source of truth) ——— */
+
+.analysis .grid {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;           /* honor <colgroup> widths */
+
+  /* central knobs — adjust here to taste */
+  --w-hex:   110px;              /* chips + hex */
+  --w-num:    64px;              /* H/C/L/Δ columns */
+  --w-count:  90px;              /* Count */
+  --w-catN:  clamp(180px, 19vw, 320px);   /* A/B neutral_cats (wider) */
+  --w-hue:   clamp(140px, 16vw, 260px);   /* A/B hue_cats (a bit narrower) */
+}
+
+/* hook colgroup classes to the knobs */
+.analysis .grid col.w-hex   { width: var(--w-hex) !important; }
+.analysis .grid col.w-num   { width: var(--w-num) !important; }
+.analysis .grid col.w-count { width: var(--w-count) !important; }
+.analysis .grid col.w-catN  { width: var(--w-catN) !important; }
+.analysis .grid col.w-hue   { width: var(--w-hue) !important; }
+
+/* header & cell box model identical so they line up */
+.analysis .grid th,
+.analysis .grid td {
+  box-sizing: border-box;
+  padding: 8px 10px;
+  white-space: nowrap;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+/* sticky header */
+.analysis .grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f8f8;
+  border-bottom: 1px solid #ddd;
+}
+
+/* cells can truncate, headers should not */
+.analysis .grid td { overflow: hidden; text-overflow: ellipsis; }
+.analysis .grid th { overflow: visible; text-overflow: clip; }
+
+/* remove legacy width helpers that might fight colgroup */
+.analysis .grid .col-hex,
+.analysis .grid .col-cat {
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+/* row hover */
+.analysis .grid tbody tr:hover td { background: #fafafa; }
+
+/* clickable sort headers */
+.th-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  color: inherit;
+}
+.th-btn:hover .th-label { text-decoration: underline; }
+.th-btn .th-arrow { font-size: 11px; opacity: .7; }
+.th-btn--active .th-arrow { opacity: 1; }
+
+/* color chip — slightly roomier now that columns are wider */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.08);
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: .3px;
+}
+
+/* small screens: gently pull the families in */
+@media (max-width: 1280px) {
+  .analysis .grid { --w-catN: clamp(160px, 17vw, 280px); --w-hue: clamp(120px, 14vw, 220px); }
+  .analysis .grid th, .analysis .grid td { padding: 6px 8px; }
+}
+/* === Compact table typography + no-bleed headers === */
+
+/* 1) Compact font sizes for the whole grid */
+.analysis .grid {
+  --fs-table: 0.8rem;   /* tweak this if you want tighter/looser */
+  --fs-head:  0.8rem;   /* header font size (can be a hair smaller if needed) */
+  table-layout: fixed;  /* keep this so <colgroup> rules the widths */
+}
+
+.analysis .grid th,
+.analysis .grid td {
+  font-size: var(--fs-table);
+  padding: 6px 8px;
+  white-space: nowrap;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+/* 2) Headers behave like cells: truncate inside their column */
+.analysis .grid thead th {
+  font-size: var(--fs-head);
+  overflow: hidden;          /* no bleed */
+  text-overflow: ellipsis;   /* show ellipsis when clipped */
+  background: #f8f8f8;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* 3) Sort button fits within the header cell */
+.th-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;                  /* tighter than before */
+  max-width: 100%;           /* allow shrinking to the col width */
+}
+.th-btn .th-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;          /* let label ellipsis */
+  text-overflow: ellipsis;
+}
+.th-btn .th-arrow {
+  flex: 0 0 auto;
+  font-size: 10px;           /* smaller arrow in compact mode */
+  opacity: .75;
+}
+
+/* 4) Cells still truncate gracefully */
+.analysis .grid td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ===== Hard alignment: identical widths for TH and TD ===== */
+
+
+
+/* identical box model for headers/cells */
+.analysis .grid th,
+.analysis .grid td {
+  box-sizing: border-box;
+  padding: 6px 8px;
+  white-space: nowrap;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analysis .grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8f8f8;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+}
+
+/* 1) If you use <colgroup>, keep it. But ALSO enforce with nth-child so
+      nothing can drift. (17 columns total — map them all.) */
+
+.analysis .grid th:nth-child(1),
+.analysis .grid td:nth-child(1)  { width: var(--w-hex);  }   /* Anchor */
+
+.analysis .grid th:nth-child(2),
+.analysis .grid td:nth-child(2),
+.analysis .grid th:nth-child(3),
+.analysis .grid td:nth-child(3),
+.analysis .grid th:nth-child(4),
+.analysis .grid td:nth-child(4)  { width: var(--w-num);  }   /* H C L (A) */
+
+.analysis .grid th:nth-child(5),
+.analysis .grid td:nth-child(5)  { width: var(--w-catN); }   /* A neutral */
+
+.analysis .grid th:nth-child(6),
+.analysis .grid td:nth-child(6)  { width: var(--w-hue);  }   /* A hue */
+
+.analysis .grid th:nth-child(7),
+.analysis .grid td:nth-child(7)  { width: var(--w-hex);  }   /* Friend */
+
+.analysis .grid th:nth-child(8),
+.analysis .grid td:nth-child(8),
+.analysis .grid th:nth-child(9),
+.analysis .grid td:nth-child(9),
+.analysis .grid th:nth-child(10),
+.analysis .grid td:nth-child(10) { width: var(--w-num);  }   /* H C L (B) */
+
+.analysis .grid th:nth-child(11),
+.analysis .grid td:nth-child(11) { width: var(--w-catN); }   /* B neutral */
+
+.analysis .grid th:nth-child(12),
+.analysis .grid td:nth-child(12) { width: var(--w-hue);  }   /* B hue */
+
+.analysis .grid th:nth-child(13),
+.analysis .grid td:nth-child(13),
+.analysis .grid th:nth-child(14),
+.analysis .grid td:nth-child(14),
+.analysis .grid th:nth-child(15),
+.analysis .grid td:nth-child(15),
+.analysis .grid th:nth-child(16),
+.analysis .grid td:nth-child(16) { width: var(--w-num);  }   /* Δh |Δh| ΔC ΔL */
+
+.analysis .grid th:nth-child(17),
+.analysis .grid td:nth-child(17) { width: var(--w-count);}   /* Count */
+
+/* kill legacy helpers that can fight widths */
+.analysis .grid .col-hex,
+.analysis .grid .col-cat {
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+/* chips sized to hex column */
+.chip {
+  min-width: 76px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,.08);
+  font: 12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+
+.result-summary {
+  margin: 6px 0 8px 0;
+  font-size: 0.9rem;
+  color: #333;
+}
+.result-summary em { font-style: normal; color: #666; }

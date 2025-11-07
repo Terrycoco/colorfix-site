@@ -1,0 +1,187 @@
+/* ===== NAV (bar height stays 40px) ===== */
+:root{
+  --bar-h: 40px;
+  --center-gap: 64px;   /* space we reserve around the centered palette icon */
+  --edge-pad:  6px;     /* how close back/logo sit to the edges */
+  --right-gap: 14px;    /* spacing between funnel and logo */
+}
+
+.board-scroller{
+  position: sticky; top: 0; width: 100%;
+  background:#000; color:#fff; border-bottom:1px solid #111;
+  z-index: 15000;
+}
+
+/* centerline via grid; sides anchor to the BAR (not the cap) */
+.board-scroller__inner{
+  position: relative; /* anchor absolute centering */
+  max-width: var(--cap, 1320px);
+  margin-inline: auto;
+  height: var(--bar-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+/* ===== CENTER (always dead-center) ===== */
+.scroller-center{
+  position: absolute; left: 50%; transform: translateX(-50%);
+  color:#fff; z-index: 20000;
+}
+.scroller-center .icon-button{
+  display:grid; place-items:center; padding:0; background:transparent; line-height:0;
+}
+.scroller-center .palette-icon{ width:28px; height:28px; display:block; }
+.board-scroller .palette-icon, .board-scroller .palette-icon *{
+  fill:none; stroke:currentColor;
+}
+
+/* ===== SIDES (clamped away from the center) ===== */
+/* RIGHT: lives only to the RIGHT of (50% + center-gap) */
+.scroller-right{
+  position:absolute; top:0; bottom:0;
+  right: 0;
+  display:flex; align-items: center; justify-content:flex-end;
+  gap: 10px;
+  z-index:20000;
+  pointer-events:none;           /* container never blocks the center */
+  width: auto;
+}
+.scroller-right > *{ pointer-events:auto; }
+
+
+/* LEFT: lives only to the LEFT of (50% - center-gap) */
+.scroller-left{
+  position:absolute; top:0; bottom:0;
+  left:  env(safe-area-inset-left, 0px);
+  right: calc(50% + var(--center-gap));
+  display:flex; align-items:center; justify-content:flex-start;
+  padding-left: max(var(--edge-pad), env(safe-area-inset-left, 0px));
+  pointer-events:none;
+}
+.scroller-left > *{ pointer-events:auto; }
+
+.scroller-left .board-tab{
+  background:transparent; border:0; padding:0; color:#fff; font-weight:600;
+  display:inline-flex; gap:6px; align-items:center;
+}
+.scroller-right .board-tab{ background:transparent; border:0; padding:0; }
+.scroller-right .logo-text{ color:#ff7a00; font-weight:800; letter-spacing:.2px; }
+.logo-btn{ padding:0 3px; }
+
+/* ===== PALETTE STRIP (sticky) ===== */
+.sticky-palette-wrapper {
+  z-index: 10000;
+  position: sticky;
+  top: var(--bar-h, 40px);
+  transform: translateZ(0);
+  will-change: opacity;
+  contain: paint;
+  background: var(--palette-bg, #f3f3f3);
+  transition: opacity 120ms ease-out;
+  box-shadow: 0 1px 0 rgba(0,0,0,.08);
+}
+.sticky-palette-wrapper.is-hidden { opacity: 0; pointer-events: none; }
+.sticky-palette-wrapper.is-visible{ opacity: 1; pointer-events: auto; }
+.sticky-palette__inner{
+  width: 100%; max-width: none; margin-inline: 0;
+  padding-left: 0; padding-right: 0; box-sizing: border-box; background: transparent;
+}
+
+/* No hover chrome */
+.board-scroller button:hover,
+.board-scroller button:active,
+.board-scroller button:focus{
+  background:transparent; color:inherit; box-shadow:none; border-color:transparent;
+}
+
+/* Funnel color logic (orange when active) */
+.mini-brand-wrap{ color:#fff; line-height:0; display:inline-flex; }
+.mini-brand-wrap svg{ fill:currentColor; stroke:currentColor; }
+.mini-brand-wrap.has-active{ color:#ff8c00; }
+
+
+/* Mobile: shrink filter + logo and add a bit more center space */
+@media (max-width: 420px) {
+  :root { --center-gap: 68px; }                /* keeps funnel farther from center */
+  .scroller-right { gap: 8px; }                /* tighter space between funnel & logo */
+
+  /* MiniBrandIcon wrapper + button (smaller hitbox) */
+  .mini-brand-wrap { width: 26px; height: 26px; }
+  .mini-brand-wrap > .icon-button,
+  .mini-brand-wrap button {
+    width: 26px; height: 26px; padding: 0; line-height: 0;
+  }
+
+  /* ColorFix logo button (narrower) */
+  .logo-btn { padding: 0 6px; }
+  .logo-text { font-size: 16px; letter-spacing: .1px; }
+}
+
+/* Extra small phones */
+@media (max-width: 360px) {
+  :root { --center-gap: 72px; }
+  .mini-brand-wrap,
+  .mini-brand-wrap > .icon-button,
+  .mini-brand-wrap button { width: 24px; height: 24px; }
+  .logo-text { font-size: 15px; }
+}
+
+
+/* MiniBrandIcon: force transparent button, tight box, and no bleed */
+.scroller-right .mini-brand-wrap button,
+.scroller-right .mini-brand-wrap .icon-button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  background: transparent !important;  /* ← removes that white square */
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.scroller-right .mini-brand-wrap svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
+}
+
+
+/* Keep the MiniBrandIcon strictly inside its hitbox */
+.scroller-right .mini-brand-wrap button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  position: relative;   /* establishes a containing box */
+  overflow: hidden;     /* clips anything that overpaints */
+  background: transparent;
+  border: 0;
+}
+
+/* Size the SVG and prevent any transform from pushing it out */
+.scroller-right .mini-brand-wrap svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  transform: none !important; /* neutralize any inherited pulse/scale */
+}
+
+
+
+
+/* only show focus ring for keyboard users */
+.mini-brand-wrap:focus { outline: none; }
+.mini-brand-wrap:focus-visible {
+  outline: 2px solid #aaa;
+  outline-offset: 2px;
+}
+.mini-brand-wrap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mini-brand-wrap svg { pointer-events: none; } /* let the span get the click */

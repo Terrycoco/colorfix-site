@@ -1,0 +1,149 @@
+.swatch-card {
+  position: relative;
+  width: 150px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+  text-align: center;
+  margin: 0.5rem;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  max-height: 200px;
+  z-index: 500;
+}
+
+.swatch-color {
+  position: relative;
+  height: 150px;
+  width: 100%;
+}
+
+.swatch-name {
+  padding: 0.5rem;
+  font-size: 0.7rem;
+  color: #333;
+}
+
+.swatch-card-mini {
+  position: relative;
+  width: 90px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+  text-align: center;
+  margin: 0.5rem;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  max-height: 200px;
+  z-index: 500;
+}
+
+.swatch-color-mini {
+  position: relative;
+  height: 90px;
+  width: 90px;
+}
+.swatch-card-mini .swatch-color {
+  height: 90px;
+}
+
+.swatch-card-tiny {
+ position: relative;
+  width: 60px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  overflow: hidden;
+  text-align: center;
+  margin: 0.5rem;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  max-height: 60px;
+  z-index: 500;
+}
+.swatch-color-tiny .swatch-color {
+  height: 60px;
+}
+
+
+
+
+
+
+
+.swatch-name-mini {
+  font-size: .7rem;
+  padding: .25rem;
+}
+
+
+.show-field {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: white;
+  color: black;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  padding: 8px 5px;
+  opacity: 0.8;
+  z-index: 1000;
+  display: grid;
+  line-height: 0;
+  grid-template-columns: 3px 1fr; /* 2 columns: fixed, more flexible */
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px; /* optional spacing between columns */
+   align-items: start;  /* prevents vertical stretching */
+}
+
+.show-field > div {
+  text-align: right;
+}
+
+.show-field > span {
+  text-align: left;
+}
+
+.add-palette-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  z-index: 10;
+}
+
+.swatch-card:hover .add-palette-btn {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .swatch-card {
+    width: 40vw;
+  }
+  .swatch-color {
+    height: 30vw;
+  }
+  .swatch-name {
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+}

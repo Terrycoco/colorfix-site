@@ -1,0 +1,19 @@
+.landing {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.headline {
+  margin-bottom: 1rem;
+}
+
+.brand {
+  color: var(--brand-color);
+  font-weight: bold;
+}
+
+.tagline {
+  color: #666;
+  font-style: italic;
+  margin-top: 1rem;
+}

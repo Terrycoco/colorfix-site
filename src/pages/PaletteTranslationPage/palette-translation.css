@@ -1,0 +1,52 @@
+.pt-page {
+  padding: 16px;
+}
+
+.pt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* button on right */
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+
+
+.pt-title h6 {
+  flex-basis: 60%;
+  font-size: 20px;
+}
+
+.pt-title h4 {
+    font-size: 18px;
+}
+
+.pt-alert {
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.pt-alert--error {
+  background: rgba(255, 0, 0, 0.06);
+  color: #b00020;
+}
+
+/* optional: keep the header visible while scrolling
+.pt-header {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 5;
+}
+*/
+
+/* Force two columns on small screens for the translations grid */
+@media (max-width: 640px) {
+  .pt-sg .sg-grid {
+    /* override auto-fit/minWidth and lock to two across */
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .pt-sg .sg-item {
+    max-width: none !important; /* prevent any per-tile max-width from collapsing */
+  }
+}

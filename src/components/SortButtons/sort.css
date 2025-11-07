@@ -1,0 +1,23 @@
+.sort-controls {
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: .75rem;
+  font-size: .8rem;
+}
+
+.sort-label {
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sort-option {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex: 0 0 auto;   /* prevents full-width stacking */
+  gap: .5rem;
+}
+
