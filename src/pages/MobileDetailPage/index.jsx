@@ -296,7 +296,7 @@ export default function MobileDetailPage() {
                   }}
                 ></p>
                 <p className="text-sm mt-2">
-                  <strong>{currentColorDetail.chroma_cat}</strong> &mdash; {currentColorDetail.name} has a chroma of {Number(currentColorDetail.hcl_c).toFixed(4)}, which puts it in the {currentColorDetail.chroma_cat} range, {currentColorDetail.chroma_cat_descr}
+                  <strong>Chroma:  {currentColorDetail.chroma_cat}</strong> &mdash; {currentColorDetail.name} has a chroma of {Number(currentColorDetail.hcl_c).toFixed(4)}, which puts it in the {currentColorDetail.chroma_cat} range, {currentColorDetail.chroma_cat_descr}
                 </p>
                 </>
               ) : (

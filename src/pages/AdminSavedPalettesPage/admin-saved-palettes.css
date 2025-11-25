@@ -1,0 +1,333 @@
+.admin-saved-palettes {
+  padding: 2rem min(4vw, 3rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.asp-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.asp-headline h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+}
+
+.asp-summary {
+  margin: 0.2rem 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.asp-actions button {
+  background: #0f172a;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.asp-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.asp-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.asp-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.asp-filter input,
+.asp-filter select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background: #fff;
+}
+
+.asp-filter-buttons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.asp-filter-buttons button {
+  flex: 1;
+  background: #334155;
+  color: #fff;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.asp-filter-buttons button:last-child {
+  background: #cbd5f5;
+  color: #1e293b;
+}
+
+.asp-error {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.asp-loading {
+  color: #64748b;
+  font-style: italic;
+}
+
+.asp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.asp-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.asp-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.asp-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.asp-pill {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: #dc2626;
+  color: #fff;
+}
+
+.asp-pill.neutral {
+  background: #cbd5f5;
+  color: #1e293b;
+}
+
+.asp-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.asp-card-times {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.asp-notes {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #1e293b;
+  font-style: italic;
+}
+
+.asp-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.asp-swatch {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  min-width: 150px;
+}
+
+.asp-swatch-chip {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.asp-swatch-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.asp-swatch-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.asp-swatch-code {
+  font-size: 0.7rem;
+  color: #475569;
+}
+
+.asp-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.asp-card-footer button {
+  border-radius: 4px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  border: none;
+}
+
+.asp-card-footer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.asp-card-footer .ghost,
+.asp-modal-actions .ghost {
+  background: transparent;
+  border: 1px solid #cbd5f5;
+  color: #0f172a;
+}
+
+.asp-card-footer .ghost:hover:not(:disabled),
+.asp-modal-actions .ghost:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+
+.asp-card-footer button:not(.ghost),
+.asp-modal-actions button:not(.ghost) {
+  background: #0f172a;
+  color: #fff;
+}
+
+.asp-card-footer button:not(.ghost):hover:not(:disabled),
+.asp-modal-actions button:not(.ghost):hover:not(:disabled) {
+  background: #111c36;
+}
+
+.asp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 11000;
+  padding: 4rem 1rem 1rem;
+}
+
+.asp-modal {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3);
+}
+
+.asp-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: top;
+  margin-bottom: 0.75rem;
+}
+
+.asp-close {
+  background: var(--button-background);
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  max-height: 28px;
+  max-width: 28px;
+}
+
+.asp-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.asp-modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.asp-modal-form input,
+.asp-modal-form textarea {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.asp-modal-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.35rem !important;
+  font-weight: 500 !important;
+}
+
+.asp-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .asp-card-header {
+    flex-direction: column;
+  }
+  .asp-card-times {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .asp-filter {
+    grid-template-columns: 1fr;
+  }
+}

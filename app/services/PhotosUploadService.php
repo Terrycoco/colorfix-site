@@ -29,6 +29,31 @@ final class PhotosUploadService
         private PdoPhotoRepository $repo,
         private string $photosRoot // e.g., $_SERVER['DOCUMENT_ROOT'].'/colorfix/photos'
     ) {}
+    private array $assetPathOverrides = [];
+
+    public function registerAssetPath(string $assetId, ?string $relativePath): void
+    {
+        $relativePath = $this->normalizeCategoryPath($relativePath);
+        if (!$relativePath) $relativePath = $this->defaultSubpath();
+        $this->assetPathOverrides[$assetId] = $relativePath;
+    }
+
+    public function moveAssetBase(string $assetId, string $fromBase, string $toBase): void
+    {
+        $fromBase = $this->normalizeCategoryPath($fromBase) ?? $this->defaultSubpath();
+        $toBase   = $this->normalizeCategoryPath($toBase) ?? $this->defaultSubpath();
+        $from = rtrim($this->photosRoot, '/')."/{$fromBase}/{$assetId}";
+        $to   = rtrim($this->photosRoot, '/')."/{$toBase}/{$assetId}";
+        if (!is_dir($from)) {
+            $this->assetPathOverrides[$assetId] = $toBase;
+            return;
+        }
+        $this->ensureDir(dirname($to));
+        if (!@rename($from, $to)) {
+            throw new \RuntimeException("Failed to move asset directory from {$from} to {$to}");
+        }
+        $this->assetPathOverrides[$assetId] = $toBase;
+    }
 
     /** Save legacy single prepared/repaired base (filename: base.<ext>; role=''). */
     public function saveBase(int $photoId, string $kind, array $file): array
@@ -56,7 +81,7 @@ final class PhotosUploadService
         [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
 
         // Correct param order: mime, bytes, width, height
-        $this->repo->upsertVariant($photoId, $kind, '', $this->publicPath($destPath), $mime, $bytes, $width, $height);
+        $this->repo->upsertVariant($photoId, $kind, '', $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
 
         return [
             'ok'      => true,
@@ -96,7 +121,7 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
 
-        $this->repo->upsertVariant($photoId, 'prepared', $tier, $this->publicPath($destPath), $mime, $bytes, $width, $height);
+        $this->repo->upsertVariant($photoId, 'prepared', $tier, $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
 
         return [
             'ok'      => true,
@@ -127,7 +152,13 @@ final class PhotosUploadService
     }
 
     /** Save a role mask PNG into masks/<role>.png */
-    public function saveMask(int $photoId, string $role, array $file): array
+    public function saveMask(
+        int $photoId,
+        string $role,
+        array $file,
+        array $overlaySettings = [],
+        ?string $originalTexture = null
+    ): array
     {
         $role = $this->normalizeRole($role);
         $photo = $this->repo->getPhotoById($photoId);
@@ -144,12 +175,53 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
 
-        $this->repo->upsertVariant($photoId, 'masks', $role, $this->publicPath($destPath), 'image/png', $bytes, $width, $height);
+        $this->repo->upsertVariant(
+            $photoId,
+            'masks',
+            $role,
+            $this->publicPath($destPath),
+            'image/png',
+            $bytes,
+            $width,
+            $height,
+            $overlaySettings,
+            $originalTexture
+        );
 
         return [
             'ok'      => true,
             'kind'    => 'masks',
             'role'    => $role,
+            'path'    => $this->publicPath($destPath),
+            'width'   => $width,
+            'height'  => $height,
+            'assetId' => $assetId,
+            'original_texture' => $originalTexture,
+        ];
+    }
+
+    /** Save a texture overlay PNG into textures/overlay.png */
+    public function saveTextureOverlay(int $photoId, array $file): array
+    {
+        $photo = $this->repo->getPhotoById($photoId);
+        if (!$photo || empty($photo['asset_id'])) throw new \RuntimeException("Photo not found: {$photoId}");
+        $assetId = (string)$photo['asset_id'];
+
+        $destDir = $this->buildDir($assetId, 'textures');
+        $this->ensureDir($destDir);
+
+        $filename = "overlay.png";
+        $destPath = rtrim($destDir, '/')."/{$filename}";
+        $this->moveUpload($file, $destPath);
+
+        [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
+
+        $this->repo->upsertVariant($photoId, 'texture', '', $this->publicPath($destPath), 'image/png', $bytes, $width, $height, []);
+
+        return [
+            'ok'      => true,
+            'kind'    => 'texture',
+            'role'    => '',
             'path'    => $this->publicPath($destPath),
             'width'   => $width,
             'height'  => $height,
@@ -174,7 +246,7 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
 
-        $this->repo->upsertVariant($photoId, 'renders', $role, $this->publicPath($destPath), 'image/png', $bytes, $width, $height);
+        $this->repo->upsertVariant($photoId, 'renders', $role, $this->publicPath($destPath), 'image/png', $bytes, $width, $height, []);
 
         return [
             'ok'      => true,
@@ -191,7 +263,7 @@ final class PhotosUploadService
     public function replaceVariant(int $photoId, string $kind, ?string $role, array $file): array
     {
         $kind = strtolower(trim($kind));
-        if (!in_array($kind, ['prepared','repaired','masks','renders','thumb'], true)) {
+        if (!in_array($kind, ['prepared','repaired','masks','renders','thumb','texture'], true)) {
             throw new \InvalidArgumentException("Invalid kind: {$kind}");
         }
 
@@ -209,7 +281,10 @@ final class PhotosUploadService
         } else {
             $role = $role === null ? '' : $this->normalizeRole($role); // allow prepared tier override
             [$ext, $destMime] = $this->extFromUpload($file);
-            $filename = ($role === '' ? 'base' : $role) . ".{$destMime === 'image/png' ? 'png' : ($destMime === 'image/webp' ? 'webp' : 'jpg')}";
+            $extOut = 'jpg';
+            if ($destMime === 'image/png') $extOut = 'png';
+            elseif ($destMime === 'image/webp') $extOut = 'webp';
+            $filename = ($role === '' ? 'base' : $role) . ".{$extOut}";
         }
 
         $destPath = rtrim($dir, '/')."/{$filename}";
@@ -217,7 +292,7 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, $destMime);
 
-        $this->repo->upsertVariant($photoId, $kind, $role, $this->publicPath($destPath), $destMime, $bytes, $width, $height);
+        $this->repo->upsertVariant($photoId, $kind, $role, $this->publicPath($destPath), $destMime, $bytes, $width, $height, []);
 
         return [
             'ok'      => true,
@@ -234,9 +309,8 @@ final class PhotosUploadService
 
     private function buildDir(string $assetId, string $leaf): string
     {
-        $y   = date('Y');
-        $ym  = date('Y-m');
-        return rtrim($this->photosRoot, '/')."/{$y}/{$ym}/{$assetId}/{$leaf}";
+        $base = $this->assetPathOverrides[$assetId] ?? $this->defaultSubpath();
+        return rtrim($this->photosRoot, '/')."/{$base}/{$assetId}/{$leaf}";
     }
 
     private function ensureDir(string $dir): void
@@ -307,5 +381,28 @@ final class PhotosUploadService
         $role = strtolower(trim($role));
         $role = preg_replace('/[^a-z0-9_-]/', '-', $role);
         return $role === '' ? 'role' : $role;
+    }
+
+    private function defaultSubpath(): string
+    {
+        $y   = date('Y');
+        $ym  = date('Y-m');
+        return "{$y}/{$ym}";
+    }
+
+    private function normalizeCategoryPath(?string $path): ?string
+    {
+        if (!$path) return null;
+        $trim = trim($path, "/ \t\n\r\0\x0B");
+        if ($trim === '') return null;
+        $trim = str_replace('\\', '/', $trim);
+        $segments = array_filter(array_map(function ($seg) {
+            $seg = strtolower(trim($seg));
+            $seg = preg_replace('/[^a-z0-9\-]+/', '-', $seg);
+            $seg = trim($seg, '-');
+            return $seg;
+        }, explode('/', $trim)));
+        if (!$segments) return null;
+        return implode('/', $segments);
     }
 }

@@ -42,9 +42,22 @@ public function renderApplyMap(
         $kind = (string)($v['kind'] ?? '');
         if ($kind === 'prepared_base') {
             $preparedRel = (string)$v['path'];
+        } elseif ($kind === 'prepared') {
+            $role = (string)($v['role'] ?? '');
+            if ($role === '' || strtolower($role) === 'base') {
+                $preparedRel = (string)$v['path'];
+            }
         } elseif ($kind === 'mask' || str_starts_with($kind, 'mask')) {
             $role = (string)($v['role'] ?? '');
-            if ($role !== '') $masksByRole[$role] = (string)$v['path'];
+            if ($role !== '') {
+                $masksByRole[$role] = [
+                    'path'     => (string)$v['path'],
+                    'overlay'  => $this->extractOverlaySettings($v),
+                    'original_texture' => isset($v['original_texture']) && $v['original_texture'] !== ''
+                        ? (string)$v['original_texture']
+                        : null,
+                ];
+            }
         }
     }
     if ($preparedRel === '') throw new \RuntimeException("No prepared_base found for {$assetId}");
@@ -65,9 +78,10 @@ public function renderApplyMap(
     foreach ($hexMap as $role => $hex6raw) {
         $hex6 = strtoupper(trim((string)$hex6raw));
         if (!preg_match('/^[0-9A-F]{6}$/', $hex6)) continue;
-        if (empty($masksByRole[$role]))     continue;
+        $maskMeta = $masksByRole[$role] ?? null;
+        if (!$maskMeta || empty($maskMeta['path'])) continue;
 
-        $maskAbs = $this->absPath($masksByRole[$role]);
+        $maskAbs = $this->absPath($maskMeta['path']);
         $maskIm  = $this->openImage($maskAbs);
         if (!$maskIm) continue;
 
@@ -87,7 +101,7 @@ public function renderApplyMap(
         $lmix     = $this->clamp01($auto['lmix'] ?? 0.35);
         $alphaForRole = $this->clamp01($auto['alpha'] ?? $alpha);
         $LbAuto   = $auto['Lb'] ?? null;
-        [$detailKeep, $alphaCap] = $this->perColorDetailControl($hex6, $Lt);
+        [$detailKeep, $alphaCap, $detailMode] = $this->perColorDetailControl($hex6, $Lt, $role);
 
         [$kCal, $bCal] = $this->getDeltaLCalib($role, $hex6, null);
 
@@ -100,8 +114,13 @@ public function renderApplyMap(
             $lmix         = min(1.0, $lmix + 0.25);
             $alphaForRole = min(1.0, $alphaForRole + 0.15);
         }
+        if ($Lt <= 15.0 && $deltaAgainstRef >= 20.0) {
+            $lmix         = min(1.0, max($lmix, 0.92));
+            $alphaForRole = min(1.0, max($alphaForRole, 0.98));
+        }
 
-        $effectiveAlpha = $this->clamp01($alphaForRole * $alpha * $alphaCap);
+        $maskBlend = $this->resolveMaskBlend($maskMeta['overlay'] ?? null, $Lt);
+        $effectiveAlpha = $this->clamp01($alphaForRole * $alpha * $alphaCap * $maskBlend['opacity']);
 
         // 4) Per-pixel
         for ($y = 0; $y < $H; $y++) {
@@ -122,26 +141,40 @@ public function renderApplyMap(
                 } else {
                     // Base Lab
                     [$L0, $a0, $b0lab] = $this->rgbToLab($r0, $g0, $b0);
-                    $deltaL             = ($Lt - $L0) * $lmix;
-                    $deltaL             = $deltaL * $kCal + $bCal;
-                    $Lnew               = $this->clamp($L0 + $deltaL, -1.0, 101.0);
+                    $rawDelta          = $Lt - $L0;
+                    $extremeShift      = abs($rawDelta) >= 25.0;
+                    if ($extremeShift) {
+                        $Lnew = $this->clamp($Lt, -1.0, 101.0);
+                    } else {
+                        $deltaL = ($Lt - $L0) * $lmix;
+                        $deltaL = $deltaL * $kCal + $bCal;
+                        $Lnew   = $this->clamp($L0 + $deltaL, -1.0, 101.0);
+                    }
 
                     // Allow intentional pushes to full white/black without banding
-                    if ($Lt >= 95.0) $Lnew = min(100.0, max($Lnew, 96.5));
-                    if ($Lt <= 5.0)  $Lnew = max(0.0,  min($Lnew,  3.5));
+                    if ($Lt >= 95.0) $Lnew = min(100.3, max($Lnew, 98.0));
+                    if ($Lt <= 5.0)  $Lnew = max(-0.3,  min($Lnew,  1.0));
 
                     if ($detailKeep > 0.0) {
-                        $Lnew = ($Lnew * (1.0 - $detailKeep)) + ($L0 * $detailKeep);
+                        $contrast = $L0 - $LbRef;
+                        if ($detailMode === 'mix' && !$extremeShift) {
+                            $Lnew = ($Lnew * (1.0 - $detailKeep)) + ($L0 * $detailKeep);
+                        } else {
+                            $blend = $extremeShift ? min($detailKeep, 0.22) : $detailKeep;
+                            $Lnew += $contrast * $blend;
+                        }
                     }
+                    $Lnew = $this->clamp($Lnew, -0.5, 101.5);
 
                     // Back to RGB
                     [$r1, $g1, $b1] = $this->labToRgb($Lnew, $at, $bt);
                 }
 
-                // Blend
-                $r = $this->clamp255($r0 * (1.0 - $coverage) + $r1 * $coverage);
-                $g = $this->clamp255($g0 * (1.0 - $coverage) + $g1 * $coverage);
-                $b = $this->clamp255($b0 * (1.0 - $coverage) + $b1 * $coverage);
+                // Blend mode (multiply/screen/etc.) then mix by coverage
+                [$rBlend, $gBlend, $bBlend] = $this->applyBlendMode([$r0, $g0, $b0], [$r1, $g1, $b1], $maskBlend['mode']);
+                $r = $this->clamp255($r0 * (1.0 - $coverage) + $rBlend * $coverage);
+                $g = $this->clamp255($g0 * (1.0 - $coverage) + $gBlend * $coverage);
+                $b = $this->clamp255($b0 * (1.0 - $coverage) + $bBlend * $coverage);
 
                 $col = imagecolorallocatealpha($baseIm, $r, $g, $b, 0);
                 imagesetpixel($baseIm, $x, $y, $col);
@@ -188,40 +221,50 @@ public function renderApplyMap(
         return [$k, $b];
     }
 
-    /** Returns [detailKeep, alphaCap] per target color (higher detailKeep => more base shading retained). */
-    private function perColorDetailControl(string $hex6, float $Lt): array {
+    /** Returns [detailKeep, alphaCap, mode] per target color. */
+    private function perColorDetailControl(string $hex6, float $Lt, string $role): array {
         $hex6 = strtoupper($hex6);
+        $role = strtolower($role);
 
         $detailKeep = 0.0;
         $alphaCap   = 1.0;
+        $mode       = 'offset'; // 'offset' adds contrast, 'mix' blends original
+
+        $isFineDetail = in_array($role, ['trim','shutters','frontdoor','gutter','windowtrim','fascia'], true);
 
         // Heuristic tiers by perceived lightness; override with explicit map if needed.
         if ($Lt >= 92.0) {
-            $detailKeep = 0.28;
-            $alphaCap   = 0.88;
+            $detailKeep = $isFineDetail ? 0.08 : 0.03;
+            $alphaCap   = $isFineDetail ? 0.98 : 1.0;
+            $mode = 'mix';
         } elseif ($Lt >= 82.0) {
-            $detailKeep = 0.18;
+            $detailKeep = $isFineDetail ? 0.10 : 0.04;
             $alphaCap   = 0.93;
+            $mode = 'mix';
         } elseif ($Lt <= 8.0) {
-            $detailKeep = 0.25;
-            $alphaCap   = 0.90;
+            $detailKeep = $isFineDetail ? 0.04 : 0.02;
+            $alphaCap   = 1.0;
+            $mode = 'offset';
         } elseif ($Lt <= 20.0) {
-            $detailKeep = 0.15;
+            $detailKeep = $isFineDetail ? 0.05 : 0.03;
             $alphaCap   = 0.94;
+            $mode = 'offset';
         }
 
         // Exact per-color overrides (edit as needed)
         $overrides = [
-            'FFFFFF' => ['detailKeep' => 0.30, 'alphaCap' => 0.85],
-            'FFF9F0' => ['detailKeep' => 0.26, 'alphaCap' => 0.88],
-            '000000' => ['detailKeep' => 0.28, 'alphaCap' => 0.88],
+            'FFFFFF' => ['detailKeep' => 0.02, 'alphaCap' => 1.0, 'mode' => 'mix'],
+            'FFF9F0' => ['detailKeep' => 0.03, 'alphaCap' => 0.99, 'mode' => 'mix'],
+            'F0EFEB' => ['detailKeep' => 0.04, 'alphaCap' => 0.99, 'mode' => 'mix'],
+            '000000' => ['detailKeep' => 0.0, 'alphaCap' => 1.0, 'mode' => 'offset'],
         ];
         if (isset($overrides[$hex6])) {
             $detailKeep = $overrides[$hex6]['detailKeep'];
             $alphaCap   = $overrides[$hex6]['alphaCap'];
+            if (isset($overrides[$hex6]['mode'])) $mode = $overrides[$hex6]['mode'];
         }
 
-        return [$this->clamp01($detailKeep), $this->clamp01($alphaCap)];
+        return [$this->clamp01($detailKeep), $this->clamp01($alphaCap), $mode];
     }
 
 // Per-photo/role one-off offset for prepared quirks (defaults to 0.0)
@@ -257,6 +300,65 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         $role = trim($role);
         if ($role === '') throw new RuntimeException("role required");
         return $this->renderApplyMap($assetId, [$role => $hex6], $mode, $alpha, 0.35);
+    }
+
+    private function extractOverlaySettings(array $variantRow): array {
+        $tiers = ['dark','medium','light'];
+        $out = [];
+        foreach ($tiers as $tier) {
+            $modeKey = "overlay_mode_{$tier}";
+            $opKey   = "overlay_opacity_{$tier}";
+            $out[$tier] = [
+                'mode'    => $this->normalizeOverlayMode($variantRow[$modeKey] ?? null),
+                'opacity' => $this->normalizeOverlayOpacity($variantRow[$opKey] ?? null),
+            ];
+        }
+        return $out;
+    }
+
+    private function resolveMaskBlend(?array $overlayMeta, float $Lt): array {
+        $candidates = $this->pickOverlayTiersByLightness($Lt);
+        $row = [];
+        if (is_array($overlayMeta)) {
+            foreach ($candidates as $tier) {
+                if (isset($overlayMeta[$tier]) && (is_array($overlayMeta[$tier]))) {
+                    $row = $overlayMeta[$tier];
+                    break;
+                }
+            }
+        }
+        $mode = $this->normalizeOverlayMode($row['mode'] ?? null) ?? 'colorize';
+        $opacity = $this->normalizeOverlayOpacity($row['opacity'] ?? null);
+        if ($opacity === null) $opacity = 1.0;
+        return [
+            'mode' => $mode,
+            'opacity' => $this->clamp01($opacity),
+        ];
+    }
+
+    private function pickOverlayTiersByLightness(float $Lt): array {
+        $primary = 'medium';
+        if ($Lt <= 32.0) $primary = 'dark';
+        elseif ($Lt >= 72.0) $primary = 'light';
+        $order = [$primary];
+        if ($primary !== 'medium') $order[] = 'medium';
+        if ($primary !== 'light') $order[] = 'light';
+        if ($primary !== 'dark') $order[] = 'dark';
+        return array_unique($order);
+    }
+
+    private function normalizeOverlayMode($mode): ?string {
+        if (!is_string($mode)) return null;
+        $m = strtolower(trim($mode));
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity'];
+        return in_array($m, $allowed, true) ? $m : null;
+    }
+
+    private function normalizeOverlayOpacity($val): ?float {
+        if ($val === '' || $val === null) return null;
+        $num = (float)$val;
+        if (!is_finite($num)) return null;
+        return $this->clamp01($num);
     }
 
     /* =======================================================================
@@ -468,6 +570,75 @@ private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float 
         $g = (int)round($c($lg)*255);
         $b2= (int)round($c($lb)*255);
         return [$this->clamp255($r), $this->clamp255($g), $this->clamp255($b2)];
+    }
+
+    private function applyBlendMode(array $baseRgb, array $topRgb, ?string $mode): array {
+        $mode = strtolower($mode ?? 'hardlight');
+        switch ($mode) {
+            case 'colorize':
+                return $topRgb;
+            case 'multiply':
+                return [
+                    $this->blendMultiplyChannel($baseRgb[0], $topRgb[0]),
+                    $this->blendMultiplyChannel($baseRgb[1], $topRgb[1]),
+                    $this->blendMultiplyChannel($baseRgb[2], $topRgb[2]),
+                ];
+            case 'screen':
+                return [
+                    $this->blendScreenChannel($baseRgb[0], $topRgb[0]),
+                    $this->blendScreenChannel($baseRgb[1], $topRgb[1]),
+                    $this->blendScreenChannel($baseRgb[2], $topRgb[2]),
+                ];
+            case 'overlay':
+                return [
+                    $this->blendOverlayChannel($baseRgb[0], $topRgb[0]),
+                    $this->blendOverlayChannel($baseRgb[1], $topRgb[1]),
+                    $this->blendOverlayChannel($baseRgb[2], $topRgb[2]),
+                ];
+            case 'softlight':
+                return [
+                    $this->softLight($baseRgb[0], $topRgb[0]),
+                    $this->softLight($baseRgb[1], $topRgb[1]),
+                    $this->softLight($baseRgb[2], $topRgb[2]),
+                ];
+            case 'luminosity':
+                [$Lb, $ab, $bb] = $this->rgbToLab($baseRgb[0], $baseRgb[1], $baseRgb[2]);
+                [$Lt] = $this->rgbToLab($topRgb[0], $topRgb[1], $topRgb[2]);
+                return $this->labToRgb($Lt, $ab, $bb);
+            case 'hardlight':
+            default:
+                return [
+                    $this->blendHardLightChannel($baseRgb[0], $topRgb[0]),
+                    $this->blendHardLightChannel($baseRgb[1], $topRgb[1]),
+                    $this->blendHardLightChannel($baseRgb[2], $topRgb[2]),
+                ];
+        }
+    }
+
+    private function blendMultiplyChannel(int $base, int $top): int {
+        return $this->clamp255(($base * $top) / 255);
+    }
+
+    private function blendScreenChannel(int $base, int $top): int {
+        return $this->clamp255(255 - ((255 - $base) * (255 - $top) / 255));
+    }
+
+    private function blendOverlayChannel(int $base, int $top): int {
+        $b = $base / 255.0;
+        $s = $top / 255.0;
+        $out = ($b < 0.5)
+            ? (2 * $b * $s)
+            : (1 - 2 * (1 - $b) * (1 - $s));
+        return $this->clamp255($out * 255.0);
+    }
+
+    private function blendHardLightChannel(int $base, int $top): int {
+        $b = $base / 255.0;
+        $s = $top / 255.0;
+        $out = ($s < 0.5)
+            ? (2 * $b * $s)
+            : (1 - 2 * (1 - $b) * (1 - $s));
+        return $this->clamp255($out * 255.0);
     }
 
     // Optional soft-light channel blend (kept for experiments)

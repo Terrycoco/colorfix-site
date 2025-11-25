@@ -1,37 +1,40 @@
-import  { useEffect, useState } from 'react';
-import {useAppState} from '@context/AppStateContext';
+import { useEffect, useState } from 'react';
+import { useAppState } from '@context/AppStateContext';
 
+const ALL_VALUE = JSON.stringify({ category: 'all' });
 
 export default function LightnessDropdown({ onSelect }) {
-  const { categories  } = useAppState();
-  const [selected, setSelected] = useState(JSON.stringify({ category: 'all' }));
-  const [hueCategories, setHueCategories] = useState([]);
- 
+  const { categories } = useAppState();
+  const [selected, setSelected] = useState(ALL_VALUE);
+  const [lightnessCategories, setLightnessCategories] = useState([]);
 
-  //USE EFFECTS
   useEffect(() => {
     if (Array.isArray(categories)) {
-      setHueCategories(categories.filter(cat => cat.type === "lightness"));
+      setLightnessCategories(categories.filter(cat => cat.type === 'lightness'));
     }
   }, [categories]);
 
- //handlers
   const handleChange = (e) => {
-    const cat = JSON.parse(e.target.value);
-    console.log('Selected:', cat);
-    setSelected(e.target.value);  // keep it a string
-    onSelect(cat);                // pass real object to parent
+    const raw = e.target.value;
+    const cat = JSON.parse(raw);
+    setSelected(raw);
+    onSelect(cat);
+  };
+
+  const formatLabel = (cat) => {
+    if (!cat || cat.category === 'all') return 'Any';
+    const type = (cat.type || '').toLowerCase();
+    return type ? `${cat.name} ${type}` : cat.name;
   };
 
   return (
-      <select id="hcl_l" value={selected} onChange={handleChange}>
-        <option value={JSON.stringify({ category: 'all' })}>Show All</option>
-        {hueCategories.map((cat) => (
-          <option key={cat.id + 'l'} value={JSON.stringify(cat)}>
-            {cat.name}
-          </option>
-        ))}
-      </select>
+    <select id="hcl_l" value={selected} onChange={handleChange}>
+      <option value={ALL_VALUE}>Any</option>
+      {lightnessCategories.map((cat) => (
+        <option key={`${cat.id}-l`} value={JSON.stringify(cat)}>
+          {formatLabel(cat)}
+        </option>
+      ))}
+    </select>
   );
 }
-

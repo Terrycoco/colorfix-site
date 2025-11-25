@@ -1,0 +1,133 @@
+.supercats-page {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.supercats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-form input {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.supercats-error {
+  padding: 10px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 8px;
+}
+
+.supercats-status {
+  padding: 8px 10px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.summary-table th,
+.summary-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.summary-table th {
+  background: #eef2ff;
+  font-weight: 600;
+}
+
+.supercats-table select,
+.supercats-table input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.axis-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.axis-scope {
+  font-size: 0.78rem;
+  padding: 3px 4px;
+}
+
+.axis-range {
+  display: flex;
+  gap: 4px;
+}
+
+.axis-range select {
+  flex: 1;
+}
+
+.actions-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+}
+.btn-compact {
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.center-cell {
+  text-align: center;
+}
+
+.muted {
+  color: #9ca3af;
+}

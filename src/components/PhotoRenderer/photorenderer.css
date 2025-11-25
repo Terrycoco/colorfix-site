@@ -32,6 +32,19 @@
 .render-meta .meta-item { margin-right: 14px; }
 .status { opacity: 0.7; }
 .error { color: #b00020; }
+.download-btn {
+  border: none;
+  border-radius: 4px;
+  background: #111;
+  color: #fff;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.download-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 
 /* Fullscreen overlay */
 .full-overlay {

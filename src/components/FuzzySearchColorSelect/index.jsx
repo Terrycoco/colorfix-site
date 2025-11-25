@@ -20,25 +20,83 @@ function useIOSNoZoomOnFocus(inputRef) {
   }, [inputRef]);
 }
 
-export default function FuzzySearchColorSelect({ onSelect, onFocus, className, label }) {
+export default function FuzzySearchColorSelect({
+  onSelect,
+  onFocus,
+  onEmpty,
+  className,
+  label,
+  value,
+  ghostValue,
+  autoFocus = true,
+  mobileBreakpoint = 768,
+}) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [open, setOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia(`(max-width: ${mobileBreakpoint}px)`).matches;
+  });
 
   const rootRef = useRef(null);
   const inputRef = useRef(null);
+  const sheetInputRef = useRef(null);
   const pickingRef = useRef(false);
   const reqSeq = useRef(0);
   const suppressNextSearchRef = useRef(false);
 
   useIOSNoZoomOnFocus(inputRef);
 
+  const isControlled = typeof value !== "undefined";
+  const lastValueRef = useRef(value);
+
   useEffect(() => {
-    if (inputRef.current) inputRef.current.focus();
-    setSelectedColor(null);
-  }, []);
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia(`(max-width: ${mobileBreakpoint}px)`);
+    const handler = (e) => setIsMobile(e.matches);
+    handler(mq);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [mobileBreakpoint]);
+
+  // 🔸 Auto-focus on mount ONLY if there's no initial value
+  useEffect(() => {
+    if (!autoFocus || isMobile) return;
+    const hasInitial = !!(value && value.id);
+    if (!hasInitial) inputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFocus, isMobile]); // run once per autoFocus flag
+
+  // 🔸 Sync with parent value; close/blur if a value is set, focus if cleared
+  useEffect(() => {
+    if (!isControlled) return;
+    if (lastValueRef.current === value) return;
+    lastValueRef.current = value;
+
+    if (value && value.id) {
+      setSelectedColor(value);
+      setQuery(value.name || value.code || '');
+      setOpen(false);
+      setResults([]);
+      setHighlightedIndex(-1);
+      suppressNextSearchRef.current = true;
+      inputRef.current?.blur();     // close dropdown visually
+    } else {
+      setSelectedColor(null);
+      setQuery('');
+      setOpen(false);
+      setResults([]);
+      setHighlightedIndex(-1);
+      if (autoFocus && !isMobile) {
+        // focus when cleared so you can type immediately
+        inputRef.current?.focus();
+      }
+    }
+  }, [isControlled, value, autoFocus, isMobile]);
 
   useEffect(() => {
     function onDocPointerDown(e) {
@@ -53,7 +111,16 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
 
   function getFontColor(color) {
     return color?.hcl_l > 70 ? "black" : "white";
-    // (fallback handled by style below when no selectedColor)
+  }
+
+  function colorToHex(color) {
+    if (!color) return null;
+    if (color.hex6) return `#${color.hex6}`;
+    if (color.hex) return color.hex.startsWith('#') ? color.hex : `#${color.hex}`;
+    if (typeof color.r === 'number' && typeof color.g === 'number' && typeof color.b === 'number') {
+      return `rgb(${color.r}, ${color.g}, ${color.b})`;
+    }
+    return null;
   }
 
   function pick(color) {
@@ -61,13 +128,21 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
     pickingRef.current = true;
     try {
       onSelect && onSelect(color);
-      setSelectedColor(color);
+      if (!isControlled) {
+        setSelectedColor(color);
+        setQuery(color.name || color.code || '');
+      }
       suppressNextSearchRef.current = true;
-      setQuery(color.name || '');
     } finally {
       setResults([]);
       setHighlightedIndex(-1);
       setOpen(false);
+      if (isMobile) {
+        setSheetOpen(false);
+        sheetInputRef.current?.blur();
+      } else {
+        inputRef.current?.blur();
+      }
       setTimeout(() => { pickingRef.current = false; }, 0);
     }
   }
@@ -81,37 +156,28 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
       return;
     }
     const seq = ++reqSeq.current;
-    const v1 = `${API_FOLDER}/search-colors-fuzzy.php?q=${encodeURIComponent(q)}&ts=${Date.now()}`;
-    const v2 = `${API_FOLDER}/v2/fuzzy-search.php?q=${encodeURIComponent(q)}&ts=${Date.now()}`
-    const url = v2;
+    const url = `${API_FOLDER}/v2/fuzzy-search.php?q=${encodeURIComponent(q)}&ts=${Date.now()}`;
     fetch(url)
-  .then(r => r.text())
-  .then(txt => {
-    if (seq !== reqSeq.current) return;
-
-    // Safely parse JSON (handles HTML/error pages too)
-    let data;
-    try { data = JSON.parse(txt); } catch { data = []; }
-
-    // Accept shapes: raw array, {results: [...]}, {items: [...]}
-    const raw = Array.isArray(data)
-      ? data
-      : (Array.isArray(data?.results) ? data.results
-        : (Array.isArray(data?.items) ? data.items : []));
-
-    // Filter out junk rows; keep ones that can render a name/code
-    const arr = raw.filter(r => r && (r.name || r.code));
-
-    setResults(arr);
-    setHighlightedIndex(-1);
-    setOpen(arr.length > 0);
-  })
-  .catch(() => {
-    if (seq !== reqSeq.current) return;
-    setResults([]);
-    setOpen(false);
-    setHighlightedIndex(-1);
-  });
+      .then(r => r.text())
+      .then(txt => {
+        if (seq !== reqSeq.current) return;
+        let data;
+        try { data = JSON.parse(txt); } catch { data = []; }
+        const raw = Array.isArray(data)
+          ? data
+          : (Array.isArray(data?.results) ? data.results
+            : (Array.isArray(data?.items) ? data.items : []));
+        const arr = raw.filter(r => r && (r.name || r.code));
+        setResults(arr);
+        setHighlightedIndex(-1);
+        setOpen(arr.length > 0);
+      })
+      .catch(() => {
+        if (seq !== reqSeq.current) return;
+        setResults([]);
+        setOpen(false);
+        setHighlightedIndex(-1);
+      });
   }
 
   useEffect(() => {
@@ -148,10 +214,8 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
         return;
       }
     }
-    // When list is closed, prevent mobile "Next" jump; keep focus or blur intentionally
     if (e.key === 'Enter' && (!open || results.length === 0)) {
       e.preventDefault();
-      // optional: blur on coarse pointers to avoid jumping focus
       if (window.matchMedia?.('(pointer: coarse)').matches) {
         inputRef.current?.blur();
       }
@@ -159,88 +223,127 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
   }
 
   function clearSelection() {
-    if (selectedColor) {
-      setSelectedColor(null);
-      onSelect && onSelect(null);
+    if (!isControlled) {
+      if (selectedColor) setSelectedColor(null);
+      setQuery('');
     }
-    setQuery('');
+    onSelect && onSelect(null);
     setResults([]);
     setHighlightedIndex(-1);
     setOpen(false);
+    inputRef.current?.focus();
   }
+
+  const displayColor = selectedColor || ghostValue || null;
+  const placeholderText =
+    !selectedColor && ghostValue
+      ? `inherits ${ghostValue.name || ghostValue.code || "role color"}`
+      : "Color name or code";
+
+  useEffect(() => {
+    if (sheetOpen && isMobile) {
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => sheetInputRef.current?.focus(), 60);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [sheetOpen, isMobile]);
 
   return (
     <div
       ref={rootRef}
       className={`fuzzy-dropdown ${className || ''}`}
       onKeyDownCapture={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+      style={className?.includes("full-width") ? { width: "100%" } : undefined}
     >
-      <label htmlFor="fuzzy-input" className="dropdown-label">{label ? label : "Enter A Color"}</label>
+      <label className="dropdown-label">
+        {label ? label : "Enter A Color"}
+      </label>
 
-      <div className="fuzzy-input-wrap">
-        <input
-          id="fuzzy-input"
-          type="search"
-          inputMode="search"
-          enterKeyHint="done"
-          value={query}
-          autoComplete="off"
-          ref={inputRef}
-          onFocus={(e) => {
-            onFocus && onFocus(e);
-            if (results.length > 0) setOpen(true);
-            const q = query.trim();
-            if (q.length >= 2 && results.length === 0) runSearch(q);
-          }}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQuery(val);
-            if (val.trim().length === 0 && selectedColor) {
-              setSelectedColor(null);
-              onSelect && onSelect(null);
-            }
-            if (val.trim().length >= 2) setOpen(true);
-          }}
-          onInput={(e) => {
-            const val = e.currentTarget.value || '';
-            if (val.length === 0 && selectedColor) {
-              setSelectedColor(null);
-              onSelect && onSelect(null);
-            }
-          }}
-          placeholder="Enter a name or color code"
-          onKeyDown={handleKeyDown}
-          aria-autocomplete="list"
-          aria-expanded={open}
-          aria-controls="fuzzy-results"
-          formNoValidate
+      {isMobile ? (
+        <button
+          type="button"
+          className="fuzzy-mobile-trigger"
+          onClick={() => setSheetOpen(true)}
           style={{
-            backgroundColor: selectedColor?.hex6 ? `#${selectedColor.hex6}` : '#fff',
-            color: selectedColor ? getFontColor(selectedColor) : '#000',
+            backgroundColor: colorToHex(displayColor) || '#f7f7f7',
+            color: displayColor ? getFontColor(displayColor) : '#222',
           }}
-        />
-
-        {/* Custom clear button — confined to right padding zone */}
-        {query.length > 0 && (
-          <button
-            type="button"
-            className="fuzzy-clear-btn"
-            aria-label="Clear search"
-            onPointerDown={(e) => {
-              e.preventDefault();       // keep focus in input (iOS)
-              clearSelection();
-              inputRef.current?.focus();
+        >
+          {selectedColor
+            ? `${selectedColor.name} (${selectedColor.brand})`
+            : "Tap to choose a color"}
+        </button>
+      ) : (
+        <div className="fuzzy-input-wrap">
+          <input
+            type="search"
+            inputMode="search"
+            enterKeyHint="done"
+            value={query}
+            autoComplete="off"
+            ref={inputRef}
+            onFocus={(e) => {
+              onFocus && onFocus(e);
+              if (!selectedColor && results.length > 0) setOpen(true);
+              const q = query.trim();
+              if (!selectedColor && q.length >= 2 && results.length === 0) runSearch(q);
             }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setQuery(val);
+              if (val.trim().length === 0 && selectedColor) {
+                setSelectedColor(null);
+                onSelect && onSelect(null);
+              }
+              if (val.trim().length >= 2) setOpen(true);
+            }}
+            onInput={(e) => {
+              const val = e.currentTarget.value || '';
+              if (val.length === 0 && selectedColor) {
+                setSelectedColor(null);
+                onSelect && onSelect(null);
+              }
+            }}
+            placeholder={placeholderText}
+            onKeyDown={handleKeyDown}
+            onBlur={() => {
+              if (!selectedColor && query.trim().length === 0) {
+                onEmpty && onEmpty();
+              }
+            }}
+            aria-autocomplete="list"
+            aria-expanded={open}
+            aria-controls="fuzzy-results"
+            formNoValidate
             style={{
-              color: selectedColor ? getFontColor(selectedColor) : '#000',
+              backgroundColor: colorToHex(displayColor) || '#fff',
+              color: displayColor ? getFontColor(displayColor) : '#000',
             }}
-          >
-            ×
-          </button>
-        )}
-      </div>
+          />
 
-      {open && results.length > 0 && (
+          {(query.length > 0 || selectedColor || ghostValue) && (
+            <button
+              type="button"
+              className="fuzzy-clear-btn"
+              aria-label="Clear color"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                clearSelection();
+                inputRef.current?.focus();
+              }}
+              style={{
+                color: displayColor ? getFontColor(displayColor) : '#000',
+              }}
+            >
+              <span className="fuzzy-clear-icon" aria-hidden="true">×</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {open && results.length > 0 && !isMobile && (
         <ul id="fuzzy-results" className="results" role="listbox">
           {results.map((c, index) => (
             <li
@@ -264,6 +367,54 @@ export default function FuzzySearchColorSelect({ onSelect, onFocus, className, l
             </li>
           ))}
         </ul>
+      )}
+
+      {isMobile && sheetOpen && (
+        <>
+          <div className="fuzzy-sheet">
+            <div className="fuzzy-sheet-header">
+              <h3>Choose a Color</h3>
+              <button type="button" onClick={() => setSheetOpen(false)} aria-label="Close color picker">
+                ✕
+              </button>
+            </div>
+            <div className="fuzzy-sheet-body">
+              <input
+                ref={sheetInputRef}
+                type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Color name or code"
+                className="fuzzy-sheet-input"
+              />
+              <div className="fuzzy-sheet-results">
+                {results.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="fuzzy-sheet-item"
+                    onClick={() => pick(c)}
+                  >
+                    <span
+                      className="sheet-swatch"
+                      style={{
+                        backgroundColor: c.hex6 ? `#${c.hex6}` : `rgb(${c.r ?? 0}, ${c.g ?? 0}, ${c.b ?? 0})`
+                      }}
+                    />
+                    <span className="sheet-name">{c.name}</span>
+                    <span className="sheet-brand">{c.brand}</span>
+                  </button>
+                ))}
+                {results.length === 0 && query.trim().length >= 2 && (
+                  <div className="fuzzy-sheet-empty">No colors matched.</div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="fuzzy-sheet-backdrop" onClick={() => setSheetOpen(false)} />
+        </>
       )}
     </div>
   );

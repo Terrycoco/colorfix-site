@@ -48,6 +48,13 @@
   border: 2px solid #888;
 }
 
+.palette-bar-arrow{
+  font-size:0.8rem;
+  color:#555;
+  margin-left:8px;
+  pointer-events:none;
+}
+
 .palette-remove-button {
   position: absolute;
   top: -6px;

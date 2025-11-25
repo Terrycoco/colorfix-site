@@ -16,11 +16,13 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
     lab_l:'', lab_a:'', lab_b:'',
     chip_num:'',       // editable
     cluster_id:'',     // read-only
-    exterior: true,    // NEW
-    interior: true     // NEW
+    exterior: true,
+    interior: true,
+    is_inactive: false,
   });
   const [busy, setBusy] = useState(false);
   const [msg,  setMsg]  = useState('—');
+  const [justSaved, setJustSaved] = useState(false);
 
   // Load form from the selected swatch (swatch_view row)
   useEffect(() => {
@@ -42,6 +44,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
       // default true if missing (DB defaults true/true)
       exterior:   (currentColorDetail.exterior ?? true) ? true : false,
       interior:   (currentColorDetail.interior ?? true) ? true : false,
+      is_inactive: !!currentColorDetail?.is_inactive,
     });
     setMsg('Loaded.');
   }, [currentColorDetail]);
@@ -80,8 +83,9 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
     });
 
     // NEW: usage flags (booleans → 0/1)
-    body.exterior = !!form.exterior;
-    body.interior = !!form.interior;
+    body.exterior = form.exterior ? 1 : 0;
+    body.interior = form.interior ? 1 : 0;
+    body.is_inactive = form.is_inactive ? 1 : 0;
 
     return body;
   }
@@ -126,9 +130,11 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
       lab_l:'', lab_a:'', lab_b:'',
       chip_num:'', cluster_id:'',
       exterior: true,
-      interior: true
+      interior: true,
+      is_inactive: false,
     });
     setMsg('Ready for new insert.');
+    setJustSaved(false);
   }
 
   useImperativeHandle(ref, () => ({
@@ -144,14 +150,14 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
       <div className="cf-grid-2">
         <label className="cf-label">
           <span className="cf-tag">ID (leave empty to INSERT)</span>
-          <input className="cf-input" type="number" min="0"
+          <input className="cf-input cf-" type="number" min="0"
                  value={form.id} onChange={e=>setField('id', e.target.value)} />
         </label>
 
         <div className="cf-grid-2">
           <label className="cf-label">
             <span className="cf-tag">Brand</span>
-            <input className="cf-input" placeholder="ppg / sw / behr / de"
+            <input className="cf-input" placeholder=""
                    value={form.brand} onChange={e=>setField('brand', e.target.value)} />
           </label>
           <label className="cf-label">
@@ -170,7 +176,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
         <div className="cf-grid-3" style={{alignItems:'end'}}>
           <label className="cf-label">
             <span className="cf-tag">hex6 (no #)</span>
-            <input className="cf-input" placeholder="EFEFEF"
+            <input className="cf-input cf-hex" placeholder="EFEFEF"
                    value={form.hex6}
                    onChange={e=>setField('hex6', e.target.value.toUpperCase())}
                    onBlur={()=>setField('hex6', hex6(form.hex6))} />
@@ -247,6 +253,17 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
               }}
             />
             <span>Interior Only</span>
+          </label>
+        </div>
+
+        <div className="cf-grid-3">
+          <label className="cf-check">
+            <input
+              type="checkbox"
+              checked={form.is_inactive}
+              onChange={e => setField('is_inactive', e.target.checked)}
+            />
+            <span>Inactive (hide from pickers)</span>
           </label>
         </div>
       </div>

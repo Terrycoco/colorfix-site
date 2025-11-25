@@ -82,12 +82,18 @@ final class ColorSaveService
             if (!$existing) {
                 throw new \RuntimeException("Color id {$id} not found");
             }
+            $existing = $existing->toArray();
 
             $update = [];
             if ($name    !== null) $update['name']     = (string)$name;
             if ($brand   !== null) $update['brand']    = (string)$brand;
             if ($code    !== null) $update['code']     = (string)$code;
             if ($chipNum !== null) $update['chip_num'] = (string)$chipNum;
+            if (array_key_exists('exterior', $data)) $update['exterior'] = $data['exterior'] ? 1 : 0;
+            if (array_key_exists('interior', $data)) $update['interior'] = $data['interior'] ? 1 : 0;
+            if (array_key_exists('is_inactive', $data)) {
+                $update['is_inactive'] = $data['is_inactive'] ? 1 : 0;
+            }
 
             // Track whether any color-defining inputs were provided (hex/rgb)
             $colorInputsProvided = false;
@@ -163,6 +169,9 @@ final class ColorSaveService
                 // Safety backups on insert = initial values
                 'orig_lab_l'  => $lab['L'],
                 'orig_hcl_l'  => $lch['L'],
+                'exterior'    => array_key_exists('exterior', $data) ? ($data['exterior'] ? 1 : 0) : 1,
+                'interior'    => array_key_exists('interior', $data) ? ($data['interior'] ? 1 : 0) : 1,
+                'is_inactive' => array_key_exists('is_inactive', $data) ? ($data['is_inactive'] ? 1 : 0) : 0,
             ];
 
             $savedId = $repo->insertColor($payload);

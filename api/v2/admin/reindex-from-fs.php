@@ -73,7 +73,7 @@ try {
     $assetId = basename($dir);
     $photo = $repo->getPhotoByAssetId($assetId);
     if (!$photo) {
-      $ins = $repo->createPhotoShell($assetId, null, null, null, null, null);
+      $ins = $repo->createPhotoShell($assetId, null, null, null, null, null, null);
       $photo = $repo->getPhotoById((int)$ins['id']);
       if (!$photo) { $missing[] = $assetId; continue; }
     }
@@ -84,7 +84,7 @@ try {
     if (is_file($rep)) {
       $pi = @getimagesize($rep);
       $rel = '/' . ltrim(substr($rep, strlen($doc)), '/');
-      $repo->upsertVariant($photoId, 'repaired_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($rep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null);
+      $repo->upsertVariant($photoId, 'repaired_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($rep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
       if ($pi && ((int)$photo['width'] === 0 || (int)$photo['height'] === 0)) {
         $repo->updatePhotoSize($photoId, (int)$pi[0], (int)$pi[1]);
       }
@@ -96,7 +96,7 @@ try {
     if (is_file($prep)) {
       $pi = @getimagesize($prep);
       $rel = '/' . ltrim(substr($prep, strlen($doc)), '/');
-      $repo->upsertVariant($photoId, 'prepared_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($prep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null);
+      $repo->upsertVariant($photoId, 'prepared_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($prep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
       if ($pi && ((int)$photo['width'] === 0 || (int)$photo['height'] === 0)) {
         $repo->updatePhotoSize($photoId, (int)$pi[0], (int)$pi[1]);
       }
@@ -113,7 +113,7 @@ try {
 
       $mi = @getimagesize($mf);
       $rel = '/' . ltrim(substr($mf, strlen($doc)), '/');
-      $repo->upsertVariant($photoId, "mask:{$role}", $role, $rel, $mi['mime'] ?? 'image/png', @filesize($mf) ?: null, $mi ? (int)$mi[0] : null, $mi ? (int)$mi[1] : null);
+      $repo->upsertVariant($photoId, "mask:{$role}", $role, $rel, $mi['mime'] ?? 'image/png', @filesize($mf) ?: null, $mi ? (int)$mi[0] : null, $mi ? (int)$mi[1] : null, []);
       $restored[] = ['asset_id'=>$assetId, 'kind'=>"mask:{$role}", 'role'=>$role, 'path'=>$rel];
     }
   }

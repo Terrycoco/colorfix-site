@@ -266,11 +266,11 @@
 
 /* Collapsible content area */
 .bpv1-control-panels {
-  overflow: hidden;
+  overflow: visible;
   transition: max-height .2s ease, padding .2s ease;
 }
 .bpv1-controls.is-open  .bpv1-control-panels { padding-bottom: 6px; max-height: 1000px; }
-.bpv1-controls.is-closed .bpv1-control-panels { max-height: 0; padding: 0; }
+.bpv1-controls.is-closed .bpv1-control-panels { max-height: 0; padding: 0; overflow: hidden; }
 
 /* Inner toolbars inside the panel (no extra stickiness in the rows) */
 .bpv1-controls .bpv1-toolbar {

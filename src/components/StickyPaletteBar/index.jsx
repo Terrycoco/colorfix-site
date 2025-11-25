@@ -36,9 +36,6 @@ export default function PaletteBar() {
 
   return (
     <div className="palette-bar" onClick={handlePaletteClick}>
-
-   
-     
       <div className="palette-bar-swatches">
   {palette?.length > 0 && palette.map((color) => (
     <div 
@@ -55,17 +52,8 @@ export default function PaletteBar() {
     </div>
   ))}
 </div>
-
-      
-
-
-
- 
-
-
-
-
-  </div>
+      <span className="palette-bar-arrow">▼</span>
+    </div>
  
   );
 }

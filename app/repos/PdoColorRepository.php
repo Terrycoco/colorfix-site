@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\repos;
+namespace App\Repos;
 
 use App\Entities\Color;
 use PDO;
@@ -110,7 +110,7 @@ public function insertColor(array $fields): int
             'contrast_text_color',
             // NEW: let the service set backups on insert
             'orig_lab_l','orig_hcl_l',
-             'exterior','interior',  
+             'exterior','interior','is_inactive',  
         ];
 
         $data = array_intersect_key($fields, array_flip($allowed));
@@ -159,7 +159,7 @@ public function insertColor(array $fields): int
 
         foreach ($data as $k => $v) {
             // ints for r,g,b; strings elsewhere; floats ok as strings (MySQL coerces)
-            if (in_array($k, ['r','g','b','exterior','interior'], true)) {
+            if (in_array($k, ['r','g','b','exterior','interior','is_inactive'], true)) {
                 $st->bindValue(":$k", (int)$v, \PDO::PARAM_INT);
             } else {
                 $st->bindValue(":$k", $v, \PDO::PARAM_STR);
@@ -183,7 +183,7 @@ $allowed = [
     'contrast_text_color',
     // NEW: backups (service sets them once when needed)
     'orig_lab_l','orig_hcl_l',
-      'exterior','interior', 
+      'exterior','interior','is_inactive', 
 ];
     $data = array_intersect_key($fields, array_flip($allowed));
     if (!$data) throw new \InvalidArgumentException("updateColor: no updatable fields provided");
@@ -195,7 +195,7 @@ $allowed = [
         }
     }
 
-    foreach (['r','g','b','exterior','interior'] as $k) {
+    foreach (['r','g','b','exterior','interior','is_inactive'] as $k) {
         if (isset($data[$k]) && $data[$k] !== null && $data[$k] !== '') {
             $v = (int)$data[$k];
             $data[$k] = max(0, min(255, $v));
@@ -209,7 +209,9 @@ $allowed = [
     $st->bindValue(':id', $id, \PDO::PARAM_INT);
 
     foreach ($data as $k => $v) {
-        $param = in_array($k, ['r','g','b'], true) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+        $param = in_array($k, ['r','g','b','exterior','interior','is_inactive'], true)
+            ? \PDO::PARAM_INT
+            : \PDO::PARAM_STR;
         $st->bindValue(":$k", $v, $param);
     }
 

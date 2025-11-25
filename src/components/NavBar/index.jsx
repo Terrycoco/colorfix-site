@@ -56,7 +56,8 @@ function NavBar() {
           label: 'Admin',
           subLinks: [
             { label: 'Categories', path: '/admin/categories' },
-            { label: 'Edit Color', path: '/admin/colors' }
+            { label: 'Edit Color', path: '/admin/colors' },
+            { label: 'Saved Palettes', path: '/admin/saved-palettes' },
           ]
         }]
       : []),

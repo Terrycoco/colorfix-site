@@ -51,8 +51,8 @@ try {
     $kind = 'prepared';
     $role = ''; // normalized (NOT NULL default '')
 
-    $repo->upsertVariant($photoId, $kind, $role, "/photos/test/$assetId/prepared/base-v1.jpg", 1600, 1067);
-    $repo->upsertVariant($photoId, $kind, $role, "/photos/test/$assetId/prepared/base-v2.jpg", 2000, 1333);
+    $repo->upsertVariant($photoId, $kind, $role, "/photos/test/$assetId/prepared/base-v1.jpg", null, null, 1600, 1067, []);
+    $repo->upsertVariant($photoId, $kind, $role, "/photos/test/$assetId/prepared/base-v2.jpg", null, null, 2000, 1333, []);
 
     // Build a SELECT that only includes columns that exist
     $selectCols = ['id','photo_id','kind','role','path','width','height'];

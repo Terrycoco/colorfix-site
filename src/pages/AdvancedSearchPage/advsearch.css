@@ -164,6 +164,12 @@ button {
 }
 .asp-wheel-toggle:hover {  text-decoration: underline; }
 
+.asp-hint {
+  font-size: 13px;
+  color: var(--asp-muted);
+  margin-top: 4px;
+}
+
 
 .asp-actionbar {
     margin-top: 2rem;

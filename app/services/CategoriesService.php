@@ -17,6 +17,8 @@ use App\Lib\Logger;
  */
 final class CategoriesService
 {
+    private const EPS = 1e-9;
+
     /** @var array<string,int> */
     private array $hueSinglesOrder = [];
 
@@ -182,9 +184,9 @@ final class CategoriesService
     private function inRange(float $x, $min, $max): bool
     {
         if ($min === null && $max === null) return true;
-        if ($min === null) return $x <= (float)$max;
-        if ($max === null) return $x >= (float)$min;
-        return $x >= (float)$min && $x <= (float)$max;
+        if ($min !== null && $x < (float)$min - self::EPS) return false;
+        if ($max !== null && $x >= (float)$max - self::EPS) return false;
+        return true;
     }
 
 private function inHueRange(float $h, $min, $max): bool

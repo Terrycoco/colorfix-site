@@ -1,0 +1,12 @@
+/* roles-bar.css */
+.roles-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.roles-bar .ed-swatch__label {
+  font-weight: 600;
+  color: var(--text-muted, #777);
+}

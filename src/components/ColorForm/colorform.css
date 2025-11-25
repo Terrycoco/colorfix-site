@@ -22,6 +22,7 @@
   display: grid; 
   grid-template-columns: repeat(3, minmax(0,1fr)); 
   gap: 12px; 
+  width: 300;
 }
 
 /* stack on narrower widths (e.g., when the left column is tight) */
@@ -48,3 +49,13 @@
 /* chip preview box (only inline color is set in JSX) */
 .cf-chipbox { display: grid; justify-items: center; align-items: center; gap: 4px; }
 .cf-chip    { width: 48px; height: 48px; border-radius: 8px; border: 1px solid #e5e7eb; }
+
+
+.cf-hex { 
+  width: 100px;
+  margin-right: 10px;
+}
+
+.cf-id {
+  width: 100px;
+}

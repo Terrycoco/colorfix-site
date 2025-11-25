@@ -42,6 +42,9 @@ $cMin   = $numOrNull(isset($data['c_min'])   ? $data['c_min']   : null);
 $cMax   = $numOrNull(isset($data['c_max'])   ? $data['c_max']   : null);
 $lMin   = $numOrNull(isset($data['l_min'])   ? $data['l_min']   : null);
 $lMax   = $numOrNull(isset($data['l_max'])   ? $data['l_max']   : null);
+$supercatId   = (int)($data['supercat_id'] ?? 0);
+if ($supercatId < 0) $supercatId = 0;
+$supercatSlug = trim((string)($data['supercat_slug'] ?? ''));
 
 $brandsIn = array();
 if (isset($data['brand'])  && is_array($data['brand']))  $brandsIn = $data['brand'];
@@ -117,16 +120,34 @@ if (!empty($brands)) {
 // HEX6 exact (sv.hex6)
 if ($hex6 !== '') { $where[] = 'UPPER(sv.hex6) = :hex6'; $params[':hex6'] = $hex6; }
 
+$joins = array('JOIN swatch_view sv ON sv.id = c.id');
+$slugFilter = '';
+$filterSupercat = ($supercatId > 0) || ($supercatSlug !== '');
+if ($filterSupercat) {
+  $joins[] = 'JOIN color_supercats cs ON cs.color_id = c.id';
+  if ($supercatSlug !== '') {
+    $slugFilter = strtolower($supercatSlug);
+    $joins[] = 'JOIN supercats sc ON sc.id = cs.supercat_id';
+    $where[] = 'sc.slug = :super_slug';
+    $where[] = 'sc.is_active = 1';
+    $params[':super_slug'] = $slugFilter;
+  }
+  if ($supercatId > 0) {
+    $where[] = 'cs.supercat_id = :super_id';
+    $params[':super_id'] = $supercatId;
+  }
+}
+$joinSql = ' ' . implode(' ', $joins) . ' ';
 $whereSql = $where ? (' WHERE ' . implode(' AND ', $where)) : '';
 
 // ---------- queries ----------
 $countSql = 'SELECT COUNT(*) AS cnt
              FROM colors c
-             JOIN swatch_view sv ON sv.id = c.id' . $whereSql;
+             ' . $joinSql . $whereSql;
 
 $dataSql  = 'SELECT sv.*
              FROM colors c
-             JOIN swatch_view sv ON sv.id = c.id' . $whereSql . '
+             ' . $joinSql . $whereSql . '
              ORDER BY c.hcl_h ASC, c.hcl_c ASC, c.hcl_l DESC
              LIMIT :limit OFFSET :offset';
 

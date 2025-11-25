@@ -1,0 +1,47 @@
+/* @components/masks-panel.css */
+.masks-panel { display:flex; flex-direction:column; gap:12px; }
+.masks-panel__title { font-weight:700; }
+.masks-panel__empty { color:#777; font-size:13px; }
+
+.masks-panel__list { display:grid; gap:8px; }
+
+.mask-row {
+  display:grid;
+  grid-template-columns: 1fr auto;
+  gap:10px;
+  align-items:flex-end;
+  padding:8px;
+  border:1px solid #eee;
+  border-radius:10px;
+  background:#fff;
+}
+.mask-row__label { font-weight:600; text-transform:capitalize; }
+.mask-row__hint { font-size:12px; color:#777; }
+
+.mask-row__overlay-btn {
+  border-radius: 6px;
+  background: #ff9800;
+  color: #fff;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-bottom: 6px;
+  outline: none;
+}
+.mask-row__overlay-btn:hover {
+  background: #e58800;
+}
+.mask-row__overlay-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.35);
+}
+
+.mask-row__overlay-gear {
+  width: 10px;
+  height: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+}

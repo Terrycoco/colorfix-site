@@ -4,7 +4,7 @@ import { API_FOLDER } from "@helpers/config";
  * Save nickname / "Terry says" / favorite flag for a palette
  * Admin-only endpoint
  */
-export async function savePaletteMeta({ palette_id, nickname, terry_says, terry_fav }) {
+export async function savePaletteMeta({ palette_id, nickname, terry_says, terry_fav, tags = [] }) {
   const url = `${API_FOLDER}/v2/admin/update-palette-meta.php?_${Date.now()}`;
   const resp = await fetch(url, {
     method: "POST",
@@ -15,6 +15,7 @@ export async function savePaletteMeta({ palette_id, nickname, terry_says, terry_
       nickname,
       terry_says,
       terry_fav: terry_fav ? 1 : 0,
+      tags,
     }),
   });
   const json = await resp.json().catch(() => ({}));

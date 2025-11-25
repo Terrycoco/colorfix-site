@@ -40,7 +40,8 @@ const initialAdvancedSearch = {
   cMax: "",
   lMin: "",
   lMax: "",
-  hex6: ""
+  hex6: "",
+  supercatSlug: ""
 };
 
 

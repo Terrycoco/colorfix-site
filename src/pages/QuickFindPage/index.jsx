@@ -1,5 +1,6 @@
 // src/pages/AdminQuickLookup.jsx
 import React, { useEffect, useRef, useState } from "react";
+import {useNavigate} from 'react-router-dom';
 import { API_FOLDER as API } from "@helpers/config";
 const v1 = '/chip-num-lookup.php';
 const v2 = '/v2/chip-num-lookup.php'
@@ -11,7 +12,7 @@ function formatChip(chip) {
 
 export default function QuickFindPage() {
  
-
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [brand, setBrand] = useState('de'); // default to DE; set '' to search all brands
   const [rows, setRows] = useState([]);
@@ -70,7 +71,7 @@ export default function QuickFindPage() {
           alignItems: 'center',
           gap: 12
         }}
-        onClick={() => onCopy(chipTxt)} // tap row to copy chip
+        onClick={() => navigate(`/color/${r.id}`)} // tap row to copy chip
       >
         <div>
             <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}>{r.name}</div>

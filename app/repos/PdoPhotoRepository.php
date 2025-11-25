@@ -24,11 +24,12 @@ class PdoPhotoRepository
         ?string $verdict,
         ?string $status,
         ?string $lighting,
-        ?string $rightsStatus
+        ?string $rightsStatus,
+        ?string $categoryPath
     ): array {
         $sql = "INSERT INTO " . self::T_PHOTOS . "
-                (asset_id, style_primary, verdict, status, lighting, rights_status, width, height, created_at)
-                VALUES (:asset_id, :style_primary, :verdict, :status, :lighting, :rights_status, 0, 0, NOW())";
+                (asset_id, style_primary, verdict, status, lighting, rights_status, category_path, width, height, created_at)
+                VALUES (:asset_id, :style_primary, :verdict, :status, :lighting, :rights_status, :category_path, 0, 0, NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':asset_id'      => $assetId,
@@ -37,6 +38,7 @@ class PdoPhotoRepository
             ':status'        => $status,
             ':lighting'      => $lighting,
             ':rights_status' => $rightsStatus,
+            ':category_path' => $categoryPath,
         ]);
         return ['id' => (int)$this->pdo->lastInsertId()];
     }
@@ -66,6 +68,13 @@ class PdoPhotoRepository
         $stmt->execute([':w' => $w, ':h' => $h, ':id' => $photoId]);
     }
 
+    public function updatePhotoCategoryPath(int $photoId, string $path): void
+    {
+        $sql = "UPDATE " . self::T_PHOTOS . " SET category_path = :path WHERE id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':path' => $path, ':id' => $photoId]);
+    }
+
     /** Upsert a variant (UNIQUE(photo_id,kind,role)). Exact columns from photos_variants. */
     public function upsertVariant(
         int $photoId,
@@ -75,24 +84,88 @@ class PdoPhotoRepository
         ?string $mime = null,
         ?int $bytes = null,
         ?int $width = null,
-        ?int $height = null
+        ?int $height = null,
+        array $overlaySettings = [],
+        ?string $originalTexture = null
     ): void {
         $roleNorm = $role ?? '';
+        $origTexture = $this->normalizeOriginalTexture($originalTexture);
+        $modeDark   = $overlaySettings['dark']['mode']   ?? null;
+        $opDark     = isset($overlaySettings['dark']['opacity']) ? (float)$overlaySettings['dark']['opacity'] : null;
+        $modeMedium = $overlaySettings['medium']['mode'] ?? null;
+        $opMedium   = isset($overlaySettings['medium']['opacity']) ? (float)$overlaySettings['medium']['opacity'] : null;
+        $modeLight  = $overlaySettings['light']['mode']  ?? null;
+        $opLight    = isset($overlaySettings['light']['opacity']) ? (float)$overlaySettings['light']['opacity'] : null;
+        $columns = array_flip($this->getVariantColumns());
+        $overlaySupported = isset($columns['overlay_mode_dark'], $columns['overlay_opacity_dark'], $columns['overlay_mode_medium'], $columns['overlay_opacity_medium'], $columns['overlay_mode_light'], $columns['overlay_opacity_light']);
+        $textureSupported = isset($columns['original_texture']);
+        $textureInsertCols = $textureSupported ? ', original_texture' : '';
+        $textureInsertVals = $textureSupported ? ', :texture' : '';
+        $textureUpdateSql  = $textureSupported ? ', original_texture = VALUES(original_texture)' : '';
+
+        if (!$overlaySupported) {
+            $sql = "
+            INSERT INTO " . self::T_VARIANTS . "
+                (photo_id, kind, role{$textureInsertCols}, path, mime, bytes, width, height, created_at, updated_at)
+            VALUES
+                (:photo_id, :kind, :role{$textureInsertVals}, :path, :mime, :bytes, :width, :height, NOW(), NOW())
+            ON DUPLICATE KEY UPDATE
+                path   = VALUES(path),
+                mime   = VALUES(mime),
+                bytes  = VALUES(bytes),
+                width  = VALUES(width),
+                height = VALUES(height)
+                {$textureUpdateSql},
+                updated_at = NOW()
+            ";
+            $stmt = $this->pdo->prepare($sql);
+            $params = [
+                ':photo_id' => $photoId,
+                ':kind'     => $kind,
+                ':role'     => $roleNorm,
+                ':path'     => $path,
+                ':mime'     => $mime,
+                ':bytes'    => $bytes,
+                ':width'    => $width,
+                ':height'   => $height,
+            ];
+            if ($textureSupported) {
+                $params[':texture'] = $origTexture;
+            }
+            $stmt->execute($params);
+            return;
+        }
+
         $sql = "
             INSERT INTO " . self::T_VARIANTS . "
-                (photo_id, kind, role, path, mime, bytes, width, height, created_at, updated_at)
+                (photo_id, kind, role{$textureInsertCols}, path, mime, bytes, width, height,
+                 overlay_mode_dark, overlay_opacity_dark,
+                 overlay_mode_medium, overlay_opacity_medium,
+                 overlay_mode_light, overlay_opacity_light,
+                 created_at, updated_at)
             VALUES
-                (:photo_id, :kind, :role, :path, :mime, :bytes, :width, :height, NOW(), NOW())
+                (:photo_id, :kind, :role{$textureInsertVals}, :path, :mime, :bytes, :width, :height,
+                 :mode_dark, :op_dark,
+                 :mode_medium, :op_medium,
+                 :mode_light, :op_light,
+                 NOW(), NOW())
             ON DUPLICATE KEY UPDATE
                 path   = VALUES(path),
                 mime   = VALUES(mime),
                 bytes  = VALUES(bytes),
                 width  = VALUES(width),
                 height = VALUES(height),
+                overlay_mode_dark   = VALUES(overlay_mode_dark),
+                overlay_opacity_dark = VALUES(overlay_opacity_dark),
+                overlay_mode_medium = VALUES(overlay_mode_medium),
+                overlay_opacity_medium = VALUES(overlay_opacity_medium),
+                overlay_mode_light  = VALUES(overlay_mode_light),
+                overlay_opacity_light = VALUES(overlay_opacity_light)
+                {$textureUpdateSql},
                 updated_at = NOW()
         ";
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([
+        $params = [
             ':photo_id' => $photoId,
             ':kind'     => $kind,
             ':role'     => $roleNorm,
@@ -101,7 +174,17 @@ class PdoPhotoRepository
             ':bytes'    => $bytes,
             ':width'    => $width,
             ':height'   => $height,
-        ]);
+            ':mode_dark'   => $modeDark,
+            ':op_dark'     => $opDark,
+            ':mode_medium' => $modeMedium,
+            ':op_medium'   => $opMedium,
+            ':mode_light'  => $modeLight,
+            ':op_light'    => $opLight,
+        ];
+        if ($textureSupported) {
+            $params[':texture'] = $origTexture;
+        }
+        $stmt->execute($params);
     }
 
     /** Back-compat for earlier code paths. */
@@ -113,21 +196,104 @@ class PdoPhotoRepository
         ?string $mime,
         ?int $bytes,
         ?int $width,
-        ?int $height
+        ?int $height,
+        array $overlaySettings = [],
+        ?string $originalTexture = null
     ): void {
-        $this->upsertVariant($photoId, $kind, $role, $path, $mime, $bytes, $width, $height);
+        $this->upsertVariant($photoId, $kind, $role, $path, $mime, $bytes, $width, $height, $overlaySettings, $originalTexture);
+    }
+
+    private ?array $variantColumnCache = null;
+
+    private function getVariantColumns(): array
+    {
+        if ($this->variantColumnCache !== null) return $this->variantColumnCache;
+        try {
+            $stmt = $this->pdo->query("SHOW COLUMNS FROM " . self::T_VARIANTS);
+            $cols = $stmt ? $stmt->fetchAll(PDO::FETCH_COLUMN, 0) : [];
+            $this->variantColumnCache = array_map('strtolower', $cols ?: []);
+        } catch (PDOException $e) {
+            $this->variantColumnCache = [];
+        }
+        return $this->variantColumnCache;
+    }
+
+    private function normalizeOriginalTexture(?string $value): ?string
+    {
+        if ($value === null) return null;
+        $trim = strtolower(trim($value));
+        if ($trim === '') return null;
+        $trim = preg_replace('/[^a-z0-9]+/', '_', $trim);
+        $trim = trim($trim, '_');
+        if ($trim === '') return null;
+        return substr($trim, 0, 64);
     }
 
     /** Return all variants for a photo (exact columns). */
     public function listVariants(int $photoId): array
     {
-        $sql = "SELECT id, photo_id, kind, role, path, mime, bytes, width, height, created_at, updated_at
+        $available = array_flip($this->getVariantColumns());
+        $baseCols = ['id','photo_id','kind','role','path','mime','bytes','width','height','created_at','updated_at'];
+        if (isset($available['original_texture'])) {
+            array_splice($baseCols, 4, 0, 'original_texture');
+        }
+        $optional = [
+            'overlay_mode_dark','overlay_opacity_dark',
+            'overlay_mode_medium','overlay_opacity_medium',
+            'overlay_mode_light','overlay_opacity_light',
+        ];
+        foreach ($optional as $col) {
+            if (isset($available[$col])) $baseCols[] = $col;
+        }
+        $selectCols = implode(',', $baseCols);
+        $sql = "SELECT {$selectCols}
                 FROM " . self::T_VARIANTS . "
                 WHERE photo_id = :pid
                 ORDER BY kind, role";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':pid' => $photoId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function updateMaskOverlay(int $photoId, string $role, array $overlaySettings, ?string $originalTexture = null): bool
+    {
+        $roleNorm = trim((string)$role);
+        if ($roleNorm === '') return false;
+
+        $available = array_flip($this->getVariantColumns());
+        $colsMap = [
+            'overlay_mode_dark'   => $overlaySettings['dark']['mode']   ?? null,
+            'overlay_opacity_dark'=> $overlaySettings['dark']['opacity']?? null,
+            'overlay_mode_medium' => $overlaySettings['medium']['mode'] ?? null,
+            'overlay_opacity_medium' => $overlaySettings['medium']['opacity'] ?? null,
+            'overlay_mode_light'  => $overlaySettings['light']['mode']  ?? null,
+            'overlay_opacity_light'=> $overlaySettings['light']['opacity'] ?? null,
+        ];
+        $setParts = [];
+        $params = [
+            ':pid'  => $photoId,
+            ':role' => $roleNorm,
+        ];
+        foreach ($colsMap as $col => $value) {
+            if (!isset($available[$col])) continue;
+            $placeholder = ':' . str_replace('overlay_', 'ov_', $col);
+            $setParts[] = "{$col} = {$placeholder}";
+            $params[$placeholder] = $value;
+        }
+        if (isset($available['original_texture'])) {
+            $setParts[] = "original_texture = :orig_texture";
+            $params[':orig_texture'] = $this->normalizeOriginalTexture($originalTexture);
+        }
+        if (!$setParts) return false;
+
+        $setParts[] = "updated_at = NOW()";
+        $sql = "UPDATE " . self::T_VARIANTS . "
+                SET " . implode(', ', $setParts) . "
+                WHERE photo_id = :pid AND kind = 'masks' AND role = :role
+                LIMIT 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount() > 0;
     }
 
     /** Add a tag (photos_tags has composite PK (photo_id, tag)). */
@@ -232,38 +398,54 @@ public function searchAssets(array $tags, string $q, int $limit, int $offset): a
         $idParams[$ph] = $id;
     }
 
-    $sqlRows = "
-        SELECT p.id, p.asset_id, p.style_primary AS title,
-               vthumb.path AS thumb_rel_path
-        FROM " . self::T_PHOTOS . " p
-        LEFT JOIN " . self::T_VARIANTS . " vthumb
-          ON vthumb.photo_id = p.id AND vthumb.kind = 'thumb'
-        WHERE p.id IN (" . implode(',', $idPh) . ")
-        ORDER BY p.id DESC";
-    $stmt = $this->pdo->prepare($sqlRows);
-    foreach ($idParams as $k => $v) $stmt->bindValue($k, $v, PDO::PARAM_INT);
-    $stmt->execute();
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    $sqlPrep = "SELECT photo_id, path FROM " . self::T_VARIANTS . "
-                WHERE kind = 'prepared_base' AND photo_id IN (" . implode(',', $idPh) . ")";
-    $stmtP = $this->pdo->prepare($sqlPrep);
-    foreach ($idParams as $k => $v) $stmtP->bindValue($k, $v, PDO::PARAM_INT);
-    $stmtP->execute();
-    $prepRows = $stmtP->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $prepByPhoto = [];
-    foreach ($prepRows as $pr) $prepByPhoto[(int)$pr['photo_id']] = (string)$pr['path'];
-
+    $rows = [];
     $tagsBy = $this->getTagsForPhotoIds($ids);
+    foreach ($ids as $pid) {
+        $photo = $this->getPhotoById($pid);
+        if (!$photo) continue;
+        $variants = $this->listVariants($pid);
+        $best = null;
+        foreach ($variants as $v) {
+            $kind = strtolower((string)$v['kind']);
+            $role = strtolower((string)($v['role'] ?? ''));
+            $path = (string)($v['path'] ?? '');
+            if ($path === '') continue;
+            $prio = 99;
+            if ($kind === 'thumb') {
+                $prio = 0;
+            } elseif ($kind === 'prepared' && ($role === '' || $role === 'base')) {
+                $prio = 1;
+            } elseif ($kind === 'prepared_base') {
+                $prio = 2;
+            } elseif ($kind === 'repaired' && ($role === '' || $role === null)) {
+                $prio = 3;
+            } elseif ($kind === 'prepared' && in_array($role, ['medium','light','dark'], true)) {
+                $prio = 4;
+            } elseif ($kind === 'masks') {
+                $prio = 5;
+            }
+            if ($prio === 99) continue;
+            if ($best === null || $prio < $best['prio']) {
+                $best = ['path' => $path, 'prio' => $prio];
+                if ($prio === 0) break;
+            }
+        }
+        $thumbPath = $best['path'] ?? '';
+        $rows[] = [
+            'id' => $pid,
+            'asset_id' => (string)($photo['asset_id'] ?? ''),
+            'title' => (string)($photo['style_primary'] ?? ''),
+            'thumb_rel_path' => $thumbPath,
+        ];
+    }
 
     $items = [];
-    foreach ($rows as $r) {
-        $pid = (int)$r['id'];
-        $thumb = $r['thumb_rel_path'] ?: ($prepByPhoto[$pid] ?? '');
+    foreach ($rows as $row) {
+        $pid = (int)$row['id'];
         $items[] = [
-            'asset_id'       => (string)$r['asset_id'],
-            'title'          => (string)($r['title'] ?? ''),
-            'thumb_rel_path' => $thumb,
+            'asset_id'       => $row['asset_id'],
+            'title'          => $row['title'],
+            'thumb_rel_path' => (string)$row['thumb_rel_path'],
             'tags'           => $tagsBy[$pid] ?? [],
         ];
     }

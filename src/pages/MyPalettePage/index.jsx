@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { useAppState } from "@context/AppStateContext";
+import { isAdmin } from "@helpers/authHelper";
 import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 import SwatchGallery from "@components/SwatchGallery";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
@@ -69,8 +70,24 @@ const activeBrandCodes = useMemo(() => {
     })
   : srcPalette;
 
-  const isEmpty = palette.length === 0;
+  const getHex = (sw) => {
+    const color = sw?.color ?? sw;
+    const raw = color?.hex6 || color?.hex || color?.rep_hex || color?.hex_code || "";
+    if (!raw) return "#cccccc";
+    return raw.startsWith("#") ? raw : `#${raw}`;
+  };
+
+  const paletteColorIds = useMemo(() => {
+    const arr = Array.isArray(palette) ? palette : [];
+    return arr
+      .map((sw) => sw?.color?.id ?? sw?.id ?? null)
+      .map((id) => (id == null ? null : Number(id)))
+      .filter((id) => Number.isFinite(id) && id > 0);
+  }, [palette]);
+
+  const isPaletteEmpty = filteredPalette.length === 0;
   const navigate = useNavigate();
+  const adminMode = isAdmin();
 
   // Results (friends / neutrals / similar / opposite)
   const [friends, setFriends] = useState([]);
@@ -94,6 +111,26 @@ const activeBrandCodes = useMemo(() => {
   const [tolOpp, setTolOpp] = useState(0);
 
   const heroRef = useRef(null);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
+
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveForm, setSaveForm] = useState({
+    brand: "de",
+    nickname: "",
+    notes: "",
+    terry_fav: false,
+    sent_to_email: "",
+    client_name: "",
+    client_email: "",
+    client_phone: "",
+    client_notes: "",
+  });
+  const [saveStatus, setSaveStatus] = useState({ loading: false, error: "", success: "" });
 
   const CLEAR_ON = ["/v2/get-friends.php"];
 
@@ -145,6 +182,10 @@ const activeBrandCodes = useMemo(() => {
       setFriends(rows);
       setNoResultsFound(rows.length === 0);
       setNeighborsUsed(data && typeof data === "object" ? data.neighbors_used || null : null);
+
+      if (isMobile && !isPaletteEmpty) {
+        setPaletteCollapsed(true);
+      }
     } catch {
       setFriends([]);
       setNoResultsFound(true);
@@ -187,6 +228,7 @@ const activeBrandCodes = useMemo(() => {
       setFriendsMode(mode);
       modeRef.current = mode;
     }
+    if (isMobile) setControlsOpen(false);
     return runQuery(endpoint, tol, mode ?? modeRef.current);
   }
 
@@ -202,10 +244,31 @@ const activeBrandCodes = useMemo(() => {
   }, [friendsMode]);
 
   useEffect(() => {
-  const ep = endpointRef.current;
-  if (!ep) return;             // nothing has been run yet
-  runQuery(ep, tolRef.current, modeRef.current);
-}, [activeBrandCodes.join(',')]);
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const handler = (e) => setIsMobile(e.matches);
+    handler(mq);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setControlsOpen(false);
+      setPaletteCollapsed(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    const ep = endpointRef.current;
+    if (!ep) return;             // nothing has been run yet
+    runQuery(ep, tolRef.current, modeRef.current);
+  }, [activeBrandCodes.join(',')]);
+
+  // expand palette if empty
+  useEffect(() => {
+    if (filteredPalette.length === 0) setPaletteCollapsed(false);
+  }, [filteredPalette.length]);
 
   // jump to top on first mount
   useEffect(() => {
@@ -220,19 +283,29 @@ const activeBrandCodes = useMemo(() => {
     runQuery(ep, tolRef.current, modeRef.current);
   }, [brandFiltersAppliedSeq]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = controlsOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [controlsOpen, isMobile]);
+
   // Sticky bar visibility (off on this page)
   useEffect(() => {
-    setShowPalette(false);
-    const target = document.getElementById("sticky-sentinel") || heroRef.current;
-    if (!target) return;
-    const BAR_H = 70;
-    const io = new IntersectionObserver(
-      ([entry]) => setShowPalette(!entry.isIntersecting),
-      { root: null, rootMargin: `-${BAR_H}px 0px 0px 0px`, threshold: 0 }
-    );
-    io.observe(target);
-    return () => io.disconnect();
-  }, [setShowPalette]);
+    if (!isMobile) {
+      const target = document.getElementById("sticky-sentinel") || heroRef.current;
+      if (!target) return;
+      const BAR_H = 70;
+      const io = new IntersectionObserver(
+        ([entry]) => setShowPalette(!entry.isIntersecting),
+        { root: null, rootMargin: `-${BAR_H}px 0px 0px 0px`, threshold: 0 }
+      );
+      io.observe(target);
+      return () => io.disconnect();
+    }
+    setShowPalette(isPaletteEmpty ? false : paletteCollapsed);
+  }, [setShowPalette, isMobile, isPaletteEmpty, paletteCollapsed]);
 
   /* ---------- Handlers ---------- */
 
@@ -261,6 +334,7 @@ const activeBrandCodes = useMemo(() => {
   function handleClear() {
     setFriends([]);
     clearPalette();
+    setPaletteCollapsed(false);
   }
 
   function onFuzzyPick(item) {
@@ -310,29 +384,209 @@ const activeBrandCodes = useMemo(() => {
     navigate(url.pathname + url.search);
   };
 
+  const ControlsContent = () => (
+    <div className="controls-grid controls-vertical">
+      <div className="cell">
+        <FuzzySearchColorSelect
+          onSelect={onFuzzyPick}
+          className="myp-fuzzy"
+          placeholder="Enter a color"
+          autoFocus={false}
+        />
+      </div>
+
+      <div className="cell">
+        <button onClick={handleFriends}>What Colors Go?</button>
+      </div>
+
+      <div className="cell">
+        <button onClick={handleNeutrals}>What Neutrals Go?</button>
+      </div>
+
+      <div className="cell">
+        <div className="hue-stack">
+          <button className="hue-btn" onClick={handleSimilar}>Same Hue</button>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            value={tolSame}
+            onChange={(e) => setTolSame(Number(e.target.value))}
+            className="hue-tolerance"
+            placeholder="0"
+            title="degree tolerance"
+            onFocus={selectAll}
+            onMouseUp={keepSelection}
+            onPointerUp={keepSelection}
+          />
+        </div>
+      </div>
+
+      <div className="cell">
+        <div className="hue-stack">
+          <button className="hue-btn" onClick={handleOpposites}>Opposite Hue</button>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            value={tolOpp}
+            onChange={(e) => setTolOpp(Number(e.target.value))}
+            className="hue-tolerance"
+            placeholder="0"
+            title="degree tolerance"
+            onFocus={selectAll}
+            onMouseUp={keepSelection}
+            onPointerUp={keepSelection}
+          />
+        </div>
+      </div>
+
+      <div className="cell">
+        <button type="button" onClick={handleBrowse}>
+          See Designer Palettes
+        </button>
+      </div>
+
+      <div className="cell">
+        <button type="button" onClick={handleTranslate}>
+          See In All Brands
+        </button>
+      </div>
+
+      <div className="cell">
+        <label className="include-close">
+          <input
+            type="checkbox"
+            checked={includeNeighbors}
+            onChange={(e) => setIncludeNeighbors(e.target.checked)}
+          />
+          Include close matches
+        </label>
+      </div>
+    </div>
+  );
+
+  const openControlsPanel = () => {
+    setPaletteCollapsed(false);
+    setControlsOpen(true);
+  };
+  const closeControlsPanel = () => setControlsOpen(false);
+  const hidePalettePanel = isMobile && !isPaletteEmpty && paletteCollapsed;
+
+  useEffect(() => {
+    setSaveForm((prev) => ({
+      ...prev,
+      brand: prev.brand || activeBrandCodes[0] || "",
+    }));
+  }, [activeBrandCodes]);
+
+  function handleSaveFieldChange(e) {
+    const { name, value, type, checked } = e.target;
+    setSaveForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
+  function openSaveModal() {
+    setSaveStatus({ loading: false, error: "", success: "" });
+    setSaveModalOpen(true);
+  }
+
+  function closeSaveModal() {
+    if (saveStatus.loading) return;
+    setSaveModalOpen(false);
+  }
+
+  async function handleSaveSubmit(e) {
+    e.preventDefault();
+    const brandToUse = (saveForm.brand || activeBrandCodes[0] || "").trim();
+    if (!brandToUse) {
+      setSaveStatus({ loading: false, error: "Brand is required", success: "" });
+      return;
+    }
+    if (!paletteColorIds.length) {
+      setSaveStatus({ loading: false, error: "Add at least one color before saving", success: "" });
+      return;
+    }
+    setSaveStatus({ loading: true, error: "", success: "" });
+    try {
+      const payload = {
+        brand: brandToUse,
+        color_ids: paletteColorIds,
+        nickname: saveForm.nickname || null,
+        notes: saveForm.notes || null,
+        terry_fav: !!saveForm.terry_fav,
+        sent_to_email: saveForm.sent_to_email || saveForm.client_email || null,
+        client_name: saveForm.client_name || null,
+        client_email: saveForm.client_email || null,
+        client_phone: saveForm.client_phone || null,
+        client_notes: saveForm.client_notes || null,
+      };
+      const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-save.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "Failed to save palette");
+      }
+      const newId = data?.data?.palette?.id ?? "";
+      setSaveStatus({
+        loading: false,
+        error: "",
+        success: newId ? `Saved palette #${newId}` : "Palette saved",
+      });
+    } catch (err) {
+      setSaveStatus({ loading: false, error: err?.message || "Failed to save", success: "" });
+    }
+  }
+
   /* ---------- Render ---------- */
   return (
     <div className="mypage">
-      <div id="palette-hero" ref={heroRef}>
+      <div
+        id="palette-hero"
+        ref={heroRef}
+        style={{ display: hidePalettePanel ? "none" : undefined }}
+      >
+             <h1 className="myp-title">My Palette</h1>
         <div className="myp-header">
-          {palette?.length > 0 && (
-            <button
-              className="myp-clear-btn"
-              onClick={handleClear}
-              title="Clear palette"
-              aria-label="Clear palette"
-              disabled={isEmpty}
-            >
-              Clear
-            </button>
-          )}
-          <h1 className="myp-title">My Palette</h1>
+          <div className="myp-header-actions">
+            {!isPaletteEmpty && (
+              <button
+                className="myp-clear-btn"
+                onClick={handleClear}
+                title="Clear palette"
+                aria-label="Clear palette"
+                disabled={isPaletteEmpty}
+              >
+                Clear
+              </button>
+            )}
+            {adminMode && (
+              <button className="myp-clear-btn" type="button" onClick={() => navigate(`/admin/saved-palettes`)}>
+                Saved Palettes
+              </button>
+            )}
+            {adminMode && !isPaletteEmpty && (
+              <button className="myp-clear-btn" type="button" onClick={openSaveModal}>
+                Save
+              </button>
+            )}
+          </div>
+     
           <div className="myp-header-spacer" aria-hidden="true" />
         </div>
 
         <section className="myp-top">
-          {isEmpty ? (
-            <div className="myp-empty">Your palette is empty. Add a color below.</div>
+          {isPaletteEmpty ? (
+            <div className="myp-empty">
+              <p>You have no colors saved yet. Enter a color name to start your palette.</p>
+              <FuzzySearchColorSelect onSelect={onFuzzyPick} className="myp-empty-fuzzy" />
+            </div>
           ) : (
             <div className="myp-row">
               <SwatchGallery
@@ -351,78 +605,11 @@ const activeBrandCodes = useMemo(() => {
 
       <div id="sticky-sentinel" aria-hidden="true" style={{ height: 1 }} />
 
-      <section className="myp-actions controls-grid">
-        <div className="cell area-fuzzy">
-          <FuzzySearchColorSelect onSelect={onFuzzyPick} className="myp-fuzzy" />
-        </div>
-
-        <div className="cell area-colors">
-          <button onClick={handleFriends}>What Colors Go?</button>
-        </div>
-
-        <div className="cell area-same">
-          <div className="hue-stack">
-            <button onClick={handleSimilar}>Same Hue</button>
-            <input
-              type="number"
-              min="0"
-              max="30"
-              value={tolSame}
-              onChange={(e) => setTolSame(Number(e.target.value))}
-              className="hue-tolerance"
-              placeholder="0"
-              title="degree tolerance"
-              onFocus={selectAll}
-              onMouseUp={keepSelection}
-              onPointerUp={keepSelection}
-            />
-          </div>
-        </div>
-
-        <div className="cell area-brands">
-          <button type="button" onClick={handleBrowse}>
-            See Palettes Based on Your Colors
-          </button>
-        </div>
-
-        <div className="cell area-include">
-          <label className="include-close">
-            <input
-              type="checkbox"
-              checked={includeNeighbors}
-              onChange={(e) => setIncludeNeighbors(e.target.checked)}
-            />
-            Include close matches
-          </label>
-        </div>
-
-        <div className="cell area-neutrals">
-          <button onClick={handleNeutrals}>What Neutrals Go?</button>
-        </div>
-
-        <div className="cell area-opposite">
-          <div className="hue-stack">
-            <button onClick={handleOpposites}>Opposite Hue</button>
-            <input
-              type="number"
-              min="0"
-              max="30"
-              value={tolOpp}
-              onChange={(e) => setTolOpp(Number(e.target.value))}
-              className="hue-tolerance"
-              placeholder="0"
-              title="degree tolerance"
-              onFocus={selectAll}
-              onMouseUp={keepSelection}
-              onPointerUp={keepSelection}
-            />
-          </div>
-        </div>
-
-        <div className="cell area-brands-2">
-          <button type="button" onClick={handleTranslate}>See In All Brands</button>
-        </div>
-      </section>
+      {!isMobile && (
+        <section className="myp-actions">
+          <ControlsContent />
+        </section>
+      )}
 
       <section className="myp-friends-results">
         {loading ? (
@@ -486,6 +673,159 @@ const activeBrandCodes = useMemo(() => {
           </>
         )}
       </section>
+
+      {isMobile && (
+        <>
+          <button
+            type="button"
+            className={`myp-fab-add${controlsOpen ? " is-hidden" : ""}`}
+            onClick={openControlsPanel}
+            aria-label="Add colors"
+          >
+            +
+          </button>
+          <div className={`myp-drawer ${controlsOpen ? "open" : ""}`}>
+            <div className="myp-drawer-header">
+             
+               <div type="button" className="drawer-back" onClick={closeControlsPanel} aria-label="Close tools">
+                  ←
+                </div>
+                  
+              <div className="drawer-title">
+                  <div>Palette Tools</div>
+              </div>
+
+            </div>
+            <div className="myp-drawer-body">
+              <ControlsContent />
+            </div>
+          </div>
+          {controlsOpen && <div className="myp-drawer-backdrop" onClick={closeControlsPanel} />}
+        </>
+      )}
+
+
+
+      {adminMode && saveModalOpen && (
+        <div className="myp-save-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="myp-save-modal">
+            <div className="save-modal-head">
+              <h2>Save Palette</h2>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={closeSaveModal}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+            <form className="save-form" onSubmit={handleSaveSubmit}>
+              <label>
+                Brand Code
+                <input
+                  name="brand"
+                  type="text"
+                  value={saveForm.brand}
+                  onChange={handleSaveFieldChange}
+                  placeholder="e.g., de, sw"
+                  required
+                />
+              </label>
+              <label>
+                Nickname
+                <input
+                  name="nickname"
+                  type="text"
+                  value={saveForm.nickname}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <label>
+                Notes
+                <textarea
+                  name="notes"
+                  rows={3}
+                  value={saveForm.notes}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <label className="checkbox-row">
+                <input
+                  type="checkbox"
+                  name="terry_fav"
+                  checked={saveForm.terry_fav}
+                  onChange={handleSaveFieldChange}
+                />
+                Mark as Terry Favorite
+              </label>
+              <label>
+                Send to Email
+                <input
+                  type="email"
+                  name="sent_to_email"
+                  value={saveForm.sent_to_email}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <hr />
+              <h3>Client (optional)</h3>
+              <label>
+                Client Name
+                <input
+                  type="text"
+                  name="client_name"
+                  value={saveForm.client_name}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <label>
+                Client Email
+                <input
+                  type="email"
+                  name="client_email"
+                  value={saveForm.client_email}
+                  onChange={handleSaveFieldChange}
+                  placeholder="client@example.com"
+                />
+              </label>
+              <label>
+                Client Phone
+                <input
+                  type="text"
+                  name="client_phone"
+                  value={saveForm.client_phone}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <label>
+                Client Notes
+                <textarea
+                  name="client_notes"
+                  rows={2}
+                  value={saveForm.client_notes}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              {saveStatus.error && <div className="save-error">{saveStatus.error}</div>}
+              {saveStatus.success && <div className="save-success">{saveStatus.success}</div>}
+              <div className="save-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={closeSaveModal}
+                  disabled={saveStatus.loading}
+                >
+                  Close
+                </button>
+                <button type="submit" className="primary" disabled={saveStatus.loading}>
+                  {saveStatus.loading ? "Saving…" : "Save Palette"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

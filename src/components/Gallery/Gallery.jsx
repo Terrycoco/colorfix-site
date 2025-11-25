@@ -11,12 +11,14 @@ import BrandItem from '../GalleryItems/BrandItem';
 import ButtonItem from '../GalleryItems/ButtonItem';
 import HeaderItem from '../GalleryItems/HeaderItem';
 import NameSearchItem from '../GalleryItems/NameSearchItem';
+import WheelItem from '../GalleryItems/WheelItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
 const renderContent = (item) => {
   const key = item.id || item.query_id || `${Math.random()}-${item.item_type || 'itm'}`;
-  switch (item.item_type) {
+  const type = (item.item_type || '').toLowerCase();
+  switch (type) {
     case 'swatch':      return <SwatchItem key={key} item={item} />;
     case 'image':       return <ImageItem key={key} item={item} />;
     case 'search':      return <SearchItem key={key} item={item} />;
@@ -25,6 +27,7 @@ const renderContent = (item) => {
     case 'brand':       return <BrandItem key={key} item={item} />;
     case 'button':      return <ButtonItem key={key} item={item} />;
     case 'name-search': return <NameSearchItem key={key} item={item} />;
+    case 'wheel':       return <WheelItem key={key} item={item} />;
     default:            return null;
   }
 };

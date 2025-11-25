@@ -8,7 +8,7 @@ import "./photorenderer.css";
  *  - assignments: { [role]: { hex6, L, a, b } }
  *  - viewMode: "before" | "after" | "prepared"
  */
-export default function PhotoRenderer({ asset, assignments, viewMode }) {
+export default function PhotoRenderer({ asset, assignments, viewMode, onStateChange }) {
   const [compositeUrl, setCompositeUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -28,16 +28,21 @@ export default function PhotoRenderer({ asset, assignments, viewMode }) {
 
   // Render when assignments change and we're in "after" mode
   useEffect(() => {
-    if (!asset?.asset_id) return;
+    if (!asset?.asset_id) {
+      onStateChange?.({ loading: false, error: "" });
+      return;
+    }
 
     if (viewMode !== "after" || Object.keys(hexMap).length === 0) {
       setCompositeUrl("");
       setErr("");
+      onStateChange?.({ loading: false, error: "" });
       return;
     }
 
     setLoading(true);
     setErr("");
+    onStateChange?.({ loading: true, error: "" });
     fetch(`${API_FOLDER}/v2/photos/render-apply.php`, {
       method: "POST",
       credentials: "include",
@@ -54,9 +59,16 @@ export default function PhotoRenderer({ asset, assignments, viewMode }) {
         if (data?.error) throw new Error(data.error);
         const url = data?.render_url || "";
         setCompositeUrl(url ? `${url}?ts=${Date.now()}` : "");
+        onStateChange?.({ loading: false, error: "" });
       })
-      .catch(e => setErr(e?.message || "Render failed"))
-      .finally(() => setLoading(false));
+      .catch(e => {
+        const msg = e?.message || "Render failed";
+        setErr(msg);
+        onStateChange?.({ loading: false, error: msg });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [asset?.asset_id, hexMap, viewMode]);
 
   // Which image to show
@@ -96,23 +108,6 @@ export default function PhotoRenderer({ asset, assignments, viewMode }) {
             onClick={toggleFull}
           />
         )}
-      </div>
-
-      <div className="render-footer">
-        <div className="render-meta">
-          <span className="meta-item"><span className="k">Asset:</span><span className="v">{asset?.asset_id || "—"}</span></span>
-          <span className="meta-item"><span className="k">View:</span><span className="v">{viewMode}</span></span>
-          {viewMode === "after" && (
-            <span className="meta-item">
-              <span className="k">Roles:</span>
-              <span className="v">{Object.keys(hexMap).length ? Object.keys(hexMap).join(", ") : "none"}</span>
-            </span>
-          )}
-        </div>
-        <div className="render-state">
-          {loading && <span className="status">Rendering…</span>}
-          {err && <span className="error">{err}</span>}
-        </div>
       </div>
 
       {/* Fullscreen overlay */}

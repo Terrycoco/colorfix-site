@@ -78,7 +78,7 @@ function CategoryDropdown({ onSelect, useShowAll = false }) {
         onPointerDown={() => { lastPointerDownAtRef.current = Date.now(); }}
       >
         {useShowAll && (
-          <option value={SHOW_ALL}>Show All</option>
+          <option value={SHOW_ALL}>Any</option>
         )}
         {hueCategories.map((cat) => (
           <option key={cat.id} value={JSON.stringify(cat)}>

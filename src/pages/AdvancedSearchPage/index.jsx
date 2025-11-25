@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
 import './advsearch.css';
@@ -7,6 +7,7 @@ import { toDisplayHue, toWheelRange } from '@helpers/hueHelper';
 import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
 import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
 import TopSpacer from '@layout/TopSpacer';
+import { API_FOLDER } from '@helpers/config';
 
 const GALLERY_PATH = '/adv-results'; // results page reads from appState.advancedSearch
 
@@ -19,11 +20,14 @@ export default function AdvancedSearchPage() {
     hueMin, hueMax,
     cMin, cMax,
     lMin, lMax,
-    hex6 = ''   // NEW: use hex6 in state
+    hex6 = '',
+    supercatSlug = ''
   } = advancedSearch;
 
   const [wheelVisible, setWheelVisible] = useState(false);
   const [catObj, setCatObj] = useState(null); // keep for clearAll()
+  const [supercats, setSupercats] = useState([]);
+  const [supercatState, setSupercatState] = useState({ loading: false, error: '' });
 
   const selectedCat = useMemo(
     () => categories.find(c => c.id === selectedCatId) || null,
@@ -44,6 +48,40 @@ export default function AdvancedSearchPage() {
   const setLMinUI  = (v) => setAdvancedSearch(p => ({ ...p, lMin: v }));
   const setLMaxUI  = (v) => setAdvancedSearch(p => ({ ...p, lMax: v }));
   const setHex6UI  = (v) => setAdvancedSearch(p => ({ ...p, hex6: v }));
+  const setSupercatSlugUI = (slug) => setAdvancedSearch(p => ({ ...p, supercatSlug: slug }));
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchSupercats() {
+      setSupercatState({ loading: true, error: '' });
+      try {
+        const res = await fetch(`${API_FOLDER}/v2/admin/supercats.php?action=list`, {
+          credentials: 'include',
+          headers: { Accept: 'application/json' }
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!data?.ok) throw new Error(data?.error || 'Failed to load supercats');
+        const active = (data.supercats || []).filter(sc => (sc?.is_active ?? 1) === 1);
+        setSupercats(active);
+        setSupercatState({ loading: false, error: '' });
+      } catch (err) {
+        if (cancelled) return;
+        setSupercatState({ loading: false, error: err?.message || 'Unable to load supercats' });
+      }
+    }
+    fetchSupercats();
+    return () => { cancelled = true; };
+  }, []);
+
+  const supercatOptions = useMemo(
+    () => supercats.map((sc) => ({
+      slug: sc.slug,
+      label: sc.display_name || sc.slug || `Supercat ${sc.id}`,
+      id: sc.id
+    })),
+    [supercats]
+  );
 
   function clearAll() {
     setAdvancedSearch({
@@ -51,7 +89,8 @@ export default function AdvancedSearchPage() {
       hueMin: '', hueMax: '',
       cMin: '', cMax: '',
       lMin: '', lMax: '',
-      hex6: '' // NEW
+      hex6: '',
+      supercatSlug: ''
     });
     setCatObj(null);
   }
@@ -123,12 +162,32 @@ function handleSubmit(e) {
 
         <div className="asp-hcl-block">
           {/* Category */}
+           <div className="asp-row">
           <div className="asp-field">
             <div className="asp-dropdown-row">
-              <label htmlFor="category">Hue Category</label>
-              <CategoryDropdown onSelect={(cat) => applyPreset(cat, 'hue')} />
+              <CategoryDropdown onSelect={(cat) => applyPreset(cat, 'hue')} useShowAll />
             </div>
           </div>
+
+          {/* Supercat */}
+          <div className="asp-field">
+            <label htmlFor="supercat">Supercat</label>
+            <select
+              id="supercat"
+              value={supercatSlug}
+              onChange={(e) => setSupercatSlugUI(e.target.value)}
+              disabled={supercatState.loading}
+            >
+              <option value="">Any</option>
+              {supercatOptions.map((opt) => (
+                <option key={opt.slug || opt.id} value={opt.slug || ''}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {supercatState.error && <div className="asp-hint">{supercatState.error}</div>}
+          </div>
+    </div>
 
           {/* Hue range */}
           <div className="asp-row">

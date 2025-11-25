@@ -6,6 +6,7 @@
 .fuzzy-dropdown {
   position: relative;
   max-width: 320px;
+  min-width: 200px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -37,7 +38,7 @@
   color: #000;
 
   /* Reserve space so clear button never overlaps caret/text */
-  padding-right: 40px;
+  padding-right: 36px;
 }
 
 /* Placeholder sizing keeps iOS calm */
@@ -66,30 +67,52 @@
   top: 50%;
   right: 8px;
   transform: translateY(-50%);
-  width: 28px;            /* fits inside the 40px padding */
-  height: 28px;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  max-width: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
+  box-sizing: border-box;
 
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
 
-  background: transparent;
-  border: 0;
-  padding: 0;
-  margin: 0;
+  background: rgba(255,255,255,0.95) !important;
+  border: 1px solid rgba(0,0,0,0.25) !important;
+  border-radius: 3px;
+  padding: 0 !important;
+  margin: 0 !important;
 
-  font-size: 20px;
+  font-size: 14px;
   line-height: 1;
-  color: inherit;         /* matches input text color */
+  color: #333 !important;
   cursor: pointer;
   z-index: 2;             /* above input, but only in the padding zone */
   touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none !important;
+}
+
+.fuzzy-clear-btn:hover,
+.fuzzy-clear-btn:focus-visible {
+  background: #ff9400 !important;
+  border-color: #ff9400 !important;
+  color: #fff !important;
+}
+
+.fuzzy-clear-icon {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 @media (pointer: coarse) {
   .fuzzy-clear-btn {
-    width: 32px;
-    height: 32px;
+    width: 26px !important;
+    height: 26px !important;
     right: 10px;
   }
 }
@@ -163,9 +186,102 @@
 }
 
 /* If your global CSS sets display: block or flex on buttons, reset it */
-.myp-fuzzy .fuzzy-clear-btn {
+.myp-fuzzy {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.fuzzy-dropdown.full-width {
+  width: 100%;
+  max-width: initial;
+}
+
+/* ===== Mobile sheet ===== */
+.fuzzy-mobile-trigger{
+  width:100%;
+  padding:10px 12px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  font-size:1rem;
+  text-align:left;
+}
+
+.fuzzy-sheet{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  top:0;
+  background:#fff;
+  z-index:30000;
+  display:flex;
+  flex-direction:column;
+}
+.fuzzy-sheet-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px;
+  border-bottom:1px solid #eee;
+}
+.fuzzy-sheet-body{
+  padding:16px;
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  overflow:hidden;
+}
+.fuzzy-sheet-input{
+  width:100%;
+  padding:10px 12px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  font-size:1rem;
+}
+.fuzzy-sheet-results{
+  flex:1;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.fuzzy-sheet-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  background:#fefefe;
+  font-size:1rem;
+}
+.sheet-swatch{
+  width:40px;
+  height:40px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,.2);
+  flex-shrink:0;
+}
+.sheet-name{
+  font-weight:600;
+  flex:1;
+}
+.sheet-brand{
+  font-size:0.85rem;
+  color:#666;
+}
+.fuzzy-sheet-empty{
+  text-align:center;
+  color:#777;
+  margin-top:20px;
+}
+.fuzzy-sheet-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.25);
+  z-index:25000;
 }

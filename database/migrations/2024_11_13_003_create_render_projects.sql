@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS render_projects (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  asset_photo_id INT UNSIGNED NOT NULL,
+  palette_id BIGINT UNSIGNED NULL,
+  customer_email VARCHAR(128) NULL,
+  title VARCHAR(128) NULL,
+  notes TEXT NULL,
+  is_public TINYINT(1) NOT NULL DEFAULT 0,
+  finished_photo_id INT UNSIGNED NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (asset_photo_id) REFERENCES photos(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (palette_id) REFERENCES palettes(id)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  FOREIGN KEY (finished_photo_id) REFERENCES photos(id)
+    ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS render_project_roles (
+  project_id BIGINT UNSIGNED NOT NULL,
+  role_id INT UNSIGNED NOT NULL,
+  color_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (project_id, role_id),
+  FOREIGN KEY (project_id) REFERENCES render_projects(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (role_id) REFERENCES master_roles(id)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS render_project_masks (
+  project_id BIGINT UNSIGNED NOT NULL,
+  mask_slug VARCHAR(64) NOT NULL,
+  mode ENUM('role','override','off') NOT NULL DEFAULT 'role',
+  color_id INT UNSIGNED NULL,
+  overlay_kind VARCHAR(64) NULL,
+  PRIMARY KEY (project_id, mask_slug),
+  FOREIGN KEY (project_id) REFERENCES render_projects(id)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -28,6 +28,7 @@ try {
     // Normalize booleans to 0/1 if provided
     if (array_key_exists('exterior', $data)) $data['exterior'] = $data['exterior'] ? 1 : 0;
     if (array_key_exists('interior', $data)) $data['interior'] = $data['interior'] ? 1 : 0;
+    if (array_key_exists('is_inactive', $data)) $data['is_inactive'] = $data['is_inactive'] ? 1 : 0;
 
     $svc = new ColorSaveService();
     $res = $svc->save($data, $pdo);

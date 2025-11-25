@@ -79,7 +79,8 @@ try {
     null,   // verdict
     null,   // status
     null,   // lighting
-    null    // rights_status
+    null,   // rights_status
+    null    // category_path
   );
   assert_true(is_array($ret) && isset($ret['id']), 'createPhotoShell should return ["id"=>int]');
   $photoId = (int)$ret['id'];

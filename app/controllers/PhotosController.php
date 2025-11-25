@@ -64,10 +64,10 @@ class PhotosController
 
             // Masks — support both "mask:<role>" (legacy) and kind='masks' role='<role>'
             if ($kind === 'masks' && $role !== '') {
-                $masks[] = ['role' => $role, 'url' => $toUrl($rel)];
+                $masks[] = $this->buildMaskPayload($role, $rel, $v, $toUrl);
             } elseif (str_starts_with($kind, 'mask:')) {
                 $roleLegacy = (string)($v['role'] ?? substr($kind, 5));
-                $masks[] = ['role' => $roleLegacy, 'url' => $toUrl($rel)];
+                $masks[] = $this->buildMaskPayload($roleLegacy, $rel, $v, $toUrl);
             }
         }
 
@@ -77,15 +77,25 @@ class PhotosController
             $precomputed[(string)$row['role']] = ['Lm' => (float)$row['l_avg01']];
         }
 
+        $tagsMap = $repo->getTagsForPhotoIds([(int)$photo['id']]);
+        $tags = $tagsMap[(int)$photo['id']] ?? [];
+
         return [
             'asset_id'       => (string)$photo['asset_id'],
             'width'          => (int)$photo['width'],
             'height'         => (int)$photo['height'],
+            'category_path'  => (string)($photo['category_path'] ?? ''),
             'repaired_url'   => $repairedUrl,
             'prepared_url'   => $preparedUrl,     // legacy single, may be null
             'prepared_tiers' => $preparedTiers,   // {dark|null, medium|null, light|null}
             'masks'          => $masks,
             'precomputed'    => $precomputed ?: null,
+            'style_primary'  => (string)($photo['style_primary'] ?? ''),
+            'verdict'        => (string)($photo['verdict'] ?? ''),
+            'status'         => (string)($photo['status'] ?? ''),
+            'lighting'       => (string)($photo['lighting'] ?? ''),
+            'rights_status'  => (string)($photo['rights_status'] ?? ''),
+            'tags'           => $tags,
         ];
     }
 
@@ -94,8 +104,9 @@ class PhotosController
     {
         $tags   = (array)($q['tags'] ?? []);
         $qtext  = (string)($q['q'] ?? '');
+        $page   = max(1, (int)($q['page'] ?? 1));
         $limit  = max(1, min(100, (int)($q['limit'] ?? 24)));
-        $offset = max(0, (int)($q['offset'] ?? 0));
+        $offset = ($page - 1) * $limit;
 
         $repo = new PdoPhotoRepository($this->pdo);
         $res  = $repo->searchAssets($tags, $qtext, $limit, $offset);
@@ -122,6 +133,7 @@ class PhotosController
         return [
             'items' => $items,
             'total' => (int)($res['total'] ?? 0),
+            'page'  => $page,
         ];
     }
 
@@ -146,12 +158,13 @@ class PhotosController
     /**
      * POST upload: supports legacy prepared_base + masks[], and NEW prepared trio:
      *   prepared_dark | prepared_medium | prepared_light
+     *   texture_overlay (PNG luminance layer)
      *
      * Saves under: /photos/YYYY/YYYY-MM/ASSET_ID/{prepared,masks,thumb,renders}
      */
     public function upload(array $post, array $files): array
     {
-        $doc = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+        $doc = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__.'/../../..'), '/');
         $photosRoot = $doc . '/photos';
 
         // Helpers
@@ -185,16 +198,21 @@ class PhotosController
         $lighting  = $post['lighting']  ?? null;
         $rights    = $post['rights']    ?? null;
         $tagsCsv   = trim((string)($post['tags'] ?? ''));
+        $categoryInput = $this->sanitizeCategoryPath($post['category_path'] ?? null);
 
         $hasPreparedSingle = isset($files['prepared_base']) && $files['prepared_base']['error'] === UPLOAD_ERR_OK;
+        $hasTexture        = isset($files['texture_overlay']) && $files['texture_overlay']['error'] === UPLOAD_ERR_OK;
         $hasMasks          = isset($files['masks']) && is_array($files['masks']['name']);
 
         $hasDark   = !empty($files['prepared_dark'])   && $files['prepared_dark']['error']   === UPLOAD_ERR_OK;
         $hasMedium = !empty($files['prepared_medium']) && $files['prepared_medium']['error'] === UPLOAD_ERR_OK;
         $hasLight  = !empty($files['prepared_light'])  && $files['prepared_light']['error']  === UPLOAD_ERR_OK;
 
-        if (!$assetIdIn && !$hasPreparedSingle && !$hasMasks && !$hasDark && !$hasMedium && !$hasLight) {
-            throw new RuntimeException('Upload requires prepared_base and/or prepared_dark/medium/light and/or masks (or provide existing asset_id).');
+        if (!$assetIdIn && !$hasPreparedSingle && !$hasDark && !$hasMedium && !$hasLight) {
+            throw new RuntimeException('New assets require prepared_base (or prepared_dark/medium/light).');
+        }
+        if (!$assetIdIn && $hasTexture && !$hasPreparedSingle && !$hasDark && !$hasMedium && !$hasLight) {
+            throw new RuntimeException('Upload prepared base before attaching a texture overlay.');
         }
 
         $repo = new PdoPhotoRepository($this->pdo);
@@ -206,12 +224,20 @@ class PhotosController
             if (!$photo) throw new RuntimeException("asset_id not found: {$assetIdIn}");
             $assetId = (string)$photo['asset_id'];
             $photoId = (int)$photo['id'];
+            $categoryPath = $this->resolveCategoryPathForPhoto($photo, $repo);
+            if ($categoryInput && $categoryInput !== $categoryPath) {
+                $svc->moveAssetBase($assetId, $categoryPath, $categoryInput);
+                $repo->updatePhotoCategoryPath($photoId, $categoryInput);
+                $categoryPath = $categoryInput;
+            }
         } else {
             $assetId = $makeAssetId();
-            $insert  = $repo->createPhotoShell($assetId, $style ?: null, $verdict ?: null, $status ?: null, $lighting ?: null, $rights ?: null);
+            $categoryPath = $categoryInput ?: $this->defaultCategoryPath();
+            $insert  = $repo->createPhotoShell($assetId, $style ?: null, $verdict ?: null, $status ?: null, $lighting ?: null, $rights ?: null, $categoryPath);
             $photo   = $repo->getPhotoById((int)$insert['id']);
             $photoId = (int)$photo['id'];
         }
+        $svc->registerAssetPath($assetId, $categoryPath);
 
         // Folder /photos/YYYY/YYYY-MM/ASSET_ID
         $now = new \DateTime('now');
@@ -222,6 +248,7 @@ class PhotosController
         $mkpath("{$assetDir}/masks");
         $mkpath("{$assetDir}/thumb");
         $mkpath("{$assetDir}/renders");
+        $mkpath("{$assetDir}/textures");
 
         $touched = [];
         $baseW = (int)($photo['width'] ?? 0);
@@ -257,17 +284,53 @@ class PhotosController
             if ($res['width'] && $res['height']) $setSizeIfEmpty((int)$res['width'], (int)$res['height']);
         }
 
+        if ($hasTexture) {
+            $res = $svc->saveTextureOverlay($photoId, $files['texture_overlay']);
+            $touched[] = ['kind'=>'texture', 'role'=>'', 'w'=>$res['width'], 'h'=>$res['height']];
+        }
+
+        $maskModeDarkArr   = $post['mask_mode_dark'] ?? [];
+        $maskModeMediumArr = $post['mask_mode_medium'] ?? [];
+        $maskModeLightArr  = $post['mask_mode_light'] ?? [];
+        $maskOpacityDarkArr   = $post['mask_opacity_dark'] ?? [];
+        $maskOpacityMediumArr = $post['mask_opacity_medium'] ?? [];
+        $maskOpacityLightArr  = $post['mask_opacity_light'] ?? [];
+        $maskSlugArr          = $post['mask_slugs'] ?? [];
+        $maskTextureArr       = $post['mask_original_texture'] ?? [];
+        foreach ([$maskModeDarkArr, $maskModeMediumArr, $maskModeLightArr, $maskOpacityDarkArr, $maskOpacityMediumArr, $maskOpacityLightArr, $maskSlugArr] as &$arr) {
+            if (!is_array($arr)) $arr = [$arr];
+        }
+        unset($arr);
+        if (!is_array($maskTextureArr)) $maskTextureArr = [$maskTextureArr];
+        $maskSettingsIndex = 0;
+
         // ----- masks[] (use service; role from filename) -----
-        if ($hasMasks) {
-            $count = count($files['masks']['name']);
-            if (!$baseW || !$baseH) throw new RuntimeException('Upload prepared image(s) first; masks must match size.');
-            for ($i=0; $i<$count; $i++) {
-                if (($files['masks']['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+            if ($hasMasks) {
+                $count = count($files['masks']['name']);
+                if (!$baseW || !$baseH) throw new RuntimeException('Upload prepared image(s) first; masks must match size.');
+                for ($i=0; $i<$count; $i++) {
+                    if (($files['masks']['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
                 $tmp  = $files['masks']['tmp_name'][$i];
                 $name = $files['masks']['name'][$i];
                 if (!is_uploaded_file($tmp)) continue;
 
-                $role = $roleFrom($name);
+                $slugOverride = $this->sanitizeMaskSlug($maskSlugArr[$maskSettingsIndex] ?? null);
+                $role = $slugOverride !== null && $slugOverride !== ''
+                    ? $slugOverride
+                    : $roleFrom($name);
+
+                // Validate mask dimensions against base
+                $maskDims = $probe($tmp);
+                if ((int)$maskDims['w'] !== $baseW || (int)$maskDims['h'] !== $baseH) {
+                    throw new RuntimeException(sprintf(
+                        'Mask "%s" must be %dx%d; got %dx%d',
+                        $name,
+                        $baseW,
+                        $baseH,
+                        (int)$maskDims['w'],
+                        (int)$maskDims['h']
+                    ));
+                }
 
                 // Repackage this single file into a $_FILES-like array for the service
                 $one = [
@@ -277,9 +340,25 @@ class PhotosController
                     'error'    => UPLOAD_ERR_OK,
                     'size'     => @filesize($tmp) ?: null,
                 ];
+                $overlaySettings = [
+                    'dark' => [
+                        'mode' => $this->normalizeOverlayMode($maskModeDarkArr[$maskSettingsIndex] ?? null),
+                        'opacity' => $this->normalizeOverlayOpacity($maskOpacityDarkArr[$maskSettingsIndex] ?? null),
+                    ],
+                    'medium' => [
+                        'mode' => $this->normalizeOverlayMode($maskModeMediumArr[$maskSettingsIndex] ?? null),
+                        'opacity' => $this->normalizeOverlayOpacity($maskOpacityMediumArr[$maskSettingsIndex] ?? null),
+                    ],
+                    'light' => [
+                        'mode' => $this->normalizeOverlayMode($maskModeLightArr[$maskSettingsIndex] ?? null),
+                        'opacity' => $this->normalizeOverlayOpacity($maskOpacityLightArr[$maskSettingsIndex] ?? null),
+                    ],
+                ];
 
-                $res = $svc->saveMask($photoId, $role, $one);
+                $texture = $this->normalizeMaskTexture($maskTextureArr[$maskSettingsIndex] ?? null);
+                $res = $svc->saveMask($photoId, $role, $one, $overlaySettings, $texture);
                 $touched[] = ['kind'=>'masks', 'role'=>$role, 'w'=>$res['width'], 'h'=>$res['height']];
+                $maskSettingsIndex++;
             }
         }
 
@@ -294,6 +373,7 @@ class PhotosController
             'asset_id'  => $assetId,
             'photo_id'  => $photoId,
             'base_size' => ['w'=>$baseW, 'h'=>$baseH],
+            'category_path' => $categoryPath,
             'touched'   => $touched,
         ];
     }
@@ -356,5 +436,122 @@ class PhotosController
             $res['render_url'] = preg_match('~^https?://~i', $rel) ? $rel : ($scheme.'://'.$host.'/'.ltrim($rel, '/'));
         }
         return $res;
+    }
+
+    private function buildOverlayPayload(array $variantRow): array
+    {
+        $tiers = ['dark','medium','light'];
+        $out = [];
+        foreach ($tiers as $tier) {
+            $modeKey = "overlay_mode_{$tier}";
+            $opKey   = "overlay_opacity_{$tier}";
+            $out[$tier] = [
+                'mode'    => $this->normalizeOverlayMode($variantRow[$modeKey] ?? null),
+                'opacity' => $this->normalizeOverlayOpacity($variantRow[$opKey] ?? null),
+            ];
+        }
+        return $out;
+    }
+
+    private function buildMaskPayload(string $role, string $relPath, array $variantRow, callable $toUrl): array
+    {
+        $url = $toUrl($relPath);
+        $filename = basename($relPath) ?: $relPath;
+        return [
+            'role'    => $role,
+            'url'     => $url,
+            'path'    => $relPath,
+            'filename'=> $filename,
+            'overlay' => $this->buildOverlayPayload($variantRow),
+            'original_texture' => $this->normalizeMaskTexture($variantRow['original_texture'] ?? null),
+        ];
+    }
+
+    private function normalizeOverlayMode($mode): ?string
+    {
+        if (!is_string($mode)) return null;
+        $m = strtolower(trim($mode));
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity'];
+        return in_array($m, $allowed, true) ? $m : null;
+    }
+
+    private function normalizeOverlayOpacity($val): ?float
+    {
+        if ($val === '' || $val === null) return null;
+        $num = (float)$val;
+        if (!is_finite($num)) return null;
+        if ($num < 0) $num = 0;
+        if ($num > 1) $num = 1;
+        return $num;
+    }
+
+    private function sanitizeMaskSlug($slug): ?string
+    {
+        if (!is_string($slug)) return null;
+        $trim = strtolower(trim($slug));
+        $trim = preg_replace('/[^a-z0-9\-]/', '-', $trim);
+        $trim = preg_replace('/-+/', '-', $trim);
+        return $trim === '' ? null : $trim;
+    }
+
+    private function normalizeMaskTexture($value): ?string
+    {
+        if (!is_string($value)) return null;
+        $trim = strtolower(trim($value));
+        if ($trim === '') return null;
+        $trim = str_replace([' ', '-'], '_', $trim);
+        $trim = preg_replace('/[^a-z0-9_]+/', '_', $trim);
+        $trim = preg_replace('/_+/', '_', $trim);
+        $trim = trim($trim, '_');
+        if ($trim === '') return null;
+        return substr($trim, 0, 64);
+    }
+
+    private function sanitizeCategoryPath($value): ?string
+    {
+        if (!is_string($value)) return null;
+        $trim = trim($value);
+        if ($trim === '') return null;
+        $trim = str_replace('\\', '/', $trim);
+        $segments = array_filter(array_map(function ($seg) {
+            $seg = strtolower(trim($seg));
+            $seg = preg_replace('/[^a-z0-9\-]+/', '-', $seg);
+            $seg = trim($seg, '-');
+            return $seg;
+        }, explode('/', $trim)));
+        if (!$segments) return null;
+        return implode('/', $segments);
+    }
+
+    private function defaultCategoryPath(): string
+    {
+        $y = date('Y');
+        $ym = date('Y-m');
+        return "{$y}/{$ym}";
+    }
+
+    private function resolveCategoryPathForPhoto(array $photo, PdoPhotoRepository $repo): string
+    {
+        $photoId = (int)($photo['id'] ?? 0);
+        $existing = (string)($photo['category_path'] ?? '');
+        if ($existing !== '') return $existing;
+        $derived = $this->inferCategoryFromVariants($repo, $photoId);
+        if ($derived === null) $derived = $this->defaultCategoryPath();
+        if ($photoId > 0) $repo->updatePhotoCategoryPath($photoId, $derived);
+        return $derived;
+    }
+
+    private function inferCategoryFromVariants(PdoPhotoRepository $repo, int $photoId): ?string
+    {
+        if ($photoId <= 0) return null;
+        foreach ($repo->listVariants($photoId) as $variant) {
+            $rel = (string)($variant['path'] ?? '');
+            if (!str_starts_with($rel, '/photos/')) continue;
+            $parts = explode('/', trim($rel, '/'));
+            if (count($parts) >= 4) {
+                return $parts[1] . '/' . $parts[2];
+            }
+        }
+        return null;
     }
 }

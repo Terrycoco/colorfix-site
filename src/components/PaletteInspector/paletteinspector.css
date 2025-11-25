@@ -54,6 +54,80 @@
   padding-bottom:  100px;
 }
 
+.pi-role-editor {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pi-role-title {
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pi-role-status {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.pi-role-error {
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.pi-role-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pi-role-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  gap: 12px;
+}
+
+.pi-role-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pi-role-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+}
+
+.pi-role-name {
+  font-weight: 600;
+}
+
+.pi-role-meta {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.pi-role-row select {
+  min-width: 140px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  padding: 6px;
+}
+
 
 /* paletteInspector.css — add at the bottom */
 
@@ -85,4 +159,3 @@
   }
 
 }
-

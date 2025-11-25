@@ -36,7 +36,7 @@ try {
     $args[':brand'] = strtolower($brand);
   }
 
-  $sql = "SELECT name, brand, code, chip_num
+  $sql = "SELECT id, name, brand, code, chip_num
             FROM colors
            WHERE $where
            ORDER BY name

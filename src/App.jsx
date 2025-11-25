@@ -50,16 +50,20 @@ export default function App() {
               <ul>
                 <li><a href="/admin/colors" className="block py-1 hover:underline">Colors</a></li>
                 <li><a href="/admin/categories" className="block py-1 hover:underline">Categories</a></li>
+                <li><a href="/admin/supercats" className="block py-1 hover:underline">Supercats</a></li>
+                <li><a href="/admin/roles-masks" className="block py-1 hover:underline">Roles/Masks</a></li>
+          
                 <li><a href="/admin/search-presets" className="block py-1 hover:underline">Search Presets</a></li>
                 <li><a href="/admin/sql" className="block py-1 hover:underline">SQL Builder</a></li>
                 <li><a href="/admin/items" className="block py-1 hover:underline">Items</a></li>
                 <li><a href="/admin/filters" className="block py-1 hover:underline">Filters</a></li>
                 <li><a href="/admin/friends" className="block py-1 hover:underline">Friends</a></li>
-                <li><a href="/admin/palette-viewer" className="block py-1 hover:underline">Palette Viewer</a></li>
+                <li><a href="/admin/saved-palettes" className="block py-1 hover:underline">Saved Palettes</a></li>
                  <li><a href="/admin/missing-chips" className="block py-1 hover:underline">Missing Chips</a></li>
                 <li><a href="/admin/lrv-editor" className="block py-1 hover:underline">LRV Editor</a></li>
                   <li><a href="/admin/upload-photo" className="block py-1 hover:underline">Upload Photos</a></li>
                     <li><a href="/admin/photo-preview" className="block py-1 hover:underline">Photo Preview</a></li>
+                 
               </ul>
             </div>
           )}

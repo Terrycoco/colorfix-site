@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace App\repos;
+namespace App\Repos;
 
-use App\entities\Swatch;
+use App\Entities\Swatch;
 use PDO;
 
 final class PdoSwatchRepository implements SwatchRepository

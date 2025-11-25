@@ -33,6 +33,9 @@ const WhitesLrvEditorPage = lazy(() => import('@pages/whitesLrvEditorPage'));
 const AdminUploadPhotoPage = lazy(() => import('@pages/AdminUploadPhotoPage'));
 const AdminPhotoPreviewPage = lazy(() => import('@pages/AdminPhotoPreviewPage'));
 const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
+const AdminRolesMasksPage = lazy(() => import ('@pages/AdminRolesMasksPage'));
+const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
+const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
 
 function AppRouter() {
   const renderWithSuspense = (Component, label) => (
@@ -126,6 +129,18 @@ function AppRouter() {
             <Route
               path="photo-preview"
               element={renderWithSuspense(AdminPhotoPreviewPage, 'Loading photo preview…')}
+            />
+            <Route
+              path="roles-masks"
+              element={renderWithSuspense(AdminRolesMasksPage, 'Loading admin roles/masks…')}
+            />
+            <Route
+              path="supercats"
+              element={renderWithSuspense(AdminSupercatsPage, 'Loading supercats…')}
+            />
+            <Route
+              path="saved-palettes"
+              element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes…')}
             />
           </Route>
 
