@@ -177,4 +177,16 @@ class SavedPaletteController
 
         return $this->service->updateSavedPalette($paletteId, $data);
     }
+
+    public function sendEmail(
+        int $paletteId,
+        string $toEmail,
+        ?string $message = null,
+        ?string $shareUrl = null,
+        ?string $clientNameOverride = null,
+        ?string $subjectOverride = null
+    ): void
+    {
+        $this->service->sendPaletteEmail($paletteId, $toEmail, $message, $shareUrl, $clientNameOverride, $subjectOverride);
+    }
 }

@@ -17,6 +17,7 @@ export default function EditableSwatch({
   disabled = false,
   readOnly = false,
   showName = false,
+  showLightness = false,
   className = "",
   placement = "bottom",
 }) {
@@ -31,6 +32,22 @@ export default function EditableSwatch({
       ? `${label}: ${value.name}${value.code ? ` (${value.code})` : ""}`
       : `${label}: (choose)`
     : (value && value.name) || "(choose)";
+
+  const lightnessVal =
+    typeof value?.lightness === "number"
+      ? value.lightness
+      : typeof value?.lab_l === "number"
+      ? value.lab_l
+      : typeof value?.hcl_l === "number"
+      ? value.hcl_l
+      : null;
+
+  function describeLightness(v) {
+    if (v == null) return "";
+    if (v < 45) return "Dark";
+    if (v >= 88) return "Light";
+    return "Medium";
+  }
 
   // click-outside to close
   useEffect(() => {
@@ -127,6 +144,11 @@ export default function EditableSwatch({
           />
         </div>
       )}
+      {showLightness && lightnessVal != null && (
+        <div className="ed-swatch__lightness">
+          L {lightnessVal.toFixed(1)} · {describeLightness(lightnessVal)}
+        </div>
+      )}
     </div>
   );
 }
@@ -146,6 +168,7 @@ EditableSwatch.propTypes = {
   disabled: PropTypes.bool,
   readOnly: PropTypes.bool,
   showName: PropTypes.bool,
+  showLightness: PropTypes.bool,
   className: PropTypes.string,
   placement: PropTypes.oneOf(["bottom", "top"]),
 };

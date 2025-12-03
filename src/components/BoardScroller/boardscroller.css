@@ -9,7 +9,7 @@
 .board-scroller{
   position: sticky; top: 0; width: 100%;
   background:#000; color:#fff; border-bottom:1px solid #111;
-  z-index: 15000;
+  z-index: var(--board-scroller-z-index);
 }
 
 /* centerline via grid; sides anchor to the BAR (not the cap) */
@@ -68,6 +68,26 @@
 .scroller-right .board-tab{ background:transparent; border:0; padding:0; }
 .scroller-right .logo-text{ color:#ff7a00; font-weight:800; letter-spacing:.2px; }
 .logo-btn{ padding:0 3px; }
+
+.palette-toggle-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.palette-toggle-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 
 /* ===== PALETTE STRIP (sticky) ===== */
 .sticky-palette-wrapper {

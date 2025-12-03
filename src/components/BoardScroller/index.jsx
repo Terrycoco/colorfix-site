@@ -13,7 +13,7 @@ import BrandFilterModal from "@components/BrandFilter";
 const BoardScroller = () => {
   const navigate = useNavigate();
   const location= useLocation();
-  const { palette, showPalette, searchFilters } = useAppState();
+  const { palette, paletteCollapsed, setPaletteCollapsed, searchFilters } = useAppState();
   const canGoBack = useCanGoBack();
   const isPaletteRoute = location.pathname.startsWith('/my-palette');
   const hasSwatches    = Array.isArray(palette) && palette.length > 0;
@@ -54,8 +54,7 @@ useEffect(() => {
   };
 
   if (!isPaletteRoute) {
-    // Other pages: just reflect whether there are swatches
-    setShowSticky(hasSwatches);
+    setShowSticky(hasSwatches && !paletteCollapsed);
     return;
   }
 
@@ -130,12 +129,19 @@ useEffect(() => {
     if (created) { try { sentinel.remove(); } catch {} }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [isPaletteRoute, hasSwatches]);
+}, [isPaletteRoute, hasSwatches, paletteCollapsed]);
 
 
 
 
 
+
+const togglePaletteBar = () => {
+    setPaletteCollapsed((prev) => !prev);
+  };
+
+  const paletteArrowLabel = paletteCollapsed ? "Show palette" : "Hide palette";
+  const paletteArrowIcon = paletteCollapsed ? "▼" : "▲";
 
 //HANDLERS
 const goToPalette = (e) => {
@@ -178,6 +184,17 @@ const goToPalette = (e) => {
 
         {/* RIGHT (funnel to the left of the logo) */}
         <div className="scroller-right">
+          {hasSwatches && (
+            <button
+              type="button"
+              className="palette-toggle-btn"
+              onClick={togglePaletteBar}
+              aria-label={paletteArrowLabel}
+              title={paletteArrowLabel}
+            >
+              {paletteArrowIcon}
+            </button>
+          )}
   <span
   ref={btnRef}
   className={`mini-brand-wrap ${filterIsActive ? 'has-active' : ''} ${pulse ? 'pulse' : ''}`}
@@ -215,10 +232,12 @@ const goToPalette = (e) => {
       onClose={() => setOpen(false)}
     />
 
-    <div className={`sticky-palette-wrapper ${showSticky ? 'is-visible' : 'is-hidden'}`}>
-      <div className="sticky-palette__inner">
-        <StickyPaletteBar />
-      </div>
+    <div className={`sticky-palette-wrapper ${(showSticky && hasSwatches && !paletteCollapsed) ? 'is-visible' : 'is-hidden'}`}>
+      {hasSwatches && !paletteCollapsed && (
+        <div className="sticky-palette__inner">
+          <StickyPaletteBar />
+        </div>
+      )}
     </div>
   </>
 );

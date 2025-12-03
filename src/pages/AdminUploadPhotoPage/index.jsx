@@ -25,8 +25,8 @@ const [rights, setRights] = useState("");
 const [tags, setTags] = useState("");
 const [categoryPath, setCategoryPath] = useState("");
 
-  const [fileBase, setFileBase] = useState(null);
-  const [fileTexture, setFileTexture] = useState(null);
+const [fileBase, setFileBase] = useState(null);
+const [fileTexture, setFileTexture] = useState(null);
   const createMaskRow = () => ({
     id: `${Date.now()}-${Math.random()}`,
     file: null,
@@ -77,21 +77,29 @@ const [categoryPath, setCategoryPath] = useState("");
 
   async function onSubmit(e) {
     e.preventDefault();
-    setBusy(true);
     setError("");
     setResult(null);
+
+    const styleTrim = stylePrimary.trim();
+    const tagsTrim = tags.trim();
+    if (!styleTrim && !tagsTrim) {
+      setError("Add a Style or at least one Tag so you can find this photo later.");
+      return;
+    }
+
+    setBusy(true);
 
     try {
       const form = new FormData();
       if (assetId.trim()) form.append("asset_id", assetId.trim());
 
       // Optional meta supported by controller
-      if (stylePrimary.trim()) form.append("style", stylePrimary.trim());
+      if (styleTrim) form.append("style", styleTrim);
       if (verdict.trim()) form.append("verdict", verdict.trim());
       if (status.trim()) form.append("status", status.trim());
       if (lighting.trim()) form.append("lighting", lighting.trim());
       if (rights.trim()) form.append("rights", rights.trim());
-      if (tags.trim()) form.append("tags", tags.trim());
+      if (tagsTrim) form.append("tags", tagsTrim);
       if (categoryPath.trim()) form.append("category_path", categoryPath.trim());
 
       if (fileBase) form.append("prepared_base", fileBase, fileBase.name);
@@ -247,7 +255,7 @@ const [categoryPath, setCategoryPath] = useState("");
         </div>
 
         <div className="row">
-          <label>Style (optional)</label>
+          <label>Style (required if no tags)</label>
           <input
             type="text"
             placeholder="e.g., Adobe, Ranch, Victorian"
@@ -297,7 +305,7 @@ const [categoryPath, setCategoryPath] = useState("");
         </div>
 
         <div className="row">
-          <label>Tags (comma-separated)</label>
+          <label>Tags (required if no style)</label>
           <input
             type="text"
             placeholder="e.g., white, shutters, adobe, front-door"

@@ -9,6 +9,7 @@ export default function RolesBar({
   onRoleChange,
   size = "sm",
   showNames = true,
+  showLightness = false,
   disabled = false,
   readOnly = false,
   className = "",
@@ -21,6 +22,7 @@ export default function RolesBar({
         onChange={(sw) => onRoleChange("body", sw)}
         size={size}
         showName={showNames}
+        showLightness={showLightness}
         disabled={disabled}
         readOnly={readOnly}
       />
@@ -30,6 +32,7 @@ export default function RolesBar({
         onChange={(sw) => onRoleChange("trim", sw)}
         size={size}
         showName={showNames}
+        showLightness={showLightness}
         disabled={disabled}
         readOnly={readOnly}
       />
@@ -39,6 +42,7 @@ export default function RolesBar({
         onChange={(sw) => onRoleChange("accent", sw)}
         size={size}
         showName={showNames}
+        showLightness={showLightness}
         disabled={disabled}
         readOnly={readOnly}
       />
@@ -55,6 +59,7 @@ RolesBar.propTypes = {
   onRoleChange: PropTypes.func.isRequired,
   size: PropTypes.oneOf(["xs", "sm", "md"]),
   showNames: PropTypes.bool,
+  showLightness: PropTypes.bool,
   disabled: PropTypes.bool,
   readOnly: PropTypes.bool,
   className: PropTypes.string,

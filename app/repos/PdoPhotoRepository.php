@@ -241,6 +241,7 @@ class PdoPhotoRepository
             'overlay_mode_dark','overlay_opacity_dark',
             'overlay_mode_medium','overlay_opacity_medium',
             'overlay_mode_light','overlay_opacity_light',
+            'overlay_shadow_l_offset','overlay_shadow_tint','overlay_shadow_tint_opacity',
         ];
         foreach ($optional as $col) {
             if (isset($available[$col])) $baseCols[] = $col;
@@ -268,6 +269,9 @@ class PdoPhotoRepository
             'overlay_opacity_medium' => $overlaySettings['medium']['opacity'] ?? null,
             'overlay_mode_light'  => $overlaySettings['light']['mode']  ?? null,
             'overlay_opacity_light'=> $overlaySettings['light']['opacity'] ?? null,
+            'overlay_shadow_l_offset' => $overlaySettings['_shadow']['l_offset'] ?? null,
+            'overlay_shadow_tint' => $overlaySettings['_shadow']['tint_hex'] ?? null,
+            'overlay_shadow_tint_opacity' => $overlaySettings['_shadow']['tint_opacity'] ?? null,
         ];
         $setParts = [];
         $params = [
@@ -525,7 +529,7 @@ public function searchAssets(array $tags, string $q, int $limit, int $offset): a
             ':pbytes'=> $preparedBytes,
             ':mbytes'=> $maskBytes,
             ':lavg'  => $lAvg01,
-            ':lp10'  => $lP90, // NOTE: if this is a typo, swap to correct binding below
+            ':lp10'  => $lP10,
             ':lp90'  => $lP90,
             ':px'    => $pxCovered,
         ]);

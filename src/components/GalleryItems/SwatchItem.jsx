@@ -5,7 +5,7 @@ import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 
 const SwatchItem = ({ item }) => {
   const navigate = useNavigate();
-  const {addToPalette, setShowPalette} = useAppState();
+  const {addToPalette} = useAppState();
 
   function handleClick() {
       navigate(`/color/${item.id}`);

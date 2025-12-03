@@ -46,6 +46,20 @@
   cursor: default;
 }
 
+.render-meta {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #475569;
+  word-break: break-all;
+}
+.render-meta .meta-item + .meta-item {
+  margin-left: 12px;
+}
+.render-meta .k {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 /* Fullscreen overlay */
 .full-overlay {
   position: fixed;

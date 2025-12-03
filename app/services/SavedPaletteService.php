@@ -6,16 +6,26 @@ namespace App\Services;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoClientRepository;
 use InvalidArgumentException;
+use App\Lib\SmtpMailer;
+use App\Services\EmailTemplateService;
 
 class SavedPaletteService
 {
     private PdoSavedPaletteRepository $repo;
     private ?PdoClientRepository $clientRepo;
+    private ?SmtpMailer $mailer;
+    private EmailTemplateService $emailTemplates;
 
-    public function __construct(PdoSavedPaletteRepository $repo, ?PdoClientRepository $clientRepo = null)
-    {
+    public function __construct(
+        PdoSavedPaletteRepository $repo,
+        ?PdoClientRepository $clientRepo = null,
+        ?SmtpMailer $mailer = null,
+        ?EmailTemplateService $emailTemplates = null
+    ) {
         $this->repo = $repo;
         $this->clientRepo = $clientRepo;
+        $this->mailer = $mailer;
+        $this->emailTemplates = $emailTemplates ?? new EmailTemplateService();
     }
 
     /**
@@ -263,6 +273,60 @@ class SavedPaletteService
     public function setFavorite(int $id, bool $fav): void
     {
         $this->repo->setFavorite($id, $fav);
+    }
+
+    public function sendPaletteEmail(
+        int $paletteId,
+        string $toEmail,
+        ?string $message = null,
+        ?string $shareUrl = null,
+        ?string $clientNameOverride = null,
+        ?string $subjectOverride = null
+    ): void
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
+        }
+        $toEmail = trim($toEmail);
+        if ($toEmail === '') {
+            throw new InvalidArgumentException('Recipient email required');
+        }
+        if (!$this->mailer) {
+            throw new \RuntimeException('SMTP mailer not configured');
+        }
+
+        $full = $this->repo->getFullPalette($paletteId);
+        if ($full === null) {
+            throw new InvalidArgumentException('saved palette not found');
+        }
+
+        $palette = $full['palette'];
+        $members = $full['members'] ?? [];
+
+        if (!$shareUrl) {
+            $shareUrl = sprintf('https://colorfix.terrymarr.com/palette/%s/share', $palette['palette_hash'] ?? $paletteId);
+        }
+
+        if ($clientNameOverride !== null && $clientNameOverride !== '') {
+            $palette['client_name'] = $clientNameOverride;
+        } elseif ($clientName !== '' && empty($palette['client_name'])) {
+            $palette['client_name'] = $clientName;
+        }
+
+        [$subject, $html, $text] = $this->emailTemplates->renderPaletteEmail(
+            $palette,
+            $members,
+            $shareUrl,
+            $message,
+            $subjectOverride
+        );
+
+        $this->mailer->send($toEmail, $subject, $html, $text);
+
+        $this->repo->updateSavedPalette($paletteId, [
+            'sent_to_email' => $toEmail,
+            'sent_at'       => date('Y-m-d H:i:s'),
+        ]);
     }
 
     /**

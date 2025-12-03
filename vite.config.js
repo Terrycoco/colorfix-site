@@ -28,6 +28,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      ignored: ['**/tmp_partial.jsx'],
+    },
     proxy: {
       // Proxy ALL /api requests to your PHP host in dev
       '/api': {

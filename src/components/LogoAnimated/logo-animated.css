@@ -1,0 +1,35 @@
+.logo-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding-right: 10px;
+}
+
+/* BRUSH START CENTERED */
+.logo-brush {
+  position: relative;
+  height: 38px;
+  transform: translateX(120px); /* adjust based on screen width */
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* TEXT STARTS FULLY HIDDEN */
+.logo-text {
+  font-size: 20px;
+  font-weight: 600;
+  margin-left: 10px;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0); /* hide all text by clipping to the right */
+  transition: clip-path 1.0s ease, opacity 0.5s ease;
+}
+
+/* WHEN "play" CLASS ADDED — ANIMATION RUNS */
+.logo-header.play .logo-brush {
+  transform: translateX(0); /* slides to final position */
+}
+
+.logo-header.play .logo-text {
+  clip-path: inset(0 0 0 0); /* wipe text in */
+  opacity: 1;
+}

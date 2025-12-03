@@ -1,0 +1,227 @@
+.admin-ap {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-ap__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.admin-ap__search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.admin-ap__search input {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-width: 220px;
+}
+
+.admin-ap__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-ap__row {
+  border: 1px solid #ececec;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+}
+
+.admin-ap__main {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+.admin-ap__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.admin-ap__meta {
+  font-size: 13px;
+  color: #666;
+}
+.admin-ap__status {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.admin-ap__status.is-ok {
+  color: #117a00;
+  background: rgba(17, 122, 0, 0.12);
+}
+.admin-ap__status.is-warn {
+  color: #b56100;
+  background: rgba(181, 97, 0, 0.15);
+}
+.admin-ap__stale-flag {
+  font-size: 12px;
+  color: #b21500;
+  margin-top: 4px;
+}
+
+.admin-ap__link {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.admin-ap__link input {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.admin-ap__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.admin-ap__tag-chip {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3b478f;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.admin-ap__render-link {
+  margin-top: 6px;
+  font-size: 13px;
+}
+.admin-ap__render-link a {
+  color: #0b5ed7;
+  text-decoration: none;
+}
+.admin-ap__render-link a:hover {
+  text-decoration: underline;
+}
+
+.admin-ap__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ap__action-btn {
+  border: none;
+  background: #1c1c1c;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.admin-ap__action-btn:hover,
+.admin-ap__action-btn:focus-visible {
+  opacity: 0.85;
+}
+.admin-ap__action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-ap__action-btn.ghost {
+  background: transparent;
+  color: #1c1c1c;
+  border: 1px solid #999;
+}
+.admin-ap__action-btn.danger {
+  background: #b3261e;
+}
+
+.admin-ap__modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 5000;
+}
+.admin-ap__modal-panel {
+  background: #fff;
+  border-radius: 16px;
+  width: min(520px, 100%);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.admin-ap__modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.admin-ap__modal-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+}
+.admin-ap__modal-panel input,
+.admin-ap__modal-panel textarea {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+.admin-ap__modal-divider {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #888;
+  margin-top: 12px;
+}
+.admin-ap__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.error {
+  color: #b21500;
+}
+.notice {
+  color: #117a00;
+}
+
+@media (max-width: 720px) {
+  .admin-ap__row {
+    flex-direction: column;
+  }
+  .admin-ap__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .admin-ap__action-btn {
+    flex: 1 1 45%;
+    text-align: center;
+  }
+}

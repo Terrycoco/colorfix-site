@@ -2,16 +2,43 @@
 namespace App\Services;
 
 use App\Repos\PdoPhotoRepository;
+use App\Repos\PdoColorRepository;
+use App\Repos\PdoMaskBlendSettingRepository;
+use App\Entities\AppliedPalette;
 use RuntimeException;
 
 class PhotoRenderingService
 {
+    private const ROLE_PRIORITY = [
+        'body'       => 10,
+        'stucco'     => 15,
+        'siding'     => 20,
+        'brick'      => 25,
+        'trim'       => 40,
+        'fascia'     => 50,
+        'bellyband'  => 60,
+        'windowtrim' => 70,
+        'doortrim'   => 75,
+        'accent'     => 80,
+        'frontdoor'  => 90,
+        'door'       => 95,
+        'gutter'     => 96,
+        'railing'    => 97,
+        'hardware'   => 98,
+        'light'      => 99,
+    ];
+
     private array $roleStatsCache = []; // [photoId => [role => statsRow]]
 
     public function __construct(
         private PdoPhotoRepository $repo,
-        private \PDO $pdo
-    ) {}
+        private \PDO $pdo,
+        private ?PdoColorRepository $colorRepo = null,
+        private ?PdoMaskBlendSettingRepository $maskBlendRepo = null
+    ) {
+        $this->colorRepo ??= new PdoColorRepository($this->pdo);
+        $this->maskBlendRepo ??= new PdoMaskBlendSettingRepository($this->pdo);
+    }
 
     /* =======================================================================
      * PUBLIC API
@@ -28,7 +55,9 @@ public function renderApplyMap(
     string $assetId,
     array $hexMap,
     string $mode = 'colorize',   // 'colorize' | 'flat' (kept for fallback)
-    float $alpha = 0.90
+    float $alpha = 0.90,
+    array $overlayOverrides = [],
+    ?string $outputRelPath = null
 ): array {
     // 1) Locate prepared + masks for this asset
     $photo = $this->repo->getPhotoByAssetId($assetId);
@@ -37,6 +66,7 @@ public function renderApplyMap(
     $variants = $this->repo->listVariants($pid);
 
     $preparedRel = '';
+    $textureOverlayRel = '';
     $masksByRole = [];
     foreach ($variants as $v) {
         $kind = (string)($v['kind'] ?? '');
@@ -58,6 +88,8 @@ public function renderApplyMap(
                         : null,
                 ];
             }
+        } elseif ($kind === 'texture') {
+            $textureOverlayRel = (string)$v['path'];
         }
     }
     if ($preparedRel === '') throw new \RuntimeException("No prepared_base found for {$assetId}");
@@ -72,10 +104,30 @@ public function renderApplyMap(
     imagesavealpha($baseIm, true);
     imagealphablending($baseIm, false); // we write final pixels
 
-    $useFlat = ($mode === 'flat');
+    // Optional texture overlay image (same dimensions as prepared base)
+    $textureIm = null;
+    if ($textureOverlayRel !== '') {
+        $texAbs = $this->absPath($textureOverlayRel);
+        $tmpTex = $this->openImage($texAbs);
+        if ($tmpTex && imagesx($tmpTex) === $W && imagesy($tmpTex) === $H) {
+            imagesavealpha($tmpTex, true);
+            imagealphablending($tmpTex, true);
+            $textureIm = $tmpTex;
+        } elseif ($tmpTex) {
+            imagedestroy($tmpTex);
+        }
+    }
+    $useTextureOverlay = $textureIm !== null;
 
-    // 3) Composite each role
-    foreach ($hexMap as $role => $hex6raw) {
+    $useFlat = ($mode === 'flat');
+    $blendSettingsByRole = [];
+    $shadowSettingsByRole = [];
+
+    // 3) Composite each role (sorted so higher-priority masks render last)
+    $orderedRoles = $this->sortRoleKeys(array_keys($hexMap));
+
+    foreach ($orderedRoles as $role) {
+        $hex6raw = $hexMap[$role];
         $hex6 = strtoupper(trim((string)$hex6raw));
         if (!preg_match('/^[0-9A-F]{6}$/', $hex6)) continue;
         $maskMeta = $masksByRole[$role] ?? null;
@@ -97,95 +149,69 @@ public function renderApplyMap(
         [$rT, $gT, $bT] = $this->hexToRgb($hex6);
         [$Lt, $at, $bt] = $this->rgbToLab($rT, $gT, $bT);
 
-        $auto     = $this->autoParamsForRole($pid, $role, $Lt);
-        $lmix     = $this->clamp01($auto['lmix'] ?? 0.35);
-        $alphaForRole = $this->clamp01($auto['alpha'] ?? $alpha);
-        $LbAuto   = $auto['Lb'] ?? null;
-        [$detailKeep, $alphaCap, $detailMode] = $this->perColorDetailControl($hex6, $Lt, $role);
+        $alphaForRole = $this->clamp01($alpha);
 
-        [$kCal, $bCal] = $this->getDeltaLCalib($role, $hex6, null);
-
-        // Measure the prepared base directly for safety (handles fresh uploads)
-        $LbRole = $this->averageLUnderMask($baseIm, $maskIm);
-        $LbRef  = $LbAuto ?? $LbRole ?? 60.0;
-
-        $deltaAgainstRef = abs($Lt - $LbRef);
-        if ($deltaAgainstRef >= 35.0) {
-            $lmix         = min(1.0, $lmix + 0.25);
-            $alphaForRole = min(1.0, $alphaForRole + 0.15);
+        $overlaySource = $overlayOverrides[$role] ?? ($maskMeta['overlay'] ?? null);
+        $maskBlend = $this->resolveMaskBlend($overlaySource, $Lt);
+        $blendSettingsByRole[$role] = $maskBlend;
+        $shadowSettingsByRole[$role] = $this->extractShadowSettings($overlaySource);
+        $modeLower = strtolower($maskBlend['mode'] ?? '');
+        $isFlatPaint = $modeLower === 'flatpaint';
+        $isOriginalMode = $modeLower === 'original';
+        if ($isOriginalMode) {
+            imagedestroy($maskIm);
+            continue;
         }
-        if ($Lt <= 15.0 && $deltaAgainstRef >= 20.0) {
-            $lmix         = min(1.0, max($lmix, 0.92));
-            $alphaForRole = min(1.0, max($alphaForRole, 0.98));
-        }
-
-        $maskBlend = $this->resolveMaskBlend($maskMeta['overlay'] ?? null, $Lt);
-        $effectiveAlpha = $this->clamp01($alphaForRole * $alpha * $alphaCap * $maskBlend['opacity']);
+        $applyTextureLater = $useTextureOverlay && !$isFlatPaint;
+        $directBlendOpacity = $applyTextureLater ? 1.0 : $maskBlend['opacity'];
 
         // 4) Per-pixel
+        if ($useFlat) {
+            $paintRgb = [$this->clamp255($rT), $this->clamp255($gT), $this->clamp255($bT)];
+        } else {
+            $paintRgb = $this->labToRgb($Lt, $at, $bt);
+            $paintRgb = [
+                $this->clamp255($paintRgb[0]),
+                $this->clamp255($paintRgb[1]),
+                $this->clamp255($paintRgb[2]),
+            ];
+        }
+
         for ($y = 0; $y < $H; $y++) {
             for ($x = 0; $x < $W; $x++) {
-                // Mask alpha (GD: 0..127, 127 transparent)
                 $m  = imagecolorat($maskIm, $x, $y);
                 $ma = ($m & 0x7F000000) >> 24;
                 if ($ma >= 127) continue;
+                $coverage = 1.0 - ($ma / 127.0);
+                if ($coverage <= 0) continue;
+                // Full coverage paint layer (just respects mask feathering)
+                [$rPaintBase, $gPaintBase, $bPaintBase] = $paintRgb;
 
-                $coverage = $this->clamp01((1.0 - ($ma / 127.0)) * $effectiveAlpha);
-
-                // Base pixel
-                $p  = imagecolorat($baseIm, $x, $y);
-                $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
-
-                if ($useFlat) {
-                    $r1 = $rT; $g1 = $gT; $b1 = $bT;
-                } else {
-                    // Base Lab
-                    [$L0, $a0, $b0lab] = $this->rgbToLab($r0, $g0, $b0);
-                    $rawDelta          = $Lt - $L0;
-                    $extremeShift      = abs($rawDelta) >= 25.0;
-                    if ($extremeShift) {
-                        $Lnew = $this->clamp($Lt, -1.0, 101.0);
-                    } else {
-                        $deltaL = ($Lt - $L0) * $lmix;
-                        $deltaL = $deltaL * $kCal + $bCal;
-                        $Lnew   = $this->clamp($L0 + $deltaL, -1.0, 101.0);
-                    }
-
-                    // Allow intentional pushes to full white/black without banding
-                    if ($Lt >= 95.0) $Lnew = min(100.3, max($Lnew, 98.0));
-                    if ($Lt <= 5.0)  $Lnew = max(-0.3,  min($Lnew,  1.0));
-
-                    if ($detailKeep > 0.0) {
-                        $contrast = $L0 - $LbRef;
-                        if ($detailMode === 'mix' && !$extremeShift) {
-                            $Lnew = ($Lnew * (1.0 - $detailKeep)) + ($L0 * $detailKeep);
-                        } else {
-                            $blend = $extremeShift ? min($detailKeep, 0.22) : $detailKeep;
-                            $Lnew += $contrast * $blend;
-                        }
-                    }
-                    $Lnew = $this->clamp($Lnew, -0.5, 101.5);
-
-                    // Back to RGB
-                    [$r1, $g1, $b1] = $this->labToRgb($Lnew, $at, $bt);
+                if ($coverage < 1.0) {
+                    $p  = imagecolorat($baseIm, $x, $y);
+                    $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
+                    $rPaintBase = $this->clamp255($r0 * (1.0 - $coverage) + $rPaintBase * $coverage);
+                    $gPaintBase = $this->clamp255($g0 * (1.0 - $coverage) + $gPaintBase * $coverage);
+                    $bPaintBase = $this->clamp255($b0 * (1.0 - $coverage) + $bPaintBase * $coverage);
                 }
 
-                // Blend mode (multiply/screen/etc.) then mix by coverage
-                [$rBlend, $gBlend, $bBlend] = $this->applyBlendMode([$r0, $g0, $b0], [$r1, $g1, $b1], $maskBlend['mode']);
-                $r = $this->clamp255($r0 * (1.0 - $coverage) + $rBlend * $coverage);
-                $g = $this->clamp255($g0 * (1.0 - $coverage) + $gBlend * $coverage);
-                $b = $this->clamp255($b0 * (1.0 - $coverage) + $bBlend * $coverage);
-
-                $col = imagecolorallocatealpha($baseIm, $r, $g, $b, 0);
-                imagesetpixel($baseIm, $x, $y, $col);
+                $colPaint = imagecolorallocatealpha($baseIm, $rPaintBase, $gPaintBase, $bPaintBase, 0);
+                imagesetpixel($baseIm, $x, $y, $colPaint);
             }
         }
 
         imagedestroy($maskIm);
     }
 
+        if ($useTextureOverlay && $textureIm) {
+            $this->applyTextureOverlays($baseIm, $textureIm, $masksByRole, $blendSettingsByRole, $W, $H);
+            imagedestroy($textureIm);
+        }
+
+        $this->applyShadowAdjustments($baseIm, $masksByRole, $shadowSettingsByRole, $blendSettingsByRole, $W, $H);
+
     // 5) Save render
-    $outRel = $this->buildRenderRelPath($assetId, $hexMap);
+    $outRel = $outputRelPath ? $this->normalizeRelPath($outputRelPath) : $this->buildRenderRelPath($assetId, $hexMap);
     $outAbs = $this->absPath($outRel, true);
     imagejpeg($baseIm, $outAbs, 90);
     imagedestroy($baseIm);
@@ -194,8 +220,30 @@ public function renderApplyMap(
         'ok'              => true,
         'render_rel_path' => $outRel,
         'render_url'      => $this->absUrl($outRel),
+        'width'           => $W,
+        'height'          => $H,
     ];
 }
+
+    private function sortRoleKeys(array $keys): array
+    {
+        $unique = array_values(array_unique($keys));
+        usort($unique, function ($a, $b) {
+            $pa = $this->rolePriority($a);
+            $pb = $this->rolePriority($b);
+            if ($pa === $pb) {
+                return strcmp((string)$a, (string)$b);
+            }
+            return $pa <=> $pb;
+        });
+        return $unique;
+    }
+
+    private function rolePriority(string $role): int
+    {
+        $key = strtolower($role);
+        return self::ROLE_PRIORITY[$key] ?? 1000;
+    }
 
 
 
@@ -251,6 +299,14 @@ public function renderApplyMap(
             $mode = 'offset';
         }
 
+        // Wide surfaces (body/stucco/etc.) need extra grit when going very light.
+        $bodyRoles = ['body','stucco','siding','brick','stone','bodymain'];
+        if (in_array($role, $bodyRoles, true) && $Lt >= 88.0) {
+            $detailKeep = max($detailKeep, 0.12);
+            $alphaCap   = min($alphaCap, 0.90);
+            $mode       = 'mix';
+        }
+
         // Exact per-color overrides (edit as needed)
         $overrides = [
             'FFFFFF' => ['detailKeep' => 0.02, 'alphaCap' => 1.0, 'mode' => 'mix'],
@@ -278,6 +334,249 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
     return $this->maskedMeanLightness($baseIm, $maskIm);
 }
 
+    private function percentile(array $values, float $fraction): float {
+        $count = count($values);
+        if ($count === 0) return 0.0;
+        $index = ($count - 1) * max(0.0, min(1.0, $fraction));
+        $lower = (int)floor($index);
+    $upper = (int)ceil($index);
+    if ($lower === $upper) return (float)$values[$lower];
+    $weight = $index - $lower;
+    return (float)$values[$lower] * (1.0 - $weight) + (float)$values[$upper] * $weight;
+}
+
+    public function measureMaskStats(string $preparedAbsPath, string $maskAbsPath): ?array {
+        $baseIm = $this->openImage($preparedAbsPath);
+        $maskIm = $this->openImage($maskAbsPath);
+        if (!$baseIm || !$maskIm) return null;
+        $W = imagesx($baseIm); $H = imagesy($baseIm);
+        if ($W !== imagesx($maskIm) || $H !== imagesy($maskIm)) {
+            imagedestroy($baseIm);
+            imagedestroy($maskIm);
+            return null;
+        }
+        imagesavealpha($maskIm, true);
+        imagealphablending($maskIm, true);
+
+        $step = max(1, (int)floor(min($W, $H) / 400));
+        $sum = 0.0;
+        $wSum = 0.0;
+        $values = [];
+        $pxCovered = 0.0;
+        $areaPerSample = $step * $step;
+
+        for ($y = 0; $y < $H; $y += $step) {
+            for ($x = 0; $x < $W; $x += $step) {
+                $m = imagecolorat($maskIm, $x, $y);
+                $ma = ($m & 0x7F000000) >> 24;
+                $coverage = 1.0 - ($ma / 127.0);
+                if ($coverage <= 0.0) continue;
+
+                $p = imagecolorat($baseIm, $x, $y);
+                $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
+                [$L0] = $this->rgbToLab($r0, $g0, $b0);
+
+                $sum  += $L0 * $coverage;
+                $wSum += $coverage;
+                $values[] = $L0;
+                $pxCovered += $coverage * $areaPerSample;
+            }
+        }
+
+        imagedestroy($baseIm);
+        imagedestroy($maskIm);
+
+        if ($wSum <= 0.0 || !$values) return null;
+        sort($values);
+
+        return [
+            'l_avg' => $sum / $wSum,
+            'l_p10' => $this->percentile($values, 0.10),
+            'l_p90' => $this->percentile($values, 0.90),
+            'px_covered' => (int)round($pxCovered),
+        ];
+    }
+
+    public function recalcLmForRoles(string $assetId, ?array $roles = null): array {
+        $photo = $this->repo->getPhotoByAssetId($assetId);
+        if (!$photo) throw new RuntimeException("asset not found: {$assetId}");
+        $photoId = (int)$photo['id'];
+        $variants = $this->repo->listVariants($photoId);
+        $preparedRel = '';
+        $masks = [];
+        foreach ($variants as $v) {
+            $kind = (string)$v['kind'];
+            if ($kind === 'prepared_base' || ($kind === 'prepared' && ((string)$v['role'] === '' || strtolower((string)$v['role']) === 'base'))) {
+                $preparedRel = (string)$v['path'];
+            } elseif ($kind === 'masks' && !empty($v['role']) && !empty($v['path'])) {
+                $masks[] = [
+                    'role' => (string)$v['role'],
+                    'path' => (string)$v['path'],
+                ];
+            }
+        }
+        if ($preparedRel === '') throw new RuntimeException("No prepared_base found for {$assetId}");
+        $preparedAbs = $this->absPath($preparedRel);
+        if (!is_file($preparedAbs)) throw new RuntimeException("Prepared base missing on disk for {$assetId}");
+        $preparedBytes = (int)@filesize($preparedAbs);
+
+        $roleFilter = null;
+        if ($roles) {
+            $roleFilter = array_fill_keys(array_map('strtolower', array_map('trim', $roles)), true);
+        }
+
+        $updated = [];
+        foreach ($masks as $mask) {
+            $role = $mask['role'];
+            if ($roleFilter && !isset($roleFilter[strtolower($role)])) continue;
+            $maskAbs = $this->absPath($mask['path']);
+            if (!is_file($maskAbs)) continue;
+            $stats = $this->measureMaskStats($preparedAbs, $maskAbs);
+            if (!$stats) continue;
+            $this->repo->upsertMaskStats(
+                $photoId,
+                $role,
+                $preparedRel,
+                $mask['path'],
+                $preparedBytes,
+                (int)@filesize($maskAbs),
+                $stats['l_avg'],
+                $stats['l_p10'],
+                $stats['l_p90'],
+                $stats['px_covered']
+            );
+            $updated[] = $role;
+        }
+        return $updated;
+    }
+
+    private function applyTextureOverlays(
+        \GdImage $baseIm,
+        \GdImage $textureIm,
+        array $masksByRole,
+        array $blendSettingsByRole,
+        int $W,
+        int $H
+    ): void {
+        $orderedRoles = $this->sortRoleKeys(array_keys($blendSettingsByRole));
+        foreach ($orderedRoles as $role) {
+            $meta = $masksByRole[$role] ?? null;
+            if (!$meta) continue;
+            $blend = $blendSettingsByRole[$role] ?? null;
+            if (!$blend) continue;
+            if (isset($blend['mode'])) {
+                $modeLower = strtolower($blend['mode']);
+                if ($modeLower === 'flatpaint' || $modeLower === 'original') continue;
+            }
+            $opacity = $this->clamp01($blend['opacity'] ?? 0.0);
+            if ($opacity <= 0.0) continue;
+            $mode = $blend['mode'] ?? 'softlight';
+            if ($mode === 'colorize') $mode = 'softlight';
+
+            $maskAbs = $this->absPath($meta['path']);
+            $maskIm = $this->openImage($maskAbs);
+            if (!$maskIm) continue;
+            if (imagesx($maskIm) !== $W || imagesy($maskIm) !== $H) {
+                imagedestroy($maskIm);
+                continue;
+            }
+            imagesavealpha($maskIm, true);
+            imagealphablending($maskIm, true);
+
+            for ($y = 0; $y < $H; $y++) {
+                for ($x = 0; $x < $W; $x++) {
+                    $m  = imagecolorat($maskIm, $x, $y);
+                    $ma = ($m & 0x7F000000) >> 24;
+                    if ($ma >= 127) continue;
+                    $coverage = $this->clamp01((1.0 - ($ma / 127.0)) * $opacity);
+                    if ($coverage <= 0) continue;
+
+                    $p  = imagecolorat($baseIm, $x, $y);
+                    $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
+
+                    $tex = imagecolorat($textureIm, $x, $y);
+                    $tr = ($tex >> 16) & 0xFF;
+                    $tg = ($tex >> 8) & 0xFF;
+                    $tb = $tex & 0xFF;
+                    $gray = (int)round(0.2126 * $tr + 0.7152 * $tg + 0.0722 * $tb);
+                    $overlayRgb = [$gray, $gray, $gray];
+
+                    [$rBlend, $gBlend, $bBlend] = $this->applyBlendMode([$r0, $g0, $b0], $overlayRgb, $mode);
+                    $r = $this->clamp255($r0 * (1.0 - $coverage) + $rBlend * $coverage);
+                    $g = $this->clamp255($g0 * (1.0 - $coverage) + $gBlend * $coverage);
+                    $b = $this->clamp255($b0 * (1.0 - $coverage) + $bBlend * $coverage);
+
+                    $col = imagecolorallocatealpha($baseIm, $r, $g, $b, 0);
+                    imagesetpixel($baseIm, $x, $y, $col);
+                }
+            }
+
+            imagedestroy($maskIm);
+        }
+    }
+
+    private function applyShadowAdjustments(
+        \GdImage $baseIm,
+        array $masksByRole,
+        array $shadowSettingsByRole,
+        array $blendSettingsByRole,
+        int $W,
+        int $H
+    ): void {
+        $orderedRoles = $this->sortRoleKeys(array_keys($shadowSettingsByRole));
+        foreach ($orderedRoles as $role) {
+            $shadow = $shadowSettingsByRole[$role];
+            $maskMeta = $masksByRole[$role] ?? null;
+            if (!$maskMeta || empty($maskMeta['path'])) continue;
+            $blendForRole = $blendSettingsByRole[$role] ?? null;
+            if (isset($blendForRole['mode']) && strtolower($blendForRole['mode']) === 'original') continue;
+            $offset = isset($shadow['l_offset']) ? (float)$shadow['l_offset'] : 0.0;
+            $tintRgb = $shadow['tint_rgb'] ?? null;
+            $tintOpacity = $this->clamp01($shadow['tint_opacity'] ?? 0.0);
+            if (abs($offset) < 0.01 && (!$tintRgb || $tintOpacity <= 0.0)) continue;
+
+            $maskAbs = $this->absPath($maskMeta['path']);
+            $maskIm = $this->openImage($maskAbs);
+            if (!$maskIm) continue;
+            if (imagesx($maskIm) !== $W || imagesy($maskIm) !== $H) {
+                imagedestroy($maskIm);
+                continue;
+            }
+            imagesavealpha($maskIm, true);
+            imagealphablending($maskIm, true);
+
+            for ($y = 0; $y < $H; $y++) {
+                for ($x = 0; $x < $W; $x++) {
+                    $m  = imagecolorat($maskIm, $x, $y);
+                    $ma = ($m & 0x7F000000) >> 24;
+                    if ($ma >= 127) continue;
+                    $coverage = 1.0 - ($ma / 127.0);
+                    if ($coverage <= 0) continue;
+
+                    $p  = imagecolorat($baseIm, $x, $y);
+                    $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
+                    [$L0, $a0, $b0Lab] = $this->rgbToLab($r0, $g0, $b0);
+                    $L1 = $this->clamp($L0 + $offset, 0.0, 100.0);
+                    $rgbAdjusted = $this->labToRgb($L1, $a0, $b0Lab);
+                    $r = $this->clamp255($rgbAdjusted[0]);
+                    $g = $this->clamp255($rgbAdjusted[1]);
+                    $b = $this->clamp255($rgbAdjusted[2]);
+
+                    if ($tintRgb && $tintOpacity > 0) {
+                        $r = $this->clamp255($r * (1.0 - $tintOpacity) + $tintRgb[0] * $tintOpacity);
+                        $g = $this->clamp255($g * (1.0 - $tintOpacity) + $tintRgb[1] * $tintOpacity);
+                        $b = $this->clamp255($b * (1.0 - $tintOpacity) + $tintRgb[2] * $tintOpacity);
+                    }
+
+                    $col = imagecolorallocatealpha($baseIm, $r, $g, $b, 0);
+                    imagesetpixel($baseIm, $x, $y, $col);
+                }
+            }
+
+            imagedestroy($maskIm);
+        }
+    }
+
 
 
 
@@ -299,7 +598,7 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         if (!preg_match('/^[0-9A-F]{6}$/', $hex6)) throw new RuntimeException("invalid hex6");
         $role = trim($role);
         if ($role === '') throw new RuntimeException("role required");
-        return $this->renderApplyMap($assetId, [$role => $hex6], $mode, $alpha, 0.35);
+        return $this->renderApplyMap($assetId, [$role => $hex6], $mode, $alpha, []);
     }
 
     private function extractOverlaySettings(array $variantRow): array {
@@ -313,6 +612,11 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
                 'opacity' => $this->normalizeOverlayOpacity($variantRow[$opKey] ?? null),
             ];
         }
+        $out['_shadow'] = [
+            'l_offset'     => $this->normalizeShadowOffset($variantRow['overlay_shadow_l_offset'] ?? null),
+            'tint_hex'     => $this->normalizeShadowTint($variantRow['overlay_shadow_tint'] ?? null),
+            'tint_opacity' => $this->normalizeShadowTintOpacity($variantRow['overlay_shadow_tint_opacity'] ?? null),
+        ];
         return $out;
     }
 
@@ -329,17 +633,108 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         }
         $mode = $this->normalizeOverlayMode($row['mode'] ?? null) ?? 'colorize';
         $opacity = $this->normalizeOverlayOpacity($row['opacity'] ?? null);
-        if ($opacity === null) $opacity = 1.0;
+        if ($opacity === null) $opacity = 0.0;
         return [
             'mode' => $mode,
             'opacity' => $this->clamp01($opacity),
         ];
     }
 
+    public function renderAppliedPalette(AppliedPalette $palette, ?string $outputRelPath = null): array
+    {
+        $hexMap = [];
+        $overrides = [];
+
+        foreach ($palette->entries as $entry) {
+            $entry = $this->applyLatestMaskSettings($palette, $entry);
+            $colorId = (int)($entry['color_id'] ?? 0);
+            $role = trim((string)($entry['mask_role'] ?? ''));
+            if ($colorId <= 0 || $role === '') continue;
+            $color = $this->colorRepo->getRowById($colorId);
+            if (!$color) continue;
+            $hex = strtoupper((string)($color['hex6'] ?? ''));
+            if (!preg_match('/^[0-9A-F]{6}$/', $hex)) continue;
+            $hexMap[$role] = $hex;
+            $overrides[$role] = $this->buildOverlayOverride($entry);
+        }
+
+        if (!$hexMap) {
+            throw new RuntimeException('Applied palette has no usable entries.');
+        }
+
+        return $this->renderApplyMap($palette->assetId, $hexMap, 'colorize', 0.9, $overrides, $outputRelPath);
+    }
+
+    public function cacheAppliedPalette(AppliedPalette $palette): array
+    {
+        $renderRel = sprintf('/photos/rendered/ap_%d.jpg', $palette->id);
+        $result = $this->renderAppliedPalette($palette, $renderRel);
+        $thumbRel = sprintf('/photos/rendered/ap_%d-thumb.jpg', $palette->id);
+        $thumbMeta = $this->createThumbnailFromRel($result['render_rel_path'], $thumbRel, 720, 480);
+        return [
+            'render_rel_path' => $result['render_rel_path'],
+            'render_url' => $result['render_url'],
+            'thumb_rel_path' => $thumbMeta ? $thumbRel : null,
+            'thumb_url' => $thumbMeta ? $this->absUrl($thumbRel) : null,
+            'width' => $result['width'] ?? null,
+            'height' => $result['height'] ?? null,
+            'thumb_width' => $thumbMeta['width'] ?? null,
+            'thumb_height' => $thumbMeta['height'] ?? null,
+        ];
+    }
+
+    private function buildOverlayOverride(array $entry): array
+    {
+        $mode = $entry['blend_mode'] ?? 'colorize';
+        $opacity = isset($entry['blend_opacity']) ? (float)$entry['blend_opacity'] : 0.0;
+        $shadow = [
+            'l_offset' => $entry['lightness_offset'] ?? 0,
+            'tint_hex' => $entry['tint_hex'] ?? null,
+            'tint_opacity' => $entry['tint_opacity'] ?? 0,
+        ];
+        $tiers = ['dark','medium','light'];
+        $out = [];
+        foreach ($tiers as $tier) {
+            $out[$tier] = [
+                'mode' => $mode,
+                'opacity' => $opacity,
+            ];
+        }
+        $out['_shadow'] = $shadow;
+        return $out;
+    }
+
+    private function applyLatestMaskSettings(AppliedPalette $palette, array $entry): array
+    {
+        if (!$this->maskBlendRepo) {
+            return $entry;
+        }
+        $recipe = null;
+        if (!empty($entry['mask_setting_id'])) {
+            $recipe = $this->maskBlendRepo->findById((int)$entry['mask_setting_id']);
+        }
+        if (!$recipe && !empty($entry['color_id'])) {
+            $recipe = $this->maskBlendRepo->findForAssetMaskColor(
+                $palette->assetId,
+                (string)($entry['mask_role'] ?? ''),
+                (int)$entry['color_id']
+            );
+        }
+        if (!$recipe) {
+            return $entry;
+        }
+        $entry['blend_mode'] = $recipe['blend_mode'] ?? $entry['blend_mode'];
+        $entry['blend_opacity'] = $recipe['blend_opacity'] ?? $entry['blend_opacity'];
+        $entry['lightness_offset'] = $recipe['shadow_l_offset'] ?? $entry['lightness_offset'];
+        $entry['tint_hex'] = $recipe['shadow_tint_hex'] ?? $entry['tint_hex'];
+        $entry['tint_opacity'] = $recipe['shadow_tint_opacity'] ?? $entry['tint_opacity'];
+        return $entry;
+    }
+
     private function pickOverlayTiersByLightness(float $Lt): array {
         $primary = 'medium';
-        if ($Lt <= 32.0) $primary = 'dark';
-        elseif ($Lt >= 72.0) $primary = 'light';
+        if ($Lt <= 45.0) $primary = 'dark';
+        elseif ($Lt >= 88.0) $primary = 'light';
         $order = [$primary];
         if ($primary !== 'medium') $order[] = 'medium';
         if ($primary !== 'light') $order[] = 'light';
@@ -350,7 +745,7 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
     private function normalizeOverlayMode($mode): ?string {
         if (!is_string($mode)) return null;
         $m = strtolower(trim($mode));
-        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity'];
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity','flatpaint','original'];
         return in_array($m, $allowed, true) ? $m : null;
     }
 
@@ -361,6 +756,48 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         return $this->clamp01($num);
     }
 
+    private function normalizeShadowOffset($val): float {
+        if ($val === null || $val === '') return 0.0;
+        $num = (float)$val;
+        if (!is_finite($num)) $num = 0.0;
+        return $this->clamp($num, -50.0, 50.0);
+    }
+
+    private function normalizeShadowTint($val): ?string {
+        if (!is_string($val)) return null;
+        $trim = strtoupper(trim($val));
+        $trim = ltrim($trim, '#');
+        if (strlen($trim) === 3) {
+            $trim = $trim[0].$trim[0].$trim[1].$trim[1].$trim[2].$trim[2];
+        }
+        if (!preg_match('/^[0-9A-F]{6}$/', $trim)) return null;
+        return '#'.$trim;
+    }
+
+    private function normalizeShadowTintOpacity($val): float {
+        if ($val === null || $val === '') return 0.0;
+        $num = (float)$val;
+        if (!is_finite($num)) $num = 0.0;
+        return $this->clamp01($num);
+    }
+
+    private function extractShadowSettings(?array $overlayMeta): array {
+        $raw = is_array($overlayMeta) ? ($overlayMeta['_shadow'] ?? null) : null;
+        $offset = $this->normalizeShadowOffset($raw['l_offset'] ?? null);
+        $tintHex = $this->normalizeShadowTint($raw['tint_hex'] ?? null);
+        $tintOpacity = $this->normalizeShadowTintOpacity($raw['tint_opacity'] ?? null);
+        $tintRgb = null;
+        if ($tintHex) {
+            $rgb = $this->hexToRgb(ltrim($tintHex, '#'));
+            $tintRgb = [$rgb[0], $rgb[1], $rgb[2]];
+        }
+        return [
+            'l_offset' => $offset,
+            'tint_rgb' => $tintRgb,
+            'tint_opacity' => $tintOpacity,
+        ];
+    }
+
     /* =======================================================================
      * SUPPORT: per-role stats + auto params
      * =======================================================================
@@ -368,9 +805,9 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
 
 
 /** Fast alpha-weighted mean L* under a mask (sub-sampled grid for speed) */
-private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float {
-    $W = imagesx($baseIm); $H = imagesy($baseIm);
-    $step = max(1, (int)floor(min($W, $H) / 400)); // ~160k samples worst-case
+    private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float {
+        $W = imagesx($baseIm); $H = imagesy($baseIm);
+        $step = max(1, (int)floor(min($W, $H) / 400)); // ~160k samples worst-case
     $sum = 0.0; $wSum = 0.0;
 
     for ($y = 0; $y < $H; $y += $step) {
@@ -473,6 +910,10 @@ private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float 
         return $abs;
     }
 
+    private function normalizeRelPath(string $rel): string {
+        return '/' . ltrim($rel, '/');
+    }
+
     /** http(s)://host + rel */
     private function absUrl(string $rel): string {
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
@@ -490,8 +931,6 @@ private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float 
 
     /** Create renders/<file>.jpg name that encodes roles+hex for cache-busting */
     private function buildRenderRelPath(string $assetId, array $hexMap): string {
-        $yy   = date('Y');
-        $ym   = date('Y-m');
         $slug = [];
         foreach ($hexMap as $role => $hex) {
             $role = preg_replace('~[^a-z0-9]+~i', '', (string)$role);
@@ -501,7 +940,40 @@ private function maskedMeanLightness(\GdImage $baseIm, \GdImage $maskIm): float 
         $slugStr = implode('_', $slug);
         $stamp   = date('Ymd_His');
         $file    = "{$assetId}_" . ($slugStr ?: 'map') . "_{$stamp}.jpg";
-        return "/photos/{$yy}/{$ym}/{$assetId}/renders/{$file}";
+        return "/temp-renders/{$assetId}/{$file}";
+    }
+
+    private function createThumbnailFromRel(string $sourceRel, string $targetRel, int $maxWidth = 720, int $maxHeight = 720): ?array
+    {
+        $srcAbs = $this->absPath($sourceRel);
+        if (!is_file($srcAbs)) return null;
+        $src = $this->openImage($srcAbs);
+        if (!$src) return null;
+        $width = imagesx($src);
+        $height = imagesy($src);
+        if ($width <= 0 || $height <= 0) {
+            imagedestroy($src);
+            return null;
+        }
+        $scale = min(1.0, $maxWidth / $width, $maxHeight / $height);
+        $targetAbs = $this->absPath($targetRel, true);
+
+        if ($scale >= 1.0) {
+            if ($targetAbs !== $srcAbs) {
+                @copy($srcAbs, $targetAbs);
+            }
+            imagedestroy($src);
+            return ['width' => $width, 'height' => $height];
+        }
+
+        $newW = max(1, (int)round($width * $scale));
+        $newH = max(1, (int)round($height * $scale));
+        $thumb = imagecreatetruecolor($newW, $newH);
+        imagecopyresampled($thumb, $src, 0, 0, 0, 0, $newW, $newH, $width, $height);
+        imagejpeg($thumb, $targetAbs, 88);
+        imagedestroy($thumb);
+        imagedestroy($src);
+        return ['width' => $newW, 'height' => $newH];
     }
 
     /* =======================================================================

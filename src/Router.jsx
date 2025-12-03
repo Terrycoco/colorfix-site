@@ -27,15 +27,18 @@ const SQLPage = lazy(() => import('@pages/SQLPage'));
 const ItemEditPage = lazy(() => import('@pages/ItemEditPage'));
 const FilterEditPage = lazy(() => import('@pages/FilterEditPage'));
 const FriendsEnterPage = lazy(() => import('@pages/FriendsEnterPage'));
-const PaletteViewerPage = lazy(() => import('@pages/PaletteViewerPage'));
+
 const MissingChipsPage = lazy(() => import('@pages/MissingChipsPage'));
 const WhitesLrvEditorPage = lazy(() => import('@pages/whitesLrvEditorPage'));
 const AdminUploadPhotoPage = lazy(() => import('@pages/AdminUploadPhotoPage'));
-const AdminPhotoPreviewPage = lazy(() => import('@pages/AdminPhotoPreviewPage'));
+
 const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
 const AdminRolesMasksPage = lazy(() => import ('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
+const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
+const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
+const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 
 function AppRouter() {
   const renderWithSuspense = (Component, label) => (
@@ -49,6 +52,11 @@ function AppRouter() {
       <ScrollToTop smooth={true} ignoreWhenHash={true} />
 
       <Routes>
+        <Route
+          path="view/:paletteId"
+          element={renderWithSuspense(AppliedPaletteViewPage, 'Loading palette…')}
+        />
+
         {/* App shell (nav, etc.) */}
         <Route element={<App />}>
           
@@ -110,10 +118,7 @@ function AppRouter() {
               path="friends"
               element={renderWithSuspense(FriendsEnterPage, 'Loading friends…')}
             />
-            <Route
-              path="palette-viewer"
-              element={renderWithSuspense(PaletteViewerPage, 'Loading palette viewer…')}
-            />
+       
             <Route
               path="missing-chips"
               element={renderWithSuspense(MissingChipsPage, 'Loading missing chips…')}
@@ -126,9 +131,10 @@ function AppRouter() {
               path="upload-photo"
               element={renderWithSuspense(AdminUploadPhotoPage, 'Loading upload tool…')}
             />
+     
             <Route
-              path="photo-preview"
-              element={renderWithSuspense(AdminPhotoPreviewPage, 'Loading photo preview…')}
+              path="mask-tester"
+              element={renderWithSuspense(AdminMaskTesterPage, 'Loading mask tester…')}
             />
             <Route
               path="roles-masks"
@@ -141,6 +147,10 @@ function AppRouter() {
             <Route
               path="saved-palettes"
               element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes…')}
+            />
+            <Route
+              path="applied-palettes"
+              element={renderWithSuspense(AdminAppliedPalettesPage, 'Loading applied palettes…')}
             />
           </Route>
 

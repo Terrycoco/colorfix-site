@@ -163,7 +163,9 @@ try {
             c.neutral_cats,
             c.hue_cats,
             c.chip_num,
-            c.brand
+            c.brand,
+            c.hcl_l,
+            c.lab_l
         FROM palette_role_members prm
         JOIN master_roles mr ON mr.id = prm.role_id
         JOIN colors c ON c.id = prm.color_id
@@ -184,6 +186,8 @@ try {
             'hex6' => strtoupper((string)$row['hex6']),
             'neutral_cats' => $row['neutral_cats'],
             'hue_cats' => $row['hue_cats'],
+            'hcl_l' => isset($row['hcl_l']) ? (float)$row['hcl_l'] : null,
+            'lab_l' => isset($row['lab_l']) ? (float)$row['lab_l'] : null,
         ];
     }
 

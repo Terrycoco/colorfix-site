@@ -13,6 +13,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [isFull, setIsFull] = useState(false);
+  const [renderPath, setRenderPath] = useState("");
 
   // Build role -> HEX6
   const hexMap = useMemo(() => {
@@ -54,11 +55,20 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
         alpha: 0.9
       })
     })
-      .then(r => r.json())
-      .then(data => {
-        if (data?.error) throw new Error(data.error);
+      .then(async (r) => {
+        const text = await r.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(text || "Invalid render response");
+        }
+        if (!r.ok || data?.error) {
+          throw new Error(data?.message || data?.error || `HTTP ${r.status}`);
+        }
         const url = data?.render_url || "";
         setCompositeUrl(url ? `${url}?ts=${Date.now()}` : "");
+        setRenderPath(data?.render_rel_path || "");
         onStateChange?.({ loading: false, error: "" });
       })
       .catch(e => {
@@ -117,6 +127,15 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
           <div className="full-hint">Tap to close · Esc to exit</div>
         </div>
       )}
+      {renderPath && (
+        <div className="render-meta">
+          <span className="meta-item">
+            <span className="k">Render Path:</span>
+            <code>{renderPath}</code>
+          </span>
+        </div>
+      )}
+      {err && <div className="error">{err}</div>}
     </div>
   );
 }

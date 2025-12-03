@@ -6,6 +6,7 @@
   /* lock to visual viewport to stop page bounce on iOS */
   height: 100dvh;
   height: 100svh;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
   background: #fff;

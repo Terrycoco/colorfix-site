@@ -1,0 +1,334 @@
+.mask-blend-history {
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.mbh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.mbh-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mbh-status {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #777;
+}
+
+.mbh-error {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #c53030;
+}
+
+.mbh-add-table {
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  padding: 8px;
+  overflow: visible;
+}
+.mbh-add-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.mbh-add-table th,
+.mbh-add-table td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+.mbh-add-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  color: #666;
+  font-size: 11px;
+  text-align: left;
+}
+.mbh-add-table th .mbh-add-btn {
+  margin-left: 8px;
+}
+.mbh-add-table .col-lightness,
+.mbh-add-table td:nth-child(2) {
+  width: 60px;
+  text-align: left;
+  padding-left: 6px;
+}
+.mbh-add-table .col-mode,
+.mbh-add-table td:nth-child(3) {
+  width: 100px;
+}
+.mbh-add-table .col-percent,
+.mbh-add-table td:nth-child(4) {
+  width: 45px;
+}
+.mbh-add-table .col-actions {
+  width: 150px;
+  text-align: left;
+}
+.mbh-add-table td:first-child .fuzzy-dropdown {
+  width: 150px !important;
+
+  position: relative;
+  z-index: 20;
+}
+.mbh-add-table td:first-child .fuzzy-input-wrap input[type="search"] {
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.mbh-add-table td input,
+.mbh-add-table td select {
+  width: 100%;
+}
+.mbh-grid-target {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+.mbh-grid-mode select,
+.mbh-grid-percent input {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+.mbh-grid-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mbh-table-wrapper {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.mbh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.mbh-table th,
+.mbh-table td {
+  border-bottom: 1px solid #f1f1f1;
+  padding: 6px 6px;
+  vertical-align: middle;
+}
+.mbh-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+}
+.mbh-sort {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.mbh-sort:hover {
+  text-decoration: underline;
+}
+.mbh-table td select,
+.mbh-table td input {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.mbh-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.mbh-color-swatch.is-original {
+  border-style: dashed;
+  border-color: #9ca3af;
+  background-image: repeating-linear-gradient(45deg, #f3f4f6, #f3f4f6 6px, #e5e7eb 6px, #e5e7eb 12px);
+}
+.mbh-color-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mbh-color-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.1;
+}
+.mbh-color-sub {
+  font-size: 10px;
+  color: #777;
+}
+
+.mbh-action-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.icon-btn {
+  border: none;
+  background: #f5f5f5;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.icon-btn:hover:not([aria-disabled="true"]) {
+  background: #ececec;
+}
+.icon-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.icon-btn .icon {
+  font-size: 12px;
+  line-height: 1;
+  color: #333;
+}
+.icon-btn .icon-play::before {
+  content: "▶";
+}
+.icon-btn .icon-save::before {
+  content: "💾";
+}
+.icon-btn .icon-delete::before {
+  content: "✕";
+}
+.icon-btn .icon-shadow::before {
+  content: "☾";
+}
+.icon-btn.danger {
+  background: #fee2e2;
+}
+.icon-btn.danger:hover:not([aria-disabled="true"]) {
+  background: #fecaca;
+}
+.icon-btn.active {
+  background: #dbeafe;
+}
+.icon-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.mbh-empty {
+  padding: 12px;
+  text-align: center;
+  color: #777;
+}
+.mbh-add-table td:first-child {
+  position: relative;
+}
+
+.mbh-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #1f2937;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.mbh-pill-btn.primary {
+  background: #fb923c;
+  color: #fff;
+}
+.mbh-pill-btn.ghost {
+  background: transparent;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+.mbh-pill-btn[aria-disabled="true"],
+.mbh-pill-btn[aria-disabled="true"]:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mbh-pill-btn[aria-disabled="true"],
+.mbh-pill-btn[aria-disabled="true"]:hover {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.mbh-pill-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.mbh-shadow-row td {
+  background: #fdfaf6;
+  padding: 12px;
+}
+.mbh-shadow-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  align-items: flex-end;
+}
+.mbh-shadow-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.mbh-shadow-editor input[type="number"],
+.mbh-shadow-editor input[type="color"] {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+.mbh-shadow-editor input[type="color"] {
+  padding: 0;
+  width: 44px;
+  height: 28px;
+}
+.mbh-shadow-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mbh-shadow-hex {
+  font-size: 11px;
+  color: #4b5563;
+  min-width: 60px;
+}
+.mbh-shadow-buttons {
+  display: flex;
+  gap: 8px;
+}

@@ -37,6 +37,16 @@ const emptyEditForm = {
   client_notes: "",
 };
 
+const emptySendForm = {
+  palette_id: null,
+  nickname: "",
+  to_email: "",
+  client_name: "",
+  subject: "",
+  message: "",
+  preview_colors: [],
+};
+
 function formatDate(value) {
   if (!value) return "—";
   const dt = new Date(value.replace(" ", "T"));
@@ -68,7 +78,7 @@ function memberToSwatch(member) {
 export default function AdminSavedPalettesPage() {
   const admin = isAdmin();
   const navigate = useNavigate();
-  const { clearPalette, addManyToPalette, setShowPalette } = useAppState();
+  const { clearPalette, addManyToPalette } = useAppState();
 
   const [form, setForm] = useState(defaultForm);
   const [filters, setFilters] = useState(() => ({
@@ -82,6 +92,9 @@ export default function AdminSavedPalettesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [editStatus, setEditStatus] = useState({ loading: false, error: "" });
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendForm, setSendForm] = useState(emptySendForm);
+  const [sendStatus, setSendStatus] = useState({ loading: false, error: "", success: "" });
 
   useEffect(() => {
     if (!admin) return;
@@ -155,7 +168,6 @@ export default function AdminSavedPalettesPage() {
     if (!palette?.members?.length) return;
     clearPalette();
     await addManyToPalette(palette.members.map(memberToSwatch));
-    setShowPalette?.(true);
     navigate("/my-palette");
   };
 
@@ -216,6 +228,71 @@ export default function AdminSavedPalettesPage() {
       setRefreshTick((tick) => tick + 1);
     } catch (err) {
       setEditStatus({ loading: false, error: err?.message || "Failed to update palette" });
+    }
+  };
+
+  const openSendModal = (palette) => {
+    const colors = (palette.members || []).slice(0, 5).map((member) => ({
+      id: member.id,
+      name: member.color_name || "",
+      code: member.color_code || "",
+      hex: member.color_hex6 || "cccccc",
+    }));
+    const defaultEmail = palette.client_email || palette.sent_to_email || "";
+    const defaultMessage = palette.message_template || `Here’s the palette we discussed for ${palette.nickname || "your project"}.\n\nLet me know what you think!`;
+    const defaultSubject = palette.subject_template || `ColorFix palette ideas`;
+    setSendForm({
+      palette_id: palette.id,
+      nickname: palette.nickname || "Saved Palette",
+      to_email: defaultEmail,
+      client_name: palette.client_name || "",
+      subject: defaultSubject,
+      message: defaultMessage,
+      preview_colors: colors,
+    });
+    setSendStatus({ loading: false, error: "", success: "" });
+    setSendModalOpen(true);
+  };
+
+  const closeSendModal = () => {
+    if (sendStatus.loading) return;
+    setSendModalOpen(false);
+    setSendForm(emptySendForm);
+    setSendStatus({ loading: false, error: "", success: "" });
+  };
+
+  const handleSendField = (name, value) => {
+    setSendForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSendSubmit = async (event) => {
+    event.preventDefault();
+    if (!sendForm.palette_id) return;
+    setSendStatus({ loading: true, error: "", success: "" });
+    try {
+      const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-send.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palette_id: sendForm.palette_id,
+          to_email: sendForm.to_email,
+          client_name: sendForm.client_name,
+          subject: sendForm.subject,
+          message: sendForm.message,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      setSendStatus({ loading: false, error: "", success: "Email sent!" });
+      setTimeout(() => {
+        closeSendModal();
+        setRefreshTick((tick) => tick + 1);
+      }, 1200);
+    } catch (err) {
+      setSendStatus({ loading: false, error: err?.message || "Failed to send email", success: "" });
     }
   };
 
@@ -360,6 +437,9 @@ export default function AdminSavedPalettesPage() {
               <button type="button" className="ghost" onClick={() => openEditModal(item)}>
                 Edit
               </button>
+              <button type="button" className="ghost" onClick={() => openSendModal(item)} disabled={!item.members?.length}>
+                Send Email
+              </button>
               <button type="button" onClick={() => handleLoadPalette(item)} disabled={!item.members?.length}>
                 Load into My Palette
               </button>
@@ -389,7 +469,7 @@ export default function AdminSavedPalettesPage() {
               </label>
 
               <label>
-                Notes
+                Internal Notes (for me)
                 <textarea
                   rows={3}
                   value={editForm.notes}
@@ -461,6 +541,88 @@ export default function AdminSavedPalettesPage() {
                 </button>
                 <button type="submit" disabled={editStatus.loading}>
                   {editStatus.loading ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {sendModalOpen && (
+        <div className="asp-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="asp-modal">
+            <header className="asp-modal-head">
+              <h2>Send Palette Email</h2>
+              <button type="button" className="asp-close" onClick={closeSendModal} aria-label="Close dialog">
+                ✕
+              </button>
+            </header>
+            <form className="asp-modal-form" onSubmit={handleSendSubmit}>
+              <label>
+                Email Subject
+                <input
+                  type="text"
+                  value={sendForm.subject}
+                  onChange={(e) => handleSendField("subject", e.target.value)}
+                  placeholder="Subject line"
+                />
+              </label>
+
+              <label>
+                Client Name
+                <input
+                  type="text"
+                  value={sendForm.client_name}
+                  onChange={(e) => handleSendField("client_name", e.target.value)}
+                  placeholder="Client name (optional)"
+                />
+              </label>
+
+              <label>
+                Send to Email
+                <input
+                  type="email"
+                  value={sendForm.to_email}
+                  onChange={(e) => handleSendField("to_email", e.target.value)}
+                  required
+                />
+              </label>
+
+              <label>
+                Message
+                <textarea
+                  rows={4}
+                  value={sendForm.message}
+                  onChange={(e) => handleSendField("message", e.target.value)}
+                />
+              </label>
+
+              {sendForm.preview_colors.length > 0 && (
+                <>
+                  <h3>Preview</h3>
+                  <div className="asp-preview-swatches">
+                    {sendForm.preview_colors.map((swatch) => (
+                      <div key={swatch.id} className="asp-preview-swatch">
+                        <div className="asp-preview-chip" style={{ backgroundColor: `#${swatch.hex}` }} />
+                        <div className="asp-preview-meta">
+                          <div>{swatch.name}</div>
+                          <span>{swatch.code}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {sendStatus.error && <div className="asp-error">{sendStatus.error}</div>}
+              {sendStatus.success && <div className="asp-success">{sendStatus.success}</div>}
+
+              <div className="asp-modal-actions">
+                <button type="button" className="ghost" onClick={closeSendModal} disabled={sendStatus.loading}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={sendStatus.loading}>
+                  {sendStatus.loading ? "Sending…" : "Send Email"}
                 </button>
               </div>
             </form>

@@ -30,6 +30,7 @@ export default function FuzzySearchColorSelect({
   ghostValue,
   autoFocus = true,
   mobileBreakpoint = 768,
+  showLabel = true,
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -109,9 +110,13 @@ export default function FuzzySearchColorSelect({
     return () => document.removeEventListener('pointerdown', onDocPointerDown, { capture: true });
   }, []);
 
-  function getFontColor(color) {
-    return color?.hcl_l > 70 ? "black" : "white";
+function getFontColor(color) {
+  const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l;
+  if (typeof lightness === "number" && !Number.isNaN(lightness)) {
+    return lightness > 70 ? "black" : "white";
   }
+  return color?.hcl_l > 70 ? "black" : "white";
+}
 
   function colorToHex(color) {
     if (!color) return null;
@@ -123,7 +128,7 @@ export default function FuzzySearchColorSelect({
     return null;
   }
 
-  function pick(color) {
+function pick(color) {
     if (!color) return;
     pickingRef.current = true;
     try {
@@ -240,6 +245,7 @@ export default function FuzzySearchColorSelect({
       ? `inherits ${ghostValue.name || ghostValue.code || "role color"}`
       : "Color name or code";
 
+
   useEffect(() => {
     if (sheetOpen && isMobile) {
       document.body.style.overflow = 'hidden';
@@ -257,9 +263,11 @@ export default function FuzzySearchColorSelect({
       onKeyDownCapture={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
       style={className?.includes("full-width") ? { width: "100%" } : undefined}
     >
-      <label className="dropdown-label">
-        {label ? label : "Enter A Color"}
-      </label>
+      {showLabel && (
+        <label className="dropdown-label">
+          {label ? label : "Enter A Color"}
+        </label>
+      )}
 
       {isMobile ? (
         <button

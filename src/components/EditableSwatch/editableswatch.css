@@ -64,6 +64,12 @@
   opacity: 0.6;
 }
 
+.ed-swatch__lightness {
+  font-size: 11px;
+  color: var(--text-muted, #7a7a7a);
+  margin-top: 2px;
+}
+
 /* Popover */
 .ed-swatch__popover {
   position: absolute;

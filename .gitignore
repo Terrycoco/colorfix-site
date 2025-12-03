@@ -28,3 +28,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local scratch files (not part of the app)
+tmp_partial.jsx

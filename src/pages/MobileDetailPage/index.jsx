@@ -27,7 +27,7 @@ export default function MobileDetailPage() {
    const [ogImage, setOgImage] = useState(null);
    const navigate = useNavigate();
    const location = useLocation();
-   const {palette, currentColorDetail, setCurrentColorDetail, setShowBack, recentSwatches, setRecentSwatches, addToPalette, setShowPalette} = useAppState();
+   const {palette, currentColorDetail, setCurrentColorDetail, setShowBack, recentSwatches, setRecentSwatches, addToPalette, removeFromPalette} = useAppState();
   const inPalette = palette?.some((c) => c.id === currentColorDetail.id);
   const text = currentColorDetail?.hcl_l > 70 ? '#111' : '#fff';
  
@@ -159,7 +159,6 @@ export default function MobileDetailPage() {
 
     const handleAddToPalette = () => {
       addToPalette(currentColorDetail);
-      setShowPalette(true);
     }
 
     const handleBack = () => {

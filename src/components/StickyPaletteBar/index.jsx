@@ -1,6 +1,6 @@
 import './stickypalette.css';
 import { useAppState } from '@context/AppStateContext';
-import { useNavigate,useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
  
 export default function PaletteBar() {
   const navigate = useNavigate();
@@ -9,14 +9,9 @@ export default function PaletteBar() {
     palette,
     removeFromPalette,
     clearPalette,
-    showPalette,
-    setShowPalette
+    showPalette
   } = useAppState();
 
-
-  function togglePaletteMode() {
-    setShowPalette(!showPalette);
-  }
 
   function handlePaletteClick() {
     navigate('/my-palette#palette-hero');
@@ -32,28 +27,32 @@ export default function PaletteBar() {
      navigate(`/color/${color.id}`);
   };
 
+  const hasSwatches = Array.isArray(palette) && palette.length > 0;
 
+  if (!hasSwatches || !showPalette) return null;
 
   return (
-    <div className="palette-bar" onClick={handlePaletteClick}>
+    <div
+      className="palette-bar palette-bar--open"
+      onClick={handlePaletteClick}
+      role="group"
+      aria-label="Sticky palette"
+    >
       <div className="palette-bar-swatches">
-  {palette?.length > 0 && palette.map((color) => (
-    <div 
-       key={color.id}  
-       className='palette-bar-tile'
-       onClick={(e) => {handleClick(e, color)}}
-   >
-       <div
-        className="palette-bar-swatch"
-        style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
-        title={color.name}
-      />
-
+        {palette.map((color) => (
+          <div
+            key={color.id}
+            className="palette-bar-tile"
+            onClick={(e) => { handleClick(e, color); }}
+          >
+            <div
+              className="palette-bar-swatch"
+              style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
+              title={color.name}
+            />
+          </div>
+        ))}
+      </div>
     </div>
-  ))}
-</div>
-      <span className="palette-bar-arrow">▼</span>
-    </div>
- 
   );
 }

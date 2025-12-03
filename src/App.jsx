@@ -58,11 +58,13 @@ export default function App() {
                 <li><a href="/admin/items" className="block py-1 hover:underline">Items</a></li>
                 <li><a href="/admin/filters" className="block py-1 hover:underline">Filters</a></li>
                 <li><a href="/admin/friends" className="block py-1 hover:underline">Friends</a></li>
-                <li><a href="/admin/saved-palettes" className="block py-1 hover:underline">Saved Palettes</a></li>
+         
                  <li><a href="/admin/missing-chips" className="block py-1 hover:underline">Missing Chips</a></li>
                 <li><a href="/admin/lrv-editor" className="block py-1 hover:underline">LRV Editor</a></li>
                   <li><a href="/admin/upload-photo" className="block py-1 hover:underline">Upload Photos</a></li>
-                    <li><a href="/admin/photo-preview" className="block py-1 hover:underline">Photo Preview</a></li>
+              
+                    <li><a href="/admin/mask-tester" className="block py-1 hover:underline">Mask Tester</a></li>
+                      <li><a href="/admin/applied-palettes" className="block py-1 hover:underline">Applied Palettes</a></li>
                  
               </ul>
             </div>

@@ -119,11 +119,13 @@ export default function PaletteRack({
           <div className="rack-status">No palettes found.</div>
         )}
         {items.map((item) => (
-          <button
-            type="button"
+          <div
             className="rack-row"
             key={item.palette_id}
             onClick={() => handleApply(item)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleApply(item); }}
+            role="button"
+            tabIndex={0}
           >
             <div className="rack-swatches">
               {ROLE_ORDER.map((role) => {
@@ -162,7 +164,7 @@ export default function PaletteRack({
                 ))}
               </div>
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>

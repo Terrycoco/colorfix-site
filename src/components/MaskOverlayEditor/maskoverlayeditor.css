@@ -36,23 +36,54 @@
   color: #111;
 }
 
+.mask-overlay-card__dirty {
+  font-size: 12px;
+  color: #c05621;
+  font-weight: 600;
+  padding: 4px 6px;
+  align-self: center;
+}
+
 .mask-overlay-card__title {
   font-weight: 600;
   text-transform: capitalize;
 }
 
-.mask-overlay-texture {
+.mask-overlay-meta {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
 }
 
-.mask-overlay-texture input {
+.mask-overlay-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.mask-overlay-meta-row input {
   border: 1px solid #ccc;
   border-radius: 6px;
   padding: 4px 6px;
   font-size: 13px;
+  min-width: 200px;
+}
+.mask-overlay-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 6px;
+}
+.mask-overlay-lightness {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #444;
 }
 
 .mask-overlay-grid {
@@ -91,4 +122,24 @@
 .mask-overlay-percent__suffix {
   font-size: 0.85rem;
   color: #555;
+}
+
+.mask-overlay-tier__apply {
+  align-self: flex-start;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.blend-help {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 16px;
+  font-size: 12px;
+  color: #555;
+}
+.blend-help__item strong {
+  display: block;
+  font-size: 12px;
+  color: #222;
 }

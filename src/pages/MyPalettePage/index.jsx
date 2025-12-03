@@ -38,9 +38,9 @@ export default function MyPalettePage() {
     palette,
     addToPalette,
     clearPalette,
-    setShowPalette,
     searchFilters,
     brandFiltersAppliedSeq,
+    paletteCollapsed,
   } = useAppState();
 
   // Compute active brand codes (supports .brands or .brand; array/Set/string)
@@ -112,7 +112,6 @@ const activeBrandCodes = useMemo(() => {
 
   const heroRef = useRef(null);
   const [controlsOpen, setControlsOpen] = useState(false);
-  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
@@ -183,9 +182,6 @@ const activeBrandCodes = useMemo(() => {
       setNoResultsFound(rows.length === 0);
       setNeighborsUsed(data && typeof data === "object" ? data.neighbors_used || null : null);
 
-      if (isMobile && !isPaletteEmpty) {
-        setPaletteCollapsed(true);
-      }
     } catch {
       setFriends([]);
       setNoResultsFound(true);
@@ -255,7 +251,6 @@ const activeBrandCodes = useMemo(() => {
   useEffect(() => {
     if (!isMobile) {
       setControlsOpen(false);
-      setPaletteCollapsed(false);
     }
   }, [isMobile]);
 
@@ -266,10 +261,6 @@ const activeBrandCodes = useMemo(() => {
   }, [activeBrandCodes.join(',')]);
 
   // expand palette if empty
-  useEffect(() => {
-    if (filteredPalette.length === 0) setPaletteCollapsed(false);
-  }, [filteredPalette.length]);
-
   // jump to top on first mount
   useEffect(() => {
     const el = document.getElementById("palette-hero") || document.getElementById("top");
@@ -290,22 +281,6 @@ const activeBrandCodes = useMemo(() => {
       document.body.style.overflow = "";
     };
   }, [controlsOpen, isMobile]);
-
-  // Sticky bar visibility (off on this page)
-  useEffect(() => {
-    if (!isMobile) {
-      const target = document.getElementById("sticky-sentinel") || heroRef.current;
-      if (!target) return;
-      const BAR_H = 70;
-      const io = new IntersectionObserver(
-        ([entry]) => setShowPalette(!entry.isIntersecting),
-        { root: null, rootMargin: `-${BAR_H}px 0px 0px 0px`, threshold: 0 }
-      );
-      io.observe(target);
-      return () => io.disconnect();
-    }
-    setShowPalette(isPaletteEmpty ? false : paletteCollapsed);
-  }, [setShowPalette, isMobile, isPaletteEmpty, paletteCollapsed]);
 
   /* ---------- Handlers ---------- */
 
@@ -334,7 +309,6 @@ const activeBrandCodes = useMemo(() => {
   function handleClear() {
     setFriends([]);
     clearPalette();
-    setPaletteCollapsed(false);
   }
 
   function onFuzzyPick(item) {
@@ -467,7 +441,6 @@ const activeBrandCodes = useMemo(() => {
   );
 
   const openControlsPanel = () => {
-    setPaletteCollapsed(false);
     setControlsOpen(true);
   };
   const closeControlsPanel = () => setControlsOpen(false);

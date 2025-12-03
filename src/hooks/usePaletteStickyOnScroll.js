@@ -7,7 +7,7 @@ import { useAppState } from "@context/AppStateContext";
  * height during early layout.
  */
 export default function usePaletteStickyOnScroll(heroRef, { offset = 0 } = {}) {
-  const { setShowPalette } = useAppState();
+  const { setPaletteCollapsed } = useAppState();
 
   useEffect(() => {
     const hero = heroRef?.current;
@@ -28,7 +28,7 @@ export default function usePaletteStickyOnScroll(heroRef, { offset = 0 } = {}) {
     const io = new IntersectionObserver(
       ([entry]) => {
         const show = entry.isIntersecting; // because of negative top rootMargin below
-        setShowPalette(show);
+        setPaletteCollapsed(!show);
       },
       {
         root: null,
@@ -42,11 +42,11 @@ export default function usePaletteStickyOnScroll(heroRef, { offset = 0 } = {}) {
     // Immediate check handles reload mid-page
     // If sentinel is already above the bar, show sticky
     const rect = sentinel.getBoundingClientRect();
-    setShowPalette(rect.top <= barH + offset);
+    setPaletteCollapsed(!(rect.top <= barH + offset));
 
     return () => {
       io.disconnect();
       sentinel.remove();
     };
-  }, [heroRef, setShowPalette, offset]);
+  }, [heroRef, setPaletteCollapsed, offset]);
 }

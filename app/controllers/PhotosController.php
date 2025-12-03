@@ -42,6 +42,12 @@ class PhotosController
         $preparedTiers = ['dark' => null, 'medium' => null, 'light' => null];
         $masks         = [];
 
+        $roleStatsRows = $repo->getRoleStats((int)$photo['id']);
+        $roleStatsMap = [];
+        foreach ($roleStatsRows as $statRow) {
+            $roleStatsMap[(string)$statRow['role']] = $statRow;
+        }
+
         foreach ($variants as $v) {
             $kind = (string)$v['kind'];
             $role = (string)($v['role'] ?? '');
@@ -64,16 +70,16 @@ class PhotosController
 
             // Masks — support both "mask:<role>" (legacy) and kind='masks' role='<role>'
             if ($kind === 'masks' && $role !== '') {
-                $masks[] = $this->buildMaskPayload($role, $rel, $v, $toUrl);
+                $masks[] = $this->buildMaskPayload($role, $rel, $v, $toUrl, $roleStatsMap[$role] ?? null);
             } elseif (str_starts_with($kind, 'mask:')) {
                 $roleLegacy = (string)($v['role'] ?? substr($kind, 5));
-                $masks[] = $this->buildMaskPayload($roleLegacy, $rel, $v, $toUrl);
+                $masks[] = $this->buildMaskPayload($roleLegacy, $rel, $v, $toUrl, $roleStatsMap[$roleLegacy] ?? null);
             }
         }
 
         // Map stats → precomputed[role].Lm
         $precomputed = [];
-        foreach ($repo->getRoleStats((int)$photo['id']) as $row) {
+        foreach ($roleStatsRows as $row) {
             $precomputed[(string)$row['role']] = ['Lm' => (float)$row['l_avg01']];
         }
 
@@ -81,6 +87,7 @@ class PhotosController
         $tags = $tagsMap[(int)$photo['id']] ?? [];
 
         return [
+            'photo_id'       => (int)$photo['id'],
             'asset_id'       => (string)$photo['asset_id'],
             'width'          => (int)$photo['width'],
             'height'         => (int)$photo['height'],
@@ -149,7 +156,7 @@ class PhotosController
         }
 
         $repo = new PdoPhotoRepository($this->pdo);
-        $svc  = new PhotoRenderingService($repo);
+        $svc  = new PhotoRenderingService($repo, $this->pdo);
         $updated = $svc->recalcLmForRoles($assetId, $roles ?: null);
 
         return ['ok' => true, 'asset_id' => $assetId, 'updated' => $updated];
@@ -192,31 +199,34 @@ class PhotosController
         };
 
         $assetIdIn = trim((string)($post['asset_id'] ?? ''));
-        $style     = $post['style']     ?? null;
+        $styleRaw  = trim((string)($post['style'] ?? ''));
+        $style     = $styleRaw !== '' ? $styleRaw : null;
         $verdict   = $post['verdict']   ?? null;
         $status    = $post['status']    ?? null;
         $lighting  = $post['lighting']  ?? null;
         $rights    = $post['rights']    ?? null;
         $tagsCsv   = trim((string)($post['tags'] ?? ''));
+        $hasIncomingStyle = $style !== null;
+        $hasIncomingTags  = $tagsCsv !== '';
+        $findableErrorMsg = 'Add a style or at least one tag so this photo can be found later.';
         $categoryInput = $this->sanitizeCategoryPath($post['category_path'] ?? null);
 
         $hasPreparedSingle = isset($files['prepared_base']) && $files['prepared_base']['error'] === UPLOAD_ERR_OK;
         $hasTexture        = isset($files['texture_overlay']) && $files['texture_overlay']['error'] === UPLOAD_ERR_OK;
         $hasMasks          = isset($files['masks']) && is_array($files['masks']['name']);
 
-        $hasDark   = !empty($files['prepared_dark'])   && $files['prepared_dark']['error']   === UPLOAD_ERR_OK;
-        $hasMedium = !empty($files['prepared_medium']) && $files['prepared_medium']['error'] === UPLOAD_ERR_OK;
-        $hasLight  = !empty($files['prepared_light'])  && $files['prepared_light']['error']  === UPLOAD_ERR_OK;
-
-        if (!$assetIdIn && !$hasPreparedSingle && !$hasDark && !$hasMedium && !$hasLight) {
-            throw new RuntimeException('New assets require prepared_base (or prepared_dark/medium/light).');
+        if (!$assetIdIn && !$hasPreparedSingle) {
+            throw new RuntimeException('New assets require prepared_base.');
         }
-        if (!$assetIdIn && $hasTexture && !$hasPreparedSingle && !$hasDark && !$hasMedium && !$hasLight) {
-            throw new RuntimeException('Upload prepared base before attaching a texture overlay.');
+        if (!$assetIdIn && $hasTexture && !$hasPreparedSingle) {
+            throw new RuntimeException('Upload the prepared base before attaching a texture overlay.');
+        }
+        if ($assetIdIn === '' && !$hasIncomingStyle && !$hasIncomingTags) {
+            throw new RuntimeException($findableErrorMsg);
         }
 
         $repo = new PdoPhotoRepository($this->pdo);
-        $svc  = new PhotosUploadService($repo, $photosRoot);
+        $svc  = new PhotosUploadService($repo, $photosRoot, $this->pdo);
 
         // Resolve/create photo
         if ($assetIdIn !== '') {
@@ -229,6 +239,16 @@ class PhotosController
                 $svc->moveAssetBase($assetId, $categoryPath, $categoryInput);
                 $repo->updatePhotoCategoryPath($photoId, $categoryInput);
                 $categoryPath = $categoryInput;
+            }
+            if (!$hasIncomingStyle && !$hasIncomingTags) {
+                $hasExistingStyle = trim((string)($photo['style_primary'] ?? '')) !== '';
+                if (!$hasExistingStyle) {
+                    $existingTagsMap = $repo->getTagsForPhotoIds([$photoId]);
+                    $hasExistingTags = !empty($existingTagsMap[$photoId] ?? []);
+                    if (!$hasExistingTags) {
+                        throw new RuntimeException($findableErrorMsg);
+                    }
+                }
             }
         } else {
             $assetId = $makeAssetId();
@@ -253,35 +273,19 @@ class PhotosController
         $touched = [];
         $baseW = (int)($photo['width'] ?? 0);
         $baseH = (int)($photo['height'] ?? 0);
-        $setSizeIfEmpty = function(int $w, int $h) use (&$baseW, &$baseH, $repo, $photoId) {
-            if (!$baseW || !$baseH) {
-                $baseW = $w; $baseH = $h;
-                $repo->updatePhotoSize($photoId, $baseW, $baseH);
-            }
+        $syncPhotoSize = function(int $w, int $h) use (&$baseW, &$baseH, $repo, $photoId) {
+            if ($w <= 0 || $h <= 0) return;
+            if ($baseW === $w && $baseH === $h) return;
+            $baseW = $w;
+            $baseH = $h;
+            $repo->updatePhotoSize($photoId, $baseW, $baseH);
         };
 
-        // ----- NEW: accept any of the trio via service -----
-        if ($hasDark) {
-            $res = $svc->savePreparedTier($photoId, 'dark', $files['prepared_dark']);
-            $touched[] = ['kind'=>'prepared', 'role'=>'dark', 'w'=>$res['width'], 'h'=>$res['height']];
-            if ($res['width'] && $res['height']) $setSizeIfEmpty((int)$res['width'], (int)$res['height']);
-        }
-        if ($hasMedium) {
-            $res = $svc->savePreparedTier($photoId, 'medium', $files['prepared_medium']);
-            $touched[] = ['kind'=>'prepared', 'role'=>'medium', 'w'=>$res['width'], 'h'=>$res['height']];
-            if ($res['width'] && $res['height']) $setSizeIfEmpty((int)$res['width'], (int)$res['height']);
-        }
-        if ($hasLight) {
-            $res = $svc->savePreparedTier($photoId, 'light', $files['prepared_light']);
-            $touched[] = ['kind'=>'prepared', 'role'=>'light', 'w'=>$res['width'], 'h'=>$res['height']];
-            if ($res['width'] && $res['height']) $setSizeIfEmpty((int)$res['width'], (int)$res['height']);
-        }
-
-        // ----- Legacy single prepared_base (optional) -----
+        // ----- Single prepared base -----
         if ($hasPreparedSingle) {
             $res = $svc->saveBase($photoId, 'prepared', $files['prepared_base']);
             $touched[] = ['kind'=>'prepared', 'role'=>'', 'w'=>$res['width'], 'h'=>$res['height']];
-            if ($res['width'] && $res['height']) $setSizeIfEmpty((int)$res['width'], (int)$res['height']);
+            if ($res['width'] && $res['height']) $syncPhotoSize((int)$res['width'], (int)$res['height']);
         }
 
         if ($hasTexture) {
@@ -426,7 +430,7 @@ class PhotosController
         $repo = new PdoPhotoRepository($this->pdo);
         $svc  = new PhotoRenderingService($repo, $this->pdo);
 
-        $res = $svc->renderApplyMap($assetId, $hexMap, $mode, $alpha);
+        $res = $svc->renderApplyMap($assetId, $hexMap, $mode, $alpha, []);
 
         // add absolute URL for convenience
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
@@ -450,10 +454,15 @@ class PhotosController
                 'opacity' => $this->normalizeOverlayOpacity($variantRow[$opKey] ?? null),
             ];
         }
+        $out['_shadow'] = [
+            'l_offset' => $this->normalizeShadowOffset($variantRow['overlay_shadow_l_offset'] ?? null),
+            'tint_hex' => $this->normalizeShadowTint($variantRow['overlay_shadow_tint'] ?? null),
+            'tint_opacity' => $this->normalizeShadowTintOpacity($variantRow['overlay_shadow_tint_opacity'] ?? null),
+        ];
         return $out;
     }
 
-    private function buildMaskPayload(string $role, string $relPath, array $variantRow, callable $toUrl): array
+    private function buildMaskPayload(string $role, string $relPath, array $variantRow, callable $toUrl, ?array $statsRow = null): array
     {
         $url = $toUrl($relPath);
         $filename = basename($relPath) ?: $relPath;
@@ -464,6 +473,7 @@ class PhotosController
             'filename'=> $filename,
             'overlay' => $this->buildOverlayPayload($variantRow),
             'original_texture' => $this->normalizeMaskTexture($variantRow['original_texture'] ?? null),
+            'base_lightness' => $statsRow && isset($statsRow['l_avg01']) ? (float)$statsRow['l_avg01'] : null,
         ];
     }
 
@@ -471,7 +481,7 @@ class PhotosController
     {
         if (!is_string($mode)) return null;
         $m = strtolower(trim($mode));
-        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity'];
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity','flatpaint','original'];
         return in_array($m, $allowed, true) ? $m : null;
     }
 
@@ -480,6 +490,38 @@ class PhotosController
         if ($val === '' || $val === null) return null;
         $num = (float)$val;
         if (!is_finite($num)) return null;
+        if ($num < 0) $num = 0;
+        if ($num > 1) $num = 1;
+        return $num;
+    }
+
+    private function normalizeShadowOffset($val): float
+    {
+        if ($val === null || $val === '') return 0.0;
+        $num = (float)$val;
+        if (!is_finite($num)) $num = 0.0;
+        if ($num < -50) $num = -50;
+        if ($num > 50) $num = 50;
+        return $num;
+    }
+
+    private function normalizeShadowTint($val): ?string
+    {
+        if (!is_string($val)) return null;
+        $trim = strtoupper(trim($val));
+        $trim = ltrim($trim, '#');
+        if (strlen($trim) === 3) {
+            $trim = $trim[0].$trim[0].$trim[1].$trim[1].$trim[2].$trim[2];
+        }
+        if (!preg_match('/^[0-9A-F]{6}$/', $trim)) return null;
+        return '#'.$trim;
+    }
+
+    private function normalizeShadowTintOpacity($val): float
+    {
+        if ($val === null || $val === '') return 0.0;
+        $num = (float)$val;
+        if (!is_finite($num)) $num = 0.0;
         if ($num < 0) $num = 0;
         if ($num > 1) $num = 1;
         return $num;

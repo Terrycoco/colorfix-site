@@ -30,6 +30,8 @@
   --search-item-background: #cdd8e0;
   --search-item-background-hover: #B9C7D3;
   --sticky-palette-bar-height: 70px;
+  --board-scroller-z-index: 4000;
+  --modals-z-index: 5000;
 }
 }
 

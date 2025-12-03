@@ -9,6 +9,7 @@
   padding: 4px 1.5rem 0 4px;
   z-index: 100;
   border-bottom: 1px solid #efefef;
+  transition: height 200ms ease, padding 200ms ease, background 200ms ease;
 }
 
 .palette-bar-side {
@@ -46,13 +47,6 @@
   height: 60px;
   border-radius: 8px;
   border: 2px solid #888;
-}
-
-.palette-bar-arrow{
-  font-size:0.8rem;
-  color:#555;
-  margin-left:8px;
-  pointer-events:none;
 }
 
 .palette-remove-button {

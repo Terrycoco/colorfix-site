@@ -155,9 +155,16 @@ const [searchFilters, setSearchFilters] = useState({
   const [brandFiltersAppliedSeq, setBrandFiltersAppliedSeq] = useState(0);
 
   const [noResults, setNoResults] = useState(false);
-  const [showPalette, setShowPalette] = useState(false);  //default true?
+  const [showPalette, setShowPalette] = useState(false);  // derived from paletteCollapsed later
 
   const [paletteActiveColor, setPaletteActiveColor] = useState(null);
+  const [paletteCollapsed, setPaletteCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const raw = localStorage.getItem('cf_palette_collapsed');
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    return false;
+  });
   const [advancedSearch, setAdvancedSearch] = useState(initialAdvancedSearch);
 const [savedPaletteIds, setSavedPaletteIds] = useState([]);
 
@@ -215,7 +222,6 @@ useEffect(() => {
     const clean = swatches.filter(Boolean);
     if (clean.length) {
       setPalette(clean);      // full swatch objects
-      setShowPalette(true);   // make sure the palette bar is visible
     }
   })();
 
@@ -267,13 +273,14 @@ useEffect(() => {
   return () => window.removeEventListener("storage", onStorage);
 }, []);
 
-useEffect (() => {
-    if (palette.length > 0) {
-      setShowPalette(true);
-    } else {
-      setShowPalette(false);
-    }
-  }, [palette.length])
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('cf_palette_collapsed', paletteCollapsed ? 'true' : 'false');
+  }, [paletteCollapsed]);
+
+  useEffect(() => {
+    setShowPalette(palette.length > 0 && !paletteCollapsed);
+  }, [palette.length, paletteCollapsed]);
 
   //INITIAL LOAD -- cats and colors
   useEffect(() => {
@@ -465,7 +472,8 @@ function applyBrandFilters(brands) {
     searchFilters, setSearchFilters, clearSearchFilters,
        toggleFilter, clearFilter, setFilterValues, isFilterChecked,
     noResults, setNoResults,
-    showPalette, setShowPalette,
+    showPalette,
+    paletteCollapsed, setPaletteCollapsed,
     palette, setPalette, addToPalette, removeFromPalette, clearPalette, addManyToPalette,
     paletteActiveColor, setPaletteActiveColor,
     advancedSearch, setAdvancedSearch,

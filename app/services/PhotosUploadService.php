@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repos\PdoPhotoRepository;
+use App\Services\PhotoRenderingService;
 
 /**
  * PhotosUploadService
@@ -27,7 +28,8 @@ final class PhotosUploadService
 {
     public function __construct(
         private PdoPhotoRepository $repo,
-        private string $photosRoot // e.g., $_SERVER['DOCUMENT_ROOT'].'/colorfix/photos'
+        private string $photosRoot, // e.g., $_SERVER['DOCUMENT_ROOT'].'/colorfix/photos'
+        private \PDO $pdo
     ) {}
     private array $assetPathOverrides = [];
 
@@ -95,62 +97,6 @@ final class PhotosUploadService
         ];
     }
 
-    /**
-     * Save a prepared tier image (dark|medium|light) under prepared/<tier>.<ext>
-     * DB: kind='prepared', role='<tier>'
-     */
-    public function savePreparedTier(int $photoId, string $tier, array $file): array
-    {
-        $tier = strtolower(trim($tier));
-        if (!in_array($tier, ['dark','medium','light'], true)) {
-            throw new \InvalidArgumentException("Invalid prepared tier: {$tier}");
-        }
-
-        $photo = $this->repo->getPhotoById($photoId);
-        if (!$photo || empty($photo['asset_id'])) throw new \RuntimeException("Photo not found: {$photoId}");
-        $assetId = (string)$photo['asset_id'];
-
-        $destDir = $this->buildDir($assetId, 'prepared');
-        $this->ensureDir($destDir);
-
-        [$ext, $mime] = $this->extFromUpload($file);
-        $filename = "{$tier}.{$ext}";
-        $destPath = rtrim($destDir, '/')."/{$filename}";
-
-        $this->moveUpload($file, $destPath);
-
-        [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
-
-        $this->repo->upsertVariant($photoId, 'prepared', $tier, $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
-
-        return [
-            'ok'      => true,
-            'kind'    => 'prepared',
-            'role'    => $tier,
-            'path'    => $this->publicPath($destPath),
-            'width'   => $width,
-            'height'  => $height,
-            'mime'    => $mime,
-            'assetId' => $assetId,
-        ];
-    }
-
-    /** Convenience: save any provided of the trio. Keys: prepared_dark|prepared_medium|prepared_light */
-    public function savePreparedTrio(int $photoId, array $files): array
-    {
-        $out = [];
-        if (!empty($files['prepared_dark'])   && $files['prepared_dark']['error']   === UPLOAD_ERR_OK) {
-            $out[] = $this->savePreparedTier($photoId, 'dark',   $files['prepared_dark']);
-        }
-        if (!empty($files['prepared_medium']) && $files['prepared_medium']['error'] === UPLOAD_ERR_OK) {
-            $out[] = $this->savePreparedTier($photoId, 'medium', $files['prepared_medium']);
-        }
-        if (!empty($files['prepared_light'])  && $files['prepared_light']['error']  === UPLOAD_ERR_OK) {
-            $out[] = $this->savePreparedTier($photoId, 'light',  $files['prepared_light']);
-        }
-        return $out;
-    }
-
     /** Save a role mask PNG into masks/<role>.png */
     public function saveMask(
         int $photoId,
@@ -175,11 +121,12 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
 
+        $maskPublicPath = $this->publicPath($destPath);
         $this->repo->upsertVariant(
             $photoId,
             'masks',
             $role,
-            $this->publicPath($destPath),
+            $maskPublicPath,
             'image/png',
             $bytes,
             $width,
@@ -187,6 +134,7 @@ final class PhotosUploadService
             $overlaySettings,
             $originalTexture
         );
+        $this->persistMaskStats($photoId, $assetId, $role, $maskPublicPath, $destPath);
 
         return [
             'ok'      => true,
@@ -309,8 +257,8 @@ final class PhotosUploadService
 
     private function buildDir(string $assetId, string $leaf): string
     {
-        $base = $this->assetPathOverrides[$assetId] ?? $this->defaultSubpath();
-        return rtrim($this->photosRoot, '/')."/{$base}/{$assetId}/{$leaf}";
+        $root = $this->assetRootPath($assetId);
+        return "{$root}/{$leaf}";
     }
 
     private function ensureDir(string $dir): void
@@ -404,5 +352,49 @@ final class PhotosUploadService
         }, explode('/', $trim)));
         if (!$segments) return null;
         return implode('/', $segments);
+    }
+
+    private function assetRootPath(string $assetId): string
+    {
+        $base = $this->assetPathOverrides[$assetId] ?? $this->defaultSubpath();
+        return rtrim($this->photosRoot, '/')."/{$base}/{$assetId}";
+    }
+
+    private function findPreparedBasePath(string $assetId): ?string
+    {
+        $dir = $this->assetRootPath($assetId) . '/prepared';
+        if (!is_dir($dir)) return null;
+        $candidates = glob($dir . '/base.*');
+        if (!$candidates) return null;
+        return $candidates[0];
+    }
+
+    private function persistMaskStats(int $photoId, string $assetId, string $role, string $maskPublicPath, string $maskAbsPath): void
+    {
+        $preparedAbs = $this->findPreparedBasePath($assetId);
+        if (!$preparedAbs || !is_file($preparedAbs)) return;
+        $maskAbs = $maskAbsPath;
+        if (!is_file($maskAbs)) return;
+
+        $renderer = new PhotoRenderingService($this->repo, $this->pdo);
+        $stats = $renderer->measureMaskStats($preparedAbs, $maskAbs);
+        if (!$stats) return;
+
+        $preparedPublic = $this->publicPath($preparedAbs);
+        $preparedBytes = (int)@filesize($preparedAbs);
+        $maskBytes     = (int)@filesize($maskAbs);
+
+        $this->repo->upsertMaskStats(
+            $photoId,
+            $role,
+            $preparedPublic,
+            $maskPublicPath,
+            $preparedBytes,
+            $maskBytes,
+            $stats['l_avg'],
+            $stats['l_p10'],
+            $stats['l_p90'],
+            $stats['px_covered']
+        );
     }
 }
