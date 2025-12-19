@@ -6,12 +6,21 @@ import AppLayout from '@layout/AppLayout';
 import BoardScroller from '@components/BoardScroller';
 import MessagePopup from '@components/MessagePopup';
 import { isAdmin } from '@helpers/authHelper';
+import { ensureViewerId } from "./lib/viewer";
+
 
 export default function App() {
   const { boards } = useAppState();
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const adminMenuRef = useRef(null);
   const admin = isAdmin();
+
+  //on load plant/retrieve a viewer_id
+    useEffect(() => {
+      ensureViewerId();
+    }, []);
+
+
 
   useEffect(() => {
     function handleClickOutside(e) {

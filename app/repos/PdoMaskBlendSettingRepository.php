@@ -12,8 +12,10 @@ class PdoMaskBlendSettingRepository
     public function listForMask(int $photoId, string $maskRole): array
     {
         $sql = "
-            SELECT *
-            FROM mask_blend_settings
+            SELECT mbs.*,
+                   COALESCE(NULLIF(mbs.color_hex, ''), c.hex6) AS color_hex
+            FROM mask_blend_settings mbs
+            LEFT JOIN colors c ON mbs.color_id = c.id
             WHERE photo_id = :photo_id
               AND mask_role = :mask_role
             ORDER BY target_lightness ASC, id ASC
@@ -33,12 +35,12 @@ class PdoMaskBlendSettingRepository
                 (photo_id, asset_id, mask_role, color_id, color_name, color_brand, color_code, color_hex,
                  base_lightness, target_lightness, target_h, target_c, blend_mode, blend_opacity,
                  shadow_l_offset, shadow_tint_hex, shadow_tint_opacity,
-                 is_preset, notes, created_at)
+                 is_preset, approved, notes, created_at)
             VALUES
                 (:photo_id, :asset_id, :mask_role, :color_id, :color_name, :color_brand, :color_code, :color_hex,
                  :base_lightness, :target_lightness, :target_h, :target_c, :blend_mode, :blend_opacity,
                  :shadow_l_offset, :shadow_tint_hex, :shadow_tint_opacity,
-                 :is_preset, :notes, NOW())
+                 :is_preset, :approved, :notes, NOW())
         ";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
@@ -60,6 +62,7 @@ class PdoMaskBlendSettingRepository
             ':shadow_tint_hex' => $data['shadow_tint_hex'],
             ':shadow_tint_opacity' => $data['shadow_tint_opacity'],
             ':is_preset' => (int)($data['is_preset'] ?? 0),
+            ':approved' => (int)($data['approved'] ?? 0),
             ':notes' => $data['notes'] ?? null,
         ]);
 
@@ -74,7 +77,7 @@ class PdoMaskBlendSettingRepository
             'base_lightness','target_lightness','target_h','target_c',
             'blend_mode','blend_opacity',
             'shadow_l_offset','shadow_tint_hex','shadow_tint_opacity',
-            'notes'
+            'notes','approved','is_preset'
         ];
         $set = [];
         $params = [':id' => $id];
@@ -115,9 +118,11 @@ class PdoMaskBlendSettingRepository
     public function findClosest(int $photoId, string $maskRole, float $baseLightness, float $targetLightness): ?array
     {
         $sql = "
-            SELECT *,
+            SELECT mbs.*,
+                   COALESCE(NULLIF(mbs.color_hex, ''), c.hex6) AS color_hex,
                    (ABS(base_lightness - :base_l) + ABS(target_lightness - :target_l)) AS rank_score
-            FROM mask_blend_settings
+            FROM mask_blend_settings mbs
+            LEFT JOIN colors c ON mbs.color_id = c.id
             WHERE photo_id = :photo_id
               AND mask_role = :mask_role
             ORDER BY rank_score ASC, updated_at DESC

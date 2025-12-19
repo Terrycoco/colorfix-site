@@ -72,8 +72,15 @@
 }
 .mbh-add-table .col-percent,
 .mbh-add-table td:nth-child(4) {
-  width: 45px;
+  width: 35px;
 }
+
+.mbh-add-table .col-offset,
+.mbh-add-table td:nth-child(5) {
+  width: 45px !important;
+}
+
+
 .mbh-add-table .col-actions {
   width: 150px;
   text-align: left;
@@ -116,6 +123,14 @@
   flex: 1;
   min-height: 0;
 }
+.mbh-row.active {
+  background: #fff6d6;
+}
+.mbh-row-title {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 6px 2px;
+}
 .mbh-table {
   width: 100%;
   border-collapse: collapse;
@@ -149,6 +164,31 @@
   border: 1px solid #ccc;
   border-radius: 6px;
   padding: 4px 6px;
+}
+
+.mbh-table .col-offset {
+  width: 45px;
+}
+.mbh-table .col-offset input {
+  width: 35px !important;
+  min-width: 35px;
+  max-width: 35px;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 4px;
+}
+.mbh-add-table .col-offset input {
+  width: 35px !important;
+  min-width: 35px;
+  max-width: 35px;
+  height: 35px;
+  box-sizing: border-box;
+  padding: 4px;
+}
+
+.mbh-approved-toggle input {
+  width: 16px;
+  height: 16px;
 }
 
 .mbh-color-swatch {

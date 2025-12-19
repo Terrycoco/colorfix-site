@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import { API_FOLDER } from "@helpers/config";
 import { bucketForLightness, getPresetForBuckets, overlayPresetConfig } from "@config/overlayPresets";
+import MaskTable from "@components/MaskTable";
 import "./maskblendhistory.css";
 
 function normalizeHex(hex) {
@@ -63,8 +64,11 @@ function enrichRow(row) {
     tint_hex: row.shadow_tint_hex || null,
     tint_opacity: row.shadow_tint_opacity ?? 0,
   });
+  const approved = !!row.approved;
   return {
     ...row,
+    approved,
+    draft_approved: approved,
     percent,
     draft_mode: row.blend_mode,
     draft_percent: percent,
@@ -86,7 +90,15 @@ export default function MaskBlendHistory({
   assetId,
   maskRole,
   baseLightness,
+  selectorVersion = 0,
   onApplyBlend,
+  onSelectRow = null,
+  activeRowId = null,
+  activeColorId = null,
+  rowTitle = null,
+  hideHeader = false,
+  filterColorId = null,
+  forceSortByBaseLightness = false,
 }) {
   const [rows, setRows] = useState([]);
   const rowsRef = useRef(rows);
@@ -95,7 +107,6 @@ export default function MaskBlendHistory({
   const [newColor, setNewColor] = useState(null);
   const [newMode, setNewMode] = useState("flatpaint");
   const [newOpacity, setNewOpacity] = useState("100");
-  const [selectorVersion, setSelectorVersion] = useState(0);
   const [savingRow, setSavingRow] = useState(null);
   const [applyingRow, setApplyingRow] = useState(null);
   const [sortField, setSortField] = useState("target_lightness");
@@ -107,24 +118,44 @@ export default function MaskBlendHistory({
   const newModeLower = (newMode || "").toLowerCase();
   const isNewOriginal = newModeLower === ORIGINAL_MODE;
 
+  const tableRows = useMemo(() => {
+    return rows.map((row) => {
+      const effectiveBase =
+        baseLightness != null && Number.isFinite(Number(baseLightness))
+          ? Number(baseLightness)
+          : row.base_lightness;
+      return {
+        ...row,
+        color_hex: row.color_hex,
+        color_name: row.color_name,
+        color_brand: row.color_brand,
+        color_code: row.color_code,
+        color_id: row.color_id,
+        base_lightness: effectiveBase,
+        target_lightness: row.target_lightness,
+        blend_mode: row.draft_mode || row.blend_mode,
+        blend_opacity: (Number(row.draft_percent ?? row.percent) || 0) / 100,
+        mask_role: row.mask_role || maskRole,
+      };
+    });
+  }, [rows, maskRole, baseLightness]);
+
   function resetNewRow() {
     setNewColor(null);
     setNewMode("flatpaint");
     setNewOpacity("100");
-    setSelectorVersion((v) => v + 1);
   }
 
   useEffect(() => {
     if (!assetId || !maskRole) return;
     fetchRows();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetId, maskRole]);
+  }, [assetId, maskRole, selectorVersion]);
 
   useEffect(() => {
     setNewColor(null);
     setNewMode("flatpaint");
     setNewOpacity("100");
-    setSelectorVersion((v) => v + 1);
     setShadowEditorRow(null);
   }, [assetId, maskRole]);
 
@@ -256,7 +287,8 @@ function updateRowShadowDraft(id, field, value) {
     const resolvedPercent = Number.isFinite(percentDraft) ? percentDraft : row.percent;
     const percentDirty = Math.round(resolvedPercent) !== Math.round(row.percent);
     const shadowDirty = !shadowsEqual(row.draft_shadow, baseShadowForRow(row));
-    return modeDirty || percentDirty || shadowDirty;
+    const approvedDirty = (row.draft_approved ?? row.approved) !== row.approved;
+    return modeDirty || percentDirty || shadowDirty || approvedDirty;
   }
 
   const dirtyRowIds = useMemo(() => rows.filter(isRowDirty).map((row) => row.id), [rows]);
@@ -297,6 +329,7 @@ function updateRowShadowDraft(id, field, value) {
         shadow_l_offset: shadow.l_offset,
         shadow_tint_hex: shadow.tint_hex,
         shadow_tint_opacity: shadow.tint_opacity,
+        approved: 1,
       },
     };
     const res = await fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
@@ -307,7 +340,7 @@ function updateRowShadowDraft(id, field, value) {
     });
     const data = await res.json();
     if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
-    const saved = enrichRow(data.setting);
+    const saved = enrichRow({ ...data.setting, approved: 1 });
     setRows((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
     return saved;
   }
@@ -446,6 +479,7 @@ function updateRowShadowDraft(id, field, value) {
         shadow_l_offset: defaultShadow.l_offset,
         shadow_tint_hex: defaultShadow.tint_hex,
         shadow_tint_opacity: defaultShadow.tint_opacity,
+        approved: 0,
       },
     };
     setSavingRow(-1);
@@ -516,6 +550,14 @@ function updateRowShadowDraft(id, field, value) {
 
   const sortedRows = useMemo(() => {
     const arr = [...rows];
+    if (forceSortByBaseLightness) {
+      arr.sort((a, b) => {
+        const aL = Number(baseLightness != null ? baseLightness : a.base_lightness ?? 0);
+        const bL = Number(baseLightness != null ? baseLightness : b.base_lightness ?? 0);
+        return aL - bL;
+      });
+      return arr;
+    }
     arr.sort((a, b) => {
       let valA;
       let valB;
@@ -541,156 +583,96 @@ function updateRowShadowDraft(id, field, value) {
       if (typeof valA === "string") {
         return sortDir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
       }
-      return sortDir === "asc" ? valA - valB : valB - valA;
+      const primary = sortDir === "asc" ? valA - valB : valB - valA;
+      if (primary !== 0) return primary;
+      // secondary sort by base lightness for stability
+      const baseA = Number(a.base_lightness ?? 0);
+      const baseB = Number(b.base_lightness ?? 0);
+      return sortDir === "asc" ? baseA - baseB : baseB - baseA;
     });
     return arr;
   }, [rows, sortField, sortDir]);
 
+  const visibleRows = useMemo(() => {
+    if (!filterColorId) return sortedRows;
+    const idNum = Number(filterColorId);
+    return sortedRows.filter((row) => Number(row.color_id) === idNum);
+  }, [sortedRows, filterColorId]);
+
   return (
     <div className="mask-blend-history">
-      <div className="mbh-header">
-        <div>
-          <strong>Tested Colors</strong>
-          {loading && <span className="mbh-status">Loading…</span>}
-          {error && <span className="mbh-error">{error}</span>}
-        </div>
-        <div className="mbh-header-actions">
-          <button
-            type="button"
-            className="btn btn-text"
-            onClick={() => {
-              resetNewRow();
-              setTimeout(() => {
-                const el = document.querySelector(".mbh-add-table .fuzzy-dropdown input");
-                el?.focus();
-              }, 0);
-            }}
-          >
-            New Color
-          </button>
-          <button
-            type="button"
-            className="btn btn-text"
-            disabled={savingAll || !dirtyRowIds.length}
-            onClick={handleSaveAll}
-          >
-            {savingAll ? "Saving…" : `Save All${dirtyRowIds.length ? ` (${dirtyRowIds.length})` : ""}`}
-          </button>
-          <button type="button" className="btn btn-text" onClick={fetchRows}>
-            Refresh
-          </button>
-        </div>
-      </div>
+      {!hideHeader && (
+        <>
+          <div className="mbh-header">
+            <div>
+              <strong>Tested Colors</strong>
+              {loading && <span className="mbh-status">Loading…</span>}
+              {error && <span className="mbh-error">{error}</span>}
+            </div>
+            <div className="mbh-header-actions">
+              <button
+                type="button"
+                className="btn btn-text"
+                disabled={savingAll || !dirtyRowIds.length}
+                onClick={handleSaveAll}
+              >
+                {savingAll ? "Saving…" : `Save All${dirtyRowIds.length ? ` (${dirtyRowIds.length})` : ""}`}
+              </button>
+              <button type="button" className="btn btn-text" onClick={fetchRows}>
+                Refresh
+              </button>
+            </div>
+          </div>
 
-      <div className="mbh-add-table">
-        <table>
+        </>
+      )}
+
+      <div className="mbh-table-wrapper">
+        {rowTitle && <div className="mbh-row-title">{rowTitle}</div>}
+        <table className="mbh-table">
           <thead>
             <tr>
               <th>Color</th>
               <th className="col-lightness">L</th>
               <th className="col-mode">Mode</th>
               <th className="col-percent">%</th>
+              <th className="col-offset">Off</th>
+              <th className="col-approved">Approved</th>
               <th className="col-actions">Actions</th>
-           </tr>
+            </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>
-                <FuzzySearchColorSelect
-                  key={selectorVersion}
-                  onSelect={(color) => setNewColor(color)}
-                  onEmpty={() => setNewColor(null)}
-                  value={newColor}
-                  autoFocus={false}
-                  label=""
-                  showLabel={false}
-                />
-              </td>
-              <td className="mbh-grid-target">
-                {isNewOriginal
-                  ? (baseLightness != null ? Math.round(baseLightness) : "—")
-                  : (newColorLightness != null ? Math.round(newColorLightness) : "—")}
-              </td>
-              <td className="mbh-grid-mode">
-              <select value={newMode} onChange={(e) => setNewMode(e.target.value)}>
-                <option value="colorize">Colorize</option>
-                <option value="softlight">Soft Light</option>
-                <option value="overlay">Overlay</option>
-                <option value="multiply">Multiply</option>
-                <option value="screen">Screen</option>
-                <option value="hardlight">Hard Light</option>
-                <option value="luminosity">Luminosity</option>
-                <option value="flatpaint">Flat Paint</option>
-                <option value="original">Original Photo</option>
-              </select>
-              </td>
-              <td className="mbh-grid-percent">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={isNewOriginal ? "0" : newOpacity}
-                  disabled={isNewOriginal}
-                  onChange={(e) => setNewOpacity(e.target.value)}
-                />
-              </td>
-              <td className="mbh-grid-actions">
-                <div
-                  className="mbh-pill-btn"
-                  role="button"
-                  tabIndex={applyingRow === "new" || (!isNewOriginal && !newColor) ? -1 : 0}
-                  aria-disabled={applyingRow === "new" || (!isNewOriginal && !newColor)}
-                  onClick={() => {
-                    if (applyingRow === "new" || (!isNewOriginal && !newColor)) return;
-                    handleApplyNew();
-                  }}
-                  onKeyDown={(e) => {
-                    if (applyingRow === "new" || (!isNewOriginal && !newColor)) return;
-                    iconKeyHandler(e, handleApplyNew);
-                  }}
-                >
-                  {applyingRow === "new" ? "Applying…" : "Apply"}
-                </div>
-                <div
-                  className="mbh-pill-btn primary"
-                  role="button"
-                  tabIndex={savingRow === -1 || (!isNewOriginal && !newColor) ? -1 : 0}
-                  aria-disabled={savingRow === -1 || (!isNewOriginal && !newColor)}
-                  onClick={() => {
-                    if (savingRow === -1 || (!isNewOriginal && !newColor)) return;
-                    handleSaveNew();
-                  }}
-                  onKeyDown={(e) => {
-                    if (savingRow === -1 || (!isNewOriginal && !newColor)) return;
-                    iconKeyHandler(e, handleSaveNew);
-                  }}
-                >
-                  {savingRow === -1 ? "Saving…" : "Save"}
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mbh-table-wrapper">
-        <table className="mbh-table">
- 
-          <tbody>
-            {sortedRows.map((row) => {
+            {visibleRows.map((row) => {
               const rowModeLower = (row.draft_mode || row.blend_mode || "").toLowerCase();
               const rowIsOriginal = rowModeLower === ORIGINAL_MODE;
               const displayName = rowIsOriginal
                 ? "Original Photo"
                 : (row.color_name || row.color_code || row.color_hex);
+              const swatchHex = row.color_hex
+                ? `#${row.color_hex.replace("#", "")}`
+                : "#ccc";
+              const isActive =
+                (activeRowId != null && activeRowId === row.id) ||
+                (activeColorId != null && activeColorId === row.color_id);
               return (
               <Fragment key={row.id}>
-              <tr>
+              <tr
+                className={isActive ? "mbh-row active" : "mbh-row"}
+                onClick={() => onSelectRow && onSelectRow(row)}
+                onKeyDown={(e) => {
+                  if (!onSelectRow) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectRow(row);
+                  }
+                }}
+                tabIndex={onSelectRow ? 0 : undefined}
+              >
                 <td>
                   <div className="mbh-color-cell">
                     <div
                       className={`mbh-color-swatch ${rowIsOriginal ? "is-original" : ""}`}
-                      style={rowIsOriginal ? undefined : { backgroundColor: `#${row.color_hex}` }}
+                      style={rowIsOriginal ? undefined : { backgroundColor: swatchHex }}
                     />
                     <div className="mbh-color-meta">
                       <div>{displayName}</div>
@@ -709,6 +691,7 @@ function updateRowShadowDraft(id, field, value) {
                     <option value="colorize">Colorize</option>
                     <option value="softlight">Soft Light</option>
                     <option value="overlay">Overlay</option>
+                    <option value="linearburn">Linear Burn</option>
                     <option value="multiply">Multiply</option>
                     <option value="screen">Screen</option>
                     <option value="hardlight">Hard Light</option>
@@ -726,6 +709,35 @@ function updateRowShadowDraft(id, field, value) {
                     onChange={(e) => updateRowDraft(row.id, "draft_percent", e.target.value)}
                     disabled={rowIsOriginal}
                   />
+                </td>
+<td>
+       <input
+                          type="text"
+                          className="col-offset"
+                          inputMode="numeric"
+                          pattern="-?[0-9]*"
+                          value={
+                            row.draft_shadow_input?.l_offset ??
+                            (typeof row.draft_shadow.l_offset === "number"
+                              ? String(row.draft_shadow.l_offset)
+                              : "")
+                          }
+                          onChange={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
+                          onBlur={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
+                        />
+</td>
+
+
+
+
+                <td className="mbh-approved">
+                  <label className="mbh-approved-toggle">
+                    <input
+                      type="checkbox"
+                      checked={!!row.draft_approved}
+                      onChange={(e) => updateRowDraft(row.id, "draft_approved", e.target.checked)}
+                    />
+                  </label>
                 </td>
                 <td className="mbh-actions">
                   <div className="mbh-action-icons">
@@ -913,7 +925,7 @@ function updateRowShadowDraft(id, field, value) {
             })}
             {!loading && !rows.length && (
               <tr>
-                <td colSpan={6} className="mbh-empty">
+                <td colSpan={7} className="mbh-empty">
                   No tests yet. Add a color above to get started.
                 </td>
               </tr>
@@ -930,10 +942,18 @@ MaskBlendHistory.propTypes = {
   maskRole: PropTypes.string.isRequired,
   baseLightness: PropTypes.number,
   onApplyBlend: PropTypes.func,
+  rowTitle: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  hideHeader: PropTypes.bool,
+  filterColorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  forceSortByBaseLightness: PropTypes.bool,
 };
 
 MaskBlendHistory.defaultProps = {
   assetId: "",
   baseLightness: null,
   onApplyBlend: null,
+  rowTitle: null,
+  hideHeader: false,
+  filterColorId: null,
+  forceSortByBaseLightness: false,
 };

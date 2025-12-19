@@ -29,14 +29,19 @@ export default function FuzzySearchColorSelect({
   value,
   ghostValue,
   autoFocus = true,
+  preventAutoFocus = false,
+  suppressFocus = false,
+  manualOpen = false,
   mobileBreakpoint = 768,
   showLabel = true,
+  compact = false,
 }) {
-  const [query, setQuery] = useState('');
+  const initialText = () => (value && (value.name || value.code || value.hex6 || value.hex || '')) || '';
+  const [query, setQuery] = useState(initialText);
   const [results, setResults] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [open, setOpen] = useState(false);
-  const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedColor, setSelectedColor] = useState(value || null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -66,11 +71,21 @@ export default function FuzzySearchColorSelect({
 
   // 🔸 Auto-focus on mount ONLY if there's no initial value
   useEffect(() => {
-    if (!autoFocus || isMobile) return;
+    if (!autoFocus || isMobile || preventAutoFocus) return;
     const hasInitial = !!(value && value.id);
     if (!hasInitial) inputRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFocus, isMobile]); // run once per autoFocus flag
+  }, [autoFocus, isMobile, preventAutoFocus]); // run once per autoFocus flag
+
+  // If we explicitly want to suppress focus (e.g., tables), blur on mount.
+  useEffect(() => {
+    if (!suppressFocus && !manualOpen) return;
+    const id = setTimeout(() => {
+      setOpen(false);
+      inputRef.current?.blur();
+    }, 0);
+    return () => clearTimeout(id);
+  }, [suppressFocus, manualOpen]);
 
   // 🔸 Sync with parent value; close/blur if a value is set, focus if cleared
   useEffect(() => {
@@ -111,18 +126,18 @@ export default function FuzzySearchColorSelect({
   }, []);
 
 function getFontColor(color) {
-  const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l;
+  const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l ?? hexLightness(color?.hex6 || color?.hex);
   if (typeof lightness === "number" && !Number.isNaN(lightness)) {
     return lightness > 70 ? "black" : "white";
   }
-  return color?.hcl_l > 70 ? "black" : "white";
+  return "white";
 }
 
-  function colorToHex(color) {
-    if (!color) return null;
-    if (color.hex6) return `#${color.hex6}`;
-    if (color.hex) return color.hex.startsWith('#') ? color.hex : `#${color.hex}`;
-    if (typeof color.r === 'number' && typeof color.g === 'number' && typeof color.b === 'number') {
+function colorToHex(color) {
+  if (!color) return null;
+  if (color.hex6) return `#${color.hex6}`;
+  if (color.hex) return color.hex.startsWith('#') ? color.hex : `#${color.hex}`;
+  if (typeof color.r === 'number' && typeof color.g === 'number' && typeof color.b === 'number') {
       return `rgb(${color.r}, ${color.g}, ${color.b})`;
     }
     return null;
@@ -259,7 +274,9 @@ function pick(color) {
   return (
     <div
       ref={rootRef}
-      className={`fuzzy-dropdown ${className || ''}`}
+      className={`fuzzy-dropdown ${className || ''} ${compact ? "fuzzy-compact" : ""}`}
+      onMouseDownCapture={(e) => e.stopPropagation()}
+      onClickCapture={(e) => e.stopPropagation()}
       onKeyDownCapture={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
       style={className?.includes("full-width") ? { width: "100%" } : undefined}
     >
@@ -292,7 +309,9 @@ function pick(color) {
             value={query}
             autoComplete="off"
             ref={inputRef}
+            tabIndex={suppressFocus ? -1 : undefined}
             onFocus={(e) => {
+              if (suppressFocus || manualOpen) { e.target.blur(); return; }
               onFocus && onFocus(e);
               if (!selectedColor && results.length > 0) setOpen(true);
               const q = query.trim();
@@ -307,6 +326,20 @@ function pick(color) {
               }
               if (val.trim().length >= 2) setOpen(true);
             }}
+            onMouseDown={(e) => {
+              if (!manualOpen) return;
+              e.preventDefault();
+              const val = query.trim();
+              if (val.length >= 2) runSearch(val);
+              setOpen(true);
+            }}
+            onClick={(e) => {
+              if (!manualOpen) return;
+              e.preventDefault();
+              const val = query.trim();
+              if (val.length >= 2) runSearch(val);
+              setOpen(true);
+            }}
             onInput={(e) => {
               const val = e.currentTarget.value || '';
               if (val.length === 0 && selectedColor) {
@@ -317,6 +350,7 @@ function pick(color) {
             placeholder={placeholderText}
             onKeyDown={handleKeyDown}
             onBlur={() => {
+              setOpen(false);
               if (!selectedColor && query.trim().length === 0) {
                 onEmpty && onEmpty();
               }
@@ -339,7 +373,10 @@ function pick(color) {
               onPointerDown={(e) => {
                 e.preventDefault();
                 clearSelection();
-                inputRef.current?.focus();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                clearSelection();
               }}
               style={{
                 color: displayColor ? getFontColor(displayColor) : '#000',
@@ -426,4 +463,17 @@ function pick(color) {
       )}
     </div>
   );
+}
+
+function hexLightness(hex) {
+  if (!hex) return null;
+  const clean = hex.toString().replace(/[^0-9a-f]/gi, '');
+  if (clean.length !== 6) return null;
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2; // 0-1
+  return l * 100;
 }

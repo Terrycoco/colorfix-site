@@ -38,31 +38,51 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
     respond(['ok' => false, 'error' => 'DB not initialized'], 500);
 }
 
+$repo = new PdoMaskBlendSettingRepository($pdo);
 $service = new MaskBlendService(
-    new PdoMaskBlendSettingRepository($pdo),
+    $repo,
     new PdoPhotoRepository($pdo)
 );
 
 try {
-    $saved = $service->saveSetting($assetId, $mask, [
-        'id' => $entry['id'] ?? null,
-        'color_id' => $entry['color_id'] ?? null,
-        'color_name' => $entry['color_name'] ?? null,
-        'color_brand' => $entry['color_brand'] ?? null,
-        'color_code' => $entry['color_code'] ?? null,
-        'color_hex' => $entry['color_hex'] ?? '',
-        'base_lightness' => $entry['base_lightness'] ?? null,
-        'target_lightness' => $entry['target_lightness'] ?? null,
-        'target_h' => $entry['target_h'] ?? null,
-        'target_c' => $entry['target_c'] ?? null,
-        'blend_mode' => $entry['blend_mode'] ?? 'colorize',
-        'blend_opacity' => $entry['blend_opacity'] ?? 1,
-        'shadow_l_offset' => $entry['shadow_l_offset'] ?? null,
-        'shadow_tint_hex' => $entry['shadow_tint_hex'] ?? null,
-        'shadow_tint_opacity' => $entry['shadow_tint_opacity'] ?? null,
-        'is_preset' => $entry['is_preset'] ?? 0,
-        'notes' => $entry['notes'] ?? null,
-    ]);
+$idFromPayload = $entry['id'] ?? null;
+// if no id provided, try to find existing by asset/mask/color to avoid duplicate constraint
+if (!$idFromPayload && !empty($entry['color_id'])) {
+    $existing = $repo->findForAssetMaskColor($assetId, $mask, (int)$entry['color_id']);
+    if ($existing && !empty($existing['id'])) {
+        $idFromPayload = (int)$existing['id'];
+    }
+}
+$existingRow = null;
+if ($idFromPayload) {
+    $existingRow = $repo->findById((int)$idFromPayload);
+}
+
+// Preserve approved flag if an existing row is already approved
+if ($existingRow && !empty($existingRow['approved'])) {
+    $entry['approved'] = 1;
+}
+
+$saved = $service->saveSetting($assetId, $mask, [
+    'id' => $idFromPayload,
+    'color_id' => $entry['color_id'] ?? null,
+    'color_name' => $entry['color_name'] ?? null,
+    'color_brand' => $entry['color_brand'] ?? null,
+    'color_code' => $entry['color_code'] ?? null,
+    'color_hex' => $entry['color_hex'] ?? '',
+    'base_lightness' => $entry['base_lightness'] ?? null,
+    'target_lightness' => $entry['target_lightness'] ?? null,
+    'target_h' => $entry['target_h'] ?? null,
+    'target_c' => $entry['target_c'] ?? null,
+    'blend_mode' => $entry['blend_mode'] ?? 'colorize',
+    'blend_opacity' => $entry['blend_opacity'] ?? 1,
+    'shadow_l_offset' => $entry['shadow_l_offset'] ?? null,
+    'shadow_tint_hex' => $entry['shadow_tint_hex'] ?? null,
+    'shadow_tint_opacity' => $entry['shadow_tint_opacity'] ?? null,
+    'is_preset' => $entry['is_preset'] ?? 0,
+    'approved' => $entry['approved'] ?? 0,
+    'notes' => $entry['notes'] ?? null,
+]);
     $flagStmt = $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 1 WHERE asset_id = :asset");
     $flagStmt->execute([':asset' => $assetId]);
 

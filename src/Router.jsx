@@ -38,7 +38,10 @@ const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
+const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
+const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
+const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 
 function AppRouter() {
   const renderWithSuspense = (Component, label) => (
@@ -52,6 +55,14 @@ function AppRouter() {
       <ScrollToTop smooth={true} ignoreWhenHash={true} />
 
       <Routes>
+        <Route
+          path="print/applied/:paletteId"
+          element={renderWithSuspense(PrintAppliedPalettePage, 'Loading printable applied palette…')}
+        />
+        <Route
+          path="print/my-palette"
+          element={renderWithSuspense(PrintMyPalettePage, 'Loading printable palette…')}
+        />
         <Route
           path="view/:paletteId"
           element={renderWithSuspense(AppliedPaletteViewPage, 'Loading palette…')}
@@ -151,6 +162,10 @@ function AppRouter() {
             <Route
               path="applied-palettes"
               element={renderWithSuspense(AdminAppliedPalettesPage, 'Loading applied palettes…')}
+            />
+            <Route
+              path="applied-palettes/:paletteId/edit"
+              element={renderWithSuspense(AdminAppliedPaletteEditorPage, 'Loading palette editor…')}
             />
           </Route>
 

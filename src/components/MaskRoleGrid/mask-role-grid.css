@@ -1,0 +1,25 @@
+.mask-grid-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.color-editor-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.color-editor-bar .btn.small {
+  height: 32px;
+  padding: 6px 10px;
+}

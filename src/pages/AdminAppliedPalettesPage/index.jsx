@@ -24,6 +24,7 @@ export default function AdminAppliedPalettesPage() {
     palette: null,
     toName: "",
     toEmail: "",
+    toPhone: "",
     message: "",
     status: { sending: false, success: "", error: "" },
   });
@@ -42,7 +43,8 @@ export default function AdminAppliedPalettesPage() {
     setError("");
     const url = new URL(LIST_URL, window.location.origin);
     if (q.trim()) url.searchParams.set("q", q.trim());
-    fetch(url.toString(), { credentials: "include" })
+    url.searchParams.set("_ts", Date.now().toString());
+    fetch(url.toString(), { credentials: "include", cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
         if (!active) return;
@@ -119,6 +121,11 @@ export default function AdminAppliedPalettesPage() {
     }
   };
 
+  const openEditor = (item) => {
+    if (!item?.id) return;
+    window.location.href = `/admin/applied-palettes/${item.id}/edit`;
+  };
+
   const handleDelete = async (item) => {
     if (!window.confirm(`Delete palette #${item.id}? This removes cached renders too.`)) return;
     setDeletingId(item.id);
@@ -127,12 +134,13 @@ export default function AdminAppliedPalettesPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ palette_id: item.id }),
+        body: JSON.stringify({ palette_id: item.id, asset_id: item.asset_id }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Delete failed");
       }
+      setItems((prev) => prev.filter((row) => row.id !== item.id));
       refreshList();
     } catch (err) {
       alert(err?.message || "Delete failed");
@@ -148,6 +156,7 @@ export default function AdminAppliedPalettesPage() {
       palette: item,
       toName: "",
       toEmail: "",
+      toPhone: "",
       message: defaultMessage,
       status: { sending: false, success: "", error: "" },
     });
@@ -217,17 +226,20 @@ export default function AdminAppliedPalettesPage() {
       palette: null,
       toName: "",
       toEmail: "",
+      toPhone: "",
       message: "",
       status: { sending: false, success: "", error: "" },
     });
   };
 
-  const sendEmail = async () => {
+  const sendShare = async () => {
     if (!shareModal.palette) return;
-    if (!shareModal.toEmail.trim()) {
+    const wantEmail = !!shareModal.toEmail.trim();
+    const wantSms = !!shareModal.toPhone.trim();
+    if (!wantEmail && !wantSms) {
       setShareModal((prev) => ({
         ...prev,
-        status: { ...prev.status, error: "Recipient email required" },
+        status: { ...prev.status, error: "Enter an email or phone to share" },
       }));
       return;
     }
@@ -235,35 +247,64 @@ export default function AdminAppliedPalettesPage() {
       ...prev,
       status: { sending: true, success: "", error: "" },
     }));
+    const results = [];
     try {
-      const res = await fetch(SEND_EMAIL_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          palette_id: shareModal.palette.id,
-          to_name: shareModal.toName,
-          to_email: shareModal.toEmail,
-          message: shareModal.message,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Email failed");
+      if (wantEmail) {
+        const res = await fetch(SEND_EMAIL_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            palette_id: shareModal.palette.id,
+            to_name: shareModal.toName,
+            to_email: shareModal.toEmail,
+            message: shareModal.message,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || "Email failed");
+        }
+        results.push("Email sent");
+      }
+      if (wantSms) {
+        const res = await fetch(`${API_FOLDER}/v2/admin/applied-palettes/share.php`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            palette_id: shareModal.palette.id,
+            client: {
+              name: shareModal.toName || "ColorFix client",
+              email: shareModal.toEmail || null,
+              phone: shareModal.toPhone,
+            },
+            note: shareModal.message,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || "Text failed");
+        }
+        results.push("Text sent");
       }
       setShareModal((prev) => ({
         ...prev,
-        status: { sending: false, success: "Email sent!", error: "" },
+        status: { sending: false, success: results.join(" · ") || "Sent", error: "" },
       }));
     } catch (err) {
       setShareModal((prev) => ({
         ...prev,
-        status: { sending: false, success: "", error: err?.message || "Email failed" },
+        status: { sending: false, success: "", error: err?.message || "Share failed" },
       }));
     }
   };
 
   const shareLink = shareModal.palette ? buildViewLink(shareModal.palette) : "";
+  const smsBody = shareLink
+    ? `${shareModal.message || "Check out your ColorFix palette:"} ${shareLink}`
+    : "";
+  const smsLink = shareLink ? `sms:&body=${encodeURIComponent(smsBody)}` : "";
 
   return (
     <div className="admin-ap">
@@ -333,7 +374,19 @@ export default function AdminAppliedPalettesPage() {
               </button>
               <button
                 className="admin-ap__action-btn"
-                onClick={() => window.open(`/admin/mask-tester?asset=${encodeURIComponent(item.asset_id)}`, "_blank", "noopener")}
+                onClick={() => openEditor(item)}
+              >
+                AP Editor
+              </button>
+              <button
+                className="admin-ap__action-btn"
+                onClick={() =>
+                  window.open(
+                    `/admin/mask-tester?asset=${encodeURIComponent(item.asset_id)}&ap=${item.id}`,
+                    "_blank",
+                    "noopener"
+                  )
+                }
               >
                 Mask Tester
               </button>
@@ -379,21 +432,31 @@ export default function AdminAppliedPalettesPage() {
               </div>
             </label>
             <div className="admin-ap__modal-divider">Email Client</div>
-            <label>
-              Client Name
-              <input
-                value={shareModal.toName}
-                onChange={(e) => setShareModal((prev) => ({ ...prev, toName: e.target.value }))}
-              />
-            </label>
-            <label>
-              Client Email*
-              <input
-                type="email"
-                value={shareModal.toEmail}
-                onChange={(e) => setShareModal((prev) => ({ ...prev, toEmail: e.target.value }))}
-              />
-            </label>
+            <div className="admin-ap__modal-grid">
+              <label>
+                Client Name
+                <input
+                  value={shareModal.toName}
+                  onChange={(e) => setShareModal((prev) => ({ ...prev, toName: e.target.value }))}
+                />
+              </label>
+              <label>
+                Client Email
+                <input
+                  type="email"
+                  value={shareModal.toEmail}
+                  onChange={(e) => setShareModal((prev) => ({ ...prev, toEmail: e.target.value }))}
+                />
+              </label>
+              <label>
+                Client Phone (for text)
+                <input
+                  type="tel"
+                  value={shareModal.toPhone}
+                  onChange={(e) => setShareModal((prev) => ({ ...prev, toPhone: e.target.value }))}
+                />
+              </label>
+            </div>
             <label>
               Message
               <textarea
@@ -408,10 +471,15 @@ export default function AdminAppliedPalettesPage() {
               <button
                 className="admin-ap__action-btn"
                 disabled={shareModal.status.sending}
-                onClick={sendEmail}
+                onClick={sendShare}
               >
-                {shareModal.status.sending ? "Sending…" : "Send Email"}
+                {shareModal.status.sending ? "Sending…" : "Send"}
               </button>
+              {smsLink && (
+                <a className="admin-ap__action-btn ghost" href={smsLink}>
+                  Open Text with Link
+                </a>
+              )}
             </div>
           </div>
         </div>

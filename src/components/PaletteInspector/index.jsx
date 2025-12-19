@@ -54,7 +54,13 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
         const resp = await fetch(`${API}/v2/admin/palette-roles.php?palette_id=${paletteId}`, {
           credentials: "include",
         });
-        const data = await resp.json();
+        const raw = await resp.text();
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error(`Roles load failed (${resp.status}): ${raw.slice(0, 120)}`);
+        }
         if (!ignore) {
           if (data.ok) setRoles(data.roles || {});
           else setRolesError(data.error || "Failed to load roles");
@@ -96,7 +102,13 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ palette_id: paletteId, roles: payload }),
       });
-      const data = await resp.json();
+      const raw = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(`Roles save failed (${resp.status}): ${raw.slice(0, 120)}`);
+      }
       if (!data.ok) throw new Error(data.error || "Failed to save roles");
     } catch (err) {
       setRolesError(err?.message || "Failed to save roles");

@@ -130,6 +130,7 @@ const activeBrandCodes = useMemo(() => {
     client_notes: "",
   });
   const [saveStatus, setSaveStatus] = useState({ loading: false, error: "", success: "" });
+  const printUrl = "/print/my-palette";
 
   const CLEAR_ON = ["/v2/get-friends.php"];
 
@@ -545,9 +546,16 @@ const activeBrandCodes = useMemo(() => {
               </button>
             )}
             {adminMode && !isPaletteEmpty && (
-              <button className="myp-clear-btn" type="button" onClick={openSaveModal}>
-                Save
-              </button>
+              <>
+                <button className="myp-clear-btn" type="button" onClick={openSaveModal}>
+                  Save
+                </button>
+                {!isMobile && (
+                  <button className="myp-clear-btn" type="button" onClick={() => navigate("/print/my-palette")}>
+                    Print
+                  </button>
+                )}
+              </>
             )}
           </div>
      

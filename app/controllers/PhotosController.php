@@ -360,7 +360,7 @@ class PhotosController
                 ];
 
                 $texture = $this->normalizeMaskTexture($maskTextureArr[$maskSettingsIndex] ?? null);
-                $res = $svc->saveMask($photoId, $role, $one, $overlaySettings, $texture);
+                $res = $svc->saveMask($photoId, $role, $one, $overlaySettings, $texture, true);
                 $touched[] = ['kind'=>'masks', 'role'=>$role, 'w'=>$res['width'], 'h'=>$res['height']];
                 $maskSettingsIndex++;
             }

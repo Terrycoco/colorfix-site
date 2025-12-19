@@ -23,6 +23,7 @@ export default defineConfig({
       '@pages': path.resolve(__dirname, './src/pages'),
       '@hooks': path.resolve(__dirname, './src/hooks'),
       '@test': path.resolve(__dirname, './src/test'),
+      '@lib': path.resolve(__dirname, './src/lib'),
     },
   },
   server: {

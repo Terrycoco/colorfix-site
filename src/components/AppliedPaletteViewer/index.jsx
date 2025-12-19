@@ -40,9 +40,17 @@ export default function AppliedPaletteViewer({
   const title = palette?.title || "ColorFix Palette";
   const shareUrl = useMemo(() => {
     if (shareUrlProp) return shareUrlProp;
-    if (typeof window !== "undefined") return window.location.href;
-    return "";
-  }, [shareUrlProp]);
+    if (typeof window === "undefined") return "";
+    try {
+      const url = new URL(window.location.href);
+      if (adminMode) {
+        url.searchParams.delete("admin");
+      }
+      return url.toString();
+    } catch (err) {
+      return window.location.href || "";
+    }
+  }, [shareUrlProp, adminMode]);
 
   const shareMessage = customShareMessage || `Check out ${title} from ColorFix: ${shareUrl}`;
   const smsLink = `sms:&body=${encodeURIComponent(shareMessage)}`;

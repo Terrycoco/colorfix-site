@@ -1,5 +1,6 @@
 // SideBySidePage.jsx
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {API_FOLDER} from '@helpers/config';
 import {useAppState} from '@context/AppStateContext';
 import {isAdmin} from '@helpers/authHelper';
@@ -14,6 +15,7 @@ export default function SideBySidePage() {
     const [source, setSource] = useState('manual');
     const [notes, setNotes] = useState('');
     const [friends, setFriends] = useState([]);
+    const navigate = useNavigate();
 
     const loadFriends = (id) => {
         const ts = Date.now();
@@ -44,7 +46,9 @@ export default function SideBySidePage() {
       }
     }, [colorA]);
 
-
+    const go = (colorid) => {
+      navigate(`/color/${colorid}`); // go to detail
+    };
 
     //handlers
     const handleOnSelect = (color) => {
@@ -110,6 +114,7 @@ return (
                 <div
                   className={`sbs-swatch${!colorA ? ' placeholder' : ''}`}
                   style={colorA ? { backgroundColor: `rgb(${colorA.r}, ${colorA.g}, ${colorA.b})` } : {}}
+                    onClick={colorA ? go(colorA.id): null}
                 />
                 
                 {colorA && (
@@ -152,6 +157,7 @@ return (
                 <div
                   className={`sbs-swatch${!colorB ? ' placeholder' : ''}`}
                   style={colorB ? { backgroundColor: `rgb(${colorB.r}, ${colorB.g}, ${colorB.b})` } : {}}
+                  onClick={colorB ? () => go(colorB.id) : undefined}
                 />
                 
                 {colorB && (

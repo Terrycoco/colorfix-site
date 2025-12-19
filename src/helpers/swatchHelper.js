@@ -40,8 +40,14 @@ export async function normalizeSwatch(raw) {
 
   try {
     const res = await fetch(`${API_FOLDER}/get-swatch.php?id=${swatchId}`);
-    if (!res.ok) throw new Error('Fetch failed');
-    const full = await res.json();
+    const rawBody = await res.text();
+    if (!res.ok) throw new Error(`Fetch failed (${res.status}): ${rawBody.slice(0, 120)}`);
+    let full;
+    try {
+      full = JSON.parse(rawBody);
+    } catch {
+      throw new Error(`Bad swatch JSON (${res.status}): ${rawBody.slice(0, 120)}`);
+    }
 
     // merge and still coerce is_stain
     return {

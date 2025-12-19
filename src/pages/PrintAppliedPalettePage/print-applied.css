@@ -1,0 +1,156 @@
+.print-shell {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  padding: 24px 32px;
+  color: #111;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.print-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+
+
+
+.print-btn.primary {
+  background: #111;
+  color: #fff;
+}
+
+.print-actions {
+  display: flex;
+  gap: 8px;
+}
+
+
+
+.print-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.print-photo img {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.print-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.print-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.print-notes {
+  font-size: 13px;
+  color: #444;
+}
+
+.print-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.print-swatch {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.swatch-chip {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.swatch-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch-role {
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+}
+
+.swatch-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.swatch-detail {
+  font-size: 12px;
+  color: #555;
+}
+
+.print-status {
+  padding: 12px;
+  font-weight: 600;
+}
+
+.print-status.error {
+  color: #b91c1c;
+}
+
+.print-only {
+  display: none;
+}
+
+.print-footer {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.print-footer img {
+  width: 60px;
+  height: auto;
+}
+
+.print-footer-text {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .print-shell {
+    padding: 16px 24px;
+    margin: 0 auto;
+  }
+  .print-swatch {
+    page-break-inside: avoid;
+  }
+  .print-photo {
+    page-break-inside: avoid;
+  }
+  .print-only { display: flex !important; }
+}

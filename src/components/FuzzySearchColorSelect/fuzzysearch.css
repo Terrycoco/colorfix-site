@@ -12,6 +12,15 @@
   align-items: flex-start;
 }
 
+.fuzzy-compact {
+  max-width: none;
+  min-width: 140px;
+}
+
+.fuzzy-dropdown.fuzzy-compact {
+  align-items: stretch;
+}
+
 /* Label */
 .dropdown-label {
   display: block;
@@ -39,6 +48,12 @@
 
   /* Reserve space so clear button never overlaps caret/text */
   padding-right: 36px;
+}
+
+.fuzzy-compact .fuzzy-input-wrap input[type="search"] {
+  height: 34px;
+  padding: 6px 8px;
+  font-size: 14px;
 }
 
 /* Placeholder sizing keeps iOS calm */
@@ -135,7 +150,7 @@
 
   max-height: 400px;
   overflow-y: auto;
-  z-index: 20000;
+  z-index: 10;
 }
 
 .result-item {

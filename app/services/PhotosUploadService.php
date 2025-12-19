@@ -97,13 +97,14 @@ final class PhotosUploadService
         ];
     }
 
-    /** Save a role mask PNG into masks/<role>.png */
+    /** Save a role mask PNG into masks/<role>.png (overwrite if exists) */
     public function saveMask(
         int $photoId,
         string $role,
         array $file,
         array $overlaySettings = [],
-        ?string $originalTexture = null
+        ?string $originalTexture = null,
+        bool $force = false
     ): array
     {
         $role = $this->normalizeRole($role);
@@ -122,6 +123,7 @@ final class PhotosUploadService
         [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
 
         $maskPublicPath = $this->publicPath($destPath);
+        // Always upsert (overwrite) the mask variant
         $this->repo->upsertVariant(
             $photoId,
             'masks',
@@ -134,6 +136,7 @@ final class PhotosUploadService
             $overlaySettings,
             $originalTexture
         );
+        // Ensure stats are refreshed for this role
         $this->persistMaskStats($photoId, $assetId, $role, $maskPublicPath, $destPath);
 
         return [
@@ -145,6 +148,7 @@ final class PhotosUploadService
             'height'  => $height,
             'assetId' => $assetId,
             'original_texture' => $originalTexture,
+            'overwritten' => true,
         ];
     }
 

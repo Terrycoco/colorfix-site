@@ -69,6 +69,7 @@ final class MaskBlendService
             'shadow_tint_hex' => $shadowTint,
             'shadow_tint_opacity' => $shadowOpacity,
             'is_preset' => (int)($payload['is_preset'] ?? 0),
+            'approved' => isset($payload['approved']) ? (int)$payload['approved'] : 0,
             'notes' => $payload['notes'] ?? null,
         ];
 
@@ -154,6 +155,7 @@ final class MaskBlendService
             'shadow_tint_hex' => $this->formatShadowTint($row['shadow_tint_hex'] ?? null),
             'shadow_tint_opacity' => isset($row['shadow_tint_opacity']) ? (float)$row['shadow_tint_opacity'] : null,
             'is_preset' => (bool)$row['is_preset'],
+            'approved' => isset($row['approved']) ? (bool)$row['approved'] : false,
             'notes' => $row['notes'],
             'created_at' => $row['created_at'],
             'updated_at' => $row['updated_at'],

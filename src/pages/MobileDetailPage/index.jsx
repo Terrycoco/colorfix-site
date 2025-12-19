@@ -100,7 +100,13 @@ export default function MobileDetailPage() {
           try {
             console.log('fetching:', fullUrl);
             const res = await fetch(`${API_FOLDER}/fetch-og-image.php?url=${encodeURIComponent(fullUrl)}`);
-            const data = await res.json();
+            const raw = await res.text();
+            let data;
+            try {
+              data = JSON.parse(raw);
+            } catch {
+              throw new Error(`og:image fetch failed (${res.status}): ${raw.slice(0, 120)}`);
+            }
             setOgImage(data.image || null);
           } catch (err) {
             console.error('Failed to fetch og:image:', err);

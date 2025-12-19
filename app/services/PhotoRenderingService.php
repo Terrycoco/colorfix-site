@@ -745,7 +745,7 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
     private function normalizeOverlayMode($mode): ?string {
         if (!is_string($mode)) return null;
         $m = strtolower(trim($mode));
-        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity','flatpaint','original'];
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity','flatpaint','original','linearburn'];
         return in_array($m, $allowed, true) ? $m : null;
     }
 

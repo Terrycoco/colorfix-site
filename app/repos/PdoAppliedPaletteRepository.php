@@ -88,11 +88,25 @@ class PdoAppliedPaletteRepository
     private function fetchEntries(int $paletteId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT e.mask_role, e.color_id, e.blend_mode, e.blend_opacity,
+            SELECT e.mask_role, e.color_id,
+                   e.mask_setting_id, e.mask_setting_revision,
+                   -- legacy fields kept for compatibility but prefer mask settings
+                   e.blend_mode, e.blend_opacity,
                    e.lightness_offset, e.tint_hex, e.tint_opacity,
-                   c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.hex6 AS color_hex6
+                   c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.hex6 AS color_hex6,
+                   mbs.blend_mode AS setting_blend_mode,
+                   mbs.blend_opacity AS setting_blend_opacity,
+                   mbs.shadow_l_offset AS setting_shadow_l_offset,
+                   mbs.shadow_tint_hex AS setting_shadow_tint_hex,
+                   mbs.shadow_tint_opacity AS setting_shadow_tint_opacity,
+                   mbs.target_lightness AS setting_target_lightness,
+                   mbs.target_h AS setting_target_h,
+                   mbs.target_c AS setting_target_c,
+                   mbs.is_preset AS setting_is_preset,
+                   mbs.updated_at AS setting_updated_at
             FROM applied_palette_entries e
             LEFT JOIN colors c ON c.id = e.color_id
+            LEFT JOIN mask_blend_settings mbs ON mbs.id = e.mask_setting_id
             WHERE e.applied_palette_id = :pid
             ORDER BY e.id ASC
         ");
@@ -146,11 +160,12 @@ class PdoAppliedPaletteRepository
             ':color_id' => $data['color_id'],
             ':mask_setting_id' => $data['mask_setting_id'] ?? null,
             ':mask_setting_revision' => $data['mask_setting_revision'] ?? null,
-            ':blend_mode' => $data['blend_mode'],
-            ':blend_opacity' => $data['blend_opacity'],
-            ':lightness_offset' => $data['shadow_l_offset'],
-            ':tint_hex' => $data['shadow_tint_hex'],
-            ':tint_opacity' => $data['shadow_tint_opacity'],
+            // legacy fields kept nullable to avoid duplication; prefer mask_setting_id linkage
+            ':blend_mode' => $data['blend_mode'] ?? null,
+            ':blend_opacity' => $data['blend_opacity'] ?? null,
+            ':lightness_offset' => $data['shadow_l_offset'] ?? null,
+            ':tint_hex' => $data['shadow_tint_hex'] ?? null,
+            ':tint_opacity' => $data['shadow_tint_opacity'] ?? null,
         ]);
         return (int)$this->pdo->lastInsertId();
     }

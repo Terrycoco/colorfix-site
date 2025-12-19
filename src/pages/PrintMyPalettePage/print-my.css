@@ -1,0 +1,103 @@
+.print-shell {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  padding: 24px 32px;
+  color: #111;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.print-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.print-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.print-actions {
+  display: flex;
+  gap: 8px;
+}
+
+
+
+
+.print-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.print-swatch {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.swatch-chip {
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.swatch-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.swatch-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.swatch-detail {
+  font-size: 12px;
+  color: #555;
+}
+
+.print-status {
+  padding: 12px;
+  font-weight: 600;
+}
+
+.print-brand {
+  margin: 12px 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.print-logo {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.print-tagline {
+  font-size: 13px;
+  color: #444;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .print-shell {
+    padding: 16px 24px;
+    margin: 0 auto;
+  }
+  .print-swatch {
+    page-break-inside: avoid;
+  }
+}

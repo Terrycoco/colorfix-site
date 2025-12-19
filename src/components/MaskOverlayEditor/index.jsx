@@ -8,6 +8,7 @@ const BLEND_OPTIONS = [
   { value: "hardlight", label: "Hard Light", desc: "High contrast overlay" },
   { value: "softlight", label: "Soft Light", desc: "Gentle contrast + warmth" },
   { value: "overlay", label: "Overlay", desc: "Similar to soft light, stronger" },
+  { value: "linearburn", label: "Linear Burn", desc: "Subtractive darken" },
   { value: "multiply", label: "Multiply", desc: "Darken; good for bright colors" },
   { value: "screen", label: "Screen", desc: "Lighten; lifts dark colors" },
   { value: "luminosity", label: "Luminosity", desc: "Keep base hue, use target brightness" },
