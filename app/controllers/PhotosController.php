@@ -5,6 +5,7 @@ namespace App\Controllers;
 
 use App\Repos\PdoPhotoRepository;
 use App\Services\PhotoRenderingService;
+use App\Services\MaskOverlayService;
 use App\Services\PhotosUploadService;
 use PDO;
 use RuntimeException;
@@ -109,8 +110,16 @@ class PhotosController
     /** GET search: by tags (AND) + free text; returns absolute thumb URLs. */
     public function search(array $q): array
     {
-        $tags   = (array)($q['tags'] ?? []);
-        $qtext  = (string)($q['q'] ?? '');
+        $tagsInput = $q['tags'] ?? [];
+        if (is_string($tagsInput)) {
+            $tags = preg_split('/[|,]+/', $tagsInput) ?: [];
+        } elseif (is_array($tagsInput)) {
+            $tags = $tagsInput;
+        } else {
+            $tags = [];
+        }
+        $tags  = array_values(array_filter(array_map('trim', $tags), fn($t) => $t !== ''));
+        $qtext = (string)($q['q'] ?? '');
         $page   = max(1, (int)($q['page'] ?? 1));
         $limit  = max(1, min(100, (int)($q['limit'] ?? 24)));
         $offset = ($page - 1) * $limit;
@@ -210,6 +219,7 @@ class PhotosController
         $hasIncomingTags  = $tagsCsv !== '';
         $findableErrorMsg = 'Add a style or at least one tag so this photo can be found later.';
         $categoryInput = $this->sanitizeCategoryPath($post['category_path'] ?? null);
+        $categoryErrorMsg = 'Category Path is required (e.g., exteriors/cottage).';
 
         $hasPreparedSingle = isset($files['prepared_base']) && $files['prepared_base']['error'] === UPLOAD_ERR_OK;
         $hasTexture        = isset($files['texture_overlay']) && $files['texture_overlay']['error'] === UPLOAD_ERR_OK;
@@ -223,6 +233,9 @@ class PhotosController
         }
         if ($assetIdIn === '' && !$hasIncomingStyle && !$hasIncomingTags) {
             throw new RuntimeException($findableErrorMsg);
+        }
+        if ($categoryInput === null && $assetIdIn === '') {
+            throw new RuntimeException($categoryErrorMsg);
         }
 
         $repo = new PdoPhotoRepository($this->pdo);
@@ -240,6 +253,9 @@ class PhotosController
                 $repo->updatePhotoCategoryPath($photoId, $categoryInput);
                 $categoryPath = $categoryInput;
             }
+            if (!$categoryPath && !$categoryInput) {
+                throw new RuntimeException($categoryErrorMsg);
+            }
             if (!$hasIncomingStyle && !$hasIncomingTags) {
                 $hasExistingStyle = trim((string)($photo['style_primary'] ?? '')) !== '';
                 if (!$hasExistingStyle) {
@@ -252,18 +268,15 @@ class PhotosController
             }
         } else {
             $assetId = $makeAssetId();
-            $categoryPath = $categoryInput ?: $this->defaultCategoryPath();
+            $categoryPath = $categoryInput;
             $insert  = $repo->createPhotoShell($assetId, $style ?: null, $verdict ?: null, $status ?: null, $lighting ?: null, $rights ?: null, $categoryPath);
             $photo   = $repo->getPhotoById((int)$insert['id']);
             $photoId = (int)$photo['id'];
         }
         $svc->registerAssetPath($assetId, $categoryPath);
 
-        // Folder /photos/YYYY/YYYY-MM/ASSET_ID
-        $now = new \DateTime('now');
-        $y   = $now->format('Y');
-        $ym  = $now->format('Y-m');
-        $assetDir = "{$photosRoot}/{$y}/{$ym}/{$assetId}";
+        // Folder /photos/<category_path>/ASSET_ID
+        $assetDir = "{$photosRoot}/{$categoryPath}/{$assetId}";
         $mkpath("{$assetDir}/prepared");
         $mkpath("{$assetDir}/masks");
         $mkpath("{$assetDir}/thumb");
@@ -370,6 +383,15 @@ class PhotosController
         if ($tagsCsv !== '') {
             $tags = array_values(array_filter(array_map('trim', explode(',', $tagsCsv))));
             foreach ($tags as $t) $repo->addTag($photoId, $t);
+        }
+
+        if ($hasMasks) {
+            try {
+                $overlaySvc = new MaskOverlayService($repo, $this->pdo);
+                $overlaySvc->applyDefaultsForAsset($assetId, false, false);
+            } catch (\Throwable $e) {
+                // Ignore overlay defaults failures during upload.
+            }
         }
 
         return [

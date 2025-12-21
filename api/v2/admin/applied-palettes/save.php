@@ -10,7 +10,9 @@ require_once __DIR__ . '/../../../db.php';
 use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoClientRepository;
 use App\Repos\PdoColorRepository;
+use App\Repos\PdoMaskBlendSettingRepository;
 use App\Repos\PdoPhotoRepository;
+use App\Services\MaskBlendService;
 use App\Services\PhotoRenderingService;
 use RuntimeException;
 
@@ -50,6 +52,8 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
 $photoRepo = new PdoPhotoRepository($pdo);
 $paletteRepo = new PdoAppliedPaletteRepository($pdo);
 $clientRepo = new PdoClientRepository($pdo);
+$maskRepo = new PdoMaskBlendSettingRepository($pdo);
+$maskService = new MaskBlendService($maskRepo, $photoRepo);
 $renderService = null;
 if ($cacheRender) {
     $renderService = new PhotoRenderingService($photoRepo, $pdo, new PdoColorRepository($pdo));
@@ -99,14 +103,45 @@ try {
         $colorId = isset($entry['color_id']) ? (int)$entry['color_id'] : null;
         if (!$colorId) continue;
 
-        $paletteRepo->insertPaletteEntry($paletteId, [
+        $settingId = null;
+        $existing = $maskRepo->findForAssetMaskColor($assetId, $maskRole, $colorId);
+        if ($existing && !empty($existing['id'])) {
+            $settingId = (int)$existing['id'];
+        }
+        $setting = $maskService->saveSetting($assetId, $maskRole, [
+            'id' => $settingId,
+            'photo_id' => (int)$photo['id'],
+            'asset_id' => $assetId,
             'mask_role' => $maskRole,
             'color_id' => $colorId,
+            'color_name' => $entry['color_name'] ?? null,
+            'color_brand' => $entry['color_brand'] ?? null,
+            'color_code' => $entry['color_code'] ?? null,
+            'color_hex' => $colorHex,
+            'base_lightness' => normalizeFloat($entry['base_lightness'] ?? null),
+            'target_lightness' => normalizeFloat($entry['target_lightness'] ?? null),
+            'target_h' => normalizeFloat($entry['target_h'] ?? null),
+            'target_c' => normalizeFloat($entry['target_c'] ?? null),
             'blend_mode' => $blendMode,
             'blend_opacity' => $blendOpacity,
             'shadow_l_offset' => $shadow['l_offset'],
             'shadow_tint_hex' => $shadow['tint_hex'],
             'shadow_tint_opacity' => $shadow['tint_opacity'],
+            'is_preset' => (int)($entry['is_preset'] ?? 0),
+            'approved' => array_key_exists('approved', $entry) ? $entry['approved'] : null,
+            'notes' => $entry['notes'] ?? null,
+        ]);
+
+        $paletteRepo->insertPaletteEntry($paletteId, [
+            'mask_role' => $maskRole,
+            'color_id' => $colorId,
+            'mask_setting_id' => $setting['id'] ?? null,
+            'mask_setting_revision' => $setting['revision'] ?? null,
+            'blend_mode' => null,
+            'blend_opacity' => null,
+            'shadow_l_offset' => null,
+            'shadow_tint_hex' => null,
+            'shadow_tint_opacity' => null,
         ]);
         $savedEntries++;
     }

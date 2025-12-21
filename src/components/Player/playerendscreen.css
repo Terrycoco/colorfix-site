@@ -1,0 +1,40 @@
+.player-end-screen {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.6); /* optional but nice */
+  z-index: 20;
+}
+
+.player-end-screen-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.player-replay-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 12px 20px;
+  border-radius: 999px;
+  transition: background-color 0.15s ease;
+}
+
+.player-replay-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.player-end-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}

@@ -45,6 +45,9 @@ export function normalizeEntryForSave(entry) {
     shadow_l_offset: entry.shadow_l_offset ?? null,
     shadow_tint_hex: tintHex,
     shadow_tint_opacity: tintOpacity,
+    target_lightness: entry.target_lightness ?? entry.color?.lightness ?? null,
+    target_h: entry.target_h ?? null,
+    target_c: entry.target_c ?? null,
   };
 }
 

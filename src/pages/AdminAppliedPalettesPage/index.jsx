@@ -123,7 +123,7 @@ export default function AdminAppliedPalettesPage() {
 
   const openEditor = (item) => {
     if (!item?.id) return;
-    window.location.href = `/admin/applied-palettes/${item.id}/edit`;
+    window.location.href = `/admin/mask-tester?ap=${item.id}&view=all`;
   };
 
   const handleDelete = async (item) => {
@@ -370,7 +370,7 @@ export default function AdminAppliedPalettesPage() {
             </div>
             <div className="admin-ap__actions">
               <button className="admin-ap__action-btn" onClick={() => handleView(item)}>
-                View
+                Render/View
               </button>
               <button
                 className="admin-ap__action-btn"
@@ -382,7 +382,7 @@ export default function AdminAppliedPalettesPage() {
                 className="admin-ap__action-btn"
                 onClick={() =>
                   window.open(
-                    `/admin/mask-tester?asset=${encodeURIComponent(item.asset_id)}&ap=${item.id}`,
+                    `/admin/mask-tester?asset=${encodeURIComponent(item.asset_id)}`,
                     "_blank",
                     "noopener"
                   )

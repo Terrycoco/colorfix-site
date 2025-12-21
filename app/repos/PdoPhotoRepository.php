@@ -350,6 +350,7 @@ class PdoPhotoRepository
 public function searchAssets(array $tags, string $q, int $limit, int $offset): array
 {
     $andTags = array_values(array_filter(array_map('trim', $tags), fn($t) => $t !== ''));
+    $andTags = array_map('strtolower', $andTags);
     $hasTags = count($andTags) > 0;
     $hasQ    = $q !== '';
 
@@ -378,9 +379,9 @@ public function searchAssets(array $tags, string $q, int $limit, int $offset): a
          FROM " . self::T_PHOTOS . " p
          LEFT JOIN " . self::T_TAGS . " t ON t.photo_id = p.id
          $whereStr
-         " . ($hasTags ? " AND t.tag IN (" . implode(',', $tagPlaceholders) . ") " : "") . "
+         " . ($hasTags ? " AND LOWER(t.tag) IN (" . implode(',', $tagPlaceholders) . ") " : "") . "
          GROUP BY p.id
-         " . ($hasTags ? " HAVING COUNT(DISTINCT t.tag) = " . count($andTags) : "") . "
+         " . ($hasTags ? " HAVING COUNT(DISTINCT LOWER(t.tag)) = " . count($andTags) : "") . "
          ORDER BY p.id DESC
          LIMIT :lim OFFSET :off";
 
@@ -461,9 +462,9 @@ public function searchAssets(array $tags, string $q, int $limit, int $offset): a
            FROM " . self::T_PHOTOS . " p
            LEFT JOIN " . self::T_TAGS . " t ON t.photo_id = p.id
            $whereStr
-           " . ($hasTags ? " AND t.tag IN (" . implode(',', $tagPlaceholders) . ") " : "") . "
+           " . ($hasTags ? " AND LOWER(t.tag) IN (" . implode(',', $tagPlaceholders) . ") " : "") . "
            GROUP BY p.id
-           " . ($hasTags ? " HAVING COUNT(DISTINCT t.tag) = " . count($andTags) : "") . "
+           " . ($hasTags ? " HAVING COUNT(DISTINCT LOWER(t.tag)) = " . count($andTags) : "") . "
         ) x";
     $stmt = $this->pdo->prepare($sqlTotal);
     foreach ($params as $k => $v) $stmt->bindValue($k, $v, is_int($v) ? PDO::PARAM_INT : PDO::PARAM_STR);

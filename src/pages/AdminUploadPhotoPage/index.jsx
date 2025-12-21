@@ -82,6 +82,11 @@ const [fileTexture, setFileTexture] = useState(null);
 
     const styleTrim = stylePrimary.trim();
     const tagsTrim = tags.trim();
+    const categoryTrim = categoryPath.trim();
+    if (!categoryTrim) {
+      setError("Category Path is required (e.g., exteriors/cottage).");
+      return;
+    }
     if (!styleTrim && !tagsTrim) {
       setError("Add a Style or at least one Tag so you can find this photo later.");
       return;
@@ -100,7 +105,7 @@ const [fileTexture, setFileTexture] = useState(null);
       if (lighting.trim()) form.append("lighting", lighting.trim());
       if (rights.trim()) form.append("rights", rights.trim());
       if (tagsTrim) form.append("tags", tagsTrim);
-      if (categoryPath.trim()) form.append("category_path", categoryPath.trim());
+      form.append("category_path", categoryTrim);
 
       if (fileBase) form.append("prepared_base", fileBase, fileBase.name);
       if (fileTexture) form.append("texture_overlay", fileTexture, fileTexture.name);
@@ -245,7 +250,7 @@ const [fileTexture, setFileTexture] = useState(null);
         {existingStatus.success && <div className="notice">{existingStatus.success}</div>}
 
         <div className="row">
-          <label>Category Path (optional)</label>
+          <label>Category Path (required)</label>
           <input
             type="text"
             placeholder="e.g., exteriors/cottage"

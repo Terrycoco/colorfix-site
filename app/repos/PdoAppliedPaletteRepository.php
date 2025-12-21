@@ -32,6 +32,10 @@ class PdoAppliedPaletteRepository
     {
         $where = [];
         $params = [];
+        if (!empty($filters['asset_id'])) {
+            $where[] = "ap.asset_id = :asset_id";
+            $params[':asset_id'] = $filters['asset_id'];
+        }
         if (!empty($filters['q'])) {
             $pattern = '%' . $filters['q'] . '%';
             $where[] = "(ap.title LIKE :q_title OR ap.asset_id LIKE :q_asset)";
@@ -94,6 +98,7 @@ class PdoAppliedPaletteRepository
                    e.blend_mode, e.blend_opacity,
                    e.lightness_offset, e.tint_hex, e.tint_opacity,
                    c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.hex6 AS color_hex6,
+                   c.hcl_l AS color_hcl_l, c.lab_l AS color_lab_l,
                    mbs.blend_mode AS setting_blend_mode,
                    mbs.blend_opacity AS setting_blend_opacity,
                    mbs.shadow_l_offset AS setting_shadow_l_offset,

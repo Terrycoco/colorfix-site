@@ -56,8 +56,8 @@ export default function AdminAppliedPaletteEditorPage() {
 
   useEffect(() => {
     if (!paletteId) return;
-    fetchPalette(paletteId);
-  }, [paletteId]);
+    navigate(`/admin/mask-tester?ap=${paletteId}&view=all`, { replace: true });
+  }, [paletteId, navigate]);
 
   const previewSource = useMemo(() => buildPreviewAssignments(entryMap), [entryMap]);
   const maskRows = useMemo(() => {
@@ -712,12 +712,22 @@ function normalizeColor(color) {
   const id = color.id ?? color.color_id ?? color.ID ?? null;
   const name = color.name || color.color_name || color.title || "";
   const code = color.code || color.color_code || (hex6 ? `#${hex6}` : "");
+  const lightness =
+    color.lightness ??
+    color.lab_l ??
+    color.hcl_l ??
+    color.L ??
+    color.hcl?.l ??
+    null;
   return {
     id,
     name: name || code || (id ? `Color #${id}` : ""),
     code,
     brand: color.brand || color.color_brand || "",
     hex6,
+    lightness: typeof lightness === "number" && Number.isFinite(lightness) ? lightness : null,
+    lab_l: color.lab_l ?? null,
+    hcl_l: color.hcl_l ?? null,
   };
 }
 
@@ -745,30 +755,20 @@ function mapEntriesToState(entries) {
   (entries || []).forEach((entry) => {
     const norm = makeEmptyEntry(entry.mask_role || "");
     norm.color = normalizeColor(entry);
-    const blendMode = entry.setting_blend_mode ?? entry.blend_mode ?? "";
+    const blendMode = entry.setting_blend_mode ?? "";
     const blendOpacity =
       entry.setting_blend_opacity != null
         ? Number(entry.setting_blend_opacity)
-        : entry.blend_opacity != null
-          ? Number(entry.blend_opacity)
-          : null;
+        : null;
     const shadowLOffset =
       entry.setting_shadow_l_offset != null
         ? Number(entry.setting_shadow_l_offset)
-        : entry.lightness_offset != null
-          ? Number(entry.lightness_offset)
-          : entry.shadow_l_offset != null
-            ? Number(entry.shadow_l_offset)
-            : null;
-    const shadowTintHex = cleanHex(entry.setting_shadow_tint_hex || entry.tint_hex || entry.shadow_tint_hex || "");
+        : null;
+    const shadowTintHex = cleanHex(entry.setting_shadow_tint_hex || "");
     const shadowTintOpacity =
       entry.setting_shadow_tint_opacity != null
         ? Number(entry.setting_shadow_tint_opacity)
-        : entry.tint_opacity != null
-          ? Number(entry.tint_opacity)
-          : entry.shadow_tint_opacity != null
-            ? Number(entry.shadow_tint_opacity)
-            : null;
+        : null;
     norm.blend_mode = blendMode;
     norm.blend_opacity = blendOpacity;
     norm.shadow_l_offset = shadowLOffset;
@@ -777,21 +777,15 @@ function mapEntriesToState(entries) {
     norm.target_lightness =
       entry.setting_target_lightness != null
         ? Number(entry.setting_target_lightness)
-        : entry.target_lightness != null
-          ? Number(entry.target_lightness)
-          : null;
+        : null;
     norm.target_h =
       entry.setting_target_h != null
         ? Number(entry.setting_target_h)
-        : entry.target_h != null
-          ? Number(entry.target_h)
-          : null;
+        : null;
     norm.target_c =
       entry.setting_target_c != null
         ? Number(entry.setting_target_c)
-        : entry.target_c != null
-          ? Number(entry.target_c)
-          : null;
+        : null;
     norm.mask_setting_id = entry.mask_setting_id || null;
     norm.mask_setting_revision = entry.mask_setting_revision || null;
     map[norm.mask_role] = norm;

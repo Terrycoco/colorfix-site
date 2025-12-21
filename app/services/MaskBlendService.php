@@ -39,6 +39,15 @@ final class MaskBlendService
     {
         $photo = $this->requirePhoto($assetId);
         $baseLightness = $this->resolveBaseLightness((int)$photo['id'], $maskRole, $payload['base_lightness'] ?? null);
+        $existingRow = null;
+        $id = isset($payload['id']) ? (int)$payload['id'] : 0;
+        if ($id > 0) {
+            $existingRow = $this->repo->findById($id);
+        }
+
+        $approved = array_key_exists('approved', $payload)
+            ? (int)$payload['approved']
+            : ($existingRow['approved'] ?? 0);
 
         $shadowTint = $this->normalizeShadowTint($payload['shadow_tint_hex'] ?? null);
         $shadowOffset = isset($payload['shadow_l_offset']) ? (float)$payload['shadow_l_offset'] : null;
@@ -60,20 +69,20 @@ final class MaskBlendService
             'color_code' => $payload['color_code'] ?? null,
             'color_hex' => strtoupper($payload['color_hex'] ?? ''),
             'base_lightness' => $this->roundLightness($baseLightness),
-            'target_lightness' => $this->roundLightness((float)($payload['target_lightness'] ?? 0)),
-            'target_h' => isset($payload['target_h']) ? (float)$payload['target_h'] : null,
-            'target_c' => isset($payload['target_c']) ? (float)$payload['target_c'] : null,
             'blend_mode' => strtolower($payload['blend_mode'] ?? 'colorize'),
             'blend_opacity' => (float)$payload['blend_opacity'],
             'shadow_l_offset' => $shadowOffset,
             'shadow_tint_hex' => $shadowTint,
             'shadow_tint_opacity' => $shadowOpacity,
             'is_preset' => (int)($payload['is_preset'] ?? 0),
-            'approved' => isset($payload['approved']) ? (int)$payload['approved'] : 0,
+            'approved' => $approved,
             'notes' => $payload['notes'] ?? null,
         ];
 
-        $id = isset($payload['id']) ? (int)$payload['id'] : 0;
+        if ($existingRow && $this->rowsMatch($existingRow, $data)) {
+            return $this->normalizeRow($existingRow);
+        }
+
         $row = $id > 0
             ? $this->repo->update($id, $data)
             : $this->repo->insert($data);
@@ -133,8 +142,29 @@ final class MaskBlendService
 
     private function normalizeRow(array $row): array
     {
+        $targetLightness = null;
+        if (array_key_exists('target_lightness_live', $row) && $row['target_lightness_live'] !== null) {
+            $targetLightness = (float)$row['target_lightness_live'];
+        } elseif (array_key_exists('target_lightness', $row) && $row['target_lightness'] !== null) {
+            $targetLightness = (float)$row['target_lightness'];
+        }
+
+        $targetH = null;
+        if (array_key_exists('target_h_live', $row) && $row['target_h_live'] !== null) {
+            $targetH = (float)$row['target_h_live'];
+        } elseif (array_key_exists('target_h', $row) && $row['target_h'] !== null) {
+            $targetH = (float)$row['target_h'];
+        }
+
+        $targetC = null;
+        if (array_key_exists('target_c_live', $row) && $row['target_c_live'] !== null) {
+            $targetC = (float)$row['target_c_live'];
+        } elseif (array_key_exists('target_c', $row) && $row['target_c'] !== null) {
+            $targetC = (float)$row['target_c'];
+        }
+
         $baseBucket = $this->bucketForLightness((float)$row['base_lightness']);
-        $targetBucket = $this->bucketForLightness((float)$row['target_lightness']);
+        $targetBucket = $targetLightness !== null ? $this->bucketForLightness($targetLightness) : $baseBucket;
         return [
             'id' => (int)$row['id'],
             'photo_id' => (int)$row['photo_id'],
@@ -146,9 +176,9 @@ final class MaskBlendService
             'color_code' => $row['color_code'],
             'color_hex' => strtoupper($row['color_hex']),
             'base_lightness' => (float)$row['base_lightness'],
-            'target_lightness' => (float)$row['target_lightness'],
-            'target_h' => $row['target_h'] !== null ? (float)$row['target_h'] : null,
-            'target_c' => $row['target_c'] !== null ? (float)$row['target_c'] : null,
+            'target_lightness' => $targetLightness,
+            'target_h' => $targetH,
+            'target_c' => $targetC,
             'blend_mode' => $row['blend_mode'],
             'blend_opacity' => (float)$row['blend_opacity'],
             'shadow_l_offset' => isset($row['shadow_l_offset']) ? (float)$row['shadow_l_offset'] : null,
@@ -162,6 +192,36 @@ final class MaskBlendService
             'base_bucket' => $baseBucket,
             'target_bucket' => $targetBucket,
         ];
+    }
+
+    private function rowsMatch(array $existing, array $next): bool
+    {
+        $keys = [
+            'color_id',
+            'color_name',
+            'color_brand',
+            'color_code',
+            'color_hex',
+            'base_lightness',
+            'blend_mode',
+            'blend_opacity',
+            'shadow_l_offset',
+            'shadow_tint_hex',
+            'shadow_tint_opacity',
+            'is_preset',
+            'approved',
+            'notes',
+        ];
+        foreach ($keys as $key) {
+            $left = $existing[$key] ?? null;
+            $right = $next[$key] ?? null;
+            if (is_numeric($left) && is_numeric($right)) {
+                if ((float)$left !== (float)$right) return false;
+                continue;
+            }
+            if ($left !== $right) return false;
+        }
+        return true;
     }
 
     private function bucketForLightness(float $value): string

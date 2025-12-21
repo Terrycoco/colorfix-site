@@ -73,7 +73,8 @@ export default function App() {
                   <li><a href="/admin/upload-photo" className="block py-1 hover:underline">Upload Photos</a></li>
               
                     <li><a href="/admin/mask-tester" className="block py-1 hover:underline">Mask Tester</a></li>
-                      <li><a href="/admin/applied-palettes" className="block py-1 hover:underline">Applied Palettes</a></li>
+                    <li><a href="/admin/applied-palettes" className="block py-1 hover:underline">Applied Palettes</a></li>
+                    <li><a href="/admin/player-preview/1" className="block py-1 hover:underline">Player Preview</a></li>
                  
               </ul>
             </div>

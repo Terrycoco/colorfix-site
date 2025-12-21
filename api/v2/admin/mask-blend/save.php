@@ -63,6 +63,11 @@ if ($existingRow && !empty($existingRow['approved'])) {
     $entry['approved'] = 1;
 }
 
+$normalizedEntry = normalizeEntryForCompare($entry, $existingRow);
+if ($existingRow && entriesMatch($existingRow, $normalizedEntry)) {
+    respond(['ok' => true, 'setting' => $existingRow]);
+}
+
 $saved = $service->saveSetting($assetId, $mask, [
     'id' => $idFromPayload,
     'color_id' => $entry['color_id'] ?? null,
@@ -83,10 +88,107 @@ $saved = $service->saveSetting($assetId, $mask, [
     'approved' => $entry['approved'] ?? 0,
     'notes' => $entry['notes'] ?? null,
 ]);
-    $flagStmt = $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 1 WHERE asset_id = :asset");
-    $flagStmt->execute([':asset' => $assetId]);
+    $flagStmt = $pdo->prepare("
+        UPDATE applied_palettes ap
+        JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
+        SET ap.needs_rerender = 1
+        WHERE ap.asset_id = :asset
+          AND ape.mask_role = :mask
+          AND ape.color_id = :color
+    ");
+    $flagStmt->execute([
+        ':asset' => $assetId,
+        ':mask' => $mask,
+        ':color' => (int)($saved['color_id'] ?? 0),
+    ]);
 
     respond(['ok' => true, 'setting' => $saved]);
 } catch (Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);
+}
+
+function normalizeEntryForCompare(array $entry, ?array $existing): array {
+    $colorHex = isset($entry['color_hex']) ? strtoupper(ltrim((string)$entry['color_hex'], '#')) : null;
+    if ($colorHex === '') $colorHex = null;
+    $shadowHex = isset($entry['shadow_tint_hex']) ? strtoupper(ltrim((string)$entry['shadow_tint_hex'], '#')) : null;
+    if ($shadowHex === '') $shadowHex = null;
+    $baseLightness = array_key_exists('base_lightness', $entry)
+        ? (float)$entry['base_lightness']
+        : ($existing['base_lightness'] ?? null);
+    $blendMode = isset($entry['blend_mode']) && $entry['blend_mode'] !== ''
+        ? strtolower((string)$entry['blend_mode'])
+        : 'colorize';
+    $blendOpacity = array_key_exists('blend_opacity', $entry)
+        ? (float)$entry['blend_opacity']
+        : 1.0;
+    $shadowOffset = array_key_exists('shadow_l_offset', $entry)
+        ? clampFloat($entry['shadow_l_offset'], -50.0, 50.0)
+        : null;
+    $shadowOpacity = array_key_exists('shadow_tint_opacity', $entry)
+        ? clampFloat($entry['shadow_tint_opacity'], 0.0, 1.0)
+        : null;
+
+    $approved = array_key_exists('approved', $entry)
+        ? (int)$entry['approved']
+        : (int)($existing['approved'] ?? 0);
+    return [
+        'color_id' => isset($entry['color_id']) ? (int)$entry['color_id'] : null,
+        'color_name' => normalizeText($entry['color_name'] ?? null),
+        'color_brand' => normalizeText($entry['color_brand'] ?? null),
+        'color_code' => normalizeText($entry['color_code'] ?? null),
+        'color_hex' => $colorHex,
+        'base_lightness' => $baseLightness,
+        'blend_mode' => $blendMode,
+        'blend_opacity' => $blendOpacity,
+        'shadow_l_offset' => $shadowOffset,
+        'shadow_tint_hex' => $shadowHex,
+        'shadow_tint_opacity' => $shadowOpacity,
+        'is_preset' => isset($entry['is_preset']) ? (int)$entry['is_preset'] : 0,
+        'approved' => $approved,
+        'notes' => normalizeText($entry['notes'] ?? null),
+    ];
+}
+
+function normalizeText($value): ?string {
+    if ($value === null) return null;
+    $trim = trim((string)$value);
+    return $trim === '' ? null : $trim;
+}
+
+function clampFloat($value, float $min, float $max): ?float {
+    if ($value === null || $value === '') return null;
+    $num = (float)$value;
+    if (!is_finite($num)) return null;
+    if ($num < $min) $num = $min;
+    if ($num > $max) $num = $max;
+    return $num;
+}
+
+function entriesMatch(array $existing, array $normalized): bool {
+    $map = [
+        'color_id',
+        'color_name',
+        'color_brand',
+        'color_code',
+        'color_hex',
+        'base_lightness',
+        'blend_mode',
+        'blend_opacity',
+        'shadow_l_offset',
+        'shadow_tint_hex',
+        'shadow_tint_opacity',
+        'is_preset',
+        'approved',
+        'notes',
+    ];
+    foreach ($map as $key) {
+        $left = $existing[$key] ?? null;
+        $right = $normalized[$key] ?? null;
+        if (is_numeric($left) && is_numeric($right)) {
+            if ((float)$left !== (float)$right) return false;
+            continue;
+        }
+        if ($left !== $right) return false;
+    }
+    return true;
 }

@@ -20,11 +20,12 @@ try {
 
     $repo = new PdoAppliedPaletteRepository($pdo);
     $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+    $assetId = isset($_GET['asset_id']) ? trim((string)$_GET['asset_id']) : '';
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 40;
     $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
     $limit = max(1, min(200, $limit));
     $offset = max(0, $offset);
-    $rows = $repo->listPalettes(['q' => $q], $limit, $offset);
+    $rows = $repo->listPalettes(['q' => $q, 'asset_id' => $assetId], $limit, $offset);
 
     $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
     $publicRoot = rtrim(dirname(__DIR__, 4) . '/public', '/');

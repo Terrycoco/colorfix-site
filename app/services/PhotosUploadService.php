@@ -285,6 +285,17 @@ final class PhotosUploadService
 
     private function moveUpload(array $file, string $destPath): void
     {
+        if (file_exists($destPath)) {
+            if (is_dir($destPath)) {
+                throw new \RuntimeException("Destination is a directory: {$destPath}");
+            }
+            if (!is_writable($destPath)) {
+                throw new \RuntimeException("Destination is not writable: {$destPath}");
+            }
+            if (!@unlink($destPath)) {
+                throw new \RuntimeException("Failed to remove existing file: {$destPath}");
+            }
+        }
         $tmp = (string)($file['tmp_name'] ?? '');
         if ($tmp === '' || !is_uploaded_file($tmp)) {
             // fallback: allow server-side moves for already-staged files

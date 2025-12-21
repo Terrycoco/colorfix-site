@@ -53,15 +53,39 @@ try {
     respond(400, ['error'=>'start_not_dir'] + $diag + ['parent'=> $parent, 'parent_listing'=>$listing]);
   }
 
-  // ---------- Find /YYYY/YYYY-MM/PHO_* ----------
-  $yearDirs = glob($startAbs . '/*', GLOB_ONLYDIR) ?: [];
+  $sanitizeCategory = function(string $value): ?string {
+    $trim = trim($value);
+    if ($trim === '') return null;
+    $trim = str_replace('\\', '/', $trim);
+    $segments = array_filter(array_map(function ($seg) {
+      $seg = strtolower(trim($seg));
+      $seg = preg_replace('/[^a-z0-9\-]+/', '-', $seg);
+      $seg = trim($seg, '-');
+      return $seg;
+    }, explode('/', $trim)));
+    if (!$segments) return null;
+    return implode('/', $segments);
+  };
+
+  $findCategoryPath = function(string $assetDir) use ($startAbs, $sanitizeCategory): ?string {
+    $rel = ltrim(substr($assetDir, strlen($startAbs)), '/');
+    if ($rel === '' || $rel === false) return null;
+    $parent = dirname($rel);
+    if ($parent === '.' || $parent === '') return null;
+    return $sanitizeCategory($parent);
+  };
+
+  // ---------- Find PHO_* at any depth ----------
   $assetDirs = [];
-  foreach ($yearDirs as $y) {
-    $ymDirs = glob($y . '/*', GLOB_ONLYDIR) ?: [];
-    foreach ($ymDirs as $ym) {
-      foreach (glob($ym . '/PHO_*', GLOB_ONLYDIR) ?: [] as $assetDir) {
-        if (preg_match('/\/PHO_[A-Z0-9]+$/', $assetDir)) $assetDirs[] = $assetDir;
-      }
+  $iter = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($startAbs, FilesystemIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::SELF_FIRST
+  );
+  foreach ($iter as $item) {
+    if (!$item->isDir()) continue;
+    $name = $item->getFilename();
+    if (preg_match('/^PHO_[A-Z0-9]+$/i', $name)) {
+      $assetDirs[] = $item->getPathname();
     }
   }
 
@@ -72,37 +96,102 @@ try {
   foreach ($assetDirs as $dir) {
     $assetId = basename($dir);
     $photo = $repo->getPhotoByAssetId($assetId);
+    $categoryPath = $findCategoryPath($dir);
     if (!$photo) {
-      $ins = $repo->createPhotoShell($assetId, null, null, null, null, null, null);
+      $ins = $repo->createPhotoShell($assetId, null, null, null, null, null, $categoryPath);
       $photo = $repo->getPhotoById((int)$ins['id']);
       if (!$photo) { $missing[] = $assetId; continue; }
+    } elseif ($categoryPath && empty($photo['category_path'])) {
+      $repo->updatePhotoCategoryPath((int)$photo['id'], $categoryPath);
     }
     $photoId = (int)$photo['id'];
 
-    // repaired: /PHO_*/PHO_*_repaired_1600.jpg
-    $rep = $dir . '/' . $assetId . '_repaired_1600.jpg';
-    if (is_file($rep)) {
-      $pi = @getimagesize($rep);
-      $rel = '/' . ltrim(substr($rep, strlen($doc)), '/');
-      $repo->upsertVariant($photoId, 'repaired_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($rep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
+    $relFromDoc = function(string $abs) use ($doc): string {
+      $rel = '/' . ltrim(substr($abs, strlen($doc)), '/');
+      return $rel === '/' ? $abs : $rel;
+    };
+
+    // repaired: /PHO_*/repaired/base.* or *_repaired_*.jpg
+    $repDir = $dir . '/repaired';
+    $repFile = '';
+    if (is_dir($repDir)) {
+      $cands = glob($repDir . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [];
+      foreach ($cands as $f) {
+        $base = strtolower(basename($f));
+        if (str_starts_with($base, 'base.')) { $repFile = $f; break; }
+        if (str_contains($base, 'repaired')) { $repFile = $f; break; }
+      }
+      if (!$repFile && count($cands) === 1) $repFile = $cands[0];
+    } else {
+      $legacy = $dir . '/' . $assetId . '_repaired_1600.jpg';
+      if (is_file($legacy)) $repFile = $legacy;
+    }
+    if ($repFile && is_file($repFile)) {
+      $pi = @getimagesize($repFile);
+      $rel = $relFromDoc($repFile);
+      $repo->upsertVariant($photoId, 'repaired_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($repFile) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
       if ($pi && ((int)$photo['width'] === 0 || (int)$photo['height'] === 0)) {
         $repo->updatePhotoSize($photoId, (int)$pi[0], (int)$pi[1]);
       }
       $restored[] = ['asset_id'=>$assetId, 'kind'=>'repaired_base', 'path'=>$rel];
     }
 
-    // prepared: /PHO_*/prepared/PHO_*_prepared_1600.jpg
-    $prep = $dir . '/prepared/' . $assetId . '_prepared_1600.jpg';
-    if (is_file($prep)) {
-      $pi = @getimagesize($prep);
-      $rel = '/' . ltrim(substr($prep, strlen($doc)), '/');
-      $repo->upsertVariant($photoId, 'prepared_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($prep) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
+    // prepared: /PHO_*/prepared/base.* or *_prepared_*.jpg (plus tiers)
+    $prepDir = $dir . '/prepared';
+    $prepBase = '';
+    $prepTiers = ['dark' => '', 'medium' => '', 'light' => ''];
+    if (is_dir($prepDir)) {
+      $cands = glob($prepDir . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [];
+      foreach ($cands as $f) {
+        $base = strtolower(basename($f));
+        if (preg_match('/_prepared_(dark|medium|light)/', $base, $m)) {
+          $prepTiers[$m[1]] = $f;
+          continue;
+        }
+        if (preg_match('/^(dark|medium|light)\\./', $base, $m)) {
+          $prepTiers[$m[1]] = $f;
+          continue;
+        }
+        if (str_starts_with($base, 'base.')) {
+          $prepBase = $f;
+          continue;
+        }
+        if (str_contains($base, 'prepared') && $prepBase === '') {
+          $prepBase = $f;
+          continue;
+        }
+      }
+      if (!$prepBase && count($cands) === 1) $prepBase = $cands[0];
+    } else {
+      $legacy = $dir . '/prepared/' . $assetId . '_prepared_1600.jpg';
+      if (is_file($legacy)) $prepBase = $legacy;
+    }
+    if ($prepBase && is_file($prepBase)) {
+      $pi = @getimagesize($prepBase);
+      $rel = $relFromDoc($prepBase);
+      $repo->upsertVariant($photoId, 'prepared_base', null, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($prepBase) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
       if ($pi && ((int)$photo['width'] === 0 || (int)$photo['height'] === 0)) {
         $repo->updatePhotoSize($photoId, (int)$pi[0], (int)$pi[1]);
       }
       $restored[] = ['asset_id'=>$assetId, 'kind'=>'prepared_base', 'path'=>$rel];
     } else {
       $skipped[] = ['asset_id'=>$assetId, 'reason'=>'no prepared_base found'];
+    }
+    foreach ($prepTiers as $role => $f) {
+      if (!$f || !is_file($f)) continue;
+      $pi = @getimagesize($f);
+      $rel = $relFromDoc($f);
+      $repo->upsertVariant($photoId, 'prepared', $role, $rel, $pi['mime'] ?? 'image/jpeg', @filesize($f) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
+      $restored[] = ['asset_id'=>$assetId, 'kind'=>'prepared', 'role'=>$role, 'path'=>$rel];
+    }
+
+    // textures: /PHO_*/textures/overlay.png
+    $tex = $dir . '/textures/overlay.png';
+    if (is_file($tex)) {
+      $pi = @getimagesize($tex);
+      $rel = $relFromDoc($tex);
+      $repo->upsertVariant($photoId, 'texture', null, $rel, $pi['mime'] ?? 'image/png', @filesize($tex) ?: null, $pi ? (int)$pi[0] : null, $pi ? (int)$pi[1] : null, []);
+      $restored[] = ['asset_id'=>$assetId, 'kind'=>'texture', 'path'=>$rel];
     }
 
     // masks: /PHO_*/masks/*.png
@@ -112,7 +201,7 @@ try {
       if ($role === '') continue;
 
       $mi = @getimagesize($mf);
-      $rel = '/' . ltrim(substr($mf, strlen($doc)), '/');
+      $rel = $relFromDoc($mf);
       $repo->upsertVariant($photoId, "mask:{$role}", $role, $rel, $mi['mime'] ?? 'image/png', @filesize($mf) ?: null, $mi ? (int)$mi[0] : null, $mi ? (int)$mi[1] : null, []);
       $restored[] = ['asset_id'=>$assetId, 'kind'=>"mask:{$role}", 'role'=>$role, 'path'=>$rel];
     }

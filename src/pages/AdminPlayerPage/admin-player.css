@@ -1,0 +1,47 @@
+.admin-player-page {
+  padding: 24px;
+}
+
+.admin-player-header {
+  margin-bottom: 18px;
+}
+
+.admin-player-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-player-subtitle {
+  color: #666;
+  font-size: 13px;
+}
+
+.admin-player-stage {
+  display: flex;
+  justify-content: center;
+}
+
+.admin-player-phone {
+  width: min(100%, 375px);
+  height: 667px;
+  border-radius: 24px;
+  background: #0a0a0a;
+  border: 1px solid #2a2a2a;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  position: relative;
+}
+
+.admin-player-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+}
+
+.admin-player-status.error {
+  color: #ffb4b4;
+}

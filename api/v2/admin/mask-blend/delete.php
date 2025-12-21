@@ -39,13 +39,30 @@ if (!isset($pdo) || !$pdo instanceof PDO) {
     respond(['ok' => false, 'error' => 'DB not initialized'], 500);
 }
 
+$repo = new PdoMaskBlendSettingRepository($pdo);
 $service = new MaskBlendService(
-    new PdoMaskBlendSettingRepository($pdo),
+    $repo,
     new PdoPhotoRepository($pdo)
 );
 
 try {
+    $row = $repo->findById($id);
     $service->deleteSetting($assetId, $mask, $id);
+    if ($row && !empty($row['color_id'])) {
+        $flagStmt = $pdo->prepare("
+            UPDATE applied_palettes ap
+            JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
+            SET ap.needs_rerender = 1
+            WHERE ap.asset_id = :asset
+              AND ape.mask_role = :mask
+              AND ape.color_id = :color
+        ");
+        $flagStmt->execute([
+            ':asset' => $assetId,
+            ':mask' => $mask,
+            ':color' => (int)$row['color_id'],
+        ]);
+    }
     respond(['ok' => true]);
 } catch (Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);

@@ -723,11 +723,11 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         if (!$recipe) {
             return $entry;
         }
-        $entry['blend_mode'] = $recipe['blend_mode'] ?? $entry['blend_mode'];
-        $entry['blend_opacity'] = $recipe['blend_opacity'] ?? $entry['blend_opacity'];
-        $entry['lightness_offset'] = $recipe['shadow_l_offset'] ?? $entry['lightness_offset'];
-        $entry['tint_hex'] = $recipe['shadow_tint_hex'] ?? $entry['tint_hex'];
-        $entry['tint_opacity'] = $recipe['shadow_tint_opacity'] ?? $entry['tint_opacity'];
+        $entry['blend_mode'] = $recipe['blend_mode'] ?? null;
+        $entry['blend_opacity'] = $recipe['blend_opacity'] ?? null;
+        $entry['lightness_offset'] = $recipe['shadow_l_offset'] ?? null;
+        $entry['tint_hex'] = $recipe['shadow_tint_hex'] ?? null;
+        $entry['tint_opacity'] = $recipe['shadow_tint_opacity'] ?? null;
         return $entry;
     }
 

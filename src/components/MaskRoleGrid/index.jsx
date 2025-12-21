@@ -18,13 +18,15 @@ export default function MaskRoleGrid({
       const entry = entries[mask.role] || {};
       const color = entry.color || null;
       const targetLightness =
-        typeof color?.lightness === "number"
-          ? color.lightness
-          : typeof color?.lab_l === "number"
-            ? color.lab_l
-            : typeof color?.hcl_l === "number"
-              ? color.hcl_l
-              : null;
+        entry.target_lightness != null
+          ? Number(entry.target_lightness)
+          : typeof color?.lightness === "number"
+            ? color.lightness
+            : typeof color?.lab_l === "number"
+              ? color.lab_l
+              : typeof color?.hcl_l === "number"
+                ? color.hcl_l
+                : null;
       return {
         id: mask.role,
         mask_role: mask.role,

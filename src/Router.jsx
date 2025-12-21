@@ -39,9 +39,12 @@ const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
 const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
+const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
+const PlayerPage = lazy(() => import('@pages/PlayerPage'));
+const StandAloneLayout = lazy(() => import('@layout/StandAloneLayout'));
 
 function AppRouter() {
   const renderWithSuspense = (Component, label) => (
@@ -67,6 +70,16 @@ function AppRouter() {
           path="view/:paletteId"
           element={renderWithSuspense(AppliedPaletteViewPage, 'Loading palette…')}
         />
+        <Route element={renderWithSuspense(StandAloneLayout, 'Loading player…')}>
+          <Route
+            path="playlist/:playlistId"
+            element={renderWithSuspense(PlayerPage, 'Loading player…')}
+          />
+          <Route
+            path="playlist/:playlistId/:start"
+            element={renderWithSuspense(PlayerPage, 'Loading player…')}
+          />
+        </Route>
 
         {/* App shell (nav, etc.) */}
         <Route element={<App />}>
@@ -166,6 +179,22 @@ function AppRouter() {
             <Route
               path="applied-palettes/:paletteId/edit"
               element={renderWithSuspense(AdminAppliedPaletteEditorPage, 'Loading palette editor…')}
+            />
+            <Route
+              path="player/:playlistId"
+              element={renderWithSuspense(PlayerPage, 'Loading player…')}
+            />
+            <Route
+              path="player/:playlistId/:start"
+              element={renderWithSuspense(PlayerPage, 'Loading player…')}
+            />
+            <Route
+              path="player-preview/:playlistId"
+              element={renderWithSuspense(AdminPlayerPage, 'Loading player preview…')}
+            />
+            <Route
+              path="player-preview/:playlistId/:start"
+              element={renderWithSuspense(AdminPlayerPage, 'Loading player preview…')}
             />
           </Route>
 

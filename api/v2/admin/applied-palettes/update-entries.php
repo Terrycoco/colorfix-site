@@ -56,6 +56,11 @@ try {
     if (!$palette) {
         respond(['ok' => false, 'error' => 'Palette not found'], 404);
     }
+    $paletteAssetId = is_array($palette) ? (string)($palette['asset_id'] ?? '') : (string)$palette->assetId;
+    $palettePhotoId = is_array($palette) ? (int)($palette['photo_id'] ?? 0) : (int)$palette->photoId;
+    if ($paletteAssetId === '' || $palettePhotoId <= 0) {
+        respond(['ok' => false, 'error' => 'Palette missing asset/photo link'], 400);
+    }
 
     $pdo->beginTransaction();
 
@@ -71,6 +76,7 @@ try {
         ->execute([':id' => $paletteId]);
 
     $saved = 0;
+    $flagPairs = [];
     foreach ($entries as $entry) {
         $maskRole = trim((string)($entry['mask_role'] ?? ''));
         $colorId = isset($entry['color_id']) ? (int)$entry['color_id'] : 0;
@@ -86,10 +92,17 @@ try {
         $shadowTintOpacity = normalizeOpacity($entry['shadow_tint_opacity'] ?? $entry['tint_opacity'] ?? null) ?? 0.0;
 
         // Save into shared mask_blend_settings (single source of truth)
-        $setting = $maskService->saveSetting((string)$palette['asset_id'], $maskRole, [
-            'id' => $entry['mask_setting_id'] ?? null,
-            'photo_id' => (int)$palette['photo_id'],
-            'asset_id' => (string)$palette['asset_id'],
+        $settingId = $entry['mask_setting_id'] ?? null;
+        if (!$settingId && $colorId > 0) {
+            $existing = $maskRepo->findForAssetMaskColor($paletteAssetId, $maskRole, $colorId);
+            if ($existing && !empty($existing['id'])) {
+                $settingId = (int)$existing['id'];
+            }
+        }
+        $setting = $maskService->saveSetting($paletteAssetId, $maskRole, [
+            'id' => $settingId,
+            'photo_id' => $palettePhotoId,
+            'asset_id' => $paletteAssetId,
             'mask_role' => $maskRole,
             'color_id' => $colorId,
             'color_name' => $entry['color_name'] ?? null,
@@ -106,7 +119,7 @@ try {
             'shadow_tint_hex' => $shadowTintHex,
             'shadow_tint_opacity' => $shadowTintOpacity,
             'is_preset' => (int)($entry['is_preset'] ?? 0),
-            'approved' => $entry['approved'] ?? 0,
+            'approved' => array_key_exists('approved', $entry) ? $entry['approved'] : null,
             'notes' => $entry['notes'] ?? null,
         ]);
 
@@ -123,10 +136,32 @@ try {
             'shadow_tint_opacity' => null,
         ]);
         $saved++;
+        $flagPairs[$maskRole . ':' . $colorId] = [
+            'mask_role' => $maskRole,
+            'color_id' => $colorId,
+        ];
     }
 
     if ($saved === 0) {
         throw new RuntimeException('No entries saved');
+    }
+
+    if ($flagPairs) {
+        $flagStmt = $pdo->prepare("
+            UPDATE applied_palettes ap
+            JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
+            SET ap.needs_rerender = 1, ap.updated_at = NOW()
+            WHERE ap.asset_id = :asset_id
+              AND ape.mask_role = :mask_role
+              AND ape.color_id = :color_id
+        ");
+        foreach ($flagPairs as $pair) {
+            $flagStmt->execute([
+                ':asset_id' => $paletteAssetId,
+                ':mask_role' => $pair['mask_role'],
+                ':color_id' => $pair['color_id'],
+            ]);
+        }
     }
 
     $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 1, updated_at = NOW() WHERE id = :id")
