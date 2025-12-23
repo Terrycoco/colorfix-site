@@ -1,10 +1,12 @@
 /* ===============================
-   PLAYER ROOT
+   PLAYER ROOT -- player fills what size frame it is given
    =============================== */
 
 .player-root {
-  position: fixed;
+  position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   background: black;
   overflow: hidden;
 }
@@ -24,6 +26,8 @@
 .player-stage {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   cursor: pointer;
   display: flex;
@@ -70,18 +74,18 @@
 
 .player-exit {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 8px;
+  right: 8px;
   z-index: 30;
 
-  width: 44px;
-  height: 44px;
+  width: 26px;
+  height: 36px;
   border-radius: 999px;
   border: 0;
 
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
-  font-size: 28px;
+  font-size: 20px;
   line-height: 1;
 
   display: flex;
@@ -89,18 +93,29 @@
   justify-content: center;
 }
 
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-exit {
+    top: 6px;
+    left: 6px;
+    right: auto;
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    opacity: 0.85;
+  }
+}
+
 
 .player-image-frame {
   position: relative;
-  display: inline-block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
 }
 
 .player-image {
   display: block;
-  max-width: 100vw;
-  max-height: 100vh;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   will-change: opacity;
 }
@@ -112,7 +127,8 @@
 }
 
 .player-image.is-current {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 2;
 }
 
@@ -125,13 +141,6 @@
 .player-title {
   position: absolute;
   z-index: 3;
-
-  /* anchor to IMAGE, not screen */
-  left: 0;
-  bottom: 24px;
-
-  /* half off the image */
-  transform: translateX(-50%);
 
   max-width: 70%;
 
@@ -149,7 +158,30 @@
   pointer-events: none;
   backdrop-filter: blur(4px);
 
-  animation: title-enter 900ms ease-out forwards;
+  opacity: 0;
+  transform: translateX(-12px);
+  animation: title-enter 1500ms ease-out forwards;
+  animation-delay: 1200ms;
+  animation-fill-mode: both;
+  
+}
+
+.player-title.is-full {
+  transform: translateX(8px);
+}
+
+.player-title.is-static {
+  opacity: 1;
+  transform: none;
+  animation: none;
+}
+
+.player-title.is-static .player-title-text {
+  transform: none;
+}
+
+.player-title.is-full .player-title-text {
+  transform: translateX(0);
 }
 
 .player-title-text {
@@ -165,10 +197,48 @@
 @keyframes title-enter {
   from {
     opacity: 0;
-    transform: translateX(-60%);
+    transform: translateX(-12px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%);
+    transform: translateX(0);
+  }
+}
+
+/* ===============================
+   TITLE — DEFAULT (mobile-first)
+   =============================== */
+
+.player-title-text {
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 10px 14px;
+  font-weight:400;
+}
+
+/* ===============================
+   TABLET / MEDIUM SCREENS
+   iPad portrait & landscape
+   =============================== */
+
+@media (min-width: 768px) and (max-width: 1199px) {
+  .player-title-text {
+    font-size: 17px;
+    line-height: 1.4;
+    padding: 12px 18px;
+    font-weight: 600;
+  }
+}
+
+/* ===============================
+   DESKTOP / LARGE SCREENS
+   =============================== */
+
+@media (min-width: 1200px) {
+  .player-title-text {
+    font-size: 16px;
+    line-height: 1.35;
+    padding: 12px 18px;
+    font-weight: 500;
   }
 }

@@ -272,14 +272,14 @@ export default function AdminMaskTesterPage() {
 
   async function saveTestColor(maskRole, colorPayload) {
     if (!assetId || !maskRole || !colorPayload?.color_id) return;
-    const body = {
+    const entry = {
       asset_id: assetId,
       mask: maskRole,
       entry: {
         color_id: colorPayload.color_id,
-        color_name: colorPayload.name || colorPayload.code || null,
-        color_brand: colorPayload.brand || null,
-        color_code: colorPayload.code || null,
+        color_name: colorPayload.name || colorPayload.color_name || colorPayload.code || colorPayload.color_code || null,
+        color_brand: colorPayload.brand || colorPayload.color_brand || null,
+        color_code: colorPayload.code || colorPayload.color_code || null,
         color_hex: (colorPayload.hex6 || colorPayload.hex || "").replace("#", ""),
         target_lightness: colorPayload.lightness ?? colorPayload.lab_l ?? colorPayload.hcl_l ?? null,
         target_h: colorPayload.hcl_h ?? null,
@@ -289,14 +289,16 @@ export default function AdminMaskTesterPage() {
         shadow_l_offset: colorPayload.shadow_l_offset ?? 0,
         shadow_tint_hex: colorPayload.shadow_tint_hex || null,
         shadow_tint_opacity: colorPayload.shadow_tint_opacity ?? 0,
-        approved: colorPayload.approved ?? 0,
       },
     };
+    if (colorPayload.approved !== undefined && colorPayload.approved !== null) {
+      entry.entry.approved = colorPayload.approved;
+    }
     await fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(entry),
     });
   }
 
@@ -1512,8 +1514,11 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     setExistingPaletteId(value);
     const selected = existingPalettes.find((row) => String(row.id) === String(value));
     if (selected) {
+      setSaveMode("update");
       setSaveTitle(selected.title || "");
       setSaveNotes(selected.notes || "");
+    } else {
+      setSaveMode("new");
     }
   }
 

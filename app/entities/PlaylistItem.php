@@ -10,7 +10,8 @@ class PlaylistItem
         public string $image_url,
         public ?string $title = null,
         public ?string $transition = null,
-        public ?int $duration_ms = null
+        public ?int $duration_ms = null,
+        public ?string $title_mode = null
     ) {
     }
 }

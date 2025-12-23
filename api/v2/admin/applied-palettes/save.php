@@ -108,7 +108,7 @@ try {
         if ($existing && !empty($existing['id'])) {
             $settingId = (int)$existing['id'];
         }
-        $setting = $maskService->saveSetting($assetId, $maskRole, [
+        $settingPayload = [
             'id' => $settingId,
             'photo_id' => (int)$photo['id'],
             'asset_id' => $assetId,
@@ -128,9 +128,12 @@ try {
             'shadow_tint_hex' => $shadow['tint_hex'],
             'shadow_tint_opacity' => $shadow['tint_opacity'],
             'is_preset' => (int)($entry['is_preset'] ?? 0),
-            'approved' => array_key_exists('approved', $entry) ? $entry['approved'] : null,
             'notes' => $entry['notes'] ?? null,
-        ]);
+        ];
+        if (array_key_exists('approved', $entry) && $entry['approved'] !== null) {
+            $settingPayload['approved'] = $entry['approved'];
+        }
+        $setting = $maskService->saveSetting($assetId, $maskRole, $settingPayload);
 
         $paletteRepo->insertPaletteEntry($paletteId, [
             'mask_role' => $maskRole,
@@ -196,6 +199,7 @@ function normalizeHex(?string $hex): ?string {
 function normalizeMode($mode): ?string {
     if (!is_string($mode)) return null;
     $value = strtolower(trim($mode));
+    $value = str_replace([' ', '_', '-'], '', $value);
     return $value !== '' ? $value : null;
 }
 

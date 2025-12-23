@@ -20,6 +20,7 @@ export default function AdminPlayerPage() {
     const params = new URLSearchParams();
     params.set("playlist_id", playlistId);
     if (startParam !== "") params.set("start", startParam);
+    params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
     fetch(`/api/v2/player-playlist.php?${params.toString()}`, {

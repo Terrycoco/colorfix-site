@@ -4,6 +4,7 @@ export default function PlayerEndScreen({
   showReplay = true,
   onReplay,
   children = null,
+  showBranding = true
 }) {
   return (
     <div className="player-end-screen">
@@ -24,6 +25,12 @@ export default function PlayerEndScreen({
           </div>
         )}
       </div>
+
+      {showBranding && (
+        <div className="player-end-branding">
+          Brought to you by <strong>ColorFix</strong>
+        </div>
+      )}
     </div>
   );
 }

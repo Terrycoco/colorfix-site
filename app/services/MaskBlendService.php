@@ -45,9 +45,30 @@ final class MaskBlendService
             $existingRow = $this->repo->findById($id);
         }
 
-        $approved = array_key_exists('approved', $payload)
+        $approved = (array_key_exists('approved', $payload) && $payload['approved'] !== null)
             ? (int)$payload['approved']
             : ($existingRow['approved'] ?? 0);
+
+        $colorId = $payload['color_id'] ?? null;
+        if ($colorId === null && $existingRow) {
+            $colorId = $existingRow['color_id'] ?? null;
+        }
+        $colorName = $payload['color_name'] ?? null;
+        if (($colorName === null || $colorName === '') && $existingRow) {
+            $colorName = $existingRow['color_name'] ?? null;
+        }
+        $colorBrand = $payload['color_brand'] ?? null;
+        if (($colorBrand === null || $colorBrand === '') && $existingRow) {
+            $colorBrand = $existingRow['color_brand'] ?? null;
+        }
+        $colorCode = $payload['color_code'] ?? null;
+        if (($colorCode === null || $colorCode === '') && $existingRow) {
+            $colorCode = $existingRow['color_code'] ?? null;
+        }
+        $colorHex = strtoupper($payload['color_hex'] ?? '');
+        if ($colorHex === '' && $existingRow) {
+            $colorHex = (string)($existingRow['color_hex'] ?? '');
+        }
 
         $shadowTint = $this->normalizeShadowTint($payload['shadow_tint_hex'] ?? null);
         $shadowOffset = isset($payload['shadow_l_offset']) ? (float)$payload['shadow_l_offset'] : null;
@@ -63,13 +84,13 @@ final class MaskBlendService
             'photo_id' => (int)$photo['id'],
             'asset_id' => $assetId,
             'mask_role' => $maskRole,
-            'color_id' => $payload['color_id'] ?? null,
-            'color_name' => $payload['color_name'] ?? null,
-            'color_brand' => $payload['color_brand'] ?? null,
-            'color_code' => $payload['color_code'] ?? null,
-            'color_hex' => strtoupper($payload['color_hex'] ?? ''),
+            'color_id' => $colorId,
+            'color_name' => $colorName,
+            'color_brand' => $colorBrand,
+            'color_code' => $colorCode,
+            'color_hex' => $colorHex,
             'base_lightness' => $this->roundLightness($baseLightness),
-            'blend_mode' => strtolower($payload['blend_mode'] ?? 'colorize'),
+            'blend_mode' => $this->normalizeBlendMode($payload['blend_mode'] ?? 'colorize'),
             'blend_opacity' => (float)$payload['blend_opacity'],
             'shadow_l_offset' => $shadowOffset,
             'shadow_tint_hex' => $shadowTint,
@@ -246,6 +267,14 @@ final class MaskBlendService
         }
         if (!preg_match('/^[0-9A-F]{6}$/', $trim)) return null;
         return $trim;
+    }
+
+    private function normalizeBlendMode($mode): string
+    {
+        $value = strtolower(trim((string)$mode));
+        $value = str_replace([' ', '_', '-'], '', $value);
+        $allowed = ['colorize','hardlight','softlight','overlay','multiply','screen','luminosity','flatpaint','original','linearburn'];
+        return in_array($value, $allowed, true) ? $value : 'colorize';
     }
 
     private function formatShadowTint($value): ?string

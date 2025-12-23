@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "@components/Player";
+import './playerpage.css';
 
 export default function PlayerPage() {
   const { playlistId, start } = useParams();
@@ -21,6 +22,7 @@ export default function PlayerPage() {
     const params = new URLSearchParams();
     params.set("playlist_id", playlistId);
     if (startParam !== "") params.set("start", startParam);
+    params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
     fetch(`/api/v2/player-playlist.php?${params.toString()}`, {

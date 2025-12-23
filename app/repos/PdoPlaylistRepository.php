@@ -25,7 +25,8 @@ class PdoPlaylistRepository
                         $itemDef['image_url'],
                         $itemDef['title'] ?? null,
                         $itemDef['transition'] ?? null,
-                        $itemDef['duration_ms'] ?? null
+                        $itemDef['duration_ms'] ?? null,
+                        $itemDef['title_mode'] ?? null
                     );
                 }
 
@@ -68,23 +69,41 @@ class PdoPlaylistRepository
                             [
                                 'ap_id' => null,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base.jpg',
-                                'title' => 'Before',
+                                'title' => 'Cottage Palettes -- Tap screen for more',
+                                'title_mode' => 'static'
                             ],
+                            [
+                                'ap_id' => 43,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_43.jpg',
+                                'title' => 'Early Bloomer',
+                                'title_mode' => 'animate'
+                            ],
+                             [
+                                'ap_id' => 44,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_44.jpg',
+                                'title' => 'Audrey',
+                                'title_mode' => 'animate'
+                            ],
+
                             [
                                 'ap_id' => 37,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_37.jpg',
                                 'title' => 'Betsy Ross',
+                                'title_mode' => 'animate'
                             ],
                             [
                                 'ap_id' => 38,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_38.jpg',
                                 'title' => "Tiffany's Cottage",
+                                'title_mode' => 'animate'
                             ],
                             [
                                 'ap_id' => 39,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_39.jpg',
                                 'title' => 'The Diva',
+                                'title_mode' => 'animate'
                             ],
+                       
                         ],
                     ],
                 ],

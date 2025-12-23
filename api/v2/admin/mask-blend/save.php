@@ -68,7 +68,7 @@ if ($existingRow && entriesMatch($existingRow, $normalizedEntry)) {
     respond(['ok' => true, 'setting' => $existingRow]);
 }
 
-$saved = $service->saveSetting($assetId, $mask, [
+$settingPayload = [
     'id' => $idFromPayload,
     'color_id' => $entry['color_id'] ?? null,
     'color_name' => $entry['color_name'] ?? null,
@@ -85,9 +85,12 @@ $saved = $service->saveSetting($assetId, $mask, [
     'shadow_tint_hex' => $entry['shadow_tint_hex'] ?? null,
     'shadow_tint_opacity' => $entry['shadow_tint_opacity'] ?? null,
     'is_preset' => $entry['is_preset'] ?? 0,
-    'approved' => $entry['approved'] ?? 0,
     'notes' => $entry['notes'] ?? null,
-]);
+];
+if (array_key_exists('approved', $entry) && $entry['approved'] !== null) {
+    $settingPayload['approved'] = $entry['approved'];
+}
+$saved = $service->saveSetting($assetId, $mask, $settingPayload);
     $flagStmt = $pdo->prepare("
         UPDATE applied_palettes ap
         JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
