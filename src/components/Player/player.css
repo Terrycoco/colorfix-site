@@ -132,6 +132,54 @@
   z-index: 2;
 }
 
+/* LIKE STAR */
+.player-like {
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  z-index: 4;
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.player-like-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.player-like-stroke-back {
+  fill: transparent;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 3.2;
+  stroke-linejoin: round;
+}
+
+.player-like-stroke-front {
+  fill: transparent;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.player-like.is-liked .player-like-stroke-back {
+  fill: transparent;
+  stroke: rgba(0, 0, 0, 0.6);
+}
+
+.player-like.is-liked .player-like-stroke-front {
+  fill: #ffd000;
+  stroke: #ffd000;
+}
+
 .player-root.player-embedded .player-image {
   max-width: 100%;
   max-height: 100%;
@@ -155,6 +203,8 @@
   line-height: 1.35;
 
   border-radius: 6px;
+  padding: 6px 10px;
+  text-align: left;
   pointer-events: none;
   backdrop-filter: blur(4px);
 
@@ -186,12 +236,23 @@
 
 .player-title-text {
   display: inline-block;
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.45);
+  padding: 0;
+  background: transparent;
   color: #fff;
   border-radius: 6px;
   pointer-events: none;
-  backdrop-filter: blur(4px);
+}
+
+.player-subtitle-text {
+  display: block;
+  margin-top: 2px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  max-width: 100%;
+  word-break: break-word;
 }
 
 @keyframes title-enter {
@@ -212,7 +273,7 @@
 .player-title-text {
   font-size: 12px;
   line-height: 1.3;
-  padding: 10px 14px;
+  padding: 0;
   font-weight:400;
 }
 
@@ -225,8 +286,11 @@
   .player-title-text {
     font-size: 17px;
     line-height: 1.4;
-    padding: 12px 18px;
+    padding: 0;
     font-weight: 600;
+  }
+  .player-subtitle-text {
+    font-size: 13px;
   }
 }
 
@@ -238,7 +302,10 @@
   .player-title-text {
     font-size: 16px;
     line-height: 1.35;
-    padding: 12px 18px;
+    padding: 0;
     font-weight: 500;
+  }
+  .player-subtitle-text {
+    font-size: 12px;
   }
 }

@@ -24,6 +24,8 @@ class PdoPlaylistRepository
                         (string)($itemDef['ap_id'] ?? ''),
                         $itemDef['image_url'],
                         $itemDef['title'] ?? null,
+                        $itemDef['subtitle'] ?? null,
+                        $itemDef['type'] ?? null,
                         $itemDef['transition'] ?? null,
                         $itemDef['duration_ms'] ?? null,
                         $itemDef['title_mode'] ?? null
@@ -70,7 +72,8 @@ class PdoPlaylistRepository
                                 'ap_id' => null,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base.jpg',
                                 'title' => 'Cottage Palettes -- Tap screen for more',
-                                'title_mode' => 'static'
+                                'title_mode' => 'static',
+                                'type' => 'intro'
                             ],
                             [
                                 'ap_id' => 43,
@@ -103,6 +106,36 @@ class PdoPlaylistRepository
                                 'title' => 'The Diva',
                                 'title_mode' => 'animate'
                             ],
+                       
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'playlist_id' => '2',
+                'type' => 'test',
+                'title' => 'Test One',
+                'steps' => [
+                    [
+                        'step_id' => 'all',
+                        'is_group' => false,
+                        'items' => [
+                            [
+                                'ap_id' => null,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
+                                'title' => 'Adobe Palettes',
+                                'subtitle' => 'Tap screen for more',
+                                'title_mode' => 'static',
+                                'type' => 'intro'
+                            ],
+                            [
+                                'ap_id' => 45,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_45.jpg',
+                                'title' => 'Oasis',
+                                'subtitle' => 'A calm and refreshing break from Southwest orange',
+                                'title_mode' => 'animate'
+                            ],
+                            
                        
                         ],
                     ],

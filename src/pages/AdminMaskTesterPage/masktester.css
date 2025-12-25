@@ -139,6 +139,7 @@
 .tester-left {
   height: 700px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
   padding-bottom: 300px;
 }

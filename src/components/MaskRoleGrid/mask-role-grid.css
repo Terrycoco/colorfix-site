@@ -7,11 +7,14 @@
 .color-editor-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   background: #fff;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .color-editor-title {
@@ -22,4 +25,9 @@
 .color-editor-bar .btn.small {
   height: 32px;
   padding: 6px 10px;
+}
+
+.color-editor-bar .fuzzy-dropdown {
+  flex: 1 1 220px;
+  max-width: 100%;
 }

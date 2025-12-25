@@ -139,9 +139,9 @@ final class MaskBlendService
         return $photo;
     }
 
-    private function resolveBaseLightness(int $photoId, string $role, ?float $input): float
+    private function resolveBaseLightness(int $photoId, string $role, $input): float
     {
-        if ($input !== null) {
+        if ($input !== null && $input !== '') {
             return (float)$input;
         }
         $stats = $this->roleStatsMap($photoId);
