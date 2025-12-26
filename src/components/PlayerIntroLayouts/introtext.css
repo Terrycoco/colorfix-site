@@ -1,0 +1,42 @@
+.intro-text {
+  position: absolute;
+  inset: 0;
+
+  width: 100vw;
+  max-width: none;
+
+  background: #000;
+  color: #fff;
+
+  pointer-events: auto;
+}
+
+
+.intro-text__content {
+  min-width: 0;
+  max-width: 720px;
+  padding: 48px 40px;
+  margin: 12vh auto 0 auto;   /* centered column */
+  box-sizing: border-box;
+}
+
+.intro-text__title {
+  font-size: 2.4rem;
+  line-height: 1.15;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.intro-text__subtitle {
+  font-size: 1.15rem;
+  line-height: 1.45;
+  max-width: 520px;
+  margin-top: 0;
+}
+
+.intro-text__hint {
+  margin-top: 48px;
+  font-size: 0.85rem;
+  opacity: 0.45;
+  letter-spacing: 0.08em;
+}

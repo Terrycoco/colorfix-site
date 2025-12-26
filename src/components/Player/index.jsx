@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import PlayerEndScreen from "./PlayerEndScreen";
+import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import "./player.css";
 
 export default function Player({
@@ -31,6 +32,7 @@ export default function Player({
   const [titlePos, setTitlePos] = useState({ left: 0, top: 0 });
   const [starPos, setStarPos] = useState({ left: 0, top: 0 });
   const [likedSet, setLikedSet] = useState(() => new Set());
+  const [isPortraitMobile, setIsPortraitMobile] = useState(false);
   const didInitRef = useRef(false);
   const currentImgRef = useRef(null);
   const stageRef = useRef(null);
@@ -56,7 +58,8 @@ export default function Player({
   function getItemKey(item) {
     if (!item) return null;
     const itemType = (item.type || "normal").toLowerCase();
-    if (itemType === "intro") return null;
+    if (itemType === "intro" || itemType === "text") return null;
+    if (item.star !== true) return null;
     const apId = item.ap_id ?? null;
     if (apId === null || apId === undefined || apId === "") return null;
     return String(apId);
@@ -88,12 +91,12 @@ export default function Player({
 
   function handleReplay() {
     emitLikesSnapshot();
-    setActiveIndex(0);
+    setActiveIndex(firstPlayableIndex);
     setMode("playing");
     setTitleVisible(false);
     setImageLoaded(false);
     setFadeReady(false);
-    setTitleIndex(0);
+    setTitleIndex(firstPlayableIndex);
     setPrevIndex(null);
     setIsFading(false);
     setTitleFull(false);
@@ -107,9 +110,22 @@ export default function Player({
   const titleMode = items[titleIndex]?.title_mode || "animated";
   const subtitleOffset = subtitle ? 0 : 18;
   const currentType = (currentItem?.type || "normal").toLowerCase();
-  const isIntro = currentType === "intro";
+  const isIntro = currentType === "intro" || currentType === "text";
+  const introLayoutKey = isIntro
+    ? ((currentItem?.layout || "").toString().toLowerCase().trim() || (currentType === "text" ? "text" : "default"))
+    : null;
+  const IntroRenderer = isIntro ? getIntroLayout(introLayoutKey) : null;
+  const isStarrable = currentItem?.star === true;
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
+  const firstPlayableIndex = useMemo(() => {
+    if (!items.length) return 0;
+    const idx = items.findIndex((item) => {
+      const t = (item?.type || "normal").toLowerCase();
+      return t !== "intro" && t !== "text";
+    });
+    return idx >= 0 ? idx : 0;
+  }, [items]);
 
   function withCacheBust(url) {
     if (!url) return url;
@@ -161,13 +177,21 @@ export default function Player({
     if (titleEl) {
       const titleRect = titleEl.getBoundingClientRect();
       const titleWidth = titleRect.width;
+      const titleHeight = titleRect.height;
       const maxLeft = Math.max(0, leftOffset + renderW - titleWidth - 8);
+      const portraitTop = bottomOffset + renderH + 8;
+      const maxTop = Math.max(0, stageRect.height - titleHeight - 8);
       setTitlePos({
         left: Math.min(baseLeft, maxLeft),
-        top: Math.max(0, baseTop - titleRect.height),
+        top: isPortraitMobile ? Math.min(portraitTop, maxTop) : Math.max(0, baseTop - titleHeight),
       });
     } else {
-      setTitlePos({ left: baseLeft, top: Math.max(0, baseTop - 24) });
+      const portraitTop = bottomOffset + renderH + 8;
+      const maxTop = Math.max(0, stageRect.height - 24);
+      setTitlePos({
+        left: baseLeft,
+        top: isPortraitMobile ? Math.min(portraitTop, maxTop) : Math.max(0, baseTop - 24),
+      });
     }
     const starSize = 40;
     const starLeft = Math.max(0, leftOffset + renderW - starSize - 12);
@@ -187,6 +211,13 @@ export default function Player({
     return () => clearTimeout(timer);
   }, [imageLoaded, currentIndex, titleMode]);
 
+  useEffect(() => {
+    if (!isIntro) return;
+    if (currentItem?.image_url) return;
+    setImageLoaded(true);
+    setFadeReady(true);
+  }, [isIntro, currentIndex, currentItem?.image_url]);
+
 
   useEffect(() => {
     if (!isFading || !fadeReady) return;
@@ -204,6 +235,10 @@ export default function Player({
 
   useEffect(() => {
     function handleResize() {
+      if (typeof window !== "undefined") {
+        const portrait = window.matchMedia("(max-width: 768px) and (orientation: portrait)").matches;
+        setIsPortraitMobile(portrait);
+      }
       const img = currentImgRef.current;
       const stage = stageRef.current;
       updateOverlayPositions(img, stage);
@@ -215,7 +250,17 @@ export default function Player({
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("orientationchange", handleResize);
     };
-  }, [currentIndex, imageLoaded, titleVisible]);
+  }, [currentIndex, imageLoaded, titleVisible, isPortraitMobile]);
+
+  useEffect(() => {
+    const img = currentImgRef.current;
+    if (!img || imageLoaded) return;
+    if (img.complete && img.naturalWidth) {
+      setImageLoaded(true);
+      requestAnimationFrame(() => setFadeReady(true));
+      updateOverlayPositions(img, stageRef.current);
+    }
+  }, [currentIndex, items, imageLoaded]);
 
   return (
     <div className={`player-root${embedded ? " player-embedded" : ""}`}>
@@ -231,7 +276,7 @@ export default function Player({
   <div
     className="player-stage"
     ref={stageRef}
-    onPointerUp={handleAdvance}
+    onClick={handleAdvance}
     role="button"
     tabIndex={0}
     onKeyDown={(e) => {
@@ -264,7 +309,7 @@ export default function Player({
           }}
         />
       )}
-      {mode === "playing" && !isIntro && (
+      {mode === "playing" && !isIntro && isStarrable && (
         <div
           className={`player-like ${isLiked ? "is-liked" : ""}`}
           role="button"
@@ -303,7 +348,22 @@ export default function Player({
         </div>
       )}
 
-      {title && titleVisible && (
+      {titleVisible && isIntro && IntroRenderer && (
+        <div
+          className="player-title is-static"
+          style={{
+            left: titlePos.left,
+            top: Math.max(0, titlePos.top - subtitleOffset),
+          }}
+          ref={titleRef}
+        >
+          <Suspense fallback={null}>
+            <IntroRenderer item={currentItem} />
+          </Suspense>
+        </div>
+      )}
+
+      {title && titleVisible && !isIntro && (
         <div
           className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}`}
           style={{

@@ -1,0 +1,19 @@
+/* Intro content only (uses Player title styling) */
+.intro-default {
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+
+.intro-default__body {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.intro-default__hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+}

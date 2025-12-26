@@ -26,6 +26,8 @@ class PdoPlaylistRepository
                         $itemDef['title'] ?? null,
                         $itemDef['subtitle'] ?? null,
                         $itemDef['type'] ?? null,
+                        isset($itemDef['star']) ? (bool)$itemDef['star'] : null,
+                        $itemDef['layout'] ?? null,
                         $itemDef['transition'] ?? null,
                         $itemDef['duration_ms'] ?? null,
                         $itemDef['title_mode'] ?? null
@@ -63,6 +65,7 @@ class PdoPlaylistRepository
                 'playlist_id' => '1',
                 'type' => 'test',
                 'title' => 'Test Four',
+                'end_screen_layout' => 'default',
                 'steps' => [
                     [
                         'step_id' => 'all',
@@ -71,40 +74,48 @@ class PdoPlaylistRepository
                             [
                                 'ap_id' => null,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base.jpg',
-                                'title' => 'Cottage Palettes -- Tap screen for more',
+                                'title' => 'Cottage Palettes',
                                 'title_mode' => 'static',
-                                'type' => 'intro'
+                                'type' => 'intro',
+                                'layout' => 'default',
+                                'star' => false
                             ],
                             [
                                 'ap_id' => 43,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_43.jpg',
                                 'title' => 'Early Bloomer',
-                                'title_mode' => 'animate'
+                                'title_mode' => 'animate',
+                                'star' => true
+                            
                             ],
                              [
                                 'ap_id' => 44,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_44.jpg',
                                 'title' => 'Audrey',
-                                'title_mode' => 'animate'
+                                'title_mode' => 'animate',
+                                'star' => true,
                             ],
 
                             [
                                 'ap_id' => 37,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_37.jpg',
                                 'title' => 'Betsy Ross',
-                                'title_mode' => 'animate'
+                                'title_mode' => 'animate',
+                                'star' => true,
                             ],
                             [
                                 'ap_id' => 38,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_38.jpg',
                                 'title' => "Tiffany's Cottage",
-                                'title_mode' => 'animate'
+                                'title_mode' => 'animate',
+                                'star' => true,
                             ],
                             [
                                 'ap_id' => 39,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_39.jpg',
                                 'title' => 'The Diva',
-                                'title_mode' => 'animate'
+                                'title_mode' => 'animate',
+                                'star' => true
                             ],
                        
                         ],
@@ -115,6 +126,7 @@ class PdoPlaylistRepository
                 'playlist_id' => '2',
                 'type' => 'test',
                 'title' => 'Test One',
+                'end_screen_layout' => 'default',
                 'steps' => [
                     [
                         'step_id' => 'all',
@@ -122,18 +134,33 @@ class PdoPlaylistRepository
                         'items' => [
                             [
                                 'ap_id' => null,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
-                                'title' => 'Adobe Palettes',
-                                'subtitle' => 'Tap screen for more',
+                                'image_url' => null,
+                                'title' => 'Adobe Transformation',
+                                'subtitle' => 'Getting rid of muddy palettes of the Southwest',
                                 'title_mode' => 'static',
-                                'type' => 'intro'
+                                'type' => 'intro',
+                                'layout' => 'text',
+                                'star' => false
+                            ],
+                            [
+                                'ap_id' => null,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
+                                'title' => 'Before',
+                                'subtitle' => 'Typical adobe tract house with muddy palette',
+                                'title_mode' => 'animated',
+                                'type' => 'normal',
+                                'layout' => 'default',
+                                'star' => false
+            
+            
                             ],
                             [
                                 'ap_id' => 45,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_45.jpg',
-                                'title' => 'Oasis',
-                                'subtitle' => 'A calm and refreshing break from Southwest orange',
-                                'title_mode' => 'animate'
+                                'title' => 'After',
+                                'subtitle' => 'Palette: Oasis -- A calm and refreshing respite from orange',
+                                'title_mode' => 'animate',
+                                'star' => true,
                             ],
                             
                        
