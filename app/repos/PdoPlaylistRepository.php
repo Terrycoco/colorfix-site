@@ -41,11 +41,12 @@ class PdoPlaylistRepository
                 );
             }
 
-            return new Playlist(
+         return new Playlist(
                 $definition['playlist_id'],
                 $definition['type'],
                 $definition['title'],
-                $steps
+                $steps,
+                $definition['meta'] ?? []
             );
         }
 
@@ -127,6 +128,13 @@ class PdoPlaylistRepository
                 'type' => 'test',
                 'title' => 'Test One',
                 'end_screen_layout' => 'default',
+                'meta' => [
+                    'share_enabled' => true,
+                    'share_title' => 'Orange Fatigue',
+                    'share_description' => 'Who says adobes have to look like mud?',
+                    'share_image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
+                ],
+
                 'steps' => [
                     [
                         'step_id' => 'all',
@@ -155,10 +163,18 @@ class PdoPlaylistRepository
             
                             ],
                             [
+                                'ap_id' => 46,
+                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_46.jpg',
+                                'title' => 'After',
+                                'subtitle' => 'Palette: Classic Mediterranean -- Crisp, clean and elegant',
+                                'title_mode' => 'animate',
+                                'star' => true,
+                            ],
+                            [
                                 'ap_id' => 45,
                                 'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_45.jpg',
                                 'title' => 'After',
-                                'subtitle' => 'Palette: Oasis -- A calm and refreshing respite from orange',
+                                'subtitle' => 'Palette: Oasis -- Cool, calm and refreshing',
                                 'title_mode' => 'animate',
                                 'star' => true,
                             ],
