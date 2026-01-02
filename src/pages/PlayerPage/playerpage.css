@@ -10,6 +10,19 @@
   inset: 0;
 }
 
+.cta-test-panel {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 50;
+}
+.cta-test-meta {
+  color: #fff;
+  font-size: 12px;
+  margin-bottom: 8px;
+  text-align: right;
+}
+
 /* TABLET */
 @media (min-width: 768px) {
   .player-page {

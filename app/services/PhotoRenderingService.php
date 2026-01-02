@@ -40,6 +40,8 @@ class PhotoRenderingService
         $this->maskBlendRepo ??= new PdoMaskBlendSettingRepository($this->pdo);
     }
 
+    private const MASK_DEBUG_THRESHOLD = false;
+
     /* =======================================================================
      * PUBLIC API
      * =======================================================================
@@ -101,8 +103,8 @@ public function renderApplyMap(
 
     $W = imagesx($baseIm);
     $H = imagesy($baseIm);
-    imagesavealpha($baseIm, true);
-    imagealphablending($baseIm, false); // we write final pixels
+        imagesavealpha($baseIm, true);
+        imagealphablending($baseIm, false); // we write final pixels
 
     // Optional texture overlay image (same dimensions as prepared base)
     $textureIm = null;
@@ -150,8 +152,6 @@ public function renderApplyMap(
         [$rT, $gT, $bT] = $this->hexToRgb($hex6);
         [$Lt, $at, $bt] = $this->rgbToLab($rT, $gT, $bT);
 
-        $alphaForRole = $this->clamp01($alpha);
-
         $overlaySource = $overlayOverrides[$role] ?? ($maskMeta['overlay'] ?? null);
         $maskBlend = $this->resolveMaskBlend($overlaySource, $Lt);
         $blendSettingsByRole[$role] = $maskBlend;
@@ -163,8 +163,12 @@ public function renderApplyMap(
             imagedestroy($maskIm);
             continue;
         }
-        $applyTextureLater = $useTextureOverlay;
-        $directBlendOpacity = $applyTextureLater ? 1.0 : $maskBlend['opacity'];
+        $applyTexture = $useTextureOverlay && !$isFlatPaint;
+        $blendOpacity = $this->clamp01($maskBlend['opacity'] ?? 0.0);
+        $shadow = $shadowSettingsByRole[$role] ?? ['l_offset' => 0, 'tint_rgb' => null, 'tint_opacity' => 0];
+        $shadowOffset = isset($shadow['l_offset']) ? (float)$shadow['l_offset'] : 0.0;
+        $shadowTint = $shadow['tint_rgb'] ?? null;
+        $shadowTintOpacity = $this->clamp01($shadow['tint_opacity'] ?? 0.0);
 
         // 4) Per-pixel
         $paintRgb = [$this->clamp255($rT), $this->clamp255($gT), $this->clamp255($bT)];
@@ -172,23 +176,61 @@ public function renderApplyMap(
         for ($y = 0; $y < $H; $y++) {
             for ($x = 0; $x < $W; $x++) {
                 $m  = imagecolorat($maskIm, $x, $y);
-                $ma = ($m & 0x7F000000) >> 24;
-                if ($ma >= 127) continue;
-                // Opaque paint within mask; no base blending.
-                $colPaint = ($paintRgb[0] << 16) | ($paintRgb[1] << 8) | $paintRgb[2];
-                imagesetpixel($baseIm, $x, $y, $colPaint);
+                $mr = ($m >> 16) & 0xFF;
+                $maskValue = self::MASK_DEBUG_THRESHOLD
+                    ? (($mr < 128) ? 0.0 : 1.0)
+                    : ($mr / 255.0);
+                if ($maskValue <= 0.0) {
+                    continue;
+                }
+
+                $p  = imagecolorat($baseIm, $x, $y);
+                $r0 = ($p >> 16) & 0xFF; $g0 = ($p >> 8) & 0xFF; $b0 = $p & 0xFF;
+
+                $roleRgb = $paintRgb;
+
+                if ($applyTexture && $blendOpacity > 0.0) {
+                    $mode = $maskBlend['mode'] ?? 'softlight';
+                    if ($mode === 'colorize') $mode = 'softlight';
+                    $tex = imagecolorat($textureIm, $x, $y);
+                    $gray = $tex & 0xFF;
+                    $overlayRgb = [$gray, $gray, $gray];
+                    [$rBlend, $gBlend, $bBlend] = $this->applyBlendMode($roleRgb, $overlayRgb, $mode);
+                    $roleRgb = [
+                        $this->clamp255($roleRgb[0] * (1.0 - $blendOpacity) + $rBlend * $blendOpacity),
+                        $this->clamp255($roleRgb[1] * (1.0 - $blendOpacity) + $gBlend * $blendOpacity),
+                        $this->clamp255($roleRgb[2] * (1.0 - $blendOpacity) + $bBlend * $blendOpacity),
+                    ];
+                }
+
+                if (abs($shadowOffset) >= 0.01) {
+                    [$L0, $a0, $b0Lab] = $this->rgbToLab($roleRgb[0], $roleRgb[1], $roleRgb[2]);
+                    $L1 = $this->clamp($L0 + $shadowOffset, 0.0, 100.0);
+                    $roleRgb = $this->labToRgb($L1, $a0, $b0Lab);
+                }
+
+                if ($shadowTint && $shadowTintOpacity > 0.0) {
+                    $roleRgb = [
+                        $this->clamp255($roleRgb[0] * (1.0 - $shadowTintOpacity) + $shadowTint[0] * $shadowTintOpacity),
+                        $this->clamp255($roleRgb[1] * (1.0 - $shadowTintOpacity) + $shadowTint[1] * $shadowTintOpacity),
+                        $this->clamp255($roleRgb[2] * (1.0 - $shadowTintOpacity) + $shadowTint[2] * $shadowTintOpacity),
+                    ];
+                }
+
+                $r = $this->clamp255($r0 + ($roleRgb[0] - $r0) * $maskValue);
+                $g = $this->clamp255($g0 + ($roleRgb[1] - $g0) * $maskValue);
+                $b = $this->clamp255($b0 + ($roleRgb[2] - $b0) * $maskValue);
+
+                $col = ($r << 16) | ($g << 8) | $b;
+                imagesetpixel($baseIm, $x, $y, $col);
             }
         }
 
         imagedestroy($maskIm);
     }
-
-        if ($useTextureOverlay && $textureIm) {
-            $this->applyTextureOverlays($baseIm, $textureIm, $masksByRole, $blendSettingsByRole, $W, $H);
+        if ($textureIm) {
             imagedestroy($textureIm);
         }
-
-        $this->applyShadowAdjustments($baseIm, $masksByRole, $shadowSettingsByRole, $blendSettingsByRole, $W, $H);
 
     // 5) Save render
     $outRel = $outputRelPath ? $this->normalizeRelPath($outputRelPath) : $this->buildRenderRelPath($assetId, $hexMap);

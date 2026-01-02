@@ -8,7 +8,7 @@ import "./photorenderer.css";
  *  - assignments: { [role]: { hex6, L, a, b } }
  *  - viewMode: "before" | "after" | "prepared"
  */
-export default function PhotoRenderer({ asset, assignments, viewMode, onStateChange }) {
+export default function PhotoRenderer({ asset, assignments, viewMode, onStateChange, overlayOverrides }) {
   const [compositeUrl, setCompositeUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -52,7 +52,8 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
         asset_id: asset.asset_id,
         map: hexMap,
         mode: "colorize",
-        alpha: 0.9
+        alpha: 0.9,
+        overrides: overlayOverrides || {},
       })
     })
       .then(async (r) => {
@@ -79,7 +80,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
       .finally(() => {
         setLoading(false);
       });
-  }, [asset?.asset_id, hexMap, viewMode]);
+  }, [asset?.asset_id, hexMap, viewMode, overlayOverrides]);
 
   // Which image to show
   const imgSrc = useMemo(() => {
@@ -94,11 +95,13 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
     if (isFull) {
       const prev = document.body.style.overflow;
       document.body.style.overflow = "hidden";
+      document.body.classList.add("photo-fullscreen");
       const onKey = (e) => { if (e.key === "Escape") setIsFull(false); };
       window.addEventListener("keydown", onKey, { passive: true });
       return () => {
         window.removeEventListener("keydown", onKey);
         document.body.style.overflow = prev;
+        document.body.classList.remove("photo-fullscreen");
       };
     }
   }, [isFull]);

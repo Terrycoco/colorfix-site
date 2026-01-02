@@ -152,7 +152,7 @@ final class PhotosUploadService
         ];
     }
 
-    /** Save a texture overlay PNG into textures/overlay.png */
+    /** Save a texture overlay into textures/overlay.<ext> */
     public function saveTextureOverlay(int $photoId, array $file): array
     {
         $photo = $this->repo->getPhotoById($photoId);
@@ -162,13 +162,14 @@ final class PhotosUploadService
         $destDir = $this->buildDir($assetId, 'textures');
         $this->ensureDir($destDir);
 
-        $filename = "overlay.png";
+        [$ext, $mime] = $this->extFromUpload($file);
+        $filename = "overlay.{$ext}";
         $destPath = rtrim($destDir, '/')."/{$filename}";
         $this->moveUpload($file, $destPath);
 
-        [$width, $height, $bytes] = $this->probeImage($destPath, 'image/png');
+        [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
 
-        $this->repo->upsertVariant($photoId, 'texture', '', $this->publicPath($destPath), 'image/png', $bytes, $width, $height, []);
+        $this->repo->upsertVariant($photoId, 'texture', '', $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
 
         return [
             'ok'      => true,
@@ -313,6 +314,7 @@ final class PhotosUploadService
         }
         @chmod($destPath, 0664);
     }
+
 
     private function convertMaskToAlphaIfNeeded(string $absPath, string $role): void
     {

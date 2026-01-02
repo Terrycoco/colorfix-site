@@ -3,6 +3,9 @@
   display: flex;
   flex-direction: column;
   color: #fff;
+  align-items: center;
+  text-align: center;
+  max-width: 80%;
 }
 
 .intro-default__body {

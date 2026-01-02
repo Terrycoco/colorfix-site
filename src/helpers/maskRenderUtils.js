@@ -77,3 +77,23 @@ export function buildPreviewAssignments(entryMap) {
   });
   return map;
 }
+
+export function getMaskBlendSettingForColor(settingsList, colorId) {
+  if (!Array.isArray(settingsList) || !colorId) return null;
+  return settingsList.find((row) => Number(row.color_id) === Number(colorId)) || null;
+}
+
+export function mergeMaskBlendSetting(entry, setting) {
+  if (!setting || !entry) return entry;
+  return {
+    ...entry,
+    blend_mode: setting.blend_mode ?? entry.blend_mode ?? "",
+    blend_opacity: setting.blend_opacity ?? entry.blend_opacity ?? null,
+    shadow_l_offset: setting.shadow_l_offset ?? entry.shadow_l_offset ?? 0,
+    shadow_tint_hex: setting.shadow_tint_hex || entry.shadow_tint_hex || "",
+    shadow_tint_opacity: setting.shadow_tint_opacity ?? entry.shadow_tint_opacity ?? 0,
+    target_lightness: setting.target_lightness ?? entry.target_lightness ?? null,
+    target_h: setting.target_h ?? entry.target_h ?? null,
+    target_c: setting.target_c ?? entry.target_c ?? null,
+  };
+}

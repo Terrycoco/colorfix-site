@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import MaskTable from "@components/MaskTable";
+import { useEffect, useMemo, useRef, useState } from "react";
+import MaskSettingsTable from "@components/MaskSettingsTable";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import "./mask-role-grid.css";
 
@@ -12,6 +12,7 @@ export default function MaskRoleGrid({
   showRole = false,
 }) {
   const [activeRole, setActiveRole] = useState("");
+  const editorRef = useRef(null);
 
   const rows = useMemo(() => {
     return (masks || []).map((mask) => {
@@ -38,14 +39,26 @@ export default function MaskRoleGrid({
         color_brand: color?.brand || "",
         base_lightness: mask.base_lightness,
         target_lightness: targetLightness ?? mask.base_lightness ?? null,
-        blend_mode: entry.blend_mode || "",
+        blend_mode: entry.blend_mode || "colorize",
         blend_opacity: entry.blend_opacity ?? null,
         shadow_l_offset: entry.shadow_l_offset ?? 0,
         shadow_tint_hex: entry.shadow_tint_hex || "",
         shadow_tint_opacity: entry.shadow_tint_opacity ?? 0,
+        approved: entry.approved ?? true,
       };
     });
   }, [masks, entries]);
+
+  useEffect(() => {
+    if (!activeRole) return;
+    const onPointerDown = (e) => {
+      if (!editorRef.current) return;
+      if (editorRef.current.contains(e.target)) return;
+      setActiveRole("");
+    };
+    document.addEventListener("pointerdown", onPointerDown, { capture: true });
+    return () => document.removeEventListener("pointerdown", onPointerDown, { capture: true });
+  }, [activeRole]);
 
   function handleMode(row, value) {
     onChange?.(row.mask_role, { blend_mode: value });
@@ -55,8 +68,12 @@ export default function MaskRoleGrid({
     onChange?.(row.mask_role, { blend_opacity: parsePct(value) });
   }
 
+  function handleOffset(row, value) {
+    onChange?.(row.mask_role, { shadow_l_offset: parseOffset(value) });
+  }
+
   function handleApplyRow(row) {
-    onApply?.(row.mask_role);
+    onApply?.(row);
   }
 
   function handleChangeColor(color) {
@@ -67,27 +84,29 @@ export default function MaskRoleGrid({
 
   return (
     <div className={`mask-grid-table ${showRole ? "show-role" : ""}`}>
-      {activeRole && (
-        <div className="color-editor-bar">
-          <div className="color-editor-title">Change color for {(activeRole || "").toUpperCase()}</div>
-          <FuzzySearchColorSelect
-            value={entries[activeRole]?.color || null}
-            onSelect={handleChangeColor}
-            placeholder="Color name or code"
-            allowManualHex
-            showLabel={false}
-            compact
-            autoFocus
-            preventAutoFocus={false}
-            suppressFocus={false}
-            manualOpen={false}
-          />
+      <div className="color-editor-bar" ref={editorRef}>
+        <div className="color-editor-title">
+          {activeRole ? `Change color for ${(activeRole || "").toUpperCase()}` : "Select a row to change color"}
+        </div>
+        <FuzzySearchColorSelect
+          value={activeRole ? entries[activeRole]?.color || null : null}
+          onSelect={handleChangeColor}
+          placeholder={activeRole ? "Color name or code" : "Pick a row first"}
+          allowManualHex
+          showLabel={false}
+          compact
+          autoFocus={false}
+          preventAutoFocus
+          suppressFocus={!activeRole}
+          manualOpen={false}
+        />
+        {activeRole && (
           <button type="button" className="btn small" onClick={() => setActiveRole("")}>
             Close
           </button>
-        </div>
-      )}
-      <MaskTable
+        )}
+      </div>
+      <MaskSettingsTable
         rows={rows}
         showRole={showRole}
         onApply={handleApplyRow}
@@ -95,8 +114,9 @@ export default function MaskRoleGrid({
         onShadow={onShadow}
         onDelete={null}
         onChangeMode={handleMode}
-        onChangeOpacity={handleOpacity}
-        onClickColor={(row) => setActiveRole(row.mask_role)}
+        onChangePercent={handleOpacity}
+        onChangeOffset={handleOffset}
+        onPickColor={(row) => setActiveRole(row.mask_role)}
       />
     </div>
   );
@@ -107,4 +127,11 @@ function parsePct(v) {
   const num = Number(v);
   if (!Number.isFinite(num)) return null;
   return Math.max(0, Math.min(1, num / 100));
+}
+
+function parseOffset(v) {
+  if (v === "" || v == null) return null;
+  const num = Number(v);
+  if (!Number.isFinite(num)) return null;
+  return Math.max(-50, Math.min(50, num));
 }

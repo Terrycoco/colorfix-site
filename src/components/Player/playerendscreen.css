@@ -1,14 +1,14 @@
 .player-end-screen {
   position: absolute;
   inset: 0;
-  height: 100dvh;
+  height: 100%;
   padding: 24px 16px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
 
-  background: rgba(0, 0, 0, 0.6); /* optional but nice */
+  background: #000;
   z-index: 20;
 }
 

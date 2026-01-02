@@ -4,9 +4,16 @@ import PhotoRenderer from "@components/PhotoRenderer";
 import MaskBlendHistory from "@components/MaskBlendHistory";
 import MaskOverlayModal from "@components/MaskOverlayModal";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
-import MaskRoleGrid from "@components/MaskRoleGrid";
+import MaskSettingsGrid from "@components/MaskSettingsGrid";
+import AppliedPaletteMaskEditor from "@components/AppliedPaletteMaskEditor";
 import { API_FOLDER } from "@helpers/config";
-import { buildPreviewAssignments, normalizeEntryForSave, normalizeShadowStruct } from "@helpers/maskRenderUtils";
+import {
+  buildPreviewAssignments,
+  normalizeEntryForSave,
+  normalizeShadowStruct,
+  getMaskBlendSettingForColor,
+  mergeMaskBlendSetting,
+} from "@helpers/maskRenderUtils";
 import "./masktester.css";
 import { overlayPresetConfig, bucketForLightness } from "@config/overlayPresets";
 const TESTER_COLORS_URL = `${API_FOLDER}/v2/mask-training/tester-colors.php`;
@@ -171,6 +178,12 @@ export default function AdminMaskTesterPage() {
   const [lastSavedSig, setLastSavedSig] = useState("");
   const [apPalette, setApPalette] = useState(null);
   const [apEntriesMap, setApEntriesMap] = useState({});
+  const [apEntriesBaseline, setApEntriesBaseline] = useState({});
+  const [apAppliedSettingsByMask, setApAppliedSettingsByMask] = useState({});
+  const [apDraftSettingsByMask, setApDraftSettingsByMask] = useState({});
+  const [apMaskBlendSettingsByMask, setApMaskBlendSettingsByMask] = useState({});
+  const apMaskBlendPendingRef = useRef({});
+  const apGlobalSigRef = useRef("");
   const [apLoadError, setApLoadError] = useState("");
   const [apMetaTitle, setApMetaTitle] = useState("");
   const [apMetaNotes, setApMetaNotes] = useState("");
@@ -451,61 +464,174 @@ export default function AdminMaskTesterPage() {
       .finally(() => setLoading(false));
   }, [assetId]);
 
-  // Load applied palette if query specifies one
-  useEffect(() => {
-    if (!appliedPaletteIdParam) {
+  function buildAppliedSettingsMap(map, settingsByMask = {}) {
+    const settings = {};
+    Object.values(map || {}).forEach((row) => {
+      if (!row?.mask_role) return;
+      const colorId = row?.color?.id || row?.color_id || null;
+      const setting = getMaskBlendSettingForColor(settingsByMask[row.mask_role], colorId);
+      const merged = setting ? mergeMaskBlendSetting(row, setting) : row;
+      settings[row.mask_role] = {
+        blend_mode: merged.blend_mode ?? null,
+        blend_opacity: merged.blend_opacity ?? null,
+        shadow_l_offset: merged.shadow_l_offset ?? 0,
+        shadow_tint_hex: merged.shadow_tint_hex || null,
+        shadow_tint_opacity: merged.shadow_tint_opacity ?? 0,
+        target_lightness: merged.target_lightness ?? null,
+        target_h: merged.target_h ?? null,
+        target_c: merged.target_c ?? null,
+      };
+    });
+    return settings;
+  }
+
+  function applyGlobalBlendSettingsToEntries(map, settingsByMask, draftByMask) {
+    const next = { ...(map || {}) };
+    let changed = false;
+    Object.values(next).forEach((row) => {
+      if (!row?.mask_role) return;
+      if (draftByMask?.[row.mask_role]) return;
+      if (row._global_synced) return;
+      const colorId = row.color?.id || row.color_id || null;
+      if (!colorId) {
+        next[row.mask_role] = { ...row, _global_synced: true };
+        changed = true;
+        return;
+      }
+      const setting = getMaskBlendSettingForColor(settingsByMask[row.mask_role], colorId);
+      if (!setting) {
+        next[row.mask_role] = { ...row, _global_synced: true };
+        changed = true;
+        return;
+      }
+      const merged = mergeMaskBlendSetting(row, setting);
+      next[row.mask_role] = { ...merged, _global_synced: true };
+      changed = true;
+    });
+    return changed ? next : map;
+  }
+
+  async function loadAppliedPalette(id, { silent = false } = {}) {
+    if (!id) {
       setApPalette(null);
+      setApEntriesMap({});
+      setApEntriesBaseline({});
+      setApAppliedSettingsByMask({});
+      setApDraftSettingsByMask({});
       setApLoadError("");
-      return;
+      return null;
     }
-    const idNum = Number(appliedPaletteIdParam);
+    const idNum = Number(id);
     if (!Number.isFinite(idNum) || idNum <= 0) {
       setApLoadError("Invalid applied palette id");
-      return;
+      return null;
     }
-    setApLoadError("");
-    fetch(`${AP_GET_URL}?id=${idNum}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data?.ok) throw new Error(data?.error || "Failed to load applied palette");
-        setApPalette(data);
-        setApMetaTitle(data?.palette?.title || "");
-        setApMetaNotes(data?.palette?.notes || "");
-        const map = {};
-        (data.entries || []).forEach((e) => {
-          const hexRaw = e.color_hex || e.color_hex6 || e.hex6 || "";
-          const hex6 = hexRaw.replace(/[^0-9a-f]/gi, "").slice(0, 6).toUpperCase();
-          const lightnessRaw = e.color_hcl_l ?? e.color_lab_l ?? null;
-          const lightness =
-            lightnessRaw != null && Number.isFinite(Number(lightnessRaw))
-              ? Number(lightnessRaw)
-              : null;
-          map[e.mask_role] = {
-            mask_role: e.mask_role,
-            color: {
-              id: e.color_id,
-              name: e.color_name || e.color_code || "",
-              code: e.color_code || "",
-              brand: e.color_brand || "",
-              hex6,
-              lightness,
-              hcl_l: e.color_hcl_l ?? null,
-              lab_l: e.color_lab_l ?? null,
-            },
-            blend_mode: e.setting_blend_mode ?? e.blend_mode ?? "",
-            blend_opacity: e.setting_blend_opacity ?? e.blend_opacity ?? null,
-            shadow_l_offset: e.setting_shadow_l_offset ?? e.lightness_offset ?? null,
-            shadow_tint_hex: e.setting_shadow_tint_hex || e.tint_hex || "",
-            shadow_tint_opacity: e.setting_shadow_tint_opacity ?? e.tint_opacity ?? null,
-            target_lightness: lightness ?? null,
-            target_h: e.setting_target_h ?? null,
-            target_c: e.setting_target_c ?? null,
-          };
-        });
-        setApEntriesMap(map);
-      })
-      .catch((e) => setApLoadError(e?.message || "Failed to load applied palette"));
+    if (!silent) {
+      setApLoadError("");
+    }
+    try {
+      const res = await fetch(`${AP_GET_URL}?id=${idNum}&_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!data?.ok) throw new Error(data?.error || "Failed to load applied palette");
+      setApPalette(data);
+      setApMetaTitle(data?.palette?.title || "");
+      setApMetaNotes(data?.palette?.notes || "");
+      const map = {};
+      (data.entries || []).forEach((e) => {
+        const hexRaw = e.color_hex || e.color_hex6 || e.hex6 || "";
+        const hex6 = hexRaw.replace(/[^0-9a-f]/gi, "").slice(0, 6).toUpperCase();
+        const lightnessRaw = e.color_hcl_l ?? e.color_lab_l ?? null;
+        const lightness =
+          lightnessRaw != null && Number.isFinite(Number(lightnessRaw))
+            ? Number(lightnessRaw)
+            : null;
+        map[e.mask_role] = {
+          mask_role: e.mask_role,
+          color: {
+            id: e.color_id,
+            name: e.color_name || e.color_code || "",
+            code: e.color_code || "",
+            brand: e.color_brand || "",
+            hex6,
+            lightness,
+            hcl_l: e.color_hcl_l ?? null,
+            lab_l: e.color_lab_l ?? null,
+          },
+          blend_mode: e.setting_blend_mode ?? e.blend_mode ?? "",
+          blend_opacity: e.setting_blend_opacity ?? e.blend_opacity ?? null,
+          shadow_l_offset: e.setting_shadow_l_offset ?? e.lightness_offset ?? null,
+          shadow_tint_hex: e.setting_shadow_tint_hex || e.tint_hex || "",
+          shadow_tint_opacity: e.setting_shadow_tint_opacity ?? e.tint_opacity ?? null,
+          target_lightness: lightness ?? null,
+          target_h: e.setting_target_h ?? null,
+          target_c: e.setting_target_c ?? null,
+          _global_synced: false,
+        };
+      });
+      setApEntriesMap(map);
+      setApEntriesBaseline(cloneEntriesMap(map));
+      setApAppliedSettingsByMask(buildAppliedSettingsMap(map, apMaskBlendSettingsByMask));
+      setApDraftSettingsByMask({});
+      return map;
+    } catch (err) {
+      if (!silent) {
+        setApLoadError(err?.message || "Failed to load applied palette");
+      }
+      return null;
+    }
+  }
+
+  // Load applied palette if query specifies one
+  useEffect(() => {
+    loadAppliedPalette(appliedPaletteIdParam);
   }, [appliedPaletteIdParam]);
+
+  function findMaskBlendSetting(maskRole, colorId) {
+    return getMaskBlendSettingForColor(apMaskBlendSettingsByMask[maskRole], colorId);
+  }
+
+  async function loadMaskBlendSettings(maskRole) {
+    if (!apPalette?.palette?.asset_id || !maskRole) return [];
+    if (apMaskBlendPendingRef.current[maskRole]) {
+      return apMaskBlendPendingRef.current[maskRole];
+    }
+    const assetId = apPalette.palette.asset_id;
+    const promise = fetch(
+      `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(maskRole)}&${Date.now()}`,
+      { credentials: "include", cache: "no-store" }
+    )
+      .then((r) => r.json())
+      .then((data) => (data?.ok && Array.isArray(data.settings) ? data.settings : []))
+      .catch(() => []);
+    apMaskBlendPendingRef.current[maskRole] = promise;
+    const settings = await promise;
+    apMaskBlendPendingRef.current[maskRole] = null;
+    setApMaskBlendSettingsByMask((prev) => ({
+      ...(prev || {}),
+      [maskRole]: settings,
+    }));
+    return settings;
+  }
+
+  useEffect(() => {
+    if (!apPalette?.palette?.asset_id) return;
+    const maskRoles = Object.values(apEntriesMap || {}).map((row) => row?.mask_role).filter(Boolean);
+    if (!maskRoles.length) return;
+    maskRoles.forEach((maskRole) => {
+      if (apMaskBlendSettingsByMask[maskRole]) return;
+      loadMaskBlendSettings(maskRole);
+    });
+  }, [apPalette?.palette?.asset_id, apEntriesMap, apMaskBlendSettingsByMask]);
+
+  useEffect(() => {
+    if (!apPalette?.palette?.asset_id) return;
+    if (!Object.keys(apEntriesMap || {}).length) return;
+    const synced = applyGlobalBlendSettingsToEntries(apEntriesMap, apMaskBlendSettingsByMask, apDraftSettingsByMask);
+    if (synced !== apEntriesMap) {
+      setApEntriesMap(synced);
+    }
+    setApAppliedSettingsByMask(buildAppliedSettingsMap(synced, apMaskBlendSettingsByMask));
+  }, [apPalette?.palette?.asset_id, apEntriesMap, apMaskBlendSettingsByMask, apDraftSettingsByMask]);
 
   async function handleSaveApMeta() {
     if (!apPalette?.palette?.id || apMetaSaving) return;
@@ -555,32 +681,213 @@ export default function AdminMaskTesterPage() {
     // Update applied entries map for admin AP mode; otherwise keep overrides
     setApEntriesMap((prev) => {
       const current = prev[maskRole] || { mask_role: maskRole };
+      let nextBlend = {};
+      if (updates.color) {
+        const normalized = normalizePick(updates.color);
+        const hit = normalized ? findMaskBlendSetting(maskRole, normalized.color_id) : null;
+        if (hit) {
+          const merged = mergeMaskBlendSetting(current, hit);
+          nextBlend = {
+            blend_mode: merged.blend_mode ?? "",
+            blend_opacity: merged.blend_opacity ?? null,
+            shadow_l_offset: merged.shadow_l_offset ?? 0,
+            shadow_tint_hex: merged.shadow_tint_hex || "",
+            shadow_tint_opacity: merged.shadow_tint_opacity ?? 0,
+            target_lightness: merged.target_lightness ?? null,
+            target_h: merged.target_h ?? null,
+            target_c: merged.target_c ?? null,
+          };
+        }
+      }
       const next = {
         ...prev,
         [maskRole]: {
           ...current,
           ...updates,
+          ...nextBlend,
           mask_role: maskRole,
+          _global_synced:
+            !!updates.color && Object.keys(nextBlend).length > 0 ||
+            updates.blend_mode != null ||
+            updates.blend_opacity != null ||
+            updates.shadow_l_offset != null ||
+            updates.shadow_tint_hex != null ||
+            updates.shadow_tint_opacity != null ||
+            updates.target_lightness != null ||
+            updates.target_h != null ||
+            updates.target_c != null,
         },
       };
-      scheduleAppliedPaletteAutoSave(next);
       return next;
     });
+    if (updates.blend_mode != null || updates.blend_opacity != null || updates.shadow_l_offset != null || updates.shadow_tint_hex != null || updates.shadow_tint_opacity != null || updates.target_lightness != null || updates.target_h != null || updates.target_c != null) {
+      setApDraftSettingsByMask((prev) => {
+        const current = prev?.[maskRole] || {};
+        return {
+          ...(prev || {}),
+          [maskRole]: {
+            ...current,
+            ...(updates.blend_mode != null ? { blend_mode: updates.blend_mode } : {}),
+            ...(updates.blend_opacity != null ? { blend_opacity: updates.blend_opacity } : {}),
+            ...(updates.shadow_l_offset != null ? { shadow_l_offset: updates.shadow_l_offset } : {}),
+            ...(updates.shadow_tint_hex != null ? { shadow_tint_hex: updates.shadow_tint_hex || null } : {}),
+            ...(updates.shadow_tint_opacity != null ? { shadow_tint_opacity: updates.shadow_tint_opacity } : {}),
+            ...(updates.target_lightness != null ? { target_lightness: updates.target_lightness } : {}),
+            ...(updates.target_h != null ? { target_h: updates.target_h } : {}),
+            ...(updates.target_c != null ? { target_c: updates.target_c } : {}),
+          },
+        };
+      });
+    }
     if (updates.color) {
       const normalized = normalizePick(updates.color);
-      if (normalized) {
-        setMaskOverrides((prev) => ({ ...(prev || {}), [maskRole]: normalized }));
-      }
+      loadMaskBlendSettings(maskRole).then((settings) => {
+        const hit = getMaskBlendSettingForColor(settings, normalized?.color_id);
+        if (!hit) return;
+        setApEntriesMap((prev) => {
+          const current = prev[maskRole] || { mask_role: maskRole };
+          return {
+            ...prev,
+            [maskRole]: { ...mergeMaskBlendSetting(current, hit), _global_synced: true },
+          };
+        });
+      });
     }
   }
 
-  async function handleMaskGridApply(maskRole) {
+  async function handleMaskGridApply(rowOrMask) {
+    const maskRole = typeof rowOrMask === "string" ? rowOrMask : rowOrMask?.mask_role;
+    if (!maskRole) return;
     const entry = apEntriesMap[maskRole];
-    if (!entry?.color?.id) return;
-    const normalized = normalizePick(entry.color);
+    if (!entry) return;
+    const rowSettings = {
+      blend_mode: entry.blend_mode ?? null,
+      blend_opacity: entry.blend_opacity ?? null,
+      shadow_l_offset: entry.shadow_l_offset ?? 0,
+      shadow_tint_hex: entry.shadow_tint_hex || null,
+      shadow_tint_opacity: entry.shadow_tint_opacity ?? 0,
+    };
+    setApAppliedSettingsByMask((prev) => ({
+      ...(prev || {}),
+      [maskRole]: {
+        ...(prev?.[maskRole] || {}),
+        ...rowSettings,
+      },
+    }));
+    const baseColor = entry.color || (entry.color_id
+      ? {
+          id: entry.color_id,
+          color_id: entry.color_id,
+          name: entry.color_name || entry.color_code || "",
+          code: entry.color_code || "",
+          brand: entry.color_brand || "",
+          hex6: entry.color_hex || "",
+          lightness: entry.target_lightness ?? null,
+          hcl_l: entry.hcl_l ?? null,
+          lab_l: entry.lab_l ?? null,
+        }
+      : null);
+    if (!baseColor) return;
+    const normalized = normalizePick(baseColor);
     if (!normalized) return;
-    const nextOverrides = { ...(maskOverrides || {}), [maskRole]: normalized };
+    const { overrides, active } = buildOverridesFromEntries(apEntriesMap);
+    overrides[maskRole] = normalized;
+    setMaskOverrides(overrides);
+    setActiveColorByMask(active);
+    setApDraftSettingsByMask((prev) => {
+      if (!prev?.[maskRole]) return prev || {};
+      const next = { ...(prev || {}) };
+      delete next[maskRole];
+      return next;
+    });
+    await applyColors(overrides);
+  }
+
+  async function handleApplyApBlend(maskRole, tier, preset, options = {}) {
+    if (!maskRole || !preset) return;
+    const { swatch = null, shadow = null, clearColor = false } = options;
+    const normalizedSwatch = !clearColor && swatch ? normalizePick(swatch) : null;
+
+    setApEntriesMap((prev) => {
+      const current = prev[maskRole] || { mask_role: maskRole };
+      const next = { ...current, mask_role: maskRole };
+
+      if (clearColor) {
+        next.color = null;
+        next.color_id = null;
+        next.color_hex = "";
+        next.color_name = "";
+        next.color_code = "";
+        next.color_brand = "";
+      } else if (normalizedSwatch) {
+        next.color = {
+          id: normalizedSwatch.color_id ?? normalizedSwatch.id,
+          color_id: normalizedSwatch.color_id ?? normalizedSwatch.id,
+          name: normalizedSwatch.name || normalizedSwatch.code || "",
+          code: normalizedSwatch.code || normalizedSwatch.color_code || "",
+          brand: normalizedSwatch.brand || normalizedSwatch.color_brand || "",
+          hex6: normalizedSwatch.hex6 || normalizedSwatch.hex || "",
+          lightness:
+            typeof normalizedSwatch.lightness === "number"
+              ? normalizedSwatch.lightness
+              : typeof normalizedSwatch.hcl_l === "number"
+                ? normalizedSwatch.hcl_l
+                : typeof normalizedSwatch.lab_l === "number"
+                  ? normalizedSwatch.lab_l
+                  : null,
+          hcl_l: normalizedSwatch.hcl_l ?? null,
+          hcl_h: normalizedSwatch.hcl_h ?? normalizedSwatch.h ?? null,
+          hcl_c: normalizedSwatch.hcl_c ?? normalizedSwatch.c ?? null,
+          lab_l: normalizedSwatch.lab_l ?? null,
+        };
+        next.color_id = normalizedSwatch.color_id ?? normalizedSwatch.id ?? null;
+        next.color_hex = normalizedSwatch.hex6 || normalizedSwatch.hex || "";
+        next.color_name = normalizedSwatch.name || normalizedSwatch.code || "";
+        next.color_code = normalizedSwatch.code || normalizedSwatch.color_code || "";
+        next.color_brand = normalizedSwatch.brand || normalizedSwatch.color_brand || "";
+      }
+
+      if (preset.mode != null) {
+        next.blend_mode = preset.mode;
+      }
+      if (typeof preset.opacity === "number") {
+        next.blend_opacity = preset.opacity;
+      }
+
+      if (shadow && typeof shadow === "object") {
+        const normalizedShadow = normalizeShadowStruct({
+          l_offset: shadow.l_offset,
+          tint_hex: shadow.tint_hex,
+          tint_opacity: shadow.tint_opacity,
+        });
+        next.shadow_l_offset = normalizedShadow.l_offset;
+        next.shadow_tint_hex = normalizedShadow.tint_hex ? normalizedShadow.tint_hex.replace("#", "") : "";
+        next.shadow_tint_opacity = normalizedShadow.tint_opacity;
+      }
+
+      const nextMap = { ...prev, [maskRole]: next };
+      scheduleAppliedPaletteAutoSave(nextMap);
+      return nextMap;
+    });
+
+    const nextOverrides = { ...(maskOverrides || {}) };
+    if (clearColor) {
+      nextOverrides[maskRole] = makeSkipSwatch();
+    } else if (normalizedSwatch) {
+      nextOverrides[maskRole] = normalizedSwatch;
+      setActiveColorByMask((prev) => ({ ...prev, [maskRole]: normalizedSwatch.color_id }));
+    }
     setMaskOverrides(nextOverrides);
+    setApAppliedSettingsByMask((prev) => ({
+      ...(prev || {}),
+      [maskRole]: {
+        blend_mode: preset.mode ?? null,
+        blend_opacity: typeof preset.opacity === "number" ? preset.opacity : null,
+        shadow_l_offset: shadow?.l_offset ?? 0,
+        shadow_tint_hex: shadow?.tint_hex || null,
+        shadow_tint_opacity: shadow?.tint_opacity ?? 0,
+      },
+    }));
     await applyColors(nextOverrides);
   }
 
@@ -588,6 +895,31 @@ export default function AdminMaskTesterPage() {
     () => Object.values(apEntriesMap || {}).map((row) => normalizeEntryForSave(row)).filter(Boolean),
     [apEntriesMap]
   );
+
+  const apBaselineSignature = useMemo(() => buildApSignature(apEntriesBaseline), [apEntriesBaseline]);
+  const apCurrentSignature = useMemo(() => buildApSignature(apEntriesMap), [apEntriesMap]);
+  const apHasChanges = apBaselineSignature !== apCurrentSignature;
+
+  const apOverlayOverrides = useMemo(() => {
+    const overrides = {};
+    Object.keys(apAppliedSettingsByMask || {}).forEach((maskRole) => {
+      const setting = apAppliedSettingsByMask[maskRole];
+      if (!setting) return;
+      const mode = setting.blend_mode || "colorize";
+      const opacity = typeof setting.blend_opacity === "number" ? setting.blend_opacity : 0;
+      overrides[maskRole] = {
+        dark: { mode, opacity },
+        medium: { mode, opacity },
+        light: { mode, opacity },
+        _shadow: {
+          l_offset: setting.shadow_l_offset ?? 0,
+          tint_hex: setting.shadow_tint_hex || null,
+          tint_opacity: setting.shadow_tint_opacity ?? 0,
+        },
+      };
+    });
+    return overrides;
+  }, [apAppliedSettingsByMask]);
 
   async function updateAppliedPaletteEntries(entries, { rerender = false, silent = false } = {}) {
     if (!apPalette?.palette?.id) return;
@@ -617,6 +949,9 @@ export default function AdminMaskTesterPage() {
         throw new Error(data?.error || "Failed to update applied palette");
       }
       if (!silent) setSaveNotice(rerender ? "Updated & rerendered." : "Updated.");
+      if (!silent) {
+        await loadAppliedPalette(apPalette.palette.id, { silent: true });
+      }
     } catch (err) {
       setSaveError(err?.message || "Failed to update applied palette");
     } finally {
@@ -625,6 +960,8 @@ export default function AdminMaskTesterPage() {
   }
 
   function scheduleAppliedPaletteAutoSave(nextEntriesMap) {
+    // AP editor should only save explicitly via the Save/Rerender button.
+    return;
     if (!apPalette?.palette?.id) return;
     const entries = Object.values(nextEntriesMap || {})
       .map((row) => normalizeEntryForSave(row))
@@ -649,6 +986,21 @@ export default function AdminMaskTesterPage() {
       return;
     }
     await updateAppliedPaletteEntries(apEntriesForSave, { rerender, silent: false });
+  }
+
+  async function handleRevertAppliedPalette() {
+    if (!apPalette?.palette?.id) return;
+    const latest = await loadAppliedPalette(apPalette.palette.id, { silent: true });
+    const baseline = latest ? cloneEntriesMap(latest) : cloneEntriesMap(apEntriesBaseline);
+    if (!Object.keys(baseline || {}).length) return;
+    setApEntriesMap(baseline);
+    setApAppliedSettingsByMask(buildAppliedSettingsMap(baseline));
+    const { overrides, active } = buildOverridesFromEntries(baseline);
+    setMaskOverrides(overrides);
+    setActiveColorByMask(active);
+    await applyColors(overrides);
+    setSaveNotice("Reverted to saved palette.");
+    setSaveError("");
   }
   // Seed starter tester colors for the currently selected mask
   async function handleSeedTestColors() {
@@ -1354,7 +1706,7 @@ async function reloadOverlayFromServer(mask, { silent = false } = {}) {
   }
 }
 
-async function handleApplyPresetValues(mask, tier, preset, options = {}) {
+  async function handleApplyPresetValues(mask, tier, preset, options = {}) {
   if (!preset) return false;
   const { autoSave = false, autoRender = false, swatch = null, shadow = null, clearColor = false } = options;
   const currentOverlay = normalizeOverlayPayload(maskOverlays[mask]);
@@ -1373,6 +1725,7 @@ async function handleApplyPresetValues(mask, tier, preset, options = {}) {
     });
     updated._shadow = normalizedShadow;
   }
+
   const normalizedMode = typeof preset.mode === "string" ? preset.mode.toLowerCase() : "";
   const shouldClearColor = clearColor || normalizedMode === "original";
 
@@ -1417,6 +1770,49 @@ async function handleApplyPresetValues(mask, tier, preset, options = {}) {
     throw err;
   }
 }
+
+  function handleApShadowEdit(maskRole) {
+    const entry = apEntriesMap[maskRole] || { mask_role: maskRole };
+    const currentOffset = entry.shadow_l_offset ?? 0;
+    const currentTintPct = entry.shadow_tint_opacity != null ? Math.round(entry.shadow_tint_opacity * 100) : 0;
+    const offsetStr = window.prompt("Shadow L offset (negative darker, positive lighter)", String(currentOffset));
+    if (offsetStr === null) return;
+    const offsetNum = clampNumber(Number(offsetStr), -50, 50);
+    const tintStr = window.prompt("Shadow tint opacity % (0-100)", String(currentTintPct));
+    if (tintStr === null) {
+      handleMaskGridChange(maskRole, { shadow_l_offset: offsetNum });
+      return;
+    }
+    const tintNum = clampNumber(Number(tintStr), 0, 100);
+    handleMaskGridChange(maskRole, {
+      shadow_l_offset: offsetNum,
+      shadow_tint_opacity: tintNum / 100,
+    });
+  }
+
+  function buildApSignature(map) {
+    const entries = Object.values(map || {})
+      .map((row) => normalizeEntryForSave(row))
+      .filter(Boolean);
+    entries.sort((a, b) => (a.mask_role || "").localeCompare(b.mask_role || ""));
+    return JSON.stringify(entries);
+  }
+
+  function cloneEntriesMap(map) {
+    return JSON.parse(JSON.stringify(map || {}));
+  }
+
+  function buildOverridesFromEntries(map) {
+    const overrides = {};
+    const active = {};
+    Object.values(map || {}).forEach((entry) => {
+      const normalized = normalizePick(entry?.color);
+      if (!normalized || !entry?.mask_role) return;
+      overrides[entry.mask_role] = normalized;
+      active[entry.mask_role] = normalized.color_id;
+    });
+    return { overrides, active };
+  }
 
 async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
   if (!asset?.asset_id) return false;
@@ -1704,6 +2100,28 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
   return (
     <div className="admin-mask-tester">
       <div className="title">{titleLabel}</div>
+      {apPalette && (
+        <div className="ap-title-editor">
+          <label>
+            Applied Palette Title
+            <input
+              type="text"
+              value={apMetaTitle}
+              onChange={(e) => setApMetaTitle(e.target.value)}
+            />
+          </label>
+          <button
+            className="btn primary"
+            type="button"
+            onClick={handleSaveApMeta}
+            disabled={apMetaSaving}
+          >
+            {apMetaSaving ? "Saving…" : "Save Title"}
+          </button>
+          {apMetaError && <div className="error">{apMetaError}</div>}
+          {apMetaNotice && <div className="notice">{apMetaNotice}</div>}
+        </div>
+      )}
       <div className="app-bar">
         <div className="left">
           <button className="btn" onClick={() => navigate(-1)}>
@@ -1717,20 +2135,20 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
           {asset && apPalette && (
             <>
               <button
-                className="btn primary"
-                disabled={saveBusy || !apEntriesForSave.length}
-                onClick={() => handleUpdateAppliedPalette({ rerender: false })}
-                title={apEntriesForSave.length ? "Update this applied palette" : "Apply at least one mask color to enable saving"}
-              >
-                {saveBusy ? "Saving…" : "Update Applied Palette"}
-              </button>
-              <button
                 className="btn"
                 disabled={saveBusy || !apEntriesForSave.length}
                 onClick={() => handleUpdateAppliedPalette({ rerender: true })}
                 title={apEntriesForSave.length ? "Update and rerender this applied palette" : "Apply at least one mask color to enable saving"}
               >
-                {saveBusy ? "Saving…" : "Update & Rerender"}
+                {saveBusy ? "Saving…" : "Save & Rerender"}
+              </button>
+              <button
+                className="btn"
+                disabled={!apHasChanges}
+                onClick={handleRevertAppliedPalette}
+                title={apHasChanges ? "Revert to saved applied palette" : "No unsaved changes"}
+              >
+                Undo Changes
               </button>
             </>
           )}
@@ -1744,7 +2162,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
               Save Applied Palette
             </button>
           )}
-          {asset && (
+          {asset && !apPalette && (
             <button
               className="btn"
               disabled={bulkSaveState.saving}
@@ -1807,11 +2225,12 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                   <div className="panel-title">Masks (Applied Palette)</div>
                   {apLoadError && <div className="error">{apLoadError}</div>}
                 </div>
-                <MaskRoleGrid
+                <MaskSettingsGrid
                   masks={maskGridRows}
-                  entries={gridEntries}
+                  entries={apEntriesMap}
                   onChange={handleMaskGridChange}
                   onApply={handleMaskGridApply}
+                  onShadow={handleApShadowEdit}
                   showRole
                 />
               </div>
@@ -2086,6 +2505,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                 asset={asset}
                 assignments={assignments}
                 viewMode={viewMode}
+                overlayOverrides={apPalette ? apOverlayOverrides : null}
                 onStateChange={setRenderState}
               />
             </div>
@@ -2096,18 +2516,9 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       {apPalette && (
         <div className="panel" style={{ marginTop: 20 }}>
           <div className="panel-head">
-            <div className="panel-title">Applied Palette Details</div>
+            <div className="panel-title">Applied Palette Notes</div>
           </div>
           <div className="panel-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <label>
-              Title
-              <input
-                type="text"
-                value={apMetaTitle}
-                onChange={(e) => setApMetaTitle(e.target.value)}
-                placeholder="Palette title"
-              />
-            </label>
             <label>
               Description
               <textarea
@@ -2119,7 +2530,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
             </label>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <button className="btn primary" type="button" disabled={apMetaSaving} onClick={handleSaveApMeta}>
-                {apMetaSaving ? "Saving…" : "Save Details"}
+                {apMetaSaving ? "Saving…" : "Save Notes"}
               </button>
               {apMetaNotice && <div className="notice">{apMetaNotice}</div>}
               {apMetaError && <div className="error">{apMetaError}</div>}

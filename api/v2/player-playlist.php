@@ -1,7 +1,11 @@
 <?php
 declare(strict_types=1);
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../autoload.php';
@@ -19,17 +23,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     respond(['ok' => false, 'error' => 'GET only'], 405);
 }
 
-$playlistId = trim((string)($_GET['playlist_id'] ?? $_GET['playlist'] ?? $_GET['id'] ?? ''));
+$playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
 
-if ($playlistId === '') {
-    respond(['ok' => false, 'error' => 'playlist_id required'], 400);
+if ($playlistInstanceId <= 0) {
+    respond(['ok' => false, 'error' => 'playlist_instance_id required'], 400);
 }
 
 try {
-    $service = new PlayerExperienceService();
-    $plan = $service->buildPlaybackPlan($playlistId, $start);
-    respond(['ok' => true, 'data' => $plan]);
+    $service = new PlayerExperienceService($pdo);
+    $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start);
+
+    respond([
+        'ok'   => true,
+        'data' => $plan,
+    ]);
 } catch (RuntimeException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 404);
 } catch (Throwable $e) {

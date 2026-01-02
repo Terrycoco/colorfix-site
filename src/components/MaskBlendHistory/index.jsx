@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import { API_FOLDER } from "@helpers/config";
 import { bucketForLightness, getPresetForBuckets, overlayPresetConfig } from "@config/overlayPresets";
-import MaskTable from "@components/MaskTable";
+import MaskSettingsTable from "@components/MaskSettingsTable";
 import "./maskblendhistory.css";
 
 function normalizeHex(hex) {
@@ -627,144 +627,126 @@ function updateRowShadowDraft(id, field, value) {
         </>
       )}
 
-      <div className="mbh-table-wrapper">
-        {rowTitle && <div className="mbh-row-title">{rowTitle}</div>}
-        <table className="mbh-table">
-          <thead>
-            <tr>
-              <th>Color</th>
-              <th className="col-lightness">L</th>
-              <th className="col-mode">Mode</th>
-              <th className="col-percent">%</th>
-              <th className="col-offset">Off</th>
-              <th className="col-approved">Approved</th>
-              <th className="col-actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map((row) => {
-              const rowModeLower = (row.draft_mode || row.blend_mode || "").toLowerCase();
-              const rowIsOriginal = rowModeLower === ORIGINAL_MODE;
-              const displayName = rowIsOriginal
-                ? "Original Photo"
-                : (row.color_name || row.color_code || row.color_hex);
-              const swatchHex = row.color_hex
-                ? `#${row.color_hex.replace("#", "")}`
-                : "#ccc";
-              const isActive =
-                (activeRowId != null && activeRowId === row.id) ||
-                (activeColorId != null && activeColorId === row.color_id);
-              return (
-              <Fragment key={row.id}>
-              <tr
-                className={isActive ? "mbh-row active" : "mbh-row"}
-                onClick={() => onSelectRow && onSelectRow(row)}
-                onKeyDown={(e) => {
-                  if (!onSelectRow) return;
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelectRow(row);
-                  }
-                }}
-                tabIndex={onSelectRow ? 0 : undefined}
-              >
-                <td>
-                  <div className="mbh-color-cell">
-                    <div
-                      className={`mbh-color-swatch ${rowIsOriginal ? "is-original" : ""}`}
-                      style={rowIsOriginal ? undefined : { backgroundColor: swatchHex }}
-                    />
-                    <div className="mbh-color-meta">
-                      <div>{displayName}</div>
-                      <div className="mbh-color-sub">
-                        {row.color_brand || ""} · Base L {Math.round(row.base_lightness)}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td>{Math.round(row.target_lightness)}</td>
-                <td>
-                  <select
-                    value={row.draft_mode}
-                    onChange={(e) => updateRowDraft(row.id, "draft_mode", e.target.value)}
-                  >
-                    <option value="colorize">Colorize</option>
-                    <option value="softlight">Soft Light</option>
-                    <option value="overlay">Overlay</option>
-                    <option value="linearburn">Linear Burn</option>
-                    <option value="multiply">Multiply</option>
-                    <option value="screen">Screen</option>
-                    <option value="hardlight">Hard Light</option>
-                    <option value="luminosity">Luminosity</option>
-                    <option value="flatpaint">Flat Paint</option>
-                    <option value="original">Original Photo</option>
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={row.draft_percent}
-                    onChange={(e) => updateRowDraft(row.id, "draft_percent", e.target.value)}
-                    disabled={rowIsOriginal}
-                  />
-                </td>
-<td>
-       <input
-                          type="text"
-                          className="col-offset"
-                          inputMode="numeric"
-                          pattern="-?[0-9]*"
-                          value={
-                            row.draft_shadow_input?.l_offset ??
-                            (typeof row.draft_shadow.l_offset === "number"
-                              ? String(row.draft_shadow.l_offset)
-                              : "")
-                          }
-                          onChange={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
-                          onBlur={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
-                        />
-</td>
-
-
-
-
-                <td className="mbh-approved">
-                  <label className="mbh-approved-toggle">
+      {rowTitle && <div className="mbh-row-title">{rowTitle}</div>}
+      <MaskSettingsTable
+        rows={visibleRows}
+        onSelectRow={onSelectRow}
+        activeRowId={activeRowId}
+        activeColorId={activeColorId}
+        onChangeMode={(row, value) => updateRowDraft(row.id, "draft_mode", value)}
+        onChangePercent={(row, value) => updateRowDraft(row.id, "draft_percent", value)}
+        onChangeOffset={(row, value) => updateRowShadowDraft(row.id, "l_offset", value)}
+        onToggleApproved={(row, checked) => updateRowDraft(row.id, "draft_approved", checked)}
+        onApply={(row) => {
+          if (applyingRow === row.id) return;
+          handleApplyRow(row);
+        }}
+        onSave={(row) => {
+          if (savingRow === row.id) return;
+          handleSaveRow(row);
+        }}
+        onShadow={(row) => {
+          const rowModeLower = (row.draft_mode || row.blend_mode || "").toLowerCase();
+          if (rowModeLower === ORIGINAL_MODE) return;
+          toggleShadowEditor(row.id);
+        }}
+        onDelete={(row) => handleDeleteRow(row)}
+        renderExtraRow={(row) => {
+          if (shadowEditorRow !== row.id) return null;
+          return (
+            <tr key={`${row.id}-shadow`} className="mbh-shadow-row">
+              <td colSpan={7}>
+                <div className="mbh-shadow-editor">
+                  <label>
+                    Offset (L)
                     <input
-                      type="checkbox"
-                      checked={!!row.draft_approved}
-                      onChange={(e) => updateRowDraft(row.id, "draft_approved", e.target.checked)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="-?[0-9]*"
+                      value={
+                        row.draft_shadow_input?.l_offset ??
+                        (typeof row.draft_shadow.l_offset === "number"
+                          ? String(row.draft_shadow.l_offset)
+                          : "")
+                      }
+                      onChange={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
+                      onBlur={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
                     />
                   </label>
-                </td>
-                <td className="mbh-actions">
-                  <div className="mbh-action-icons">
-                    <div
-                      className="icon-btn"
-                      role="button"
-                      tabIndex={applyingRow === row.id ? -1 : 0}
-                      aria-disabled={applyingRow === row.id}
-                      title="Apply test"
-                      onClick={() => {
-                        if (applyingRow === row.id) return;
-                        handleApplyRow(row);
-                      }}
-                      onKeyDown={(e) => {
-                        if (applyingRow === row.id) return;
-                        iconKeyHandler(e, () => handleApplyRow(row));
+                  <label>
+                    Tint Preset
+                    <select
+                      value={
+                        (SHADOW_PRESETS.find((preset) =>
+                          preset.tint_hex === (row.draft_shadow.tint_hex || null) &&
+                          Math.round((preset.tint_opacity ?? 0) * 100) === Math.round((row.draft_shadow.tint_opacity ?? 0) * 100)
+                        )?.id) || "custom"
+                      }
+                      onChange={(e) => {
+                        const preset = SHADOW_PRESETS.find((p) => p.id === e.target.value);
+                        if (!preset) {
+                          updateRowShadowDraft(row.id, "tint_hex", row.draft_shadow.tint_hex);
+                          return;
+                        }
+                        updateRowShadowDraft(row.id, "tint_hex", preset.tint_hex);
+                        updateRowShadowDraft(row.id, "tint_opacity", preset.tint_opacity);
                       }}
                     >
-                      <span className="icon icon-play" aria-hidden="true" />
-                      <span className="sr-only">Apply</span>
+                      <option value="custom">Custom</option>
+                      {SHADOW_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Tint Color
+                    <div className="mbh-shadow-color">
+                      <input
+                        type="color"
+                        value={row.draft_shadow.tint_hex || "#000000"}
+                        onChange={(e) => updateRowShadowDraft(row.id, "tint_hex", e.target.value)}
+                      />
+                      <div className="mbh-shadow-hex">{row.draft_shadow.tint_hex || "none"}</div>
+                      <div
+                        className="mbh-pill-btn ghost"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => updateRowShadowDraft(row.id, "tint_hex", null)}
+                        onKeyDown={(e) => iconKeyHandler(e, () => updateRowShadowDraft(row.id, "tint_hex", null))}
+                      >
+                        Clear
+                      </div>
+                    </div>
+                  </label>
+                  <label>
+                    Tint %
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={Math.round((row.draft_shadow.tint_opacity || 0) * 100)}
+                      onChange={(e) =>
+                        updateRowShadowDraft(row.id, "tint_opacity", Math.max(0, Math.min(1, Number(e.target.value) / 100)))
+                      }
+                    />
+                  </label>
+                  <div className="mbh-shadow-buttons">
+                    <div
+                      className="mbh-pill-btn ghost"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => revertRowShadow(row.id)}
+                      onKeyDown={(e) => iconKeyHandler(e, () => revertRowShadow(row.id))}
+                    >
+                      Reset
                     </div>
                     <div
-                      className="icon-btn"
+                      className="mbh-pill-btn"
                       role="button"
                       tabIndex={savingRow === row.id ? -1 : 0}
                       aria-disabled={savingRow === row.id}
-                      title="Save test"
                       onClick={() => {
                         if (savingRow === row.id) return;
                         handleSaveRow(row);
@@ -774,165 +756,18 @@ function updateRowShadowDraft(id, field, value) {
                         iconKeyHandler(e, () => handleSaveRow(row));
                       }}
                     >
-                      <span className="icon icon-save" aria-hidden="true" />
-                      <span className="sr-only">Save</span>
-                    </div>
-                    <div
-                      className={`icon-btn ${shadowEditorRow === row.id ? "active" : ""}`}
-                      role="button"
-                      tabIndex={rowIsOriginal ? -1 : 0}
-                      title="Shadow settings"
-                      aria-pressed={shadowEditorRow === row.id}
-                      aria-disabled={rowIsOriginal}
-                      onClick={() => {
-                        if (rowIsOriginal) return;
-                        toggleShadowEditor(row.id);
-                      }}
-                      onKeyDown={(e) => {
-                        if (rowIsOriginal) return;
-                        iconKeyHandler(e, () => toggleShadowEditor(row.id));
-                      }}
-                    >
-                      <span className="icon icon-shadow" aria-hidden="true" />
-                      <span className="sr-only">Shadow settings</span>
-                    </div>
-                    <div
-                      className="icon-btn danger"
-                      role="button"
-                      tabIndex={0}
-                      title="Delete test"
-                      onClick={() => handleDeleteRow(row)}
-                      onKeyDown={(e) => iconKeyHandler(e, () => handleDeleteRow(row))}
-                    >
-                      <span className="icon icon-delete" aria-hidden="true" />
-                      <span className="sr-only">Delete</span>
+                      Save Row
                     </div>
                   </div>
-                </td>
-              </tr>
-              {shadowEditorRow === row.id && (
-                <tr key={`${row.id}-shadow`} className="mbh-shadow-row">
-                  <td colSpan={5}>
-                    <div className="mbh-shadow-editor">
-                      <label>
-                        Offset (L)
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="-?[0-9]*"
-                          value={
-                            row.draft_shadow_input?.l_offset ??
-                            (typeof row.draft_shadow.l_offset === "number"
-                              ? String(row.draft_shadow.l_offset)
-                              : "")
-                          }
-                          onChange={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
-                          onBlur={(e) => updateRowShadowDraft(row.id, "l_offset", e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Tint Preset
-                        <select
-                          value={
-                            (SHADOW_PRESETS.find((preset) =>
-                              preset.tint_hex === (row.draft_shadow.tint_hex || null) &&
-                              Math.round((preset.tint_opacity ?? 0) * 100) === Math.round((row.draft_shadow.tint_opacity ?? 0) * 100)
-                            )?.id) || "custom"
-                          }
-                          onChange={(e) => {
-                            const preset = SHADOW_PRESETS.find((p) => p.id === e.target.value);
-                            if (!preset) {
-                              updateRowShadowDraft(row.id, "tint_hex", row.draft_shadow.tint_hex);
-                              return;
-                            }
-                            updateRowShadowDraft(row.id, "tint_hex", preset.tint_hex);
-                            updateRowShadowDraft(row.id, "tint_opacity", preset.tint_opacity);
-                          }}
-                        >
-                          <option value="custom">Custom</option>
-                          {SHADOW_PRESETS.map((preset) => (
-                            <option key={preset.id} value={preset.id}>
-                              {preset.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        Tint Color
-                        <div className="mbh-shadow-color">
-                          <input
-                            type="color"
-                            value={row.draft_shadow.tint_hex || "#000000"}
-                            onChange={(e) => updateRowShadowDraft(row.id, "tint_hex", e.target.value)}
-                          />
-                          <div className="mbh-shadow-hex">{row.draft_shadow.tint_hex || "none"}</div>
-                          <div
-                            className="mbh-pill-btn ghost"
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => updateRowShadowDraft(row.id, "tint_hex", null)}
-                            onKeyDown={(e) => iconKeyHandler(e, () => updateRowShadowDraft(row.id, "tint_hex", null))}
-                          >
-                            Clear
-                          </div>
-                        </div>
-                      </label>
-                      <label>
-                        Tint %
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={Math.round((row.draft_shadow.tint_opacity || 0) * 100)}
-                          onChange={(e) =>
-                            updateRowShadowDraft(row.id, "tint_opacity", Math.max(0, Math.min(1, Number(e.target.value) / 100)))
-                          }
-                        />
-                      </label>
-                      <div className="mbh-shadow-buttons">
-                        <div
-                          className="mbh-pill-btn ghost"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => revertRowShadow(row.id)}
-                          onKeyDown={(e) => iconKeyHandler(e, () => revertRowShadow(row.id))}
-                        >
-                          Reset
-                        </div>
-                        <div
-                          className="mbh-pill-btn"
-                          role="button"
-                          tabIndex={savingRow === row.id ? -1 : 0}
-                          aria-disabled={savingRow === row.id}
-                          onClick={() => {
-                            if (savingRow === row.id) return;
-                            handleSaveRow(row);
-                          }}
-                          onKeyDown={(e) => {
-                            if (savingRow === row.id) return;
-                            iconKeyHandler(e, () => handleSaveRow(row));
-                          }}
-                        >
-                          Save Row
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </Fragment>
-              );
-            })}
-            {!loading && !rows.length && (
-              <tr>
-                <td colSpan={7} className="mbh-empty">
-                  No tests yet. Add a color above to get started.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </td>
+            </tr>
+          );
+        }}
+      />
+      {!loading && !rows.length && (
+        <div className="mbh-empty">No tests yet. Add a color above to get started.</div>
+      )}
     </div>
   );
 }

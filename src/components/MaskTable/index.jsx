@@ -10,6 +10,7 @@ export default function MaskTable({
   onDelete,
   onChangeMode,
   onChangeOpacity,
+  onChangeOffset,
   showRole = false,
   onClickColor,
 }) {
@@ -18,6 +19,7 @@ export default function MaskTable({
       (rows || []).map((row) => ({
         ...row,
         opacityPct: row.blend_opacity == null ? "" : Math.round(row.blend_opacity * 100),
+        shadowOffset: row.shadow_l_offset == null ? "" : row.shadow_l_offset,
         displayLightness:
           row.target_lightness != null
             ? Math.round(row.target_lightness)
@@ -30,14 +32,17 @@ export default function MaskTable({
     [rows]
   );
 
+  const showOffset = !!onChangeOffset;
+
   return (
-    <div className={`mask-table ${showRole ? "show-role" : ""}`}>
+    <div className={`mask-table ${showRole ? "show-role" : ""} ${showOffset ? "with-offset" : ""}`}>
       <div className="mask-table-header">
         {showRole && <div className="col role-col">Role</div>}
         <div className="col swatch-col">Color</div>
         <div className="col light-col">L</div>
         <div className="col mode-col">Mode</div>
         <div className="col pct-col">%</div>
+        {showOffset && <div className="col off-col">Off</div>}
         <div className="col actions-col">Actions</div>
       </div>
       <div className="mask-table-body">
@@ -92,6 +97,18 @@ export default function MaskTable({
                 onChange={(e) => onChangeOpacity && onChangeOpacity(row, e.target.value)}
               />
             </div>
+            {showOffset && (
+              <div className="col off-col">
+                <input
+                  type="number"
+                  min="-50"
+                  max="50"
+                  value={row.shadowOffset}
+                  onChange={(e) => onChangeOffset && onChangeOffset(row, e.target.value)}
+                  disabled={!onChangeOffset}
+                />
+              </div>
+            )}
             <div className="col actions-col">
               <div className="action-icons">
                 <button className="icon-btn" title="Apply" onClick={() => onApply && onApply(row)}>
@@ -140,6 +157,7 @@ MaskTable.propTypes = {
   onDelete: PropTypes.func,
   onChangeMode: PropTypes.func,
   onChangeOpacity: PropTypes.func,
+  onChangeOffset: PropTypes.func,
   showRole: PropTypes.bool,
   onClickColor: PropTypes.func,
 };
@@ -152,6 +170,7 @@ MaskTable.defaultProps = {
   onDelete: null,
   onChangeMode: null,
   onChangeOpacity: null,
+  onChangeOffset: null,
   showRole: false,
   onClickColor: null,
 };

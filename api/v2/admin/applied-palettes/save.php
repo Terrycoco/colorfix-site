@@ -165,6 +165,8 @@ try {
         if ($entity) {
             try {
                 $renderInfo = $renderService?->cacheAppliedPalette($entity);
+                $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 0, updated_at = NOW() WHERE id = :id")
+                    ->execute([':id' => $paletteId]);
             } catch (Throwable $renderEx) {
                 $renderError = $renderEx->getMessage();
             }

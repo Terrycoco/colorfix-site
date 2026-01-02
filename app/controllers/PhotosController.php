@@ -432,9 +432,13 @@ class PhotosController
         $map     = $payload['map'] ?? [];
         $mode    = strtolower((string)($payload['mode'] ?? 'match-lightness')); // match-lightness|softlight|keep-lightness
         $alpha   = (float)($payload['alpha'] ?? 0.9);
+        $overrides = $payload['overrides'] ?? [];
 
         if ($assetId === '' || !is_array($map) || !$map) {
             throw new \RuntimeException('asset_id and non-empty map are required');
+        }
+        if (!is_array($overrides)) {
+            $overrides = [];
         }
 
         // Normalize hex (role -> 6-digit hex, no #)
@@ -452,7 +456,7 @@ class PhotosController
         $repo = new PdoPhotoRepository($this->pdo);
         $svc  = new PhotoRenderingService($repo, $this->pdo);
 
-        $res = $svc->renderApplyMap($assetId, $hexMap, $mode, $alpha, []);
+        $res = $svc->renderApplyMap($assetId, $hexMap, $mode, $alpha, $overrides);
 
         // add absolute URL for convenience
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';

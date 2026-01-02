@@ -73,7 +73,7 @@ function PaletteMetaEditor({ palette, onPatched, isAdmin = true }) {
   }
 
   return (
-    <div className="panel" style={{ marginTop: 10 }}>
+    <div className="panel pi-meta-editor" style={{ marginTop: 10 }}>
       <div style={{ display: "grid", gap: 10 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input type="checkbox" checked={fav} onChange={(e)=>setFav(e.target.checked)} />

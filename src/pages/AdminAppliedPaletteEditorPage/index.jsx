@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
-import { buildPreviewAssignments, normalizeEntryForSave, cleanHex, normalizeShadowStruct } from "@helpers/maskRenderUtils";
-import MaskRoleGrid from "@components/MaskRoleGrid";
+import {
+  buildPreviewAssignments,
+  normalizeEntryForSave,
+  cleanHex,
+  normalizeShadowStruct,
+  getMaskBlendSettingForColor,
+  mergeMaskBlendSetting,
+} from "@helpers/maskRenderUtils";
+import MaskSettingsGrid from "@components/MaskSettingsGrid";
 import "./ap-editor.css";
 
 const GET_URL = `${API_FOLDER}/v2/admin/applied-palettes/get.php`;
@@ -11,18 +18,6 @@ const SAVE_NEW_URL = `${API_FOLDER}/v2/admin/applied-palettes/save.php`;
 const CLEAR_URL = `${API_FOLDER}/v2/admin/applied-palettes/clear-render.php`;
 const PREVIEW_URL = `${API_FOLDER}/v2/admin/applied-palettes/preview.php`;
 
-const BLEND_OPTIONS = [
-  { value: "", label: "Default" },
-  { value: "colorize", label: "Colorize" },
-  { value: "hardlight", label: "Hard Light" },
-  { value: "softlight", label: "Soft Light" },
-  { value: "overlay", label: "Overlay" },
-  { value: "multiply", label: "Multiply" },
-  { value: "screen", label: "Screen" },
-  { value: "luminosity", label: "Luminosity" },
-  { value: "flatpaint", label: "Flat Paint" },
-  { value: "original", label: "Original Photo" },
-];
 
 export default function AdminAppliedPaletteEditorPage() {
   const { paletteId } = useParams();
@@ -53,6 +48,8 @@ export default function AdminAppliedPaletteEditorPage() {
   const [savedImageError, setSavedImageError] = useState(false);
   const [previewImage, setPreviewImage] = useState({ url: "", ts: 0, error: "" });
   const [fullPreviewUrl, setFullPreviewUrl] = useState("");
+  const [blendSettingsByMask, setBlendSettingsByMask] = useState({});
+  const blendSettingsPendingRef = useRef({});
 
   useEffect(() => {
     if (!paletteId) return;
@@ -104,6 +101,29 @@ export default function AdminAppliedPaletteEditorPage() {
     }
   }, [previewAssignments]);
 
+  useEffect(() => {
+    if (!palette?.asset_id) return;
+    const maskRoles = Object.keys(entryMap || {});
+    if (!maskRoles.length) return;
+    maskRoles.forEach((maskRole) => {
+      if (blendSettingsByMask[maskRole]) return;
+      loadMaskBlendSettings(maskRole);
+    });
+  }, [palette?.asset_id, entryMap, blendSettingsByMask]);
+
+  useEffect(() => {
+    if (!palette?.asset_id) return;
+    if (!Object.keys(entryMap || {}).length) return;
+    const synced = applyGlobalBlendSettings(entryMap, blendSettingsByMask);
+    if (synced !== entryMap) {
+      const baselineSame = serializeEntryMap(entryMap) === serializeEntryMap(entryBaseline);
+      setEntryMap(synced);
+      if (baselineSame) {
+        setEntryBaseline(cloneEntryMap(synced));
+      }
+    }
+  }, [palette?.asset_id, entryMap, entryBaseline, blendSettingsByMask]);
+
   const renderUrl = renderInfo?.render_rel_path ? `${origin}${renderInfo.render_rel_path}` : null;
   const hasThumb = renderInfo?.render_thumb_rel_path;
   const previewMap = previewAssignments;
@@ -149,6 +169,9 @@ export default function AdminAppliedPaletteEditorPage() {
         needs_rerender: !!data.palette?.needs_rerender,
       });
       setRenderInfo(renderInfoFromPalette(data.palette));
+      setPreviewMode("saved");
+      setPreviewAssignments({});
+      setPreviewImage({ url: "", ts: 0, error: "" });
       setClearStatus("");
       setClearError("");
       if (data.palette?.asset_id) {
@@ -159,6 +182,30 @@ export default function AdminAppliedPaletteEditorPage() {
     } finally {
       if (!silent) setLoading(false);
     }
+  }
+
+  async function loadMaskBlendSettings(maskRole) {
+    if (!palette?.asset_id || !maskRole) return [];
+    if (blendSettingsPendingRef.current[maskRole]) {
+      return blendSettingsPendingRef.current[maskRole];
+    }
+    const assetId = palette.asset_id;
+    const promise = fetch(
+      `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(maskRole)}&${Date.now()}`,
+      { credentials: "include", cache: "no-store" }
+    )
+      .then((r) => r.json())
+      .then((data) => (data?.ok && Array.isArray(data.settings) ? data.settings : []))
+      .catch(() => []);
+    blendSettingsPendingRef.current[maskRole] = promise;
+    const settings = await promise;
+    blendSettingsPendingRef.current[maskRole] = null;
+    setBlendSettingsByMask((prev) => ({
+      ...(prev || {}),
+      [maskRole]: settings,
+    }));
+    setEntryMap((prev) => applyGlobalBlendSettings(prev, { [maskRole]: settings }));
+    return settings;
   }
 
   async function fetchAsset(assetId) {
@@ -213,21 +260,33 @@ export default function AdminAppliedPaletteEditorPage() {
     const normalized = color ? normalizeColor(color) : null;
     const targetL =
       normalized?.lightness ?? normalized?.lab_l ?? normalized?.hcl_l ?? null;
-    updateEntry(mask, { color: normalized, target_lightness: targetL });
+    updateEntry(mask, { color: normalized, target_lightness: targetL, _global_synced: false });
+    const colorId = normalized?.id || normalized?.color_id;
+    const settings = getMaskBlendSettingForColor(blendSettingsByMask[mask], colorId);
+    if (settings) {
+      setEntryMap((prev) => {
+        const current = prev[mask] || makeEmptyEntry(mask);
+        const merged = mergeMaskBlendSetting(current, settings);
+        return {
+          ...prev,
+          [mask]: { ...merged, _global_synced: true },
+        };
+      });
+    }
   }
 
   function handleBlendChange(mask, mode) {
-    updateEntry(mask, { blend_mode: mode || "" });
+    updateEntry(mask, { blend_mode: mode || "", _global_synced: true });
   }
 
   function handleOpacityChange(mask, value) {
     const num = value === "" ? null : clampNumber(Number(value) / 100, 0, 1);
-    updateEntry(mask, { blend_opacity: num });
+    updateEntry(mask, { blend_opacity: num, _global_synced: true });
   }
 
   function handleShadowOffset(mask, value) {
     const num = value === "" ? null : clampNumber(Number(value), -50, 50);
-    updateEntry(mask, { shadow_l_offset: num });
+    updateEntry(mask, { shadow_l_offset: num, _global_synced: true });
   }
 
   function handleShadowEdit(mask) {
@@ -246,6 +305,7 @@ export default function AdminAppliedPaletteEditorPage() {
     updateEntry(mask, {
       shadow_l_offset: offsetNum,
       shadow_tint_opacity: tintNum != null ? tintNum / 100 : null,
+      _global_synced: true,
     });
   }
 
@@ -582,7 +642,7 @@ export default function AdminAppliedPaletteEditorPage() {
               <div className="ap-panel__title">Masks</div>
               <div className="ap-panel__meta">{assignedCount}/{maskRows.length} assigned</div>
             </div>
-          <MaskRoleGrid
+          <MaskSettingsGrid
             masks={maskRows}
             entries={entryMap}
             onChange={(maskRole, updates) => {
@@ -788,6 +848,7 @@ function mapEntriesToState(entries) {
         : null;
     norm.mask_setting_id = entry.mask_setting_id || null;
     norm.mask_setting_revision = entry.mask_setting_revision || null;
+    norm._global_synced = false;
     map[norm.mask_role] = norm;
   });
   return map;
@@ -826,6 +887,45 @@ function serializeEntryMap(map) {
       };
     });
   return JSON.stringify(rows);
+}
+
+function applyGlobalBlendSettings(entryMap, settingsByMask) {
+  const next = { ...entryMap };
+  let changed = false;
+  Object.keys(next || {}).forEach((maskRole) => {
+    const entry = next[maskRole];
+    if (!entry || entry._global_synced) return;
+    const colorId = entry.color?.id || entry.color_id;
+    if (!colorId) {
+      if (entry._global_synced !== true) {
+        next[maskRole] = { ...entry, _global_synced: true };
+        changed = true;
+      }
+      return;
+    }
+    const setting = getMaskBlendSettingForColor(settingsByMask?.[maskRole], colorId);
+    if (!setting) {
+      next[maskRole] = { ...entry, _global_synced: true };
+      changed = true;
+      return;
+    }
+    const merged = mergeMaskBlendSetting(entry, setting);
+    const hasChange =
+      merged.blend_mode !== entry.blend_mode ||
+      merged.blend_opacity !== entry.blend_opacity ||
+      merged.shadow_l_offset !== entry.shadow_l_offset ||
+      merged.shadow_tint_hex !== entry.shadow_tint_hex ||
+      merged.shadow_tint_opacity !== entry.shadow_tint_opacity ||
+      merged.target_lightness !== entry.target_lightness ||
+      merged.target_h !== entry.target_h ||
+      merged.target_c !== entry.target_c ||
+      entry._global_synced !== true;
+    if (hasChange) {
+      next[maskRole] = { ...merged, _global_synced: true };
+      changed = true;
+    }
+  });
+  return changed ? next : entryMap;
 }
 
 function renderInfoFromPalette(palette) {

@@ -1,54 +1,48 @@
 <?php
 declare(strict_types=1);
 
+use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoPlaylistRepository;
 
 require_once __DIR__ . '/../api/autoload.php';
+require_once __DIR__ . '/../api/db.php';
 
-$playlistId = (int)($_GET['id'] ?? 0);
-if ($playlistId <= 0) {
+$instanceId = (int)($_GET['id'] ?? 0);
+if ($instanceId <= 0) {
     http_response_code(404);
-    exit('Missing playlist id');
+    exit('Missing playlist instance id');
 }
 
-$repo = new PdoPlaylistRepository();
-$playlist = $repo->getById((string)$playlistId);
-
-if (!$playlist) {
+$instanceRepo = new PdoPlaylistInstanceRepository($pdo);
+$instance = $instanceRepo->getById($instanceId);
+if (!$instance) {
     http_response_code(404);
-    exit('Playlist not found');
+    exit('Playlist instance not found');
 }
 
-
-// If you stored meta directly on the definition array in the repo
-$meta = $definition['meta'] ?? [];
-
-// Respect share_enabled
-if (($meta['share_enabled'] ?? true) === false) {
+if ($instance->shareEnabled === false) {
     http_response_code(404);
     exit;
 }
 
-// Resolve share fields with fallbacks
-$title = $meta['share_title'] ?? $playlist->title;
-$description = $meta['share_description'] ?? '';
-$image = $meta['share_image_url'] ?? '';
-
-// Resolve share meta
-$meta = $playlist->meta;
-
-if (($meta['share_enabled'] ?? true) === false) {
-    http_response_code(404);
-    exit;
+$playlistTitle = 'Playlist';
+try {
+    $playlistRepo = new PdoPlaylistRepository($pdo);
+    $playlist = $playlistRepo->getById((string)$instance->playlistId);
+    if ($playlist) {
+        $playlistTitle = $playlist->title;
+    }
+} catch (\Throwable $e) {
+    // Non-fatal: keep fallback title.
 }
 
-$title = $meta['share_title'] ?? $playlist->title;
-$description = $meta['share_description'] ?? '';
-$image = $meta['share_image_url'] ?? '';
+$title = $instance->shareTitle ?: $playlistTitle;
+$description = $instance->shareDescription ?? '';
+$image = $instance->shareImageUrl ?? '';
 
 $host = $_SERVER['HTTP_HOST'];
-$shareUrl = "https://{$host}/share/playlist/{$playlistId}";
-$appPath = "/playlist/{$playlistId}";
+$shareUrl = "https://{$host}/share/playlist.php?id={$instanceId}";
+$appPath = "/playlist/{$instanceId}";
 
 $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
 $descEsc  = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');

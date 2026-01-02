@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\lib;
+namespace App\Lib;
 
 /**
  * ColorCompute: derive LAB, LCh (HCL), HSL from hex/RGB.
@@ -116,7 +116,7 @@ final class ColorCompute
     }
 
 
-// Add inside App\lib\ColorCompute class
+// Add inside App\Lib\ColorCompute class
 
 /** Convert CIE L*a*b* (D65) to sRGB integers (0–255). */
 public static function labToRgb(float $L, float $a, float $b): array

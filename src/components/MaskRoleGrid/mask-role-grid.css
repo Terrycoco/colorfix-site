@@ -13,6 +13,10 @@
   border: 1px solid #e5e5e5;
   border-radius: 8px;
   background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
   width: 100%;
   box-sizing: border-box;
 }
@@ -30,4 +34,8 @@
 .color-editor-bar .fuzzy-dropdown {
   flex: 1 1 220px;
   max-width: 100%;
+}
+
+body.photo-fullscreen .color-editor-bar {
+  visibility: hidden;
 }

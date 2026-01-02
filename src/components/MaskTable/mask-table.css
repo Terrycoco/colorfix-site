@@ -144,6 +144,17 @@
   grid-template-columns: 0.7fr 1.6fr 0.5fr 1fr 0.6fr 1.4fr;
 }
 
+.mask-table.with-offset .mask-table-header,
+.mask-table.with-offset .mask-table-row {
+  grid-template-columns: 1.5fr 0.55fr 0.8fr 0.55fr 0.55fr 0.8fr;
+}
+
+.mask-table.show-role.with-offset .mask-table-header,
+.mask-table.show-role.with-offset .mask-table-row {
+  grid-template-columns: 0.7fr 1.6fr 0.5fr 1fr 0.6fr 0.6fr 1.2fr;
+}
+
+
 .mask-table .swatch-meta .swatch-brand {
   display: flex;
   gap: 6px;

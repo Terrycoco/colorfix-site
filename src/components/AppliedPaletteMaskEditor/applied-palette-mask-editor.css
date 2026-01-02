@@ -1,0 +1,20 @@
+.ap-mask-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ap-mask-editor__row {
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+}
+
+.ap-mask-editor__row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.ap-mask-editor__empty {
+  font-size: 14px;
+  color: #666;
+}

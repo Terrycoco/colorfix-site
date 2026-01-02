@@ -40,6 +40,8 @@ const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
 const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
+const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
+const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
@@ -195,6 +197,18 @@ function AppRouter() {
             <Route
               path="player-preview/:playlistId/:start"
               element={renderWithSuspense(AdminPlayerPage, 'Loading player preview…')}
+            />
+            <Route
+              path="playlist-instances"
+              element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances…')}
+            />
+            <Route
+              path="playlists/:playlistId"
+              element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor…')}
+            />
+            <Route
+              path="playlists/new"
+              element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor…')}
             />
           </Route>
 

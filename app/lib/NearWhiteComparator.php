@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\lib;
+namespace App\Lib;
 
 /**
  * Experimental distance for near-whites.
@@ -30,7 +30,7 @@ final class NearWhiteComparator
         float $L1, float $a1, float $b1,
         float $L2, float $a2, float $b2
     ): array {
-        $dE = \App\lib\ColorDelta::deltaE2000($L1,$a1,$b1,$L2,$a2,$b2);
+        $dE = \App\Lib\ColorDelta::deltaE2000($L1,$a1,$b1,$L2,$a2,$b2);
         $nw = self::whiteAwareDistance($L1,$a1,$b1,$L2,$a2,$b2);
         return [$dE, $nw];
     }
@@ -98,7 +98,7 @@ final class NearWhiteComparator
     }
 
 
-// In App\lib\NearWhiteComparator (add this method)
+// In App\Lib\NearWhiteComparator (add this method)
 
 public static function combinedHueFirstKeyForWhiteSeed(
     float $L1, float $a1, float $b1,
@@ -110,7 +110,7 @@ public static function combinedHueFirstKeyForWhiteSeed(
 
     $nearWhite = ($L1 >= self::L_MIN) && ($C1 <= self::C_MAX);
 
-    $de00 = \App\lib\ColorDelta::deltaE2000($L1,$a1,$b1,$L2,$a2,$b2);
+    $de00 = \App\Lib\ColorDelta::deltaE2000($L1,$a1,$b1,$L2,$a2,$b2);
     if ($nearWhite) {
         $dh = self::hueDiffDeg($h1, $h2);   // 0..180 degrees, shorter arc
         return [$dh, $de00];                // hue first, then ΔE00

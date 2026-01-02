@@ -1,27 +1,27 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import PlayerEndScreen from "./PlayerEndScreen";
+import { forwardRef, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import "./player.css";
 
-export default function Player({
-  items = [],
+const Player = forwardRef(function Player({
+  slides = [],
   startIndex = 0,
-  onFinished,
   onAbort,
-  onLikesSnapshot,
+  onLikeChange,
+  onPlaybackEnd,
   embedded = false,
-  showReplay = true,
-  endScreen = null,
-}) {
-  const safeStart = useMemo(() => {
-    if (!Array.isArray(items) || !items.length) return 0;
-    const parsed = Number(startIndex);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed >= items.length) return 0;
-    return parsed;
-  }, [items, startIndex]);
+}, ref) {
+  const allItems = Array.isArray(slides) ? slides : [];
+
+
+  const safeStart = Math.min(
+    Math.max(0, Number(startIndex) || 0),
+    Math.max(0, allItems.length - 1)
+  );
+
 
   const [activeIndex, setActiveIndex] = useState(safeStart);
-  const [mode, setMode] = useState("playing"); // "playing" | "end"
+  const [playbackState, setPlaybackState] = useState("playing"); // "playing" | "end"
+  const [playbackMode, setPlaybackMode] = useState("all"); // "all" | "liked"
   const [titleIndex, setTitleIndex] = useState(safeStart);
   const [titleVisible, setTitleVisible] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -33,19 +33,24 @@ export default function Player({
   const [starPos, setStarPos] = useState({ left: 0, top: 0 });
   const [likedSet, setLikedSet] = useState(() => new Set());
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
+  const [cacheBustEnabled, setCacheBustEnabled] = useState(true);
   const didInitRef = useRef(false);
+  const endEmitRef = useRef(null);
   const currentImgRef = useRef(null);
   const stageRef = useRef(null);
   const titleRef = useRef(null);
+  const didLikeInteractRef = useRef(false);
   const cacheBustRef = useRef(Date.now());
+
 
   useEffect(() => {
     if (!didInitRef.current) {
       didInitRef.current = true;
       return;
     }
+    setPlaybackMode("all");
+    setPlaybackState("playing");
     setActiveIndex(safeStart);
-    setMode("playing");
     setTitleIndex(safeStart);
     setTitleVisible(false);
     setImageLoaded(false);
@@ -55,26 +60,47 @@ export default function Player({
     setTitleFull(false);
   }, [safeStart]);
 
+  useEffect(() => {
+    cacheBustRef.current = Date.now();
+    setCacheBustEnabled(true);
+  }, [slides]);
+
+  function isItemStarrable(item) {
+    if (!item) return false;
+    const itemType = (item.type || "normal").toLowerCase();
+    if (itemType === "intro" || itemType === "text") return false;
+    return item.star === true || item.star === 1 || item.star === "1";
+  }
+
   function getItemKey(item) {
     if (!item) return null;
-    const itemType = (item.type || "normal").toLowerCase();
-    if (itemType === "intro" || itemType === "text") return null;
-    if (item.star !== true) return null;
+    if (!isItemStarrable(item)) return null;
     const apId = item.ap_id ?? null;
     if (apId === null || apId === undefined || apId === "") return null;
     return String(apId);
   }
 
-  function emitLikesSnapshot() {
-    if (!onLikesSnapshot) return;
-    onLikesSnapshot(Array.from(likedSet));
-  }
+  const playItems = useMemo(() => {
+    if (playbackMode !== "liked") return allItems;
+    return (allItems || []).filter((item) => {
+      const key = getItemKey(item);
+      return key && likedSet.has(key);
+    });
+  }, [allItems, playbackMode, likedSet]);
+
+useEffect(() => {
+  if (!onLikeChange) return;
+  if (!didLikeInteractRef.current) return;
+  onLikeChange({ likedCount: likedSet.size });
+}, [likedSet.size, onLikeChange]);
+
 
   function handleAdvance() {
-    if (!items.length) return;
+    if (playbackState !== "playing") return;
+    if (!playItems.length) return;
 
-    if (activeIndex >= items.length - 1) {
-      setMode("end");
+    if (activeIndex >= playItems.length - 1) {
+      setPlaybackState("end");
       return;
     }
 
@@ -89,46 +115,58 @@ export default function Player({
     setTitleFull(false);
   }
 
-  function handleReplay() {
-    emitLikesSnapshot();
-    setActiveIndex(firstPlayableIndex);
-    setMode("playing");
-    setTitleVisible(false);
-    setImageLoaded(false);
-    setFadeReady(false);
-    setTitleIndex(firstPlayableIndex);
-    setPrevIndex(null);
-    setIsFading(false);
-    setTitleFull(false);
-  }
+function startPlayback(nextMode, nextIndex = 0) {
+  setPlaybackMode(nextMode);
+  setPlaybackState("playing");
+  setTitleVisible(false);
+  setImageLoaded(false);
+  setFadeReady(false);
+  setTitleIndex(nextIndex);
+  setPrevIndex(null);
+  setIsFading(false);
+  setTitleFull(false);
+  setActiveIndex(nextIndex);
+}
+
+
+  useImperativeHandle(ref, () => ({
+    replay: ({ likedOnly = false, startIndex: nextIndex = 0 } = {}) => {
+      setCacheBustEnabled(false);
+      const baseItems = likedOnly
+        ? (allItems || []).filter((item) => {
+            const key = getItemKey(item);
+            return key && likedSet.has(key);
+          })
+        : allItems;
+      const clampedIndex = Math.min(
+        Math.max(0, Number(nextIndex) || 0),
+        Math.max(0, baseItems.length - 1)
+      );
+      startPlayback(likedOnly ? "liked" : "all", clampedIndex);
+    },
+  }));
 
   const currentIndex = activeIndex;
-  const currentItem = items[currentIndex] || null;
-  const prevItem = prevIndex != null ? items[prevIndex] || null : null;
-  const title = items[titleIndex]?.title || "";
-  const subtitle = (items[titleIndex]?.subtitle || "").trim();
-  const titleMode = items[titleIndex]?.title_mode || "animated";
+  const currentItem = playItems[currentIndex] || null;
+  const prevItem = prevIndex != null ? playItems[prevIndex] || null : null;
+  const title = playItems[titleIndex]?.title || "";
+  const subtitle = (playItems[titleIndex]?.subtitle || "").trim();
+  const titleMode = playItems[titleIndex]?.title_mode || "animated";
   const subtitleOffset = subtitle ? 0 : 18;
   const currentType = (currentItem?.type || "normal").toLowerCase();
   const isIntro = currentType === "intro" || currentType === "text";
+  const introNoImage = isIntro && !currentItem?.image_url;
   const introLayoutKey = isIntro
     ? ((currentItem?.layout || "").toString().toLowerCase().trim() || (currentType === "text" ? "text" : "default"))
     : null;
   const IntroRenderer = isIntro ? getIntroLayout(introLayoutKey) : null;
-  const isStarrable = currentItem?.star === true;
+  const isStarrable = isItemStarrable(currentItem);
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
-  const firstPlayableIndex = useMemo(() => {
-    if (!items.length) return 0;
-    const idx = items.findIndex((item) => {
-      const t = (item?.type || "normal").toLowerCase();
-      return t !== "intro" && t !== "text";
-    });
-    return idx >= 0 ? idx : 0;
-  }, [items]);
 
   function withCacheBust(url) {
     if (!url) return url;
+    if (!cacheBustEnabled) return url;
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}v=${cacheBustRef.current}`;
   }
@@ -147,17 +185,37 @@ export default function Player({
       } else {
         next.add(currentKey);
       }
+      didLikeInteractRef.current = true;
       return next;
     });
   }
 
-  function handleEndActionCapture(e) {
-    const target = e.target;
-    if (!target || !(target instanceof Element)) return;
-    const actionable = target.closest("button,[role=\"button\"],a,[data-player-cta=\"true\"]");
-    if (!actionable) return;
-    emitLikesSnapshot();
-  }
+  useEffect(() => {
+    if (!playItems.length) {
+      setPlaybackState("end");
+      return;
+    }
+    if (activeIndex >= playItems.length) {
+      setActiveIndex(0);
+      setTitleIndex(0);
+      setPrevIndex(null);
+      setIsFading(false);
+    }
+  }, [playItems, activeIndex]);
+
+  useEffect(() => {
+    if (playbackState !== "end") return;
+    if (!onPlaybackEnd) return;
+    const signature = `${playbackMode}:${likedSet.size}`;
+    if (endEmitRef.current === signature) return;
+    endEmitRef.current = signature;
+    onPlaybackEnd({ likedCount: likedSet.size });
+  }, [playbackState, onPlaybackEnd, likedSet.size]);
+
+  useEffect(() => {
+    if (playbackState === "end") return;
+    endEmitRef.current = null;
+  }, [playbackState]);
 
   function updateOverlayPositions(imgEl, stageEl) {
     if (!imgEl || !stageEl) return;
@@ -229,11 +287,6 @@ export default function Player({
   }, [isFading, fadeReady]);
 
   useEffect(() => {
-    if (mode !== "end") return;
-    emitLikesSnapshot();
-  }, [mode]);
-
-  useEffect(() => {
     function handleResize() {
       if (typeof window !== "undefined") {
         const portrait = window.matchMedia("(max-width: 768px) and (orientation: portrait)").matches;
@@ -260,7 +313,7 @@ export default function Player({
       requestAnimationFrame(() => setFadeReady(true));
       updateOverlayPositions(img, stageRef.current);
     }
-  }, [currentIndex, items, imageLoaded]);
+  }, [currentIndex, playItems, imageLoaded]);
 
   return (
     <div className={`player-root${embedded ? " player-embedded" : ""}`}>
@@ -272,123 +325,117 @@ export default function Player({
         ×
       </button>
 
-      {mode === "playing" && (
-  <div
-    className="player-stage"
-    ref={stageRef}
-    onClick={handleAdvance}
-    role="button"
-    tabIndex={0}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        handleAdvance();
-      }
-    }}
-  >
-    <div className="player-image-frame">
-      {prevItem?.image_url && (
-        <img
-          key={`prev-${prevIndex}-${prevItem.image_url}`}
-          src={withCacheBust(prevItem.image_url)}
-          alt=""
-          className={`player-image is-prev${fadeReady ? " fade-out is-ready" : ""}`}
-        />
-      )}
-      {currentItem?.image_url && (
-        <img
-          key={`cur-${currentIndex}-${currentItem.image_url}`}
-          src={withCacheBust(currentItem.image_url)}
-          alt={currentItem.title || ""}
-          className={`player-image is-current${isFading ? " fade-in" : ""}${fadeReady ? " is-ready" : ""}`}
-          ref={currentImgRef}
-          onLoad={(e) => {
-            setImageLoaded(true);
-            requestAnimationFrame(() => setFadeReady(true));
-            updateOverlayPositions(e.currentTarget, stageRef.current);
-          }}
-        />
-      )}
-      {mode === "playing" && !isIntro && isStarrable && (
-        <div
-          className={`player-like ${isLiked ? "is-liked" : ""}`}
-          role="button"
-          aria-pressed={isLiked}
-          aria-label={isLiked ? "Unlike" : "Like"}
-          onPointerDown={(e) => {
+      <div
+        className="player-stage"
+        ref={stageRef}
+        onClick={handleAdvance}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            e.stopPropagation();
-          }}
-          onPointerUp={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleLike(e);
-          }}
-          style={{ left: starPos.left, top: starPos.top }}
-        >
-          <svg
-            className="player-like-icon"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <path
-              className="player-like-stroke-back"
-              d="M12 2.5l2.9 5.88 6.5.95-4.7 4.58 1.1 6.49L12 17.9l-5.8 3.05 1.1-6.49-4.7-4.58 6.5-.95L12 2.5z"
+            handleAdvance();
+          }
+        }}
+      >
+        <div className="player-image-frame">
+          {prevItem?.image_url && (
+            <img
+              key={`prev-${prevIndex}-${prevItem.image_url}`}
+              src={withCacheBust(prevItem.image_url)}
+              alt=""
+              className={`player-image is-prev${fadeReady ? " fade-out is-ready" : ""}`}
             />
-            <path
-              className="player-like-stroke-front"
-              d="M12 2.5l2.9 5.88 6.5.95-4.7 4.58 1.1 6.49L12 17.9l-5.8 3.05 1.1-6.49-4.7-4.58 6.5-.95L12 2.5z"
+          )}
+          {currentItem?.image_url && (
+            <img
+              key={`cur-${currentIndex}-${currentItem.image_url}`}
+              src={withCacheBust(currentItem.image_url)}
+              alt={currentItem.title || ""}
+              className={`player-image is-current${isFading ? " fade-in" : ""}${fadeReady ? " is-ready" : ""}`}
+              ref={currentImgRef}
+              onLoad={(e) => {
+                setImageLoaded(true);
+                requestAnimationFrame(() => setFadeReady(true));
+                updateOverlayPositions(e.currentTarget, stageRef.current);
+              }}
             />
-          </svg>
-        </div>
-      )}
-
-      {titleVisible && isIntro && IntroRenderer && (
-        <div
-          className="player-title is-static"
-          style={{
-            left: titlePos.left,
-            top: Math.max(0, titlePos.top - subtitleOffset),
-          }}
-          ref={titleRef}
-        >
-          <Suspense fallback={null}>
-            <IntroRenderer item={currentItem} />
-          </Suspense>
-        </div>
-      )}
-
-      {title && titleVisible && !isIntro && (
-        <div
-          className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}`}
-          style={{
-            left: titlePos.left,
-            top: Math.max(0, titlePos.top - subtitleOffset),
-          }}
-          ref={titleRef}
-        >
-          <span className="player-title-text">{title}</span>
-          {subtitle && <span className="player-subtitle-text">{subtitle}</span>}
-        </div>
-      )}
-    </div>
-  </div>
-)}
-
-      {mode === "end" && (
-        <PlayerEndScreen showReplay={showReplay} onReplay={handleReplay}>
-          {endScreen ? (
-            <div onClickCapture={handleEndActionCapture}>
-              {endScreen}
+          )}
+          {playbackState === "playing" && !isIntro && isStarrable && (
+            <div
+              className={`player-like ${isLiked ? "is-liked" : ""}`}
+              role="button"
+              aria-pressed={isLiked}
+              aria-label={isLiked ? "Unlike" : "Like"}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onPointerUp={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleLike(e);
+              }}
+              style={{ left: starPos.left, top: starPos.top }}
+            >
+              <svg
+                className="player-like-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  className="player-like-stroke-back"
+                  d="M12 2.5l2.9 5.88 6.5.95-4.7 4.58 1.1 6.49L12 17.9l-5.8 3.05 1.1-6.49-4.7-4.58 6.5-.95L12 2.5z"
+                />
+                <path
+                  className="player-like-stroke-front"
+                  d="M12 2.5l2.9 5.88 6.5.95-4.7 4.58 1.1 6.49L12 17.9l-5.8 3.05 1.1-6.49-4.7-4.58 6.5-.95L12 2.5z"
+                />
+              </svg>
             </div>
-          ) : null}
-        </PlayerEndScreen>
-      )}
+          )}
+
+          {titleVisible && isIntro && IntroRenderer && (
+            <div
+              className={`player-title is-static${introNoImage ? " is-intro-full" : ""}`}
+              style={
+                introNoImage
+                  ? undefined
+                  : {
+                      left: titlePos.left,
+                      top: Math.max(0, titlePos.top - subtitleOffset),
+                    }
+              }
+              ref={titleRef}
+            >
+              <Suspense fallback={null}>
+                <IntroRenderer item={currentItem} />
+              </Suspense>
+            </div>
+          )}
+
+          {title && titleVisible && !isIntro && (
+            <div
+              className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}`}
+              style={{
+                left: titlePos.left,
+                top: Math.max(0, titlePos.top - subtitleOffset),
+              }}
+              ref={titleRef}
+            >
+              <span className="player-title-text">{title}</span>
+              {subtitle && <span className="player-subtitle-text">{subtitle}</span>}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
-}
+});
+
+export default Player;

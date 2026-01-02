@@ -9,6 +9,29 @@
   margin: 8px 0 6px;
 }
 
+.ap-title-editor {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.ap-title-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ap-title-editor input {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-width: 260px;
+}
+
 .app-bar {
   display: flex;
   align-items: center;

@@ -166,6 +166,15 @@
   padding: 4px 6px;
 }
 
+.mbh-table .col-role {
+  width: 90px;
+}
+.mbh-role {
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .mbh-table .col-offset {
   width: 45px;
 }

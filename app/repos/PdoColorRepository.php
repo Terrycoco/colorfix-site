@@ -316,7 +316,7 @@ public function nearestColorCandidates(array $opts): array
             $A = (float)$r['lab_a'];
             $B = (float)$r['lab_b'];
 
-            [$k1, $k2] = \App\lib\NearWhiteComparator::combinedHueFirstKeyForWhiteSeed($aL0,$aA0,$aB0,$L,$A,$B);
+            [$k1, $k2] = \App\Lib\NearWhiteComparator::combinedHueFirstKeyForWhiteSeed($aL0,$aA0,$aB0,$L,$A,$B);
             $r['__k1'] = (float)$k1;
             $r['__k2'] = (float)$k2;
         }

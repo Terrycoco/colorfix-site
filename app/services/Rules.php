@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace App\services;
 
 use App\entities\Color;
-use App\lib\ColorDelta;
-use App\lib\NearWhiteComparator;
+use App\Lib\ColorDelta;
+use App\Lib\NearWhiteComparator;
 
 final class Rules
 {

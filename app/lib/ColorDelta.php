@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\lib;
+namespace App\Lib;
 
 /**
  * CIEDE2000 ΔE for LAB colors.

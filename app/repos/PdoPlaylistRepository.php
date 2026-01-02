@@ -6,184 +6,114 @@ namespace App\Repos;
 use App\Entities\Playlist;
 use App\Entities\PlaylistItem;
 use App\Entities\PlaylistStep;
+use PDO;
 
 class PdoPlaylistRepository
 {
+    public function __construct(
+        private PDO $pdo
+    ) {}
+
     public function getById(string $playlistId): ?Playlist
     {
-        foreach ($this->getPlaylistDefinitions() as $definition) {
-            if ($definition['playlist_id'] !== $playlistId) {
-                continue;
-            }
-
-            $steps = [];
-            foreach ($definition['steps'] as $stepDef) {
-                $items = [];
-                foreach ($stepDef['items'] as $itemDef) {
-                    $items[] = new PlaylistItem(
-                        (string)($itemDef['ap_id'] ?? ''),
-                        $itemDef['image_url'],
-                        $itemDef['title'] ?? null,
-                        $itemDef['subtitle'] ?? null,
-                        $itemDef['type'] ?? null,
-                        isset($itemDef['star']) ? (bool)$itemDef['star'] : null,
-                        $itemDef['layout'] ?? null,
-                        $itemDef['transition'] ?? null,
-                        $itemDef['duration_ms'] ?? null,
-                        $itemDef['title_mode'] ?? null
-                    );
-                }
-
-                $steps[] = new PlaylistStep(
-                    $stepDef['step_id'],
-                    (bool) $stepDef['is_group'],
-                    $items
-                );
-            }
-
-         return new Playlist(
-                $definition['playlist_id'],
-                $definition['type'],
-                $definition['title'],
-                $steps,
-                $definition['meta'] ?? []
-            );
+        $meta = $this->getPlaylistMeta($playlistId);
+        if ($meta === null) {
+            return null;
         }
 
-        return null;
+        $items = $this->getItemsFromDb($playlistId) ?? [];
+
+        return new Playlist(
+            $playlistId,
+            $meta['type'],
+            $meta['title'],
+            [
+                new PlaylistStep('all', false, $items),
+            ],
+            []
+        );
     }
 
     /**
-     * ==========================================================
-     * PLAYLIST DEFINITIONS
-     * EDIT HERE TO ADD / MODIFY PLAYLISTS
-     * ==========================================================
+     * @return PlaylistItem[]|null
      */
-    private function getPlaylistDefinitions(): array
+    private function getItemsFromDb(string $playlistId): ?array
     {
+        $sql = <<<SQL
+            SELECT
+                playlist_item_id,
+                playlist_id,
+                order_index,
+                ap_id,
+                image_url,
+                title,
+                subtitle,
+                item_type,
+                layout,
+                title_mode,
+                star,
+                transition,
+                duration_ms
+            FROM playlist_items
+            WHERE playlist_id = :playlist_id
+              AND is_active = 1
+            ORDER BY order_index ASC
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['playlist_id' => (int)$playlistId]);
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!$rows) {
+            return null;
+        }
+
+        $items = [];
+        foreach ($rows as $row) {
+            $star = null;
+            if (array_key_exists('star', $row)) {
+                $star = $row['star'] === null ? null : (bool)$row['star'];
+            }
+
+            $items[] = new PlaylistItem(
+                (string)($row['ap_id'] ?? ''),
+                $row['image_url'] ?? null,
+                $row['title'] ?? null,
+                $row['subtitle'] ?? null,
+                $row['item_type'] ?? null,
+                $star,
+                $row['layout'] ?? null,
+                $row['transition'] ?? null,
+                $row['duration_ms'] !== null ? (int)$row['duration_ms'] : null,
+                $row['title_mode'] ?? null
+            );
+        }
+
+        return $items;
+    }
+
+    private function getPlaylistMeta(string $playlistId): ?array
+    {
+        $sql = <<<SQL
+            SELECT playlist_id, title, type
+            FROM playlists
+            WHERE playlist_id = :playlist_id
+              AND is_active = 1
+            LIMIT 1
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['playlist_id' => (int)$playlistId]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
         return [
-            [
-                'playlist_id' => '1',
-                'type' => 'test',
-                'title' => 'Test Four',
-                'end_screen_layout' => 'default',
-                'steps' => [
-                    [
-                        'step_id' => 'all',
-                        'is_group' => false,
-                        'items' => [
-                            [
-                                'ap_id' => null,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base.jpg',
-                                'title' => 'Cottage Palettes',
-                                'title_mode' => 'static',
-                                'type' => 'intro',
-                                'layout' => 'default',
-                                'star' => false
-                            ],
-                            [
-                                'ap_id' => 43,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_43.jpg',
-                                'title' => 'Early Bloomer',
-                                'title_mode' => 'animate',
-                                'star' => true
-                            
-                            ],
-                             [
-                                'ap_id' => 44,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_44.jpg',
-                                'title' => 'Audrey',
-                                'title_mode' => 'animate',
-                                'star' => true,
-                            ],
-
-                            [
-                                'ap_id' => 37,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_37.jpg',
-                                'title' => 'Betsy Ross',
-                                'title_mode' => 'animate',
-                                'star' => true,
-                            ],
-                            [
-                                'ap_id' => 38,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_38.jpg',
-                                'title' => "Tiffany's Cottage",
-                                'title_mode' => 'animate',
-                                'star' => true,
-                            ],
-                            [
-                                'ap_id' => 39,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_39.jpg',
-                                'title' => 'The Diva',
-                                'title_mode' => 'animate',
-                                'star' => true
-                            ],
-                       
-                        ],
-                    ],
-                ],
-            ],
-            [
-                'playlist_id' => '2',
-                'type' => 'test',
-                'title' => 'Test One',
-                'end_screen_layout' => 'default',
-                'meta' => [
-                    'share_enabled' => true,
-                    'share_title' => 'Orange Fatigue',
-                    'share_description' => 'Who says adobes have to look like mud?',
-                    'share_image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
-                ],
-
-                'steps' => [
-                    [
-                        'step_id' => 'all',
-                        'is_group' => false,
-                        'items' => [
-                            [
-                                'ap_id' => null,
-                                'image_url' => null,
-                                'title' => 'Adobe Transformation',
-                                'subtitle' => 'Getting rid of muddy palettes of the Southwest',
-                                'title_mode' => 'static',
-                                'type' => 'intro',
-                                'layout' => 'text',
-                                'star' => false
-                            ],
-                            [
-                                'ap_id' => null,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg',
-                                'title' => 'Before',
-                                'subtitle' => 'Typical adobe tract house with muddy palette',
-                                'title_mode' => 'animated',
-                                'type' => 'normal',
-                                'layout' => 'default',
-                                'star' => false
-            
-            
-                            ],
-                            [
-                                'ap_id' => 46,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_46.jpg',
-                                'title' => 'After',
-                                'subtitle' => 'Palette: Classic Mediterranean -- Crisp, clean and elegant',
-                                'title_mode' => 'animate',
-                                'star' => true,
-                            ],
-                            [
-                                'ap_id' => 45,
-                                'image_url' => 'https://colorfix.terrymarr.com/photos/rendered/ap_45.jpg',
-                                'title' => 'After',
-                                'subtitle' => 'Palette: Oasis -- Cool, calm and refreshing',
-                                'title_mode' => 'animate',
-                                'star' => true,
-                            ],
-                            
-                       
-                        ],
-                    ],
-                ],
-            ],
+            'playlist_id' => (string)$row['playlist_id'],
+            'title' => (string)$row['title'],
+            'type' => (string)$row['type'],
         ];
     }
 }
