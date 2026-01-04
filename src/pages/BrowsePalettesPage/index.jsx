@@ -49,9 +49,6 @@ export default function BrowsePalettesPage({
   // Refs
   const pushedRef = useRef(false);
   const lastScrollYRef = useRef(0);
-  // Section refs are keyed by `${group}-${size}`, e.g., "exact-4", "near-5"
-  const sectionRefs = useRef({});
-
   // Inputs (live)
   const [selectedColor, setSelectedColor] = useState(null);
   const [selectedFamily, setSelectedFamily] = useState(null);
@@ -59,7 +56,6 @@ export default function BrowsePalettesPage({
 
   // Results (live, inline)
   const [palettes, setPalettes] = useState([]);
-  const [countsBySize, setCountsBySize] = useState({});
   const [totalCount, setTotalCount] = useState(0);
   const [nextOffset, setNextOffset] = useState(null);
 
@@ -70,14 +66,6 @@ export default function BrowsePalettesPage({
   const [inspected, setInspected] = useState(null);
 
   const [selectedTags, setSelectedTags] = useState([]);
-const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
-
-  // Size filter (checkboxes): 3, 4, 5+
-  const [sizePicks, setSizePicks] = useState({
-    three: true,
-    four: true,
-    fivePlus: false,
-  });
 
   // Snapshot (applied search)
   const [applied, setApplied] = useState(null);
@@ -112,7 +100,7 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
   const famLabel = selectedFamily?.name || null;
   const hasFamily = !!selectedFamily?.name;
   const hasLightness = !!selectedLightness;
-  const goEnabled = hasColor || selectedTags.length > 0;
+  const goEnabled = hasColor || (hasFamily && hasLightness) || selectedTags.length > 0;
 
   // Back/forward closes modal
   useEffect(() => {
@@ -138,12 +126,12 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
 
     sessionStorage.removeItem("bpv1-restore-once");
     setPalettes(snap.palettes || []);
-    setCountsBySize(snap.countsBySize || {});
     setTotalCount(snap.totalCount || 0);
     setNextOffset(snap.nextOffset ?? null);
     setSelectedColor(snap.selectedColor || null);
     setSelectedFamily(snap.selectedFamily || null);
     setSelectedLightness(snap.selectedLightness || "");
+    setSelectedTags(snap.selectedTags || []);
     setHasRun(!!snap.hasRun);
 
     requestAnimationFrame(() => {
@@ -156,26 +144,18 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
   const appliedFamLabel = applied?.selectedFamily?.name || null;
   const appliedLight = applied?.selectedLightness || "";
 
-  const countsLine = useMemo(() => {
-    const cbs = applied?.countsBySize || {};
-    if (!cbs || !Object.keys(cbs).length) return "";
-    const order = [3, 4, 5, 6, 7];
-    return order
-      .filter((n) => (cbs[n] || cbs[String(n)]) > 0)
-      .map((n) => {
-        const c = cbs[n] ?? cbs[String(n)];
-        return `${n}-color (${Number(c).toLocaleString()})`;
-      })
-      .join(" • ");
-  }, [applied?.countsBySize]);
-
   const emptyMsg = useMemo(() => {
     if (!applied?.hasRun)
-      return "No palettes yet. Pick a color or a family + lightness and tap Go.";
+      return "No palettes yet. Pick a color, a family + lightness, or a tag and tap Search.";
     if ((applied?.totalCount || 0) > 0) return "";
     const c = appliedColor?.name;
     const f = appliedFamLabel;
     const l = appliedLight;
+    const t = (applied?.selectedTags || selectedTags || []).filter(Boolean);
+    const tagLabel = t.length ? t.join(", ") : "";
+    if (t.length) {
+      return `No palettes tagged ${tagLabel} yet.`;
+    }
     if (c && f && l)
       return `No palettes featuring ${c} and ${f} • ${l}. Try widening your search.`;
     if (c && f)
@@ -183,8 +163,8 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
     if (f && l)
       return `No palettes in ${f} • ${l}. Try removing lightness or family.`;
     if (c) return `No palettes featuring ${c}. Try by family + lightness instead.`;
-    return `No palettes yet. Pick a color or a family + lightness and tap Go.`;
-  }, [applied?.hasRun, applied?.totalCount, appliedColor?.name, appliedFamLabel, appliedLight]);
+    return `No palettes yet. Pick a color, a family + lightness, or a tag and tap Search.`;
+  }, [applied?.hasRun, applied?.totalCount, appliedColor?.name, appliedFamLabel, appliedLight, applied?.selectedTags, selectedTags]);
 
   // Normalize + keep backend grouping metadata
   function normalizeItems(items) {
@@ -264,10 +244,9 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
       const raw = await resp.text();
       if (!resp.ok) {
         setErrorMsg(`HTTP ${resp.status}`);
-        setPalettes([]); setCountsBySize({}); setTotalCount(0); setNextOffset(null);
+        setPalettes([]); setTotalCount(0); setNextOffset(null);
         saveSnapshot({
           palettes: [],
-          countsBySize: {},
           totalCount: 0,
           nextOffset: null,
           selectedColor: sentColor,
@@ -286,13 +265,11 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
       if (!json) { setErrorMsg("Empty response from server"); return; }
 
       const items  = Array.isArray(json) ? json : (json.items || []);
-      const counts = Array.isArray(json) ? {}  : (json.counts_by_size || {});
       const total  = Array.isArray(json) ? items.length : (json.total_count || items.length || 0);
       const next   = Array.isArray(json) ? null : (json.next_offset ?? null);
 
       const normalized = normalizeItems(items);
 
-      setCountsBySize(counts);
       setTotalCount(total);
       setPalettes(normalized);
       setNextOffset(next);
@@ -307,12 +284,12 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
       // Save snapshot
       saveSnapshot({
         palettes: normalized,
-        countsBySize: counts,
         totalCount: total,
         nextOffset: next,
         selectedColor: sentColor,
         selectedFamily: sentFamily,
         selectedLightness,
+        selectedTags,
         hasRun: true,
         include_close: sentPayload.include_close,
         exact_anchor_cluster_ids: sentPayload.exact_anchor_cluster_ids || [],
@@ -321,15 +298,15 @@ const [tagModeAll, setTagModeAll] = useState(false); // false = ANY, true = ALL
 
     } catch (err) {
       setErrorMsg(err?.name === "AbortError" ? "Request timed out. Try again." : "Could not load palettes.");
-      setPalettes([]); setCountsBySize({}); setTotalCount(0); setNextOffset(null);
+      setPalettes([]); setTotalCount(0); setNextOffset(null);
       saveSnapshot({
         palettes: [],
-        countsBySize: {},
         totalCount: 0,
         nextOffset: null,
         selectedColor: null,
         selectedFamily: null,
         selectedLightness: "",
+        selectedTags,
         hasRun: false,
         include_close: (overrides && typeof overrides.include_close === "boolean") ? overrides.include_close : includeClose,
         ...(overrides || {}),
@@ -436,8 +413,7 @@ function handleMetaPatched(delta) {
 
     if (clusterIds.length === 0) return;
 
-    // HOT: show all sizes, close filter panel
-    setSizePicks({ three: true, four: true, fivePlus: true });
+    // HOT: close filter panel
     setCtrlOpen(false);
     try { sessionStorage.setItem(CTRL_KEY, "0"); } catch {}
 
@@ -456,24 +432,8 @@ function handleMetaPatched(delta) {
     overrides = {},
     lightnessOverride = null
   ) {
-    // derive size_min/max from checkboxes
-    let sizeMin = 3, sizeMax = 7;
-    if (sizePicks.three && !sizePicks.four && !sizePicks.fivePlus) { sizeMin = 3; sizeMax = 3; }
-    else if (!sizePicks.three && sizePicks.four && !sizePicks.fivePlus) { sizeMin = 4; sizeMax = 4; }
-    else if (!sizePicks.three && !sizePicks.four && sizePicks.fivePlus) { sizeMin = 5; sizeMax = 7; }
-    else {
-      const chosen = [];
-      if (sizePicks.three) chosen.push(3);
-      if (sizePicks.four) chosen.push(4);
-      if (sizePicks.fivePlus) chosen.push(5, 6, 7);
-      sizeMin = Math.min(...chosen);
-      sizeMax = Math.max(...chosen);
-    }
-
     const payload = {
-      size_min: sizeMin,
-      size_max: sizeMax,
-      include_counts: true,
+      include_counts: false,
       limit: 60,
       offset: 0,
       ...overrides,
@@ -500,20 +460,10 @@ function handleMetaPatched(delta) {
     if (tone) idea.lightness_cats = tone;
 
     if (Object.keys(idea).length) payload.include_idea = idea;
-    if (selectedTags.length > 0) {
-  if (tagModeAll) payload.include_tags_all = selectedTags;
-  else payload.include_tags_any = selectedTags;
-}
+    if (selectedTags.length > 1) payload.include_tags_all = selectedTags;
+    else if (selectedTags.length === 1) payload.include_tags_any = selectedTags;
 
     return payload;
-  }
-
-  // Selected sizes helper
-  function isSizeSelected(size) {
-    if (size === 3 && sizePicks.three) return true;
-    if (size === 4 && sizePicks.four) return true;
-    if (size >= 5 && sizePicks.fivePlus) return true;
-    return false;
   }
 
   // Anchor count → heading pluralization
@@ -521,47 +471,14 @@ function handleMetaPatched(delta) {
     (applied?.exact_anchor_cluster_ids?.length ?? 0) ||
     (selectedColor?.cluster_id ? 1 : (hotClusterIds?.length || 0));
   const colorWord = anchorCount > 1 ? "Colors" : "Color";
-  const colorWordLower = anchorCount > 1 ? "colors" : "color";
-
-  // Bucket by group → size
   const grouped = useMemo(() => {
-    const acc = { exact: {}, near: {} };
+    const acc = { exact: [], near: [] };
     for (const p of palettes) {
       const g = p.group === "near" ? "near" : "exact";
-      (acc[g][p.size] ||= []).push(p);
-    }
-    // Ensure stable sort order inside each size bucket
-    for (const g of ["exact", "near"]) {
-      for (const size of Object.keys(acc[g])) {
-        acc[g][size].sort((a, b) => (a.palette_id ?? 0) - (b.palette_id ?? 0));
-      }
+      acc[g].push(p);
     }
     return acc;
   }, [palettes]);
-
-  // Count for a given size (keeps your existing behavior)
-  const countFor = (size) => {
-    const a = applied?.countsBySize;
-    const live = countsBySize;
-    const fromApplied = a && (a[size] ?? a[String(size)]);
-    const fromLive    = live && (live[size] ?? live[String(size)]);
-    if (fromApplied != null) return Number(fromApplied);
-    if (fromLive != null)    return Number(fromLive);
-    // fallback: total across both groups for this size
-    const exactLen = (grouped.exact[size]?.length || 0);
-    const nearLen  = (grouped.near[size]?.length  || 0);
-    return exactLen + nearLen;
-  };
-
-  // Jump-to prefers exact group for that size, else near
-  function jumpTo(size) {
-    const keyExact = `exact-${size}`;
-    const keyNear  = `near-${size}`;
-    const el = sectionRefs.current[keyExact] || sectionRefs.current[keyNear];
-    if (!el) return;
-    const y = el.getBoundingClientRect().top + window.scrollY - 56;
-    window.scrollTo({ top: y, behavior: "smooth" });
-  }
 
   // Scroll helpers for inspector
   function saveScroll() {
@@ -600,12 +517,6 @@ function handleMetaPatched(delta) {
     }
   }
 
-  function toggleSize(key) {
-    setSizePicks((s) => ({ ...s, [key]: !s[key] }));
-    clearSnapshot();
-    setHasRun(false);
-  }
-
   return (
     <div className="bpv1-page">
       {/* Viewport-level FAB (portal) — only on mobile + when filters are closed */}
@@ -627,50 +538,26 @@ function handleMetaPatched(delta) {
 <div className="bpv1-toolbar">
   <div className="bpv1-field">
     <FuzzySearchColorSelect
+      mobileBreakpoint={0}
       onSelect={(c) => { setSelectedColor(c || null); clearSnapshot(); setHasRun(false); }}
     />
   </div>
 
   <div className="bpv1-field">
     <TagMultiSelect
+      simple
+      placeholder="Tags (comma separated)"
       selected={selectedTags}
       onChange={(tags) => { setSelectedTags(tags); clearSnapshot(); setHasRun(false); }}
     />
   </div>
 
-  <div className="bpv1-field">
-    <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <input
-        type="checkbox"
-        checked={tagModeAll}
-        onChange={(e) => setTagModeAll(e.target.checked)}
-      />
-      match all tags
-    </label>
+  <div className="bpv1-actions">
+    <button className="bpv1-go" onClick={() => runSearch()} disabled={!goEnabled || loading} type="button">
+      {loading ? "Searching…" : "Search"}
+    </button>
   </div>
 </div>
-
-          {/* row 2 */}
-          <div className="bpv1-toolbar bpv1-toolbar--row2">
-            <label>Palette Size</label>
-            <div className="bpv1-field bpv1-sizes">
-              <label className="bpv1-sizechk">
-                <input type="checkbox" checked={!!sizePicks.three} onChange={() => toggleSize("three")} /> 3
-              </label>
-              <label className="bpv1-sizechk">
-                <input type="checkbox" checked={!!sizePicks.four} onChange={() => toggleSize("four")} /> 4
-              </label>
-              <label className="bpv1-sizechk">
-                <input type="checkbox" checked={!!sizePicks.fivePlus} onChange={() => toggleSize("fivePlus")} /> 5+
-              </label>
-            </div>
-
-            <div className="bpv1-actions">
-              <button className="bpv1-go" onClick={() => runSearch()} disabled={!goEnabled || loading} type="button">
-                {loading ? "Searching…" : "Go"}
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Desktop toggle (below panels). Hidden on mobile; mobile uses FAB. */}
@@ -705,7 +592,6 @@ function handleMetaPatched(delta) {
       {(applied?.hasRun || hasRun) && totalCount > 0 && (
         <div className="bpv1-summary" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span>Showing results</span>
-          {countsLine && <span className="bpv1-summary-counts"> · {countsLine}</span>}
           <button
             className="bpv1-summary-edit"
             type="button"
@@ -717,27 +603,6 @@ function handleMetaPatched(delta) {
           >
             Edit filters
           </button>
-
-          {/* Jump-to toolbar */}
-          <div className="bpv1-jumpto" style={{display:'flex',gap:'8px',flexWrap:'wrap',marginLeft:'auto'}}>
-            <span style={{opacity:0.7}}>Jump to:</span>
-            {[3,4,5,6,7]
-              .filter((s) => isSizeSelected(s))
-              .filter((s) => countFor(s) > 0)
-              .map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className="bpv1-go"
-                  onClick={() => jumpTo(s)}
-                  style={{padding:'6px 10px'}}
-                  aria-label={`Jump to ${s}-color sections`}
-                >
-                  {s}-color ({countFor(s).toLocaleString()})
-                </button>
-              ))
-            }
-          </div>
         </div>
       )}
 
@@ -746,17 +611,16 @@ function handleMetaPatched(delta) {
         <div className="bpv1-empty">{emptyMsg}</div>
       )}
 
-      {/* Results: grouped by EXACT vs NEAR, then by SIZE */}
+      {/* Results: grouped by EXACT vs NEAR */}
       <div className="bpv1-results">
       {["exact", "near"].map((groupKey) => {
-          // Only render the group if it has at least one selected-size bucket with items
-          const sizes = [3,4,5,6,7].filter((s) => isSizeSelected(s) && (grouped[groupKey][s]?.length || 0) > 0);
-          if (!sizes.length) return null;
+          const items = grouped[groupKey] || [];
+          if (!items.length) return null;
 
           const groupTitle =
             groupKey === "exact"
-              ? `Palettes With Your ${colorWord}`
-              : `Palettes With Close Matches to Your ${colorWord}`;
+              ? "Search Results"
+              : "More Results";
 
           // If exact group is empty but near exists, we could optionally show a one-liner above near.
           // Keeping it simple per your note.
@@ -767,30 +631,15 @@ function handleMetaPatched(delta) {
                 {groupTitle}
               </h3>
 
-              {sizes.map((size) => (
-                <section
-                  key={`${groupKey}-${size}`}
-                  id={`bpv1-${groupKey}-size-${size}`}
-                  ref={(el) => { sectionRefs.current[`${groupKey}-${size}`] = el || undefined; }}
-                  className="bpv1-group"
-                >
-                  <h4 className="bpv1-group-title">
-                    {size}-color palettes{" "}
-                    <span className="bpv1-count">
-                      {(grouped[groupKey][size]?.length || 0).toLocaleString()}
-                    </span>
-                  </h4>
-                  <div className="bpv1-group-list">
-                    {(grouped[groupKey][size] || []).map((p, idx) => (
-                      <PaletteRow
-                        key={p.palette_id ?? `${groupKey}-${size}-${idx}`}
-                        palette={p}
-                        onClick={() => openInspector(p)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
+              <div className="bpv1-group-list">
+                {items.map((p, idx) => (
+                  <PaletteRow
+                    key={p.palette_id ?? `${groupKey}-${idx}`}
+                    palette={p}
+                    onClick={() => openInspector(p)}
+                  />
+                ))}
+              </div>
             </section>
           );
         })}

@@ -9,15 +9,27 @@ import './tagmultiselect.css';
  * - onChange(newTags)
  * - placeholder? (default: "Search tags…")
  */
-export default function TagMultiSelect({ selected = [], onChange, placeholder = "Search tags…" }) {
+export default function TagMultiSelect({
+  selected = [],
+  onChange,
+  placeholder = "Search tags…",
+  simple = false,
+}) {
   const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const timerRef = useRef(null);
 
-  // Debounced fetch
   useEffect(() => {
+    if (!simple || focused) return;
+    setQuery(selected.join(", "));
+  }, [selected, simple, focused]);
+
+  // Debounced fetch (disabled in simple mode)
+  useEffect(() => {
+    if (simple) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     if (query.trim() === "") {
       setSuggestions([]);
@@ -39,7 +51,7 @@ export default function TagMultiSelect({ selected = [], onChange, placeholder = 
     }, 250);
 
     return () => clearTimeout(timerRef.current);
-  }, [query]);
+  }, [query, simple]);
 
   function toggleTag(tag) {
     const next = selected.includes(tag)
@@ -55,35 +67,50 @@ export default function TagMultiSelect({ selected = [], onChange, placeholder = 
         className="bpv1-select"
         placeholder={placeholder}
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          const val = e.target.value;
+          setQuery(val);
+          if (simple) {
+            const tags = val
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean);
+            onChange(tags);
+          }
+        }}
+        onFocus={() => {
+          setFocused(true);
+          if (!simple) setOpen(true);
+        }}
+        onBlur={() => setFocused(false)}
       />
-      {loading && <div className="tag-loading">Loading…</div>}
-
-      {open && suggestions.length > 0 && (
-        <div className="tag-dropdown">
-          {suggestions.map((s) => (
-            <div
-              key={s.tag}
-              className={`tag-suggestion ${selected.includes(s.tag) ? "is-selected" : ""}`}
-              onClick={() => toggleTag(s.tag)}
-            >
-              <span>{s.tag}</span>
-              {s.count > 0 && <small>{s.count}</small>}
+      {!simple && (
+        <>
+          {loading && <div className="tag-loading">Loading…</div>}
+          {open && suggestions.length > 0 && (
+            <div className="tag-dropdown">
+              {suggestions.map((s) => (
+                <div
+                  key={s.tag}
+                  className={`tag-suggestion ${selected.includes(s.tag) ? "is-selected" : ""}`}
+                  onClick={() => toggleTag(s.tag)}
+                >
+                  <span>{s.tag}</span>
+                  {s.count > 0 && <small>{s.count}</small>}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Selected chips */}
-      {selected.length > 0 && (
-        <div className="tag-chips">
-          {selected.map((t) => (
-            <span key={t} className="tag-chip" onClick={() => toggleTag(t)}>
-              {t} ×
-            </span>
-          ))}
-        </div>
+          )}
+          {selected.length > 0 && (
+            <div className="tag-chips">
+              {selected.map((t) => (
+                <span key={t} className="tag-chip" onClick={() => toggleTag(t)}>
+                  {t} ×
+                </span>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -42,6 +42,7 @@ const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPale
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
 const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
+const AdminHOAPage = lazy(() => import('@pages/AdminHOAPage'));
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
@@ -201,6 +202,10 @@ function AppRouter() {
             <Route
               path="playlist-instances"
               element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances…')}
+            />
+            <Route
+              path="hoas"
+              element={renderWithSuspense(AdminHOAPage, 'Loading HOAs…')}
             />
             <Route
               path="playlists/:playlistId"

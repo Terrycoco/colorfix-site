@@ -1,0 +1,284 @@
+.admin-hoa-page {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  padding: 24px;
+}
+
+.admin-hoa-page .hoa-panel {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+
+.admin-hoa-page .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.admin-hoa-page .panel-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.admin-hoa-page .header-actions .primary-btn,
+.admin-hoa-page .panel-actions .primary-btn {
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.admin-hoa-page .panel-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-hoa-page .panel-controls input,
+.admin-hoa-page .panel-controls button {
+  height: 38px;
+}
+
+.admin-hoa-page .panel-controls button {
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #bcbcbc;
+  background: #ffffff;
+  color: #111;
+  font-weight: 600;
+}
+
+.admin-hoa-page .panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.admin-hoa-page .list-row {
+  text-align: left;
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #111;
+}
+
+.admin-hoa-page .list-row.active {
+  border-color: #111;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.admin-hoa-page .row-title {
+  font-weight: 600;
+  color: #111;
+}
+
+.admin-hoa-page .row-meta {
+  color: #666;
+  font-size: 12px;
+}
+
+.admin-hoa-page .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 18px;
+  margin-bottom: 18px;
+}
+
+.admin-hoa-page label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.admin-hoa-page input,
+.admin-hoa-page select,
+.admin-hoa-page textarea {
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.admin-hoa-page .panel-status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #666;
+}
+
+.admin-hoa-page .panel-status.error {
+  color: #c0392b;
+}
+
+.admin-hoa-page .panel-status.success {
+  color: #2d7f3a;
+}
+
+.admin-hoa-page .hoa-section {
+  border: 1px dashed #d7d7d7;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fafafa;
+}
+
+.admin-hoa-page .section-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.hoa-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6000;
+  padding: 24px;
+}
+
+.hoa-modal__content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  max-width: 960px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.hoa-modal__content--compact {
+  max-width: 700px;
+}
+
+.hoa-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hoa-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.hoa-modal__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hoa-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.ghost-btn {
+  border: 1px solid #cfcfcf;
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #111;
+  font-weight: 600;
+}
+
+.hoa-schemes-table {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.hoa-schemes-row {
+  display: grid;
+  grid-template-columns: 160px 180px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  align-items: center;
+}
+
+.hoa-schemes-row.header {
+  background: #f7f7f7;
+  font-weight: 700;
+  cursor: default;
+}
+
+.hoa-schemes-row.active {
+  background: #fff7ef;
+}
+
+.hoa-schemes-row .notes {
+  color: #555;
+  font-size: 12px;
+}
+
+.hoa-scheme-colors {
+  margin-top: 12px;
+}
+
+.scheme-color-form {
+  display: grid;
+  grid-template-columns: 280px 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scheme-color-form input {
+  height: 36px;
+}
+
+.scheme-color-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scheme-color-meta {
+  font-size: 12px;
+  color: #555;
+}
+
+.hoa-scheme-colors .hoa-schemes-row {
+  grid-template-columns: 1fr 140px 160px 1fr 90px;
+  cursor: default;
+}
+
+@media (max-width: 900px) {
+  .scheme-color-form {
+    grid-template-columns: 1fr;
+  }
+
+  .hoa-schemes-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .hoa-scheme-colors .hoa-schemes-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-hoa-page {
+    grid-template-columns: 1fr;
+  }
+}

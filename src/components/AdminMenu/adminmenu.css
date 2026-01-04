@@ -1,0 +1,74 @@
+.admin-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.admin-menu__trigger {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.admin-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #fff;
+  color: #111;
+  border-radius: 12px;
+  padding: 8px 0;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  min-width: 200px;
+  z-index: 5000;
+}
+
+.admin-menu__group {
+  position: relative;
+  padding: 6px 14px;
+  cursor: default;
+}
+
+.admin-menu__group:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.admin-menu__group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.admin-menu__chev {
+  opacity: 0.6;
+}
+
+.admin-menu__submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 6px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 0;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  min-width: 220px;
+}
+
+.admin-menu__item {
+  display: block;
+  padding: 6px 14px;
+  color: #111;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.admin-menu__item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

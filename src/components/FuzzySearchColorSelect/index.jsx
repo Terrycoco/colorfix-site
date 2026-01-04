@@ -271,12 +271,17 @@ function pick(color) {
     return () => { document.body.style.overflow = ''; };
   }, [sheetOpen, isMobile]);
 
+  const stopCapture = (e) => {
+    if (isMobile) return;
+    e.stopPropagation();
+  };
+
   return (
     <div
       ref={rootRef}
       className={`fuzzy-dropdown ${className || ''} ${compact ? "fuzzy-compact" : ""}`}
-      onMouseDownCapture={(e) => e.stopPropagation()}
-      onClickCapture={(e) => e.stopPropagation()}
+      onMouseDownCapture={stopCapture}
+      onClickCapture={stopCapture}
       onKeyDownCapture={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
       style={className?.includes("full-width") ? { width: "100%" } : undefined}
     >
@@ -290,7 +295,10 @@ function pick(color) {
         <button
           type="button"
           className="fuzzy-mobile-trigger"
-          onClick={() => setSheetOpen(true)}
+          onClick={() => {
+            setSheetOpen(true);
+            setTimeout(() => sheetInputRef.current?.focus(), 0);
+          }}
           style={{
             backgroundColor: colorToHex(displayColor) || '#f7f7f7',
             color: displayColor ? getFontColor(displayColor) : '#222',
@@ -429,6 +437,7 @@ function pick(color) {
                 type="search"
                 inputMode="search"
                 enterKeyHint="search"
+                autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Color name or code"

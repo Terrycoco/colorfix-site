@@ -63,12 +63,15 @@ const activeBrandCodes = useMemo(() => {
 
   // Live-filter palette on every render (no extra state/effect)
   const srcPalette = Array.isArray(palette) ? palette : [];
- const filteredPalette = activeBrandCodes.length
+  const filteredPalette = activeBrandCodes.length
   ? srcPalette.filter(sw => {
       const b = (sw?.brand ?? sw?.color?.brand ?? '').toString().trim().toLowerCase();
       return activeBrandCodes.includes(b);
     })
   : srcPalette;
+  const paletteFallback = (filteredPalette.length === 0 && srcPalette.length > 0)
+    ? srcPalette
+    : filteredPalette;
 
   const getHex = (sw) => {
     const color = sw?.color ?? sw;
@@ -85,7 +88,7 @@ const activeBrandCodes = useMemo(() => {
       .filter((id) => Number.isFinite(id) && id > 0);
   }, [palette]);
 
-  const isPaletteEmpty = filteredPalette.length === 0;
+  const isPaletteEmpty = paletteFallback.length === 0;
   const navigate = useNavigate();
   const adminMode = isAdmin();
 
@@ -367,6 +370,7 @@ const activeBrandCodes = useMemo(() => {
           className="myp-fuzzy"
           placeholder="Enter a color"
           autoFocus={false}
+          mobileBreakpoint={0}
         />
       </div>
 
@@ -566,12 +570,16 @@ const activeBrandCodes = useMemo(() => {
           {isPaletteEmpty ? (
             <div className="myp-empty">
               <p>You have no colors saved yet. Enter a color name to start your palette.</p>
-              <FuzzySearchColorSelect onSelect={onFuzzyPick} className="myp-empty-fuzzy" />
+              <FuzzySearchColorSelect
+                onSelect={onFuzzyPick}
+                className="myp-empty-fuzzy"
+                mobileBreakpoint={0}
+              />
             </div>
           ) : (
             <div className="myp-row">
               <SwatchGallery
-                items={filteredPalette}
+                items={paletteFallback}
                 SwatchComponent={PaletteSwatch}
                 swatchPropName="color"
                 className="sg-palette"
@@ -609,6 +617,7 @@ const activeBrandCodes = useMemo(() => {
               groupOrderBy="group_order"
               showGroupHeaders
               onSelectColor={onResultsPick}
+              emptyMessage=""
             />
             {includeNeighbors && neighborAddendum.length > 0 && (
               <div className="neighbors-addendum">

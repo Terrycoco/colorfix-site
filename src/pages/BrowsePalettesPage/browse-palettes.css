@@ -67,6 +67,14 @@
 .bpv1-toolbar select,
 .bpv1-go { height: 40px; }
 
+.bpv1-toolbar .fuzzy-dropdown input[type="search"] {
+  color: #111;
+}
+
+.bpv1-toolbar .fuzzy-dropdown input[type="search"]::placeholder {
+  color: #6b7280;
+}
+
 /* Go */
 .bpv1-go {
   display: inline-flex;
@@ -380,6 +388,23 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.bpv1-terrywrap { display: flex; flex-direction: column; gap: 4px; }
+.bpv1-terry.is-full {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.bpv1-terry-more {
+  align-self: flex-end;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2f6fed;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* Chips */

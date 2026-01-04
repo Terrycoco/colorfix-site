@@ -54,6 +54,13 @@ export default function NameSearchItem({ item }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!term.trim()) {
+      setShowInput(false);
+      setActive(false);
+      setTerm('');
+      setOpeningFromRect(null);
+      return;
+    }
     submittingRef.current = true;
     clearSearchFilters();
     setNoResults(false);

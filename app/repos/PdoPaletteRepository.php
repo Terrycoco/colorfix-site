@@ -524,6 +524,103 @@ public function findVisibleAnySizeByClusterGroups(array $clusterGroups, int $lim
         return $out;
     }
 
+    /**
+     * Fetch palette IDs by tags (any/all).
+     * Returns ['palette_ids'=>int[], 'total_count'=>int]
+     */
+    public function findPaletteIdsByTags(
+        array $tags,
+        bool $matchAll = false,
+        int $limit = 200,
+        int $offset = 0
+    ): array {
+        $tags = array_values(array_unique(array_filter(array_map(static function($t){
+            $t = trim((string)$t);
+            return $t === '' ? null : $t;
+        }, $tags))));
+        if (!$tags) return ['palette_ids'=>[], 'total_count'=>0];
+
+        $limit  = max(1, (int)$limit);
+        $offset = max(0, (int)$offset);
+        $ph = implode(',', array_fill(0, count($tags), '?'));
+
+        if ($matchAll) {
+            $countSql = "
+              SELECT COUNT(*) FROM (
+                SELECT pt.palette_id
+                FROM palette_tags pt
+                JOIN palettes p ON p.id = pt.palette_id
+                WHERE p.status = 'active'
+                  AND pt.tag IN ($ph)
+                GROUP BY pt.palette_id
+                HAVING COUNT(DISTINCT pt.tag) = ?
+              ) x
+            ";
+            $st = $this->pdo->prepare($countSql);
+            $bind = 1;
+            foreach ($tags as $t) $st->bindValue($bind++, $t, PDO::PARAM_STR);
+            $st->bindValue($bind++, count($tags), PDO::PARAM_INT);
+            $st->execute();
+            $total = (int)($st->fetchColumn() ?: 0);
+            if ($total === 0) return ['palette_ids'=>[], 'total_count'=>0];
+
+            $pageSql = "
+              SELECT pt.palette_id
+              FROM palette_tags pt
+              JOIN palettes p ON p.id = pt.palette_id
+              WHERE p.status = 'active'
+                AND pt.tag IN ($ph)
+              GROUP BY pt.palette_id
+              HAVING COUNT(DISTINCT pt.tag) = ?
+              ORDER BY pt.palette_id DESC
+              LIMIT ? OFFSET ?
+            ";
+            $st = $this->pdo->prepare($pageSql);
+            $bind = 1;
+            foreach ($tags as $t) $st->bindValue($bind++, $t, PDO::PARAM_STR);
+            $st->bindValue($bind++, count($tags), PDO::PARAM_INT);
+            $st->bindValue($bind++, $limit, PDO::PARAM_INT);
+            $st->bindValue($bind++, $offset, PDO::PARAM_INT);
+            $st->execute();
+        } else {
+            $countSql = "
+              SELECT COUNT(DISTINCT pt.palette_id)
+              FROM palette_tags pt
+              JOIN palettes p ON p.id = pt.palette_id
+              WHERE p.status = 'active'
+                AND pt.tag IN ($ph)
+            ";
+            $st = $this->pdo->prepare($countSql);
+            foreach ($tags as $i => $t) $st->bindValue($i + 1, $t, PDO::PARAM_STR);
+            $st->execute();
+            $total = (int)($st->fetchColumn() ?: 0);
+            if ($total === 0) return ['palette_ids'=>[], 'total_count'=>0];
+
+            $pageSql = "
+              SELECT DISTINCT pt.palette_id
+              FROM palette_tags pt
+              JOIN palettes p ON p.id = pt.palette_id
+              WHERE p.status = 'active'
+                AND pt.tag IN ($ph)
+              ORDER BY pt.palette_id DESC
+              LIMIT ? OFFSET ?
+            ";
+            $st = $this->pdo->prepare($pageSql);
+            $bind = 1;
+            foreach ($tags as $t) $st->bindValue($bind++, $t, PDO::PARAM_STR);
+            $st->bindValue($bind++, $limit, PDO::PARAM_INT);
+            $st->bindValue($bind++, $offset, PDO::PARAM_INT);
+            $st->execute();
+        }
+
+        $ids = [];
+        while ($row = $st->fetch(PDO::FETCH_NUM)) {
+            $ids[] = (int)$row[0];
+        }
+
+        return ['palette_ids'=>$ids, 'total_count'=>$total ?? 0];
+    }
+
 
     public function updatePaletteMeta(int $paletteId, ?string $nickname, ?string $terrySays, int $terryFav): bool
     {

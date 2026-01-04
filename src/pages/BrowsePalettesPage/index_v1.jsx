@@ -638,7 +638,7 @@ function toggleSize(key) {
           {/* row 1 */}
           <div className="bpv1-toolbar">
             <div className="bpv1-field">
-              <FuzzySearchColorSelect onSelect={handlePickColor} />
+              <FuzzySearchColorSelect mobileBreakpoint={0} onSelect={handlePickColor} />
             </div>
             <div className="bpv1-field">
               <CategoryDropdown onSelect={handlePickFamily} useShowAll={true} />

@@ -69,7 +69,10 @@
 /* iOS-only guard */
 @supports (-webkit-touch-callout: none) {
   .fuzzy-input-wrap input[type="search"],
-  .fuzzy-input-wrap input[type="search"]::placeholder {
+  .fuzzy-input-wrap input[type="search"]::placeholder,
+  .fuzzy-sheet-input,
+  .fuzzy-sheet-input::placeholder,
+  .fuzzy-mobile-trigger {
     font-size: 16px !important;
     line-height: 1.25;
     -webkit-text-size-adjust: 100%;
@@ -161,6 +164,7 @@
   background: #fff;
   border-bottom: 1px solid #eee;
   cursor: pointer;
+  color: #111;
 }
 
 .result-item:hover {
@@ -182,6 +186,7 @@
 
 .color-name {
   font-size: 0.8rem;
+  color: #111;
 }
 
 .color-brand {
@@ -219,8 +224,10 @@
   padding:10px 12px;
   border-radius:6px;
   border:1px solid #ccc;
-  font-size:1rem;
+  font-size:16px;
   text-align:left;
+  background:#fff;
+  color:#111;
 }
 
 .fuzzy-sheet{
@@ -254,7 +261,12 @@
   padding:10px 12px;
   border-radius:6px;
   border:1px solid #ccc;
-  font-size:1rem;
+  font-size:16px;
+  background:#fff;
+  color:#111;
+}
+.fuzzy-sheet-input::placeholder{
+  color:#6b7280;
 }
 .fuzzy-sheet-results{
   flex:1;
@@ -273,6 +285,7 @@
   border:1px solid #ddd;
   background:#fefefe;
   font-size:1rem;
+  color:#111;
 }
 .sheet-swatch{
   width:40px;
@@ -284,6 +297,7 @@
 .sheet-name{
   font-weight:600;
   flex:1;
+  color:#111;
 }
 .sheet-brand{
   font-size:0.85rem;

@@ -58,6 +58,23 @@ final class PaletteController
         $tier   = is_string($in['tier'] ?? null) ? $in['tier'] : 'A';
         $limit  = max(1, (int)($in['limit']  ?? 60));
         $offset = max(0, (int)($in['offset'] ?? 0));
+        $tagsAny = isset($in['include_tags_any']) && is_array($in['include_tags_any'])
+            ? $in['include_tags_any']
+            : [];
+        $tagsAll = isset($in['include_tags_all']) && is_array($in['include_tags_all'])
+            ? $in['include_tags_all']
+            : [];
+        $tagsAny = array_values(array_unique(array_filter(array_map(static function($t){
+            $t = trim((string)$t);
+            return $t === '' ? null : $t;
+        }, $tagsAny))));
+        $tagsAll = array_values(array_unique(array_filter(array_map(static function($t){
+            $t = trim((string)$t);
+            return $t === '' ? null : $t;
+        }, $tagsAll))));
+        $tagModeAll = !empty($tagsAll);
+        $tagsFilter = $tagModeAll ? $tagsAll : $tagsAny;
+        $hasTags = !empty($tagsFilter);
 
         // Anchors: cluster_ids only
         $anchors = [];
@@ -68,7 +85,97 @@ final class PaletteController
         }
         $anchors = array_values(array_unique(array_filter(array_map('intval', (array)$anchors), fn($v)=>$v>0)));
 
+        // Optional size window (applied only if provided)
+        $sizeMin = isset($in['size_min']) ? (int)$in['size_min'] : null;
+        $sizeMax = isset($in['size_max']) ? (int)$in['size_max'] : null;
+
         if (!$anchors) {
+            if ($hasTags) {
+                $paletteRepo = new PdoPaletteRepository($this->pdo);
+                $idsRes = $paletteRepo->findPaletteIdsByTags($tagsFilter, $tagModeAll, $limit, $offset);
+                $ids = $idsRes['palette_ids'] ?? [];
+                if (!$ids) {
+                    return [
+                        'items'          => [],
+                        'total_count'    => 0,
+                        'counts_by_size' => (object)[],
+                        'limit'          => $limit,
+                        'next_offset'    => null,
+                        'branch'         => 'TagsOnly',
+                    ];
+                }
+                $svc = new PaletteAnchorService($paletteRepo);
+                $hydrated = $svc->hydrateVisibleAnySizeByIds($ids, $limit, 0);
+                $items = is_array($hydrated['items'] ?? null) ? $hydrated['items'] : [];
+                $total = (int)($idsRes['total_count'] ?? 0);
+
+                // Optional size window
+                if ($sizeMin !== null || $sizeMax !== null) {
+                    $min = ($sizeMin !== null) ? (int)$sizeMin : 1;
+                    $max = ($sizeMax !== null) ? (int)$sizeMax : 99;
+                    $items = array_values(array_filter($items, static function(array $p) use ($min,$max): bool {
+                        $sz = (int)($p['size'] ?? 0);
+                        return ($sz >= $min && $sz <= $max);
+                    }));
+                    $total = count($items);
+                }
+
+                $counts = [];
+                foreach ($items as $p) {
+                    $s = (string)($p['size'] ?? 0);
+                    if ($s !== '0') $counts[$s] = ($counts[$s] ?? 0) + 1;
+                }
+                $next = ($offset + $limit < $total) ? ($offset + $limit) : null;
+
+                // Ensure member_pairs for swatch colors
+                if (!empty($items)) {
+                    $allCids = [];
+                    foreach ($items as $it) {
+                        foreach (($it['member_cluster_ids'] ?? []) as $cid) $allCids[] = (int)$cid;
+                    }
+                    $allCids = array_values(array_unique(array_filter($allCids, fn($v)=>$v>0)));
+                    if ($allCids) {
+                        $hexMap = (new PdoClusterRepository($this->pdo))->getRepHexForClusterIds($allCids);
+                        foreach ($items as &$it) {
+                            $pairs = [];
+                            foreach (($it['member_cluster_ids'] ?? []) as $cid) {
+                                $cid = (int)$cid; $hex = $hexMap[$cid] ?? '';
+                                $pairs[] = $cid . ':' . ltrim($hex, '#');
+                            }
+                            $it['member_pairs'] = implode(',', $pairs);
+                        }
+                        unset($it);
+                    }
+                }
+
+                // Attach meta/tags
+                $pids = array_values(array_unique(array_filter(array_map(
+                    fn($it) => (int)($it['palette_id'] ?? 0), $items
+                ), fn($v)=>$v>0)));
+                if ($pids) {
+                    $metaMap = $paletteRepo->getMetaForPaletteIds($pids);
+                    $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
+                    foreach ($items as &$it) {
+                        $pid = (int)($it['palette_id'] ?? 0);
+                        $it['meta'] = array_merge(
+                            ['nickname'=>null,'terry_says'=>null,'terry_fav'=>0,'tags'=>[]],
+                            $metaMap[$pid] ?? []
+                        );
+                        $it['meta']['tags'] = $tagsMap[$pid] ?? [];
+                    }
+                    unset($it);
+                }
+
+                return [
+                    'items'          => $items,
+                    'total_count'    => $total,
+                    'counts_by_size' => (object)$counts,
+                    'limit'          => $limit,
+                    'next_offset'    => $next,
+                    'branch'         => 'TagsOnly',
+                ];
+            }
+
             return [
                 'items'          => [],
                 'total_count'    => 0,
@@ -93,10 +200,6 @@ final class PaletteController
             $v = $in['enforce_seed_presence'];
             $enforceSeedPresence = ($v === 1 || $v === '1' || $v === true || $v === 'true' || $v === 'TRUE');
         }
-
-        // Optional size window (applied only if provided) — important for test behavior
-        $sizeMin = isset($in['size_min']) ? (int)$in['size_min'] : null;
-        $sizeMax = isset($in['size_max']) ? (int)$in['size_max'] : null;
 
         // Debug snapshot + headers
         $__debug_snapshot = [
@@ -128,19 +231,38 @@ final class PaletteController
             }
             unset($it);
 
+            $paletteRepo = new \App\Repos\PdoPaletteRepository($this->pdo);
+            $pids = array_values(array_unique(array_filter(array_map(
+                fn($it) => (int)($it['palette_id'] ?? 0), $items
+            ), fn($v)=>$v>0)));
+
+            // Filter by tags if requested
+            if ($hasTags && $pids) {
+                $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
+                $need = array_map('strtolower', $tagsFilter);
+                $items = array_values(array_filter($items, function(array $it) use ($tagsMap, $need, $tagModeAll): bool {
+                    $pid = (int)($it['palette_id'] ?? 0);
+                    $tags = array_map('strtolower', $tagsMap[$pid] ?? []);
+                    if (!$need) return true;
+                    if ($tagModeAll) {
+                        return empty(array_diff($need, $tags));
+                    }
+                    return !empty(array_intersect($need, $tags));
+                }));
+                $pids = array_values(array_unique(array_filter(array_map(
+                    fn($it) => (int)($it['palette_id'] ?? 0), $items
+                ), fn($v)=>$v>0)));
+            }
+
             $counts = [];
             foreach ($items as $p) {
                 $s = (string)($p['size'] ?? 0);
                 if ($s !== '0') $counts[$s] = ($counts[$s] ?? 0) + 1;
             }
-            $total = (int)($res['total_count'] ?? 0);
+            $total = $hasTags ? count($items) : (int)($res['total_count'] ?? 0);
             $next  = ($offset + $limit < $total) ? ($offset + $limit) : null;
 
-                        // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
-            $paletteRepo = new \App\Repos\PdoPaletteRepository($this->pdo);
-            $pids = array_values(array_unique(array_filter(array_map(
-                fn($it) => (int)($it['palette_id'] ?? 0), $items
-            ), fn($v)=>$v>0)));
+            // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
             if ($pids) {
                 $metaMap = $paletteRepo->getMetaForPaletteIds($pids);
                 $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
@@ -457,20 +579,39 @@ final class PaletteController
             $neighborsUsedPills = $mapped;
         }
 
+        $paletteRepo = new \App\Repos\PdoPaletteRepository($this->pdo);
+        $pids = array_values(array_unique(array_filter(array_map(
+            fn($it) => (int)($it['palette_id'] ?? 0), $items
+        ), fn($v)=>$v>0)));
+
+        // Filter by tags if requested
+        if ($hasTags && $pids) {
+            $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
+            $need = array_map('strtolower', $tagsFilter);
+            $items = array_values(array_filter($items, function(array $it) use ($tagsMap, $need, $tagModeAll): bool {
+                $pid = (int)($it['palette_id'] ?? 0);
+                $tags = array_map('strtolower', $tagsMap[$pid] ?? []);
+                if (!$need) return true;
+                if ($tagModeAll) {
+                    return empty(array_diff($need, $tags));
+                }
+                return !empty(array_intersect($need, $tags));
+            }));
+            $pids = array_values(array_unique(array_filter(array_map(
+                fn($it) => (int)($it['palette_id'] ?? 0), $items
+            ), fn($v)=>$v>0)));
+        }
+
         // counts_by_size + next_offset (based on deduped $items)
         $counts = [];
         foreach ($items as $p) {
             $s = (string)($p['size'] ?? 0);
             if ($s !== '0') $counts[$s] = ($counts[$s] ?? 0) + 1;
         }
+        $total = $hasTags ? count($items) : $total;
         $next  = ($offset + $limit < $total) ? ($offset + $limit) : null;
 
-                    // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
-               // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
-        $paletteRepo = new \App\Repos\PdoPaletteRepository($this->pdo);
-        $pids = array_values(array_unique(array_filter(array_map(
-            fn($it) => (int)($it['palette_id'] ?? 0), $items
-        ), fn($v)=>$v>0)));
+        // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
         if ($pids) {
             $metaMap = $paletteRepo->getMetaForPaletteIds($pids);
             $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);

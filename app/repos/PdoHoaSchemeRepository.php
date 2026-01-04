@@ -1,0 +1,167 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Repos;
+
+use PDO;
+
+class PdoHoaSchemeRepository
+{
+    private PDO $pdo;
+
+    public function __construct(PDO $pdo)
+    {
+        $this->pdo = $pdo;
+    }
+
+    /* =========================================================
+     * SCHEMES
+     * ======================================================= */
+
+    public function getSchemesByHoaId(int $hoaId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT *
+            FROM hoa_schemes
+            WHERE hoa_id = :hoa_id
+            ORDER BY scheme_code ASC
+        ");
+        $stmt->execute(['hoa_id' => $hoaId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getSchemeById(int $schemeId): ?array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT *
+            FROM hoa_schemes
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $schemeId]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function insertScheme(array $data): int
+    {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO hoa_schemes (
+                hoa_id,
+                scheme_code,
+                source_brand,
+                notes
+            ) VALUES (
+                :hoa_id,
+                :scheme_code,
+                :source_brand,
+                :notes
+            )
+        ");
+
+        $stmt->execute([
+            'hoa_id' => $data['hoa_id'],
+            'scheme_code' => $data['scheme_code'],
+            'source_brand' => $data['source_brand'],
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    public function updateScheme(int $schemeId, array $data): void
+    {
+        $stmt = $this->pdo->prepare("
+            UPDATE hoa_schemes
+            SET
+                scheme_code = :scheme_code,
+                source_brand = :source_brand,
+                notes = :notes
+            WHERE id = :id
+        ");
+
+        $stmt->execute([
+            'id' => $schemeId,
+            'scheme_code' => $data['scheme_code'],
+            'source_brand' => $data['source_brand'],
+            'notes' => $data['notes'] ?? null,
+        ]);
+    }
+
+    /* =========================================================
+     * SCHEME COLORS
+     * ======================================================= */
+
+    public function getColorsBySchemeId(int $schemeId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT sc.*, c.*
+            FROM hoa_scheme_colors sc
+            JOIN colors c ON c.id = sc.color_id
+            WHERE sc.scheme_id = :scheme_id
+            ORDER BY c.name ASC
+        ");
+        $stmt->execute(['scheme_id' => $schemeId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getAllowedColorsByRole(int $schemeId, string $role): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT c.*, sc.allowed_roles
+            FROM hoa_scheme_colors sc
+            JOIN colors c ON c.id = sc.color_id
+            WHERE sc.scheme_id = :scheme_id
+              AND (
+                    sc.allowed_roles = 'any'
+                    OR FIND_IN_SET(:role, sc.allowed_roles)
+                  )
+            ORDER BY c.name ASC
+        ");
+        $stmt->execute([
+            'scheme_id' => $schemeId,
+            'role' => $role,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function insertSchemeColor(
+        int $schemeId,
+        int $colorId,
+        string $allowedRoles,
+        ?string $notes = null
+    ): void {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO hoa_scheme_colors (
+                scheme_id,
+                color_id,
+                allowed_roles,
+                notes
+            ) VALUES (
+                :scheme_id,
+                :color_id,
+                :allowed_roles,
+                :notes
+            )
+        ");
+
+        $stmt->execute([
+            'scheme_id' => $schemeId,
+            'color_id' => $colorId,
+            'allowed_roles' => $allowedRoles,
+            'notes' => $notes,
+        ]);
+    }
+
+    public function deleteSchemeColor(int $id): void
+    {
+        $stmt = $this->pdo->prepare("
+            DELETE FROM hoa_scheme_colors
+            WHERE id = :id
+        ");
+        $stmt->execute(['id' => $id]);
+    }
+}

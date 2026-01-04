@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import "./browse-palettes.css";
 
 export default function PaletteRow({ palette, onClick }) {
@@ -14,6 +14,8 @@ export default function PaletteRow({ palette, onClick }) {
   const terryFav = Number(meta.terry_fav || 0) === 1;
   const terrySays = meta.terry_says ? String(meta.terry_says).trim() : "";
   const tags = Array.isArray(meta.tags) ? meta.tags : [];
+  const [showFullTerry, setShowFullTerry] = useState(false);
+  const terryHasMore = terrySays.length > 120;
 
   return (
     <div
@@ -50,7 +52,26 @@ export default function PaletteRow({ palette, onClick }) {
           </div>
 
           {/* Optional “Terry says” line (fades if long; no label) */}
-          {terrySays && <div className="bpv1-terry">Terry says: {terrySays}</div>}
+          {terrySays && (
+            <div className="bpv1-terrywrap">
+              <div className={`bpv1-terry ${showFullTerry ? "is-full" : ""}`}>
+                Terry says: {terrySays}
+              </div>
+              {terryHasMore && (
+                <button
+                  type="button"
+                  className="bpv1-terry-more"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowFullTerry((v) => !v);
+                  }}
+                >
+                  {showFullTerry ? "less" : "…more"}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Tag chips (no “Tags:” label) */}
           {tags.length > 0 && (

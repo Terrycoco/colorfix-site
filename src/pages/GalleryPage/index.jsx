@@ -180,7 +180,8 @@ const GalleryPage = () => {
             className={`btn ${groupMode === 'hue' ? 'btn-active' : ''}`}
             title="Group by Hue"
           >
-            Group by Hue
+            <span className="btn-label-full">Group by Hue</span>
+            <span className="btn-label-short">Sort by Hue</span>
           </button>
           <button
             type="button"
@@ -189,7 +190,8 @@ const GalleryPage = () => {
             className={`btn ${groupMode === 'lightness' ? 'btn-active' : ''}`}
             title="Group by Lightness"
           >
-            Group by Lightness
+            <span className="btn-label-full">Group by Lightness</span>
+            <span className="btn-label-short">By Lightness</span>
           </button>
         </div>
       )}

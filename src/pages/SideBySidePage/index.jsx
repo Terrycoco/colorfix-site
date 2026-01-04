@@ -1,6 +1,6 @@
 // SideBySidePage.jsx
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {API_FOLDER} from '@helpers/config';
 import {useAppState} from '@context/AppStateContext';
 import {isAdmin} from '@helpers/authHelper';
@@ -16,6 +16,9 @@ export default function SideBySidePage() {
     const [notes, setNotes] = useState('');
     const [friends, setFriends] = useState([]);
     const navigate = useNavigate();
+    const location = useLocation();
+    const suppressNavigateRef = useRef(false);
+    const lastSearchRef = useRef(location.search);
 
     const loadFriends = (id) => {
         const ts = Date.now();
@@ -32,11 +35,13 @@ export default function SideBySidePage() {
       };
   
     useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('a') || params.get('b')) return;
         if (recentSwatches.length >= 2) {
         setColorA(recentSwatches[recentSwatches.length - 2]);
         setColorB(recentSwatches[recentSwatches.length - 1]);
         }
-    }, [recentSwatches]);
+    }, [recentSwatches, location.search]);
 
     useEffect(() => {
       if (colorA?.id) {
@@ -46,13 +51,87 @@ export default function SideBySidePage() {
       }
     }, [colorA]);
 
-    const go = (colorid) => {
-      navigate(`/color/${colorid}`); // go to detail
+    async function fetchColorById(colorId) {
+      const resp = await fetch(`${API_FOLDER}/get-single-color.php?id=${colorId}`);
+      const data = await resp.json();
+      if (data?.status !== 'success' || !data?.data) return null;
+      const c = data.data;
+      return {
+        id: c.id,
+        name: c.name,
+        brand: c.brand,
+        brand_name: c.brand_name,
+        code: c.code,
+        r: c.r,
+        g: c.g,
+        b: c.b,
+        hcl_l: c.hcl_l,
+        hcl_c: c.hcl_c,
+        hcl_h: c.hcl_h,
+        hex6: c.hex6,
+        cluster_id: c.cluster_id
+      };
+    }
+
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const aId = Number(params.get('a') || 0);
+      const bId = Number(params.get('b') || 0);
+      let alive = true;
+      async function hydrateFromQuery() {
+        if (aId && (!colorA || Number(colorA.id) !== aId)) {
+          const fetched = await fetchColorById(aId);
+          if (alive && fetched) setColorA(fetched);
+        }
+        if (bId && (!colorB || Number(colorB.id) !== bId)) {
+          const fetched = await fetchColorById(bId);
+          if (alive && fetched) setColorB(fetched);
+        }
+      }
+      hydrateFromQuery();
+      return () => { alive = false; };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
+
+    useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      if (colorA?.id) params.set('a', colorA.id);
+      else params.delete('a');
+      if (colorB?.id) params.set('b', colorB.id);
+      else params.delete('b');
+      const nextSearch = params.toString() ? `?${params.toString()}` : '';
+      if (nextSearch === lastSearchRef.current) return;
+      lastSearchRef.current = nextSearch;
+      const nextUrl = `${location.pathname}${nextSearch}`;
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }, [colorA?.id, colorB?.id, location.pathname, location.search]);
+
+    const go = (colorid, event) => {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (suppressNavigateRef.current) {
+        suppressNavigateRef.current = false;
+        return;
+      }
+      const params = new URLSearchParams();
+      if (colorA?.id) params.set('a', colorA.id);
+      if (colorB?.id) params.set('b', colorB.id);
+      const query = params.toString();
+      const returnTo = `/sbs${query ? `?${query}` : ''}`;
+      navigate(`/color/${colorid}${query ? `?${query}` : ''}`, {
+        state: { returnTo }
+      }); // go to detail
     };
 
     //handlers
     const handleOnSelect = (color) => {
         console.log('newcolor:', color);
+      suppressNavigateRef.current = true;
+      setTimeout(() => {
+        suppressNavigateRef.current = false;
+      }, 150);
       if (!colorA) {
         setColorA(color);
       } else if (!colorB) {
@@ -107,14 +186,18 @@ return (
   <div className="side-by-side-page">
     <div className="swatch-section">
       <h4 className="page-title">Compare Colors</h4>
-      <FuzzySearchColorSelect onSelect={handleOnSelect} onFocus={handleOnFocus} />
+      <FuzzySearchColorSelect
+        onSelect={handleOnSelect}
+        onFocus={handleOnFocus}
+        mobileBreakpoint={0}
+      />
       <div className="sbs-wrapper admin-compare-wrapper">
             <div className="sbs-comparison-block">
               <div className="sbs-swatch-block">
                 <div
                   className={`sbs-swatch${!colorA ? ' placeholder' : ''}`}
                   style={colorA ? { backgroundColor: `rgb(${colorA.r}, ${colorA.g}, ${colorA.b})` } : {}}
-                    onClick={colorA ? go(colorA.id): null}
+                    onClick={colorA ? (e) => go(colorA.id, e) : undefined}
                 />
                 
                 {colorA && (
@@ -147,8 +230,9 @@ return (
                       </div>
                       <div className="value-label">Code:</div>
                       <div className="compare-highlight">{colorA.code}</div>
-                        <div className="value-label" >{colorA.id}</div>
-                          <div className="value-label" >{colorA.hex6}</div>
+                  
+                        <div className="value-label" >Hex: #{colorA.hex6}</div>
+                              <div className="value-label" >id: {colorA.id}</div>
                       </div>
                 )}
               </div>
@@ -157,7 +241,7 @@ return (
                 <div
                   className={`sbs-swatch${!colorB ? ' placeholder' : ''}`}
                   style={colorB ? { backgroundColor: `rgb(${colorB.r}, ${colorB.g}, ${colorB.b})` } : {}}
-                  onClick={colorB ? () => go(colorB.id) : undefined}
+                  onClick={colorB ? (e) => go(colorB.id, e) : undefined}
                 />
                 
                 {colorB && (
@@ -196,8 +280,10 @@ return (
                       </div>
                       <div className="value-label">Code:</div>
                       <div className="compare-highlight">{colorB.code}</div>
-                      <div className="value-label" >{colorB.id}</div>
-                      <div className="value-label" >{colorB.hex6}</div>
+      
+                      <div className="value-label">Hex: #{colorB.hex6}</div>
+                      <div className="value-label" >id: {colorB.id}</div>
+                     
               </div>
                 )}
               </div>

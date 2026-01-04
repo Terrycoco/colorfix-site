@@ -8,6 +8,7 @@ import { PaletteOutlineIcon } from '@components/Icons/PaletteIcons';
 import useCanGoBack from "@hooks/useCanGoBack.js";
 import MiniBrandIcon from '@components/BrandFilter/MiniBrandIcon';
 import BrandFilterModal from "@components/BrandFilter";
+import AdminMenu from "@components/AdminMenu/AdminMenu";
 
 
 const BoardScroller = () => {
@@ -166,8 +167,26 @@ const goToPalette = (e) => {
         {/* LEFT */}
         <div className="scroller-left">
           {canGoBack && (
-            <button className="board-tab" onClick={() => navigate(-1)}>← Back</button>
+            <button
+              className="board-tab"
+              onClick={() => {
+                const params = new URLSearchParams(location.search);
+                const hasCompareParams = params.get('a') || params.get('b');
+                const returnTo = location.state?.returnTo
+                  || ((location.pathname.startsWith('/color/') && hasCompareParams)
+                    ? `/sbs?${params.toString()}`
+                    : null);
+                if (returnTo) {
+                  navigate(returnTo);
+                } else {
+                  navigate(-1);
+                }
+              }}
+            >
+              ← Back
+            </button>
           )}
+          <AdminMenu />
         </div>
 
         {/* CENTER (always centered) */}
