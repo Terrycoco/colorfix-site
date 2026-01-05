@@ -12,6 +12,7 @@ const SCHEMES_SAVE_URL = `${API_FOLDER}/v2/admin/hoa-schemes/save.php`;
 const SCHEME_COLORS_LIST_URL = `${API_FOLDER}/v2/admin/hoa-schemes/colors/list.php`;
 const SCHEME_COLORS_ADD_URL = `${API_FOLDER}/v2/admin/hoa-schemes/colors/add.php`;
 const SCHEME_COLORS_DELETE_URL = `${API_FOLDER}/v2/admin/hoa-schemes/colors/delete.php`;
+const SCHEME_COLORS_UPDATE_URL = `${API_FOLDER}/v2/admin/hoa-schemes/colors/update.php`;
 
 const emptyHoa = {
   id: null,
@@ -74,11 +75,15 @@ export default function AdminHOAPage() {
   const [schemeColors, setSchemeColors] = useState([]);
   const [schemeColorForm, setSchemeColorForm] = useState({
     color_id: "",
-    allowed_roles: "any",
+    allowed_roles: "",
     notes: "",
   });
   const [schemeColorSelected, setSchemeColorSelected] = useState(null);
   const [schemeColorPickerKey, setSchemeColorPickerKey] = useState(0);
+  const [schemeColorEditorOpen, setSchemeColorEditorOpen] = useState(false);
+  const [schemeColorEditing, setSchemeColorEditing] = useState(null);
+  const [schemeColorSaving, setSchemeColorSaving] = useState(false);
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
 
   useEffect(() => {
     fetchHoas();
@@ -154,7 +159,16 @@ export default function AdminHOAPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load scheme colors");
-      setSchemeColors(data.items || []);
+      const items = data.items || [];
+      setSchemeColors(items);
+      setRoleSuggestions((prev) => {
+        const nextSuggestions = new Set(prev);
+        items.forEach((row) => {
+          const roles = (row.allowed_roles || "").trim();
+          if (roles) nextSuggestions.add(roles);
+        });
+        return Array.from(nextSuggestions);
+      });
     } catch (err) {
       setSchemeError(err?.message || "Failed to load scheme colors");
     }
@@ -182,6 +196,7 @@ export default function AdminHOAPage() {
   function closeSchemes() {
     setSchemesOpen(false);
     setSchemeEditorOpen(false);
+    setSchemeColorEditorOpen(false);
   }
 
   function openSchemeEditor(scheme = null) {
@@ -227,6 +242,10 @@ export default function AdminHOAPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
       await fetchSchemes(activeId);
+      if (!schemeForm.id && data.id) {
+        setSelectedSchemeId(data.id);
+        fetchSchemeColors(data.id);
+      }
       setSchemeEditorOpen(false);
     } catch (err) {
       setSchemeError(err?.message || "Save failed");
@@ -237,6 +256,7 @@ export default function AdminHOAPage() {
 
   function handleSchemeSelect(schemeId) {
     setSelectedSchemeId(schemeId);
+    setSchemeColorEditorOpen(false);
     fetchSchemeColors(schemeId);
   }
 
@@ -251,7 +271,7 @@ export default function AdminHOAPage() {
       const payload = {
         scheme_id: selectedSchemeId,
         color_id: colorId,
-        allowed_roles: schemeColorForm.allowed_roles || "any",
+        allowed_roles: schemeColorForm.allowed_roles.trim() || "any",
         notes: schemeColorForm.notes || null,
       };
       const res = await fetch(SCHEME_COLORS_ADD_URL, {
@@ -262,7 +282,10 @@ export default function AdminHOAPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Add failed");
-      setSchemeColorForm({ color_id: "", allowed_roles: "any", notes: "" });
+      if (payload.allowed_roles && !roleSuggestions.includes(payload.allowed_roles)) {
+        setRoleSuggestions((prev) => [...prev, payload.allowed_roles]);
+      }
+      setSchemeColorForm({ color_id: "", allowed_roles: "", notes: "" });
       setSchemeColorSelected(null);
       setSchemeColorPickerKey((v) => v + 1);
       fetchSchemeColors(selectedSchemeId);
@@ -285,6 +308,48 @@ export default function AdminHOAPage() {
       fetchSchemeColors(selectedSchemeId);
     } catch (err) {
       setSchemeError(err?.message || "Delete failed");
+    }
+  }
+
+  function openSchemeColorEditor(row) {
+    if (!row) return;
+    setSchemeColorEditing({
+      scheme_color_id: row.scheme_color_id ?? row.id,
+      name: row.name || row.color_name || "",
+      brand: row.brand || row.color_brand || "",
+      allowed_roles: row.allowed_roles || "any",
+      notes: row.notes || "",
+    });
+    setSchemeColorEditorOpen(true);
+  }
+
+  async function handleSchemeColorUpdate() {
+    if (!schemeColorEditing?.scheme_color_id) return;
+    setSchemeColorSaving(true);
+    setSchemeError("");
+    const payload = {
+      id: schemeColorEditing.scheme_color_id,
+      allowed_roles: schemeColorEditing.allowed_roles?.trim() || "any",
+      notes: schemeColorEditing.notes || null,
+    };
+    try {
+      const res = await fetch(SCHEME_COLORS_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Update failed");
+      if (payload.allowed_roles && !roleSuggestions.includes(payload.allowed_roles)) {
+        setRoleSuggestions((prev) => [...prev, payload.allowed_roles]);
+      }
+      setSchemeColorEditorOpen(false);
+      fetchSchemeColors(selectedSchemeId);
+    } catch (err) {
+      setSchemeError(err?.message || "Update failed");
+    } finally {
+      setSchemeColorSaving(false);
     }
   }
 
@@ -499,7 +564,9 @@ export default function AdminHOAPage() {
         <div className="hoa-modal">
           <div className="hoa-modal__content">
             <div className="hoa-modal__header">
-              <div className="hoa-modal__title">HOA Schemes</div>
+              <div className="hoa-modal__title">
+                HOA Schemes{form.name ? ` — ${form.name}` : ""}
+              </div>
               <div className="hoa-modal__actions">
                 <button type="button" className="primary-btn" onClick={() => openSchemeEditor(null)}>
                   + New Scheme
@@ -560,12 +627,20 @@ export default function AdminHOAPage() {
                         placeholder="Allowed roles (comma or 'any')"
                         value={schemeColorForm.allowed_roles}
                         onChange={(e) => setSchemeColorForm((prev) => ({ ...prev, allowed_roles: e.target.value }))}
+                        onFocus={(e) => e.target.select()}
+                        list="scheme-role-suggestions"
                       />
+                      <datalist id="scheme-role-suggestions">
+                        {roleSuggestions.map((entry) => (
+                          <option key={entry} value={entry} />
+                        ))}
+                      </datalist>
                       <input
                         type="text"
                         placeholder="Notes"
                         value={schemeColorForm.notes}
                         onChange={(e) => setSchemeColorForm((prev) => ({ ...prev, notes: e.target.value }))}
+                        onFocus={(e) => e.target.select()}
                       />
                       <button type="button" className="primary-btn" onClick={handleAddSchemeColor}>
                         Add Color
@@ -581,7 +656,11 @@ export default function AdminHOAPage() {
                         <div></div>
                       </div>
                       {schemeColors.map((row) => (
-                        <div key={row.id} className="hoa-schemes-row">
+                        <div
+                          key={row.scheme_color_id ?? row.id}
+                          className="hoa-schemes-row"
+                          onDoubleClick={() => openSchemeColorEditor(row)}
+                        >
                           <div>{row.name || row.color_name || row.color_id}</div>
                           <div>{row.brand || row.color_brand || "-"}</div>
                           <div>{row.allowed_roles || "any"}</div>
@@ -590,7 +669,7 @@ export default function AdminHOAPage() {
                             <button
                               type="button"
                               className="ghost-btn"
-                              onClick={() => handleDeleteSchemeColor(row.id)}
+                              onClick={() => handleDeleteSchemeColor(row.scheme_color_id ?? row.id)}
                             >
                               Remove
                             </button>
@@ -650,6 +729,62 @@ export default function AdminHOAPage() {
             <div className="hoa-modal__footer">
               <button type="button" className="primary-btn" onClick={handleSchemeSave} disabled={schemeSaving}>
                 {schemeSaving ? "Saving..." : "Save scheme"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {schemeColorEditorOpen && schemeColorEditing && (
+        <div className="hoa-modal">
+          <div className="hoa-modal__content hoa-modal__content--compact">
+            <div className="hoa-modal__header">
+              <div className="hoa-modal__title">
+                Edit Scheme Color
+              </div>
+              <button type="button" className="ghost-btn" onClick={() => setSchemeColorEditorOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="hoa-modal__body">
+              <div className="scheme-color-editor-meta">
+                <strong>{schemeColorEditing.name || "Color"}</strong>
+                {schemeColorEditing.brand ? ` • ${schemeColorEditing.brand}` : ""}
+              </div>
+              <div className="form-grid">
+                <label>
+                  Allowed roles
+                  <input
+                    type="text"
+                    value={schemeColorEditing.allowed_roles}
+                    onChange={(e) =>
+                      setSchemeColorEditing((prev) => ({ ...prev, allowed_roles: e.target.value }))
+                    }
+                    onFocus={(e) => e.target.select()}
+                    list="scheme-role-suggestions"
+                  />
+                </label>
+                <label>
+                  Notes
+                  <input
+                    type="text"
+                    value={schemeColorEditing.notes}
+                    onChange={(e) =>
+                      setSchemeColorEditing((prev) => ({ ...prev, notes: e.target.value }))
+                    }
+                    onFocus={(e) => e.target.select()}
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="hoa-modal__footer">
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={handleSchemeColorUpdate}
+                disabled={schemeColorSaving}
+              >
+                {schemeColorSaving ? "Saving..." : "Save changes"}
               </button>
             </div>
           </div>

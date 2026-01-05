@@ -96,7 +96,16 @@ class PdoHoaSchemeRepository
     public function getColorsBySchemeId(int $schemeId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT sc.*, c.*
+            SELECT
+                sc.id AS scheme_color_id,
+                sc.scheme_id,
+                sc.color_id,
+                sc.allowed_roles,
+                sc.notes,
+                c.id AS color_id,
+                c.name,
+                c.brand,
+                c.hex6
             FROM hoa_scheme_colors sc
             JOIN colors c ON c.id = sc.color_id
             WHERE sc.scheme_id = :scheme_id
@@ -163,5 +172,21 @@ class PdoHoaSchemeRepository
             WHERE id = :id
         ");
         $stmt->execute(['id' => $id]);
+    }
+
+    public function updateSchemeColor(int $id, string $allowedRoles, ?string $notes = null): void
+    {
+        $stmt = $this->pdo->prepare("
+            UPDATE hoa_scheme_colors
+            SET
+                allowed_roles = :allowed_roles,
+                notes = :notes
+            WHERE id = :id
+        ");
+        $stmt->execute([
+            'id' => $id,
+            'allowed_roles' => $allowedRoles,
+            'notes' => $notes,
+        ]);
     }
 }

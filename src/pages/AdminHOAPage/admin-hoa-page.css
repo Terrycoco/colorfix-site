@@ -154,7 +154,7 @@
 .hoa-modal__content {
   background: #fff;
   border-radius: 16px;
-  padding: 16px;
+  padding: 12px 14px;
   max-width: 960px;
   width: 100%;
   max-height: 90vh;
@@ -174,7 +174,7 @@
 }
 
 .hoa-modal__title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
 }
 
@@ -190,9 +190,9 @@
 }
 
 .ghost-btn {
-  border: 1px solid #cfcfcf;
-  background: #fff;
-  padding: 8px 12px;
+  border: 1px solid #b7b7b7;
+  background: #f4f4f4;
+  padding: 6px 12px;
   border-radius: 10px;
   cursor: pointer;
   color: #111;
@@ -210,7 +210,7 @@
   display: grid;
   grid-template-columns: 160px 180px 1fr;
   gap: 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-bottom: 1px solid #eee;
   cursor: pointer;
   align-items: center;
@@ -240,10 +240,11 @@
   grid-template-columns: 280px 1fr 1fr auto;
   gap: 8px;
   margin-bottom: 12px;
+  align-items: flex-end;
 }
 
 .scheme-color-form input {
-  height: 36px;
+  height: 32px;
 }
 
 .scheme-color-select {
@@ -260,6 +261,12 @@
 .hoa-scheme-colors .hoa-schemes-row {
   grid-template-columns: 1fr 140px 160px 1fr 90px;
   cursor: default;
+}
+
+.scheme-color-editor-meta {
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #333;
 }
 
 @media (max-width: 900px) {
