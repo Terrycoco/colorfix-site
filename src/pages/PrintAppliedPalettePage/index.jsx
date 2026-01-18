@@ -54,7 +54,9 @@ export default function PrintAppliedPalettePage() {
         )}
 
         <div className="print-meta">
-          {palette?.title && <div className="print-name">{palette.title}</div>}
+          {(palette?.display_title || palette?.title) && (
+            <div className="print-name">{palette?.display_title || palette?.title}</div>
+          )}
           {palette?.notes && <div className="print-notes">{palette.notes}</div>}
         </div>
 

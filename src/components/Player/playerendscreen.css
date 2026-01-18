@@ -12,6 +12,10 @@
   z-index: 20;
 }
 
+.player-end-screen .player-exit {
+  z-index: 40;
+}
+
 .player-end-screen-inner {
   flex: 1;
   width: 100%;

@@ -41,6 +41,7 @@ if (!is_array($entries) || !count($entries)) {
 }
 
 $title = array_key_exists('title', $input) ? trim((string)$input['title']) : null;
+$displayTitle = array_key_exists('display_title', $input) ? trim((string)$input['display_title']) : null;
 $notes = array_key_exists('notes', $input) ? trim((string)$input['notes']) : null;
 $tags = normalizeTags($input['tags'] ?? null);
 $clearRender = !empty($input['clear_render']);
@@ -66,6 +67,7 @@ try {
 
     $fields = [];
     if ($title !== null) $fields['title'] = $title === '' ? null : $title;
+    if ($displayTitle !== null) $fields['display_title'] = $displayTitle === '' ? null : $displayTitle;
     if ($notes !== null) $fields['notes'] = $notes === '' ? null : $notes;
     if (array_key_exists('tags', $input)) $fields['tags'] = $tags;
     if ($fields) {

@@ -5,9 +5,11 @@ import "./player.css";
 const Player = forwardRef(function Player({
   slides = [],
   startIndex = 0,
+  playlistInstanceId,
   onAbort,
   onLikeChange,
   onPlaybackEnd,
+  hideStars = false,
   embedded = false,
 }, ref) {
   const allItems = Array.isArray(slides) ? slides : [];
@@ -34,6 +36,7 @@ const Player = forwardRef(function Player({
   const [likedSet, setLikedSet] = useState(() => new Set());
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
   const [cacheBustEnabled, setCacheBustEnabled] = useState(true);
+  const [showAdvanceHint, setShowAdvanceHint] = useState(true);
   const didInitRef = useRef(false);
   const endEmitRef = useRef(null);
   const currentImgRef = useRef(null);
@@ -42,6 +45,19 @@ const Player = forwardRef(function Player({
   const didLikeInteractRef = useRef(false);
   const cacheBustRef = useRef(Date.now());
 
+  function handleExit() {
+    if (onAbort) {
+      onAbort();
+      return;
+    }
+    if (typeof window !== "undefined") {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "/";
+      }
+    }
+  }
 
   useEffect(() => {
     if (!didInitRef.current) {
@@ -58,14 +74,36 @@ const Player = forwardRef(function Player({
     setPrevIndex(null);
     setIsFading(false);
     setTitleFull(false);
-  }, [safeStart]);
+    setLikedSet(readLikedSet(playlistInstanceId));
+    setShowAdvanceHint(true);
+    didLikeInteractRef.current = false;
+  }, [safeStart, playlistInstanceId]);
 
   useEffect(() => {
     cacheBustRef.current = Date.now();
     setCacheBustEnabled(true);
-  }, [slides]);
+    setLikedSet(readLikedSet(playlistInstanceId));
+    setShowAdvanceHint(true);
+    didLikeInteractRef.current = false;
+  }, [slides, playlistInstanceId]);
+
+  useEffect(() => {
+    writeLikedSet(playlistInstanceId, likedSet);
+  }, [likedSet, playlistInstanceId]);
+
+  useEffect(() => {
+    if (playbackState !== "playing") return;
+    if (activeIndex !== 0) {
+      if (showAdvanceHint) setShowAdvanceHint(false);
+      return;
+    }
+    if (!showAdvanceHint) return;
+    const timer = setTimeout(() => setShowAdvanceHint(false), 2200);
+    return () => clearTimeout(timer);
+  }, [activeIndex, playbackState, showAdvanceHint]);
 
   function isItemStarrable(item) {
+    if (hideStars) return false;
     if (!item) return false;
     const itemType = (item.type || "normal").toLowerCase();
     if (itemType === "intro" || itemType === "text") return false;
@@ -96,6 +134,7 @@ useEffect(() => {
 
 
   function handleAdvance() {
+    if (showAdvanceHint) setShowAdvanceHint(false);
     if (playbackState !== "playing") return;
     if (!playItems.length) return;
 
@@ -176,7 +215,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (isIntro) return;
+    if (isIntro || hideStars) return;
     if (!currentKey) return;
     setLikedSet((prev) => {
       const next = new Set(prev);
@@ -320,7 +359,8 @@ function startPlayback(nextMode, nextIndex = 0) {
       <button
         className="player-exit"
         type="button"
-        onClick={() => onAbort && onAbort()}
+        onClick={handleExit}
+        aria-label="Exit player"
       >
         ×
       </button>
@@ -433,9 +473,44 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
         </div>
+        {showAdvanceHint && playbackState === "playing" && activeIndex === 0 && (
+          <div className="player-advance-hint">Tap screen to advance</div>
+        )}
       </div>
     </div>
   );
 });
+
+function getLikeStorageKey(playlistInstanceId) {
+  const id = playlistInstanceId ?? "";
+  if (!id) return "";
+  return `playlist-liked:${id}`;
+}
+
+function readLikedSet(playlistInstanceId) {
+  if (typeof window === "undefined") return new Set();
+  const key = getLikeStorageKey(playlistInstanceId);
+  if (!key) return new Set();
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return new Set();
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return new Set();
+    return new Set(data.map((value) => String(value)));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeLikedSet(playlistInstanceId, likedSet) {
+  if (typeof window === "undefined") return;
+  const key = getLikeStorageKey(playlistInstanceId);
+  if (!key) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(Array.from(likedSet)));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export default Player;

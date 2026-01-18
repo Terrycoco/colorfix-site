@@ -25,6 +25,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 $playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
+$mode = trim((string)($_GET['mode'] ?? ''));
+$addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null;
 
 if ($playlistInstanceId <= 0) {
     respond(['ok' => false, 'error' => 'playlist_instance_id required'], 400);
@@ -32,7 +34,7 @@ if ($playlistInstanceId <= 0) {
 
 try {
     $service = new PlayerExperienceService($pdo);
-    $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start);
+    $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start, $mode, $addGroupId);
 
     respond([
         'ok'   => true,

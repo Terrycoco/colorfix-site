@@ -19,11 +19,21 @@ export const adminMenuItems = [
   {
     label: "Player",
     items: [
-     { label: "Upload Photos", href: "/admin/upload-photo" },
+      { label: "Upload Photos", href: "/admin/upload-photo" },
       { label: "Playlist Instances", href: "/admin/playlist-instances" },
-      { label: "Playlists", href: "/admin/playlists/new" },
+      { label: "Playlists", href: "/admin/playlists" },
+      { label: "CTAs", href: "/admin/ctas" },
+      { label: "Presenter", href: "/admin/player-presenter" },
       { label: "Player Preview", href: "/admin/player-preview/1" },
+    ],
+  },
+  {
+    label: "HOA",
+    items: [
       { label: "HOAs", href: "/admin/hoas" },
+      {label: "HOA Landing", href: "/hoa"},
+      { label: "HOA Scheme Mapper", href: "/admin/hoa-scheme-tester" },
+      { label: "HOA Mask Tester", href: "/admin/hoa-mask-tester" },
     ],
   },
   {

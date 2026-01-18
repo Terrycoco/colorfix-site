@@ -208,7 +208,7 @@
 
 .hoa-schemes-row {
   display: grid;
-  grid-template-columns: 160px 180px 1fr;
+  grid-template-columns: 200px 1fr;
   gap: 12px;
   padding: 6px 10px;
   border-bottom: 1px solid #eee;

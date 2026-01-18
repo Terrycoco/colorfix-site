@@ -14,31 +14,83 @@
 }
 
 .cta-button {
-  padding: 12px 16px;
+  padding: 12px 28px;
   font-size: 0.95rem;
   border-radius: 6px;
   cursor: pointer;
   border: none;
+  text-decoration: none;
+  line-height: 1.25;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
 }
 
 .cta-layout--stacked .cta-button {
-  width: min(100%, 320px);
+  width: min(100%, 360px);
+}
+
+.cta-button__label {
+  white-space: normal;
+}
+
+@media (max-width: 600px) {
+  .cta-layout {
+    width: 100%;
+  }
+
+  .cta-layout--stacked .cta-button,
+  .cta-layout--inline .cta-button {
+    width: 100%;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .cta-layout--stacked .cta-button--link,
+  .cta-layout--inline .cta-button--link {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .cta-button--primary {
-  background: #fff;
-  color: #000;
+  background: #111;
+  color: #fff;
 }
 
 .cta-button--secondary {
-  background: #2a2a2a;
-  color: #fff;
+  background: #f2f2f2;
+  color: #111;
+  border: 1px solid #d7d7d7;
 }
 
 .cta-button--ghost {
   background: transparent;
   color: #aaa;
   border: none;
+}
+
+.cta-button--link {
+  background: transparent;
+  color: #555;
+  border: none;
+  padding: 0;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-align: left;
+  width: auto;
+}
+
+.cta-button--link:hover {
+  color: #000;
+}
+
+.cta-layout--stacked .cta-button--link,
+.cta-layout--inline .cta-button--link {
+  width: auto;
+  align-self: flex-start;
 }
 
 .cta-button__icon {

@@ -15,7 +15,8 @@ class PlaylistItem
         public ?string $layout = null,
         public ?string $transition = null,
         public ?int $duration_ms = null,
-        public ?string $title_mode = null
+        public ?string $title_mode = null,
+        public ?bool $exclude_from_thumbs = null
     ) {
     }
 }

@@ -18,6 +18,9 @@ import MatchResultsPage from '@pages/MatchResultsPage';
 import QuickFindPage from '@pages/QuickFindPage';
 import BrowsePalettesPage from '@pages/BrowsePalettesPage';
 import PaletteTranslationPage from '@pages/PaletteTranslationPage';
+import { HOALandingPage, HOAExplainerPage, HOAContactPage } from "@pages/HOAPage";
+
+
 
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
 const CategoryEditPage = lazy(() => import('@pages/CategoryEditPage'));
@@ -40,14 +43,21 @@ const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
 const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
+const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresenterPage'));
 const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
 const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
 const AdminHOAPage = lazy(() => import('@pages/AdminHOAPage'));
+const AdminHoaSchemeTesterPage = lazy(() => import('@pages/AdminHoaSchemeTesterPage'));
+const AdminHoaMaskTesterPage = lazy(() => import('@pages/AdminHoaMaskTesterPage'));
+const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
+const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const StandAloneLayout = lazy(() => import('@layout/StandAloneLayout'));
+const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
+
 
 function AppRouter() {
   const renderWithSuspense = (Component, label) => (
@@ -82,6 +92,10 @@ function AppRouter() {
             path="playlist/:playlistId/:start"
             element={renderWithSuspense(PlayerPage, 'Loading player…')}
           />
+          <Route
+            path="playlist-thumbs/:playlistId"
+            element={renderWithSuspense(PlaylistThumbsPage, 'Loading palettes…')}
+          />
         </Route>
 
         {/* App shell (nav, etc.) */}
@@ -101,9 +115,13 @@ function AppRouter() {
             <Route path="about" element={<AboutPage />} />
            <Route path="matches" element={<MatchResultsPage />} />
            <Route path="quick-find" element={<QuickFindPage />} />
-          <Route path="browse-palettes" element={<BrowsePalettesPage />} />
+           <Route path="browse-palettes" element={<BrowsePalettesPage />} />
            <Route path="palette/:id/brands" element={<PaletteTranslationPage  />} />
            <Route path="/palette/translate" element={<PaletteTranslationPage />} />   
+           <Route path="/hoa" element={<HOALandingPage />} />
+            <Route path="/hoa/explain" element={<HOAExplainerPage />} />
+            <Route path="/hoa/contact" element={<HOAContactPage />} />
+
            
           </Route>
 
@@ -200,12 +218,32 @@ function AppRouter() {
               element={renderWithSuspense(AdminPlayerPage, 'Loading player preview…')}
             />
             <Route
+              path="player-presenter"
+              element={renderWithSuspense(AdminPlaylistPresenterPage, 'Loading presenter…')}
+            />
+            <Route
               path="playlist-instances"
               element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances…')}
             />
             <Route
+              path="ctas"
+              element={renderWithSuspense(AdminCtasPage, 'Loading CTAs…')}
+            />
+            <Route
               path="hoas"
               element={renderWithSuspense(AdminHOAPage, 'Loading HOAs…')}
+            />
+
+
+
+
+            <Route
+              path="hoa-scheme-tester"
+              element={renderWithSuspense(AdminHoaSchemeTesterPage, 'Loading HOA scheme tester…')}
+            />
+            <Route
+              path="hoa-mask-tester"
+              element={renderWithSuspense(AdminHoaMaskTesterPage, 'Loading HOA mask tester…')}
             />
             <Route
               path="playlists/:playlistId"
@@ -214,6 +252,10 @@ function AppRouter() {
             <Route
               path="playlists/new"
               element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor…')}
+            />
+            <Route
+              path="playlists"
+              element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists…')}
             />
           </Route>
 

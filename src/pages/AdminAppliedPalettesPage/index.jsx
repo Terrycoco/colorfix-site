@@ -32,6 +32,7 @@ export default function AdminAppliedPalettesPage() {
     open: false,
     palette: null,
     title: "",
+    displayTitle: "",
     notes: "",
     tags: "",
     status: { saving: false, error: "", success: "" },
@@ -167,6 +168,7 @@ export default function AdminAppliedPalettesPage() {
       open: true,
       palette: item,
       title: item.title || "",
+      displayTitle: item.display_title || "",
       notes: item.notes || "",
       tags: item.tags || "",
       status: { saving: false, error: "", success: "" },
@@ -178,6 +180,7 @@ export default function AdminAppliedPalettesPage() {
       open: false,
       palette: null,
       title: "",
+      displayTitle: "",
       notes: "",
       tags: "",
       status: { saving: false, error: "", success: "" },
@@ -198,6 +201,7 @@ export default function AdminAppliedPalettesPage() {
         body: JSON.stringify({
           palette_id: editModal.palette.id,
           title: editModal.title,
+          display_title: editModal.displayTitle,
           notes: editModal.notes,
           tags: editModal.tags,
         }),
@@ -305,6 +309,21 @@ export default function AdminAppliedPalettesPage() {
     ? `${shareModal.message || "Check out your ColorFix palette:"} ${shareLink}`
     : "";
   const smsLink = shareLink ? `sms:&body=${encodeURIComponent(smsBody)}` : "";
+  const sortedItems = useMemo(() => {
+    return [...(items || [])].sort((a, b) => {
+      const nameA = String(a?.title || "").toLowerCase();
+      const nameB = String(b?.title || "").toLowerCase();
+      if (nameA && nameB) {
+        const cmp = nameA.localeCompare(nameB);
+        if (cmp !== 0) return cmp;
+      } else if (nameA) {
+        return -1;
+      } else if (nameB) {
+        return 1;
+      }
+      return String(a?.id || 0).localeCompare(String(b?.id || 0));
+    });
+  }, [items]);
 
   return (
     <div className="admin-ap">
@@ -313,7 +332,7 @@ export default function AdminAppliedPalettesPage() {
         <div className="admin-ap__search">
           <input
             type="text"
-            placeholder="Search by title or asset"
+            placeholder="Search by handle or asset"
             value={draftQ}
             onChange={(e) => setDraftQ(e.target.value)}
             onKeyDown={(e) => {
@@ -335,12 +354,17 @@ export default function AdminAppliedPalettesPage() {
       {error && <div className="error">{error}</div>}
 
       <div className="admin-ap__list">
-        {items.map((item) => (
+        {sortedItems.map((item) => (
           <div key={item.id} className="admin-ap__row">
             <div className="admin-ap__main">
               <div className="admin-ap__title">
                 {item.title || `Palette #${item.id}`}
               </div>
+              {item.display_title && (
+                <div className="admin-ap__subtitle">
+                  {item.display_title}
+                </div>
+              )}
               <div className="admin-ap__meta">
                 {item.asset_id} · #{item.id}
               </div>
@@ -419,7 +443,7 @@ export default function AdminAppliedPalettesPage() {
         <div className="admin-ap__modal" role="dialog" aria-modal="true">
           <div className="admin-ap__modal-panel">
             <div className="admin-ap__modal-head">
-              <h2>Share {shareModal.palette.title || `Palette #${shareModal.palette.id}`}</h2>
+              <h2>Share {shareModal.palette.display_title || shareModal.palette.title || `Palette #${shareModal.palette.id}`}</h2>
               <button className="admin-ap__action-btn ghost" onClick={closeShareModal}>Close</button>
             </div>
             <label>
@@ -493,10 +517,17 @@ export default function AdminAppliedPalettesPage() {
               <button className="admin-ap__action-btn ghost" onClick={closeEditModal}>Close</button>
             </div>
             <label>
-              Nickname / Title
+              Handle (internal)
               <input
                 value={editModal.title}
                 onChange={(e) => setEditModal((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </label>
+            <label>
+              Display Title (viewer)
+              <input
+                value={editModal.displayTitle}
+                onChange={(e) => setEditModal((prev) => ({ ...prev, displayTitle: e.target.value }))}
               />
             </label>
             <label>

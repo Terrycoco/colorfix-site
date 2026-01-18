@@ -7,11 +7,14 @@ const LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const GET_URL = `${API_FOLDER}/v2/admin/playlist-instances/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instances/save.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const CTA_GROUPS_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
+const CTA_GROUP_ITEMS_URL = `${API_FOLDER}/v2/admin/cta-group-items/list.php`;
 
 const emptyInstance = {
   playlist_instance_id: null,
   playlist_id: "",
   instance_name: "",
+  display_title: "",
   instance_notes: "",
   intro_layout: "default",
   intro_title: "",
@@ -20,6 +23,7 @@ const emptyInstance = {
   intro_image_url: "",
   cta_group_id: "",
   cta_context_key: "default",
+  cta_overrides: {},
   share_enabled: true,
   share_title: "",
   share_description: "",
@@ -39,6 +43,9 @@ export default function AdminPlaylistInstancesPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [ctaGroups, setCtaGroups] = useState([]);
+  const [ctaGroupItems, setCtaGroupItems] = useState([]);
+  const [ctaOverrides, setCtaOverrides] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
@@ -49,6 +56,7 @@ export default function AdminPlaylistInstancesPage() {
 
   useEffect(() => {
     fetchPlaylists();
+    fetchCtaGroups();
   }, []);
 
   useEffect(() => {
@@ -59,6 +67,27 @@ export default function AdminPlaylistInstancesPage() {
     if (!activeId) return;
     fetchInstance(activeId);
   }, [activeId]);
+
+  useEffect(() => {
+    const groupId = form.cta_group_id;
+    if (!groupId) {
+      setCtaGroupItems([]);
+      return;
+    }
+    fetchCtaGroupItems(groupId);
+  }, [form.cta_group_id]);
+
+  useEffect(() => {
+    if (!ctaGroupItems.length) return;
+    setCtaOverrides((prev) => {
+      const allowed = new Set(ctaGroupItems.map((item) => String(item.cta_id)));
+      const next = {};
+      Object.entries(prev || {}).forEach(([key, value]) => {
+        if (allowed.has(String(key))) next[key] = value;
+      });
+      return next;
+    });
+  }, [ctaGroupItems]);
 
 
   async function fetchPlaylists() {
@@ -71,6 +100,43 @@ export default function AdminPlaylistInstancesPage() {
       setPlaylists(data.items || []);
     } catch (err) {
       // playlist list is optional for now
+    }
+  }
+
+  async function fetchCtaGroups() {
+    try {
+      const res = await fetch(`${CTA_GROUPS_URL}?_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA groups");
+      setCtaGroups(data.items || []);
+    } catch (err) {
+      // optional convenience list
+    }
+  }
+
+  async function fetchCtaGroupItems(groupId) {
+    try {
+      const res = await fetch(`${CTA_GROUP_ITEMS_URL}?group_id=${groupId}&_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA group items");
+      setCtaGroupItems(data.items || []);
+    } catch (err) {
+      setCtaGroupItems([]);
+    }
+  }
+
+  function parseOverrides(raw) {
+    if (!raw) return {};
+    if (typeof raw === "object") return raw;
+    try {
+      const decoded = JSON.parse(raw);
+      return decoded && typeof decoded === "object" ? decoded : {};
+    } catch {
+      return {};
     }
   }
 
@@ -117,6 +183,7 @@ export default function AdminPlaylistInstancesPage() {
         is_active: coerceBoolean(data.item?.is_active),
       };
       setForm(next);
+      setCtaOverrides(parseOverrides(data.item?.cta_overrides));
       setSaveStatus("");
       setSaveError("");
     } catch (err) {
@@ -130,9 +197,31 @@ export default function AdminPlaylistInstancesPage() {
     setSaveError("");
   }
 
+  function updateOverride(ctaId, key, value) {
+    setCtaOverrides((prev) => {
+      const next = { ...prev };
+      const base = next[ctaId] && typeof next[ctaId] === "object" ? { ...next[ctaId] } : {};
+      if (value === "" || value === null || value === undefined) {
+        delete base[key];
+      } else {
+        base[key] = value;
+      }
+      if (Object.keys(base).length === 0) {
+        delete next[ctaId];
+      } else {
+        next[ctaId] = base;
+      }
+      return next;
+    });
+    setSaveStatus("");
+    setSaveError("");
+  }
+
   function handleNew() {
     setActiveId(null);
     setForm(emptyInstance);
+    setCtaOverrides({});
+    setCtaGroupItems([]);
     setSaveStatus("");
     setSaveError("");
   }
@@ -166,6 +255,7 @@ export default function AdminPlaylistInstancesPage() {
         ...form,
         playlist_id: Number(form.playlist_id) || 0,
         cta_group_id: form.cta_group_id === "" ? null : Number(form.cta_group_id),
+        cta_overrides: ctaOverrides,
         created_from_instance: form.created_from_instance === "" ? null : Number(form.created_from_instance),
       };
       const res = await fetch(SAVE_URL, {
@@ -193,8 +283,9 @@ export default function AdminPlaylistInstancesPage() {
     const needle = query.trim().toLowerCase();
     return (items || []).filter((item) => {
       const name = (item?.instance_name || "").toLowerCase();
+      const displayTitle = (item?.display_title || "").toLowerCase();
       const id = String(item?.playlist_instance_id || "");
-      return name.includes(needle) || id.includes(needle);
+      return name.includes(needle) || displayTitle.includes(needle) || id.includes(needle);
     });
   }, [items, query]);
 
@@ -204,6 +295,98 @@ export default function AdminPlaylistInstancesPage() {
       label: `${row.playlist_id} — ${row.title}`,
     }));
   }, [playlists]);
+
+  const ctaGroupOptions = useMemo(() => {
+    return ctaGroups.map((row) => ({
+      id: row.id,
+      label: `${row.label} (${row.key})`,
+    }));
+  }, [ctaGroups]);
+
+  const parsedGroupItems = useMemo(() => {
+    return ctaGroupItems.map((item) => {
+      let params = {};
+      if (item?.params) {
+        try {
+          params = typeof item.params === "string" ? JSON.parse(item.params) : item.params;
+        } catch {
+          params = {};
+        }
+      }
+      const overrides = ctaOverrides[item.cta_id] || {};
+      const mergedParams = { ...(params || {}), ...(overrides || {}) };
+      return {
+        ...item,
+        baseParams: params || {},
+        overrideParams: overrides,
+        mergedParams,
+      };
+    });
+  }, [ctaGroupItems, ctaOverrides]);
+
+  function renderParams(item) {
+    const action = item?.type_action_key || "";
+    const params = item?.mergedParams || {};
+    const ctaId = item?.cta_id;
+    if (!ctaId) return null;
+
+    if (action === "navigate") {
+      return (
+        <div className="cta-param-row">
+          <label>
+            url
+            <input
+              type="text"
+              value={params.url || ""}
+              onChange={(e) => updateOverride(ctaId, "url", e.target.value)}
+            />
+          </label>
+          <label>
+            target
+            <input
+              type="text"
+              value={params.target || ""}
+              onChange={(e) => updateOverride(ctaId, "target", e.target.value)}
+              placeholder="_blank"
+            />
+          </label>
+        </div>
+      );
+    }
+
+    if (action === "jump_to_item") {
+      return (
+        <div className="cta-param-row">
+          <label>
+            item_index
+            <input
+              type="number"
+              value={params.item_index ?? ""}
+              onChange={(e) => updateOverride(ctaId, "item_index", e.target.value)}
+            />
+          </label>
+        </div>
+      );
+    }
+
+    if (action === "replay_filtered") {
+      return (
+        <div className="cta-param-row">
+          <label>
+            filter
+            <input
+              type="text"
+              value={params.filter || ""}
+              onChange={(e) => updateOverride(ctaId, "filter", e.target.value)}
+              placeholder="liked"
+            />
+          </label>
+        </div>
+      );
+    }
+
+    return <div className="cta-param-muted">No params</div>;
+  }
 
   return (
     <div className="admin-playlist-instances">
@@ -246,6 +429,7 @@ export default function AdminPlaylistInstancesPage() {
               </div>
               <div className="row-meta">
                 #{item.playlist_instance_id} • Playlist {item.playlist_id}
+                {item.display_title ? ` • ${item.display_title}` : ""}
               </div>
             </button>
           ))}
@@ -284,154 +468,223 @@ export default function AdminPlaylistInstancesPage() {
             >
               New Playlist
             </button>
-            <button type="button" onClick={() => navigate(`/admin/player-preview/${form.playlist_instance_id || ""}`)}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!form.playlist_instance_id) return;
+                const url = `${window.location.origin}/playlist/${form.playlist_instance_id}`;
+                window.open(url, "_blank", "noopener");
+              }}
+              disabled={!form.playlist_instance_id}
+            >
+              Open Live URL
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!form.playlist_instance_id) return;
+                const params = new URLSearchParams();
+                if (form.cta_context_key) params.set("mode", form.cta_context_key);
+                if (form.cta_group_id) params.set("add_cta_group", form.cta_group_id);
+                const suffix = params.toString();
+                navigate(`/admin/player-preview/${form.playlist_instance_id || ""}${suffix ? `?${suffix}` : ""}`);
+              }}
+              disabled={!form.playlist_instance_id}
+            >
               Preview
             </button>
-            <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={handleSave}
+              disabled={saving || (!form.playlist_instance_id && !form.playlist_id)}
+            >
               {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
 
-        <div className="form-grid">
-          <label>
-            Instance name
-            <input
-              type="text"
-              value={form.instance_name}
-              onChange={(e) => updateForm("instance_name", e.target.value)}
-            />
-          </label>
+        <div className="instance-section">
+          <div className="section-title">Share Metadata</div>
+          <div className="form-grid">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.share_enabled}
+                onChange={(e) => updateForm("share_enabled", e.target.checked)}
+              />
+              Share enabled
+            </label>
 
-          <label>
-            Playlist
-            <select
-              value={form.playlist_id}
-              onChange={(e) => updateForm("playlist_id", e.target.value)}
-            >
-              <option value="">Select playlist</option>
-              {playlistOptions.map((opt) => (
-                <option key={opt.id} value={opt.id}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {form.playlist_id && (
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => navigate(`/admin/playlists/${form.playlist_id}`)}
+            <label>
+              Share title
+              <input
+                type="text"
+                value={form.share_title || ""}
+                onChange={(e) => updateForm("share_title", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Share description
+              <textarea
+                rows={2}
+                value={form.share_description || ""}
+                onChange={(e) => updateForm("share_description", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Share image URL
+              <input
+                type="text"
+                value={form.share_image_url || ""}
+                onChange={(e) => updateForm("share_image_url", e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="instance-section">
+          <div className="section-title">Playlist</div>
+          <div className="form-grid">
+            <label>
+              Instance name
+              <input
+                type="text"
+                value={form.instance_name}
+                onChange={(e) => updateForm("instance_name", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Display title
+              <input
+                type="text"
+                value={form.display_title || ""}
+                onChange={(e) => updateForm("display_title", e.target.value)}
+                placeholder="Shown to viewers (thumbnail title)"
+              />
+            </label>
+
+            <label>
+              Playlist
+              <select
+                value={form.playlist_id}
+                onChange={(e) => updateForm("playlist_id", e.target.value)}
               >
-                Edit playlist
-              </button>
+                <option value="">Select playlist</option>
+                {playlistOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {form.playlist_id && (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => navigate(`/admin/playlists/${form.playlist_id}`)}
+                >
+                  Edit playlist
+                </button>
+              )}
+            </label>
+
+            <label>
+              Instance notes
+              <textarea
+                rows={3}
+                value={form.instance_notes || ""}
+                onChange={(e) => updateForm("instance_notes", e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="form-grid">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.skip_intro_on_replay}
+                onChange={(e) => updateForm("skip_intro_on_replay", e.target.checked)}
+              />
+              Skip intro on replay
+            </label>
+
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.hide_stars}
+                onChange={(e) => updateForm("hide_stars", e.target.checked)}
+              />
+              Hide stars
+            </label>
+
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => updateForm("is_active", e.target.checked)}
+              />
+              Active
+            </label>
+
+            <label>
+              Created from instance (optional)
+              <input
+                type="number"
+                value={form.created_from_instance}
+                onChange={(e) => updateForm("created_from_instance", e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="instance-section cta-section">
+          <div className="section-title">CTA Settings</div>
+          <div className="cta-controls">
+            <label className="cta-group">
+              Player CTA Group -- Seen at EndScreen of Player -- all will get Default 
+              <select
+                className="cta-group-select"
+                value={form.cta_group_id}
+                onChange={(e) => updateForm("cta_group_id", e.target.value)}
+              >
+                <option value="">None</option>
+                {ctaGroupOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="cta-context">
+              CTA context key
+              <input
+                type="text"
+                value={form.cta_context_key || ""}
+                onChange={(e) => updateForm("cta_context_key", e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="cta-group-list">
+            {!form.cta_group_id && (
+              <div className="cta-empty">Select a CTA group to edit parameters.</div>
             )}
-          </label>
-
-          <label>
-            Instance notes
-            <textarea
-              rows={3}
-              value={form.instance_notes || ""}
-              onChange={(e) => updateForm("instance_notes", e.target.value)}
-            />
-          </label>
-
-        </div>
-
-        <div className="form-grid">
-          <label>
-            CTA group id (optional)
-            <input
-              type="number"
-              value={form.cta_group_id}
-              onChange={(e) => updateForm("cta_group_id", e.target.value)}
-            />
-          </label>
-
-          <label>
-            CTA context key
-            <input
-              type="text"
-              value={form.cta_context_key || ""}
-              onChange={(e) => updateForm("cta_context_key", e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="form-grid">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.share_enabled}
-              onChange={(e) => updateForm("share_enabled", e.target.checked)}
-            />
-            Share enabled
-          </label>
-
-          <label>
-            Share title
-            <input
-              type="text"
-              value={form.share_title || ""}
-              onChange={(e) => updateForm("share_title", e.target.value)}
-            />
-          </label>
-
-          <label>
-            Share description
-            <textarea
-              rows={3}
-              value={form.share_description || ""}
-              onChange={(e) => updateForm("share_description", e.target.value)}
-            />
-          </label>
-
-          <label>
-            Share image URL
-            <input
-              type="text"
-              value={form.share_image_url || ""}
-              onChange={(e) => updateForm("share_image_url", e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="form-grid">
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.skip_intro_on_replay}
-              onChange={(e) => updateForm("skip_intro_on_replay", e.target.checked)}
-            />
-            Skip intro on replay
-          </label>
-
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.hide_stars}
-              onChange={(e) => updateForm("hide_stars", e.target.checked)}
-            />
-            Hide stars
-          </label>
-
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={form.is_active}
-              onChange={(e) => updateForm("is_active", e.target.checked)}
-            />
-            Active
-          </label>
-
-          <label>
-            Created from instance (optional)
-            <input
-              type="number"
-              value={form.created_from_instance}
-              onChange={(e) => updateForm("created_from_instance", e.target.value)}
-            />
-          </label>
+            {form.cta_group_id && parsedGroupItems.map((item) => (
+              <div key={item.cta_id} className="cta-item">
+                <div className="cta-item-head">
+                  <div className="cta-item-title">{item.label}</div>
+                  <div className="cta-item-meta">
+                    {item.type_label} ({item.type_action_key})
+                  </div>
+                </div>
+                {renderParams(item)}
+              </div>
+            ))}
+          </div>
         </div>
 
         {saveStatus && <div className="panel-status success">{saveStatus}</div>}

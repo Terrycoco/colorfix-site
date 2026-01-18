@@ -17,5 +17,5 @@ try {
   ]);
   respond(200, $res);
 } catch (Throwable $e) {
-  respond(500, ['error'=>'server', 'message'=>$e->getMessage()]);
+  respond(500, ['error'=>$e->getMessage(), 'message'=>$e->getMessage()]);
 }

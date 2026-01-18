@@ -32,8 +32,8 @@ export default function AdminAppliedPaletteEditorPage() {
   const [renderInfo, setRenderInfo] = useState(null);
   const [entryMap, setEntryMap] = useState({});
   const [entryBaseline, setEntryBaseline] = useState({});
-  const [meta, setMeta] = useState({ title: "", notes: "", tags: "" });
-  const [metaBaseline, setMetaBaseline] = useState({ title: "", notes: "", tags: "" });
+  const [meta, setMeta] = useState({ title: "", display_title: "", notes: "", tags: "" });
+  const [metaBaseline, setMetaBaseline] = useState({ title: "", display_title: "", notes: "", tags: "" });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -78,7 +78,12 @@ export default function AdminAppliedPaletteEditorPage() {
   }, [entryMap]);
 
   const hasChanges = useMemo(() => {
-    if (meta.title !== metaBaseline.title || meta.notes !== metaBaseline.notes || meta.tags !== metaBaseline.tags) {
+    if (
+      meta.title !== metaBaseline.title ||
+      meta.display_title !== metaBaseline.display_title ||
+      meta.notes !== metaBaseline.notes ||
+      meta.tags !== metaBaseline.tags
+    ) {
       return true;
     }
     return serializeEntryMap(entryMap) !== serializeEntryMap(entryBaseline);
@@ -159,6 +164,7 @@ export default function AdminAppliedPaletteEditorPage() {
       setEntryBaseline(cloneEntryMap(normalizedEntries));
       const paletteMeta = {
         title: data.palette?.title || "",
+        display_title: data.palette?.display_title || "",
         notes: data.palette?.notes || "",
         tags: data.palette?.tags || "",
       };
@@ -292,7 +298,9 @@ export default function AdminAppliedPaletteEditorPage() {
   function handleShadowEdit(mask) {
     const entry = entryMap[mask] || makeEmptyEntry(mask);
     const currentOffset = entry.shadow_l_offset ?? 0;
-    const currentTintPct = entry.shadow_tint_opacity != null ? Math.round(entry.shadow_tint_opacity * 100) : 0;
+    const currentTintPct = entry.shadow_tint_opacity != null
+      ? (entry.shadow_tint_opacity * 100).toFixed(1)
+      : "0.0";
     const offsetStr = window.prompt(`Shadow L offset (negative darker, positive lighter)`, String(currentOffset));
     if (offsetStr === null) return;
     const offsetNum = clampNumber(Number(offsetStr), -50, 50);
@@ -403,6 +411,7 @@ export default function AdminAppliedPaletteEditorPage() {
         body: JSON.stringify({
           palette_id: palette.id,
           title: meta.title,
+          display_title: meta.display_title,
           notes: meta.notes,
           tags: meta.tags,
           entries: entriesForSave,
@@ -464,6 +473,7 @@ export default function AdminAppliedPaletteEditorPage() {
       const payload = {
         asset_id: asset.asset_id,
         title: meta.title,
+        display_title: meta.display_title,
         notes: meta.notes,
         tags: meta.tags,
         entries: entriesForSave,
@@ -567,10 +577,17 @@ export default function AdminAppliedPaletteEditorPage() {
           </div>
           <div className="ap-fields">
               <label>
-                <span>Nickname / Title</span>
+                <span>Handle (internal)</span>
                 <input
                   value={meta.title}
                   onChange={(e) => setMeta((prev) => ({ ...prev, title: e.target.value }))}
+                />
+              </label>
+              <label>
+                <span>Display Title (viewer)</span>
+                <input
+                  value={meta.display_title}
+                  onChange={(e) => setMeta((prev) => ({ ...prev, display_title: e.target.value }))}
                 />
               </label>
               <label>

@@ -21,14 +21,19 @@ try {
         exit;
     }
 
+    $debug = null;
     $svc = new MaskTrainingService($pdo);
-    $guess = $svc->guessSettings($maskRole, $colorId, 5, $photoId, $assetId);
+    $guess = $svc->guessSettings($maskRole, $colorId, 5, $photoId, $assetId, $debug);
     if (!$guess) {
         echo json_encode(['ok' => false, 'error' => 'No training samples'], JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    echo json_encode(['ok' => true, 'guess' => $guess], JSON_UNESCAPED_SLASHES);
+    $payload = ['ok' => true, 'guess' => $guess];
+    if (!empty($input['debug'])) {
+        $payload['debug'] = $debug;
+    }
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);

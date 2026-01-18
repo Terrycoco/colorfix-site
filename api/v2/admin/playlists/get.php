@@ -15,6 +15,22 @@ function respond(array $payload, int $status = 200): void {
     exit;
 }
 
+function columnExists(PDO $pdo, string $table, string $column): bool {
+    $sql = <<<SQL
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table
+          AND COLUMN_NAME = :column
+        SQL;
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        'table' => $table,
+        'column' => $column,
+    ]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     respond(['ok' => false, 'error' => 'GET only'], 405);
 }
@@ -39,6 +55,8 @@ if (!$playlist) {
     respond(['ok' => false, 'error' => 'Playlist not found'], 404);
 }
 
+$hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
+$excludeSelect = $hasExcludeFromThumbs ? 'exclude_from_thumbs' : '0 AS exclude_from_thumbs';
 $itemSql = <<<SQL
     SELECT
       playlist_item_id,
@@ -56,9 +74,11 @@ $itemSql = <<<SQL
       star,
       transition,
       duration_ms,
+      {$excludeSelect},
       is_active
     FROM playlist_items
     WHERE playlist_id = :playlist_id
+      AND is_active = 1
     ORDER BY order_index ASC
     SQL;
 

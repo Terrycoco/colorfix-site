@@ -42,6 +42,7 @@ class PhotosController
         $preparedUrl   = null; // legacy single
         $preparedTiers = ['dark' => null, 'medium' => null, 'light' => null];
         $masks         = [];
+        $extras        = [];
 
         $roleStatsRows = $repo->getRoleStats((int)$photo['id']);
         $roleStatsMap = [];
@@ -76,6 +77,15 @@ class PhotosController
                 $roleLegacy = (string)($v['role'] ?? substr($kind, 5));
                 $masks[] = $this->buildMaskPayload($roleLegacy, $rel, $v, $toUrl, $roleStatsMap[$roleLegacy] ?? null);
             }
+
+            if ($kind === 'extras') {
+                $extras[] = [
+                    'role' => $role,
+                    'url' => $toUrl($rel),
+                    'path' => $rel,
+                    'filename' => basename($rel) ?: $rel,
+                ];
+            }
         }
 
         // Map stats → precomputed[role].Lm
@@ -97,6 +107,7 @@ class PhotosController
             'prepared_url'   => $preparedUrl,     // legacy single, may be null
             'prepared_tiers' => $preparedTiers,   // {dark|null, medium|null, light|null}
             'masks'          => $masks,
+            'extras'         => $extras,
             'precomputed'    => $precomputed ?: null,
             'style_primary'  => (string)($photo['style_primary'] ?? ''),
             'verdict'        => (string)($photo['verdict'] ?? ''),
@@ -156,8 +167,11 @@ class PhotosController
     /** POST recalc Lm stats for roles; service reads files, repo persists. */
     public function recalcLm(array $post): array
     {
+        $all = !empty($post['all']);
         $assetId = trim((string)($post['asset_id'] ?? ''));
-        if ($assetId === '') throw new RuntimeException('asset_id required');
+        if (!$all && $assetId === '') {
+            throw new RuntimeException('asset_id required');
+        }
 
         $roles = $post['roles'] ?? null;
         if ($roles !== null && !is_array($roles)) {
@@ -166,6 +180,29 @@ class PhotosController
 
         $repo = new PdoPhotoRepository($this->pdo);
         $svc  = new PhotoRenderingService($repo, $this->pdo);
+        if ($all) {
+            $limit = isset($post['limit']) ? (int)$post['limit'] : null;
+            $offset = isset($post['offset']) ? (int)$post['offset'] : null;
+            $assetIds = $repo->listAllAssetIds($limit, $offset);
+            $results = [];
+            $errors = [];
+            foreach ($assetIds as $id) {
+                try {
+                    $updated = $svc->recalcLmForRoles($id, $roles ?: null);
+                    $results[] = ['asset_id' => $id, 'updated' => $updated];
+                } catch (\Throwable $e) {
+                    $errors[] = ['asset_id' => $id, 'error' => $e->getMessage()];
+                }
+            }
+            return [
+                'ok' => true,
+                'all' => true,
+                'count' => count($assetIds),
+                'results' => $results,
+                'errors' => $errors,
+            ];
+        }
+
         $updated = $svc->recalcLmForRoles($assetId, $roles ?: null);
 
         return ['ok' => true, 'asset_id' => $assetId, 'updated' => $updated];
@@ -207,7 +244,7 @@ class PhotosController
             return 'PHO_' . substr(strtoupper(base_convert(bin2hex($r), 16, 36)), 0, 6);
         };
 
-        $assetIdIn = trim((string)($post['asset_id'] ?? ''));
+        $assetIdIn = trim((string)($post['asset_id'] ?? ($post['assetId'] ?? '')));
         $styleRaw  = trim((string)($post['style'] ?? ''));
         $style     = $styleRaw !== '' ? $styleRaw : null;
         $verdict   = $post['verdict']   ?? null;
@@ -218,14 +255,18 @@ class PhotosController
         $hasIncomingStyle = $style !== null;
         $hasIncomingTags  = $tagsCsv !== '';
         $findableErrorMsg = 'Add a style or at least one tag so this photo can be found later.';
-        $categoryInput = $this->sanitizeCategoryPath($post['category_path'] ?? null);
+        $categoryInput = $this->sanitizeCategoryPath($post['category_path'] ?? ($post['category'] ?? null));
         $categoryErrorMsg = 'Category Path is required (e.g., exteriors/cottage).';
 
         $hasPreparedSingle = isset($files['prepared_base']) && $files['prepared_base']['error'] === UPLOAD_ERR_OK;
         $hasTexture        = isset($files['texture_overlay']) && $files['texture_overlay']['error'] === UPLOAD_ERR_OK;
         $hasMasks          = isset($files['masks']) && is_array($files['masks']['name']);
+        $hasExtras         = isset($files['extras']) && is_array($files['extras']['name']);
 
         if (!$assetIdIn && !$hasPreparedSingle) {
+            if ($hasExtras) {
+                throw new RuntimeException('Extra photos require an existing asset ID or a prepared base.');
+            }
             throw new RuntimeException('New assets require prepared_base.');
         }
         if (!$assetIdIn && $hasTexture && !$hasPreparedSingle) {
@@ -282,6 +323,7 @@ class PhotosController
         $mkpath("{$assetDir}/thumb");
         $mkpath("{$assetDir}/renders");
         $mkpath("{$assetDir}/textures");
+        $mkpath("{$assetDir}/extras");
 
         $touched = [];
         $baseW = (int)($photo['width'] ?? 0);
@@ -304,6 +346,35 @@ class PhotosController
         if ($hasTexture) {
             $res = $svc->saveTextureOverlay($photoId, $files['texture_overlay']);
             $touched[] = ['kind'=>'texture', 'role'=>'', 'w'=>$res['width'], 'h'=>$res['height']];
+        }
+
+        $extraSlugArr = $post['extra_slugs'] ?? [];
+        if (!is_array($extraSlugArr)) $extraSlugArr = [$extraSlugArr];
+        $extraIndex = 0;
+        if ($hasExtras) {
+            $count = count($files['extras']['name']);
+            for ($i=0; $i<$count; $i++) {
+                if (($files['extras']['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                $tmp  = $files['extras']['tmp_name'][$i] ?? '';
+                $name = $files['extras']['name'][$i] ?? '';
+                if ($tmp === '' || !is_uploaded_file($tmp)) continue;
+
+                $slugOverride = $this->sanitizeMaskSlug($extraSlugArr[$extraIndex] ?? null);
+                $role = $slugOverride !== null && $slugOverride !== ''
+                    ? $slugOverride
+                    : $roleFrom($name);
+
+                $one = [
+                    'tmp_name' => $tmp,
+                    'name'     => $name,
+                    'type'     => $files['extras']['type'][$i] ?? '',
+                    'error'    => UPLOAD_ERR_OK,
+                    'size'     => $files['extras']['size'][$i] ?? null,
+                ];
+                $res = $svc->saveExtraPhoto($photoId, $role, $one);
+                $touched[] = ['kind'=>'extras', 'role'=>$role, 'w'=>$res['width'], 'h'=>$res['height']];
+                $extraIndex++;
+            }
         }
 
         $maskModeDarkArr   = $post['mask_mode_dark'] ?? [];
@@ -593,9 +664,7 @@ class PhotosController
 
     private function defaultCategoryPath(): string
     {
-        $y = date('Y');
-        $ym = date('Y-m');
-        return "{$y}/{$ym}";
+        return 'uncategorized';
     }
 
     private function resolveCategoryPathForPhoto(array $photo, PdoPhotoRepository $repo): string
@@ -617,6 +686,10 @@ class PhotosController
             if (!str_starts_with($rel, '/photos/')) continue;
             $parts = explode('/', trim($rel, '/'));
             if (count($parts) >= 4) {
+                // Ignore legacy date-based paths like /photos/2025/2025-12/...
+                if (preg_match('/^\d{4}$/', $parts[1] ?? '') && preg_match('/^\d{4}-\d{2}$/', $parts[2] ?? '')) {
+                    continue;
+                }
                 return $parts[1] . '/' . $parts[2];
             }
         }

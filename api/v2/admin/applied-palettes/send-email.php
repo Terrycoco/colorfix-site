@@ -78,7 +78,7 @@ try {
 
     $emailSvc = new EmailTemplateService();
     $paletteMeta = [
-        'nickname' => $palette->title ?? ('Palette #' . $palette->id),
+        'nickname' => $palette->displayTitle ?? $palette->title ?? ('Palette #' . $palette->id),
         'client_name' => $toName,
     ];
     [$finalSubject, $htmlBody, $textBody] = $emailSvc->renderPaletteEmail(

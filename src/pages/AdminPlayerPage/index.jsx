@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "@components/Player";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
 import CTALayout from "@components/cta/CTALayout";
+import { SHARE_FOLDER } from "@helpers/config";
+import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import "./admin-player.css";
 
 export default function AdminPlayerPage() {
   const { playlistId, start } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,6 +26,29 @@ export default function AdminPlayerPage() {
     return index >= 0 ? index : 0;
   }, [data?.items]);
 
+  const paletteItems = useMemo(() => {
+    const items = data?.items || [];
+    return items.filter((item) => {
+      const type = (item?.type || "normal").toLowerCase();
+      if (type === "intro" || type === "before" || type === "text") return false;
+      if (item?.exclude_from_thumbs) return false;
+      return Boolean(item?.ap_id);
+    });
+  }, [data?.items]);
+
+  const paletteCount = paletteItems.length;
+
+  const ctaHandlers = useMemo(() => (
+    buildCtaHandlers({
+      data,
+      shareFolder: SHARE_FOLDER,
+      playerRef,
+      setPlaybackEnded,
+      firstNonIntroIndex,
+      navigate,
+    })
+  ), [data, firstNonIntroIndex, navigate]);
+
   useEffect(() => {
     if (!playlistId) {
       setError("Missing playlist instance id");
@@ -30,9 +56,13 @@ export default function AdminPlayerPage() {
       return;
     }
     const startParam = start ?? searchParams.get("start") ?? "";
+    const modeParam = searchParams.get("mode") ?? "";
+    const addCtaGroup = searchParams.get("add_cta_group") ?? "";
     const params = new URLSearchParams();
     params.set("playlist_instance_id", playlistId);
     if (startParam !== "") params.set("start", startParam);
+    if (modeParam !== "") params.set("mode", modeParam);
+    if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
@@ -55,6 +85,7 @@ export default function AdminPlayerPage() {
 
   useEffect(() => {
     setPlaybackEnded(false);
+    setLikedCount(0);
   }, [data?.playlist_instance_id]);
 
   const ctas = useMemo(() => {
@@ -89,6 +120,22 @@ export default function AdminPlayerPage() {
     });
   }, [data?.ctas]);
 
+  const visibleCTAs = useMemo(() => {
+    return ctas.filter((cta) => {
+      if (!cta || cta.enabled === false) return false;
+      if (cta.key === "replay_liked") return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+      if (cta.key === "replay_filtered") {
+        if (cta?.params?.filter === "liked") {
+          return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+        }
+        return true;
+      }
+      if (cta.key === "to_thumbs") return paletteCount > 1;
+      if (cta.key === "to_palette") return paletteCount === 1;
+      return true;
+    });
+  }, [ctas, likedCount, paletteCount]);
+
   return (
     <div className="admin-player-page">
       <div className="admin-player-header">
@@ -105,7 +152,8 @@ export default function AdminPlayerPage() {
                 ref={playerRef}
                 slides={data?.items || []}
                 startIndex={data?.start_index ?? 0}
-                onAbort={() => {}}
+                hideStars={Boolean(data?.hide_stars)}
+                onAbort={() => navigate(-1)}
                 onLikeChange={({ likedCount: nextCount }) => setLikedCount(nextCount)}
                 onPlaybackEnd={({ likedCount: nextCount }) => {
                   setLikedCount(nextCount);
@@ -114,15 +162,15 @@ export default function AdminPlayerPage() {
                 embedded
               />
               {playbackEnded && (
-                <PlayerEndScreen showBranding={false}>
-                  {ctas.length > 0 && (
+                <PlayerEndScreen showBranding={false} onExit={() => navigate(-1)}>
+                  {visibleCTAs.length > 0 && (
                     <CTALayout
                       layout="stacked"
-                      ctas={ctas}
+                      ctas={visibleCTAs}
                       onCtaClick={(cta) => {
-                        if (cta?.key !== "replay") return;
-                        setPlaybackEnded(false);
-                        playerRef.current?.replay({ likedOnly: false, startIndex: firstNonIntroIndex });
+                        const key = getCtaKey(cta);
+                        if (!key) return;
+                        ctaHandlers[key]?.(cta);
                       }}
                     />
                   )}

@@ -8,6 +8,38 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
   const variant = cta.variant || "secondary";
   const displayMode = cta.display_mode || "text"; // text | icon | both
   const hasIcon = Boolean(cta.icon);
+  const isLink = variant === "link";
+  const href = cta?.params?.url || cta?.href || cta?.url || "#";
+
+  const content = (
+    <>
+      {displayMode !== "text" && hasIcon && (
+        <CTAIcon name={cta.icon} className="cta-button__icon" />
+      )}
+
+      {displayMode !== "icon" && (
+        <span className="cta-button__label">{cta.label}</span>
+      )}
+    </>
+  );
+
+  if (isLink) {
+    return (
+      <a
+        href={href}
+        className={`cta-button cta-button--${variant} cta-button--${displayMode}`}
+        onClick={(event) => {
+          if (onClick) {
+            event.preventDefault();
+            if (!disabled) onClick(cta);
+          }
+        }}
+        aria-disabled={disabled ? "true" : undefined}
+      >
+        {content}
+      </a>
+    );
+  }
 
   return (
     <button
@@ -16,13 +48,7 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
       onClick={() => !disabled && onClick && onClick(cta)}
       disabled={disabled}
     >
-      {displayMode !== "text" && hasIcon && (
-        <CTAIcon name={cta.icon} className="cta-button__icon" />
-      )}
-
-      {displayMode !== "icon" && (
-        <span className="cta-button__label">{cta.label}</span>
-      )}
+      {content}
     </button>
   );
 }

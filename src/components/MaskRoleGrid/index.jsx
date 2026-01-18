@@ -6,6 +6,7 @@ import "./mask-role-grid.css";
 export default function MaskRoleGrid({
   masks = [],
   entries = {},
+  activeColorByMask = null,
   onChange,
   onApply,
   onShadow,
@@ -117,6 +118,7 @@ export default function MaskRoleGrid({
         onChangePercent={handleOpacity}
         onChangeOffset={handleOffset}
         onPickColor={(row) => setActiveRole(row.mask_role)}
+        activeColorIdByRow={(row) => (activeColorByMask ? activeColorByMask[row.mask_role] : null)}
       />
     </div>
   );

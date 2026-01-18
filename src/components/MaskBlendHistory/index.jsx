@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import { API_FOLDER } from "@helpers/config";
 import { bucketForLightness, getPresetForBuckets, overlayPresetConfig } from "@config/overlayPresets";
+import { resolveBlendOpacity, resolveTargetBucket } from "@helpers/maskRenderUtils";
 import MaskSettingsTable from "@components/MaskSettingsTable";
 import "./maskblendhistory.css";
 
@@ -57,8 +58,14 @@ const SHADOW_PRESETS = [
 
 const ORIGINAL_MODE = "original";
 
+const toPercent = (value) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return 0;
+  return Number((num * 100).toFixed(1));
+};
+
 function enrichRow(row) {
-  const percent = Math.round((row.blend_opacity ?? 0) * 100);
+  const percent = toPercent(row.blend_opacity ?? 0);
   const shadow = normalizeShadowDraft({
     l_offset: row.shadow_l_offset ?? 0,
     tint_hex: row.shadow_tint_hex || null,
@@ -86,18 +93,44 @@ function iconKeyHandler(e, handler) {
   }
 }
 
+function sortRowsByColorName(list = []) {
+  return [...list].sort((a, b) => {
+    const nameA = (a.color_name || a.color_code || "").toLowerCase();
+    const nameB = (b.color_name || b.color_code || "").toLowerCase();
+    const primary = nameA.localeCompare(nameB);
+    if (primary !== 0) return primary;
+    return (a.color_l ?? a.target_lightness ?? 0) - (b.color_l ?? b.target_lightness ?? 0);
+  });
+}
+
+function sortRowsByTargetLightness(list = []) {
+  return [...list].sort((a, b) => {
+    const la = a.color_l ?? a.target_lightness ?? a.hcl_l ?? 0;
+    const lb = b.color_l ?? b.target_lightness ?? b.hcl_l ?? 0;
+    if (la !== lb) return la - lb;
+    const nameA = (a.color_name || a.color_code || "").toLowerCase();
+    const nameB = (b.color_name || b.color_code || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+}
+
 export default function MaskBlendHistory({
   assetId,
   maskRole,
   baseLightness,
   selectorVersion = 0,
   onApplyBlend,
+  onRowsChange = null,
   onSelectRow = null,
   activeRowId = null,
   activeColorId = null,
   rowTitle = null,
   hideHeader = false,
   filterColorId = null,
+  filterColorIds = null,
+  forceApproved = null,
+  sortByColor = false,
+  sortByTargetLightness = false,
   forceSortByBaseLightness = false,
 }) {
   const [rows, setRows] = useState([]);
@@ -134,7 +167,7 @@ export default function MaskBlendHistory({
         base_lightness: effectiveBase,
         target_lightness: row.target_lightness,
         blend_mode: row.draft_mode || row.blend_mode,
-        blend_opacity: (Number(row.draft_percent ?? row.percent) || 0) / 100,
+        blend_opacity: resolveBlendOpacity(row, 0.5),
         mask_role: row.mask_role || maskRole,
       };
     });
@@ -153,6 +186,8 @@ export default function MaskBlendHistory({
   }, [assetId, maskRole, selectorVersion]);
 
   useEffect(() => {
+    setRows([]);
+    setError("");
     setNewColor(null);
     setNewMode("flatpaint");
     setNewOpacity("100");
@@ -180,7 +215,11 @@ export default function MaskBlendHistory({
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Load failed");
       }
-      setRows((data.settings || []).map((row) => enrichRow(row)));
+      const nextRows = (data.settings || []).map((row) => enrichRow(row));
+      const sorted = sortByTargetLightness
+        ? sortRowsByTargetLightness(nextRows)
+        : (sortByColor ? sortRowsByColorName(nextRows) : nextRows);
+      setRows(sorted);
     } catch (err) {
       setError(err?.message || "Failed to load settings");
     } finally {
@@ -265,6 +304,16 @@ function updateRowShadowDraft(id, field, value) {
     rowsRef.current = rows;
   }, [rows]);
 
+  useEffect(() => {
+    if (!onRowsChange) return;
+    onRowsChange(rows);
+  }, [rows, onRowsChange]);
+
+  useEffect(() => {
+    if (!sortByColor) return;
+    setRows((prev) => sortRowsByColorName(prev));
+  }, [sortByColor]);
+
   const baseShadowForRow = (row) =>
     normalizeShadowDraft({
       l_offset: row.shadow_l_offset ?? 0,
@@ -284,8 +333,9 @@ function updateRowShadowDraft(id, field, value) {
   function isRowDirty(row) {
     const modeDirty = (row.draft_mode || row.blend_mode) !== row.blend_mode;
     const percentDraft = Number(row.draft_percent ?? row.percent);
-    const resolvedPercent = Number.isFinite(percentDraft) ? percentDraft : row.percent;
-    const percentDirty = Math.round(resolvedPercent) !== Math.round(row.percent);
+    const basePercent = Number(row.percent ?? 0);
+    const resolvedPercent = Number.isFinite(percentDraft) ? percentDraft : basePercent;
+    const percentDirty = Number(resolvedPercent.toFixed(1)) !== Number(basePercent.toFixed(1));
     const shadowDirty = !shadowsEqual(row.draft_shadow, baseShadowForRow(row));
     const approvedDirty = (row.draft_approved ?? row.approved) !== row.approved;
     return modeDirty || percentDirty || shadowDirty || approvedDirty;
@@ -325,7 +375,7 @@ function updateRowShadowDraft(id, field, value) {
         target_h: latestRow.target_h,
         target_c: latestRow.target_c,
         blend_mode: latestRow.draft_mode || latestRow.blend_mode,
-        blend_opacity: (Number(latestRow.draft_percent ?? latestRow.percent) || 0) / 100,
+        blend_opacity: resolveBlendOpacity(latestRow, 0.5),
         shadow_l_offset: shadow.l_offset,
         shadow_tint_hex: shadow.tint_hex,
         shadow_tint_opacity: shadow.tint_opacity,
@@ -377,7 +427,6 @@ function updateRowShadowDraft(id, field, value) {
   }
 
   async function handleDeleteRow(row) {
-    if (!window.confirm("Delete this test?")) return;
     try {
       await fetch(`${API_FOLDER}/v2/admin/mask-blend/delete.php`, {
         method: "POST",
@@ -396,9 +445,7 @@ function updateRowShadowDraft(id, field, value) {
   async function handleApplyRow(row) {
     const latestRow = rowsRef.current.find((r) => r.id === row.id) ?? row;
     if (!onApplyBlend) return;
-    const tier =
-      latestRow.target_bucket ||
-      bucketForLightness(latestRow.target_lightness, overlayPresetConfig.targetBuckets);
+    const tier = resolveTargetBucket(latestRow, latestRow.target_lightness);
     const rowSwatch = {
       id: latestRow.color_id,
       color_id: latestRow.color_id,
@@ -413,7 +460,7 @@ function updateRowShadowDraft(id, field, value) {
       hcl_h: latestRow.target_h,
       hcl_c: latestRow.target_c,
     };
-    const effectiveMode = (latestRow.draft_mode || latestRow.blend_mode || '').toLowerCase();
+    const effectiveMode = (latestRow.draft_mode || latestRow.blend_mode || "").toLowerCase();
     const isOriginal = effectiveMode === ORIGINAL_MODE;
     const tierForOriginal = bucketForLightness(
       latestRow.base_lightness ?? latestRow.target_lightness ?? 60,
@@ -421,6 +468,7 @@ function updateRowShadowDraft(id, field, value) {
     );
     const tierToUse = isOriginal ? tierForOriginal : tier;
     const shadow = normalizeShadowDraft(latestRow.draft_shadow);
+    const resolvedOpacity = resolveBlendOpacity(latestRow, 0.5);
 
     setApplyingRow(latestRow.id);
     setError("");
@@ -431,7 +479,7 @@ function updateRowShadowDraft(id, field, value) {
           tierToUse,
           {
             mode: latestRow.draft_mode || latestRow.blend_mode,
-            opacity: isOriginal ? 0 : (Number(latestRow.draft_percent ?? latestRow.percent) || 0) / 100,
+            opacity: isOriginal ? 0 : resolvedOpacity,
           },
           { swatch: isOriginal ? null : rowSwatch, shadow, clearColor: isOriginal }
         )
@@ -479,7 +527,7 @@ function updateRowShadowDraft(id, field, value) {
         shadow_l_offset: defaultShadow.l_offset,
         shadow_tint_hex: defaultShadow.tint_hex,
         shadow_tint_opacity: defaultShadow.tint_opacity,
-        approved: 0,
+        approved: typeof forceApproved === "number" ? forceApproved : 0,
       },
     };
     setSavingRow(-1);
@@ -558,6 +606,16 @@ function updateRowShadowDraft(id, field, value) {
       });
       return arr;
     }
+    if (sortByColor) {
+      arr.sort((a, b) => {
+        const valA = (a.color_name || a.color_code || "").toLowerCase();
+        const valB = (b.color_name || b.color_code || "").toLowerCase();
+        const primary = valA.localeCompare(valB);
+        if (primary !== 0) return primary;
+        return (a.target_lightness ?? 0) - (b.target_lightness ?? 0);
+      });
+      return arr;
+    }
     arr.sort((a, b) => {
       let valA;
       let valB;
@@ -591,13 +649,24 @@ function updateRowShadowDraft(id, field, value) {
       return sortDir === "asc" ? baseA - baseB : baseB - baseA;
     });
     return arr;
-  }, [rows, sortField, sortDir]);
+  }, [rows, sortField, sortDir, forceSortByBaseLightness, sortByColor, baseLightness]);
 
   const visibleRows = useMemo(() => {
+    if (Array.isArray(filterColorIds) && filterColorIds.length) {
+      const allowed = new Set(filterColorIds.map((id) => Number(id)));
+      return sortedRows.filter((row) => allowed.has(Number(row.color_id)));
+    }
+    if (Array.isArray(filterColorIds) && filterColorIds.length === 0) {
+      return [];
+    }
     if (!filterColorId) return sortedRows;
     const idNum = Number(filterColorId);
     return sortedRows.filter((row) => Number(row.color_id) === idNum);
-  }, [sortedRows, filterColorId]);
+  }, [sortedRows, filterColorId, filterColorIds]);
+  const sortedVisibleRows = useMemo(() => {
+    if (!sortByColor) return visibleRows;
+    return sortRowsByColorName(visibleRows);
+  }, [visibleRows, sortByColor]);
 
   return (
     <div className="mask-blend-history">
@@ -629,7 +698,7 @@ function updateRowShadowDraft(id, field, value) {
 
       {rowTitle && <div className="mbh-row-title">{rowTitle}</div>}
       <MaskSettingsTable
-        rows={visibleRows}
+        rows={sortedVisibleRows}
         onSelectRow={onSelectRow}
         activeRowId={activeRowId}
         activeColorId={activeColorId}
@@ -661,7 +730,7 @@ function updateRowShadowDraft(id, field, value) {
                     Offset (L)
                     <input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="text"
                       pattern="-?[0-9]*"
                       value={
                         row.draft_shadow_input?.l_offset ??
@@ -679,7 +748,7 @@ function updateRowShadowDraft(id, field, value) {
                       value={
                         (SHADOW_PRESETS.find((preset) =>
                           preset.tint_hex === (row.draft_shadow.tint_hex || null) &&
-                          Math.round((preset.tint_opacity ?? 0) * 100) === Math.round((row.draft_shadow.tint_opacity ?? 0) * 100)
+                          toPercent(preset.tint_opacity ?? 0) === toPercent(row.draft_shadow.tint_opacity ?? 0)
                         )?.id) || "custom"
                       }
                       onChange={(e) => {
@@ -726,7 +795,9 @@ function updateRowShadowDraft(id, field, value) {
                       type="number"
                       min="0"
                       max="100"
-                      value={Math.round((row.draft_shadow.tint_opacity || 0) * 100)}
+                      step="0.1"
+                      inputMode="decimal"
+                      value={toPercent(row.draft_shadow.tint_opacity || 0)}
                       onChange={(e) =>
                         updateRowShadowDraft(row.id, "tint_opacity", Math.max(0, Math.min(1, Number(e.target.value) / 100)))
                       }
@@ -777,9 +848,16 @@ MaskBlendHistory.propTypes = {
   maskRole: PropTypes.string.isRequired,
   baseLightness: PropTypes.number,
   onApplyBlend: PropTypes.func,
+  onRowsChange: PropTypes.func,
   rowTitle: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   hideHeader: PropTypes.bool,
   filterColorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  filterColorIds: PropTypes.arrayOf(
+    PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  ),
+  forceApproved: PropTypes.number,
+  sortByColor: PropTypes.bool,
+  sortByTargetLightness: PropTypes.bool,
   forceSortByBaseLightness: PropTypes.bool,
 };
 
@@ -787,8 +865,13 @@ MaskBlendHistory.defaultProps = {
   assetId: "",
   baseLightness: null,
   onApplyBlend: null,
+  onRowsChange: null,
   rowTitle: null,
   hideHeader: false,
   filterColorId: null,
+  filterColorIds: null,
+  forceApproved: null,
+  sortByColor: false,
+  sortByTargetLightness: false,
   forceSortByBaseLightness: false,
 };

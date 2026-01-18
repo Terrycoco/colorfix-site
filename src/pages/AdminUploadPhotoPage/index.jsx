@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import PhotoSearchPicker from "@components/PhotoSearchPicker";
 import "./uploader.css";
 
 const TEXTURE_SUGGESTIONS = [
@@ -21,12 +22,12 @@ export default function PhotoPreparedUploader() {
   const [verdict, setVerdict] = useState("");
   const [status, setStatus] = useState("");
   const [lighting, setLighting] = useState("");
-const [rights, setRights] = useState("");
-const [tags, setTags] = useState("");
-const [categoryPath, setCategoryPath] = useState("");
+  const [rights, setRights] = useState("");
+  const [tags, setTags] = useState("");
+  const [categoryPath, setCategoryPath] = useState("");
 
-const [fileBase, setFileBase] = useState(null);
-const [fileTexture, setFileTexture] = useState(null);
+  const [fileBase, setFileBase] = useState(null);
+  const [fileTexture, setFileTexture] = useState(null);
   const createMaskRow = () => ({
     id: `${Date.now()}-${Math.random()}`,
     file: null,
@@ -35,7 +36,13 @@ const [fileTexture, setFileTexture] = useState(null);
     modes: { dark: "colorize", medium: "colorize", light: "colorize" },
     opacities: { dark: 1, medium: 1, light: 1 },
   });
+  const createExtraRow = () => ({
+    id: `${Date.now()}-${Math.random()}`,
+    file: null,
+    slug: "",
+  });
   const [maskRows, setMaskRows] = useState([createMaskRow()]);
+  const [extraRows, setExtraRows] = useState([createExtraRow()]);
   const [maskOptions, setMaskOptions] = useState([]);
 
   const [busy, setBusy] = useState(false);
@@ -43,6 +50,8 @@ const [fileTexture, setFileTexture] = useState(null);
   const [error, setError] = useState("");
   const [existingAsset, setExistingAsset] = useState(null);
   const [existingMasks, setExistingMasks] = useState([]);
+  const [existingExtras, setExistingExtras] = useState([]);
+  const [maskDeleteStatus, setMaskDeleteStatus] = useState({ role: "", error: "", success: "" });
   const [existingStatus, setExistingStatus] = useState({ loading: false, error: "", success: "" });
   const [lastLoadedId, setLastLoadedId] = useState("");
 
@@ -60,6 +69,8 @@ const [fileTexture, setFileTexture] = useState(null);
     if (!trimmed) {
       setExistingAsset(null);
       setExistingMasks([]);
+      setExistingExtras([]);
+      setMaskDeleteStatus({ role: "", error: "", success: "" });
       setLastLoadedId("");
       setExistingStatus((prev) => ({ ...prev, loading: false, error: "", success: "" }));
       return;
@@ -83,7 +94,9 @@ const [fileTexture, setFileTexture] = useState(null);
     const styleTrim = stylePrimary.trim();
     const tagsTrim = tags.trim();
     const categoryTrim = categoryPath.trim();
-    if (!categoryTrim) {
+    const assetTrim = (assetId.trim() || existingAsset?.asset_id || "").trim();
+    const hasExtraFiles = extraRows.some((row) => row.file);
+    if (!assetTrim && !categoryTrim) {
       setError("Category Path is required (e.g., exteriors/cottage).");
       return;
     }
@@ -91,12 +104,16 @@ const [fileTexture, setFileTexture] = useState(null);
       setError("Add a Style or at least one Tag so you can find this photo later.");
       return;
     }
+    if (!assetTrim && !fileBase && hasExtraFiles) {
+      setError("Extra photos need an Asset ID (or upload a prepared base).");
+      return;
+    }
 
     setBusy(true);
 
     try {
       const form = new FormData();
-      if (assetId.trim()) form.append("asset_id", assetId.trim());
+      if (assetTrim) form.append("asset_id", assetTrim);
 
       // Optional meta supported by controller
       if (styleTrim) form.append("style", styleTrim);
@@ -105,10 +122,16 @@ const [fileTexture, setFileTexture] = useState(null);
       if (lighting.trim()) form.append("lighting", lighting.trim());
       if (rights.trim()) form.append("rights", rights.trim());
       if (tagsTrim) form.append("tags", tagsTrim);
-      form.append("category_path", categoryTrim);
+      if (categoryTrim) form.append("category_path", categoryTrim);
 
       if (fileBase) form.append("prepared_base", fileBase, fileBase.name);
       if (fileTexture) form.append("texture_overlay", fileTexture, fileTexture.name);
+
+      extraRows.forEach((row) => {
+        if (!row.file) return;
+        form.append("extras[]", row.file, row.file.name);
+        form.append("extra_slugs[]", row.slug || "");
+      });
 
       // Optional masks[]
       let maskCount = 0;
@@ -150,7 +173,8 @@ const [fileTexture, setFileTexture] = useState(null);
       }
 
       if (!res.ok || json?.error) {
-        throw new Error(json?.message || json?.error || `HTTP ${res.status}`);
+        const where = json?.where ? ` (${json.where})` : "";
+        throw new Error(`${json?.message || json?.error || `HTTP ${res.status}`}${where}`);
       }
 
       setResult(json);
@@ -183,16 +207,21 @@ const [fileTexture, setFileTexture] = useState(null);
       setExistingStatus((prev) => ({ ...prev, loading: true }));
     }
     try {
-      const res = await fetch(`${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(normalizedId)}`, {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(normalizedId)}&_=${Date.now()}`,
+        {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Accept: "application/json" },
+        }
+      );
       const data = await res.json();
       if (!res.ok || data?.error) {
         throw new Error(data?.message || data?.error || "Failed to load asset");
       }
       setExistingAsset(data);
       setExistingMasks(Array.isArray(data.masks) ? data.masks : []);
+      setExistingExtras(Array.isArray(data.extras) ? data.extras : []);
       setStylePrimary(data.style_primary || "");
       setVerdict(data.verdict || "");
       setStatus(data.status || "");
@@ -209,11 +238,53 @@ const [fileTexture, setFileTexture] = useState(null);
     } catch (err) {
       setExistingAsset(null);
       setExistingMasks([]);
+      setExistingExtras([]);
+      setMaskDeleteStatus({ role: "", error: "", success: "" });
       if (silent) {
         setExistingStatus({ loading: false, error: err?.message || "Failed to load asset", success: "" });
       } else {
         setExistingStatus({ loading: false, error: err?.message || "Failed to load asset", success: "" });
       }
+    }
+  }
+
+  async function handleDeleteMask(maskRole) {
+    if (!maskRole || !existingAsset?.asset_id) return;
+    const ok = window.confirm(`Remove mask "${maskRole}"? This deletes it from palettes and flags rerender.`);
+    if (!ok) return;
+    setMaskDeleteStatus({ role: maskRole, error: "", success: "" });
+    try {
+      const res = await fetch(`${API_FOLDER}/v2/admin/photo-mask-delete.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          asset_id: existingAsset.asset_id,
+          mask_role: maskRole,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        const message = data?.error || "Failed to delete mask";
+        if (!/mask not found/i.test(message)) {
+          throw new Error(message);
+        }
+      }
+      setExistingMasks((prev) => prev.filter((m) => m.role !== maskRole));
+      setExistingAsset((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          masks: Array.isArray(prev.masks) ? prev.masks.filter((m) => m.role !== maskRole) : prev.masks,
+        };
+      });
+      setMaskDeleteStatus({
+        role: "",
+        error: "",
+        success: /mask not found/i.test(data?.error || "") ? `Already removed ${maskRole}` : `Removed ${maskRole}`,
+      });
+    } catch (err) {
+      setMaskDeleteStatus({ role: maskRole, error: err?.message || "Failed to delete mask", success: "" });
     }
   }
 
@@ -227,6 +298,14 @@ const [fileTexture, setFileTexture] = useState(null);
             <option key={opt} value={opt} />
           ))}
         </datalist>
+        <PhotoSearchPicker
+          onPick={(item) => {
+            const id = item?.asset_id || "";
+            if (!id) return;
+            setAssetId(id);
+            loadExistingAsset(id, { silent: true });
+          }}
+        />
         <div className="row asset-row">
           <label>Asset ID (optional)</label>
           <div className="asset-input-group">
@@ -383,6 +462,34 @@ const [fileTexture, setFileTexture] = useState(null);
                           View
                         </a>
                       )}
+                      <button
+                        type="button"
+                        className="mask-delete-btn"
+                        onClick={() => handleDeleteMask(mask.role)}
+                        disabled={maskDeleteStatus.role === mask.role}
+                      >
+                        {maskDeleteStatus.role === mask.role ? "Removing…" : "Remove"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {maskDeleteStatus.error && <div className="error">{maskDeleteStatus.error}</div>}
+                {maskDeleteStatus.success && <div className="notice">{maskDeleteStatus.success}</div>}
+              </div>
+            )}
+            {existingExtras.length > 0 && (
+              <div className="existing-mask-list">
+                <div className="section-title">Extra Photos</div>
+                <ul>
+                  {existingExtras.map((extra) => (
+                    <li key={extra.role || extra.filename}>
+                      <span className="mask-label">{extra.role || "extra"}</span>
+                      {extra.filename && <span className="mask-file">{extra.filename}</span>}
+                      {extra.url && (
+                        <a href={extra.url} target="_blank" rel="noreferrer">
+                          View
+                        </a>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -407,6 +514,49 @@ const [fileTexture, setFileTexture] = useState(null);
             accept=".png"
             onChange={(e) => setFileTexture(e.target.files?.[0] || null)}
           />
+        </div>
+
+        <div className="extras-section">
+          <div className="masks-header">
+            <label>Extra Photos (optional)</label>
+            <button type="button" onClick={() => setExtraRows((rows) => [...rows, createExtraRow()])}>
+              + Add Photo
+            </button>
+          </div>
+          {extraRows.map((row, idx) => (
+            <div key={row.id} className="mask-row">
+              <div className="mask-row-head">
+                <span>Extra #{idx + 1}</span>
+                {extraRows.length > 1 && (
+                  <button type="button" onClick={() => setExtraRows((rows) => rows.filter((r) => r.id !== row.id))}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                onChange={(e) =>
+                  setExtraRows((rows) =>
+                    rows.map((r) => (r.id === row.id ? { ...r, file: e.target.files?.[0] || null } : r))
+                  )
+                }
+              />
+              <div className="mask-slug-select">
+                <label>Label (used in filename)</label>
+                <input
+                  type="text"
+                  placeholder="e.g., before, side-yard, elevation-b"
+                  value={row.slug}
+                  onChange={(e) =>
+                    setExtraRows((rows) =>
+                      rows.map((r) => (r.id === row.id ? { ...r, slug: e.target.value } : r))
+                    )
+                  }
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="masks-section">

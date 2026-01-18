@@ -29,9 +29,16 @@ if ($method === 'POST') {
     $roles = isset($_GET['roles'])
         ? array_filter(array_map('trim', explode(',', (string)$_GET['roles'])))
         : null;
-    $input = $assetId !== '' ? ['asset_id' => $assetId, 'roles' => $roles] : null;
-    if (!$input) {
-        respond(['ok' => false, 'error' => 'asset_id required'], 400);
+    $all = isset($_GET['all']) && ((string)$_GET['all'] === '1' || strtolower((string)$_GET['all']) === 'true');
+    if ($all) {
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : null;
+        $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : null;
+        $input = ['all' => true, 'roles' => $roles, 'limit' => $limit, 'offset' => $offset];
+    } else {
+        $input = $assetId !== '' ? ['asset_id' => $assetId, 'roles' => $roles] : null;
+        if (!$input) {
+            respond(['ok' => false, 'error' => 'asset_id required'], 400);
+        }
     }
 } else {
     respond(['ok' => false, 'error' => 'Method not allowed'], 405);

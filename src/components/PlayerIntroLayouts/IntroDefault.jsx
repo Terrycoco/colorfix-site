@@ -22,7 +22,7 @@ export default function IntroDefault({ item }) {
       {title && <div className="player-title-text">{title}</div>}
       {subtitle && <div className="player-subtitle-text">{subtitle}</div>}
       {body && <div className="intro-default__body">{body}</div>}
-      <div className="intro-default__hint">Tap screen to begin</div>
+      <div className="intro-default__hint">Tap screen to advance</div>
     </div>
   );
 }

@@ -68,6 +68,8 @@ if ($existingRow && entriesMatch($existingRow, $normalizedEntry)) {
     respond(['ok' => true, 'setting' => $existingRow]);
 }
 
+$blendOpacity = normalizeOpacity($entry['blend_opacity'] ?? null, 1.0);
+$shadowOpacity = normalizeOpacity($entry['shadow_tint_opacity'] ?? null, null);
 $settingPayload = [
     'id' => $idFromPayload,
     'color_id' => $entry['color_id'] ?? null,
@@ -76,14 +78,11 @@ $settingPayload = [
     'color_code' => $entry['color_code'] ?? null,
     'color_hex' => $entry['color_hex'] ?? '',
     'base_lightness' => $entry['base_lightness'] ?? null,
-    'target_lightness' => $entry['target_lightness'] ?? null,
-    'target_h' => $entry['target_h'] ?? null,
-    'target_c' => $entry['target_c'] ?? null,
     'blend_mode' => $entry['blend_mode'] ?? 'colorize',
-    'blend_opacity' => $entry['blend_opacity'] ?? 1,
+    'blend_opacity' => $blendOpacity,
     'shadow_l_offset' => $entry['shadow_l_offset'] ?? null,
     'shadow_tint_hex' => $entry['shadow_tint_hex'] ?? null,
-    'shadow_tint_opacity' => $entry['shadow_tint_opacity'] ?? null,
+    'shadow_tint_opacity' => $shadowOpacity,
     'is_preset' => $entry['is_preset'] ?? 0,
     'notes' => $entry['notes'] ?? null,
 ];
@@ -122,13 +121,13 @@ function normalizeEntryForCompare(array $entry, ?array $existing): array {
         ? strtolower((string)$entry['blend_mode'])
         : 'colorize';
     $blendOpacity = array_key_exists('blend_opacity', $entry)
-        ? (float)$entry['blend_opacity']
+        ? normalizeOpacity($entry['blend_opacity'], 1.0)
         : 1.0;
     $shadowOffset = array_key_exists('shadow_l_offset', $entry)
         ? clampFloat($entry['shadow_l_offset'], -50.0, 50.0)
         : null;
     $shadowOpacity = array_key_exists('shadow_tint_opacity', $entry)
-        ? clampFloat($entry['shadow_tint_opacity'], 0.0, 1.0)
+        ? normalizeOpacity($entry['shadow_tint_opacity'], null)
         : null;
 
     $approved = array_key_exists('approved', $entry)
@@ -165,6 +164,14 @@ function clampFloat($value, float $min, float $max): ?float {
     if ($num < $min) $num = $min;
     if ($num > $max) $num = $max;
     return $num;
+}
+
+function normalizeOpacity($value, ?float $default): ?float {
+    if ($value === null || $value === '') return $default;
+    $num = (float)$value;
+    if (!is_finite($num)) return $default;
+    if ($num > 1.0) $num = $num / 100.0;
+    return clampFloat($num, 0.0, 1.0);
 }
 
 function entriesMatch(array $existing, array $normalized): bool {

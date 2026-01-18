@@ -124,7 +124,9 @@
   min-height: 0;
 }
 .mbh-row.active {
-  background: #fff6d6;
+  background: transparent;
+  outline: 2px solid #d62828;
+  outline-offset: -2px;
 }
 .mbh-row-title {
   font-weight: 600;

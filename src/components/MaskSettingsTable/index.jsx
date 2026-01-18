@@ -23,9 +23,29 @@ export default function MaskSettingsTable({
   onSelectRow,
   activeRowId = null,
   activeColorId = null,
+  activeColorIdByRow = null,
   showRole = false,
   renderExtraRow = null,
 }) {
+  const formatPercentValue = (value) => {
+    if (value == null || value === "") return "";
+    if (typeof value === "string") return value;
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(1) : "";
+  };
+
+  const formatHcl = (row) => {
+    const h = row?.color_h;
+    const c = row?.color_c;
+    const l = row?.color_l;
+    const hasAny = [h, c, l].some((val) => Number.isFinite(Number(val)));
+    if (!hasAny) return "H:— C:— L:—";
+    const hVal = Number.isFinite(Number(h)) ? Math.round(Number(h)) : "—";
+    const cVal = Number.isFinite(Number(c)) ? Math.round(Number(c)) : "—";
+    const lVal = Number.isFinite(Number(l)) ? Math.round(Number(l)) : "—";
+    return `H:${hVal} C:${cVal} L:${lVal}`;
+  };
+
   return (
     <div className="mbh-table-wrapper">
       <table className="mbh-table">
@@ -55,15 +75,20 @@ export default function MaskSettingsTable({
             const percentValue =
               row.draft_percent ??
               row.percent ??
-              (row.blend_opacity == null ? "" : Math.round(row.blend_opacity * 100));
+              (row.blend_opacity == null ? "" : row.blend_opacity * 100);
+            const percentDisplay = formatPercentValue(percentValue);
             const offsetValue =
               row.draft_shadow_input?.l_offset ??
               (typeof row.draft_shadow?.l_offset === "number"
                 ? String(row.draft_shadow.l_offset)
                 : row.shadow_l_offset ?? "");
             const approvedValue = row.draft_approved ?? row.approved ?? false;
+            const resolvedActiveColorId = typeof activeColorIdByRow === "function"
+              ? activeColorIdByRow(row)
+              : (activeColorIdByRow && (activeColorIdByRow[row.id] ?? activeColorIdByRow[row.mask_role]));
             const isActive =
               (activeRowId != null && activeRowId === row.id) ||
+              (resolvedActiveColorId != null && resolvedActiveColorId === row.color_id) ||
               (activeColorId != null && activeColorId === row.color_id);
 
             const rowKey = row.id || row.color_id || row.mask_role;
@@ -111,12 +136,12 @@ export default function MaskSettingsTable({
                       <div className="mbh-color-meta">
                         <div>{displayName || "Add color"}</div>
                         <div className="mbh-color-sub">
-                          {row.color_brand || ""} · Base L {row.base_lightness != null ? Math.round(row.base_lightness) : "—"}
+                          {(row.color_brand || "").trim() || "—"} · {formatHcl(row)}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td>{row.target_lightness != null ? Math.round(row.target_lightness) : "—"}</td>
+                  <td>{row.base_lightness != null ? Math.round(row.base_lightness) : "—"}</td>
                   <td>
                     <select
                       value={modeValue}
@@ -139,7 +164,9 @@ export default function MaskSettingsTable({
                       type="number"
                       min="0"
                       max="100"
-                      value={percentValue}
+                      step="0.1"
+                      inputMode="decimal"
+                      value={percentDisplay}
                       onChange={(e) => onChangePercent && onChangePercent(row, e.target.value)}
                       disabled={isOriginal}
                     />
@@ -148,7 +175,7 @@ export default function MaskSettingsTable({
                     <input
                       type="text"
                       className="col-offset"
-                      inputMode="numeric"
+                      inputMode="text"
                       pattern="-?[0-9]*"
                       value={offsetValue}
                       onChange={(e) => onChangeOffset && onChangeOffset(row, e.target.value)}
@@ -242,6 +269,7 @@ MaskSettingsTable.propTypes = {
   onSelectRow: PropTypes.func,
   activeRowId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   activeColorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  activeColorIdByRow: PropTypes.oneOfType([PropTypes.object, PropTypes.func]),
   showRole: PropTypes.bool,
   renderExtraRow: PropTypes.func,
 };

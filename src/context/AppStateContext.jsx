@@ -5,6 +5,7 @@ import fetchCategories from '@data/fetchCategories'; //for wheels not admin
 import fetchColors from '@data/fetchColors';
 import fetchColorSchemes from '@data/fetchColorSchemes';
 import { normalizeSwatch } from '@helpers/swatchHelper'; 
+import { API_FOLDER } from '@helpers/config';
 
 const AppStateContext = createContext();
 const PALETTE_STORAGE_KEY = "pals.palette.v1";
@@ -19,6 +20,44 @@ const savePaletteIds = (arr = []) => {
       JSON.stringify(arr.map(s => s?.id).filter(Boolean))
     );
   } catch {}
+};
+
+const readCookie = (name) => {
+  if (typeof document === 'undefined') return '';
+  const needle = `${name}=`;
+  const parts = document.cookie.split(';').map((part) => part.trim());
+  const hit = parts.find((part) => part.startsWith(needle));
+  return hit ? hit.slice(needle.length) : '';
+};
+
+const persistDeviceToken = (token) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('cf_device_token', token);
+  } catch {}
+  const host = window.location.hostname;
+  const isPrimaryDomain = host.endsWith('terrymarr.com');
+  const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `cf_device_token=${encodeURIComponent(token)}; Max-Age=31536000; path=/; SameSite=Lax${securePart}`;
+  if (isPrimaryDomain) {
+    document.cookie = `cf_device_token=${encodeURIComponent(token)}; Max-Age=31536000; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
+  }
+};
+
+const getDeviceToken = () => {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search || '');
+  const fromUrl = params.get('device_token') || '';
+  if (fromUrl) {
+    persistDeviceToken(fromUrl);
+    return fromUrl;
+  }
+  try {
+    const stored = localStorage.getItem('cf_device_token') || '';
+    if (stored) return stored;
+  } catch {
+  }
+  return readCookie('cf_device_token') || '';
 };
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -130,8 +169,30 @@ const initialAdvancedSearch = {
 
 export function AppStateProvider({ children }) {
   //DECLARATIONS
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [user, setUser] = useState(null);
+  const [loggedIn, setLoggedIn] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('cf_logged_in') === '1'
+        || !!localStorage.getItem('cf_user')
+        || readCookie('cf_admin') === '1'
+        || readCookie('cf_admin_global') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem('cf_user');
+      if (raw) return JSON.parse(raw);
+      if (readCookie('cf_admin') === '1' || readCookie('cf_admin_global') === '1') {
+        return { is_admin: true };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
   const [colors, setColors] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
 
@@ -173,6 +234,72 @@ const [palette, setPalette] = useState([]); // array of full swatch objects
 const [hydrated, setHydrated] = useState(false);
 
 //USE EFFECTS 
+
+// Persist login state for mobile browsers that reload tabs aggressively.
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (loggedIn) {
+      localStorage.setItem('cf_logged_in', '1');
+    } else {
+      localStorage.removeItem('cf_logged_in');
+    }
+    if (user) {
+      localStorage.setItem('cf_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('cf_user');
+    }
+  } catch {}
+}, [loggedIn, user]);
+
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  if (loggedIn && user) return;
+  let cancelled = false;
+  const token = getDeviceToken();
+  const authFromToken = token
+    ? fetch(`${API_FOLDER}/device-auth.php?token=${encodeURIComponent(token)}`, {
+        credentials: 'include',
+      })
+        .then((res) => res.json())
+        .then((payload) => {
+          if (cancelled) return false;
+          if (payload?.ok && payload?.user) {
+            setUser(payload.user);
+            setLoggedIn(true);
+            if (payload.user.is_admin) {
+              localStorage.setItem('isAdmin', 'true');
+              localStorage.setItem('isTerry', 'true');
+            }
+            return true;
+          }
+          return false;
+        })
+        .catch(() => false)
+    : Promise.resolve(false);
+
+  authFromToken.then((ok) => {
+    if (ok || cancelled) return;
+    fetch(`${API_FOLDER}/session.php`, { credentials: 'include' })
+      .then((res) => res.json())
+      .then((payload) => {
+        if (cancelled) return;
+        if (payload?.ok && payload?.user) {
+          setUser(payload.user);
+          setLoggedIn(true);
+          if (payload.user.is_admin) {
+            localStorage.setItem('isAdmin', 'true');
+            localStorage.setItem('isTerry', 'true');
+          }
+        }
+      })
+      .catch(() => {});
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, [loggedIn, user]);
 
 // 1) Load once: read ids -> hydrate with normalizeSwatch (MERGE + DEDUPE)
 // Hydrate palette once from localStorage via normalizeSwatch (no writes here)

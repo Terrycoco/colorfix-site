@@ -46,6 +46,14 @@ foreach ($files as $file) {
         $stmt->execute([$name]);
         echo " done.\n";
     } catch (PDOException $e) {
+        $message = $e->getMessage();
+        $code = (string) $e->getCode();
+        if (str_contains($message, 'Duplicate column name') || str_contains($message, 'SQLSTATE[42S21]') || $code === '1060') {
+            $stmt = $pdo->prepare('INSERT IGNORE INTO schema_migrations (filename) VALUES (?)');
+            $stmt->execute([$name]);
+            echo " skipped (duplicate column).\n";
+            continue;
+        }
         echo " failed!\n";
         fwrite(STDERR, $e->getMessage() . "\n");
         exit(1);

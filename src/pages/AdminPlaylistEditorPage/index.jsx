@@ -29,6 +29,7 @@ const emptyItem = {
   star: true,
   transition: "",
   duration_ms: "",
+  exclude_from_thumbs: false,
   is_active: true,
 };
 
@@ -37,6 +38,7 @@ export default function AdminPlaylistEditorPage() {
   const navigate = useNavigate();
   const [playlist, setPlaylist] = useState(emptyPlaylist);
   const [items, setItems] = useState([]);
+  const [expandedItems, setExpandedItems] = useState({});
   const [apOptions, setApOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -89,6 +91,7 @@ export default function AdminPlaylistEditorPage() {
           star: item.star === null ? true : Boolean(item.star),
           transition: item.transition ?? "",
           duration_ms: item.duration_ms ?? "",
+          exclude_from_thumbs: Boolean(item.exclude_from_thumbs),
           is_active: item.is_active === null ? true : Boolean(item.is_active),
         }))
       );
@@ -112,7 +115,7 @@ export default function AdminPlaylistEditorPage() {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const options = (data.items || []).map((row) => ({
         id: row.id,
-        title: row.title || `Applied Palette ${row.id}`,
+        title: (row.title || `Applied Palette ${row.id}`) + (row.display_title ? ` — ${row.display_title}` : ""),
         renderUrl: row.render_rel_path ? `${origin}${row.render_rel_path}` : "",
       }));
       setApOptions(options);
@@ -127,9 +130,19 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
+  function toggleExpanded(key) {
+    setExpandedItems((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
   function updateItem(index, field, value) {
+    let nextValue = value;
+    if (typeof nextValue === "string") {
+      nextValue = nextValue
+        .replace(/&mdash;/gi, "—")
+        .replace(/--/g, "—");
+    }
     setItems((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: nextValue } : item))
     );
     setSaveStatus("");
     setSaveError("");
@@ -298,82 +311,10 @@ export default function AdminPlaylistEditorPage() {
       <div className="items-list">
         {items.map((item, index) => (
           <div className="item-card" key={`${item.playlist_item_id || "new"}-${index}`}>
-            <div className="item-card-header">
-              <div className="item-card-title">
-                #{index + 1} • {item.item_type || "normal"}
-              </div>
-              <div className="item-card-actions">
-                <button type="button" onClick={() => moveItem(index, -1)}>↑</button>
-                <button type="button" onClick={() => moveItem(index, 1)}>↓</button>
-                <button type="button" onClick={() => removeItem(index)}>Remove</button>
-              </div>
-            </div>
-
-            <div className="item-grid">
-              <label className="field--wide">
-                Applied Palette
-                <select
-                  value={item.ap_id || ""}
-                  onChange={(e) => applyAppliedPalette(index, e.target.value)}
-                >
-                  <option value="">Select applied palette</option>
-                  {apOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.id} — {option.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field--small">
-                AP ID
-                <input
-                  type="number"
-                  value={item.ap_id}
-                  onChange={(e) => updateItem(index, "ap_id", e.target.value)}
-                />
-              </label>
-              <label className="field--wide">
-                Image URL
-                <input
-                  type="text"
-                  value={item.image_url}
-                  onChange={(e) => updateItem(index, "image_url", e.target.value)}
-                />
-              </label>
-              <label className="field--wide">
-                Title
-                <input
-                  type="text"
-                  value={item.title}
-                  onChange={(e) => updateItem(index, "title", e.target.value)}
-                />
-              </label>
-              <label className="field--wide">
-                Subtitle
-                <input
-                  type="text"
-                  value={item.subtitle}
-                  onChange={(e) => updateItem(index, "subtitle", e.target.value)}
-                />
-              </label>
-              <label className="field--wide">
-                Subtitle 2
-                <input
-                  type="text"
-                  value={item.subtitle_2}
-                  onChange={(e) => updateItem(index, "subtitle_2", e.target.value)}
-                />
-              </label>
-              <label className="field--wide">
-                Body
-                <textarea
-                  rows={3}
-                  value={item.body}
-                  onChange={(e) => updateItem(index, "body", e.target.value)}
-                />
-              </label>
-              <label className="field--small">
-                Item Type
+            <div className="item-row">
+              <div className="item-cell item-order">#{index + 1}</div>
+              <label className="item-cell">
+                Type
                 <select
                   value={item.item_type}
                   onChange={(e) => updateItem(index, "item_type", e.target.value)}
@@ -383,60 +324,145 @@ export default function AdminPlaylistEditorPage() {
                   <option value="text">text</option>
                 </select>
               </label>
-              <label className="field--small">
-                Layout
+              <label className="item-cell item-title">
+                Title
                 <input
                   type="text"
-                  value={item.layout}
-                  onChange={(e) => updateItem(index, "layout", e.target.value)}
+                  value={item.title}
+                  onChange={(e) => updateItem(index, "title", e.target.value)}
                 />
               </label>
-              <label className="field--small">
-                Title Mode
+              <label className="item-cell item-subtitle">
+                Subtitle
+                <input
+                  type="text"
+                  value={item.subtitle}
+                  onChange={(e) => updateItem(index, "subtitle", e.target.value)}
+                />
+              </label>
+              <label className="item-cell item-ap">
+                Applied Palette
                 <select
-                  value={item.title_mode}
-                  onChange={(e) => updateItem(index, "title_mode", e.target.value)}
+                  value={item.ap_id || ""}
+                  onChange={(e) => applyAppliedPalette(index, e.target.value)}
                 >
                   <option value="">Select</option>
-                  <option value="static">static</option>
-                  <option value="animate">animate</option>
+                  {apOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.id} — {option.title}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <label className="field--small">
-                Star
-                <select
-                  value={item.star ? "1" : "0"}
-                  onChange={(e) => updateItem(index, "star", e.target.value === "1")}
-                >
-                  <option value="1">Yes</option>
-                  <option value="0">No</option>
-                </select>
-              </label>
-              <label className="field--small">
-                Transition
-                <input
-                  type="text"
-                  value={item.transition}
-                  onChange={(e) => updateItem(index, "transition", e.target.value)}
-                />
-              </label>
-              <label className="field--small">
-                Duration (ms)
-                <input
-                  type="number"
-                  value={item.duration_ms}
-                  onChange={(e) => updateItem(index, "duration_ms", e.target.value)}
-                />
-              </label>
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={item.is_active}
-                  onChange={(e) => updateItem(index, "is_active", e.target.checked)}
-                />
-                Active
-              </label>
+              <div className="item-actions">
+                <div className="item-move">
+                  <button type="button" onClick={() => moveItem(index, -1)}>↑</button>
+                  <button type="button" onClick={() => moveItem(index, 1)}>↓</button>
+                </div>
+                <button type="button" className="item-more" onClick={() => toggleExpanded(index)}>
+                  {expandedItems[index] ? "Less" : "More"}
+                </button>
+                <button type="button" onClick={() => removeItem(index)}>Remove</button>
+              </div>
             </div>
+
+            {expandedItems[index] && (
+              <div className="item-row item-row--details">
+                <label className="item-cell item-wide">
+                  Image URL
+                  <input
+                    type="text"
+                    value={item.image_url}
+                    onChange={(e) => updateItem(index, "image_url", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell">
+                  AP ID
+                  <input
+                    type="number"
+                    value={item.ap_id}
+                    onChange={(e) => updateItem(index, "ap_id", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell item-wide">
+                  Subtitle 2
+                  <input
+                    type="text"
+                    value={item.subtitle_2}
+                    onChange={(e) => updateItem(index, "subtitle_2", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell item-wide">
+                  Body
+                  <textarea
+                    rows={2}
+                    value={item.body}
+                    onChange={(e) => updateItem(index, "body", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell">
+                  Layout
+                  <input
+                    type="text"
+                    value={item.layout}
+                    onChange={(e) => updateItem(index, "layout", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell">
+                  Title Mode
+                  <select
+                    value={item.title_mode}
+                    onChange={(e) => updateItem(index, "title_mode", e.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="static">static</option>
+                    <option value="animate">animate</option>
+                  </select>
+                </label>
+                <label className="item-cell">
+                  Star
+                  <select
+                    value={item.star ? "1" : "0"}
+                    onChange={(e) => updateItem(index, "star", e.target.value === "1")}
+                  >
+                    <option value="1">Yes</option>
+                    <option value="0">No</option>
+                  </select>
+                </label>
+                <label className="item-cell">
+                  Transition
+                  <input
+                    type="text"
+                    value={item.transition}
+                    onChange={(e) => updateItem(index, "transition", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell">
+                  Duration
+                  <input
+                    type="number"
+                    value={item.duration_ms}
+                    onChange={(e) => updateItem(index, "duration_ms", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.exclude_from_thumbs)}
+                    onChange={(e) => updateItem(index, "exclude_from_thumbs", e.target.checked)}
+                  />
+                  Hide from Thumbs
+                </label>
+                <label className="item-cell checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={item.is_active}
+                    onChange={(e) => updateItem(index, "is_active", e.target.checked)}
+                  />
+                  Active
+                </label>
+              </div>
+            )}
           </div>
         ))}
       </div>

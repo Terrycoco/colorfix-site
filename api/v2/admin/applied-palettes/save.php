@@ -34,6 +34,7 @@ if (!is_array($input)) {
 
 $assetId = trim((string)($input['asset_id'] ?? ''));
 $title = trim((string)($input['title'] ?? ($input['nickname'] ?? '')));
+$displayTitle = trim((string)($input['display_title'] ?? ''));
 $notes = trim((string)($input['notes'] ?? ''));
 $entries = $input['entries'] ?? [];
 $clientId = isset($input['client_id']) ? (int)$input['client_id'] : null;
@@ -81,6 +82,7 @@ try {
         'photo_id' => (int)$photo['id'],
         'asset_id' => $assetId,
         'title' => $title,
+        'display_title' => $displayTitle !== '' ? $displayTitle : null,
         'notes' => $notes,
     ]);
     $paletteId = $palette['id'];

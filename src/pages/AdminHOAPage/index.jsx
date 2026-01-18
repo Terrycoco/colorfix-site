@@ -83,6 +83,10 @@ export default function AdminHOAPage() {
   const [schemeColorEditorOpen, setSchemeColorEditorOpen] = useState(false);
   const [schemeColorEditing, setSchemeColorEditing] = useState(null);
   const [schemeColorSaving, setSchemeColorSaving] = useState(false);
+
+  const selectedScheme = schemes.find(
+    (scheme) => String(scheme.id) === String(selectedSchemeId)
+  );
   const [roleSuggestions, setRoleSuggestions] = useState([]);
 
   useEffect(() => {
@@ -580,8 +584,7 @@ export default function AdminHOAPage() {
             <div className="hoa-modal__body">
               <div className="hoa-schemes-table">
                 <div className="hoa-schemes-row header">
-                  <div>Code</div>
-                  <div>Brand</div>
+                  <div>Scheme</div>
                   <div>Notes</div>
                 </div>
                 {schemes.map((scheme) => (
@@ -592,14 +595,15 @@ export default function AdminHOAPage() {
                     onDoubleClick={() => openSchemeEditor(scheme)}
                   >
                     <div>{scheme.scheme_code}</div>
-                    <div>{scheme.source_brand || "-"}</div>
                     <div className="notes">{scheme.notes || ""}</div>
                   </div>
                 ))}
               </div>
 
               <div className="hoa-scheme-colors">
-                <div className="section-title">Scheme colors</div>
+                <div className="section-title">
+                  Scheme colors{selectedScheme?.scheme_code ? ` — ${selectedScheme.scheme_code}` : ""}
+                </div>
                 {!selectedSchemeId && <div className="section-body">Select a scheme to view colors.</div>}
                 {selectedSchemeId && (
                   <>

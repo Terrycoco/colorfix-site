@@ -1,18 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AppliedPaletteViewer from "@components/AppliedPaletteViewer";
+import CTASection from "@components/CTASection";
+import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 
 const API_URL = "/api/v2/applied-palettes/render.php";
+const CTA_GROUP_BY_AUDIENCE_URL = "/api/v2/cta-groups/by-audience.php";
+const CTA_GROUP_ITEMS_URL = "/api/v2/cta-group-items/list.php";
 
 export default function AppliedPaletteViewPage() {
   const { paletteId } = useParams();
+  const navigate = useNavigate();
   const paletteNumericId = useMemo(() => {
     const parsed = Number(paletteId);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [paletteId]);
   const [searchParams] = useSearchParams();
   const [state, setState] = useState({ loading: true, error: "", data: null });
+  const [ctaItems, setCtaItems] = useState([]);
+  const [shareStatus, setShareStatus] = useState("");
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const isAdminView = (searchParams.get("admin") || "").toString() === "1";
+  const ctaAudience = searchParams.get("aud") ?? "";
+  const addCtaGroup = searchParams.get("add_cta_group") ?? "";
+  const isHoaView = ctaAudience.toLowerCase() === "hoa";
 
   useEffect(() => {
     if (!paletteNumericId) return;
@@ -22,7 +33,12 @@ export default function AppliedPaletteViewPage() {
       .then((r) => r.json())
       .then((res) => {
         if (!res?.ok) throw new Error(res?.error || "Failed to load palette");
-        setState({ loading: false, error: "", data: res });
+        const renderNonce = Date.now();
+        const next = {
+          ...res,
+          render: res.render ? { ...res.render, cache_bust: renderNonce } : res.render,
+        };
+        setState({ loading: false, error: "", data: next });
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
@@ -30,6 +46,153 @@ export default function AppliedPaletteViewPage() {
       });
     return () => controller.abort();
   }, [paletteNumericId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCtas() {
+      setCtaItems([]);
+      const groupId = Number(addCtaGroup || 0);
+      let resolvedGroupId = groupId;
+      if (!resolvedGroupId && ctaAudience) {
+        try {
+          const res = await fetch(`${CTA_GROUP_BY_AUDIENCE_URL}?audience=${encodeURIComponent(ctaAudience)}`, {
+            headers: { Accept: "application/json" },
+          });
+          const data = await res.json();
+          if (res.ok && data?.ok && data?.group?.id) {
+            resolvedGroupId = Number(data.group.id) || 0;
+          }
+        } catch {
+          resolvedGroupId = 0;
+        }
+      }
+      if (!resolvedGroupId) return;
+      try {
+        const res = await fetch(`${CTA_GROUP_ITEMS_URL}?group_id=${resolvedGroupId}`, {
+          headers: { Accept: "application/json" },
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) return;
+        if (!cancelled) {
+          setCtaItems(Array.isArray(data.items) ? data.items : []);
+        }
+      } catch {
+        // ignore CTA load errors
+      }
+    }
+    loadCtas();
+    return () => {
+      cancelled = true;
+    };
+  }, [addCtaGroup, ctaAudience]);
+
+  const handleBack = () => {
+    if (isAdminView) {
+      window.location.href = "/admin/applied-palettes";
+    } else if (isHoaView) {
+      window.location.href = "/hoa";
+    } else if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = "/";
+    }
+  };
+
+  const ctas = useMemo(() => {
+    const raw = ctaItems || [];
+    return raw.map((cta, index) => {
+      let parsedParams = {};
+      if (typeof cta?.params === "string" && cta.params.trim() !== "") {
+        try {
+          const decoded = JSON.parse(cta.params);
+          if (decoded && typeof decoded === "object") {
+            parsedParams = decoded;
+          }
+        } catch {
+          parsedParams = {};
+        }
+      } else if (cta?.params && typeof cta.params === "object") {
+        parsedParams = cta.params;
+      }
+      const key = cta?.key || cta?.type_action_key || cta?.action_key || cta?.action || "";
+      const label = cta?.label ?? "";
+      const isBack = key.toLowerCase().includes("back") || label.trim().toLowerCase().startsWith("back");
+      const variant = resolveVariant(parsedParams.variant || parsedParams.style, isBack);
+      return {
+        cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
+        label,
+        key,
+        enabled: cta?.is_active ?? true,
+        variant,
+        display_mode: parsedParams.display_mode,
+        icon: parsedParams.icon,
+        params: parsedParams,
+      };
+    });
+  }, [ctaItems]);
+
+  const ctaHandlers = useMemo(
+    () =>
+      buildCtaHandlers({
+        data: {},
+        navigate,
+        ctaAudience,
+      }),
+    [navigate, ctaAudience]
+  );
+
+  const handleCtaClick = (cta) => {
+    const key = getCtaKey(cta);
+    if (!key) return;
+    if (key === "open_share") {
+      setShareSheetOpen(true);
+      return;
+    }
+    ctaHandlers[key]?.(cta);
+  };
+
+  const palette = state.data?.palette || null;
+  const render = state.data?.render || null;
+  const entries = state.data?.entries || [];
+
+  const pageCtas = ctas;
+
+  const shareUrl = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      const url = new URL(window.location.href);
+      if (isAdminView) {
+        url.searchParams.delete("admin");
+      }
+      return url.toString();
+    } catch {
+      return window.location.href || "";
+    }
+  }, [isAdminView]);
+
+  const shareTitle = palette?.display_title || palette?.title || "ColorFix Palette";
+  const shareMessage = `Check out ${shareTitle} from ColorFix: ${shareUrl}`;
+  const smsLink = `sms:&body=${encodeURIComponent(shareMessage)}`;
+  const emailLink = `mailto:?subject=${encodeURIComponent("Your ColorFix Palette")}&body=${encodeURIComponent(shareMessage)}`;
+
+  const copyLink = async () => {
+    if (!shareUrl) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareUrl);
+      } else {
+        const tmp = document.createElement("textarea");
+        tmp.value = shareUrl;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand("copy");
+        tmp.remove();
+      }
+      setShareStatus("Link copied");
+    } catch (err) {
+      setShareStatus(err?.message || "Unable to copy");
+    }
+  };
 
   if (!paletteNumericId) {
     return <div className="apv-page">Missing palette id.</div>;
@@ -47,27 +210,59 @@ export default function AppliedPaletteViewPage() {
     );
   }
 
-  const { render, palette, entries = [] } = state.data || {};
-
-  const handleBack = () => {
-    if (isAdminView) {
-      window.location.href = "/admin/applied-palettes";
-    } else if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = "/";
-    }
-  };
-
   return (
-    <AppliedPaletteViewer
-      palette={palette}
-      renderInfo={render}
-      entries={entries}
-      adminMode={isAdminView}
-      onBack={isAdminView ? handleBack : undefined}
-      showBackButton={isAdminView}
-      shareEnabled={isAdminView}
-    />
+    <>
+      <AppliedPaletteViewer
+        palette={palette}
+        renderInfo={render}
+        entries={entries}
+        adminMode={isAdminView}
+        onBack={isAdminView ? handleBack : undefined}
+        showBackButton={isAdminView}
+        footer={
+          <CTASection
+            className="cta-section--transparent cta-section--on-dark cta-section--back-left cta-section--desktop-row-split"
+            ctas={pageCtas}
+            onCtaClick={handleCtaClick}
+          />
+        }
+      />
+      {shareSheetOpen && (
+        <div className="apv-share-modal" role="dialog" aria-modal="true">
+          <div className="apv-share-panel">
+            <button className="apv-share-close" onClick={() => setShareSheetOpen(false)} aria-label="Close share options">
+              ×
+            </button>
+            <h3>Share Palette</h3>
+            <label>
+              Link
+              <input type="text" readOnly value={shareUrl} onFocus={(e) => e.target.select()} />
+            </label>
+            {shareStatus && <div className="apv-share-status">{shareStatus}</div>}
+            <button className="apv-btn apv-btn--copy" onClick={copyLink}>
+              Copy Link
+            </button>
+            <a className="apv-share-option" href={smsLink}>
+              Text Link
+            </a>
+            <a className="apv-share-option" href={emailLink}>
+              Email Link
+            </a>
+            <button className="apv-btn apv-btn--ghost" onClick={() => setShareSheetOpen(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
+}
+
+function resolveVariant(raw, isBack = false) {
+  if (!raw) return isBack ? "link" : undefined;
+  const normalized = String(raw).toLowerCase();
+  if (normalized === "anchor" || normalized === "link") return "link";
+  if (normalized === "button") return isBack ? "link" : undefined;
+  if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
+  return isBack ? "link" : undefined;
 }

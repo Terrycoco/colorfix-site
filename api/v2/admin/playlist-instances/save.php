@@ -31,8 +31,10 @@ if (!is_array($payload)) {
 $id = isset($payload['playlist_instance_id']) ? (int)$payload['playlist_instance_id'] : null;
 $playlistId = isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : 0;
 $instanceName = trim((string)($payload['instance_name'] ?? ''));
+$displayTitle = trim((string)($payload['display_title'] ?? ''));
 $introLayout = trim((string)($payload['intro_layout'] ?? 'default'));
 $ctaContextKey = trim((string)($payload['cta_context_key'] ?? ''));
+$ctaOverrides = $payload['cta_overrides'] ?? null;
 if ($ctaContextKey === '') {
     $ctaContextKey = 'default';
 }
@@ -52,6 +54,7 @@ try {
         $id,
         $playlistId,
         $instanceName,
+        $displayTitle !== '' ? $displayTitle : null,
         $payload['instance_notes'] ?? null,
         $introLayout,
         $payload['intro_title'] ?? null,
@@ -60,6 +63,7 @@ try {
         $payload['intro_image_url'] ?? null,
         isset($payload['cta_group_id']) && $payload['cta_group_id'] !== '' ? (int)$payload['cta_group_id'] : null,
         $ctaContextKey,
+        is_array($ctaOverrides) ? json_encode($ctaOverrides, JSON_UNESCAPED_SLASHES) : (is_string($ctaOverrides) ? $ctaOverrides : null),
         !empty($payload['share_enabled']),
         $payload['share_title'] ?? null,
         $payload['share_description'] ?? null,

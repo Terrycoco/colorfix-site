@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "@components/Player";
 import CTALayout from "@components/cta/CTALayout";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
+import { SHARE_FOLDER } from "@helpers/config";
+import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import './playerpage.css';
 
 export default function PlayerPage() {
   const { playlistId, start } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const modeParam = searchParams.get("mode") ?? "";
+  const addCtaGroup = searchParams.get("add_cta_group") ?? "";
+  const ctaAudience = searchParams.get("aud") ?? "";
+  const endParam = (searchParams.get("end") ?? "") === "1";
 
 
   const [data, setData] = useState(null);
@@ -28,6 +34,9 @@ export default function PlayerPage() {
     const params = new URLSearchParams();
     params.set("playlist_instance_id", playlistId);
     if (startParam !== "") params.set("start", startParam);
+    if (modeParam !== "") params.set("mode", modeParam);
+    if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
+    if (ctaAudience !== "") params.set("aud", ctaAudience);
     params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
@@ -46,13 +55,14 @@ export default function PlayerPage() {
         setError(err?.message || "Failed to load playlist");
       })
       .finally(() => setLoading(false));
-  }, [playlistId, start, searchParams]);
+  }, [playlistId, start, searchParams, modeParam, addCtaGroup, ctaAudience]);
 
 
 
   useEffect(() => {
-    setPlaybackEnded(false);
-  }, [data?.playlist_instance_id]);
+    setPlaybackEnded(endParam);
+    setLikedCount(0);
+  }, [data?.playlist_instance_id, endParam]);
 
   function handleExit() {
     if (window.history.length > 1) {
@@ -61,11 +71,6 @@ export default function PlayerPage() {
       navigate("/");
     }
   }
-
-const replay = useCallback((likedOnly = false) => {
-  setPlaybackEnded(false);
-  playerRef.current?.replay({ likedOnly });
-}, []);
 
   const firstNonIntroIndex = useMemo(() => {
     const items = data?.items || [];
@@ -76,17 +81,30 @@ const replay = useCallback((likedOnly = false) => {
     return index >= 0 ? index : 0;
   }, [data?.items]);
 
-  const ctaHandlers = useMemo(
-    () => ({
-      replay: () => {
-        setPlaybackEnded(false);
-        playerRef.current?.replay({ likedOnly: false, startIndex: firstNonIntroIndex });
-      },
-      replay_liked: () => replay(true),
-      exit: handleExit,
-    }),
-    [replay, handleExit, firstNonIntroIndex]
-  );
+  const ctaHandlers = useMemo(() => (
+    buildCtaHandlers({
+      data,
+      shareFolder: SHARE_FOLDER,
+      playerRef,
+      setPlaybackEnded,
+      firstNonIntroIndex,
+      handleExit,
+      navigate,
+      ctaAudience,
+    })
+  ), [data, firstNonIntroIndex, handleExit, navigate, ctaAudience]);
+
+  const paletteItems = useMemo(() => {
+    const items = data?.items || [];
+    return items.filter((item) => {
+      const type = (item?.type || "normal").toLowerCase();
+      if (type === "intro" || type === "before" || type === "text") return false;
+      if (item?.exclude_from_thumbs) return false;
+      return Boolean(item?.ap_id);
+    });
+  }, [data?.items]);
+
+  const paletteCount = paletteItems.length;
 
   function isCtaVisible(cta) {
     if (!cta) return false;
@@ -94,7 +112,16 @@ const replay = useCallback((likedOnly = false) => {
 
     switch (cta.key) {
       case "replay_liked":
-        return likedCount > 0;
+        return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+      case "replay_filtered":
+        if (cta?.params?.filter === "liked") {
+          return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+        }
+        return true;
+      case "to_thumbs":
+        return paletteCount > 1;
+      case "to_palette":
+        return paletteCount === 1;
 
       // future examples (not active yet):
       // case "see_palettes":
@@ -106,13 +133,8 @@ const replay = useCallback((likedOnly = false) => {
   }
 
 
-function ctaKey(cta) {
-  return cta?.key || "";
-}
-
-
   function handleCta(cta) {
-    const key = ctaKey(cta);
+    const key = getCtaKey(cta);
     if (!key) return;
     ctaHandlers[key]?.(cta);
   }
@@ -136,18 +158,31 @@ const ctas = useMemo(() => {
 
     const key = cta?.key || cta?.action_key || cta?.action || "";
 
+    const variant = resolveVariant(
+      cta?.variant ?? parsedParams.variant ?? parsedParams.style,
+      key.toLowerCase().includes("back")
+    );
     return {
       cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
       label: cta?.label ?? "",
       key,
       enabled: cta?.enabled ?? true,
-      variant: cta?.variant ?? parsedParams.variant,
+      variant,
       display_mode: cta?.display_mode ?? parsedParams.display_mode,
       icon: cta?.icon ?? parsedParams.icon,
       params: parsedParams,
     };
   });
 }, [data?.ctas]);
+
+function resolveVariant(raw, isBack = false) {
+  if (!raw) return isBack ? "link" : undefined;
+  const normalized = String(raw).toLowerCase();
+  if (normalized === "anchor" || normalized === "link") return "link";
+  if (normalized === "button") return isBack ? "link" : undefined;
+  if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
+  return isBack ? "link" : undefined;
+}
 
 const visibleCTAs = useMemo(
   () => ctas.filter(isCtaVisible),
@@ -164,6 +199,8 @@ const visibleCTAs = useMemo(
           ref={playerRef}
           slides={data?.items || []}
           startIndex={data?.start_index ?? 0}
+          playlistInstanceId={playlistId}
+          hideStars={Boolean(data?.hide_stars)}
           onAbort={handleExit}
           onLikeChange={({ likedCount: nextCount }) => setLikedCount(nextCount)}
           onPlaybackEnd={({ likedCount: nextCount }) => {
@@ -172,7 +209,7 @@ const visibleCTAs = useMemo(
             }}
         />
         {playbackEnded && (
-          <PlayerEndScreen>
+          <PlayerEndScreen onExit={handleExit}>
             {visibleCTAs.length > 0 && (
               <CTALayout
                 layout="stacked"

@@ -16,6 +16,7 @@ use App\Services\PhotoRenderingService;
  *     repaired/  base.jpg
  *     masks/     <role>.png
  *     renders/   <role or composite>.png
+ *     extras/    <name>.<ext>
  *
  * Variants in DB (UNIQUE(photo_id, kind, role)):
  *   - Base (legacy single): kind='prepared' role=''
@@ -23,6 +24,7 @@ use App\Services\PhotoRenderingService;
  *   - repaired base: kind='repaired' role=''
  *   - masks: kind='masks' role='<role>'
  *   - renders: kind='renders' role='<role or composite>'
+ *   - extras: kind='extras' role='<label>'
  */
 final class PhotosUploadService
 {
@@ -138,6 +140,7 @@ final class PhotosUploadService
         );
         // Ensure stats are refreshed for this role
         $this->persistMaskStats($photoId, $assetId, $role, $maskPublicPath, $destPath);
+        $this->flagAppliedPalettesForMask($assetId, $role);
 
         return [
             'ok'      => true,
@@ -150,6 +153,25 @@ final class PhotosUploadService
             'original_texture' => $originalTexture,
             'overwritten' => true,
         ];
+    }
+
+    private function flagAppliedPalettesForMask(string $assetId, string $maskRole): void
+    {
+        try {
+            $stmt = $this->pdo->prepare("
+                UPDATE applied_palettes ap
+                JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
+                SET ap.needs_rerender = 1, ap.updated_at = NOW()
+                WHERE ap.asset_id = :asset_id
+                  AND ape.mask_role = :mask_role
+            ");
+            $stmt->execute([
+                ':asset_id' => $assetId,
+                ':mask_role' => $maskRole,
+            ]);
+        } catch (\Throwable $e) {
+            // Non-fatal: uploading masks should not fail if rerender flagging does.
+        }
     }
 
     /** Save a texture overlay into textures/overlay.<ext> */
@@ -212,11 +234,42 @@ final class PhotosUploadService
         ];
     }
 
+    /** Save an extra/reference photo into extras/<role>.<ext>. */
+    public function saveExtraPhoto(int $photoId, string $role, array $file): array
+    {
+        $role = $this->normalizeRole($role);
+        $photo = $this->repo->getPhotoById($photoId);
+        if (!$photo || empty($photo['asset_id'])) throw new \RuntimeException("Photo not found: {$photoId}");
+        $assetId = (string)$photo['asset_id'];
+
+        $destDir = $this->buildDir($assetId, 'extras');
+        $this->ensureDir($destDir);
+
+        [$ext, $mime] = $this->extFromUpload($file);
+        $filename = "{$role}.{$ext}";
+        $destPath = rtrim($destDir, '/')."/{$filename}";
+        $this->moveUpload($file, $destPath);
+
+        [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
+
+        $this->repo->upsertVariant($photoId, 'extras', $role, $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
+
+        return [
+            'ok'      => true,
+            'kind'    => 'extras',
+            'role'    => $role,
+            'path'    => $this->publicPath($destPath),
+            'width'   => $width,
+            'height'  => $height,
+            'assetId' => $assetId,
+        ];
+    }
+
     /** Generic variant replace for arbitrary kind/role. */
     public function replaceVariant(int $photoId, string $kind, ?string $role, array $file): array
     {
         $kind = strtolower(trim($kind));
-        if (!in_array($kind, ['prepared','repaired','masks','renders','thumb','texture'], true)) {
+        if (!in_array($kind, ['prepared','repaired','masks','renders','thumb','texture','extras'], true)) {
             throw new \InvalidArgumentException("Invalid kind: {$kind}");
         }
 
@@ -428,9 +481,7 @@ final class PhotosUploadService
 
     private function defaultSubpath(): string
     {
-        $y   = date('Y');
-        $ym  = date('Y-m');
-        return "{$y}/{$ym}";
+        return "uncategorized";
     }
 
     private function normalizeCategoryPath(?string $path): ?string

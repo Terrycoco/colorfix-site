@@ -36,6 +36,12 @@ function ensureOverlayStruct(overlay) {
   return out;
 }
 
+const toPercent = (value) => {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return "";
+  return (num * 100).toFixed(1);
+};
+
 export default function MaskOverlayEditor({
   masks,
   overlays,
@@ -169,11 +175,12 @@ export default function MaskOverlayEditor({
                       type="number"
                       min="0"
                       max="100"
-                      step="any"
+                      step="0.1"
+                      inputMode="decimal"
                       value={
                         overlay[tier].opacity == null
                           ? ""
-                          : Math.round(overlay[tier].opacity * 100)
+                          : toPercent(overlay[tier].opacity)
                       }
                       placeholder="100"
                       onChange={(e) => {
@@ -195,7 +202,7 @@ export default function MaskOverlayEditor({
                       onClick={() => onApplyPreset(role, tier, suggestion.preset)}
                       disabled={maskStatus.saving || maskStatus.refreshing}
                     >
-                      Use {suggestion.preset.mode} · {Math.round((suggestion.preset.opacity ?? 0) * 100)}%
+                      Use {suggestion.preset.mode} · {toPercent(suggestion.preset.opacity ?? 0)}%
                     </button>
                   )}
                 </div>

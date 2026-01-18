@@ -189,4 +189,74 @@ class PdoHoaSchemeRepository
             'notes' => $notes,
         ]);
     }
+
+    /* =========================================================
+     * SCHEME MASK MAPS
+     * ======================================================= */
+
+    public function getMaskMapBySchemeAsset(int $schemeId, string $assetId): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT mask_role, scheme_role
+            FROM hoa_scheme_mask_maps
+            WHERE scheme_id = :scheme_id
+              AND asset_id = :asset_id
+            ORDER BY mask_role ASC
+        ");
+        $stmt->execute([
+            'scheme_id' => $schemeId,
+            'asset_id' => $assetId,
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function replaceMaskMap(int $hoaId, int $schemeId, string $assetId, array $items): void
+    {
+        $this->pdo->beginTransaction();
+        try {
+            $del = $this->pdo->prepare("
+                DELETE FROM hoa_scheme_mask_maps
+                WHERE scheme_id = :scheme_id
+                  AND asset_id = :asset_id
+            ");
+            $del->execute([
+                'scheme_id' => $schemeId,
+                'asset_id' => $assetId,
+            ]);
+
+            if ($items) {
+                $ins = $this->pdo->prepare("
+                    INSERT INTO hoa_scheme_mask_maps (
+                        hoa_id,
+                        scheme_id,
+                        asset_id,
+                        mask_role,
+                        scheme_role
+                    ) VALUES (
+                        :hoa_id,
+                        :scheme_id,
+                        :asset_id,
+                        :mask_role,
+                        :scheme_role
+                    )
+                ");
+                foreach ($items as $row) {
+                    $maskRole = trim((string)($row['mask_role'] ?? ''));
+                    $schemeRole = trim((string)($row['scheme_role'] ?? ''));
+                    if ($maskRole === '' || $schemeRole === '') continue;
+                    $ins->execute([
+                        'hoa_id' => $hoaId,
+                        'scheme_id' => $schemeId,
+                        'asset_id' => $assetId,
+                        'mask_role' => $maskRole,
+                        'scheme_role' => $schemeRole,
+                    ]);
+                }
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
 }

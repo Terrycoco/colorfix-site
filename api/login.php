@@ -67,8 +67,45 @@ $real_password='sunshine88';
 if ($email === $real_email && $pass === $real_password) {
   $user = ['id'=>'terry','email'=>$real_email,'firstname'=>'Terry','name'=>'Terry Marr','is_admin'=>true];
   log_line('login_success','ok',['email'=>$real_email]);
+  $deviceToken = bin2hex(random_bytes(24));
+  $tokenFile = __DIR__ . '/data/device_tokens.json';
+  $tokenDir = dirname($tokenFile);
+  if (!is_dir($tokenDir)) @mkdir($tokenDir, 0755, true);
+  $tokens = [];
+  if (is_file($tokenFile)) {
+    $raw = @file_get_contents($tokenFile);
+    $decoded = $raw ? json_decode($raw, true) : null;
+    if (is_array($decoded)) $tokens = $decoded;
+  }
+  $tokens[$deviceToken] = [
+    'created_at' => date('c'),
+    'last_used' => null,
+    'label' => 'login',
+  ];
+  @file_put_contents($tokenFile, json_encode($tokens, JSON_UNESCAPED_SLASHES));
+  $expires = time() + 365 * 24 * 60 * 60;
+  if (!headers_sent()) {
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on';
+    $opts = [
+      'expires' => $expires,
+      'path' => '/',
+      'secure' => $secure,
+      'httponly' => false,
+      'samesite' => 'Lax',
+    ];
+    setcookie('cf_admin', '1', $opts);
+    setcookie('cf_device_token', $deviceToken, $opts);
+    if (preg_match('/\.terrymarr\.com$/', $host)) {
+      $opts['domain'] = '.terrymarr.com';
+      $opts['secure'] = true;
+      $opts['samesite'] = 'None';
+      setcookie('cf_admin_global', '1', $opts);
+      setcookie('cf_device_token', $deviceToken, $opts);
+    }
+  }
   if (ob_get_length()) ob_clean();
-  echo json_encode(['success'=>true,'user'=>$user]);
+  echo json_encode(['success'=>true,'user'=>$user,'device_token'=>$deviceToken]);
   if (ob_get_level()) ob_end_flush();
   exit;
 }

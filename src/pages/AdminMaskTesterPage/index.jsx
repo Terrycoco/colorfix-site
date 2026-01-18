@@ -6,6 +6,7 @@ import MaskOverlayModal from "@components/MaskOverlayModal";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import MaskSettingsGrid from "@components/MaskSettingsGrid";
 import AppliedPaletteMaskEditor from "@components/AppliedPaletteMaskEditor";
+import PhotoSearchPicker from "@components/PhotoSearchPicker";
 import { API_FOLDER } from "@helpers/config";
 import {
   buildPreviewAssignments,
@@ -13,11 +14,15 @@ import {
   normalizeShadowStruct,
   getMaskBlendSettingForColor,
   mergeMaskBlendSetting,
+  resolveBlendOpacity,
+  resolveTargetBucket,
 } from "@helpers/maskRenderUtils";
 import "./masktester.css";
 import { overlayPresetConfig, bucketForLightness } from "@config/overlayPresets";
 const TESTER_COLORS_URL = `${API_FOLDER}/v2/mask-training/tester-colors.php`;
 const GUESS_URL = `${API_FOLDER}/v2/mask-training/guess.php`;
+const HOA_LIST_URL = `${API_FOLDER}/v2/admin/hoas/list.php`;
+const HOA_COLORS_URL = `${API_FOLDER}/v2/admin/hoa-schemes/colors/by-hoa.php`;
 
 const ROLE_SEQUENCE = ["body", "trim", "accent"];
 const MASK_TEXTURE_OPTIONS = ["smooth_flat", "rough_stucco", "semi_gloss", "textured_wood", "small_detail"];
@@ -31,6 +36,36 @@ const isSkipSwatch = (sw) => !!(sw && sw.__skip);
 const AP_GET_URL = `${API_FOLDER}/v2/admin/applied-palettes/get.php`;
 const AP_UPDATE_URL = `${API_FOLDER}/v2/admin/applied-palettes/update-entries.php`;
 const AP_UPDATE_META_URL = `${API_FOLDER}/v2/admin/applied-palettes/update.php`;
+const normalizeRoleKey = (role) => {
+  const base = String(role || "").trim().toLowerCase();
+  if (base.length > 3 && base.endsWith("s") && !base.endsWith("ss")) {
+    return base.slice(0, -1);
+  }
+  return base;
+};
+const mergeTesterColorLists = (a = [], b = []) => {
+  const out = [];
+  const seen = new Set();
+  [...a, ...b].forEach((row) => {
+    const key = Number(row?.color_id);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(row);
+  });
+  return out;
+};
+const sortColorsByName = (list = []) =>
+  [...list].sort((a, b) => {
+    const nameA = String(a?.name || a?.color_name || a?.code || a?.color_code || "").toLowerCase();
+    const nameB = String(b?.name || b?.color_name || b?.code || b?.color_code || "").toLowerCase();
+    if (nameA && nameB) {
+      const primary = nameA.localeCompare(nameB);
+      if (primary !== 0) return primary;
+    }
+    const codeA = String(a?.code || a?.color_code || a?.color_id || "").toLowerCase();
+    const codeB = String(b?.code || b?.color_code || b?.color_id || "").toLowerCase();
+    return codeA.localeCompare(codeB);
+  });
 
 /* ---------- URL query helper ---------- */
 function useQuery() {
@@ -38,100 +73,49 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-/* ---------- Embedded search bits (unchanged) ---------- */
-function SearchBar({ initialQ = "", initialTags = "", onSearch }) {
-  const [q, setQ] = useState(initialQ);
-  const [tagsText, setTagsText] = useState(initialTags);
-  function submit() {
-    const nextTags = tagsText.trim();
-    const nextQ = nextTags ? "" : q.trim();
-    onSearch && onSearch({ q: nextQ, tagsText: nextTags });
-  }
-  return (
-    <div className="photo-searchbar">
-      <div className="psb-field">
-        <label className="psb-label">Tags</label>
-        <input
-          className="psb-input"
-          type="text"
-          placeholder="comma or | separated (e.g., adobe,white)"
-          value={tagsText}
-          onChange={(e) => setTagsText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-        />
-      </div>
- 
-
-      <div className="psb-actions">
-        <button className="psb-btn psb-primary" onClick={submit}>Search</button>
-        <button
-          className="psb-btn"
-          onClick={() => {
-            setQ("");
-            setTagsText("");
-            onSearch && onSearch({ q: "", tagsText: "" });
-          }}
-        >
-          Clear
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PhotoGrid({ items = [], onPick, emptyText = "No results" }) {
-  if (!items.length) return <div className="photo-grid-empty">{emptyText}</div>;
-  return (
-    <div className="photo-grid">
-      {items.map((item) => (
-        <div
-          key={item.asset_id}
-          className="photo-card"
-          onClick={() => onPick && onPick(item)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === "Enter") onPick && onPick(item); }}
-        >
-          <div className="photo-thumb-wrap">
-            {item.thumb_url ? (
-              <img className="photo-thumb" src={item.thumb_url} alt="" loading="lazy" />
-            ) : (
-              <div className="photo-thumb placeholder">No preview</div>
-            )}
-          </div>
-          <div className="photo-meta">
-            <div className="photo-title">{item.title || item.asset_id}</div>
-            <div className="photo-tags">
-              {(item.tags || []).map((t) => (
-                <span key={t} className="photo-tag">{t}</span>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ---------- Page ---------- */
-export default function AdminMaskTesterPage() {
+export default function AdminMaskTesterPage({
+  baseRoute = "/admin/mask-tester",
+  forcedAssetId = "",
+  forcedTesterLabel = "",
+  forcedTesterColors = null,
+  forcedTesterColorsByMask = null,
+  forcedTesterColorsAny = null,
+  schemeMode = false,
+  schemeOptions = null,
+  schemeSelection = "",
+  onSchemeChange = null,
+  defaultTesterView = "",
+  schemeMappingLink = "",
+  schemeColorIds = null,
+  allSchemeColorsByMask = null,
+  allSchemeColorsAny = null,
+  hideTesterSourceControls = false,
+  hideFinder = false,
+  roleAliasMap = null,
+  titleOverride = "",
+  defaultBlendMode = "colorize",
+  defaultBlendOpacity = 0.5,
+} = {}) {
   const query = useQuery();
   const navigate = useNavigate();
   const appliedPaletteIdParam = query.get("ap") || query.get("applied") || "";
   const assetParam = query.get("asset") || "";
   const initialMaskParam = query.get("mask") || "";
   const initialViewParam = query.get("view") || "";
-  const initialTesterView = initialViewParam === "all" ? "all" : "mask";
+  const initialTesterView = initialViewParam === "all"
+    ? "all"
+    : initialViewParam === "mask"
+      ? "mask"
+      : (defaultTesterView || "mask");
 
   // search panel state
-  const [findOpen, setFindOpen] = useState(!(appliedPaletteIdParam || assetParam));
-  const [sLoading, setSLoading] = useState(false);
-  const [sItems, setSItems] = useState([]);
-  const [sTotal, setSTotal] = useState(0);
-  const [sError, setSError] = useState("");
-  const [sPage, setSPage] = useState(1);
-  const [sQ, setSQ] = useState(query.get("q") || "");
-  const [sTags, setSTags] = useState(query.get("tags") || "");
+  const [findOpen, setFindOpen] = useState(
+    hideFinder ? false : !(appliedPaletteIdParam || assetParam || forcedAssetId)
+  );
+  const initialSearchPage = Number(query.get("page") || 1);
+  const initialSearchQ = query.get("q") || "";
+  const initialSearchTags = query.get("tags") || "";
 
   // asset + render state
   const [loading, setLoading] = useState(false);
@@ -159,21 +143,22 @@ export default function AdminMaskTesterPage() {
   const [selectedMask, setSelectedMask] = useState(initialMaskParam);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
+  const [saveDisplayTitle, setSaveDisplayTitle] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
-  const [saveClientName, setSaveClientName] = useState("");
-  const [saveClientEmail, setSaveClientEmail] = useState("");
-  const [saveClientPhone, setSaveClientPhone] = useState("");
-  const [saveClientNotes, setSaveClientNotes] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
   const [saveResult, setSaveResult] = useState(null);
+  const [saveSuccessAt, setSaveSuccessAt] = useState(0);
   const [saveRenderChoice, setSaveRenderChoice] = useState("generate");
   const [saveMode, setSaveMode] = useState("new"); // new | update
   const [existingPalettes, setExistingPalettes] = useState([]);
   const [existingPaletteId, setExistingPaletteId] = useState("");
   const [existingLoadError, setExistingLoadError] = useState("");
   const [existingLoading, setExistingLoading] = useState(false);
+  const [loadPreviousId, setLoadPreviousId] = useState("");
+  const [loadPreviousError, setLoadPreviousError] = useState("");
+  const [loadPreviousBusy, setLoadPreviousBusy] = useState(false);
   const [bulkSaveState, setBulkSaveState] = useState({ saving: false, message: "", error: "" });
   const [lastSavedSig, setLastSavedSig] = useState("");
   const [apPalette, setApPalette] = useState(null);
@@ -186,11 +171,25 @@ export default function AdminMaskTesterPage() {
   const apGlobalSigRef = useRef("");
   const [apLoadError, setApLoadError] = useState("");
   const [apMetaTitle, setApMetaTitle] = useState("");
+  const [apMetaDisplayTitle, setApMetaDisplayTitle] = useState("");
   const [apMetaNotes, setApMetaNotes] = useState("");
   const [apMetaSaving, setApMetaSaving] = useState(false);
   const [apMetaError, setApMetaError] = useState("");
   const [apMetaNotice, setApMetaNotice] = useState("");
   const [testerColors, setTesterColors] = useState([]);
+  const [testerColorsByMask, setTesterColorsByMask] = useState({});
+  const [testerColorsAny, setTesterColorsAny] = useState([]);
+  const [testerSourceType, setTesterSourceType] = useState("standard");
+  const [testerSourceHoaId, setTesterSourceHoaId] = useState(null);
+  const [testerSourceLabel, setTesterSourceLabel] = useState("Standard Test");
+  const [testerSourceModalOpen, setTesterSourceModalOpen] = useState(false);
+  const [testerSourceSelection, setTesterSourceSelection] = useState("standard");
+  const [testerSourceBusy, setTesterSourceBusy] = useState(false);
+  const [testerSourceError, setTesterSourceError] = useState("");
+  const [hoaOptions, setHoaOptions] = useState([]);
+  const [hoaLoading, setHoaLoading] = useState(false);
+  const [hoaError, setHoaError] = useState("");
+  const [seedWarning, setSeedWarning] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [applyingAll, setApplyingAll] = useState(false);
   const [selectorVersion, setSelectorVersion] = useState(0);
@@ -201,16 +200,92 @@ export default function AdminMaskTesterPage() {
   const [allMaskFilterColorId, setAllMaskFilterColorId] = useState("");
   const [maskAddColorId, setMaskAddColorId] = useState("");
   const [maskAddCustomColor, setMaskAddCustomColor] = useState(null);
+  const [schemeAddNotice, setSchemeAddNotice] = useState("");
+  const [schemeAddError, setSchemeAddError] = useState("");
+  const [schemeAddBusy, setSchemeAddBusy] = useState(false);
   const [activeColorByMask, setActiveColorByMask] = useState({});
+  const [schemeClearing, setSchemeClearing] = useState(false);
+  const [schemeSeeding, setSchemeSeeding] = useState(false);
+  const [schemeSeedNotice, setSchemeSeedNotice] = useState("");
+  const [mappingOpen, setMappingOpen] = useState(false);
   const apAutoSaveRef = useRef({ timer: null, lastSig: "" });
   const apInitRef = useRef({ id: null });
+  const testerWarningRef = useRef("");
+  const schemeSeedRef = useRef({ key: "", masks: {} });
+  const schemeRowsRef = useRef({});
+  const approvedRowsCacheRef = useRef({ key: "", rows: [] });
+  const saveSuccessTimerRef = useRef(null);
 
-  const assetId = (apPalette?.palette?.asset_id) || assetParam || "";
+  const assetId = (apPalette?.palette?.asset_id) || forcedAssetId || assetParam || "";
+
+  useEffect(() => {
+    if (!assetId) {
+      setExistingPalettes([]);
+      setLoadPreviousId("");
+      setLoadPreviousError("");
+      return;
+    }
+    loadExistingPalettes(assetId);
+  }, [assetId]);
+
+  useEffect(() => {
+    if (!saveSuccessAt) return undefined;
+    if (saveSuccessTimerRef.current) {
+      clearTimeout(saveSuccessTimerRef.current);
+    }
+    saveSuccessTimerRef.current = setTimeout(() => {
+      setSaveSuccessAt(0);
+    }, 4000);
+    return () => {
+      if (saveSuccessTimerRef.current) {
+        clearTimeout(saveSuccessTimerRef.current);
+      }
+    };
+  }, [saveSuccessAt]);
 
   const dirtyMasks = useMemo(
     () => Object.keys(overlayStatus || {}).filter((m) => overlayStatus[m]?.dirty),
     [overlayStatus]
   );
+  const maskTesterColors = useMemo(
+    () => getTesterColorsForMask(selectedMask),
+    [selectedMask, testerColors, testerColorsByMask, testerColorsAny, testerSourceType]
+  );
+  const sortedTesterColors = useMemo(
+    () => sortColorsByName(testerColors),
+    [testerColors]
+  );
+  const sortedMaskTesterColors = useMemo(
+    () => sortColorsByName(maskTesterColors),
+    [maskTesterColors]
+  );
+  const schemeMasksSortedByColor = useMemo(() => {
+    if (!schemeMode || !asset?.masks?.length) return asset?.masks || [];
+    const masks = [...(asset.masks || [])];
+    const colorNameForMask = (role) => {
+      const override = maskOverrides?.[role];
+      if (override && !isSkipSwatch(override)) {
+        return String(override.name || override.color_name || override.code || override.color_code || "").toLowerCase();
+      }
+      const activeId = activeColorByMask?.[role];
+      if (!activeId) return "";
+      const pool = getTesterColorsForMask(role);
+      const hit = pool.find((c) => Number(c.color_id) === Number(activeId));
+      return String(hit?.name || hit?.color_name || hit?.code || hit?.color_code || "").toLowerCase();
+    };
+    masks.sort((a, b) => {
+      const nameA = colorNameForMask(a.role);
+      const nameB = colorNameForMask(b.role);
+      if (nameA && nameB) {
+        const primary = nameA.localeCompare(nameB);
+        if (primary !== 0) return primary;
+      } else if (nameA || nameB) {
+        return nameA ? -1 : 1;
+      }
+      return String(a.role || "").localeCompare(String(b.role || ""));
+    });
+    return masks;
+  }, [schemeMode, asset?.masks, maskOverrides, activeColorByMask, testerColorsByMask, testerColorsAny, testerSourceType]);
 
   useEffect(() => {
     return () => {
@@ -220,6 +295,14 @@ export default function AdminMaskTesterPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    schemeRowsRef.current = {};
+  }, [assetId]);
+
+  useEffect(() => {
+    approvedRowsCacheRef.current = { key: "", rows: [] };
+  }, [assetId, selectorVersion]);
 
   useEffect(() => {
     if (!apPalette?.palette?.id || !asset?.masks?.length) return;
@@ -236,51 +319,271 @@ export default function AdminMaskTesterPage() {
     apInitRef.current.id = apPalette.palette.id;
   }, [apPalette?.palette?.id, apEntriesMap, asset?.masks]);
 
-  /* ---------- Search handlers ---------- */
-  function doSearch({ q, tagsText }, p = 1) {
-    setSLoading(true);
-    setSError("");
+  useEffect(() => {
+    if (testerSourceType !== "standard") return;
+    if (testerColors.length) return;
+    loadStandardTesterColors().catch(() => {});
+  }, [testerSourceType, testerColors.length]);
 
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (tagsText) params.set("tags", tagsText);
-    params.set("page", String(p));
-    params.set("limit", "24");
-    params.set("_", String(Date.now()));
+  useEffect(() => {
+    if (!testerSourceModalOpen || hoaOptions.length || hoaLoading) return;
+    setHoaLoading(true);
+    setHoaError("");
+    fetch(HOA_LIST_URL, { credentials: "include" })
+      .then((r) => r.json())
+      .then((payload) => {
+        if (payload?.ok && Array.isArray(payload.items)) {
+          setHoaOptions(payload.items);
+        } else {
+          setHoaError(payload?.error || "Failed to load HOAs");
+        }
+      })
+      .catch((err) => setHoaError(err?.message || "Failed to load HOAs"))
+      .finally(() => setHoaLoading(false));
+  }, [testerSourceModalOpen, hoaOptions.length, hoaLoading]);
 
-    fetch(`${API_FOLDER}/v2/photos/search.php?${params.toString()}`, {
+  useEffect(() => {
+    if (testerSourceType !== "hoa") {
+      setSeedWarning("");
+      testerWarningRef.current = "";
+      return;
+    }
+    if (!asset?.masks?.length) return;
+    const missingRoles = [];
+    const missingColors = [];
+    asset.masks.forEach((m) => {
+      const role = m.role;
+      if (!role) return;
+      const aliasRole = roleAliasMap?.[role];
+      const key = normalizeRoleKey(aliasRole || role);
+      if (!Object.prototype.hasOwnProperty.call(testerColorsByMask, key)) {
+        if (aliasRole) {
+          missingColors.push(role);
+        } else {
+          missingRoles.push(role);
+        }
+      }
+    });
+    if (!missingRoles.length && !missingColors.length) {
+      setSeedWarning("");
+      testerWarningRef.current = "";
+      return;
+    }
+    const parts = [];
+    if (missingRoles.length) {
+      parts.push(`Not mapped to existing role: ${missingRoles.join(", ")}`);
+    }
+    if (missingColors.length) {
+      parts.push(`No scheme colors for: ${missingColors.join(", ")}`);
+    }
+    const message = parts.join(" · ");
+    setSeedWarning(message);
+    testerWarningRef.current = message;
+  }, [testerSourceType, testerColorsByMask, testerColorsAny, asset?.masks, roleAliasMap]);
+
+  function resolveAddColor(colorInput) {
+    if (!selectedMask) return null;
+    if (colorInput === "custom") {
+      return normalizePick(maskAddCustomColor);
+    }
+    const pool = getTesterColorsForMask(selectedMask);
+    const tc = pool.find((t) => Number(t.color_id) === Number(colorInput));
+    return normalizePick(tc);
+  }
+
+  function formatHoaLabel(hoa) {
+    if (!hoa) return "";
+    const name = hoa.name || "";
+    const city = hoa.city || "";
+    const state = hoa.state || "";
+    let label = name;
+    if (city) label = label ? `${label}, ${city}` : city;
+    if (state) label = label ? `${label} ${state}` : state;
+    return label;
+  }
+
+  function resetTesterSelections() {
+    setMaskAddColorId("");
+    setMaskAddCustomColor(null);
+    setAllMaskColorId("");
+    setAllMaskCustomColor(null);
+    setAllMaskFilterColorId("");
+    setSchemeAddNotice("");
+    setSchemeAddError("");
+  }
+
+  function colorAllowedForSchemeRole(allowedRoles, schemeRole) {
+    if (!schemeRole) return false;
+    const allowedRaw = String(allowedRoles || "").trim().toLowerCase();
+    if (!allowedRaw || allowedRaw === "any") return true;
+    const allowedTokens = splitRoleTokens(allowedRaw).map(normalizeRoleKey).filter(Boolean);
+    if (!allowedTokens.length) return true;
+    const schemeTokens = splitRoleTokens(schemeRole).map(normalizeRoleKey).filter(Boolean);
+    return schemeTokens.some((token) => allowedTokens.includes(token));
+  }
+
+  function openTesterSourceModal() {
+    if (hideTesterSourceControls) return;
+    const selection = testerSourceType === "hoa" && testerSourceHoaId
+      ? `hoa:${testerSourceHoaId}`
+      : "standard";
+    setTesterSourceSelection(selection);
+    setTesterSourceError("");
+    setTesterSourceModalOpen(true);
+  }
+
+  function closeTesterSourceModal() {
+    if (testerSourceBusy) return;
+    setTesterSourceModalOpen(false);
+  }
+
+  async function loadStandardTesterColors() {
+    const payload = await fetch(TESTER_COLORS_URL, { credentials: "include" })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (!payload?.ok || !Array.isArray(payload.items)) {
+      throw new Error(payload?.error || "Failed to load tester colors");
+    }
+    setTesterColors(payload.items);
+    setTesterColorsByMask({});
+    setTesterColorsAny([]);
+    return payload.items;
+  }
+
+  async function loadHoaTesterColors(hoaId) {
+    const res = await fetch(`${HOA_COLORS_URL}?hoa_id=${encodeURIComponent(hoaId)}`, {
       credentials: "include",
-      headers: { Accept: "application/json" },
       cache: "no-store",
     })
       .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setSError(data.error);
-          setSItems([]);
-          setSTotal(0);
-          return;
-        }
-        const items = (data.items || []).map((it) => ({
-          ...it,
-          thumb_url: it.thumb_url || "",
-          _thumbLoading: false,
-        }));
-        setSItems(items);
-        setSTotal(data.total || 0);
-        setSPage(data.page || p);
-        setSQ(q || "");
-        setSTags(tagsText || "");
+      .catch(() => null);
+    if (!res?.ok) {
+      throw new Error(res?.error || "Failed to load HOA scheme colors");
+    }
+    const rawByRole = res?.colors_by_role || {};
+    const byRole = {};
+    Object.entries(rawByRole).forEach(([role, list]) => {
+      const key = normalizeRoleKey(role);
+      byRole[key] = Array.isArray(list) ? list : [];
+    });
+    const anyColors = Array.isArray(res?.any_colors) ? res.any_colors : [];
+    let union = [...anyColors];
+    Object.values(byRole).forEach((list) => {
+      union = mergeTesterColorLists(union, list);
+    });
+    setTesterColors(union);
+    setTesterColorsByMask(byRole);
+    setTesterColorsAny(anyColors);
+    return { hoa: res.hoa, byRole, anyColors, union };
+  }
 
-        const nav = new URLSearchParams();
-        if (assetId) nav.set("asset", assetId);
-        if (q) nav.set("q", q);
-        if (tagsText) nav.set("tags", tagsText);
-        nav.set("page", String(data.page || p));
-        navigate(`/admin/mask-tester?${nav.toString()}`, { replace: true });
-      })
-      .catch((e) => setSError(e?.message || "Search failed"))
-      .finally(() => setSLoading(false));
+  useEffect(() => {
+    if (!forcedTesterColors && !forcedTesterColorsByMask && !forcedTesterColorsAny) return;
+    const byRole = forcedTesterColorsByMask || {};
+    const anyColors = forcedTesterColorsAny || [];
+    let union = Array.isArray(forcedTesterColors) ? forcedTesterColors : [...anyColors];
+    if (!Array.isArray(forcedTesterColors)) {
+      Object.values(byRole).forEach((list) => {
+        union = mergeTesterColorLists(union, list);
+      });
+    }
+    setTesterColors(union);
+    setTesterColorsByMask(byRole);
+    setTesterColorsAny(anyColors);
+    setTesterSourceType("hoa");
+    setTesterSourceLabel(forcedTesterLabel || "HOA Scheme");
+  }, [forcedTesterColors, forcedTesterColorsAny, forcedTesterColorsByMask, forcedTesterLabel]);
+
+  function getTesterColorsForMask(maskRole) {
+    if (!maskRole) return [];
+    if (testerSourceType !== "hoa") return testerColors;
+    const aliasRole = roleAliasMap?.[maskRole];
+    const key = normalizeRoleKey(aliasRole || maskRole);
+    const roleList = testerColorsByMask[key] || [];
+    return mergeTesterColorLists(roleList, testerColorsAny);
+  }
+
+  function getAllSchemeColorsForMask(maskRole) {
+    if (!maskRole) return [];
+    if (!allSchemeColorsByMask && !allSchemeColorsAny) return [];
+    const aliasRole = roleAliasMap?.[maskRole];
+    const key = normalizeRoleKey(aliasRole || maskRole);
+    const roleList = allSchemeColorsByMask?.[key] || [];
+    return mergeTesterColorLists(roleList, allSchemeColorsAny || []);
+  }
+
+  function getMappedTesterColorsForMask(maskRole) {
+    if (!maskRole) return [];
+    if (testerSourceType !== "hoa") return testerColors;
+    const aliasRole = roleAliasMap?.[maskRole];
+    const key = normalizeRoleKey(aliasRole || maskRole);
+    return testerColorsByMask[key] || [];
+  }
+
+  function getTesterColorIdsForMask(maskRole) {
+    if (!maskRole) return [];
+    const list = schemeMode ? getMappedTesterColorsForMask(maskRole) : getTesterColorsForMask(maskRole);
+    if (schemeMode && !list.length) return [];
+    const ids = [];
+    const seen = new Set();
+    list.forEach((row) => {
+      const id = Number(row?.color_id);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+    });
+    return ids;
+  }
+
+  function getAllSchemeColorIdsForMask(maskRole) {
+    if (!maskRole) return [];
+    const list = getAllSchemeColorsForMask(maskRole);
+    if (!list.length) return [];
+    const ids = [];
+    const seen = new Set();
+    list.forEach((row) => {
+      const id = Number(row?.color_id);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+    });
+    return ids;
+  }
+
+  async function handleApplyTesterSource() {
+    if (!selectedMask) return;
+    setTesterSourceBusy(true);
+    setTesterSourceError("");
+    try {
+      if (testerSourceSelection === "standard") {
+        const items = await loadStandardTesterColors();
+        setTesterSourceType("standard");
+        setTesterSourceHoaId(null);
+        setTesterSourceLabel("Standard Test");
+        resetTesterSelections();
+        await handleSeedTestColors(items);
+        setTesterSourceModalOpen(false);
+        return;
+      }
+      if (testerSourceSelection.startsWith("hoa:")) {
+        const hoaId = Number(testerSourceSelection.slice(4));
+        if (!hoaId) throw new Error("Select a valid HOA");
+        const res = await loadHoaTesterColors(hoaId);
+        setTesterSourceType("hoa");
+        setTesterSourceHoaId(hoaId);
+        setTesterSourceLabel(formatHoaLabel(res.hoa) || "HOA Scheme");
+        resetTesterSelections();
+        const maskColors = mergeTesterColorLists(res.byRole[normalizeRoleKey(selectedMask)] || [], res.anyColors);
+        await handleSeedTestColors(maskColors);
+        setTesterSourceModalOpen(false);
+        return;
+      }
+      throw new Error("Select a tester source");
+    } catch (err) {
+      setTesterSourceError(err?.message || "Failed to load tester colors");
+    } finally {
+      setTesterSourceBusy(false);
+    }
   }
 
   async function saveTestColor(maskRole, colorPayload) {
@@ -294,9 +597,6 @@ export default function AdminMaskTesterPage() {
         color_brand: colorPayload.brand || colorPayload.color_brand || null,
         color_code: colorPayload.code || colorPayload.color_code || null,
         color_hex: (colorPayload.hex6 || colorPayload.hex || "").replace("#", ""),
-        target_lightness: colorPayload.lightness ?? colorPayload.lab_l ?? colorPayload.hcl_l ?? null,
-        target_h: colorPayload.hcl_h ?? null,
-        target_c: colorPayload.hcl_c ?? null,
         blend_mode: colorPayload.blend_mode || "colorize",
         blend_opacity: colorPayload.blend_opacity ?? 0.5,
         shadow_l_offset: colorPayload.shadow_l_offset ?? 0,
@@ -307,27 +607,26 @@ export default function AdminMaskTesterPage() {
     if (colorPayload.approved !== undefined && colorPayload.approved !== null) {
       entry.entry.approved = colorPayload.approved;
     }
-    await fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
+    const res = await fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entry),
     });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "Failed to save mask blend");
+    }
+    return data.setting || null;
   }
 
   async function handleAddColorToMask(colorInput) {
     if (!assetId || !selectedMask) return;
-    let baseColor = null;
-    if (colorInput === "custom") {
-      baseColor = normalizePick(maskAddCustomColor);
-    } else {
-      const tc = testerColors.find((t) => Number(t.color_id) === Number(colorInput));
-      baseColor = normalizePick(tc);
-    }
+    const baseColor = resolveAddColor(colorInput);
     if (!baseColor?.color_id) return;
 
     // Guess settings for this mask/color
-    let preset = { mode: "colorize", opacity: 0.5 };
+    let preset = { mode: defaultBlendMode, opacity: defaultBlendOpacity };
     let shadow = { l_offset: 0, tint_hex: null, tint_opacity: 0 };
     try {
       const guess = await fetch(GUESS_URL, {
@@ -339,13 +638,17 @@ export default function AdminMaskTesterPage() {
           color_id: baseColor.color_id,
           asset_id: assetId,
           photo_id: asset?.photo_id,
+          debug: 1,
         }),
       })
         .then((r) => r.json())
         .catch(() => null);
       const g = guess?.ok ? guess.guess : null;
+      if (guess?.debug) {
+        console.info("mask-guess debug", guess.debug);
+      }
       if (g) {
-        preset = { mode: g.blend_mode || "colorize", opacity: g.blend_opacity ?? 0.5 };
+        preset = { mode: g.blend_mode || defaultBlendMode, opacity: g.blend_opacity ?? defaultBlendOpacity };
         shadow = {
           l_offset: g.shadow_l_offset ?? 0,
           tint_hex: g.shadow_tint_hex || null,
@@ -363,21 +666,61 @@ export default function AdminMaskTesterPage() {
       shadow_l_offset: shadow.l_offset,
       shadow_tint_hex: shadow.tint_hex,
       shadow_tint_opacity: shadow.tint_opacity,
-      approved: 0,
+      approved: schemeMode ? 1 : 0,
     });
     setActiveColorByMask((prev) => ({ ...prev, [selectedMask]: baseColor.color_id }));
     setSelectorVersion((v) => v + 1);
   }
 
+  async function handleAddColorToScheme(colorInput) {
+    if (!schemeMode || !schemeSelection || !selectedMask) return;
+    const baseColor = resolveAddColor(colorInput);
+    if (!baseColor?.color_id) return;
+    const allowedRole = roleAliasMap?.[selectedMask] || selectedMask;
+    setSchemeAddBusy(true);
+    setSchemeAddError("");
+    setSchemeAddNotice("");
+    try {
+      const res = await fetch(`${API_FOLDER}/v2/admin/hoa-schemes/colors/add.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          scheme_id: Number(schemeSelection),
+          color_id: Number(baseColor.color_id),
+          allowed_roles: allowedRole || "any",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to add scheme color");
+      }
+      const roleKey = normalizeRoleKey(allowedRole || selectedMask);
+      setTesterColorsByMask((prev) => {
+        const next = { ...(prev || {}) };
+        const existing = next[roleKey] || [];
+        next[roleKey] = mergeTesterColorLists(existing, [baseColor]);
+        return next;
+      });
+      setTesterColors((prev) => mergeTesterColorLists(prev || [], [baseColor]));
+      setSchemeAddNotice("Added to scheme.");
+      await handleAddColorToMask(colorInput);
+    } catch (err) {
+      setSchemeAddError(err?.message || "Failed to add scheme color");
+    } finally {
+      setSchemeAddBusy(false);
+    }
+  }
+
   // picking photo
-  function onPick(item) {
+  function onPick(item, meta = {}) {
     const nav = new URLSearchParams();
     nav.set("asset", item.asset_id);
-    if (sQ) nav.set("q", sQ);
-    if (sTags) nav.set("tags", sTags);
-    navigate(`/admin/mask-tester?${nav.toString()}`);
+    if (meta.q) nav.set("q", meta.q);
+    if (meta.tagsText) nav.set("tags", meta.tagsText);
+    if (meta.page) nav.set("page", String(meta.page));
+    navigate(`${baseRoute}?${nav.toString()}`);
     setFindOpen(false);
-    setSError("");
     setError("");
   }
 
@@ -397,16 +740,9 @@ export default function AdminMaskTesterPage() {
     }
     setLoading(true);
     setError("");
-    fetch(TESTER_COLORS_URL, { credentials: "include" })
-      .then((r) => r.json())
-      .then((payload) => {
-        if (payload?.ok && Array.isArray(payload.items)) {
-          setTesterColors(payload.items);
-        }
-      })
-      .catch(() => {});
-    fetch(`${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(assetId)}`, {
+    fetch(`${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(assetId)}&_=${Date.now()}`, {
       credentials: "include",
+      cache: "no-store",
       headers: { Accept: "application/json" },
     })
       .then((r) => r.json())
@@ -477,9 +813,9 @@ export default function AdminMaskTesterPage() {
         shadow_l_offset: merged.shadow_l_offset ?? 0,
         shadow_tint_hex: merged.shadow_tint_hex || null,
         shadow_tint_opacity: merged.shadow_tint_opacity ?? 0,
-        target_lightness: merged.target_lightness ?? null,
-        target_h: merged.target_h ?? null,
-        target_c: merged.target_c ?? null,
+          color_l: merged.color_l ?? null,
+          color_h: merged.color_h ?? null,
+          color_c: merged.color_c ?? null,
       };
     });
     return settings;
@@ -535,6 +871,7 @@ export default function AdminMaskTesterPage() {
       if (!data?.ok) throw new Error(data?.error || "Failed to load applied palette");
       setApPalette(data);
       setApMetaTitle(data?.palette?.title || "");
+      setApMetaDisplayTitle(data?.palette?.display_title || "");
       setApMetaNotes(data?.palette?.notes || "");
       const map = {};
       (data.entries || []).forEach((e) => {
@@ -562,9 +899,9 @@ export default function AdminMaskTesterPage() {
           shadow_l_offset: e.setting_shadow_l_offset ?? e.lightness_offset ?? null,
           shadow_tint_hex: e.setting_shadow_tint_hex || e.tint_hex || "",
           shadow_tint_opacity: e.setting_shadow_tint_opacity ?? e.tint_opacity ?? null,
-          target_lightness: lightness ?? null,
-          target_h: e.setting_target_h ?? null,
-          target_c: e.setting_target_c ?? null,
+          color_l: lightness ?? null,
+          color_h: e.setting_color_h ?? null,
+          color_c: e.setting_color_c ?? null,
           _global_synced: false,
         };
       });
@@ -646,6 +983,7 @@ export default function AdminMaskTesterPage() {
         body: JSON.stringify({
           palette_id: apPalette.palette.id,
           title: apMetaTitle.trim(),
+          display_title: apMetaDisplayTitle.trim(),
           notes: apMetaNotes.trim(),
         }),
       });
@@ -656,7 +994,15 @@ export default function AdminMaskTesterPage() {
       setApMetaNotice("Updated palette details.");
       setApPalette((prev) => (
         prev
-          ? { ...prev, palette: { ...prev.palette, title: apMetaTitle.trim(), notes: apMetaNotes.trim() } }
+          ? {
+              ...prev,
+              palette: {
+                ...prev.palette,
+                title: apMetaTitle.trim(),
+                display_title: apMetaDisplayTitle.trim(),
+                notes: apMetaNotes.trim(),
+              },
+            }
           : prev
       ));
     } catch (err) {
@@ -693,9 +1039,9 @@ export default function AdminMaskTesterPage() {
             shadow_l_offset: merged.shadow_l_offset ?? 0,
             shadow_tint_hex: merged.shadow_tint_hex || "",
             shadow_tint_opacity: merged.shadow_tint_opacity ?? 0,
-            target_lightness: merged.target_lightness ?? null,
-            target_h: merged.target_h ?? null,
-            target_c: merged.target_c ?? null,
+            color_l: merged.color_l ?? null,
+            color_h: merged.color_h ?? null,
+            color_c: merged.color_c ?? null,
           };
         }
       }
@@ -713,14 +1059,14 @@ export default function AdminMaskTesterPage() {
             updates.shadow_l_offset != null ||
             updates.shadow_tint_hex != null ||
             updates.shadow_tint_opacity != null ||
-            updates.target_lightness != null ||
-            updates.target_h != null ||
-            updates.target_c != null,
+            updates.color_l != null ||
+            updates.color_h != null ||
+            updates.color_c != null,
         },
       };
       return next;
     });
-    if (updates.blend_mode != null || updates.blend_opacity != null || updates.shadow_l_offset != null || updates.shadow_tint_hex != null || updates.shadow_tint_opacity != null || updates.target_lightness != null || updates.target_h != null || updates.target_c != null) {
+    if (updates.blend_mode != null || updates.blend_opacity != null || updates.shadow_l_offset != null || updates.shadow_tint_hex != null || updates.shadow_tint_opacity != null || updates.color_l != null || updates.color_h != null || updates.color_c != null) {
       setApDraftSettingsByMask((prev) => {
         const current = prev?.[maskRole] || {};
         return {
@@ -732,9 +1078,9 @@ export default function AdminMaskTesterPage() {
             ...(updates.shadow_l_offset != null ? { shadow_l_offset: updates.shadow_l_offset } : {}),
             ...(updates.shadow_tint_hex != null ? { shadow_tint_hex: updates.shadow_tint_hex || null } : {}),
             ...(updates.shadow_tint_opacity != null ? { shadow_tint_opacity: updates.shadow_tint_opacity } : {}),
-            ...(updates.target_lightness != null ? { target_lightness: updates.target_lightness } : {}),
-            ...(updates.target_h != null ? { target_h: updates.target_h } : {}),
-            ...(updates.target_c != null ? { target_c: updates.target_c } : {}),
+            ...(updates.color_l != null ? { color_l: updates.color_l } : {}),
+            ...(updates.color_h != null ? { color_h: updates.color_h } : {}),
+            ...(updates.color_c != null ? { color_c: updates.color_c } : {}),
           },
         };
       });
@@ -782,7 +1128,7 @@ export default function AdminMaskTesterPage() {
           code: entry.color_code || "",
           brand: entry.color_brand || "",
           hex6: entry.color_hex || "",
-          lightness: entry.target_lightness ?? null,
+          lightness: entry.color_l ?? null,
           hcl_l: entry.hcl_l ?? null,
           lab_l: entry.lab_l ?? null,
         }
@@ -1003,8 +1349,11 @@ export default function AdminMaskTesterPage() {
     setSaveError("");
   }
   // Seed starter tester colors for the currently selected mask
-  async function handleSeedTestColors() {
-    if (!selectedMask || !testerColors.length || !assetId) return;
+  async function handleSeedTestColors(colorsOverride) {
+    const colorsToSeed = Array.isArray(colorsOverride)
+      ? colorsOverride
+      : getTesterColorsForMask(selectedMask);
+    if (!selectedMask || !colorsToSeed.length || !assetId) return;
     setSeeding(true);
     setSeedError("");
     try {
@@ -1019,7 +1368,7 @@ export default function AdminMaskTesterPage() {
           .map((row) => Number(row.color_id))
       );
       await Promise.all(
-        testerColors.map(async (tc) => {
+        colorsToSeed.map(async (tc) => {
           const color = normalizePick(tc);
           if (!color?.color_id) return;
           if (existingIds.has(Number(color.color_id))) return; // skip if already present
@@ -1027,19 +1376,28 @@ export default function AdminMaskTesterPage() {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mask_role: selectedMask, color_id: color.color_id, asset_id: assetId, photo_id: asset?.photo_id }),
+            body: JSON.stringify({
+              mask_role: selectedMask,
+              color_id: color.color_id,
+              asset_id: assetId,
+              photo_id: asset?.photo_id,
+              debug: 1,
+            }),
           })
             .then((r) => r.json())
             .catch(() => null);
           const g = guess?.ok ? guess.guess : null;
+          if (guess?.debug) {
+            console.info("mask-guess debug", guess.debug);
+          }
           await saveTestColor(selectedMask, {
             ...color,
-            blend_mode: g?.blend_mode || color.blend_mode || "colorize",
-            blend_opacity: g?.blend_opacity ?? color.blend_opacity ?? 0.5,
+            blend_mode: g?.blend_mode || color.blend_mode || defaultBlendMode,
+            blend_opacity: g?.blend_opacity ?? color.blend_opacity ?? defaultBlendOpacity,
             shadow_l_offset: g?.shadow_l_offset ?? 0,
             shadow_tint_hex: g?.shadow_tint_hex || null,
             shadow_tint_opacity: g?.shadow_tint_opacity ?? 0,
-            approved: color.approved ?? 1,
+            approved: schemeMode ? 1 : 0,
           });
         })
       );
@@ -1050,6 +1408,169 @@ export default function AdminMaskTesterPage() {
       setSeedError(err?.message || "Failed to seed test colors");
     } finally {
       setSeeding(false);
+    }
+  }
+
+  async function seedSchemeColorsForMask(maskRole, { force = false } = {}) {
+    if (!maskRole || !assetId) return;
+    const colorsToSeed = getMappedTesterColorsForMask(maskRole);
+    if (!colorsToSeed.length) return;
+    try {
+      const listUrl = TESTER_COLORS_URL.replace("tester-colors.php", "../admin/mask-blend/list.php");
+      const existing = await fetch(`${listUrl}?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(maskRole)}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then((r) => r.json()).catch(() => null);
+      const existingRows = Array.isArray(existing?.settings) ? existing.settings : [];
+      const existingIds = new Set(
+        existingRows
+          .filter((row) => row.color_id)
+          .map((row) => Number(row.color_id))
+      );
+      let approvedRows = existingRows.filter((row) => Number(row?.approved) === 1);
+      const photoRule = (() => {
+        if (!approvedRows.length) return null;
+        const byMode = new Map();
+        approvedRows.forEach((row) => {
+          const mode = String(row?.blend_mode || "").toLowerCase();
+          if (!mode) return;
+          const lightness = row?.color_l ?? row?.base_lightness ?? null;
+          if (lightness == null) return;
+          const bucket = byMode.get(mode) || { count: 0, sumL: 0, sumOpacity: 0 };
+          bucket.count += 1;
+          bucket.sumL += Number(lightness);
+          bucket.sumOpacity += Number(row?.blend_opacity ?? 0);
+          byMode.set(mode, bucket);
+        });
+        if (!byMode.size) return null;
+        const modes = Array.from(byMode.entries()).map(([mode, data]) => ({
+          mode,
+          avgL: data.sumL / data.count,
+          avgOpacity: data.sumOpacity / data.count,
+          count: data.count,
+        }));
+        modes.sort((a, b) => b.count - a.count);
+        if (modes.length === 1) {
+          return {
+            primaryMode: modes[0].mode,
+            primaryOpacity: modes[0].avgOpacity || defaultBlendOpacity,
+          };
+        }
+        const bright = modes.reduce((a, b) => (a.avgL > b.avgL ? a : b));
+        const dark = modes.reduce((a, b) => (a.avgL < b.avgL ? a : b));
+        const threshold = (bright.avgL + dark.avgL) / 2;
+        return {
+          brightMode: bright.mode,
+          brightOpacity: bright.avgOpacity || defaultBlendOpacity,
+          darkMode: dark.mode,
+          darkOpacity: dark.avgOpacity || defaultBlendOpacity,
+          threshold,
+        };
+      })();
+      let added = 0;
+      for (const tc of colorsToSeed) {
+        const color = normalizePick(tc);
+        if (!color?.color_id) continue;
+        if (existingIds.has(Number(color.color_id))) continue;
+        const guess = await fetch(GUESS_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mask_role: maskRole,
+            color_id: color.color_id,
+            asset_id: assetId,
+            photo_id: asset?.photo_id,
+            debug: 1,
+          }),
+        })
+          .then((r) => r.json())
+          .catch(() => null);
+        const g = guess?.ok ? guess.guess : null;
+        if (guess?.debug) {
+          console.info("mask-guess debug", guess.debug);
+        }
+        const lightness = color.lightness ?? color.hcl_l ?? color.lab_l ?? null;
+        const useFallback = (!g || g.neighbors_used === 0 || !g.blend_mode) && !!photoRule;
+        let fallbackMode = lightness != null && lightness >= 65 ? "hardlight" : "multiply";
+        let fallbackOpacity = lightness != null && lightness >= 65 ? 0.5 : 1;
+        if (useFallback) {
+          if (photoRule.threshold != null && lightness != null) {
+            if (lightness >= photoRule.threshold) {
+              fallbackMode = photoRule.brightMode || fallbackMode;
+              fallbackOpacity = photoRule.brightOpacity ?? fallbackOpacity;
+            } else {
+              fallbackMode = photoRule.darkMode || fallbackMode;
+              fallbackOpacity = photoRule.darkOpacity ?? fallbackOpacity;
+            }
+          } else {
+            fallbackMode = photoRule.primaryMode || fallbackMode;
+            fallbackOpacity = photoRule.primaryOpacity ?? fallbackOpacity;
+          }
+        }
+        await saveTestColor(maskRole, {
+          ...color,
+          blend_mode: useFallback ? fallbackMode : (g?.blend_mode || color.blend_mode || defaultBlendMode),
+          blend_opacity: useFallback ? fallbackOpacity : (g?.blend_opacity ?? color.blend_opacity ?? defaultBlendOpacity),
+          shadow_l_offset: g?.shadow_l_offset ?? 0,
+          shadow_tint_hex: g?.shadow_tint_hex || null,
+          shadow_tint_opacity: g?.shadow_tint_opacity ?? 0,
+          approved: 0,
+        });
+        added += 1;
+      }
+      setSelectorVersion((v) => v + 1);
+      return added;
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
+  }
+
+  async function triggerSchemeSeed() {
+    setSchemeSeedNotice("");
+    if (!schemeMode) return;
+    if (!schemeSelection) {
+      setSchemeSeedNotice("Select a scheme first.");
+      return;
+    }
+    if (!assetId || !asset?.masks?.length) {
+      setSchemeSeedNotice("Load a photo first.");
+      return;
+    }
+    if (!testerColors.length && !Object.keys(testerColorsByMask || {}).length) {
+      setSchemeSeedNotice("Scheme colors not loaded yet.");
+      return;
+    }
+    if (schemeSeeding) return;
+    setSchemeSeeding(true);
+    try {
+      schemeSeedRef.current = { key: `${assetId}:${schemeSelection}`, masks: {} };
+      if (testerView === "mask" && selectedMask) {
+        const added = await seedSchemeColorsForMask(selectedMask, { force: true });
+        setSchemeSeedNotice(added ? `Seeded ${added}.` : "No mapped colors to seed.");
+      } else {
+        const pending = (asset.masks || []).map((m) => m.role).filter(Boolean);
+        let totalAdded = 0;
+        let skipped = 0;
+        for (const maskRole of pending) {
+          const added = await seedSchemeColorsForMask(maskRole, { force: true });
+          if (!added) {
+            skipped += 1;
+          } else {
+            totalAdded += added || 0;
+          }
+        }
+        if (totalAdded) {
+          setSchemeSeedNotice(`Seeded ${totalAdded}.${skipped ? ` Skipped ${skipped} unmapped.` : ""}`);
+        } else {
+          setSchemeSeedNotice("No mapped colors to seed.");
+        }
+      }
+    } catch (err) {
+      setSchemeSeedNotice(err?.message || "Seed failed.");
+    } finally {
+      setSchemeSeeding(false);
     }
   }
 
@@ -1075,19 +1596,28 @@ export default function AdminMaskTesterPage() {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mask_role: m.role, color_id: color.color_id, asset_id: assetId, photo_id: asset?.photo_id }),
+            body: JSON.stringify({
+              mask_role: m.role,
+              color_id: color.color_id,
+              asset_id: assetId,
+              photo_id: asset?.photo_id,
+              debug: 1,
+            }),
           })
             .then((r) => r.json())
             .catch(() => null);
           const g = guess?.ok ? guess.guess : null;
+          if (guess?.debug) {
+            console.info("mask-guess debug", guess.debug);
+          }
           await saveTestColor(m.role, {
             ...color,
-            blend_mode: g?.blend_mode || color.blend_mode || "colorize",
-            blend_opacity: g?.blend_opacity ?? color.blend_opacity ?? 0.5,
+            blend_mode: g?.blend_mode || color.blend_mode || defaultBlendMode,
+            blend_opacity: g?.blend_opacity ?? color.blend_opacity ?? defaultBlendOpacity,
             shadow_l_offset: g?.shadow_l_offset ?? 0,
             shadow_tint_hex: g?.shadow_tint_hex || null,
             shadow_tint_opacity: g?.shadow_tint_opacity ?? 0,
-            approved: color.approved ?? 0,
+            approved: schemeMode ? 1 : 0,
           });
         })
       );
@@ -1097,6 +1627,273 @@ export default function AdminMaskTesterPage() {
       setSeedError(err?.message || "Failed to seed all masks");
     } finally {
       setSeeding(false);
+    }
+  }
+
+  function getAllowedSchemeColorIds(maskRole) {
+    if (!maskRole) return [];
+    const mapped = getTesterColorIdsForMask(maskRole);
+    if (mapped.length) return mapped;
+    const all = getAllSchemeColorIdsForMask(maskRole);
+    if (all.length) return all;
+    if (Array.isArray(schemeColorIds) && schemeColorIds.length) return schemeColorIds;
+    return [];
+  }
+
+  function buildSchemeOverridesFromSelection(
+    rowsByMask = null,
+    { preferActive = true, fillMissing = false } = {}
+  ) {
+    if (!asset?.masks?.length) return { overrides: {}, activeMap: {} };
+    const overrides = {};
+    const activeMap = { ...activeColorByMask };
+    const missingSwatch = {
+      color_id: -1,
+      name: "Missing",
+      code: "",
+      brand: "",
+      hex6: "FF00FF",
+      lightness: 50,
+      hcl_l: 50,
+      hcl_h: null,
+      hcl_c: null,
+    };
+    (asset.masks || []).forEach((m) => {
+      const role = m.role;
+      if (!role) return;
+      const pool = getTesterColorsForMask(role);
+      const fallbackPool = pool.length ? pool : (schemeMode ? testerColors : []);
+      const allowedIds = schemeMode ? getAllowedSchemeColorIds(role) : [];
+      const selectedId = preferActive ? activeColorByMask[role] : null;
+      let chosen = null;
+      if (selectedId && fallbackPool.length) {
+        chosen = fallbackPool.find((c) => Number(c.color_id) === Number(selectedId));
+        if (allowedIds.length && chosen && !allowedIds.includes(Number(chosen.color_id))) {
+          chosen = null;
+        }
+      }
+      if (!chosen) {
+        const rows = rowsByMask?.[role] || schemeRowsRef.current?.[role] || [];
+        const allowedRows = allowedIds.length
+          ? rows.filter((row) => allowedIds.includes(Number(row?.color_id)))
+          : rows;
+        const approvedRow = allowedRows.find((row) => Number(row?.approved) === 1 || row?.draft_approved === true);
+        const fallbackRow = approvedRow || allowedRows[0];
+        if (fallbackRow?.color_id) {
+          chosen = {
+            color_id: fallbackRow.color_id,
+            name: fallbackRow.color_name || fallbackRow.color_code || "",
+            code: fallbackRow.color_code || "",
+            brand: fallbackRow.color_brand || "",
+            hex6: fallbackRow.color_hex || "",
+            lightness: fallbackRow.color_l ?? null,
+            hcl_l: fallbackRow.color_l ?? null,
+            hcl_h: fallbackRow.color_h ?? null,
+            hcl_c: fallbackRow.color_c ?? null,
+          };
+        }
+      }
+      if (!chosen && fallbackPool.length) {
+        const fallbackList = allowedIds.length
+          ? fallbackPool.filter((c) => allowedIds.includes(Number(c.color_id)))
+          : fallbackPool;
+        chosen = fallbackList[0] || null;
+      }
+      if (!chosen && fillMissing) {
+        chosen = missingSwatch;
+      }
+      if (chosen?.color_id) {
+        activeMap[role] = chosen.color_id;
+      }
+      const normalized = normalizePick(chosen);
+      if (normalized) overrides[role] = normalized;
+    });
+    return { overrides, activeMap };
+  }
+
+  async function applySchemeSelections() {
+    const rowsByMask = {};
+    const missing = [];
+    for (const m of asset?.masks || []) {
+      const role = m.role;
+      if (!role) continue;
+      const cached = schemeRowsRef.current?.[role] || [];
+      if (cached.length) {
+        rowsByMask[role] = cached;
+      } else {
+        missing.push(role);
+      }
+    }
+    if (missing.length) {
+      for (const role of missing) {
+        try {
+          const res = await fetch(
+            `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(role)}&${Date.now()}`,
+            { credentials: "include", cache: "no-store" }
+          );
+          const data = await res.json();
+          rowsByMask[role] = data?.ok && Array.isArray(data.settings) ? data.settings : [];
+        } catch {
+          rowsByMask[role] = [];
+        }
+      }
+    }
+    const { overrides, activeMap } = buildSchemeOverridesFromSelection(rowsByMask, {
+      preferActive: true,
+      fillMissing: true,
+    });
+    if (!Object.keys(overrides).length || !asset?.masks?.length) return;
+    setActiveColorByMask(activeMap);
+    setApplyingAll(true);
+    try {
+      const settingsByMask = rowsByMask;
+      for (const m of asset.masks || []) {
+        const swatch = overrides[m.role];
+        if (!swatch?.color_id) continue;
+        const rows = settingsByMask[m.role] || [];
+        const hit = rows
+          .filter((row) => Number(row.color_id) === Number(swatch.color_id))
+          .reduce((latest, row) => {
+            if (!latest) return row;
+            const latestId = Number(latest.id ?? 0);
+            const rowId = Number(row.id ?? 0);
+            return rowId > latestId ? row : latest;
+          }, null);
+        const resolvedOpacity = hit ? resolveBlendOpacity(hit, defaultBlendOpacity) : defaultBlendOpacity;
+
+        const preset = hit
+          ? {
+            mode: hit.draft_mode || hit.blend_mode || defaultBlendMode,
+            opacity: resolvedOpacity,
+            }
+          : { mode: defaultBlendMode, opacity: defaultBlendOpacity };
+        const shadowSource = hit?.draft_shadow || {
+          l_offset: hit?.shadow_l_offset ?? 0,
+          tint_hex: hit?.shadow_tint_hex || null,
+          tint_opacity: hit?.shadow_tint_opacity ?? 0,
+        };
+        const shadow = hit ? normalizeShadowStruct(shadowSource) : null;
+        const fallbackLightness =
+          swatch.lightness ??
+          swatch.hcl_l ??
+          m?.stats?.l_avg01 ??
+          60;
+        const tierLabel = resolveTargetBucket(hit, fallbackLightness, overlayPresetConfig.targetBuckets);
+        await handleApplyPresetValues(m.role, tierLabel, preset, {
+          swatch,
+          shadow,
+          clearColor: preset.mode === "original",
+          autoRender: false,
+          autoSave: false,
+        });
+      }
+      setMaskOverrides(overrides);
+      await applyColors(overrides);
+    } finally {
+      setApplyingAll(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!schemeMode || !schemeSelection || !assetId || !asset?.masks?.length) return;
+    let cancelled = false;
+    async function loadSchemeSelections() {
+      const rowsByMask = {};
+      for (const m of asset.masks || []) {
+        const role = m.role;
+        if (!role) continue;
+        try {
+          const res = await fetch(
+            `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(role)}&${Date.now()}`,
+            { credentials: "include", cache: "no-store" }
+          );
+          const data = await res.json();
+          rowsByMask[role] = data?.ok && Array.isArray(data.settings) ? data.settings : [];
+        } catch {
+          rowsByMask[role] = [];
+        }
+      }
+      if (cancelled) return;
+      const { overrides, activeMap } = buildSchemeOverridesFromSelection(rowsByMask, {
+        preferActive: false,
+        fillMissing: false,
+      });
+      setActiveColorByMask(activeMap);
+      setMaskOverrides(overrides);
+    }
+    loadSchemeSelections();
+    return () => {
+      cancelled = true;
+    };
+  }, [schemeMode, schemeSelection, assetId, asset?.masks?.length]);
+
+  function showOriginalPhoto() {
+    setAssignments({});
+    setError("");
+  }
+
+  async function clearSchemeSettings() {
+    if (!schemeMode || !assetId || !asset?.masks?.length) return;
+    if (schemeClearing) return;
+    setSchemeClearing(true);
+    try {
+      const otherSchemes = (schemeOptions || []).filter((s) => String(s.id) !== String(schemeSelection));
+      const currentSchemeColors = await fetch(
+        `${API_FOLDER}/v2/admin/hoa-schemes/colors/list.php?scheme_id=${encodeURIComponent(schemeSelection)}&_=${Date.now()}`,
+        { credentials: "include", cache: "no-store" }
+      ).then((r) => r.json()).catch(() => null);
+      const currentColors = Array.isArray(currentSchemeColors?.items) ? currentSchemeColors.items : [];
+      const currentSchemeColorIds = new Set(
+        currentColors.map((row) => Number(row?.color_id)).filter(Boolean)
+      );
+
+      const keepColorIds = new Set();
+      await Promise.all(
+        otherSchemes.map(async (scheme) => {
+          const colorsRes = await fetch(
+            `${API_FOLDER}/v2/admin/hoa-schemes/colors/list.php?scheme_id=${encodeURIComponent(scheme.id)}&_=${Date.now()}`,
+            { credentials: "include", cache: "no-store" }
+          ).then((r) => r.json()).catch(() => null);
+          const colors = Array.isArray(colorsRes?.items) ? colorsRes.items : [];
+          colors.forEach((row) => {
+            const colorId = Number(row?.color_id);
+            if (colorId) keepColorIds.add(colorId);
+          });
+        })
+      );
+
+      for (const mask of asset.masks) {
+        const res = await fetch(
+          `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(mask.role)}&${Date.now()}`,
+          { credentials: "include", cache: "no-store" }
+        );
+        const data = await res.json();
+        const rows = Array.isArray(data?.settings) ? data.settings : [];
+        for (const row of rows) {
+          const colorId = Number(row?.color_id);
+          if (!colorId) continue;
+          if (!currentSchemeColorIds.has(colorId)) continue;
+          if (keepColorIds.has(colorId)) continue;
+          await fetch(`${API_FOLDER}/v2/admin/mask-blend/delete.php`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              asset_id: assetId,
+              mask: mask.role,
+              id: row.id,
+            }),
+          });
+        }
+      }
+      setActiveColorByMask({});
+      setMaskOverrides({});
+      setAssignments({});
+      setSelectorVersion((v) => v + 1);
+    } catch (err) {
+      console.warn("Failed to clear scheme settings", err);
+    } finally {
+      setSchemeClearing(false);
     }
   }
 
@@ -1144,24 +1941,33 @@ export default function AdminMaskTesterPage() {
         if (hit) {
           preset = {
             mode: hit.blend_mode,
-            opacity: hit.blend_opacity,
+            opacity: resolveBlendOpacity(hit, defaultBlendOpacity),
           };
           shadow = {
             l_offset: hit.shadow_l_offset ?? 0,
             tint_hex: hit.shadow_tint_hex || null,
             tint_opacity: hit.shadow_tint_opacity ?? 0,
           };
-          tierLightness = hit.target_lightness ?? hit.base_lightness ?? null;
+          tierLightness = hit.color_l ?? hit.base_lightness ?? null;
         } else {
           const guess = await fetch(GUESS_URL, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mask_role: m.role, color_id: baseColor.color_id, asset_id: assetId, photo_id: asset?.photo_id }),
+            body: JSON.stringify({
+              mask_role: m.role,
+              color_id: baseColor.color_id,
+              asset_id: assetId,
+              photo_id: asset?.photo_id,
+              debug: 1,
+            }),
           })
             .then((r) => r.json())
             .catch(() => null);
           const g = guess?.ok ? guess.guess : null;
+          if (guess?.debug) {
+            console.info("mask-guess debug", guess.debug);
+          }
           preset = {
             mode: g?.blend_mode || "colorize",
             opacity: g?.blend_opacity ?? 0.5,
@@ -1173,10 +1979,10 @@ export default function AdminMaskTesterPage() {
                 tint_opacity: g.shadow_tint_opacity ?? 0,
               }
             : null;
-          tierLightness = g?.target_lightness ?? g?.base_lightness ?? null;
+          tierLightness = g?.color_l ?? g?.base_lightness ?? null;
         }
         const tierLabel = bucketForLightness(
-          (tierLightness ?? hit?.target_lightness ?? hit?.base_lightness ?? baseColor.lightness ?? baseColor.hcl_l ?? m?.stats?.l_avg01 ?? 60),
+          (tierLightness ?? hit?.color_l ?? hit?.base_lightness ?? baseColor.lightness ?? baseColor.hcl_l ?? m?.stats?.l_avg01 ?? 60),
           overlayPresetConfig.targetBuckets
         );
         await handleApplyPresetValues(m.role, tierLabel, preset, {
@@ -1199,15 +2005,15 @@ export default function AdminMaskTesterPage() {
               color_code: baseColor.code || baseColor.color_code || null,
               color_hex: (baseColor.hex6 || baseColor.hex || "").replace("#", ""),
               base_lightness: m?.stats?.l_avg01 ?? hit?.base_lightness ?? null,
-              target_lightness: baseColor.lightness ?? baseColor.lab_l ?? baseColor.hcl_l ?? null,
-              target_h: baseColor.hcl_h ?? null,
-              target_c: baseColor.hcl_c ?? null,
+              color_l: baseColor.lightness ?? baseColor.lab_l ?? baseColor.hcl_l ?? null,
+              color_h: baseColor.hcl_h ?? null,
+              color_c: baseColor.hcl_c ?? null,
               blend_mode: preset.mode,
               blend_opacity: preset.opacity,
               shadow_l_offset: shadow?.l_offset ?? 0,
               shadow_tint_hex: shadow?.tint_hex ? shadow.tint_hex.replace("#", "") : null,
               shadow_tint_opacity: shadow?.tint_opacity ?? 0,
-              approved: 1,
+              approved: schemeMode ? 1 : 0,
             },
           };
           await fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
@@ -1286,11 +2092,17 @@ export default function AdminMaskTesterPage() {
     const lightness = Number.isFinite(Number(lightnessRaw))
       ? Number(lightnessRaw)
       : null;
+    const hclHRaw = obj.hcl_h ?? obj.h ?? obj.hcl?.h ?? null;
+    const hclCRaw = obj.hcl_c ?? obj.c ?? obj.hcl?.c ?? null;
+    const hcl_h = Number.isFinite(Number(hclHRaw)) ? Number(hclHRaw) : null;
+    const hcl_c = Number.isFinite(Number(hclCRaw)) ? Number(hclCRaw) : null;
     return {
       ...obj,
       color_id: Number(colorId),
       hex6: hex6.toUpperCase(),
       lightness,
+      hcl_h,
+      hcl_c,
     };
   }
 
@@ -1458,7 +2270,7 @@ function maskToRoleGroup(mask) {
         shadow_tint_hex: shadow.tint_hex ? shadow.tint_hex.replace("#", "").toUpperCase() : null,
         shadow_tint_opacity: shadow.tint_opacity ?? 0,
         base_lightness: mask?.base_lightness ?? null,
-        target_lightness: targetLightness,
+        color_l: targetLightness,
         bucket_label: tierKey,
         is_original: explicitSkip,
         has_color: !!swatch,
@@ -1585,12 +2397,6 @@ function maskToRoleGroup(mask) {
     setAssignments({});
   }
 
-  /* ---------- Initial search if we arrived w/ q/tags ---------- */
-  useEffect(() => {
-    if (!assetId && (sQ || sTags)) doSearch({ q: sQ, tagsText: sTags }, sPage || 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     if (!asset?.masks?.length) {
       setSelectedMask("");
@@ -1605,7 +2411,14 @@ function maskToRoleGroup(mask) {
     }
   }, [asset, selectedMask, initialMaskParam]);
 
-  const totalPages = Math.max(1, Math.ceil(sTotal / 24));
+  function handleSearchQueryChange({ q, tagsText, page }) {
+    const nav = new URLSearchParams();
+    if (assetId) nav.set("asset", assetId);
+    if (q) nav.set("q", q);
+    if (tagsText) nav.set("tags", tagsText);
+    if (page) nav.set("page", String(page));
+    navigate(`${baseRoute}?${nav.toString()}`, { replace: true });
+  }
 
 
 function handleOverlayChange(mask, tier, field, value) {
@@ -1707,74 +2520,76 @@ async function reloadOverlayFromServer(mask, { silent = false } = {}) {
 }
 
   async function handleApplyPresetValues(mask, tier, preset, options = {}) {
-  if (!preset) return false;
-  const { autoSave = false, autoRender = false, swatch = null, shadow = null, clearColor = false } = options;
-  const currentOverlay = normalizeOverlayPayload(maskOverlays[mask]);
-  const updated = {
-    ...currentOverlay,
-    [tier]: {
-      mode: preset.mode ?? null,
-      opacity: typeof preset.opacity === "number" ? preset.opacity : null,
-    },
-  };
-  if (shadow && typeof shadow === "object") {
-    const normalizedShadow = normalizeShadowStruct({
-      l_offset: shadow.l_offset,
-      tint_hex: shadow.tint_hex,
-      tint_opacity: shadow.tint_opacity,
-    });
-    updated._shadow = normalizedShadow;
-  }
-
-  const normalizedMode = typeof preset.mode === "string" ? preset.mode.toLowerCase() : "";
-  const shouldClearColor = clearColor || normalizedMode === "original";
-
-  let nextOverrides = maskOverrides;
-  if (shouldClearColor) {
-    nextOverrides = { ...(maskOverrides || {}) };
-    nextOverrides[mask] = makeSkipSwatch();
-    setMaskOverrides(nextOverrides);
-  } else if (swatch) {
-    const normalizedSwatch = normalizePick(swatch);
-    if (normalizedSwatch) {
-      nextOverrides = { ...(maskOverrides || {}), [mask]: normalizedSwatch };
-      setMaskOverrides(nextOverrides);
+    if (!preset) return false;
+    const { autoSave = false, autoRender = false, swatch = null, shadow = null, clearColor = false } = options;
+    const currentOverlay = normalizeOverlayPayload(maskOverlays[mask]);
+    const updated = {
+      ...currentOverlay,
+      [tier]: {
+        mode: preset.mode ?? null,
+        opacity: typeof preset.opacity === "number" ? preset.opacity : null,
+      },
+    };
+    if (shadow && typeof shadow === "object") {
+      const normalizedShadow = normalizeShadowStruct({
+        l_offset: shadow.l_offset,
+        tint_hex: shadow.tint_hex,
+        tint_opacity: shadow.tint_opacity,
+      });
+      updated._shadow = normalizedShadow;
     }
-  }
-  setMaskOverlays((prev) => ({
-    ...prev,
-    [mask]: updated,
-  }));
-  if (!autoSave) {
-    const dirty = computeDirtyFlag(mask, updated, maskTextures[mask]);
-    const statusLabel = shouldClearColor
-      ? "Original Photo"
-      : `${preset.mode} · ${Math.round((preset.opacity ?? 0) * 100)}%`;
+
+    const normalizedMode = typeof preset.mode === "string" ? preset.mode.toLowerCase() : "";
+    const shouldClearColor = clearColor || normalizedMode === "original";
+
+    let nextOverrides = maskOverrides;
+    if (shouldClearColor) {
+      nextOverrides = { ...(maskOverrides || {}) };
+      nextOverrides[mask] = makeSkipSwatch();
+      setMaskOverrides(nextOverrides);
+    } else if (swatch) {
+      const normalizedSwatch = normalizePick(swatch);
+      if (normalizedSwatch) {
+        nextOverrides = { ...(maskOverrides || {}), [mask]: normalizedSwatch };
+        setMaskOverrides(nextOverrides);
+      }
+    }
+    setMaskOverlays((prev) => ({
+      ...prev,
+      [mask]: updated,
+    }));
+    if (!autoSave) {
+      const dirty = computeDirtyFlag(mask, updated, maskTextures[mask]);
+      const statusLabel = shouldClearColor
+        ? "Original Photo"
+        : `${preset.mode} · ${(Number(preset.opacity ?? 0) * 100).toFixed(1)}%`;
       setOverlayStatus((prev) => ({
         ...prev,
         [mask]: { ...(prev[mask] || {}), error: "", success: `Applied ${statusLabel}`, dirty },
       }));
       return true;
     }
-  try {
-    await handleOverlaySave(mask, { overrideSettings: updated });
-    if (autoRender) {
-      await applyColors(nextOverrides);
+    try {
+      await handleOverlaySave(mask, { overrideSettings: updated });
+      if (autoRender) {
+        await applyColors(nextOverrides);
+      }
+      return true;
+    } catch (err) {
+      setOverlayStatus((prev) => ({
+        ...prev,
+        [mask]: { ...(prev[mask] || {}), error: err?.message || "Failed to apply preset", success: "" },
+      }));
+      throw err;
     }
-    return true;
-  } catch (err) {
-    setOverlayStatus((prev) => ({
-      ...prev,
-      [mask]: { ...(prev[mask] || {}), error: err?.message || "Failed to apply preset", success: "" },
-    }));
-    throw err;
   }
-}
 
   function handleApShadowEdit(maskRole) {
     const entry = apEntriesMap[maskRole] || { mask_role: maskRole };
     const currentOffset = entry.shadow_l_offset ?? 0;
-    const currentTintPct = entry.shadow_tint_opacity != null ? Math.round(entry.shadow_tint_opacity * 100) : 0;
+    const currentTintPct = entry.shadow_tint_opacity != null
+      ? (entry.shadow_tint_opacity * 100).toFixed(1)
+      : "0.0";
     const offsetStr = window.prompt("Shadow L offset (negative darker, positive lighter)", String(currentOffset));
     if (offsetStr === null) return;
     const offsetNum = clampNumber(Number(offsetStr), -50, 50);
@@ -1886,11 +2701,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     setSaveRenderChoice("generate");
     setSaveMode("new");
     setSaveTitle("");
+    setSaveDisplayTitle("");
     setSaveNotes("");
-    setSaveClientName("");
-    setSaveClientEmail("");
-    setSaveClientPhone("");
-    setSaveClientNotes("");
     setExistingPaletteId("");
     setExistingLoadError("");
     if (asset?.asset_id) {
@@ -1912,6 +2724,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     if (selected) {
       setSaveMode("update");
       setSaveTitle(selected.title || "");
+      setSaveDisplayTitle(selected.display_title || "");
       setSaveNotes(selected.notes || "");
     } else {
       setSaveMode("new");
@@ -1943,6 +2756,145 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     }
   }
 
+  async function handleLoadPreviousPalette(paletteId) {
+    const idNum = Number(paletteId);
+    if (!Number.isFinite(idNum) || idNum <= 0) {
+      setLoadPreviousId("");
+      setLoadPreviousError("");
+      return;
+    }
+    if (!assetId) return;
+    setLoadPreviousBusy(true);
+    setLoadPreviousError("");
+    setLoadPreviousId(String(idNum));
+    try {
+      const res = await fetch(`${AP_GET_URL}?id=${idNum}&_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load applied palette");
+      const entries = Array.isArray(data.entries) ? data.entries : [];
+      const rolesNeedingLookup = new Set();
+      entries.forEach((e) => {
+        if (!e?.mask_role) return;
+        const needsMode = e.setting_blend_mode == null && e.blend_mode == null;
+        const needsOpacity = e.setting_blend_opacity == null && e.blend_opacity == null;
+        const needsShadow = e.setting_shadow_l_offset == null && e.shadow_l_offset == null;
+        if (needsMode || needsOpacity || needsShadow) {
+          rolesNeedingLookup.add(e.mask_role);
+        }
+      });
+      const blendSettingsByRole = {};
+      if (rolesNeedingLookup.size) {
+        const lookups = Array.from(rolesNeedingLookup).map(async (maskRole) => {
+          try {
+            const url = `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(maskRole)}&${Date.now()}`;
+            const r = await fetch(url, { credentials: "include", cache: "no-store" });
+            const payload = await r.json();
+            if (payload?.ok && Array.isArray(payload.settings)) {
+              blendSettingsByRole[maskRole] = payload.settings;
+            }
+          } catch {
+            // ignore lookup errors; fall back to defaults
+          }
+        });
+        await Promise.all(lookups);
+      }
+      const overrides = {};
+      const active = {};
+      const nextOverlays = { ...(maskOverlays || {}) };
+      const blendSaves = [];
+      entries.forEach((e) => {
+        const maskRole = e.mask_role;
+        if (!maskRole) return;
+        const hexRaw = e.color_hex || e.color_hex6 || e.hex6 || "";
+        const hex6 = hexRaw.replace(/[^0-9a-f]/gi, "").slice(0, 6).toUpperCase();
+        const lightnessRaw = e.color_hcl_l ?? e.color_lab_l ?? null;
+        const color = normalizePick({
+          color_id: e.color_id,
+          name: e.color_name || e.color_code || "",
+          code: e.color_code || "",
+          brand: e.color_brand || "",
+          hex6,
+          lightness: lightnessRaw,
+          hcl_l: e.color_hcl_l ?? null,
+          lab_l: e.color_lab_l ?? null,
+        });
+        if (!color) return;
+        overrides[maskRole] = color;
+        active[maskRole] = color.color_id;
+        const fallbackSetting = getMaskBlendSettingForColor(blendSettingsByRole[maskRole], e.color_id);
+        const mode =
+          e.setting_blend_mode ??
+          e.blend_mode ??
+          fallbackSetting?.blend_mode ??
+          defaultBlendMode;
+        const opacity =
+          e.setting_blend_opacity ??
+          e.blend_opacity ??
+          fallbackSetting?.blend_opacity ??
+          defaultBlendOpacity;
+        const shadow = normalizeShadowStruct({
+          l_offset: e.setting_shadow_l_offset ?? e.shadow_l_offset ?? fallbackSetting?.shadow_l_offset ?? 0,
+          tint_hex: e.setting_shadow_tint_hex || e.shadow_tint_hex || fallbackSetting?.shadow_tint_hex || null,
+          tint_opacity: e.setting_shadow_tint_opacity ?? e.shadow_tint_opacity ?? fallbackSetting?.shadow_tint_opacity ?? 0,
+        });
+        const nextOverlay = cloneOverlayStruct(nextOverlays[maskRole]);
+        OVERLAY_TIERS.forEach((tier) => {
+          nextOverlay[tier] = {
+            mode: typeof mode === "string" && mode ? mode : null,
+            opacity: typeof opacity === "number" ? opacity : defaultBlendOpacity,
+          };
+        });
+        nextOverlay._shadow = shadow;
+        nextOverlays[maskRole] = nextOverlay;
+
+        if (assetId && e.color_id) {
+          blendSaves.push({
+            mask_role: maskRole,
+            color_id: e.color_id,
+            color_name: e.color_name || null,
+            color_brand: e.color_brand || null,
+            color_code: e.color_code || null,
+            color_hex: hex6 || null,
+            blend_mode: typeof mode === "string" && mode ? mode : defaultBlendMode,
+            blend_opacity: typeof opacity === "number" ? opacity : defaultBlendOpacity,
+            shadow_l_offset: shadow.l_offset ?? 0,
+            shadow_tint_hex: shadow.tint_hex ? shadow.tint_hex.replace("#", "") : null,
+            shadow_tint_opacity: shadow.tint_opacity ?? 0,
+          });
+        }
+      });
+      setMaskOverrides(overrides);
+      setActiveColorByMask(active);
+      setMaskOverlays(nextOverlays);
+      setOverlayStatus((prev) => {
+        const next = { ...(prev || {}) };
+        Object.keys(nextOverlays).forEach((mask) => {
+          const dirty = computeDirtyFlag(mask, nextOverlays[mask], maskTextures[mask]);
+          next[mask] = { ...(next[mask] || {}), dirty };
+        });
+        return next;
+      });
+      if (blendSaves.length) {
+        await Promise.all(
+          blendSaves.map((entry) =>
+            fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json", Accept: "application/json" },
+              body: JSON.stringify({ asset_id: assetId, mask: entry.mask_role, entry }),
+            }).catch(() => null)
+          )
+        );
+        setSelectorVersion((v) => v + 1);
+      }
+      await applyColors(overrides);
+    } catch (err) {
+      setLoadPreviousError(err?.message || "Failed to load applied palette");
+    } finally {
+      setLoadPreviousBusy(false);
+    }
+  }
+
   async function handleSaveAppliedPalette() {
     if (saveBusy || !asset?.asset_id || !hasPaletteEntries) return;
     if (saveMode === "update" && !existingPaletteId) {
@@ -1962,7 +2914,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
         shadow_l_offset: entry.shadow_l_offset,
         shadow_tint_hex: entry.shadow_tint_hex,
         shadow_tint_opacity: entry.shadow_tint_opacity,
-        target_lightness: entry.target_lightness,
+        color_l: entry.color_l,
       }))
       .sort((a, b) => a.mask_role.localeCompare(b.mask_role));
     const signaturePayload = {
@@ -1970,12 +2922,6 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       title: saveTitle.trim(),
       notes: saveNotes.trim(),
       render: saveRenderChoice,
-      client: {
-        name: saveClientName.trim(),
-        email: saveClientEmail.trim(),
-        phone: saveClientPhone.trim(),
-        notes: saveClientNotes.trim(),
-      },
       entries: normalizedEntries,
     };
     const signature = JSON.stringify(signaturePayload);
@@ -1987,14 +2933,36 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     setSaveError("");
     setSaveNotice("");
     setSaveResult(null);
-    const clientPayload = {};
-    if (saveClientName.trim()) clientPayload.name = saveClientName.trim();
-    if (saveClientEmail.trim()) clientPayload.email = saveClientEmail.trim();
-    if (saveClientPhone.trim()) clientPayload.phone = saveClientPhone.trim();
-    if (saveClientNotes.trim()) clientPayload.notes = saveClientNotes.trim();
+    try {
+      await Promise.all(
+        paletteEntries
+          .filter((entry) => entry?.color_id && !entry?.is_original)
+          .map((entry) =>
+            saveTestColor(entry.mask_role, {
+              color_id: entry.color_id,
+              name: entry.color_name,
+              brand: entry.color_brand,
+              code: entry.color_code,
+              hex6: entry.color_hex,
+              blend_mode: entry.blend_mode ?? defaultBlendMode,
+              blend_opacity: entry.blend_opacity ?? defaultBlendOpacity,
+              shadow_l_offset: entry.shadow_l_offset ?? 0,
+              shadow_tint_hex: entry.shadow_tint_hex || null,
+              shadow_tint_opacity: entry.shadow_tint_opacity ?? 0,
+              approved: 1,
+            })
+          )
+      );
+      setSelectorVersion((v) => v + 1);
+    } catch (err) {
+      setSaveError(err?.message || "Failed to save mask settings.");
+      setSaveBusy(false);
+      return;
+    }
     const payload = {
       asset_id: asset.asset_id,
       title: saveTitle.trim(),
+      display_title: saveDisplayTitle.trim(),
       notes: saveNotes.trim(),
       entries: paletteEntries.map((entry) => ({
         mask_role: entry.mask_role,
@@ -2004,7 +2972,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
         color_code: entry.color_code,
         color_hex: entry.color_hex,
         base_lightness: entry.base_lightness,
-        target_lightness: entry.target_lightness,
+        color_l: entry.color_l,
         blend_mode: entry.blend_mode,
         blend_opacity: entry.blend_opacity,
         shadow_l_offset: entry.shadow_l_offset,
@@ -2012,11 +2980,9 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
         shadow_tint_opacity: entry.shadow_tint_opacity,
       })),
     };
-    if (saveRenderChoice === "generate") {
+    const shouldCacheRender = saveRenderChoice === "generate" || saveMode === "update";
+    if (shouldCacheRender) {
       payload.render = { cache: true };
-    }
-    if (saveMode === "new" && Object.keys(clientPayload).length) {
-      payload.client = clientPayload;
     }
     try {
       const request = saveMode === "update"
@@ -2027,10 +2993,11 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
           body: JSON.stringify({
             palette_id: Number(existingPaletteId),
             title: saveTitle.trim(),
+            display_title: saveDisplayTitle.trim(),
             notes: saveNotes.trim(),
             entries: payload.entries,
             render: payload.render,
-            clear_render: saveRenderChoice === "generate",
+            clear_render: shouldCacheRender,
           }),
         })
         : fetch(`${API_FOLDER}/v2/admin/applied-palettes/save.php`, {
@@ -2055,6 +3022,30 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
         render_cache_error: data.render_cache_error || null,
         view_url: viewUrl,
       });
+      setSaveSuccessAt(Date.now());
+      setExistingPalettes((prev) => {
+        const next = Array.isArray(prev) ? [...prev] : [];
+        const idx = next.findIndex((row) => String(row?.id) === String(paletteId));
+        const updated = {
+          ...(idx >= 0 ? next[idx] : {}),
+          id: paletteId,
+          title: saveTitle.trim(),
+          display_title: saveDisplayTitle.trim(),
+          notes: saveNotes.trim(),
+          asset_id: asset?.asset_id || (idx >= 0 ? next[idx]?.asset_id : undefined),
+        };
+        if (idx >= 0) {
+          next[idx] = updated;
+        } else {
+          next.unshift(updated);
+        }
+        return next;
+      });
+      if (asset?.asset_id) {
+        await loadExistingPalettes(asset.asset_id);
+        setExistingPaletteId(String(paletteId));
+        setSaveMode("update");
+      }
       setLastSavedSig(signature);
     } catch (err) {
       setSaveError(err?.message || "Failed to save palette");
@@ -2066,11 +3057,86 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
   async function handleSaveAllDirtyMasks() {
     if (bulkSaveState.saving || !asset?.asset_id) return;
     const dirtyMasks = Object.keys(overlayStatus || {}).filter((m) => overlayStatus[m]?.dirty);
+    const approveSchemeRows = async () => {
+      if (!schemeMode || !asset?.masks?.length) return 0;
+      const rowsByMask = schemeRowsRef.current || {};
+      const approveTasks = [];
+      for (const mask of asset.masks || []) {
+        const role = mask.role;
+        let rows = rowsByMask[role];
+        if (!rows) {
+          try {
+            const res = await fetch(
+              `${API_FOLDER}/v2/admin/mask-blend/list.php?asset_id=${encodeURIComponent(assetId)}&mask=${encodeURIComponent(role)}&${Date.now()}`,
+              { credentials: "include", cache: "no-store" }
+            );
+            const data = await res.json();
+            rows = data?.ok && Array.isArray(data.settings) ? data.settings : [];
+          } catch {
+            rows = [];
+          }
+        }
+        (rows || []).forEach((row) => {
+          if (!row?.id || !row?.color_id) return;
+          const entry = {
+            id: row.id,
+            color_id: row.color_id,
+            color_name: row.color_name,
+            color_brand: row.color_brand,
+            color_code: row.color_code,
+            color_hex: row.color_hex,
+            base_lightness: row.base_lightness,
+            color_l: row.color_l,
+            color_h: row.color_h,
+            color_c: row.color_c,
+            blend_mode: row.draft_mode || row.blend_mode || defaultBlendMode,
+            blend_opacity: resolveBlendOpacity(row, defaultBlendOpacity),
+            shadow_l_offset: row.draft_shadow?.l_offset ?? row.shadow_l_offset ?? 0,
+            shadow_tint_hex: row.draft_shadow?.tint_hex
+              ? row.draft_shadow.tint_hex.replace("#", "")
+              : (row.shadow_tint_hex || null),
+            shadow_tint_opacity: row.draft_shadow?.tint_opacity ?? row.shadow_tint_opacity ?? 0,
+            approved: 1,
+          };
+          approveTasks.push(
+            fetch(`${API_FOLDER}/v2/admin/mask-blend/save.php`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ asset_id: assetId, mask: role, entry }),
+            }).catch(() => null)
+          );
+        });
+      }
+      if (approveTasks.length) {
+        await Promise.all(approveTasks);
+      }
+      return approveTasks.length;
+    };
+
     if (!dirtyMasks.length) {
-      setBulkSaveState({ saving: false, message: "Nothing to save", error: "" });
+      setBulkSaveState({ saving: true, message: "Refreshing…", error: "" });
+      const approvedCount = await approveSchemeRows();
+      setSelectorVersion((v) => v + 1);
+      setBulkSaveState({
+        saving: false,
+        message: approvedCount ? "Approved & refreshed" : "Refreshed",
+        error: "",
+      });
+      setTimeout(() => {
+        setBulkSaveState((prev) => ({ ...prev, message: "" }));
+      }, 1500);
       return;
     }
+
     setBulkSaveState({ saving: true, message: "Saving…", error: "" });
+    setOverlayStatus((prev) => {
+      const next = { ...prev };
+      dirtyMasks.forEach((mask) => {
+        next[mask] = { ...(next[mask] || {}), approved: true };
+      });
+      return next;
+    });
     const errors = [];
     for (const mask of dirtyMasks) {
       try {
@@ -2079,6 +3145,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
         errors.push(`${mask}: ${err?.message || "failed"}`);
       }
     }
+    await approveSchemeRows();
+    setSelectorVersion((v) => v + 1);
     if (errors.length) {
       setBulkSaveState({ saving: false, message: "", error: errors.join("; ") });
     } else {
@@ -2093,9 +3161,10 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     }
   }
 
-  const titleLabel = apPalette?.palette?.id
-    ? `Mask Editor for ${apPalette.palette.title || `Palette #${apPalette.palette.id}`}`
-    : "Mask Tester";
+  const titleLabel = titleOverride
+    || (apPalette?.palette?.id
+      ? `Mask Editor for ${apPalette.palette.title || `Palette #${apPalette.palette.id}`}`
+      : "Mask Tester");
 
   return (
     <div className="admin-mask-tester">
@@ -2103,11 +3172,19 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       {apPalette && (
         <div className="ap-title-editor">
           <label>
-            Applied Palette Title
+            Applied Palette Handle
             <input
               type="text"
               value={apMetaTitle}
               onChange={(e) => setApMetaTitle(e.target.value)}
+            />
+          </label>
+          <label>
+            Display Title (viewer)
+            <input
+              type="text"
+              value={apMetaDisplayTitle}
+              onChange={(e) => setApMetaDisplayTitle(e.target.value)}
             />
           </label>
           <button
@@ -2116,7 +3193,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
             onClick={handleSaveApMeta}
             disabled={apMetaSaving}
           >
-            {apMetaSaving ? "Saving…" : "Save Title"}
+            {apMetaSaving ? "Saving…" : "Save Titles"}
           </button>
           {apMetaError && <div className="error">{apMetaError}</div>}
           {apMetaNotice && <div className="notice">{apMetaNotice}</div>}
@@ -2124,12 +3201,11 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       )}
       <div className="app-bar">
         <div className="left">
-          <button className="btn" onClick={() => navigate(-1)}>
-            Back
-          </button>
-          <button className="btn" onClick={() => setFindOpen(!findOpen)}>
-            {findOpen ? "Hide Finder" : "Find Photo"}
-          </button>
+          {!hideFinder && (
+            <button className="btn" onClick={() => setFindOpen(!findOpen)}>
+              {findOpen ? "Hide Finder" : "Find Photo"}
+            </button>
+          )}
         </div>
         <div className="right">
           {asset && apPalette && (
@@ -2163,57 +3239,110 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
             </button>
           )}
           {asset && !apPalette && (
-            <button
-              className="btn"
-              disabled={bulkSaveState.saving}
-              onClick={handleSaveAllDirtyMasks}
-              title="Save all dirty mask settings"
-            >
-              {bulkSaveState.saving ? "Saving All…" : "Save All Masks"}
-            </button>
+            <div className="mask-tester-actions">
+              <button
+                className="btn"
+                disabled={bulkSaveState.saving}
+                onClick={handleSaveAllDirtyMasks}
+                title="Save all dirty mask settings"
+              >
+                {bulkSaveState.saving ? "Saving All…" : "Save All Masks"}
+              </button>
+              <button
+                className="btn btn-small"
+                onClick={showOriginalPhoto}
+                title="Show the original photo"
+              >
+                Original
+              </button>
+              {schemeMode && (
+                <>
+                  {schemeMappingLink && (
+                    <button
+                      className="btn btn-small"
+                      onClick={() => setMappingOpen(true)}
+                      title="Open scheme mapping for this HOA/photo"
+                    >
+                      Mapping
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
 
 
-      {findOpen && (
-        <div className="finder">
-          <SearchBar
-            initialQ={sQ}
-            initialTags={sTags}
-            onSearch={(payload) => doSearch(payload, 1)}
-          />
-          {sLoading && <div className="notice">Loading…</div>}
-          {sError && <div className="error">{sError}</div>}
-          <PhotoGrid items={sItems} onPick={onPick} emptyText="No photos matched." />
-          {totalPages > 1 && (
-            <div className="pager">
-              <button
-                className="btn"
-                disabled={sPage <= 1}
-                onClick={() => doSearch({ q: sQ, tagsText: sTags }, sPage - 1)}
-              >
-                Prev
-              </button>
-              <div className="page-info">{sPage} / {totalPages}</div>
-              <button
-                className="btn"
-                disabled={sPage >= totalPages}
-                onClick={() => doSearch({ q: sQ, tagsText: sTags }, sPage + 1)}
-              >
-                Next
+      {findOpen && !hideFinder && (
+        <PhotoSearchPicker
+          initialQ={initialSearchQ}
+          initialTags={initialSearchTags}
+          initialPage={initialSearchPage}
+          onPick={onPick}
+          onQueryChange={handleSearchQueryChange}
+        />
+      )}
+
+      {mappingOpen && schemeMappingLink && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+          onClick={() => setMappingOpen(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              width: "min(1200px, 96vw)",
+              height: "min(80vh, 900px)",
+              boxShadow: "0 18px 40px rgba(0,0,0,0.25)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 14px",
+                borderBottom: "1px solid #eee",
+                background: "#fafafa",
+              }}
+            >
+              <strong>Scheme Mapping</strong>
+              <button className="btn btn-small" onClick={() => setMappingOpen(false)}>
+                Close
               </button>
             </div>
-          )}
+            <iframe
+              title="HOA Scheme Mapping"
+              src={schemeMappingLink}
+              style={{ width: "100%", height: "calc(100% - 44px)", border: "0" }}
+            />
+          </div>
         </div>
       )}
 
       <div className="content">
-        {!assetId && !findOpen && <div className="notice">Use “Find Photo” to select an image.</div>}
+        {!assetId && !findOpen && !hideFinder && (
+          <div className="notice">Use “Find Photo” to select an image.</div>
+        )}
         {loading && <div className="notice">Loading asset…</div>}
         {error && <div className="error">{error}</div>}
         {bulkSaveState.message && <div className="notice">{bulkSaveState.message}</div>}
         {bulkSaveState.error && <div className="error">{bulkSaveState.error}</div>}
+        {seedWarning && <div className="notice">{seedWarning}</div>}
         {seedError && <div className="error">{seedError}</div>}
       </div>
       {asset && (
@@ -2221,26 +3350,54 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
           <div className="tester-left">
             {apPalette ? (
               <div className="panel">
-                <div className="panel-head">
-                  <div className="panel-title">Masks (Applied Palette)</div>
-                  {apLoadError && <div className="error">{apLoadError}</div>}
-                </div>
-                <MaskSettingsGrid
-                  masks={maskGridRows}
-                  entries={apEntriesMap}
-                  onChange={handleMaskGridChange}
-                  onApply={handleMaskGridApply}
-                  onShadow={handleApShadowEdit}
-                  showRole
-                />
+              <div className="panel-head">
+                <div className="panel-title">Masks (Applied Palette)</div>
+                {apLoadError && <div className="error">{apLoadError}</div>}
               </div>
-            ) : selectedMask ? (
-              <div className="panel">
-                <div className="panel-head" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <div className="pill-toggle">
-                      <button
-                        className="btn"
+              <MaskSettingsGrid
+                masks={maskGridRows}
+                entries={apEntriesMap}
+                activeColorByMask={activeColorByMask}
+                onChange={handleMaskGridChange}
+                onApply={handleMaskGridApply}
+                onShadow={handleApShadowEdit}
+                showRole
+              />
+            </div>
+          ) : selectedMask ? (
+            <div className="panel">
+              <div className="panel-head" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="mask-tester-load-prev">
+                  <label>Load Previous</label>
+                  <select
+                    value={loadPreviousId}
+                    onChange={(e) => handleLoadPreviousPalette(e.target.value)}
+                    disabled={!asset?.asset_id || loadPreviousBusy}
+                    onFocus={() => {
+                      if (asset?.asset_id) {
+                        loadExistingPalettes(asset.asset_id);
+                      }
+                    }}
+                  >
+                    <option value="">Select palette</option>
+                    {existingLoading && (
+                      <option value="" disabled>
+                        Loading…
+                      </option>
+                    )}
+                    {existingPalettes.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {(p.title || `Palette #${p.id}`) + (p.display_title ? ` — ${p.display_title}` : "")}
+                      </option>
+                    ))}
+                  </select>
+                  {loadPreviousBusy && <span className="mask-tester-load-prev__status">Loading…</span>}
+                  {loadPreviousError && <span className="mask-tester-load-prev__error">{loadPreviousError}</span>}
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <div className="pill-toggle">
+                    <button
+                      className="btn"
                         onClick={() => setTesterView("mask")}
                         disabled={testerView === "mask"}
                         style={{
@@ -2263,7 +3420,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                           color: testerView === "all" ? "#fff" : "#333",
                         }}
                       >
-                        By Color
+                        {schemeMode ? "By Scheme" : "By Color"}
                       </button>
                     </div>
                     {testerView === "mask" ? (
@@ -2278,23 +3435,51 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                         ))}
                       </select>
                     ) : (
-                      <select
-                        value={allMaskColorId}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setAllMaskColorId(val);
-                          if (val !== "other") setAllMaskCustomColor(null);
-                        }}
-                        style={{ minWidth: 160, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc" }}
-                      >
-                        <option value="">Select tester color</option>
-                        {testerColors.map((tc) => (
-                          <option key={tc.color_id} value={tc.color_id}>
-                            {tc.name} ({tc.note || tc.code || tc.color_id})
-                          </option>
-                        ))}
-                        <option value="other">Other…</option>
-                      </select>
+                      schemeMode ? (
+                        <>
+                          <select
+                            value={schemeSelection}
+                            onChange={(e) => onSchemeChange && onSchemeChange(e.target.value)}
+                            style={{ minWidth: 200, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc" }}
+                          >
+                            <option value="">Select scheme</option>
+                            {(schemeOptions || []).map((scheme) => (
+                              <option key={scheme.id} value={scheme.id}>
+                                {scheme.scheme_code} {scheme.notes ? `• ${scheme.notes}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="btn btn-small"
+                            onClick={triggerSchemeSeed}
+                            title="Seed scheme colors"
+                            disabled={!schemeSelection || !asset?.masks?.length || schemeSeeding}
+                          >
+                            {schemeSeeding ? "Seeding…" : "Seed"}
+                          </button>
+                          {schemeSeedNotice && (
+                            <span style={{ fontSize: 11, color: "#666" }}>{schemeSeedNotice}</span>
+                          )}
+                        </>
+                      ) : (
+                        <select
+                          value={allMaskColorId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setAllMaskColorId(val);
+                            if (val !== "other") setAllMaskCustomColor(null);
+                          }}
+                          style={{ minWidth: 160, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc" }}
+                        >
+                          <option value="">Select tester color</option>
+                          {sortedTesterColors.map((tc) => (
+                            <option key={tc.color_id} value={tc.color_id}>
+                              {tc.name} ({tc.note || tc.code || tc.color_id})
+                            </option>
+                          ))}
+                          <option value="other">Other…</option>
+                        </select>
+                      )
                     )}
                   </div>
 
@@ -2314,7 +3499,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                       style={{ minWidth: 170, padding: "6px 8px", borderRadius: 6, border: "1px solid #ccc" }}
                     >
                       <option value="">Select color</option>
-                      {testerColors.map((tc) => (
+                      {(testerView === "mask" ? sortedMaskTesterColors : sortedTesterColors).map((tc) => (
                         <option key={tc.color_id} value={tc.color_id}>
                           {tc.name} ({tc.note || tc.code || tc.color_id})
                         </option>
@@ -2340,17 +3525,23 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
 
                     {testerView === "mask" ? (
                       <>
+                        {!hideTesterSourceControls && (
+                          <button
+                            className="btn"
+                            onClick={openTesterSourceModal}
+                            disabled={!selectedMask || seeding}
+                            title="Choose a tester source and seed colors for this mask"
+                          >
+                            {seeding ? "Seeding…" : "Add Test Colors"}
+                          </button>
+                        )}
                         <button
                           className="btn"
-                          onClick={handleSeedTestColors}
-                          disabled={!selectedMask || seeding}
-                          title="Add starter test colors with guessed settings for this mask"
-                        >
-                          {seeding ? "Seeding…" : "Add Test Colors"}
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => handleAddColorToMask(maskAddColorId === "other" ? "custom" : maskAddColorId)}
+                          onClick={() =>
+                            schemeMode
+                              ? handleAddColorToScheme(maskAddColorId === "other" ? "custom" : maskAddColorId)
+                              : handleAddColorToMask(maskAddColorId === "other" ? "custom" : maskAddColorId)
+                          }
                           disabled={
                             seeding ||
                             !selectedMask ||
@@ -2359,40 +3550,55 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                           }
                           title="Add this color to the selected mask with guessed settings"
                         >
-                          Add Color
+                          {schemeMode ? (schemeAddBusy ? "Adding…" : "Add Color to Scheme") : "Add Color"}
                         </button>
+                        {schemeMode && schemeAddNotice && (
+                          <span style={{ fontSize: 12, color: "#2e7d32" }}>{schemeAddNotice}</span>
+                        )}
+                        {schemeMode && schemeAddError && (
+                          <span style={{ fontSize: 12, color: "#b40000" }}>{schemeAddError}</span>
+                        )}
+                        {!hideTesterSourceControls && (
+                          <span style={{ fontSize: 12, color: "#555" }}>
+                            Source: {testerSourceType === "standard" ? "Standard Test" : testerSourceLabel}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <>
-                        <button
-                          className="btn"
-                          onClick={() => {
-                            const target = allMaskColorId === "other" ? "custom" : allMaskColorId;
-                            if (target === "custom" && !allMaskCustomColor) return;
-                            handleSeedAllMasksWithColor(target);
-                          }}
-                          disabled={
-                            seeding ||
-                            (!allMaskColorId && !allMaskCustomColor) ||
-                            (allMaskColorId === "other" && !allMaskCustomColor)
-                          }
-                          title="Add this tester color to all masks with guessed settings"
-                        >
-                          {seeding ? "Seeding…" : "Add To All Masks"}
-                        </button>
-                        <button
-                          className="btn primary"
-                          onClick={() => handleApplyAllMasksColor(allMaskColorId === "other" ? "custom" : allMaskColorId)}
-                          disabled={
-                            applyingAll ||
-                            !asset ||
-                            (!allMaskColorId && !allMaskCustomColor) ||
-                            (allMaskColorId === "other" && !allMaskCustomColor)
-                          }
-                          title="Render this color across all masks"
-                        >
-                          {applyingAll ? "Applying…" : "Apply"}
-                        </button>
+                        {!schemeMode && (
+                          <>
+                            <button
+                              className="btn"
+                              onClick={() => {
+                                const target = allMaskColorId === "other" ? "custom" : allMaskColorId;
+                                if (target === "custom" && !allMaskCustomColor) return;
+                                handleSeedAllMasksWithColor(target);
+                              }}
+                              disabled={
+                                seeding ||
+                                (!allMaskColorId && !allMaskCustomColor) ||
+                                (allMaskColorId === "other" && !allMaskCustomColor)
+                              }
+                              title="Add this tester color to all masks with guessed settings"
+                            >
+                              {seeding ? "Seeding…" : "Add To All Masks"}
+                            </button>
+                            <button
+                              className="btn primary"
+                              onClick={() => handleApplyAllMasksColor(allMaskColorId === "other" ? "custom" : allMaskColorId)}
+                              disabled={
+                                applyingAll ||
+                                !asset ||
+                                (!allMaskColorId && !allMaskCustomColor) ||
+                                (allMaskColorId === "other" && !allMaskCustomColor)
+                              }
+                              title="Render this color across all masks"
+                            >
+                              {applyingAll ? "Applying…" : "Apply"}
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -2407,6 +3613,26 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                     >
                       {bulkSaveState.saving ? "Saving All…" : "Save All Masks"}
                     </button>
+                    {schemeMode && (
+                      <>
+                        <button
+                          className="btn btn-small"
+                          onClick={applySchemeSelections}
+                          disabled={!schemeSelection || !asset || testerView !== "all" || applyingAll}
+                          title="Apply the currently selected scheme colors across all masks"
+                        >
+                          Apply All
+                        </button>
+                        <button
+                          className="btn btn-small"
+                          onClick={clearSchemeSettings}
+                          disabled={schemeClearing}
+                          title="Clear scheme settings for this photo"
+                        >
+                          {schemeClearing ? "Clearing…" : "Clear Scheme"}
+                        </button>
+                      </>
+                    )}
                     {(bulkSaveState.message || bulkSaveState.error) && (
                       <span
                         style={{
@@ -2426,29 +3652,45 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                     Refresh
                   </button>
                   {testerView === "all" && (
-                    <button
-                      className="btn primary"
-                      onClick={() => handleApplyAllMasksColor(allMaskColorId === "other" ? "custom" : allMaskColorId)}
-                      disabled={
-                        !asset ||
-                        (!allMaskColorId && !allMaskCustomColor) ||
-                        (allMaskColorId === "other" && !allMaskCustomColor) ||
-                        applyingAll
-                      }
-                      title="Render the selected color on all masks"
-                    >
-                      {applyingAll ? "Applying…" : "Apply"}
-                    </button>
+                    !schemeMode && (
+                      <button
+                        className="btn primary"
+                        onClick={() => handleApplyAllMasksColor(allMaskColorId === "other" ? "custom" : allMaskColorId)}
+                        disabled={
+                          !asset ||
+                          (!allMaskColorId && !allMaskCustomColor) ||
+                          (allMaskColorId === "other" && !allMaskCustomColor) ||
+                          applyingAll
+                        }
+                        title="Render the selected color on all masks"
+                      >
+                        {applyingAll ? "Applying…" : "Apply"}
+                      </button>
+                    )
                   )}
                 </div>
                 {testerView === "mask" ? (
                   <MaskBlendHistory
+                    key={selectedMask || "mask"}
                     assetId={asset.asset_id}
                     maskRole={selectedMask}
                     baseLightness={selectedMaskData?.stats?.l_avg01 ?? selectedMaskData?.base_lightness ?? null}
                     selectorVersion={selectorVersion}
                     activeColorId={activeColorByMask[selectedMask]}
                     onSelectRow={(row) => setActiveColorByMask((prev) => ({ ...prev, [selectedMask]: row.color_id }))}
+                    onRowsChange={(rows) => {
+                      if (schemeMode && selectedMask) {
+                        schemeRowsRef.current[selectedMask] = rows;
+                      }
+                    }}
+                    filterColorIds={
+                      schemeMode
+                        ? (testerView === "mask" ? null : getTesterColorIdsForMask(selectedMask))
+                        : null
+                    }
+                    forceApproved={schemeMode ? 1 : null}
+                    sortByColor={schemeMode}
+                    sortByTargetLightness
                     onApplyBlend={(mask, tier, preset, extra) =>
                       handleApplyPresetValues(mask, tier, preset, {
                         autoSave: true,
@@ -2459,7 +3701,49 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                   />
                 ) : (
                   <div>
-                    {allMaskColorId && allMaskColorId !== "other" ? (
+                    {schemeMode ? (
+                      <div>
+                        {asset?.masks?.length ? (
+                          (schemeMode ? schemeMasksSortedByColor : [...(asset?.masks || [])].sort((a, b) => {
+                            const la = Number(a?.stats?.l_avg01 ?? a?.base_lightness ?? 999);
+                            const lb = Number(b?.stats?.l_avg01 ?? b?.base_lightness ?? 999);
+                            return la - lb;
+                          }))
+                            .map((m) => (
+                              <div key={m.role} style={{ marginBottom: 12 }}>
+                                <MaskBlendHistory
+                                  assetId={asset.asset_id}
+                                  maskRole={m.role}
+                                  baseLightness={m?.stats?.l_avg01 ?? m?.base_lightness ?? null}
+                                  selectorVersion={selectorVersion}
+                                  rowTitle={m.role}
+                                  hideHeader
+                                  forceSortByBaseLightness={!schemeMode}
+                                  activeColorId={activeColorByMask[m.role]}
+                                  onSelectRow={(row) => setActiveColorByMask((prev) => ({ ...prev, [m.role]: row.color_id }))}
+                                  onRowsChange={(rows) => {
+                                    if (schemeMode) {
+                                      schemeRowsRef.current[m.role] = rows;
+                                    }
+                                  }}
+                                  filterColorIds={schemeMode ? getTesterColorIdsForMask(m.role) : null}
+                                  forceApproved={schemeMode ? 1 : null}
+                                  sortByColor={schemeMode}
+                                  onApplyBlend={(mask, tier, preset, extra) =>
+                                    handleApplyPresetValues(mask, tier, preset, {
+                                      autoSave: true,
+                                      autoRender: true,
+                                      ...(extra || {}),
+                                    })
+                                  }
+                                />
+                              </div>
+                            ))
+                        ) : (
+                          <div className="notice">Load a photo to see masks.</div>
+                        )}
+                      </div>
+                    ) : allMaskColorId && allMaskColorId !== "other" ? (
                       [...(asset?.masks || [])]
                         .sort((a, b) => {
                           const la = Number(a?.stats?.l_avg01 ?? a?.base_lightness ?? 999);
@@ -2538,6 +3822,57 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
           </div>
         </div>
       )}
+      {testerSourceModalOpen && !hideTesterSourceControls && (
+        <MaskOverlayModal
+          title="Add Test Colors"
+          subtitle={selectedMask ? `Mask: ${selectedMask}` : ""}
+          onClose={closeTesterSourceModal}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 320 }}>
+            <label>
+              Tester Source
+              <select
+                value={testerSourceSelection}
+                onChange={(e) => setTesterSourceSelection(e.target.value)}
+                disabled={testerSourceBusy}
+              >
+                <option value="standard">Standard Test</option>
+                {hoaOptions.length > 0 ? (
+                  <optgroup label="HOAs">
+                    {hoaOptions.map((hoa) => {
+                      const label = formatHoaLabel(hoa) || `HOA #${hoa.id}`;
+                      return (
+                        <option key={hoa.id} value={`hoa:${hoa.id}`}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ) : (
+                  <option value="" disabled>
+                    {hoaLoading ? "Loading HOAs…" : "No HOAs available"}
+                  </option>
+                )}
+              </select>
+            </label>
+            {hoaError && <div className="error">{hoaError}</div>}
+            {testerSourceError && <div className="error">{testerSourceError}</div>}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button className="btn" type="button" onClick={closeTesterSourceModal} disabled={testerSourceBusy}>
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                type="button"
+                onClick={handleApplyTesterSource}
+                disabled={testerSourceBusy || !testerSourceSelection}
+              >
+                {testerSourceBusy ? "Loading…" : "Load & Seed"}
+              </button>
+            </div>
+          </div>
+        </MaskOverlayModal>
+      )}
       {saveModalOpen && (
         <MaskOverlayModal
           title="Save Applied Palette"
@@ -2562,12 +3897,22 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                   <select
                     value={existingPaletteId}
                     onChange={(e) => handleSelectExistingPalette(e.target.value)}
-                    disabled={existingLoading || !existingPalettes.length}
+                    disabled={!asset?.asset_id}
+                    onFocus={() => {
+                      if (asset?.asset_id) {
+                        loadExistingPalettes(asset.asset_id);
+                      }
+                    }}
                   >
                     <option value="">Select palette</option>
+                    {existingLoading && (
+                      <option value="" disabled>
+                        Loading…
+                      </option>
+                    )}
                     {existingPalettes.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.title || `Palette #${p.id}`}
+                        {(p.title || `Palette #${p.id}`) + (p.display_title ? ` — ${p.display_title}` : "")}
                       </option>
                     ))}
                   </select>
@@ -2575,12 +3920,21 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
               </div>
               {existingLoadError && <div className="error">{existingLoadError}</div>}
               <label>
-                Title / Nickname
+                Handle (internal)
                 <input
                   type="text"
                   value={saveTitle}
                   onChange={(e) => setSaveTitle(e.target.value)}
-                  placeholder="e.g., Manny · Moody Blues"
+                  placeholder="e.g., HOA/CitrusHeights/Sch1"
+                />
+              </label>
+              <label>
+                Display Title (viewer)
+                <input
+                  type="text"
+                  value={saveDisplayTitle}
+                  onChange={(e) => setSaveDisplayTitle(e.target.value)}
+                  placeholder="e.g., Classic Cedar Exterior"
                 />
               </label>
               <label>
@@ -2592,44 +3946,6 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                   placeholder="Optional internal notes"
                 />
               </label>
-            </div>
-            <div className="save-palette-fields">
-              <div className="field-row">
-                <label>
-                  Client Name
-                  <input
-                    type="text"
-                    value={saveClientName}
-                    onChange={(e) => setSaveClientName(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Client Email
-                  <input
-                    type="email"
-                    value={saveClientEmail}
-                    onChange={(e) => setSaveClientEmail(e.target.value)}
-                  />
-                </label>
-              </div>
-              <div className="field-row">
-                <label>
-                  Client Phone
-                  <input
-                    type="text"
-                    value={saveClientPhone}
-                    onChange={(e) => setSaveClientPhone(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Client Notes
-                  <textarea
-                    value={saveClientNotes}
-                    onChange={(e) => setSaveClientNotes(e.target.value)}
-                    rows={2}
-                  />
-                </label>
-              </div>
             </div>
             <div className="save-palette-summary">
               {paletteEntries.length === 0 && (
@@ -2661,7 +3977,7 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                       <div className="save-entry-mode">
                         <span className="mode">{entry.blend_mode || "colorize"}</span>
                         {entry.blend_opacity != null && (
-                          <span className="opacity">{Math.round((entry.blend_opacity || 0) * 100)}%</span>
+                          <span className="opacity">{(Number(entry.blend_opacity || 0) * 100).toFixed(1)}%</span>
                         )}
                       </div>
                       <div className="save-entry-shadow">
@@ -2733,6 +4049,11 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
               >
                 {saveBusy ? "Saving…" : (saveMode === "update" ? "Update Palette" : "Save Palette")}
               </button>
+              {!saveBusy && (saveNotice || saveResult || saveSuccessAt) && (
+                <span style={{ fontSize: 12, color: "#2e7d32" }}>
+                  Saved
+                </span>
+              )}
             </div>
           </div>
         </MaskOverlayModal>

@@ -3,6 +3,7 @@ import MaskRoleGrid from "@components/MaskRoleGrid";
 export default function MaskSettingsGrid({
   masks = [],
   entries = {},
+  activeColorByMask = null,
   onChange,
   onApply,
   onShadow,
@@ -12,6 +13,7 @@ export default function MaskSettingsGrid({
     <MaskRoleGrid
       masks={masks}
       entries={entries}
+      activeColorByMask={activeColorByMask}
       onChange={onChange}
       onApply={onApply}
       onShadow={onShadow}

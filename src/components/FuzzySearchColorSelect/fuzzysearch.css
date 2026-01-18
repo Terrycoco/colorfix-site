@@ -12,6 +12,12 @@
   align-items: flex-start;
 }
 
+body.photo-fullscreen .fuzzy-dropdown,
+body.photo-fullscreen .fuzzy-mobile-trigger,
+body.photo-fullscreen .results {
+  visibility: hidden;
+}
+
 .fuzzy-compact {
   max-width: none;
   min-width: 140px;

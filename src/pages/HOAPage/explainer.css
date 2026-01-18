@@ -1,0 +1,129 @@
+/* ========== HOA EXPLAINER PAGE ========== */
+
+.hoa-explainer {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #222;
+  line-height: 1.5;
+}
+
+.hoa-explainer h1 {
+  font-size: 26px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.hoa-explainer p {
+  font-size: 15px;
+  margin: 0 0 12px 0;
+  color: #333;
+}
+
+.hoa-explainer section {
+  margin-top: 24px;
+}
+
+.hoa-explainer-artifact {
+  margin-top: 32px;
+}
+
+.hoa-explainer-followup {
+  margin-top: 28px;
+  font-size: 14px;
+  color: #444;
+}
+
+.hoa-explainer-cta {
+  margin-top: 12px;
+}
+
+/* ========== HOA SUBMISSION ARTIFACT ========== */
+
+.hoa-submission-artifact {
+  border: 1px solid #bbb;
+  background: #fafafa;
+  padding: 20px 22px;
+  font-size: 14px;
+  color: #111;
+   overflow-x: hidden;
+
+  /* subtle paper lift */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  border-radius: 12px;
+}
+
+.hoa-submission-artifact .submission-header {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.hoa-submission-artifact dl {
+  display: grid;
+  grid-template-columns: 1fr;
+  row-gap: 10px;
+  margin: 0 0 16px 0;
+}
+
+@media (min-width: 640px) {
+  .hoa-submission-artifact dl {
+    grid-template-columns: 160px 1fr;
+    column-gap: 16px;
+  }
+}
+
+.hoa-submission-artifact dt {
+  font-weight: 700;
+  color: #444;
+  font-size: 13px;
+}
+
+.hoa-submission-artifact dd {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  word-wrap: break-word;
+}
+
+.hoa-submission-artifact .submission-colors {
+  margin-top: 12px;
+}
+
+.hoa-submission-artifact .submission-colors strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hoa-submission-artifact ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.hoa-submission-artifact li {
+  margin-bottom: 6px;
+}
+
+.hoa-submission-artifact .submission-visual-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: #444;
+}
+
+.hoa-submission-artifact .submission-meta {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+@media (max-width: 480px) {
+  .hoa-explainer {
+    padding: 24px 16px;
+  }
+
+  .hoa-submission-artifact {
+    padding: 16px;
+    font-size: 13.5px;
+  }
+}

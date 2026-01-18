@@ -166,26 +166,6 @@ const goToPalette = (e) => {
 
         {/* LEFT */}
         <div className="scroller-left">
-          {canGoBack && (
-            <button
-              className="board-tab"
-              onClick={() => {
-                const params = new URLSearchParams(location.search);
-                const hasCompareParams = params.get('a') || params.get('b');
-                const returnTo = location.state?.returnTo
-                  || ((location.pathname.startsWith('/color/') && hasCompareParams)
-                    ? `/sbs?${params.toString()}`
-                    : null);
-                if (returnTo) {
-                  navigate(returnTo);
-                } else {
-                  navigate(-1);
-                }
-              }}
-            >
-              ← Back
-            </button>
-          )}
           <AdminMenu />
         </div>
 

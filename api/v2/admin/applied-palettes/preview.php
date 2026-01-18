@@ -50,6 +50,7 @@ try {
     $previewPalette = new AppliedPalette(
         $palette->id,
         $palette->title,
+        $palette->displayTitle,
         $palette->notes,
         $palette->tags,
         $palette->photoId,

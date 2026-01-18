@@ -28,6 +28,22 @@ function NavBar() {
   const handleLogout = () => {
     setLoggedIn(false);
     setUser(null);
+    try {
+      localStorage.removeItem('cf_logged_in');
+      localStorage.removeItem('cf_user');
+      localStorage.removeItem('cf_device_token');
+      localStorage.removeItem('isAdmin');
+      localStorage.removeItem('isTerry');
+    } catch {}
+    const host = window.location.hostname;
+    const isPrimaryDomain = host.endsWith('terrymarr.com');
+    const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `cf_admin=; Max-Age=0; path=/; SameSite=Lax${securePart}`;
+    document.cookie = `cf_device_token=; Max-Age=0; path=/; SameSite=Lax${securePart}`;
+    if (isPrimaryDomain) {
+      document.cookie = `cf_admin_global=; Max-Age=0; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
+      document.cookie = `cf_device_token=; Max-Age=0; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
+    }
     navigate('/');
     setHamburgerOpen(false);
   };
@@ -55,9 +71,21 @@ function NavBar() {
       ? [{
           label: 'Admin',
           subLinks: [
-            { label: 'Categories', path: '/admin/categories' },
-            { label: 'Edit Color', path: '/admin/colors' },
-            { label: 'Saved Palettes', path: '/admin/saved-palettes' },
+            {
+              label: 'Core',
+              items: [
+                { label: 'Categories', path: '/admin/categories' },
+                { label: 'Edit Color', path: '/admin/colors' },
+                { label: 'Saved Palettes', path: '/admin/saved-palettes' },
+              ],
+            },
+            {
+              label: 'HOA',
+              items: [
+                { label: 'HOAs', path: '/admin/hoas' },
+                { label: 'Scheme Tester', path: '/admin/hoa-scheme-tester' },
+              ],
+            },
           ]
         }]
       : []),
@@ -105,13 +133,30 @@ function NavBar() {
                      <div className="absolute mr-0 right-0 top-[3rem] flex flex-col bg-gray-900 text-white rounded shadow-md z-50 min-w-[10rem]">
 
                     {link.subLinks.map((sublink, subIdx) => (
-                      <Link
-                        key={subIdx}
-                        to={sublink.path}
-                        className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
-                      >
-                        {sublink.label}
-                      </Link>
+                      sublink.items ? (
+                        <div key={subIdx} className="py-2">
+                          <div className="px-4 pb-1 text-xs uppercase tracking-wide text-gray-400">
+                            {sublink.label}
+                          </div>
+                          {sublink.items.map((item) => (
+                            <Link
+                              key={item.path}
+                              to={item.path}
+                              className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <Link
+                          key={subIdx}
+                          to={sublink.path}
+                          className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
+                        >
+                          {sublink.label}
+                        </Link>
+                      )
                     ))}
                   </div>
                 )}
@@ -152,15 +197,36 @@ function NavBar() {
                       <span className="px-4 py-2 font-semibold">{link.label}</span>
                       <ul className="pl-4">
                         {link.subLinks.map((sublink, subIdx) => (
-                          <li key={subIdx}>
-                            <Link
-                              to={sublink.path}
-                              onClick={() => setHamburgerOpen(false)}
-                              className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
-                            >
-                              {sublink.label}
-                            </Link>
-                          </li>
+                          sublink.items ? (
+                            <li key={subIdx}>
+                              <div className="px-4 pt-2 text-xs uppercase tracking-wide text-gray-400">
+                                {sublink.label}
+                              </div>
+                              <ul className="pl-2">
+                                {sublink.items.map((item) => (
+                                  <li key={item.path}>
+                                    <Link
+                                      to={item.path}
+                                      onClick={() => setHamburgerOpen(false)}
+                                      className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
+                                    >
+                                      {item.label}
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            </li>
+                          ) : (
+                            <li key={subIdx}>
+                              <Link
+                                to={sublink.path}
+                                onClick={() => setHamburgerOpen(false)}
+                                className="px-4 py-2 hover:text-orange-400 hover:bg-gray-800 whitespace-nowrap"
+                              >
+                                {sublink.label}
+                              </Link>
+                            </li>
+                          )
                         ))}
                       </ul>
                     </li>

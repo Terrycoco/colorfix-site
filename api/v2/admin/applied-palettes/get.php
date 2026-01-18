@@ -45,6 +45,7 @@ try {
         'palette' => [
             'id' => $palette->id,
             'title' => $palette->title,
+            'display_title' => $palette->displayTitle,
             'notes' => $palette->notes,
             'tags' => $palette->tags,
             'photo_id' => $palette->photoId,

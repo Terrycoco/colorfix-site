@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import "./photorenderer.css";
 
@@ -14,6 +14,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
   const [err, setErr] = useState("");
   const [isFull, setIsFull] = useState(false);
   const [renderPath, setRenderPath] = useState("");
+  const scrollRef = useRef(0);
 
   // Build role -> HEX6
   const hexMap = useMemo(() => {
@@ -37,6 +38,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
     if (viewMode !== "after" || Object.keys(hexMap).length === 0) {
       setCompositeUrl("");
       setErr("");
+      setRenderPath("");
       onStateChange?.({ loading: false, error: "" });
       return;
     }
@@ -82,6 +84,12 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
       });
   }, [asset?.asset_id, hexMap, viewMode, overlayOverrides]);
 
+  useEffect(() => {
+    setCompositeUrl("");
+    setRenderPath("");
+    setErr("");
+  }, [asset?.asset_id]);
+
   // Which image to show
   const imgSrc = useMemo(() => {
     if (!asset) return "";
@@ -93,6 +101,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
   // Fullscreen UX: block body scroll, close on Escape
   useEffect(() => {
     if (isFull) {
+      scrollRef.current = window.scrollY || 0;
       const prev = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       document.body.classList.add("photo-fullscreen");
@@ -102,6 +111,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
         window.removeEventListener("keydown", onKey);
         document.body.style.overflow = prev;
         document.body.classList.remove("photo-fullscreen");
+        window.scrollTo({ top: scrollRef.current, behavior: "auto" });
       };
     }
   }, [isFull]);

@@ -20,6 +20,7 @@ class PdoAppliedPaletteRepository
         return new AppliedPalette(
             (int)$row['id'],
             $row['title'] ?? null,
+            $row['display_title'] ?? null,
             $row['notes'] ?? null,
             $row['tags'] ?? null,
             (int)$row['photo_id'],
@@ -38,8 +39,9 @@ class PdoAppliedPaletteRepository
         }
         if (!empty($filters['q'])) {
             $pattern = '%' . $filters['q'] . '%';
-            $where[] = "(ap.title LIKE :q_title OR ap.asset_id LIKE :q_asset)";
+            $where[] = "(ap.title LIKE :q_title OR ap.display_title LIKE :q_display OR ap.asset_id LIKE :q_asset)";
             $params[':q_title'] = $pattern;
+            $params[':q_display'] = $pattern;
             $params[':q_asset'] = $pattern;
             if (ctype_digit($filters['q'])) {
                 $where[] = "ap.id = :q_id";
@@ -126,6 +128,7 @@ class PdoAppliedPaletteRepository
      *   photo_id:int,
      *   asset_id:string,
      *   title?:string|null,
+     *   display_title?:string|null,
      *   notes?:string|null
      * } $data
      * @return array{id:int}
@@ -133,13 +136,14 @@ class PdoAppliedPaletteRepository
     public function insertPalette(array $data): array
     {
         $sql = "INSERT INTO applied_palettes
-                (photo_id, asset_id, title, notes, tags, created_at, updated_at)
-                VALUES (:photo_id, :asset_id, :title, :notes, :tags, NOW(), NOW())";
+                (photo_id, asset_id, title, display_title, notes, tags, created_at, updated_at)
+                VALUES (:photo_id, :asset_id, :title, :display_title, :notes, :tags, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':photo_id' => $data['photo_id'],
             ':asset_id' => $data['asset_id'],
             ':title' => $data['title'] ?? null,
+            ':display_title' => $data['display_title'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
         ]);
@@ -199,7 +203,7 @@ class PdoAppliedPaletteRepository
     {
         $cols = [];
         $params = [':id' => $id];
-        foreach (['title', 'notes', 'tags'] as $key) {
+        foreach (['title', 'display_title', 'notes', 'tags'] as $key) {
             if (array_key_exists($key, $fields)) {
                 $cols[] = "{$key} = :{$key}";
                 $params[":{$key}"] = $fields[$key];

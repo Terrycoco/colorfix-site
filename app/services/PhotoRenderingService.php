@@ -152,7 +152,21 @@ public function renderApplyMap(
         [$rT, $gT, $bT] = $this->hexToRgb($hex6);
         [$Lt, $at, $bt] = $this->rgbToLab($rT, $gT, $bT);
 
-        $overlaySource = $overlayOverrides[$role] ?? ($maskMeta['overlay'] ?? null);
+        $overlaySource = $maskMeta['overlay'] ?? null;
+        if (isset($overlayOverrides[$role]) && is_array($overlayOverrides[$role])) {
+            $override = $overlayOverrides[$role];
+            if (is_array($overlaySource)) {
+                foreach ($override as $key => $value) {
+                    if (is_array($value) && isset($overlaySource[$key]) && is_array($overlaySource[$key])) {
+                        $overlaySource[$key] = array_replace($overlaySource[$key], $value);
+                    } else {
+                        $overlaySource[$key] = $value;
+                    }
+                }
+            } else {
+                $overlaySource = $override;
+            }
+        }
         $maskBlend = $this->resolveMaskBlend($overlaySource, $Lt);
         $blendSettingsByRole[$role] = $maskBlend;
         $shadowSettingsByRole[$role] = $this->extractShadowSettings($overlaySource);
@@ -390,8 +404,9 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         for ($y = 0; $y < $H; $y += $step) {
             for ($x = 0; $x < $W; $x += $step) {
                 $m = imagecolorat($maskIm, $x, $y);
-                $ma = ($m & 0x7F000000) >> 24;
-                $coverage = 1.0 - ($ma / 127.0);
+                // Masks are encoded in RGB (like renderApplyMap), not alpha.
+                $mr = ($m >> 16) & 0xFF;
+                $coverage = $mr / 255.0;
                 if ($coverage <= 0.0) continue;
 
                 $p = imagecolorat($baseIm, $x, $y);
@@ -709,22 +724,34 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
 
     private function buildOverlayOverride(array $entry): array
     {
-        $mode = $entry['blend_mode'] ?? 'colorize';
-        $opacity = isset($entry['blend_opacity']) ? (float)$entry['blend_opacity'] : 0.0;
-        $shadow = [
-            'l_offset' => $entry['lightness_offset'] ?? 0,
-            'tint_hex' => $entry['tint_hex'] ?? null,
-            'tint_opacity' => $entry['tint_opacity'] ?? 0,
-        ];
-        $tiers = ['dark','medium','light'];
         $out = [];
-        foreach ($tiers as $tier) {
-            $out[$tier] = [
-                'mode' => $mode,
-                'opacity' => $opacity,
-            ];
+        $tierOverride = [];
+        if (isset($entry['blend_mode']) && $entry['blend_mode'] !== '') {
+            $tierOverride['mode'] = $entry['blend_mode'];
         }
-        $out['_shadow'] = $shadow;
+        if (array_key_exists('blend_opacity', $entry) && $entry['blend_opacity'] !== null) {
+            $tierOverride['opacity'] = (float)$entry['blend_opacity'];
+        }
+        if ($tierOverride) {
+            foreach (['dark', 'medium', 'light'] as $tier) {
+                $out[$tier] = $tierOverride;
+            }
+        }
+
+        $shadow = [];
+        if (array_key_exists('lightness_offset', $entry) && $entry['lightness_offset'] !== null) {
+            $shadow['l_offset'] = (float)$entry['lightness_offset'];
+        }
+        if (isset($entry['tint_hex']) && $entry['tint_hex'] !== '') {
+            $shadow['tint_hex'] = $entry['tint_hex'];
+        }
+        if (array_key_exists('tint_opacity', $entry) && $entry['tint_opacity'] !== null) {
+            $shadow['tint_opacity'] = (float)$entry['tint_opacity'];
+        }
+        if ($shadow) {
+            $out['_shadow'] = $shadow;
+        }
+
         return $out;
     }
 
@@ -778,6 +805,7 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         if ($val === '' || $val === null) return null;
         $num = (float)$val;
         if (!is_finite($num)) return null;
+        if ($num > 1.0) $num = $num / 100.0;
         return $this->clamp01($num);
     }
 

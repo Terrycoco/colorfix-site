@@ -14,20 +14,26 @@ export default function MaskTable({
   showRole = false,
   onClickColor,
 }) {
+  const formatHcl = (row) => {
+    const h = row?.color_h;
+    const c = row?.color_c;
+    const l = row?.color_l;
+    const hasAny = [h, c, l].some((val) => Number.isFinite(Number(val)));
+    if (!hasAny) return "H:— C:— L:—";
+    const hVal = Number.isFinite(Number(h)) ? Math.round(Number(h)) : "—";
+    const cVal = Number.isFinite(Number(c)) ? Math.round(Number(c)) : "—";
+    const lVal = Number.isFinite(Number(l)) ? Math.round(Number(l)) : "—";
+    return `H:${hVal} C:${cVal} L:${lVal}`;
+  };
+
   const normalized = useMemo(
     () =>
       (rows || []).map((row) => ({
         ...row,
-        opacityPct: row.blend_opacity == null ? "" : Math.round(row.blend_opacity * 100),
+        opacityPct: row.blend_opacity == null ? "" : (row.blend_opacity * 100).toFixed(1),
         shadowOffset: row.shadow_l_offset == null ? "" : row.shadow_l_offset,
         displayLightness:
-          row.target_lightness != null
-            ? Math.round(row.target_lightness)
-            : row.color_lightness != null
-              ? Math.round(row.color_lightness)
-              : row.base_lightness != null
-                ? Math.round(row.base_lightness)
-                : "—",
+          row.base_lightness != null ? Math.round(row.base_lightness) : "—",
       })),
     [rows]
   );
@@ -73,7 +79,7 @@ export default function MaskTable({
                   {row.color_name || row.color_code || (row.color_id ? `Color #${row.color_id}` : "Add color")}
                 </div>
                 <div className="swatch-brand">
-                  {row.color_brand || row.brand || ""} · Base L {row.base_lightness != null ? Math.round(row.base_lightness) : "—"}
+                  {(row.color_brand || row.brand || "").trim() || "—"} · {formatHcl(row)}
                 </div>
               </div>
             </div>
@@ -94,6 +100,8 @@ export default function MaskTable({
                 min="0"
                 max="100"
                 value={row.opacityPct}
+                step="0.1"
+                inputMode="decimal"
                 onChange={(e) => onChangeOpacity && onChangeOpacity(row, e.target.value)}
               />
             </div>

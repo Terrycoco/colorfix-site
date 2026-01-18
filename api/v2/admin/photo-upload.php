@@ -81,6 +81,7 @@ try {
   // - texture_overlay (optional PNG luminance layer)
   // - prepared_dark | prepared_medium | prepared_light (back-compat trio)
   // - masks[] (multiple files, roles inferred from filenames)
+  // - extras[] (additional photos tied to asset; role from filename or extra_slugs[])
   // Optional: asset_id, style, verdict, status, lighting, rights, tags
   $result = $controller->upload($_POST, $_FILES);
 

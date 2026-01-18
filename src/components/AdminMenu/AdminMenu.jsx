@@ -8,6 +8,7 @@ export default function AdminMenu() {
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
   const menuRef = useRef(null);
+  const hoverTimerRef = useRef(null);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -19,6 +20,29 @@ export default function AdminMenu() {
     if (open) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  function scheduleHoverClose() {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setHovered(null);
+    }, 250);
+  }
+
+  function cancelHoverClose() {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  }
 
   if (!admin) return null;
 
@@ -39,16 +63,27 @@ export default function AdminMenu() {
             <div
               key={group.label}
               className="admin-menu__group"
-              onMouseEnter={() => setHovered(idx)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => setHovered((prev) => (prev === idx ? null : idx))}
+              onMouseEnter={() => {
+                cancelHoverClose();
+                setHovered(idx);
+              }}
+              onMouseLeave={scheduleHoverClose}
+              onClick={() => {
+                cancelHoverClose();
+                setHovered((prev) => (prev === idx ? null : idx));
+              }}
             >
               <div className="admin-menu__group-label">
                 {group.label}
                 <span className="admin-menu__chev">›</span>
               </div>
               {(hovered === idx) && (
-                <div className="admin-menu__submenu" role="menu">
+                <div
+                  className="admin-menu__submenu"
+                  role="menu"
+                  onMouseEnter={cancelHoverClose}
+                  onMouseLeave={scheduleHoverClose}
+                >
                   {group.items.map((item) => (
                     <a
                       key={item.href}

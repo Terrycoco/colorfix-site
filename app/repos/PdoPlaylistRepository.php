@@ -39,6 +39,7 @@ class PdoPlaylistRepository
      */
     private function getItemsFromDb(string $playlistId): ?array
     {
+        $excludeSelect = $this->getExcludeFromThumbsSelect();
         $sql = <<<SQL
             SELECT
                 playlist_item_id,
@@ -53,7 +54,8 @@ class PdoPlaylistRepository
                 title_mode,
                 star,
                 transition,
-                duration_ms
+                duration_ms,
+                {$excludeSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
@@ -85,11 +87,30 @@ class PdoPlaylistRepository
                 $row['layout'] ?? null,
                 $row['transition'] ?? null,
                 $row['duration_ms'] !== null ? (int)$row['duration_ms'] : null,
-                $row['title_mode'] ?? null
+                $row['title_mode'] ?? null,
+                isset($row['exclude_from_thumbs']) ? (bool)$row['exclude_from_thumbs'] : null
             );
         }
 
         return $items;
+    }
+
+    private function getExcludeFromThumbsSelect(): string
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+        $sql = <<<SQL
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'playlist_items'
+              AND COLUMN_NAME = 'exclude_from_thumbs'
+            SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $hasColumn = (int)$stmt->fetchColumn() > 0;
+        $cached = $hasColumn ? 'exclude_from_thumbs' : '0 AS exclude_from_thumbs';
+        return $cached;
     }
 
     private function getPlaylistMeta(string $playlistId): ?array

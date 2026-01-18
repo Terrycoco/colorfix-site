@@ -25,6 +25,7 @@ try {
     }
 
     $title = array_key_exists('title', $payload) ? trim((string)$payload['title']) : null;
+    $displayTitle = array_key_exists('display_title', $payload) ? trim((string)$payload['display_title']) : null;
     $notes = array_key_exists('notes', $payload) ? trim((string)$payload['notes']) : null;
     $tags = normalizeTags($payload['tags'] ?? null);
 
@@ -35,6 +36,7 @@ try {
 
     $fields = [];
     if ($title !== null) $fields['title'] = $title === '' ? null : $title;
+    if ($displayTitle !== null) $fields['display_title'] = $displayTitle === '' ? null : $displayTitle;
     if ($notes !== null) $fields['notes'] = $notes === '' ? null : $notes;
     if (array_key_exists('tags', $payload)) $fields['tags'] = $tags;
 

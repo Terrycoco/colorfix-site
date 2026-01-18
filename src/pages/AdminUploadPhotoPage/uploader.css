@@ -51,7 +51,30 @@
 .existing-mask-list li { display: flex; gap: 8px; align-items: center; font-size: 0.9rem; }
 .existing-mask-list .mask-label { font-weight: 600; text-transform: capitalize; }
 .existing-mask-list .mask-file { color: #555; }
+.mask-delete-btn {
+  margin-left: auto;
+  border: 1px solid #d64545;
+  background: #fff5f5;
+  color: #b40000;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mask-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .masks-section{
+  border-top:1px solid var(--border,#ccc);
+  margin-top:12px;
+  padding-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.extras-section{
   border-top:1px solid var(--border,#ccc);
   margin-top:12px;
   padding-top:12px;
