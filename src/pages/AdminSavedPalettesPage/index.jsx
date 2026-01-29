@@ -47,6 +47,8 @@ const emptySendForm = {
   preview_colors: [],
 };
 
+const DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-delete.php`;
+
 function formatDate(value) {
   if (!value) return "—";
   const dt = new Date(value.replace(" ", "T"));
@@ -95,6 +97,7 @@ export default function AdminSavedPalettesPage() {
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendForm, setSendForm] = useState(emptySendForm);
   const [sendStatus, setSendStatus] = useState({ loading: false, error: "", success: "" });
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     if (!admin) return;
@@ -252,6 +255,31 @@ export default function AdminSavedPalettesPage() {
     });
     setSendStatus({ loading: false, error: "", success: "" });
     setSendModalOpen(true);
+  };
+
+  const handleDeletePalette = async (palette) => {
+    if (!palette?.id) return;
+    const label = palette.nickname || palette.brand || `Palette #${palette.id}`;
+    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
+    setDeletingId(palette.id);
+    setError("");
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ palette_id: palette.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      setItems((prev) => prev.filter((row) => row.id !== palette.id));
+    } catch (err) {
+      setError(err?.message || "Failed to delete saved palette");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const closeSendModal = () => {
@@ -440,8 +468,21 @@ export default function AdminSavedPalettesPage() {
               <button type="button" className="ghost" onClick={() => openSendModal(item)} disabled={!item.members?.length}>
                 Send Email
               </button>
-              <button type="button" onClick={() => handleLoadPalette(item)} disabled={!item.members?.length}>
+              <button
+                type="button"
+                className="full-width"
+                onClick={() => handleLoadPalette(item)}
+                disabled={!item.members?.length}
+              >
                 Load into My Palette
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => handleDeletePalette(item)}
+                disabled={deletingId === item.id}
+              >
+                {deletingId === item.id ? "Deleting…" : "Delete"}
               </button>
             </footer>
           </article>

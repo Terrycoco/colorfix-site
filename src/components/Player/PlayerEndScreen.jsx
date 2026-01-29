@@ -7,16 +7,6 @@ export default function PlayerEndScreen({
 }) {
   return (
     <div className="player-end-screen">
-      {onExit && (
-        <button
-          className="player-exit player-exit--end"
-          type="button"
-          onClick={onExit}
-          aria-label="Exit player"
-        >
-          ×
-        </button>
-      )}
       <div className="player-end-screen-inner">
         {children && (
           <div className="player-end-actions">

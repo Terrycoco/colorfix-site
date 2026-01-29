@@ -23,7 +23,7 @@ const emptyItem = {
   subtitle: "",
   subtitle_2: "",
   body: "",
-  item_type: "normal",
+  item_type: "non-palette",
   layout: "default",
   title_mode: "",
   star: true,
@@ -85,7 +85,7 @@ export default function AdminPlaylistEditorPage() {
           subtitle: item.subtitle ?? "",
           subtitle_2: item.subtitle_2 ?? "",
           body: item.body ?? "",
-          item_type: item.item_type ?? "normal",
+          item_type: item.item_type ?? "non-palette",
           layout: item.layout ?? "default",
           title_mode: item.title_mode ?? "",
           star: item.star === null ? true : Boolean(item.star),
@@ -165,7 +165,7 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
-  function addItem(type = "normal") {
+  function addItem(type = "non-palette") {
     setItems((prev) => [
       ...prev,
       { ...emptyItem, item_type: type },
@@ -229,6 +229,7 @@ export default function AdminPlaylistEditorPage() {
       }
 
       setSaveStatus("Saved");
+      await fetchPlaylist(playlistIdToSave);
       if (!playlistId) {
         navigate(`/admin/playlists/${playlistIdToSave}`, { replace: true });
       }
@@ -319,9 +320,10 @@ export default function AdminPlaylistEditorPage() {
                   value={item.item_type}
                   onChange={(e) => updateItem(index, "item_type", e.target.value)}
                 >
-                  <option value="normal">normal</option>
+                  <option value="palette">palette</option>
                   <option value="intro">intro</option>
                   <option value="text">text</option>
+                  <option value="non-palette">no palette</option>
                 </select>
               </label>
               <label className="item-cell item-title">

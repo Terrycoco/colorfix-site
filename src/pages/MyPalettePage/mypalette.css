@@ -521,6 +521,38 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 }
 .na-de{ font-size:.75rem; opacity:.75; }
 
+.myp-results-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+  flex-wrap: wrap;
+}
+
+.myp-results-label {
+  font-size: 0.85rem;
+  color: #444;
+  margin-right: 4px;
+}
+
+.myp-sort-btn {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #f3f4f6;
+  color: #222;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.myp-sort-btn.is-active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
 @media (max-width: 720px){
   .na-row{ grid-template-columns:1fr; }
   .na-label{ margin-bottom:2px; }

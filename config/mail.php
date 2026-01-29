@@ -6,7 +6,7 @@ $config = [
     'username'   => 'terry@terrymarr.com',
     'password'   => '', // override in mail.local.php
     'from_email' => 'terry@terrymarr.com',
-    'from_name'  => 'Terry Marr',
+    'from_name'  => 'Terry Marr TEST',
 ];
 
 $local = __DIR__ . '/mail.local.php';

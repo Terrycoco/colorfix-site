@@ -93,6 +93,16 @@ class SavedPaletteService
 
         return $full;
     }
+
+    public function deleteSavedPalette(int $savedPaletteId): void
+    {
+        if ($savedPaletteId <= 0) {
+            throw new InvalidArgumentException('saved_palette_id required');
+        }
+        $this->repo->deleteMembersForPalette($savedPaletteId);
+        $this->repo->deleteViewsForPalette($savedPaletteId);
+        $this->repo->deleteSavedPalette($savedPaletteId);
+    }
     private function resolveClientId(array $data): ?int
     {
         $email = trim((string)($data['client_email'] ?? ''));

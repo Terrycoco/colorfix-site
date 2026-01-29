@@ -91,7 +91,7 @@ export default function MaskSettingsTable({
               (resolvedActiveColorId != null && resolvedActiveColorId === row.color_id) ||
               (activeColorId != null && activeColorId === row.color_id);
 
-            const rowKey = row.id || row.color_id || row.mask_role;
+            const rowKey = row._local_id || row.id || row.color_id || row.mask_role;
             return (
               <Fragment key={rowKey}>
                 <tr
@@ -117,6 +117,10 @@ export default function MaskSettingsTable({
                       role={onPickColor ? "button" : undefined}
                       tabIndex={onPickColor ? 0 : undefined}
                       onClick={(e) => {
+                        if (!onPickColor) return;
+                        e.stopPropagation();
+                      }}
+                      onDoubleClick={(e) => {
                         if (!onPickColor) return;
                         e.stopPropagation();
                         onPickColor(row);

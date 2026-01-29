@@ -70,7 +70,7 @@ try {
             'subtitle' => $item['subtitle'] ?? null,
             'subtitle_2' => $item['subtitle_2'] ?? null,
             'body' => $item['body'] ?? null,
-            'item_type' => $item['item_type'] ?? 'normal',
+            'item_type' => $item['item_type'] ?? 'non-palette',
             'layout' => $item['layout'] ?? 'default',
             'title_mode' => $item['title_mode'] ?? null,
             'star' => isset($item['star']) ? (int)(bool)$item['star'] : 1,
@@ -140,11 +140,11 @@ try {
 
     if ($keepIds) {
         $placeholders = implode(',', array_fill(0, count($keepIds), '?'));
-        $sql = "UPDATE playlist_items SET is_active = 0 WHERE playlist_id = ? AND playlist_item_id NOT IN ({$placeholders})";
+        $sql = "DELETE FROM playlist_items WHERE playlist_id = ? AND playlist_item_id NOT IN ({$placeholders})";
         $stmt = $pdo->prepare($sql);
         $stmt->execute(array_merge([$playlistId], $keepIds));
     } else {
-        $stmt = $pdo->prepare("UPDATE playlist_items SET is_active = 0 WHERE playlist_id = ?");
+        $stmt = $pdo->prepare("DELETE FROM playlist_items WHERE playlist_id = ?");
         $stmt->execute([$playlistId]);
     }
     $pdo->commit();

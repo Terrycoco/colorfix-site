@@ -43,11 +43,13 @@
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.78);
   color: #fff;
   font-size: 13px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
   pointer-events: none;
 }
 

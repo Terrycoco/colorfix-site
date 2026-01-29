@@ -97,6 +97,7 @@ const activeBrandCodes = useMemo(() => {
   const [loading, setLoading] = useState(false);
   const [noResultsFound, setNoResultsFound] = useState(false);
   const [friendsMode, setFriendsMode] = useState("colors"); // 'colors' | 'neutrals' | 'all'
+  const [resultsSort, setResultsSort] = useState("");
 
   // neighbor toggle + metadata returned by backend (per-anchor lines)
   const [includeNeighbors, setIncludeNeighbors] = useState(true);
@@ -220,6 +221,31 @@ const activeBrandCodes = useMemo(() => {
     }
     return lines;
   }, [neighborsUsed, palette]);
+
+  const sortedFriends = useMemo(() => {
+    if (!resultsSort) return friends;
+    const key = resultsSort;
+    const getMetric = (item) => {
+      const color = item?.color ?? item;
+      const h = Number(color?.hcl_h ?? color?.h ?? color?.color_h ?? NaN);
+      const c = Number(color?.hcl_c ?? color?.c ?? color?.color_c ?? NaN);
+      const l = Number(color?.hcl_l ?? color?.l ?? color?.color_l ?? NaN);
+      if (key === "hue") {
+        if (!Number.isFinite(h)) return Number.POSITIVE_INFINITY;
+        return (h % 360 + 360) % 360;
+      }
+      if (key === "chroma") return Number.isFinite(c) ? c : Number.POSITIVE_INFINITY;
+      return Number.isFinite(l) ? l : Number.POSITIVE_INFINITY;
+    };
+    return [...(friends || [])].sort((a, b) => {
+      const av = getMetric(a);
+      const bv = getMetric(b);
+      if (av !== bv) return av - bv;
+      const an = String(a?.color?.name ?? a?.name ?? a?.color_code ?? "").toLowerCase();
+      const bn = String(b?.color?.name ?? b?.name ?? b?.color_code ?? "").toLowerCase();
+      return an.localeCompare(bn);
+    });
+  }, [friends, resultsSort]);
 
   function runAndRemember(endpoint, tol = null, mode = null) {
     setCurrentEndpoint(endpoint);
@@ -606,16 +632,42 @@ const activeBrandCodes = useMemo(() => {
         ) : (
           <>
             {noResultsFound && <div className="no-results">No results for the current filter.</div>}
+            {friends.length > 0 && (
+              <div className="myp-results-sort">
+                <span className="myp-results-label">Sort by:</span>
+                <button
+                  type="button"
+                  className={`myp-sort-btn${resultsSort === "hue" ? " is-active" : ""}`}
+                  onClick={() => setResultsSort((prev) => (prev === "hue" ? "" : "hue"))}
+                >
+                  Hue
+                </button>
+                <button
+                  type="button"
+                  className={`myp-sort-btn${resultsSort === "chroma" ? " is-active" : ""}`}
+                  onClick={() => setResultsSort((prev) => (prev === "chroma" ? "" : "chroma"))}
+                >
+                  Chroma
+                </button>
+                <button
+                  type="button"
+                  className={`myp-sort-btn${resultsSort === "lightness" ? " is-active" : ""}`}
+                  onClick={() => setResultsSort((prev) => (prev === "lightness" ? "" : "lightness"))}
+                >
+                  Lightness
+                </button>
+              </div>
+            )}
             <SwatchGallery
               className="sg-results sw-edge"
-              items={friends}
+              items={sortedFriends}
               SwatchComponent={PaletteSwatch}
               swatchPropName="color"
               gap={16}
               aspectRatio="5 / 4"
-              groupBy="group_header"
-              groupOrderBy="group_order"
-              showGroupHeaders
+              groupBy={resultsSort ? null : "group_header"}
+              groupOrderBy={resultsSort ? null : "group_order"}
+              showGroupHeaders={!resultsSort}
               onSelectColor={onResultsPick}
               emptyMessage=""
             />

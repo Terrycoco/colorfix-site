@@ -583,32 +583,7 @@ export default function AdminCtasPage() {
           </div>
         </div>
 
-        <div className="cta-panel cta-cheatsheet">
-          <div className="panel-header">
-            <div className="panel-title">CTA Params Cheat Sheet</div>
-          </div>
-          <div className="cta-cheatsheet-body">
-            <div className="cta-cheatsheet-row">
-              <div className="cta-cheatsheet-key">style</div>
-              <div className="cta-cheatsheet-value">button | link | primary | secondary | ghost</div>
-            </div>
-            <div className="cta-cheatsheet-row">
-              <div className="cta-cheatsheet-key">theme</div>
-              <div className="cta-cheatsheet-value">dark | light</div>
-            </div>
-            <div className="cta-cheatsheet-row">
-              <div className="cta-cheatsheet-key">align</div>
-              <div className="cta-cheatsheet-value">left | center | right</div>
-            </div>
-            <div className="cta-cheatsheet-row">
-              <div className="cta-cheatsheet-key">width</div>
-              <div className="cta-cheatsheet-value">auto | standard | full</div>
-            </div>
-            <div className="cta-cheatsheet-note">
-              Add these inside Params (JSON). Example: {"{ \"style\":\"link\", \"align\":\"center\" }"}
-            </div>
-          </div>
-        </div>
+  
       </div>
 
       <div className="cta-column">
@@ -722,6 +697,48 @@ export default function AdminCtasPage() {
             <button type="button" className="secondary-btn" onClick={() => setShowTypes(true)}>
               Manage Types
             </button>
+          </div>
+        </div>
+              <div className="cta-panel cta-cheatsheet">
+          <div className="panel-header">
+            <div className="panel-title">CTA Params Cheat Sheet</div>
+          </div>
+          <div className="cta-cheatsheet-body">
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">style</div>
+              <div className="cta-cheatsheet-value">button | link | primary | secondary | ghost</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">theme</div>
+              <div className="cta-cheatsheet-value">dark | light</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">align</div>
+              <div className="cta-cheatsheet-value">left | center | right</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">width</div>
+              <div className="cta-cheatsheet-value">auto | standard | full</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">require_psi</div>
+              <div className="cta-cheatsheet-value">true | false</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">require_thumb</div>
+              <div className="cta-cheatsheet-value">true | false</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">require_demo</div>
+              <div className="cta-cheatsheet-value">true | false</div>
+            </div>
+            <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">require_aud</div>
+              <div className="cta-cheatsheet-value">hoa | homeowner | contractor | admin</div>
+            </div>
+            <div className="cta-cheatsheet-note">
+              Add these inside Params (JSON). Example: {"{ \"style\":\"link\", \"align\":\"center\" }"}
+            </div>
           </div>
         </div>
       </div>

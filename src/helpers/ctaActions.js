@@ -35,7 +35,7 @@ function runCopyLink({ data, shareFolder }) {
   window.location.href = `sms:&body=${body}`;
 }
 
-function runNavigate({ navigate, cta }) {
+function runNavigate({ navigate, cta, psi, thumb, demo }) {
   let url = cta?.params?.url;
   if (!url) return;
   if (typeof url === "string") {
@@ -43,7 +43,10 @@ function runNavigate({ navigate, cta }) {
     const playlistId = cta?.data?.playlist_id;
     url = url
       .replaceAll("{playlist_instance_id}", playlistInstanceId ?? "")
-      .replaceAll("{playlist_id}", playlistId ?? "");
+      .replaceAll("{playlist_id}", playlistId ?? "")
+      .replaceAll("{psi}", psi ?? "")
+      .replaceAll("{thumb}", thumb ? "1" : "")
+      .replaceAll("{demo}", demo ? "1" : "");
   }
   const target = cta?.params?.target || "_blank";
   if (navigate && url.startsWith("/")) {
@@ -53,7 +56,16 @@ function runNavigate({ navigate, cta }) {
   window.open(url, target, "noopener");
 }
 
-function runSeeColorsUsed({ navigate, cta, data, ctaAudience }) {
+function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo }) {
+  if (!data?.playlist_instance_id) return;
+  if (thumb) {
+    runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo });
+    return;
+  }
+  runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo });
+}
+
+function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
   if (!data?.playlist_instance_id) return;
   const params = new URLSearchParams();
   if (cta?.params?.mode) params.set("mode", cta.params.mode);
@@ -62,6 +74,9 @@ function runSeeColorsUsed({ navigate, cta, data, ctaAudience }) {
   }
   const audience = cta?.params?.aud || cta?.params?.audience || ctaAudience;
   if (audience) params.set("aud", String(audience));
+  if (psi) params.set("psi", String(psi));
+  if (thumb) params.set("thumb", "1");
+  if (demo) params.set("demo", "1");
   const query = params.toString();
   const url = `/playlist-thumbs/${data.playlist_instance_id}${query ? `?${query}` : ""}`;
   if (navigate) {
@@ -82,26 +97,7 @@ function getPaletteItems(data) {
   });
 }
 
-function runToThumbs({ navigate, data, cta, ctaAudience }) {
-  if (!data?.playlist_instance_id) return;
-  const params = new URLSearchParams();
-  if (cta?.params?.mode) params.set("mode", cta.params.mode);
-  if (cta?.params?.add_cta_group !== undefined) {
-    params.set("add_cta_group", String(cta.params.add_cta_group));
-  }
-  const audience = cta?.params?.aud || cta?.params?.audience || ctaAudience;
-  if (audience) params.set("aud", String(audience));
-  const query = params.toString();
-  const url = `/playlist-thumbs/${data.playlist_instance_id}${query ? `?${query}` : ""}`;
-  if (navigate) {
-    navigate(url);
-    return;
-  }
-  const target = cta?.params?.target || "_self";
-  window.open(url, target, "noopener");
-}
-
-function runToPalette({ navigate, data, cta, ctaAudience }) {
+function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
   const palettes = getPaletteItems(data);
   if (!palettes.length) return;
   const apId = palettes[0].ap_id;
@@ -109,9 +105,14 @@ function runToPalette({ navigate, data, cta, ctaAudience }) {
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
     params.set("add_cta_group", String(cta.params.add_cta_group));
+  } else if (data?.palette_viewer_cta_group_id) {
+    params.set("add_cta_group", String(data.palette_viewer_cta_group_id));
   }
   const audience = cta?.params?.aud || cta?.params?.audience || ctaAudience;
   if (audience) params.set("aud", String(audience));
+  if (psi) params.set("psi", String(psi));
+  if (thumb) params.set("thumb", "1");
+  if (demo) params.set("demo", "1");
   const qs = params.toString();
   const url = `/view/${apId}${qs ? `?${qs}` : ""}`;
   if (navigate) {
@@ -131,6 +132,9 @@ export function buildCtaHandlers({
   handleExit,
   navigate,
   ctaAudience,
+  psi,
+  thumb,
+  demo,
 } = {}) {
   return {
     replay: () => {
@@ -156,10 +160,10 @@ export function buildCtaHandlers({
     share: () => runShare({ data, shareFolder }),
     copy_link: () => runCopyLink({ data, shareFolder }),
     share_playlist: () => runShare({ data, shareFolder }),
-    navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data } }),
-    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience }),
-    to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience }),
-    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience }),
+    navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data }, psi, thumb, demo }),
+    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo }),
+    to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo }),
+    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo }),
     exit: () => handleExit?.(),
   };
 }

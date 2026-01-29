@@ -50,16 +50,8 @@ final class PlayerExperienceService
         $ctas = [];
         $ctaRepo = null;
         if ($instance->ctaGroupId !== null) {
-            $context = strtolower(trim((string)($instance->ctaContextKey ?? '')));
-            $requestContext = strtolower(trim((string)($ctaContext ?? '')));
-            $shouldInclude = true;
-            if ($context !== '' && $context !== 'default') {
-                $shouldInclude = $requestContext !== '' && $requestContext === $context;
-            }
-            if ($shouldInclude) {
-                $ctaRepo = new PdoCtaRepository($this->pdo);
-                $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
-            }
+            $ctaRepo = new PdoCtaRepository($this->pdo);
+            $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
         }
         if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
             if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
@@ -75,6 +67,8 @@ final class PlayerExperienceService
             }
         }
 
+        $thumbsEnabled = $this->shouldUseThumbs($items);
+
         // 5. Return full playback plan
         $displayTitle = $instance->displayTitle ?? $instance->instanceName ?? $playlist->title;
         return [
@@ -88,6 +82,10 @@ final class PlayerExperienceService
             'items'                => $items,
             'ctas'                 => $ctas,
             'cta_context_key'      => $instance->ctaContextKey,
+            'audience'             => $instance->audience,
+            'palette_viewer_cta_group_id' => $instance->paletteViewerCtaGroupId,
+            'thumbs_enabled'       => $thumbsEnabled,
+            'demo_enabled'         => $instance->demoEnabled,
             'share_enabled'        => $instance->shareEnabled,
             'share_title'          => $instance->shareTitle,
             'share_description'    => $instance->shareDescription,
@@ -116,6 +114,22 @@ final class PlayerExperienceService
             return 0;
         }
         return $start;
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
+    private function shouldUseThumbs(array $items): bool
+    {
+        $count = 0;
+        foreach ($items as $item) {
+            $type = strtolower((string)($item->type ?? 'normal'));
+            if ($type !== 'palette') continue;
+            if (!empty($item->exclude_from_thumbs)) continue;
+            $count++;
+            if ($count > 1) return true;
+        }
+        return false;
     }
 
     /**

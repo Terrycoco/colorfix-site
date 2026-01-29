@@ -1,15 +1,15 @@
-import React from 'react';
+import IntroDefault from "./IntroDefault";
+import IntroText from "./IntroText";
 
 /**
  * Intro layout registry
  *
- * Maps layout keys to lazy-loaded renderer components.
+ * Maps layout keys to renderer components.
  * This file contains NO JSX.
  */
-
 const introLayoutRegistry = {
-  default: React.lazy(() => import('./IntroDefault')),
-  text: React.lazy(() => import('./IntroText')),
+  default: IntroDefault,
+  text: IntroText,
 };
 
 /**

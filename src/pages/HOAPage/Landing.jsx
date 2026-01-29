@@ -32,7 +32,7 @@ export default function HOALandingPage() {
         <div className="hoa-hero-ctas">
           <a
             className="cta-button cta-button--primary"
-            href="/playlist/6?aud=hoa"
+            href="/picker?psi=2&aud=hoa"
           >
             See What Homeowners See
           </a>

@@ -9,13 +9,16 @@ export default function PlaylistThumbsPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [title, setTitle] = useState("");
+  const [paletteViewerCtaGroupId, setPaletteViewerCtaGroupId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [likedSet, setLikedSet] = useState(new Set());
-  const modeParam = searchParams.get("mode") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const ctaAudience = searchParams.get("aud") ?? "";
   const startParam = searchParams.get("start") ?? "";
+  const psiParam = searchParams.get("psi") ?? "";
+  const thumbParam = searchParams.get("thumb") ?? "";
+  const demoParam = searchParams.get("demo") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
 
   useEffect(() => {
@@ -26,7 +29,6 @@ export default function PlaylistThumbsPage() {
     }
     const params = new URLSearchParams();
     params.set("playlist_instance_id", playlistId);
-    if (modeParam !== "") params.set("mode", modeParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     params.set("_", String(Date.now()));
     setLoading(true);
@@ -40,14 +42,15 @@ export default function PlaylistThumbsPage() {
         if (!payload?.ok || !payload?.data) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
-        setTitle(payload.data?.display_title || payload.data?.title || "Playlist Palettes");
+        setTitle(formatTitle(payload.data?.display_title || payload.data?.title || "Playlist Palettes"));
         setItems(payload.data?.items || []);
+        setPaletteViewerCtaGroupId(payload.data?.palette_viewer_cta_group_id ? String(payload.data.palette_viewer_cta_group_id) : "");
       })
       .catch((err) => {
         setError(err?.message || "Failed to load playlist");
       })
       .finally(() => setLoading(false));
-  }, [playlistId, modeParam, addCtaGroup]);
+  }, [playlistId, addCtaGroup]);
 
   useEffect(() => {
     if (!playlistId || typeof window === "undefined") {
@@ -82,7 +85,7 @@ export default function PlaylistThumbsPage() {
       seen.add(key);
       list.push({
         ap_id: apId,
-        title: item?.title || `Palette ${apId}`,
+        title: formatTitle(item?.title || `Palette ${apId}`),
         image_url: item?.image_url || "",
         is_liked: likedSet.has(String(apId)),
       });
@@ -100,9 +103,11 @@ export default function PlaylistThumbsPage() {
       return;
     }
     const params = new URLSearchParams();
-    if (modeParam !== "") params.set("mode", modeParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
+    if (psiParam !== "") params.set("psi", psiParam);
+    if (thumbParam !== "") params.set("thumb", thumbParam);
+    if (demoParam !== "") params.set("demo", demoParam);
     params.set("end", "1");
     const qs = params.toString();
     navigate(`/playlist/${playlistId}${qs ? `?${qs}` : ""}`);
@@ -136,7 +141,11 @@ export default function PlaylistThumbsPage() {
             {palettes.map((palette) => {
               const params = new URLSearchParams();
               if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
+              else if (paletteViewerCtaGroupId !== "") params.set("add_cta_group", paletteViewerCtaGroupId);
               if (ctaAudience !== "") params.set("aud", ctaAudience);
+              if (psiParam !== "") params.set("psi", psiParam);
+              if (thumbParam !== "") params.set("thumb", thumbParam);
+              if (demoParam !== "") params.set("demo", demoParam);
               const qs = params.toString();
               const href = `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
               return (
@@ -189,4 +198,8 @@ export default function PlaylistThumbsPage() {
       />
     </div>
   );
+}
+
+function formatTitle(value) {
+  return String(value || "").replace(/\s*--\s*/g, " — ").trim();
 }

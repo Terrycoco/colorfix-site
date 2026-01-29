@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Player from "@components/Player";
 import CTALayout from "@components/cta/CTALayout";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
@@ -11,9 +11,12 @@ export default function PlayerPage() {
   const { playlistId, start } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const modeParam = searchParams.get("mode") ?? "";
+  const location = useLocation();
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const ctaAudience = searchParams.get("aud") ?? "";
+  const psiParam = searchParams.get("psi") ?? "";
+  const thumbParam = searchParams.get("thumb") ?? "";
+  const demoParam = searchParams.get("demo") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
 
 
@@ -23,6 +26,31 @@ export default function PlayerPage() {
   const [likedCount, setLikedCount] = useState(0);
   const [playbackEnded, setPlaybackEnded] = useState(false);
   const playerRef = useRef(null);
+  const thumbsEnabled =
+    thumbParam === "1" || thumbParam.toLowerCase() === "true" || Boolean(data?.thumbs_enabled);
+  const demoEnabled =
+    demoParam === "1" || demoParam.toLowerCase() === "true" || Boolean(data?.demo_enabled);
+
+  useEffect(() => {
+    if (!data) return;
+    const params = new URLSearchParams(searchParams);
+    let changed = false;
+    if (data?.thumbs_enabled && !thumbParam) {
+      params.set("thumb", "1");
+      changed = true;
+    }
+    if (data?.demo_enabled && !demoParam) {
+      params.set("demo", "1");
+      changed = true;
+    }
+    if (data?.audience && !ctaAudience) {
+      params.set("aud", data.audience);
+      changed = true;
+    }
+    if (!changed) return;
+    const qs = params.toString();
+    navigate(`${location.pathname}${qs ? `?${qs}` : ""}`, { replace: true });
+  }, [data, demoParam, location.pathname, navigate, searchParams, thumbParam, ctaAudience]);
 
   useEffect(() => {
     if (!playlistId) {
@@ -34,7 +62,6 @@ export default function PlayerPage() {
     const params = new URLSearchParams();
     params.set("playlist_instance_id", playlistId);
     if (startParam !== "") params.set("start", startParam);
-    if (modeParam !== "") params.set("mode", modeParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     params.set("_", String(Date.now()));
@@ -55,7 +82,7 @@ export default function PlayerPage() {
         setError(err?.message || "Failed to load playlist");
       })
       .finally(() => setLoading(false));
-  }, [playlistId, start, searchParams, modeParam, addCtaGroup, ctaAudience]);
+  }, [playlistId, start, searchParams, addCtaGroup, ctaAudience]);
 
 
 
@@ -91,8 +118,22 @@ export default function PlayerPage() {
       handleExit,
       navigate,
       ctaAudience,
+      psi: psiParam,
+      thumb: thumbsEnabled,
+      demo: demoEnabled,
     })
-  ), [data, firstNonIntroIndex, handleExit, navigate, ctaAudience]);
+  ), [
+    data,
+    firstNonIntroIndex,
+    handleExit,
+    navigate,
+    ctaAudience,
+    psiParam,
+    thumbParam,
+    demoParam,
+    data?.thumbs_enabled,
+    data?.demo_enabled,
+  ]);
 
   const paletteItems = useMemo(() => {
     const items = data?.items || [];
@@ -166,14 +207,14 @@ const ctas = useMemo(() => {
       cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
       label: cta?.label ?? "",
       key,
-      enabled: cta?.enabled ?? true,
+      enabled: resolveEnabled(cta?.enabled, parsedParams, psiParam, thumbsEnabled, demoEnabled, ctaAudience),
       variant,
       display_mode: cta?.display_mode ?? parsedParams.display_mode,
       icon: cta?.icon ?? parsedParams.icon,
       params: parsedParams,
     };
   });
-}, [data?.ctas]);
+}, [data?.ctas, psiParam, thumbsEnabled, demoEnabled, ctaAudience]);
 
 function resolveVariant(raw, isBack = false) {
   if (!raw) return isBack ? "link" : undefined;
@@ -182,6 +223,27 @@ function resolveVariant(raw, isBack = false) {
   if (normalized === "button") return isBack ? "link" : undefined;
   if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
   return isBack ? "link" : undefined;
+}
+
+function isTruthyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value === null || value === undefined) return false;
+  const normalized = String(value).toLowerCase().trim();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, audParam) {
+  const enabled = baseEnabled ?? true;
+  if (!enabled) return false;
+  const requirePsi = Boolean(params?.require_psi || params?.requirePsi || params?.require_psi_id);
+  if (requirePsi && !psiParam) return false;
+  const requireThumb = Boolean(params?.require_thumb || params?.requireThumb);
+  if (requireThumb && !isTruthyFlag(thumbParam)) return false;
+  const requireDemo = Boolean(params?.require_demo || params?.requireDemo);
+  if (requireDemo && !isTruthyFlag(demoParam)) return false;
+  const requireAud = params?.require_aud || params?.requireAud;
+  if (requireAud && String(audParam || "").toLowerCase() !== String(requireAud).toLowerCase()) return false;
+  return true;
 }
 
 const visibleCTAs = useMemo(

@@ -178,6 +178,14 @@ class SavedPaletteController
         return $this->service->updateSavedPalette($paletteId, $data);
     }
 
+    public function deleteSavedPalette(int $paletteId): void
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
+        }
+        $this->service->deleteSavedPalette($paletteId);
+    }
+
     public function sendEmail(
         int $paletteId,
         string $toEmail,

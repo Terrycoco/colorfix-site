@@ -131,6 +131,11 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
             onClick={toggleFull}
           />
         )}
+        {loading && (
+          <div className="render-loading" role="status" aria-live="polite">
+            Rendering…
+          </div>
+        )}
       </div>
 
       {/* Fullscreen overlay */}

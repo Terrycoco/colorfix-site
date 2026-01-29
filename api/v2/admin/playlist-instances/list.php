@@ -61,7 +61,10 @@ $items = array_map(static function ($instance) {
         'display_title' => $instance->displayTitle,
         'instance_notes' => $instance->instanceNotes,
         'cta_group_id' => $instance->ctaGroupId,
+        'palette_viewer_cta_group_id' => $instance->paletteViewerCtaGroupId,
+        'demo_enabled' => $instance->demoEnabled ? 1 : 0,
         'cta_context_key' => $instance->ctaContextKey,
+        'audience' => $instance->audience,
         'cta_overrides' => $instance->ctaOverrides,
         'is_active' => $instance->isActive ? 1 : 0,
     ];

@@ -10,6 +10,14 @@ const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const CTA_GROUPS_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 const CTA_GROUP_ITEMS_URL = `${API_FOLDER}/v2/admin/cta-group-items/list.php`;
 
+const AUDIENCE_OPTIONS = [
+  { value: "any", label: "Any" },
+  { value: "hoa", label: "HOA" },
+  { value: "homeowner", label: "Homeowner" },
+  { value: "contractor", label: "Contractor" },
+  { value: "admin", label: "Admin" },
+];
+
 const emptyInstance = {
   playlist_instance_id: null,
   playlist_id: "",
@@ -22,6 +30,9 @@ const emptyInstance = {
   intro_body: "",
   intro_image_url: "",
   cta_group_id: "",
+  palette_viewer_cta_group_id: "",
+  demo_enabled: false,
+  audience: "any",
   cta_context_key: "default",
   cta_overrides: {},
   share_enabled: true,
@@ -177,9 +188,12 @@ export default function AdminPlaylistInstancesPage() {
       const next = {
         ...emptyInstance,
         ...data.item,
+        audience: data.item?.audience || "any",
+        cta_context_key: data.item?.cta_context_key || "default",
         share_enabled: coerceBoolean(data.item?.share_enabled),
         skip_intro_on_replay: coerceBoolean(data.item?.skip_intro_on_replay),
         hide_stars: coerceBoolean(data.item?.hide_stars),
+        demo_enabled: coerceBoolean(data.item?.demo_enabled),
         is_active: coerceBoolean(data.item?.is_active),
       };
       setForm(next);
@@ -255,6 +269,9 @@ export default function AdminPlaylistInstancesPage() {
         ...form,
         playlist_id: Number(form.playlist_id) || 0,
         cta_group_id: form.cta_group_id === "" ? null : Number(form.cta_group_id),
+        palette_viewer_cta_group_id:
+          form.palette_viewer_cta_group_id === "" ? null : Number(form.palette_viewer_cta_group_id),
+        demo_enabled: Boolean(form.demo_enabled),
         cta_overrides: ctaOverrides,
         created_from_instance: form.created_from_instance === "" ? null : Number(form.created_from_instance),
       };
@@ -279,9 +296,14 @@ export default function AdminPlaylistInstancesPage() {
   }
 
   const filteredItems = useMemo(() => {
-    if (!query.trim()) return items;
+    const sorted = [...(items || [])].sort((a, b) => {
+      const aLabel = String(a?.instance_name || a?.display_title || a?.playlist_instance_id || "").toLowerCase();
+      const bLabel = String(b?.instance_name || b?.display_title || b?.playlist_instance_id || "").toLowerCase();
+      return aLabel.localeCompare(bLabel);
+    });
+    if (!query.trim()) return sorted;
     const needle = query.trim().toLowerCase();
-    return (items || []).filter((item) => {
+    return sorted.filter((item) => {
       const name = (item?.instance_name || "").toLowerCase();
       const displayTitle = (item?.display_title || "").toLowerCase();
       const id = String(item?.playlist_instance_id || "");
@@ -300,8 +322,24 @@ export default function AdminPlaylistInstancesPage() {
     return ctaGroups.map((row) => ({
       id: row.id,
       label: `${row.label} (${row.key})`,
+      audience: (row.audience || "").toLowerCase(),
     }));
   }, [ctaGroups]);
+
+  function filterCtaGroupsByAudience(options, audience) {
+    const target = String(audience || "").toLowerCase();
+    if (!target || target === "any" || target === "all") return options;
+    return options.filter((opt) => {
+      if (!opt.audience) return true;
+      if (opt.audience === "any") return true;
+      return opt.audience === target;
+    });
+  }
+
+  const filteredCtaGroupOptions = useMemo(
+    () => filterCtaGroupsByAudience(ctaGroupOptions, form.audience),
+    [ctaGroupOptions, form.audience]
+  );
 
   const parsedGroupItems = useMemo(() => {
     return ctaGroupItems.map((item) => {
@@ -425,12 +463,9 @@ export default function AdminPlaylistInstancesPage() {
               onClick={() => setActiveId(item.playlist_instance_id)}
             >
               <div className="row-title">
-                {item.instance_name || "Untitled"}
+                #{item.playlist_instance_id} {item.instance_name || "Untitled"}
               </div>
-              <div className="row-meta">
-                #{item.playlist_instance_id} • Playlist {item.playlist_id}
-                {item.display_title ? ` • ${item.display_title}` : ""}
-              </div>
+          
             </button>
           ))}
         </div>
@@ -472,7 +507,11 @@ export default function AdminPlaylistInstancesPage() {
               type="button"
               onClick={() => {
                 if (!form.playlist_instance_id) return;
-                const url = `${window.location.origin}/playlist/${form.playlist_instance_id}`;
+                const params = new URLSearchParams();
+                if (form.audience && form.audience !== "any") params.set("aud", form.audience);
+                if (form.demo_enabled) params.set("demo", "1");
+                const qs = params.toString();
+                const url = `${window.location.origin}/playlist/${form.playlist_instance_id}${qs ? `?${qs}` : ""}`;
                 window.open(url, "_blank", "noopener");
               }}
               disabled={!form.playlist_instance_id}
@@ -484,8 +523,9 @@ export default function AdminPlaylistInstancesPage() {
               onClick={() => {
                 if (!form.playlist_instance_id) return;
                 const params = new URLSearchParams();
-                if (form.cta_context_key) params.set("mode", form.cta_context_key);
+                if (form.audience && form.audience !== "any") params.set("aud", form.audience);
                 if (form.cta_group_id) params.set("add_cta_group", form.cta_group_id);
+                if (form.demo_enabled) params.set("demo", "1");
                 const suffix = params.toString();
                 navigate(`/admin/player-preview/${form.playlist_instance_id || ""}${suffix ? `?${suffix}` : ""}`);
               }}
@@ -504,47 +544,7 @@ export default function AdminPlaylistInstancesPage() {
           </div>
         </div>
 
-        <div className="instance-section">
-          <div className="section-title">Share Metadata</div>
-          <div className="form-grid">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={form.share_enabled}
-                onChange={(e) => updateForm("share_enabled", e.target.checked)}
-              />
-              Share enabled
-            </label>
-
-            <label>
-              Share title
-              <input
-                type="text"
-                value={form.share_title || ""}
-                onChange={(e) => updateForm("share_title", e.target.value)}
-              />
-            </label>
-
-            <label>
-              Share description
-              <textarea
-                rows={2}
-                value={form.share_description || ""}
-                onChange={(e) => updateForm("share_description", e.target.value)}
-              />
-            </label>
-
-            <label>
-              Share image URL
-              <input
-                type="text"
-                value={form.share_image_url || ""}
-                onChange={(e) => updateForm("share_image_url", e.target.value)}
-              />
-            </label>
-          </div>
-        </div>
-
+    
         <div className="instance-section">
           <div className="section-title">Playlist</div>
           <div className="form-grid">
@@ -614,6 +614,15 @@ export default function AdminPlaylistInstancesPage() {
             <label className="checkbox-row">
               <input
                 type="checkbox"
+                checked={form.demo_enabled}
+                onChange={(e) => updateForm("demo_enabled", e.target.checked)}
+              />
+              Demo flow (adds demo=1)
+            </label>
+
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
                 checked={form.hide_stars}
                 onChange={(e) => updateForm("hide_stars", e.target.checked)}
               />
@@ -644,14 +653,31 @@ export default function AdminPlaylistInstancesPage() {
           <div className="section-title">CTA Settings</div>
           <div className="cta-controls">
             <label className="cta-group">
-              Player CTA Group -- Seen at EndScreen of Player -- all will get Default 
+              <span>Player CTA Group</span>
+              <span className="cta-label-note">All will get default</span>
               <select
                 className="cta-group-select"
                 value={form.cta_group_id}
                 onChange={(e) => updateForm("cta_group_id", e.target.value)}
               >
                 <option value="">None</option>
-                {ctaGroupOptions.map((opt) => (
+                {filteredCtaGroupOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="cta-group">
+              <span>Palette Viewer CTA Group</span>
+              <select
+                className="cta-group-select"
+                value={form.palette_viewer_cta_group_id}
+                onChange={(e) => updateForm("palette_viewer_cta_group_id", e.target.value)}
+              >
+                <option value="">None</option>
+                {filteredCtaGroupOptions.map((opt) => (
                   <option key={opt.id} value={opt.id}>
                     {opt.label}
                   </option>
@@ -660,12 +686,17 @@ export default function AdminPlaylistInstancesPage() {
             </label>
 
             <label className="cta-context">
-              CTA context key
-              <input
-                type="text"
-                value={form.cta_context_key || ""}
-                onChange={(e) => updateForm("cta_context_key", e.target.value)}
-              />
+              Audience
+              <select
+                value={form.audience || "any"}
+                onChange={(e) => updateForm("audience", e.target.value)}
+              >
+                {AUDIENCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -686,6 +717,48 @@ export default function AdminPlaylistInstancesPage() {
             ))}
           </div>
         </div>
+
+            <div className="instance-section">
+          <div className="section-title">Share Metadata</div>
+          <div className="form-grid">
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={form.share_enabled}
+                onChange={(e) => updateForm("share_enabled", e.target.checked)}
+              />
+              Share enabled
+            </label>
+
+            <label>
+              Share title
+              <input
+                type="text"
+                value={form.share_title || ""}
+                onChange={(e) => updateForm("share_title", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Share description
+              <textarea
+                rows={2}
+                value={form.share_description || ""}
+                onChange={(e) => updateForm("share_description", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Share image URL
+              <input
+                type="text"
+                value={form.share_image_url || ""}
+                onChange={(e) => updateForm("share_image_url", e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
 
         {saveStatus && <div className="panel-status success">{saveStatus}</div>}
         {saveError && <div className="panel-status error">{saveError}</div>}

@@ -112,12 +112,16 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  overflow: hidden;
+  text-align: left;
 }
 
 .asp-card-header {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .asp-card-title {
@@ -148,6 +152,7 @@
   gap: 0.6rem;
   color: #475569;
   font-size: 0.85rem;
+  word-break: break-word;
 }
 
 .asp-card-times {
@@ -156,7 +161,9 @@
   gap: 0.2rem;
   font-size: 0.8rem;
   color: #94a3b8;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: left;
+  margin-left: 0;
 }
 
 .asp-notes {
@@ -206,9 +213,10 @@
 }
 
 .asp-card-footer {
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 0.5rem;
+  align-items: stretch;
 }
 
 .asp-card-footer button {
@@ -216,6 +224,12 @@
   padding: 0.45rem 0.8rem;
   cursor: pointer;
   border: none;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.asp-card-footer .full-width {
+  grid-column: 1 / -1;
 }
 
 .asp-card-footer button:disabled {
@@ -239,6 +253,16 @@
 .asp-modal-actions button:not(.ghost) {
   background: #0f172a;
   color: #fff;
+}
+
+.asp-card-footer .danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.asp-card-footer .danger:hover:not(:disabled) {
+  background: #fecaca;
 }
 
 .asp-card-footer button:not(.ghost):hover:not(:disabled),

@@ -774,11 +774,22 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         if (!$recipe) {
             return $entry;
         }
-        $entry['blend_mode'] = $recipe['blend_mode'] ?? null;
-        $entry['blend_opacity'] = $recipe['blend_opacity'] ?? null;
-        $entry['lightness_offset'] = $recipe['shadow_l_offset'] ?? null;
-        $entry['tint_hex'] = $recipe['shadow_tint_hex'] ?? null;
-        $entry['tint_opacity'] = $recipe['shadow_tint_opacity'] ?? null;
+        $force = !empty($entry['mask_setting_id']);
+        if ($force || !isset($entry['blend_mode']) || $entry['blend_mode'] === '') {
+            $entry['blend_mode'] = $recipe['blend_mode'] ?? null;
+        }
+        if ($force || !array_key_exists('blend_opacity', $entry) || $entry['blend_opacity'] === null) {
+            $entry['blend_opacity'] = $recipe['blend_opacity'] ?? null;
+        }
+        if ($force || !array_key_exists('lightness_offset', $entry) || $entry['lightness_offset'] === null) {
+            $entry['lightness_offset'] = $recipe['shadow_l_offset'] ?? null;
+        }
+        if ($force || !isset($entry['tint_hex']) || $entry['tint_hex'] === '') {
+            $entry['tint_hex'] = $recipe['shadow_tint_hex'] ?? null;
+        }
+        if ($force || !array_key_exists('tint_opacity', $entry) || $entry['tint_opacity'] === null) {
+            $entry['tint_opacity'] = $recipe['shadow_tint_opacity'] ?? null;
+        }
         return $entry;
     }
 

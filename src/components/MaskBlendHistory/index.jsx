@@ -5,6 +5,7 @@ import { API_FOLDER } from "@helpers/config";
 import { bucketForLightness, getPresetForBuckets, overlayPresetConfig } from "@config/overlayPresets";
 import { resolveBlendOpacity, resolveTargetBucket } from "@helpers/maskRenderUtils";
 import MaskSettingsTable from "@components/MaskSettingsTable";
+import MaskOverlayModal from "@components/MaskOverlayModal";
 import "./maskblendhistory.css";
 
 function normalizeHex(hex) {
@@ -64,6 +65,27 @@ const toPercent = (value) => {
   return Number((num * 100).toFixed(1));
 };
 
+const getRowKey = (row) => {
+  if (!row) return "";
+  const raw =
+    row.id ??
+    row.mask_blend_id ??
+    row._local_id ??
+    (row.mask_role ? `${row.mask_role}:${row.color_id ?? row.color_code ?? ""}` : null);
+  if (raw == null) return "";
+  return String(raw);
+};
+
+const assignLocalId = (row, fallback) => {
+  if (!row) return row;
+  if (row._local_id) return row;
+  const key = getRowKey(row) || (fallback != null ? String(fallback) : "");
+  return {
+    ...row,
+    _local_id: key || `row-${Date.now()}`,
+  };
+};
+
 function enrichRow(row) {
   const percent = toPercent(row.blend_opacity ?? 0);
   const shadow = normalizeShadowDraft({
@@ -120,6 +142,7 @@ export default function MaskBlendHistory({
   baseLightness,
   selectorVersion = 0,
   onApplyBlend,
+  onOverrideColor,
   onRowsChange = null,
   onSelectRow = null,
   activeRowId = null,
@@ -148,6 +171,9 @@ export default function MaskBlendHistory({
     sortField === field ? (sortDir === "asc" ? "↑" : "↓") : "";
   const [shadowEditorRow, setShadowEditorRow] = useState(null);
   const [savingAll, setSavingAll] = useState(false);
+  const [colorPickerRow, setColorPickerRow] = useState(null);
+  const [colorPickerValue, setColorPickerValue] = useState(null);
+  const [forcedRowKeys, setForcedRowKeys] = useState(() => new Set());
   const newModeLower = (newMode || "").toLowerCase();
   const isNewOriginal = newModeLower === ORIGINAL_MODE;
 
@@ -173,6 +199,15 @@ export default function MaskBlendHistory({
     });
   }, [rows, maskRole, baseLightness]);
 
+  const filterKey = useMemo(() => {
+    if (Array.isArray(filterColorIds)) {
+      const normalized = filterColorIds.map((id) => Number(id)).filter(Boolean).sort((a, b) => a - b);
+      return `ids:${normalized.join(",")}`;
+    }
+    if (filterColorId != null && filterColorId !== "") return `id:${filterColorId}`;
+    return "none";
+  }, [filterColorId, filterColorIds]);
+
   function resetNewRow() {
     setNewColor(null);
     setNewMode("flatpaint");
@@ -192,6 +227,7 @@ export default function MaskBlendHistory({
     setNewMode("flatpaint");
     setNewOpacity("100");
     setShadowEditorRow(null);
+    setForcedRowKeys(new Set());
   }, [assetId, maskRole]);
 
   useEffect(() => {
@@ -215,7 +251,9 @@ export default function MaskBlendHistory({
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Load failed");
       }
-      const nextRows = (data.settings || []).map((row) => enrichRow(row));
+      const nextRows = (data.settings || []).map((row, index) =>
+        assignLocalId(enrichRow(row), `${maskRole || "mask"}-${index}`)
+      );
       const sorted = sortByTargetLightness
         ? sortRowsByTargetLightness(nextRows)
         : (sortByColor ? sortRowsByColorName(nextRows) : nextRows);
@@ -303,6 +341,10 @@ function updateRowShadowDraft(id, field, value) {
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
+
+  useEffect(() => {
+    setForcedRowKeys(new Set());
+  }, [filterKey]);
 
   useEffect(() => {
     if (!onRowsChange) return;
@@ -491,6 +533,74 @@ function updateRowShadowDraft(id, field, value) {
     }
   }
 
+  function openColorPicker(row) {
+    if (!row) return;
+    setColorPickerRow(row);
+    setColorPickerValue({
+      id: row.color_id ?? row.id ?? null,
+      color_id: row.color_id ?? row.id ?? null,
+      name: row.color_name || row.color_code || "",
+      code: row.color_code || "",
+      brand: row.color_brand || "",
+      hex6: row.color_hex || "",
+      lightness: row.target_lightness ?? row.color_l ?? null,
+      hcl_l: row.target_lightness ?? row.color_l ?? null,
+      hcl_h: row.target_h ?? null,
+      hcl_c: row.target_c ?? null,
+    });
+  }
+
+  function applyPickedColor(color) {
+    if (!colorPickerRow || !color) return;
+    const nextColorId = color.id ?? color.color_id ?? null;
+    if (!nextColorId) return;
+    const nextHex = (color.hex6 || color.hex || "").replace("#", "").toUpperCase();
+    const nextLightness = lightnessFromColor(color);
+    const targetRowId = colorPickerRow.id ?? null;
+    setRows((prev) =>
+      {
+        const nextRows = prev.map((row) => {
+          if (getRowKey(row) !== getRowKey(colorPickerRow)) return row;
+          return {
+            ...row,
+            color_id: nextColorId,
+            color_name: color.name || color.code || row.color_name || "",
+            color_brand: color.brand || row.color_brand || "",
+            color_code: color.code || row.color_code || "",
+            color_hex: nextHex || row.color_hex,
+            target_lightness: nextLightness ?? row.target_lightness,
+            target_h: color.hcl_h ?? color.h ?? row.target_h ?? null,
+            target_c: color.hcl_c ?? color.c ?? row.target_c ?? null,
+          };
+        });
+        rowsRef.current = nextRows;
+        return nextRows;
+      }
+    );
+    setForcedRowKeys((prev) => {
+      const next = new Set(prev);
+      const key = getRowKey(colorPickerRow);
+      if (key) next.add(key);
+      return next;
+    });
+    if (targetRowId) {
+      setSavingRow(targetRowId);
+      setError("");
+      persistRowById(targetRowId)
+        .catch((err) => {
+          setError(err?.message || "Failed to save row");
+        })
+        .finally(() => {
+          setSavingRow(null);
+        });
+    }
+    if (onOverrideColor) {
+      Promise.resolve(onOverrideColor(color, colorPickerRow)).catch(() => {});
+    }
+    setColorPickerRow(null);
+    setColorPickerValue(null);
+  }
+
   const newColorLightness = useMemo(() => lightnessFromColor(newColor), [newColor]);
   const newTargetBucket = useMemo(() => {
     if (newColorLightness == null) return null;
@@ -652,17 +762,18 @@ function updateRowShadowDraft(id, field, value) {
   }, [rows, sortField, sortDir, forceSortByBaseLightness, sortByColor, baseLightness]);
 
   const visibleRows = useMemo(() => {
+    const isForced = (row) => forcedRowKeys.has(getRowKey(row));
     if (Array.isArray(filterColorIds) && filterColorIds.length) {
       const allowed = new Set(filterColorIds.map((id) => Number(id)));
-      return sortedRows.filter((row) => allowed.has(Number(row.color_id)));
+      return sortedRows.filter((row) => allowed.has(Number(row.color_id)) || isForced(row));
     }
     if (Array.isArray(filterColorIds) && filterColorIds.length === 0) {
-      return [];
+      return sortedRows.filter((row) => isForced(row));
     }
     if (!filterColorId) return sortedRows;
     const idNum = Number(filterColorId);
-    return sortedRows.filter((row) => Number(row.color_id) === idNum);
-  }, [sortedRows, filterColorId, filterColorIds]);
+    return sortedRows.filter((row) => Number(row.color_id) === idNum || isForced(row));
+  }, [sortedRows, filterColorId, filterColorIds, forcedRowKeys]);
   const sortedVisibleRows = useMemo(() => {
     if (!sortByColor) return visibleRows;
     return sortRowsByColorName(visibleRows);
@@ -702,6 +813,7 @@ function updateRowShadowDraft(id, field, value) {
         onSelectRow={onSelectRow}
         activeRowId={activeRowId}
         activeColorId={activeColorId}
+        onPickColor={openColorPicker}
         onChangeMode={(row, value) => updateRowDraft(row.id, "draft_mode", value)}
         onChangePercent={(row, value) => updateRowDraft(row.id, "draft_percent", value)}
         onChangeOffset={(row, value) => updateRowShadowDraft(row.id, "l_offset", value)}
@@ -839,6 +951,41 @@ function updateRowShadowDraft(id, field, value) {
       {!loading && !rows.length && (
         <div className="mbh-empty">No tests yet. Add a color above to get started.</div>
       )}
+
+      {colorPickerRow && (
+        <MaskOverlayModal
+          title="Override color"
+          subtitle={colorPickerRow.color_name || colorPickerRow.color_code || "Select color"}
+          onClose={() => {
+            setColorPickerRow(null);
+            setColorPickerValue(null);
+          }}
+        >
+          <div style={{ minWidth: 320 }}>
+            <FuzzySearchColorSelect
+              value={colorPickerValue}
+              onSelect={applyPickedColor}
+              onEmpty={() => setColorPickerValue(null)}
+              label="Search color"
+              autoFocus
+              manualOpen={false}
+              suppressFocus={false}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setColorPickerRow(null);
+                  setColorPickerValue(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </MaskOverlayModal>
+      )}
     </div>
   );
 }
@@ -848,6 +995,7 @@ MaskBlendHistory.propTypes = {
   maskRole: PropTypes.string.isRequired,
   baseLightness: PropTypes.number,
   onApplyBlend: PropTypes.func,
+  onOverrideColor: PropTypes.func,
   onRowsChange: PropTypes.func,
   rowTitle: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
   hideHeader: PropTypes.bool,
@@ -865,6 +1013,7 @@ MaskBlendHistory.defaultProps = {
   assetId: "",
   baseLightness: null,
   onApplyBlend: null,
+  onOverrideColor: null,
   onRowsChange: null,
   rowTitle: null,
   hideHeader: false,

@@ -23,6 +23,9 @@ export default function AppliedPaletteViewPage() {
   const isAdminView = (searchParams.get("admin") || "").toString() === "1";
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
+  const psiParam = searchParams.get("psi") ?? "";
+  const thumbParam = searchParams.get("thumb") ?? "";
+  const demoParam = searchParams.get("demo") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
 
   useEffect(() => {
@@ -122,14 +125,21 @@ export default function AppliedPaletteViewPage() {
         cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
         label,
         key,
-        enabled: cta?.is_active ?? true,
+        enabled: resolveEnabled(
+          cta?.is_active ?? true,
+          parsedParams,
+          psiParam,
+          thumbParam,
+          demoParam,
+          ctaAudience
+        ),
         variant,
         display_mode: parsedParams.display_mode,
         icon: parsedParams.icon,
         params: parsedParams,
       };
     });
-  }, [ctaItems]);
+  }, [ctaItems, psiParam, thumbParam, demoParam, ctaAudience]);
 
   const ctaHandlers = useMemo(
     () =>
@@ -137,8 +147,11 @@ export default function AppliedPaletteViewPage() {
         data: {},
         navigate,
         ctaAudience,
+        psi: psiParam,
+        thumb: thumbParam === "1" || thumbParam.toLowerCase() === "true",
+        demo: demoParam === "1" || demoParam.toLowerCase() === "true",
       }),
-    [navigate, ctaAudience]
+    [navigate, ctaAudience, psiParam, thumbParam, demoParam]
   );
 
   const handleCtaClick = (cta) => {
@@ -256,6 +269,26 @@ export default function AppliedPaletteViewPage() {
       )}
     </>
   );
+}
+
+function isTruthyFlag(value) {
+  if (value === true) return true;
+  if (value === false || value === null || value === undefined) return false;
+  const normalized = String(value).toLowerCase().trim();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, audParam) {
+  if (!baseEnabled) return false;
+  const requirePsi = Boolean(params?.require_psi || params?.requirePsi || params?.require_psi_id);
+  if (requirePsi && !psiParam) return false;
+  const requireThumb = Boolean(params?.require_thumb || params?.requireThumb);
+  if (requireThumb && !isTruthyFlag(thumbParam)) return false;
+  const requireDemo = Boolean(params?.require_demo || params?.requireDemo);
+  if (requireDemo && !isTruthyFlag(demoParam)) return false;
+  const requireAud = params?.require_aud || params?.requireAud;
+  if (requireAud && String(audParam || "").toLowerCase() !== String(requireAud).toLowerCase()) return false;
+  return true;
 }
 
 function resolveVariant(raw, isBack = false) {

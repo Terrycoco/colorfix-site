@@ -17,12 +17,20 @@ export const adminMenuItems = [
     ],
   },
   {
+    label: "CTAs",
+    items: [
+           { label: "CTA Groups", href: "/admin/ctas" },
+    ],
+  },
+
+  {
     label: "Player",
     items: [
+     { label: "All Playlists", href: "/picker?psi=1" },
       { label: "Upload Photos", href: "/admin/upload-photo" },
       { label: "Playlist Instances", href: "/admin/playlist-instances" },
+      { label: "PI Sets", href: "/admin/playlist-instance-sets" },
       { label: "Playlists", href: "/admin/playlists" },
-      { label: "CTAs", href: "/admin/ctas" },
       { label: "Presenter", href: "/admin/player-presenter" },
       { label: "Player Preview", href: "/admin/player-preview/1" },
     ],

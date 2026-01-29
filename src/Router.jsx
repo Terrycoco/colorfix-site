@@ -45,6 +45,7 @@ const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPale
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresenterPage'));
 const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
+const AdminPlaylistInstanceSetsPage = lazy(() => import('@pages/AdminPlaylistInstanceSetsPage'));
 const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
 const AdminHOAPage = lazy(() => import('@pages/AdminHOAPage'));
 const AdminHoaSchemeTesterPage = lazy(() => import('@pages/AdminHoaSchemeTesterPage'));
@@ -57,6 +58,8 @@ const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const StandAloneLayout = lazy(() => import('@layout/StandAloneLayout'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
+const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
+const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
 
 
 function AppRouter() {
@@ -83,6 +86,10 @@ function AppRouter() {
           path="view/:paletteId"
           element={renderWithSuspense(AppliedPaletteViewPage, 'Loading palette…')}
         />
+        <Route
+          path="palette/:hash/share"
+          element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
+        />
         <Route element={renderWithSuspense(StandAloneLayout, 'Loading player…')}>
           <Route
             path="playlist/:playlistId"
@@ -95,6 +102,10 @@ function AppRouter() {
           <Route
             path="playlist-thumbs/:playlistId"
             element={renderWithSuspense(PlaylistThumbsPage, 'Loading palettes…')}
+          />
+          <Route
+            path="picker"
+            element={renderWithSuspense(PlaylistPickerPage, 'Loading picker…')}
           />
         </Route>
 
@@ -224,6 +235,10 @@ function AppRouter() {
             <Route
               path="playlist-instances"
               element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances…')}
+            />
+            <Route
+              path="playlist-instance-sets"
+              element={renderWithSuspense(AdminPlaylistInstanceSetsPage, 'Loading playlist instance sets…')}
             />
             <Route
               path="ctas"

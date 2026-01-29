@@ -1,4 +1,4 @@
-import { forwardRef, Suspense, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import "./player.css";
 
@@ -401,7 +401,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               }}
             />
           )}
-          {playbackState === "playing" && !isIntro && isStarrable && (
+          {playbackState === "playing" && !isIntro && isStarrable && imageLoaded && (
             <div
               className={`player-like ${isLiked ? "is-liked" : ""}`}
               role="button"
@@ -453,9 +453,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               }
               ref={titleRef}
             >
-              <Suspense fallback={null}>
-                <IntroRenderer item={currentItem} />
-              </Suspense>
+              <IntroRenderer item={currentItem} />
             </div>
           )}
 
@@ -473,9 +471,13 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
         </div>
-        {showAdvanceHint && playbackState === "playing" && activeIndex === 0 && (
-          <div className="player-advance-hint">Tap screen to advance</div>
-        )}
+        {showAdvanceHint &&
+          playbackState === "playing" &&
+          activeIndex === 0 &&
+          !isIntro &&
+          (imageLoaded || introNoImage) && (
+            <div className="player-advance-hint">Tap screen to advance</div>
+          )}
       </div>
     </div>
   );

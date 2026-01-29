@@ -223,6 +223,10 @@ export default function AdminHoaSchemeTesterPage() {
 
   async function saveMapping(targetSchemeId) {
     if (!hoaId || !assetId || !targetSchemeId) return;
+    if (schemes.length > 1) {
+      await saveAllMappings();
+      return;
+    }
     const map = mappingByScheme[targetSchemeId] || {};
     setSaving(true);
     setError("");
@@ -334,10 +338,18 @@ export default function AdminHoaSchemeTesterPage() {
       } else {
         map[maskRole] = value;
       }
-      next[schemeId] = map;
+      schemes.forEach((scheme) => {
+        next[scheme.id] = { ...map };
+      });
       return next;
     });
-    setDirtyByScheme((prev) => ({ ...prev, [schemeId]: true }));
+    setDirtyByScheme((prev) => {
+      const next = { ...prev };
+      schemes.forEach((scheme) => {
+        next[scheme.id] = true;
+      });
+      return next;
+    });
   }
 
   function applyToAllSchemes(baseMap) {

@@ -145,6 +145,34 @@ class PdoSavedPaletteRepository
         return $row !== false ? $row : null;
     }
 
+    public function getSavedPaletteByHash(string $hash): ?array
+    {
+        $sql = "SELECT * FROM saved_palettes WHERE palette_hash = :hash LIMIT 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':hash' => $hash,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
+
+    public function getFullPaletteByHash(string $hash): ?array
+    {
+        $palette = $this->getSavedPaletteByHash($hash);
+        if ($palette === null) {
+            return null;
+        }
+
+        $members = $this->getMembersForPalette((int)$palette['id']);
+
+        return [
+            'palette' => $palette,
+            'members' => $members,
+        ];
+    }
+
     /**
      * Delete a saved palette and cascade members + views.
      */
@@ -153,6 +181,16 @@ class PdoSavedPaletteRepository
         $sql = "DELETE FROM saved_palettes WHERE id = :id";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':id' => $id]);
+    }
+
+    /**
+     * Remove all views for a palette.
+     */
+    public function deleteViewsForPalette(int $savedPaletteId): void
+    {
+        $sql = "DELETE FROM saved_palette_views WHERE saved_palette_id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $savedPaletteId]);
     }
 
     /**

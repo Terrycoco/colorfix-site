@@ -9,10 +9,6 @@ export default function IntroText({ item }) {
      <div className="intro-text__content">
   <h1 className="intro-text__title">{title}</h1>
   <p className="intro-text__subtitle">{subtitle}</p>
-
-  <div className="intro-text__hint">
-    Tap anywhere to begin
-  </div>
 </div>
     </div>
   );
