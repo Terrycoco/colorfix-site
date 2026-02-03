@@ -22,31 +22,13 @@ class EmailTemplateService
 
         $logoUrl = 'https://colorfix.terrymarr.com/logo.png';
 
-        $membersHtml = '';
-        foreach ($members as $member) {
-            $hex = strtoupper((string)($member['color_hex6'] ?? 'CCCCCC'));
-            if ($hex === '') { $hex = 'CCCCCC'; }
-            $hex = ltrim($hex, '#');
-            $name = htmlspecialchars((string)($member['color_name'] ?? 'Color'), ENT_QUOTES, 'UTF-8');
-            $code = htmlspecialchars((string)($member['color_code'] ?? ''), ENT_QUOTES, 'UTF-8');
-            $membersHtml .= sprintf(
-                '<tr><td width="48" height="48" style="background:#%1$s;border-radius:8px;"></td><td style="padding-left:12px;"><div style="font-size:15px;color:#0f172a;font-weight:600;line-height:1.2;">%2$s</div><div style="font-size:13px;color:#475569;">%3$s</div></td></tr><tr><td colspan="2" style="height:12px;"></td></tr>',
-                $hex,
-                $name,
-                $code
-            );
-        }
-
         $clientGreeting = $clientName !== ''
             ? sprintf('<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Hi %s —</p>', htmlspecialchars($clientName, ENT_QUOTES, 'UTF-8'))
-            : '<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Hi there —</p>';
+            : '<p style="margin:0 0 16px;font-size:15px;color:#0f172a;">Hi —</p>';
 
         $messageText = trim((string)$customMessage);
         if ($messageText === '') {
-            $messageText = sprintf(
-                "Here’s the palette we worked on for your project.\n\nLet me know what you think!",
-                $nickname
-            );
+            $messageText = "I wanted to share this color palette with you.\n\nThe link shows the colors together so you can get a feel for the overall look.\n\nWhat do you think?";
         }
         $escapedMessage = htmlspecialchars($messageText, ENT_QUOTES, 'UTF-8');
         $escapedMessage = str_replace('  ', '&nbsp;&nbsp;', $escapedMessage);
@@ -71,11 +53,8 @@ class EmailTemplateService
               $clientGreeting
               $messageHtml
               $renderBlock
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                $membersHtml
-              </table>
               <p style="margin:24px 0;text-align:center;">
-                <a href="$link" style="display:inline-block;background:#ef6d00;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:15px;font-weight:600;">View Palette</a>
+                <a href="$link" style="display:inline-block;background:#ef6d00;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:15px;font-weight:600;">View on ColorFix</a>
               </p>
               <p style="margin:0;font-size:13px;color:#475569;">If the button doesn’t work, copy/paste this link:<br><span style="color:#2563eb;">$link</span></p>
             </td>
@@ -95,7 +74,7 @@ class EmailTemplateService
 </html>
 HTML;
 
-        $text = $messageText . "\n\nView your palette here: $link";
+        $text = "Hi —\n\n" . $messageText . "\n\nView on ColorFix: $link";
 
         return [$subject, $html, $text];
     }

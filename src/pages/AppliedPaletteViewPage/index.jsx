@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import AppliedPaletteViewer from "@components/AppliedPaletteViewer";
+import PaletteViewer from "@components/PaletteViewer";
 import CTASection from "@components/CTASection";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 
-const API_URL = "/api/v2/applied-palettes/render.php";
+const API_URL = "/api/v2/palette-viewer.php";
 const CTA_GROUP_BY_AUDIENCE_URL = "/api/v2/cta-groups/by-audience.php";
 const CTA_GROUP_ITEMS_URL = "/api/v2/cta-group-items/list.php";
 
@@ -32,16 +32,11 @@ export default function AppliedPaletteViewPage() {
     if (!paletteNumericId) return;
     setState({ loading: true, error: "", data: null });
     const controller = new AbortController();
-    fetch(`${API_URL}?id=${paletteNumericId}`, { signal: controller.signal })
+    fetch(`${API_URL}?source=applied&id=${paletteNumericId}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((res) => {
-        if (!res?.ok) throw new Error(res?.error || "Failed to load palette");
-        const renderNonce = Date.now();
-        const next = {
-          ...res,
-          render: res.render ? { ...res.render, cache_bust: renderNonce } : res.render,
-        };
-        setState({ loading: false, error: "", data: next });
+        if (!res?.ok || !res?.data) throw new Error(res?.error || "Failed to load palette");
+        setState({ loading: false, error: "", data: res.data });
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
@@ -164,9 +159,8 @@ export default function AppliedPaletteViewPage() {
     ctaHandlers[key]?.(cta);
   };
 
-  const palette = state.data?.palette || null;
-  const render = state.data?.render || null;
-  const entries = state.data?.entries || [];
+  const meta = state.data?.meta || null;
+  const swatches = state.data?.swatches || [];
 
   const pageCtas = ctas;
 
@@ -183,7 +177,7 @@ export default function AppliedPaletteViewPage() {
     }
   }, [isAdminView]);
 
-  const shareTitle = palette?.display_title || palette?.title || "ColorFix Palette";
+  const shareTitle = meta?.title || "ColorFix Palette";
   const shareMessage = `Check out ${shareTitle} from ColorFix: ${shareUrl}`;
   const smsLink = `sms:&body=${encodeURIComponent(shareMessage)}`;
   const emailLink = `mailto:?subject=${encodeURIComponent("Your ColorFix Palette")}&body=${encodeURIComponent(shareMessage)}`;
@@ -225,13 +219,14 @@ export default function AppliedPaletteViewPage() {
 
   return (
     <>
-      <AppliedPaletteViewer
-        palette={palette}
-        renderInfo={render}
-        entries={entries}
+      <PaletteViewer
+        meta={meta}
+        swatches={swatches}
         adminMode={isAdminView}
         onBack={isAdminView ? handleBack : undefined}
         showBackButton={isAdminView}
+        showLogo={!isAdminView}
+        showShare={true}
         footer={
           <CTASection
             className="cta-section--transparent cta-section--on-dark cta-section--back-left cta-section--desktop-row-split"

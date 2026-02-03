@@ -24,16 +24,14 @@ class PdoSavedPaletteRepository
      *  - nickname     (string|null)
      *  - notes        (string|null)
      *  - terry_fav    (bool|int|null)
-     *  - sent_to_email(string|null)
-     *  - sent_at      (string|null, 'Y-m-d H:i:s')
      */
     public function createSavedPalette(array $data): int
     {
         $sql = "
             INSERT INTO saved_palettes
-                (palette_hash, brand, client_id, nickname, notes, terry_fav, sent_to_email, sent_at, created_at)
+                (palette_hash, brand, nickname, notes, terry_fav, created_at)
             VALUES
-                (:palette_hash, :brand, :client_id, :nickname, :notes, :terry_fav, :sent_to_email, :sent_at, NOW())
+                (:palette_hash, :brand, :nickname, :notes, :terry_fav, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -41,12 +39,9 @@ class PdoSavedPaletteRepository
         $stmt->execute([
             ':palette_hash'  => $data['palette_hash'] ?? null,
             ':brand'         => $data['brand'],
-            ':client_id'     => $data['client_id'] ?? null,
             ':nickname'      => $data['nickname'] ?? null,
             ':notes'         => $data['notes'] ?? null,
             ':terry_fav'     => isset($data['terry_fav']) ? (int) (bool) $data['terry_fav'] : 0,
-            ':sent_to_email' => $data['sent_to_email'] ?? null,
-            ':sent_at'       => $data['sent_at'] ?? null,
         ]);
 
         return (int) $this->pdo->lastInsertId();
@@ -67,12 +62,9 @@ class PdoSavedPaletteRepository
         $allowed = [
             'palette_hash',
             'brand',
-            'client_id',
             'nickname',
             'notes',
             'terry_fav',
-            'sent_to_email',
-            'sent_at',
         ];
 
         $setParts = [];
@@ -166,10 +158,17 @@ class PdoSavedPaletteRepository
         }
 
         $members = $this->getMembersForPalette((int)$palette['id']);
+        $photos = [];
+        try {
+            $photos = $this->getPhotosForPalette((int)$palette['id']);
+        } catch (\Throwable $e) {
+            $photos = [];
+        }
 
         return [
             'palette' => $palette,
             'members' => $members,
+            'photos'  => $photos,
         ];
     }
 
@@ -194,6 +193,149 @@ class PdoSavedPaletteRepository
     }
 
     /**
+     * Remove all photos for a palette.
+     */
+    public function deletePhotosForPalette(int $savedPaletteId): void
+    {
+        $sql = "DELETE FROM saved_palette_photos WHERE saved_palette_id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $savedPaletteId]);
+    }
+
+    /**
+     * Fetch photos for a palette.
+     */
+    public function getPhotosForPalette(int $savedPaletteId): array
+    {
+        $sql = "
+            SELECT id,
+                   saved_palette_id,
+                   rel_path,
+                   photo_type,
+                   trigger_color_id,
+                   caption,
+                   order_index,
+                   created_at
+              FROM saved_palette_photos
+             WHERE saved_palette_id = :id
+          ORDER BY order_index ASC, id ASC
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $savedPaletteId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Fetch a single photo row.
+     */
+    public function getPhotoById(int $photoId): ?array
+    {
+        $sql = "SELECT * FROM saved_palette_photos WHERE id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $photoId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
+
+    /**
+     * Get the highest order_index for a palette's photos.
+     */
+    public function getMaxPhotoOrder(int $savedPaletteId): int
+    {
+        $sql = "SELECT MAX(order_index) AS max_order FROM saved_palette_photos WHERE saved_palette_id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $savedPaletteId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return (int)($row['max_order'] ?? 0);
+    }
+
+    /**
+     * Add a photo row for a palette.
+     */
+    public function addPhoto(int $savedPaletteId, string $relPath, ?string $caption, int $orderIndex): int
+    {
+        $sql = "
+            INSERT INTO saved_palette_photos
+                (saved_palette_id, rel_path, photo_type, trigger_color_id, caption, order_index, created_at)
+            VALUES
+                (:saved_palette_id, :rel_path, :photo_type, :trigger_color_id, :caption, :order_index, NOW())
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':saved_palette_id' => $savedPaletteId,
+            ':rel_path'         => $relPath,
+            ':photo_type'       => 'full',
+            ':trigger_color_id' => null,
+            ':caption'          => $caption,
+            ':order_index'      => $orderIndex,
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    /**
+     * Delete a single photo row.
+     */
+    public function deletePhoto(int $photoId): void
+    {
+        $sql = "DELETE FROM saved_palette_photos WHERE id = :id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id' => $photoId]);
+    }
+
+    /**
+     * Update photo metadata, scoped to a palette.
+     */
+    public function updatePhoto(int $photoId, int $savedPaletteId, array $fields): void
+    {
+        if (empty($fields)) {
+            return;
+        }
+
+        $allowed = [
+            'photo_type',
+            'trigger_color_id',
+            'caption',
+            'order_index',
+        ];
+
+        $setParts = [];
+        $params = [
+            ':id' => $photoId,
+            ':saved_palette_id' => $savedPaletteId,
+        ];
+
+        foreach ($fields as $column => $value) {
+            if (!in_array($column, $allowed, true)) {
+                continue;
+            }
+
+            $paramKey = ':' . $column;
+            $setParts[] = "{$column} = {$paramKey}";
+            $params[$paramKey] = $value;
+        }
+
+        if (!$setParts) {
+            return;
+        }
+
+        $sql = "
+            UPDATE saved_palette_photos
+               SET " . implode(', ', $setParts) . "
+             WHERE id = :id
+               AND saved_palette_id = :saved_palette_id
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+    }
+
+    /**
      * Add a single member row.
      *
      * $orderIndex is used to preserve ordering in the palette.
@@ -202,15 +344,16 @@ class PdoSavedPaletteRepository
     {
         $sql = "
             INSERT INTO saved_palette_members
-                (saved_palette_id, color_id, order_index, created_at)
+                (saved_palette_id, color_id, role_name, order_index, created_at)
             VALUES
-                (:saved_palette_id, :color_id, :order_index, NOW())
+                (:saved_palette_id, :color_id, :role_name, :order_index, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':saved_palette_id' => $savedPaletteId,
             ':color_id'         => $colorId,
+            ':role_name'        => null,
             ':order_index'      => $orderIndex,
         ]);
 
@@ -220,7 +363,7 @@ class PdoSavedPaletteRepository
     /**
      * Bulk insert members for a palette.
      *
-     * $members is an array of ['color_id' => int, 'order_index' => int].
+     * $members is an array of ['color_id' => int, 'order_index' => int, 'role' => ?string].
      */
     public function addMembers(int $savedPaletteId, array $members): void
     {
@@ -230,9 +373,9 @@ class PdoSavedPaletteRepository
 
         $sql = "
             INSERT INTO saved_palette_members
-                (saved_palette_id, color_id, order_index, created_at)
+                (saved_palette_id, color_id, role_name, order_index, created_at)
             VALUES
-                (:saved_palette_id, :color_id, :order_index, NOW())
+                (:saved_palette_id, :color_id, :role_name, :order_index, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -245,6 +388,7 @@ class PdoSavedPaletteRepository
             $stmt->execute([
                 ':saved_palette_id' => $savedPaletteId,
                 ':color_id'         => (int) $m['color_id'],
+                ':role_name'        => isset($m['role']) && $m['role'] !== '' ? (string) $m['role'] : null,
                 ':order_index'      => isset($m['order_index']) ? (int) $m['order_index'] : 0,
             ]);
         }
@@ -288,9 +432,11 @@ class PdoSavedPaletteRepository
             SELECT m.id,
                    m.saved_palette_id,
                    m.color_id,
+                   m.role_name AS role,
                    m.order_index,
                    c.name       AS color_name,
                    c.brand      AS color_brand,
+                   c.brand_name AS color_brand_name,
                    c.code       AS color_code,
                    c.hex6       AS color_hex6,
                    c.hcl_h      AS color_hcl_h,
@@ -299,7 +445,7 @@ class PdoSavedPaletteRepository
                    c.chip_num   AS color_chip_num,
                    c.cluster_id AS color_cluster_id
               FROM saved_palette_members m
-         LEFT JOIN colors c
+         LEFT JOIN swatch_view c
                 ON c.id = m.color_id
              WHERE m.saved_palette_id = :id
           ORDER BY m.order_index ASC, m.id ASC
@@ -322,10 +468,12 @@ class PdoSavedPaletteRepository
         }
 
         $members = $this->getMembersForPalette($id);
+        $photos = $this->getPhotosForPalette($id);
 
         return [
             'palette' => $palette,
             'members' => $members,
+            'photos'  => $photos,
         ];
     }
 
@@ -373,22 +521,14 @@ class PdoSavedPaletteRepository
         if (!empty($filters['q'])) {
             $where[] = '('
                 . 'p.nickname LIKE :q_nickname '
-                . 'OR p.notes LIKE :q_notes '
-                . 'OR p.sent_to_email LIKE :q_email '
-                . 'OR c.name LIKE :q_client_name '
-                . 'OR c.email LIKE :q_client_email'
+                . 'OR p.notes LIKE :q_notes'
                 . ')';
             $likeValue = '%' . $filters['q'] . '%';
             $params[':q_nickname']    = $likeValue;
             $params[':q_notes']       = $likeValue;
-            $params[':q_email']       = $likeValue;
-            $params[':q_client_name'] = $likeValue;
-            $params[':q_client_email']= $likeValue;
         }
 
-        $sql = "SELECT p.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
-                FROM saved_palettes p
-                LEFT JOIN clients c ON c.id = p.client_id";
+        $sql = "SELECT p.* FROM saved_palettes p";
 
         if (!empty($where)) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -407,24 +547,6 @@ class PdoSavedPaletteRepository
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 
         $stmt->execute();
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Find all saved palettes sent to a given email.
-     */
-    public function findPalettesByEmail(string $email): array
-    {
-        $sql = "
-            SELECT *
-              FROM saved_palettes
-             WHERE sent_to_email = :email
-          ORDER BY created_at DESC, id DESC
-        ";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':email' => $email]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

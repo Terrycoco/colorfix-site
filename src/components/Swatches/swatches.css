@@ -181,6 +181,24 @@
   transform: translate(2px, -1px) rotate(9deg) scale(1.05);
 }
 
+/* ===== Picture swatch ===== */
+.pals-photo {
+  cursor: pointer;
+}
+
+.pals-photo-fill {
+  background: #0f172a;
+}
+
+.pals-photo-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
 /* Reduced motion respect */
 @media (prefers-reduced-motion: reduce) {
   .pals-fill { transition: none; }

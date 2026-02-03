@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { useAppState } from "@context/AppStateContext";
 import { isAdmin } from "@helpers/authHelper";
+import EditableSwatch from "@components/EditableSwatch";
 import "./admin-saved-palettes.css";
 
 const BRAND_CHOICES = [
@@ -29,25 +30,20 @@ const emptyEditForm = {
   nickname: "",
   notes: "",
   terry_fav: false,
-  sent_to_email: "",
-  client_id: null,
-  client_name: "",
-  client_email: "",
-  client_phone: "",
-  client_notes: "",
 };
 
 const emptySendForm = {
   palette_id: null,
   nickname: "",
   to_email: "",
-  client_name: "",
   subject: "",
   message: "",
   preview_colors: [],
 };
 
 const DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-delete.php`;
+const PHOTO_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
+const PHOTO_DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/delete.php`;
 
 function formatDate(value) {
   if (!value) return "—";
@@ -94,6 +90,9 @@ export default function AdminSavedPalettesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [editStatus, setEditStatus] = useState({ loading: false, error: "" });
+  const [editMembers, setEditMembers] = useState([]);
+  const [editPhotos, setEditPhotos] = useState([]);
+  const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendForm, setSendForm] = useState(emptySendForm);
   const [sendStatus, setSendStatus] = useState({ loading: false, error: "", success: "" });
@@ -112,6 +111,7 @@ export default function AdminSavedPalettesPage() {
           qs.set(key, String(value));
         });
         qs.set("with_members", "1");
+        qs.set("with_photos", "1");
         qs.set("_", Date.now().toString());
         const res = await fetch(`${API_FOLDER}/v2/admin/saved-palettes.php?${qs.toString()}`, {
           credentials: "include",
@@ -175,23 +175,29 @@ export default function AdminSavedPalettesPage() {
   };
 
   const openEditModal = (palette) => {
-    const parsedClientId =
-      palette.client_id !== undefined && palette.client_id !== null
-        ? Number(palette.client_id)
-        : null;
     setEditForm({
       palette_id: Number(palette.id) || palette.id,
       nickname: palette.nickname || "",
       notes: palette.notes || "",
       terry_fav: Number(palette.terry_fav) === 1,
-      sent_to_email: palette.sent_to_email || "",
-      client_id: Number.isFinite(parsedClientId) ? parsedClientId : null,
-      client_name: palette.client_name || "",
-      client_email: palette.client_email || "",
-      client_phone: palette.client_phone || "",
-      client_notes: palette.client_notes || "",
     });
+    const members = (palette.members || []).map((member, index) => ({
+      key: member.id ?? `${member.color_id}-${index}`,
+      color: memberToSwatch(member),
+      role: member.role || "",
+    }));
+    const photos = (palette.photos || []).map((photo, index) => ({
+      id: photo.id,
+      rel_path: photo.rel_path,
+      photo_type: photo.photo_type || "full",
+      trigger_color_id: photo.trigger_color_id ?? null,
+      caption: photo.caption || "",
+      order_index: photo.order_index ?? index,
+    }));
+    setEditMembers(members);
+    setEditPhotos(photos);
     setEditStatus({ loading: false, error: "" });
+    setPhotoStatus({ loading: false, error: "" });
     setEditModalOpen(true);
   };
 
@@ -199,11 +205,102 @@ export default function AdminSavedPalettesPage() {
     if (editStatus.loading) return;
     setEditModalOpen(false);
     setEditForm(emptyEditForm);
+    setEditMembers([]);
+    setEditPhotos([]);
     setEditStatus({ loading: false, error: "" });
+    setPhotoStatus({ loading: false, error: "" });
   };
 
   const handleEditField = (name, value) => {
     setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditMemberColor = (index, color) => {
+    setEditMembers((prev) =>
+      prev.map((row, idx) => (idx === index ? { ...row, color } : row))
+    );
+  };
+
+  const handleEditMemberRole = (index, value) => {
+    setEditMembers((prev) =>
+      prev.map((row, idx) => (idx === index ? { ...row, role: value } : row))
+    );
+  };
+
+  const handleAddMember = () => {
+    setEditMembers((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}`,
+        color: null,
+        role: "",
+      },
+    ]);
+  };
+
+  const handleRemoveMember = (index) => {
+    setEditMembers((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePhotoUpload = async (files) => {
+    if (!editForm.palette_id || !files?.length) return;
+    setPhotoStatus({ loading: true, error: "" });
+    try {
+      const formData = new FormData();
+      formData.append("palette_id", String(editForm.palette_id));
+      Array.from(files).forEach((file) => formData.append("photos[]", file));
+      const res = await fetch(PHOTO_UPLOAD_URL, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      const added = Array.isArray(json.photos) ? json.photos : [];
+      setEditPhotos((prev) => [
+        ...prev,
+        ...added.map((photo, index) => ({
+          id: photo.id,
+          rel_path: photo.rel_path,
+          caption: photo.caption || "",
+          order_index: photo.order_index ?? prev.length + index,
+        })),
+      ]);
+      setPhotoStatus({ loading: false, error: "" });
+    } catch (err) {
+      setPhotoStatus({ loading: false, error: err?.message || "Failed to upload photos" });
+    }
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    if (!photoId) return;
+    setPhotoStatus({ loading: true, error: "" });
+    try {
+      const res = await fetch(PHOTO_DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photo_id: photoId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      setEditPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+      setPhotoStatus({ loading: false, error: "" });
+    } catch (err) {
+      setPhotoStatus({ loading: false, error: err?.message || "Failed to delete photo" });
+    }
+  };
+
+  const handlePhotoField = (photoId, field, value) => {
+    setEditPhotos((prev) =>
+      prev.map((photo) =>
+        photo.id === photoId ? { ...photo, [field]: value } : photo
+      )
+    );
   };
 
   const handleEditSubmit = async (event) => {
@@ -211,9 +308,26 @@ export default function AdminSavedPalettesPage() {
     if (!editForm.palette_id) return;
     setEditStatus({ loading: true, error: "" });
     try {
+    const members = editMembers
+        .map((row, index) => {
+          const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
+          if (!colorId) return null;
+          const role = row?.role?.trim() || null;
+          return { color_id: colorId, order_index: index, role };
+        })
+        .filter(Boolean);
+      if (!members.length) {
+        throw new Error("Add at least one color before saving.");
+      }
       const payload = {
         ...editForm,
         terry_fav: editForm.terry_fav ? 1 : 0,
+        members,
+        photos: editPhotos.map((photo) => ({
+          id: photo.id,
+          photo_type: photo.photo_type || "full",
+          trigger_color_id: photo.trigger_color_id || null,
+        })),
       };
       const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-update.php`, {
         method: "POST",
@@ -241,14 +355,13 @@ export default function AdminSavedPalettesPage() {
       code: member.color_code || "",
       hex: member.color_hex6 || "cccccc",
     }));
-    const defaultEmail = palette.client_email || palette.sent_to_email || "";
+    const defaultEmail = "";
     const defaultMessage = palette.message_template || `Here’s the palette we discussed for ${palette.nickname || "your project"}.\n\nLet me know what you think!`;
     const defaultSubject = palette.subject_template || `ColorFix palette ideas`;
     setSendForm({
       palette_id: palette.id,
       nickname: palette.nickname || "Saved Palette",
       to_email: defaultEmail,
-      client_name: palette.client_name || "",
       subject: defaultSubject,
       message: defaultMessage,
       preview_colors: colors,
@@ -305,7 +418,6 @@ export default function AdminSavedPalettesPage() {
         body: JSON.stringify({
           palette_id: sendForm.palette_id,
           to_email: sendForm.to_email,
-          client_name: sendForm.client_name,
           subject: sendForm.subject,
           message: sendForm.message,
         }),
@@ -370,7 +482,7 @@ export default function AdminSavedPalettesPage() {
           <input
             type="text"
             value={form.q}
-            placeholder="Nickname, notes, client, email…"
+            placeholder="Nickname, notes, tags, roles…"
             onChange={(e) => handleField("q", e.target.value)}
           />
         </label>
@@ -429,23 +541,21 @@ export default function AdminSavedPalettesPage() {
                   {Number(item.terry_fav) === 1 && <span className="asp-pill">Fav</span>}
                   <span className="asp-pill neutral">{(item.brand || "").toUpperCase() || "?"}</span>
                 </div>
-                <div className="asp-meta-line">
-                  {item.client_name && <span>{item.client_name}</span>}
-                  {item.client_email && <span>{item.client_email}</span>}
-                  {item.client_phone && <span>{item.client_phone}</span>}
-                </div>
               </div>
               <div className="asp-card-times">
                 <span>Created {formatDate(item.created_at)}</span>
-                {item.sent_at && <span>Sent {formatDate(item.sent_at)}</span>}
               </div>
             </header>
 
             {item.notes && <p className="asp-notes">{item.notes}</p>}
 
-            {item.sent_to_email && (
-              <div className="asp-meta-line">
-                Sent to <strong>{item.sent_to_email}</strong>
+            {item.photos?.length > 0 && (
+              <div className="asp-photo-strip">
+                {item.photos.slice(0, 4).map((photo) => (
+                  <div key={photo.id} className="asp-photo-thumb">
+                    <img src={photo.rel_path} alt={item.nickname || "Saved palette photo"} loading="lazy" />
+                  </div>
+                ))}
               </div>
             )}
 
@@ -456,6 +566,7 @@ export default function AdminSavedPalettesPage() {
                   <div className="asp-swatch-meta">
                     <span className="asp-swatch-name">{member.color_name || "—"}</span>
                     <span className="asp-swatch-code">{member.color_code || member.color_id}</span>
+                    {member.role && <span className="asp-swatch-role">{member.role}</span>}
                   </div>
                 </div>
               ))}
@@ -465,16 +576,23 @@ export default function AdminSavedPalettesPage() {
               <button type="button" className="ghost" onClick={() => openEditModal(item)}>
                 Edit
               </button>
-              <button type="button" className="ghost" onClick={() => openSendModal(item)} disabled={!item.members?.length}>
-                Send Email
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  if (!item?.palette_hash) return;
+                  window.location.href = `/palette/${item.palette_hash}/share`;
+                }}
+                disabled={!item.members?.length}
+              >
+                Viewer
               </button>
               <button
                 type="button"
-                className="full-width"
                 onClick={() => handleLoadPalette(item)}
                 disabled={!item.members?.length}
               >
-                Load into My Palette
+                My Palette
               </button>
               <button
                 type="button"
@@ -500,6 +618,106 @@ export default function AdminSavedPalettesPage() {
             </header>
 
             <form className="asp-modal-form" onSubmit={handleEditSubmit}>
+              <div className="asp-photo-editor">
+                <div className="asp-member-list-head">
+                  <h3>Photos</h3>
+                  <label className="asp-upload-btn">
+                    Upload
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => handlePhotoUpload(e.target.files)}
+                      disabled={photoStatus.loading}
+                    />
+                  </label>
+                </div>
+                {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
+                {editPhotos.length > 0 ? (
+                  <div className="asp-photo-grid">
+                    {editPhotos.map((photo) => (
+                      <div key={photo.id} className="asp-photo-card">
+                        <img src={photo.rel_path} alt="Palette upload" />
+                        <select
+                          value={photo.photo_type || "full"}
+                          onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
+                        >
+                          <option value="full">Full</option>
+                          <option value="zoom">Zoom</option>
+                        </select>
+                        <select
+                          value={photo.trigger_color_id || ""}
+                          onChange={(e) =>
+                            handlePhotoField(
+                              photo.id,
+                              "trigger_color_id",
+                              e.target.value ? Number(e.target.value) : null
+                            )
+                          }
+                        >
+                          <option value="">Trigger: any color</option>
+                          {editMembers.map((row) => (
+                            <option
+                              key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
+                              value={row.color?.id || row.color?.color_id || ""}
+                            >
+                              {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                          disabled={photoStatus.loading}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="asp-member-empty">No photos yet.</div>
+                )}
+              </div>
+
+              <div className="asp-member-list">
+                <div className="asp-member-list-head">
+                  <h3>Palette Colors</h3>
+                  <button type="button" className="ghost" onClick={handleAddMember}>
+                    Add Color
+                  </button>
+                </div>
+                <div className="asp-member-rows">
+                  {editMembers.map((row, index) => (
+                    <div key={row.key || index} className="asp-member-row">
+                      <EditableSwatch
+                        value={row.color}
+                        onChange={(color) => handleEditMemberColor(index, color)}
+                        showName
+                        size="sm"
+                        placement="top"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Role (e.g. trim, body, door)"
+                        value={row.role}
+                        onChange={(e) => handleEditMemberRole(index, e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => handleRemoveMember(index)}
+                        aria-label="Remove color"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
+                </div>
+              </div>
+
               <label>
                 Nickname
                 <input
@@ -525,53 +743,6 @@ export default function AdminSavedPalettesPage() {
                   onChange={(e) => handleEditField("terry_fav", e.target.checked)}
                 />
                 Mark as Terry favorite
-              </label>
-
-              <label>
-                Send to Email
-                <input
-                  type="email"
-                  value={editForm.sent_to_email}
-                  onChange={(e) => handleEditField("sent_to_email", e.target.value)}
-                  placeholder="client@example.com"
-                />
-              </label>
-
-              <h3>Client</h3>
-              <label>
-                Client Name
-                <input
-                  type="text"
-                  value={editForm.client_name}
-                  onChange={(e) => handleEditField("client_name", e.target.value)}
-                />
-              </label>
-
-              <label>
-                Client Email
-                <input
-                  type="email"
-                  value={editForm.client_email}
-                  onChange={(e) => handleEditField("client_email", e.target.value)}
-                />
-              </label>
-
-              <label>
-                Client Phone
-                <input
-                  type="text"
-                  value={editForm.client_phone}
-                  onChange={(e) => handleEditField("client_phone", e.target.value)}
-                />
-              </label>
-
-              <label>
-                Client Notes
-                <textarea
-                  rows={2}
-                  value={editForm.client_notes}
-                  onChange={(e) => handleEditField("client_notes", e.target.value)}
-                />
               </label>
 
               {editStatus.error && <div className="asp-error">{editStatus.error}</div>}
@@ -606,16 +777,6 @@ export default function AdminSavedPalettesPage() {
                   value={sendForm.subject}
                   onChange={(e) => handleSendField("subject", e.target.value)}
                   placeholder="Subject line"
-                />
-              </label>
-
-              <label>
-                Client Name
-                <input
-                  type="text"
-                  value={sendForm.client_name}
-                  onChange={(e) => handleSendField("client_name", e.target.value)}
-                  placeholder="Client name (optional)"
                 />
               </label>
 

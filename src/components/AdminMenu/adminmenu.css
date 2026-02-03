@@ -69,6 +69,14 @@
   font-size: 13px;
 }
 
+.admin-menu__item.admin-menu__back {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
 .admin-menu__item:hover {
   background: rgba(0, 0, 0, 0.06);
 }

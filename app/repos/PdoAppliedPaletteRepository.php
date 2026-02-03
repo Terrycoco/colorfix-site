@@ -99,8 +99,8 @@ class PdoAppliedPaletteRepository
                    -- legacy fields kept for compatibility but prefer mask settings
                    e.blend_mode, e.blend_opacity,
                    e.lightness_offset, e.tint_hex, e.tint_opacity,
-                   c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.hex6 AS color_hex6,
-                   c.hcl_l AS color_hcl_l, c.lab_l AS color_lab_l,
+                   c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.brand_name AS color_brand_name, c.hex6 AS color_hex6,
+                   c.hcl_l AS color_hcl_l,
                    mbs.blend_mode AS setting_blend_mode,
                    mbs.blend_opacity AS setting_blend_opacity,
                    mbs.shadow_l_offset AS setting_shadow_l_offset,
@@ -112,7 +112,7 @@ class PdoAppliedPaletteRepository
                    mbs.is_preset AS setting_is_preset,
                    mbs.updated_at AS setting_updated_at
             FROM applied_palette_entries e
-            LEFT JOIN colors c ON c.id = e.color_id
+            LEFT JOIN swatch_view c ON c.id = e.color_id
             LEFT JOIN mask_blend_settings mbs ON mbs.id = e.mask_setting_id
             WHERE e.applied_palette_id = :pid
             ORDER BY e.id ASC

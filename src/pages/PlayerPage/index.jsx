@@ -18,6 +18,8 @@ export default function PlayerPage() {
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
+  const returnToParam = searchParams.get("return_to") ?? "";
+  const returnTo = resolveReturnTo(returnToParam);
 
 
   const [data, setData] = useState(null);
@@ -92,6 +94,10 @@ export default function PlayerPage() {
   }, [data?.playlist_instance_id, endParam]);
 
   function handleExit() {
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
     if (window.history.length > 1) {
       navigate(-1);
     } else {
@@ -121,6 +127,7 @@ export default function PlayerPage() {
       psi: psiParam,
       thumb: thumbsEnabled,
       demo: demoEnabled,
+      returnTo,
     })
   ), [
     data,
@@ -133,6 +140,7 @@ export default function PlayerPage() {
     demoParam,
     data?.thumbs_enabled,
     data?.demo_enabled,
+    returnTo,
   ]);
 
   const paletteItems = useMemo(() => {
@@ -223,6 +231,14 @@ function resolveVariant(raw, isBack = false) {
   if (normalized === "button") return isBack ? "link" : undefined;
   if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
   return isBack ? "link" : undefined;
+}
+
+function resolveReturnTo(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed.startsWith("/")) return "";
+  if (trimmed.startsWith("//")) return "";
+  return trimmed;
 }
 
 function isTruthyFlag(value) {

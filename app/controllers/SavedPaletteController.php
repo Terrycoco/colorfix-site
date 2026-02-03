@@ -24,8 +24,7 @@ class SavedPaletteController
      *  - nickname      (string|null)
      *  - notes         (string|null)
      *  - terry_fav     (bool|int|null)
-     *  - sent_to_email (string|null)
-     *  - sent_at       (string|null, 'Y-m-d H:i:s')
+     *  - palette_id    (int|null) if provided, overwrites existing palette
      *
      * Returns:
      *  [
@@ -37,6 +36,7 @@ class SavedPaletteController
      */
     public function saveFromPayload(array $payload): array
     {
+        $paletteId = isset($payload['palette_id']) ? (int)$payload['palette_id'] : 0;
         $brand = isset($payload['brand']) ? trim((string)$payload['brand']) : '';
         if ($brand === '') {
             throw new InvalidArgumentException('brand is required');
@@ -52,14 +52,11 @@ class SavedPaletteController
             'nickname'      => isset($payload['nickname']) ? (string)$payload['nickname'] : null,
             'notes'         => isset($payload['notes']) ? (string)$payload['notes'] : null,
             'terry_fav'     => isset($payload['terry_fav']) ? (bool)$payload['terry_fav'] : false,
-            'sent_to_email' => isset($payload['sent_to_email']) ? trim((string)$payload['sent_to_email']) : null,
-            'sent_at'       => isset($payload['sent_at']) ? (string)$payload['sent_at'] : null,
-            'client_id'     => isset($payload['client_id']) ? (int)$payload['client_id'] : null,
-            'client_name'   => isset($payload['client_name']) ? (string)$payload['client_name'] : null,
-            'client_email'  => isset($payload['client_email']) ? (string)$payload['client_email'] : null,
-            'client_phone'  => isset($payload['client_phone']) ? (string)$payload['client_phone'] : null,
-            'client_notes'  => isset($payload['client_notes']) ? (string)$payload['client_notes'] : null,
         ];
+
+        if ($paletteId > 0) {
+            return $this->service->overwriteSavedPalette($paletteId, $data);
+        }
 
         return $this->service->createSavedPalette($data);
     }
@@ -130,20 +127,7 @@ class SavedPaletteController
     }
 
     /**
-     * Convenience: find all palettes that have been sent to a given email.
-     */
-    public function findByEmail(string $email): array
-    {
-        $email = trim($email);
-        if ($email === '') {
-            return [];
-        }
-
-        return $this->service->findPalettesByEmail($email);
-    }
-
-    /**
-     * Update palette metadata/client fields.
+     * Update palette metadata.
      */
     public function updateFromPayload(int $paletteId, array $payload): array
     {
@@ -155,13 +139,6 @@ class SavedPaletteController
             'nickname',
             'notes',
             'terry_fav',
-            'sent_to_email',
-            'sent_at',
-            'client_id',
-            'client_name',
-            'client_email',
-            'client_phone',
-            'client_notes',
         ];
 
         $data = [];
@@ -171,11 +148,39 @@ class SavedPaletteController
             }
         }
 
-        if (!$data) {
+        $members = null;
+        if (array_key_exists('members', $payload)) {
+            $members = $payload['members'];
+            if (!is_array($members)) {
+                throw new InvalidArgumentException('members must be an array');
+            }
+        }
+
+        $photos = null;
+        if (array_key_exists('photos', $payload)) {
+            $photos = $payload['photos'];
+            if (!is_array($photos)) {
+                throw new InvalidArgumentException('photos must be an array');
+            }
+        }
+
+        if (!$data && $members === null && $photos === null) {
             throw new InvalidArgumentException('No update fields provided');
         }
 
-        return $this->service->updateSavedPalette($paletteId, $data);
+        if ($data) {
+            $this->service->updateSavedPalette($paletteId, $data);
+        }
+
+        if ($members !== null) {
+            $this->service->updateSavedPaletteMembers($paletteId, $members);
+        }
+
+        if ($photos !== null) {
+            $this->service->updateSavedPalettePhotos($paletteId, $photos);
+        }
+
+        return $this->service->getSavedPalette($paletteId) ?? [];
     }
 
     public function deleteSavedPalette(int $paletteId): void
@@ -191,10 +196,9 @@ class SavedPaletteController
         string $toEmail,
         ?string $message = null,
         ?string $shareUrl = null,
-        ?string $clientNameOverride = null,
         ?string $subjectOverride = null
     ): void
     {
-        $this->service->sendPaletteEmail($paletteId, $toEmail, $message, $shareUrl, $clientNameOverride, $subjectOverride);
+        $this->service->sendPaletteEmail($paletteId, $toEmail, $message, $shareUrl, $subjectOverride);
     }
 }

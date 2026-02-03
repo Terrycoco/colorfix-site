@@ -40,6 +40,23 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   box-sizing:border-box;
 }
 
+.myp-palette-grid .sg-item {
+  cursor: grab;
+}
+
+.myp-palette-grid .sg-item:active {
+  cursor: grabbing;
+}
+
+.myp-palette-grid .sg-item.is-dragging {
+  opacity: 0.55;
+}
+
+.myp-palette-grid .sg-item.is-over .sg-card-shell {
+  outline: 2px dashed rgba(0, 0, 0, 0.25);
+  outline-offset: 4px;
+}
+
 .myp-empty{ color:#666; font-size:14px; height:150px; }
 .myp-empty{ display:flex; flex-direction:column; gap:12px; align-items:center; justify-content:center; text-align:center; padding:20px; box-sizing:border-box; }
 .myp-empty-fuzzy{ width:100%; max-width:320px; }
@@ -282,12 +299,21 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   font-size: 0.9rem;
 }
 .save-form input,
-.save-form textarea {
+.save-form textarea,
+.save-form select {
   width: 100%;
   padding: 8px;
   border: 1px solid #ccc;
   border-radius: 6px;
   font-size: 0.95rem;
+}
+.save-help {
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: #5a6472;
+}
+.save-help.error {
+  color: #b00020;
 }
 .checkbox-row {
   flex-direction: row;

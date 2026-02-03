@@ -59,6 +59,21 @@ export default function AdminMenu() {
       </button>
       {open && (
         <div className="admin-menu__panel" role="menu">
+          <button
+            type="button"
+            className="admin-menu__item admin-menu__back"
+            onClick={() => {
+              setOpen(false);
+              setHovered(null);
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                window.location.href = "/";
+              }
+            }}
+          >
+            ← Back
+          </button>
           {adminMenuItems.map((group, idx) => (
             <div
               key={group.label}

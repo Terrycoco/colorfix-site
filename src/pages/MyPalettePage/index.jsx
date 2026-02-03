@@ -41,6 +41,7 @@ export default function MyPalettePage() {
     searchFilters,
     brandFiltersAppliedSeq,
     paletteCollapsed,
+    reorderPalette,
   } = useAppState();
 
   // Compute active brand codes (supports .brands or .brand; array/Set/string)
@@ -124,17 +125,20 @@ const activeBrandCodes = useMemo(() => {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveForm, setSaveForm] = useState({
     brand: "de",
+    overwrite_id: "",
     nickname: "",
     notes: "",
     terry_fav: false,
-    sent_to_email: "",
-    client_name: "",
-    client_email: "",
-    client_phone: "",
-    client_notes: "",
   });
   const [saveStatus, setSaveStatus] = useState({ loading: false, error: "", success: "" });
+  const [savedPaletteOptions, setSavedPaletteOptions] = useState([]);
+  const [savedPaletteOptionsStatus, setSavedPaletteOptionsStatus] = useState({
+    loading: false,
+    error: "",
+  });
   const printUrl = "/print/my-palette";
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   const CLEAR_ON = ["/v2/get-friends.php"];
 
@@ -388,6 +392,49 @@ const activeBrandCodes = useMemo(() => {
     navigate(url.pathname + url.search);
   };
 
+  const getSwatchId = (swatch) => {
+    const id = swatch?.id ?? swatch?.color?.id ?? null;
+    return id == null ? null : Number(id);
+  };
+
+  const handleReorder = (dragId, overId) => {
+    if (!dragId || !overId || dragId === overId) return;
+    const list = Array.isArray(palette) ? [...palette] : [];
+    const fromIndex = list.findIndex((item) => getSwatchId(item) === dragId);
+    const toIndex = list.findIndex((item) => getSwatchId(item) === overId);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const [moved] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, moved);
+    reorderPalette(list);
+  };
+
+  const handleDragStart = (event, id) => {
+    if (!id) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(id));
+    setDraggingId(id);
+  };
+
+  const handleDragOver = (event, id) => {
+    if (!id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (dragOverId !== id) setDragOverId(id);
+  };
+
+  const handleDrop = (event, id) => {
+    event.preventDefault();
+    const dragId = Number(event.dataTransfer.getData("text/plain"));
+    handleReorder(dragId, id);
+    setDragOverId(null);
+    setDraggingId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
   const ControlsContent = () => (
     <div className="controls-grid controls-vertical">
       <div className="cell">
@@ -492,6 +539,21 @@ const activeBrandCodes = useMemo(() => {
     }));
   }
 
+  function handleOverwriteSelect(e) {
+    const value = e.target.value;
+    setSaveForm((prev) => {
+      const next = { ...prev, overwrite_id: value };
+      if (!value) {
+        return next;
+      }
+      const match = savedPaletteOptions.find((item) => String(item.id) === String(value));
+      if (match && match.nickname) {
+        next.nickname = match.nickname;
+      }
+      return next;
+    });
+  }
+
   function openSaveModal() {
     setSaveStatus({ loading: false, error: "", success: "" });
     setSaveModalOpen(true);
@@ -501,6 +563,53 @@ const activeBrandCodes = useMemo(() => {
     if (saveStatus.loading) return;
     setSaveModalOpen(false);
   }
+
+  useEffect(() => {
+    if (!saveModalOpen) return;
+    const brandToUse = (saveForm.brand || activeBrandCodes[0] || "").trim();
+    if (!brandToUse) return;
+    let isCancelled = false;
+
+    async function loadSavedPalettes() {
+      setSavedPaletteOptionsStatus({ loading: true, error: "" });
+      try {
+        const qs = new URLSearchParams();
+        qs.set("brand", brandToUse);
+        qs.set("limit", "200");
+        const res = await fetch(`${API_FOLDER}/v2/admin/saved-palettes.php?${qs.toString()}`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error || "Failed to load saved palettes");
+        }
+        const items = Array.isArray(data?.items) ? data.items : [];
+        const options = items.map((item) => ({
+          id: item.id,
+          nickname: (item.nickname || "").trim(),
+          label: (item.nickname || "").trim() || `Untitled #${item.id}`,
+        }));
+        if (!isCancelled) {
+          setSavedPaletteOptions(options);
+          setSavedPaletteOptionsStatus({ loading: false, error: "" });
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setSavedPaletteOptions([]);
+          setSavedPaletteOptionsStatus({
+            loading: false,
+            error: err?.message || "Failed to load saved palettes",
+          });
+        }
+      }
+    }
+
+    loadSavedPalettes();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [saveModalOpen, saveForm.brand, activeBrandCodes]);
 
   async function handleSaveSubmit(e) {
     e.preventDefault();
@@ -515,17 +624,14 @@ const activeBrandCodes = useMemo(() => {
     }
     setSaveStatus({ loading: true, error: "", success: "" });
     try {
+      const overwriteId = Number(saveForm.overwrite_id || 0);
       const payload = {
         brand: brandToUse,
         color_ids: paletteColorIds,
         nickname: saveForm.nickname || null,
         notes: saveForm.notes || null,
         terry_fav: !!saveForm.terry_fav,
-        sent_to_email: saveForm.sent_to_email || saveForm.client_email || null,
-        client_name: saveForm.client_name || null,
-        client_email: saveForm.client_email || null,
-        client_phone: saveForm.client_phone || null,
-        client_notes: saveForm.client_notes || null,
+        ...(overwriteId > 0 ? { palette_id: overwriteId } : {}),
       };
       const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-save.php`, {
         method: "POST",
@@ -537,11 +643,15 @@ const activeBrandCodes = useMemo(() => {
       if (!res.ok || data?.ok === false) {
         throw new Error(data?.error || "Failed to save palette");
       }
-      const newId = data?.data?.palette?.id ?? "";
+      const newId = data?.data?.palette?.id ?? overwriteId ?? "";
       setSaveStatus({
         loading: false,
         error: "",
-        success: newId ? `Saved palette #${newId}` : "Palette saved",
+        success: newId
+          ? overwriteId > 0
+            ? `Updated palette #${newId}`
+            : `Saved palette #${newId}`
+          : "Palette saved",
       });
     } catch (err) {
       setSaveStatus({ loading: false, error: err?.message || "Failed to save", success: "" });
@@ -604,15 +714,32 @@ const activeBrandCodes = useMemo(() => {
             </div>
           ) : (
             <div className="myp-row">
-              <SwatchGallery
-                items={paletteFallback}
-                SwatchComponent={PaletteSwatch}
-                swatchPropName="color"
-                className="sg-palette"
-                gap={14}
-                aspectRatio="5 / 4"
-                onSelectColor={onResultsPick}
-              />
+              <div className="sg-root sg-palette myp-palette-grid">
+                <div className="sg-grid">
+                  {paletteFallback.map((swatch, index) => {
+                    const swatchId = getSwatchId(swatch);
+                    const key = swatchId ?? swatch?.hex6 ?? swatch?.hex ?? index;
+                    return (
+                      <div
+                        key={key}
+                        className={`sg-item${swatchId === draggingId ? " is-dragging" : ""}${swatchId === dragOverId ? " is-over" : ""}`}
+                        draggable={paletteFallback.length > 1}
+                        onDragStart={(event) => handleDragStart(event, swatchId)}
+                        onDragOver={(event) => handleDragOver(event, swatchId)}
+                        onDrop={(event) => handleDrop(event, swatchId)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <div className="sg-card-shell">
+                          <PaletteSwatch
+                            color={swatch?.color ?? swatch}
+                            onSelectColor={onResultsPick}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </section>
@@ -764,6 +891,27 @@ const activeBrandCodes = useMemo(() => {
             </div>
             <form className="save-form" onSubmit={handleSaveSubmit}>
               <label>
+                Overwrite Existing (optional)
+                <select
+                  name="overwrite_id"
+                  value={saveForm.overwrite_id}
+                  onChange={handleOverwriteSelect}
+                >
+                  <option value="">Create new…</option>
+                  {savedPaletteOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {savedPaletteOptionsStatus.loading && (
+                  <div className="save-help">Loading saved palettes…</div>
+                )}
+                {savedPaletteOptionsStatus.error && (
+                  <div className="save-help error">{savedPaletteOptionsStatus.error}</div>
+                )}
+              </label>
+              <label>
                 Brand Code
                 <input
                   name="brand"
@@ -800,54 +948,6 @@ const activeBrandCodes = useMemo(() => {
                   onChange={handleSaveFieldChange}
                 />
                 Mark as Terry Favorite
-              </label>
-              <label>
-                Send to Email
-                <input
-                  type="email"
-                  name="sent_to_email"
-                  value={saveForm.sent_to_email}
-                  onChange={handleSaveFieldChange}
-                />
-              </label>
-              <hr />
-              <h3>Client (optional)</h3>
-              <label>
-                Client Name
-                <input
-                  type="text"
-                  name="client_name"
-                  value={saveForm.client_name}
-                  onChange={handleSaveFieldChange}
-                />
-              </label>
-              <label>
-                Client Email
-                <input
-                  type="email"
-                  name="client_email"
-                  value={saveForm.client_email}
-                  onChange={handleSaveFieldChange}
-                  placeholder="client@example.com"
-                />
-              </label>
-              <label>
-                Client Phone
-                <input
-                  type="text"
-                  name="client_phone"
-                  value={saveForm.client_phone}
-                  onChange={handleSaveFieldChange}
-                />
-              </label>
-              <label>
-                Client Notes
-                <textarea
-                  name="client_notes"
-                  rows={2}
-                  value={saveForm.client_notes}
-                  onChange={handleSaveFieldChange}
-                />
               </label>
               {saveStatus.error && <div className="save-error">{saveStatus.error}</div>}
               {saveStatus.success && <div className="save-success">{saveStatus.success}</div>}

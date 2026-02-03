@@ -89,7 +89,9 @@ try {
   if (!isset($params['group_mode'])) {
     $params['group_mode'] = 'hue'; // default
   }
-  $groupMode = ($params['group_mode'] === 'lightness') ? 'lightness' : 'hue';
+  $groupMode = in_array($params['group_mode'], ['lightness', 'chroma'], true)
+    ? $params['group_mode']
+    : 'hue';
 
   // Are we dealing with swatches? (Only swatch queries have hcl_* / light_cat_*)
   $isSwatchQuery = (trim((string)($queryRow['item_type'] ?? '')) === 'swatch');
@@ -114,6 +116,9 @@ try {
                    . "  q.hcl_l DESC,"   // lightest → darkest inside the band
                    . "  q.hcl_c ASC,"    // softer first (tie-breaker)
                    . "  q.hcl_h ASC";    // final tie-breaker
+    } else if ($groupMode === 'chroma') {
+      // Chroma mode: most saturated to least, then hue sweep
+      $finalQuery .= " ORDER BY q.hcl_c DESC, q.hcl_h ASC, q.hcl_l DESC";
     } else {
       // Hue mode (legacy)
       $finalQuery .= " ORDER BY q.hue_cat_order, q.hcl_h ASC, q.hcl_l DESC";
@@ -134,6 +139,214 @@ try {
   }
   $stmt->execute();
   $queryResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+  // 6.5) Optionally inject "picture swatch" items for swatch queries.
+  $hasSwatchRows = false;
+  if ($queryResults) {
+    foreach ($queryResults as $row) {
+      if (($row['item_type'] ?? '') === 'swatch' || ($row['item_type'] ?? '') === 'no-render') {
+        $hasSwatchRows = true;
+        break;
+      }
+      if (array_key_exists('hcl_l', $row) || array_key_exists('hex6', $row)) {
+        $hasSwatchRows = true;
+        break;
+      }
+      if (!empty($row['id']) && (isset($row['name']) || isset($row['code']))) {
+        $hasSwatchRows = true;
+        break;
+      }
+    }
+  }
+  if (($isSwatchQuery || $hasSwatchRows) && $queryResults) {
+    $colorIds = [];
+    foreach ($queryResults as $row) {
+      $cid = isset($row['id']) ? (int)$row['id'] : (int)($row['color_id'] ?? 0);
+      if ($cid > 0) $colorIds[$cid] = true;
+    }
+
+    $pictureByColor = [];
+    $zoomByColor = [];
+    if ($colorIds) {
+      $placeholders = implode(',', array_fill(0, count($colorIds), '?'));
+      $sqlPhotos = "
+        SELECT m.color_id,
+               p.id AS photo_id,
+               p.rel_path,
+               p.photo_type,
+               p.trigger_color_id,
+               p.order_index,
+               sp.id AS saved_palette_id,
+               sp.palette_hash,
+               sp.nickname,
+               sp.brand
+          FROM saved_palette_members m
+          JOIN saved_palette_photos p
+            ON p.saved_palette_id = m.saved_palette_id
+          JOIN saved_palettes sp
+            ON sp.id = m.saved_palette_id
+         WHERE m.color_id IN ($placeholders)
+         ORDER BY m.color_id ASC, p.order_index ASC, p.id ASC
+      ";
+
+      $stmtPhotos = $pdo->prepare($sqlPhotos);
+      $stmtPhotos->execute(array_keys($colorIds));
+      $photoRows = $stmtPhotos->fetchAll(PDO::FETCH_ASSOC);
+
+      $byColor = [];
+      foreach ($photoRows as $row) {
+        $cid = (int)$row['color_id'];
+        $pid = (int)$row['saved_palette_id'];
+        if (!$cid || !$pid) continue;
+        if (!isset($byColor[$cid])) $byColor[$cid] = [];
+        if (!isset($byColor[$cid][$pid])) {
+          $byColor[$cid][$pid] = [
+            'palette' => [
+              'id' => $pid,
+              'hash' => $row['palette_hash'] ?? null,
+              'nickname' => $row['nickname'] ?? null,
+              'brand' => $row['brand'] ?? null,
+            ],
+            'photos' => [],
+          ];
+        }
+        $byColor[$cid][$pid]['photos'][] = [
+          'photo_id' => (int)$row['photo_id'],
+          'rel_path' => $row['rel_path'] ?? null,
+          'photo_type' => $row['photo_type'] ?? null,
+          'trigger_color_id' => isset($row['trigger_color_id']) ? (int)$row['trigger_color_id'] : null,
+        ];
+      }
+
+      foreach ($byColor as $cid => $palettes) {
+        $exactPaletteIds = [];
+        $fallbackPaletteIds = [];
+        $zoomCandidates = [];
+        foreach ($palettes as $pid => $entry) {
+          $hasExact = false;
+          $hasFallback = false;
+          foreach ($entry['photos'] as $photo) {
+            if (($photo['photo_type'] ?? '') === 'zoom') {
+              if (($photo['trigger_color_id'] ?? null) === $cid && !empty($photo['rel_path'])) {
+                $zoomCandidates[] = [
+                  'palette' => $entry['palette'],
+                  'photo' => $photo,
+                ];
+              }
+              continue;
+            }
+            if ($photo['trigger_color_id'] === $cid) {
+              $hasExact = true;
+            } else if ($photo['trigger_color_id'] === null) {
+              $hasFallback = true;
+            }
+          }
+          if ($hasExact) {
+            $exactPaletteIds[] = $pid;
+          } else if ($hasFallback) {
+            $fallbackPaletteIds[] = $pid;
+          }
+        }
+
+        $paletteIds = $exactPaletteIds ?: $fallbackPaletteIds;
+        if (!$paletteIds) {
+          if ($zoomCandidates) {
+            $zoomByColor[$cid] = $zoomCandidates[random_int(0, count($zoomCandidates) - 1)];
+          }
+          continue;
+        }
+        $randPaletteId = $paletteIds[random_int(0, count($paletteIds) - 1)];
+        $palette = $palettes[$randPaletteId]['palette'];
+        $photos = $palettes[$randPaletteId]['photos'];
+        if (!$photos) continue;
+        $photos = array_values(array_filter($photos, function($photo) use ($cid, $exactPaletteIds) {
+          if (($photo['photo_type'] ?? '') === 'zoom') return false;
+          if ($photo['trigger_color_id'] === $cid) return true;
+          if ($photo['trigger_color_id'] === null && empty($exactPaletteIds)) return true;
+          return false;
+        }));
+        if (!$photos) continue;
+        $photo = $photos[random_int(0, count($photos) - 1)];
+        $pictureByColor[$cid] = [
+          'palette' => $palette,
+          'photo' => $photo,
+        ];
+        if ($zoomCandidates) {
+          $zoomByColor[$cid] = $zoomCandidates[random_int(0, count($zoomCandidates) - 1)];
+        }
+      }
+    }
+
+    if ($pictureByColor || $zoomByColor) {
+      $withPictures = [];
+      $usedPhotoKeys = [];
+      $usedZoomKeys = [];
+      foreach ($queryResults as $row) {
+        $withPictures[] = $row;
+        $cid = isset($row['id']) ? (int)$row['id'] : (int)($row['color_id'] ?? 0);
+        if (!$cid || (empty($pictureByColor[$cid]) && empty($zoomByColor[$cid]))) continue;
+        if (!empty($pictureByColor[$cid])) {
+          $pic = $pictureByColor[$cid];
+          $palette = $pic['palette'];
+          $photo = $pic['photo'];
+          if (!empty($photo['rel_path'])) {
+            $photoKey = (string)($photo['photo_id'] ?? $photo['id'] ?? $photo['rel_path']);
+            if ($photoKey !== '' && isset($usedPhotoKeys[$photoKey])) {
+              // already placed this full photo in the results
+            } else {
+              if ($photoKey !== '') $usedPhotoKeys[$photoKey] = true;
+              $withPictures[] = [
+                'id' => 'ps_' . $cid . '_' . ($photo['photo_id'] ?? uniqid()),
+                'item_type' => 'picture-swatch',
+                'photo_url' => $photo['rel_path'],
+                'photo_type' => $photo['photo_type'] ?? null,
+                'palette_id' => $palette['id'] ?? null,
+                'palette_hash' => $palette['hash'] ?? null,
+                'palette_name' => $palette['nickname'] ?? null,
+                'palette_brand' => $palette['brand'] ?? null,
+                'source_color_id' => $cid,
+                'hue_cats' => $row['hue_cats'] ?? null,
+                'light_cat_name' => $row['light_cat_name'] ?? ($row['__light_cat_name_outer'] ?? null),
+                'light_cat_order' => $row['light_cat_order'] ?? ($row['__light_cat_order_outer'] ?? null),
+                'hcl_h' => $row['hcl_h'] ?? null,
+                'hcl_c' => $row['hcl_c'] ?? null,
+                'hcl_l' => $row['hcl_l'] ?? null,
+              ];
+            }
+          }
+        }
+        if (!empty($zoomByColor[$cid])) {
+          $zoom = $zoomByColor[$cid];
+          $zpalette = $zoom['palette'];
+          $zphoto = $zoom['photo'];
+          if (!empty($zphoto['rel_path'])) {
+            $zoomKey = (string)($zphoto['photo_id'] ?? $zphoto['id'] ?? $zphoto['rel_path']);
+            if ($zoomKey === '' || empty($usedZoomKeys[$zoomKey])) {
+              if ($zoomKey !== '') $usedZoomKeys[$zoomKey] = true;
+              $withPictures[] = [
+                'id' => 'psz_' . $cid . '_' . ($zphoto['photo_id'] ?? uniqid()),
+                'item_type' => 'picture-swatch',
+                'photo_url' => $zphoto['rel_path'],
+                'photo_type' => $zphoto['photo_type'] ?? null,
+                'palette_id' => $zpalette['id'] ?? null,
+                'palette_hash' => $zpalette['hash'] ?? null,
+                'palette_name' => $zpalette['nickname'] ?? null,
+                'palette_brand' => $zpalette['brand'] ?? null,
+                'source_color_id' => $cid,
+                'hue_cats' => $row['hue_cats'] ?? null,
+                'light_cat_name' => $row['light_cat_name'] ?? ($row['__light_cat_name_outer'] ?? null),
+                'light_cat_order' => $row['light_cat_order'] ?? ($row['__light_cat_order_outer'] ?? null),
+                'hcl_h' => $row['hcl_h'] ?? null,
+                'hcl_c' => $row['hcl_c'] ?? null,
+                'hcl_l' => $row['hcl_l'] ?? null,
+              ];
+            }
+          }
+        }
+      }
+      $queryResults = $withPictures;
+    }
+  }
 
   // 6) Safety: default item_type if missing
   foreach ($queryResults as &$r) { if (!isset($r['item_type'])) $r['item_type'] = 'unknown'; }

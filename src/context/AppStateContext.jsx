@@ -9,6 +9,7 @@ import { API_FOLDER } from '@helpers/config';
 
 const AppStateContext = createContext();
 const PALETTE_STORAGE_KEY = "pals.palette.v1";
+const BRAND_FILTERS_STORAGE_KEY = "pals.brand_filters.v1";
 //import mockBoards from '@test/mockBoards';
 
 
@@ -70,6 +71,12 @@ async function normalizeWithRetry(id, tries = 5, delay = 120) {
   return null;
 }
 
+function normalizeBrandList(values) {
+  if (!Array.isArray(values)) return [];
+  return Array.from(
+    new Set(values.map((value) => String(value || '').trim().toLowerCase()).filter(Boolean))
+  );
+}
 
 const initialAdvancedSearch = {
   selectedCatId: null,
@@ -210,9 +217,22 @@ export function AppStateProvider({ children }) {
 
  
   const [recentSwatches, setRecentSwatches] = useState([]); //used for detail screen
-const [searchFilters, setSearchFilters] = useState({
-    brands: [],     // canonical
- });
+const [searchFilters, setSearchFilters] = useState(() => {
+  if (typeof window === 'undefined') return { brands: [] };
+  try {
+    const raw = localStorage.getItem(BRAND_FILTERS_STORAGE_KEY);
+    if (!raw) return { brands: [] };
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return { brands: normalizeBrandList(parsed) };
+    }
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.brands)) {
+      return { brands: normalizeBrandList(parsed.brands) };
+    }
+  } catch {
+  }
+  return { brands: [] };
+});
   const [brandFiltersAppliedSeq, setBrandFiltersAppliedSeq] = useState(0);
 
   const [noResults, setNoResults] = useState(false);
@@ -300,6 +320,14 @@ useEffect(() => {
     cancelled = true;
   };
 }, [loggedIn, user]);
+
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  try {
+    const brands = normalizeBrandList(searchFilters?.brands ?? []);
+    localStorage.setItem(BRAND_FILTERS_STORAGE_KEY, JSON.stringify(brands));
+  } catch {}
+}, [searchFilters?.brands]);
 
 // 1) Load once: read ids -> hydrate with normalizeSwatch (MERGE + DEDUPE)
 // Hydrate palette once from localStorage via normalizeSwatch (no writes here)
@@ -571,6 +599,12 @@ function removeFromPalette(id) {
   setPaletteActiveColor(prev => (prev?.id === id ? null : prev));
 }
 
+function reorderPalette(next) {
+  if (!Array.isArray(next)) return;
+  setPalette(next);
+  savePaletteIds(next);
+}
+
  const clearPalette = () => {
   setPalette([]);
   savePaletteIds([]);                    // ✅ write here
@@ -601,7 +635,7 @@ function applyBrandFilters(brands) {
     noResults, setNoResults,
     showPalette,
     paletteCollapsed, setPaletteCollapsed,
-    palette, setPalette, addToPalette, removeFromPalette, clearPalette, addManyToPalette,
+    palette, setPalette, addToPalette, removeFromPalette, reorderPalette, clearPalette, addManyToPalette,
     paletteActiveColor, setPaletteActiveColor,
     advancedSearch, setAdvancedSearch,
     applyBrandFilters, brandFiltersAppliedSeq

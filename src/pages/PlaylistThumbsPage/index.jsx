@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CTASection from "@components/CTASection";
 import "./playlist-thumbs.css";
 
@@ -7,6 +7,7 @@ export default function PlaylistThumbsPage() {
   const { playlistId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [title, setTitle] = useState("");
   const [paletteViewerCtaGroupId, setPaletteViewerCtaGroupId] = useState("");
@@ -19,6 +20,7 @@ export default function PlaylistThumbsPage() {
   const psiParam = searchParams.get("psi") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
+  const returnToParam = searchParams.get("return_to") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
 
   useEffect(() => {
@@ -108,6 +110,7 @@ export default function PlaylistThumbsPage() {
     if (psiParam !== "") params.set("psi", psiParam);
     if (thumbParam !== "") params.set("thumb", thumbParam);
     if (demoParam !== "") params.set("demo", demoParam);
+    if (returnToParam !== "") params.set("return_to", returnToParam);
     params.set("end", "1");
     const qs = params.toString();
     navigate(`/playlist/${playlistId}${qs ? `?${qs}` : ""}`);
@@ -146,6 +149,8 @@ export default function PlaylistThumbsPage() {
               if (psiParam !== "") params.set("psi", psiParam);
               if (thumbParam !== "") params.set("thumb", thumbParam);
               if (demoParam !== "") params.set("demo", demoParam);
+              const returnTo = buildReturnTo(location.pathname, location.search);
+              if (returnTo) params.set("return_to", returnTo);
               const qs = params.toString();
               const href = `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
               return (
@@ -202,4 +207,11 @@ export default function PlaylistThumbsPage() {
 
 function formatTitle(value) {
   return String(value || "").replace(/\s*--\s*/g, " — ").trim();
+}
+
+function buildReturnTo(pathname, search) {
+  const params = new URLSearchParams(search || "");
+  params.delete("return_to");
+  const qs = params.toString();
+  return `${pathname}${qs ? `?${qs}` : ""}`;
 }

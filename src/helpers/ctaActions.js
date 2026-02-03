@@ -56,16 +56,16 @@ function runNavigate({ navigate, cta, psi, thumb, demo }) {
   window.open(url, target, "noopener");
 }
 
-function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo }) {
+function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }) {
   if (!data?.playlist_instance_id) return;
   if (thumb) {
-    runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo });
+    runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo });
     return;
   }
-  runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo });
+  runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo });
 }
 
-function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
+function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }) {
   if (!data?.playlist_instance_id) return;
   const params = new URLSearchParams();
   if (cta?.params?.mode) params.set("mode", cta.params.mode);
@@ -77,6 +77,7 @@ function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
   if (psi) params.set("psi", String(psi));
   if (thumb) params.set("thumb", "1");
   if (demo) params.set("demo", "1");
+  if (returnTo) params.set("return_to", returnTo);
   const query = params.toString();
   const url = `/playlist-thumbs/${data.playlist_instance_id}${query ? `?${query}` : ""}`;
   if (navigate) {
@@ -97,7 +98,7 @@ function getPaletteItems(data) {
   });
 }
 
-function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
+function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }) {
   const palettes = getPaletteItems(data);
   if (!palettes.length) return;
   const apId = palettes[0].ap_id;
@@ -113,6 +114,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo }) {
   if (psi) params.set("psi", String(psi));
   if (thumb) params.set("thumb", "1");
   if (demo) params.set("demo", "1");
+  if (returnTo) params.set("return_to", returnTo);
   const qs = params.toString();
   const url = `/view/${apId}${qs ? `?${qs}` : ""}`;
   if (navigate) {
@@ -135,6 +137,7 @@ export function buildCtaHandlers({
   psi,
   thumb,
   demo,
+  returnTo,
 } = {}) {
   return {
     replay: () => {
@@ -161,9 +164,9 @@ export function buildCtaHandlers({
     copy_link: () => runCopyLink({ data, shareFolder }),
     share_playlist: () => runShare({ data, shareFolder }),
     navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data }, psi, thumb, demo }),
-    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo }),
-    to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo }),
-    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo }),
+    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }),
+    to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
+    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
     exit: () => handleExit?.(),
   };
 }

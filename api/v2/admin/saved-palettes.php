@@ -10,7 +10,6 @@ require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
-use App\Repos\PdoClientRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Services\SavedPaletteService;
 
@@ -26,8 +25,7 @@ try {
     }
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $clientRepo  = new PdoClientRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo, $clientRepo);
+    $service     = new SavedPaletteService($paletteRepo);
     $controller  = new SavedPaletteController($service);
 
     $brand = isset($_GET['brand']) ? strtolower(trim((string)$_GET['brand'])) : '';
@@ -52,13 +50,19 @@ try {
     $offset = max(0, $offset);
 
     $withMembers = !empty($_GET['with_members']) && (int) $_GET['with_members'] === 1;
+    $withPhotos  = !empty($_GET['with_photos']) && (int) $_GET['with_photos'] === 1;
 
     $rows = $controller->list($filters, $limit, $offset);
 
-    if ($withMembers && $rows) {
+    if (($withMembers || $withPhotos) && $rows) {
         foreach ($rows as &$row) {
             $full = $controller->getById((int) $row['id'], false);
-            $row['members'] = $full['members'] ?? [];
+            if ($withMembers) {
+                $row['members'] = $full['members'] ?? [];
+            }
+            if ($withPhotos) {
+                $row['photos'] = $full['photos'] ?? [];
+            }
         }
         unset($row);
     }

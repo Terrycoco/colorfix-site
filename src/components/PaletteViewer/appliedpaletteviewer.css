@@ -106,6 +106,7 @@
 }
 .apv-column--photo {
   flex: 1;
+  gap: 4px;
 }
 .apv-column--details {
   flex: 1;
@@ -116,11 +117,35 @@
   border-radius: 16px;
   overflow: hidden;
   background: #000;
+  position: relative;
 }
 
 .apv-photo {
   width: 100%;
   display: block;
+}
+
+.apv-photo-insets {
+  display: flex;
+  gap: 8px;
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+
+.apv-photo-inset {
+  width: 180px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+@media (max-width: 720px) {
+  .apv-photo-inset {
+    width: 140px;
+    height: 96px;
+  }
 }
 
 .apv-photo.placeholder {
@@ -243,6 +268,45 @@
   width: 100%;
   max-width: 1200px;
   margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 24px;
+}
+
+.apv-btn--share {
+  align-self: flex-start;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apv-btn--share:hover {
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.apv-branding {
+  width: 100%;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  margin-top: 12px;
+  padding: 8px 0 22px;
+}
+
+.apv-branding-link {
+  color: #ff7a00;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.apv-branding-link:hover {
+  text-decoration: underline;
 }
 .apv-share-panel h3 {
   margin: 0;
@@ -260,6 +324,44 @@
   padding: 8px;
   font-size: 14px;
 }
+
+.apv-share-panel textarea {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.apv-share-status {
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.apv-share-status--error {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.apv-share-status--success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.apv-share-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.apv-share-panel .apv-btn {
+  color: #111;
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
 .apv-btn--copy {
   background: #111;
   color: #fff;
@@ -289,7 +391,9 @@
 }
 .apv-share-panel .apv-btn--ghost {
   justify-content: center;
-  border-color: #ccc;
+  background: transparent;
+  border-color: #cbd5f5;
+  color: #111;
 }
 
 .apv-logo-button {

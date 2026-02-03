@@ -12,6 +12,7 @@ import ButtonItem from '../GalleryItems/ButtonItem';
 import HeaderItem from '../GalleryItems/HeaderItem';
 import NameSearchItem from '../GalleryItems/NameSearchItem';
 import WheelItem from '../GalleryItems/WheelItem';
+import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
@@ -20,6 +21,7 @@ const renderContent = (item) => {
   const type = (item.item_type || '').toLowerCase();
   switch (type) {
     case 'swatch':      return <SwatchItem key={key} item={item} />;
+    case 'picture-swatch': return <PictureSwatchItem key={key} item={item} />;
     case 'image':       return <ImageItem key={key} item={item} />;
     case 'search':      return <SearchItem key={key} item={item} />;
     case 'quote':       return <QuoteItem key={key} item={item} />;
@@ -47,13 +49,20 @@ function Gallery({ items, runQueryById, meta }) {
   const shouldHideDisclaimer = hideDisclaimerRoutes.some(route => location.pathname === route);
 
   // Mode decided by runner; default to hue
-  const groupMode = meta?.params?.group_mode === 'lightness' ? 'lightness' : 'hue';
+  const groupMode = ['lightness', 'chroma'].includes(meta?.params?.group_mode)
+    ? meta.params.group_mode
+    : 'hue';
 
   // Pick label field per mode (fallbacks included)
-  const getGroupLabel = (item) =>
-    groupMode === 'lightness'
-      ? (item.light_cat_name || item.__light_cat_name_outer || 'TOP')
-      : (item.hue_cats || 'TOP');
+  const getGroupLabel = (item) => {
+    if (groupMode === 'lightness') {
+      return item.light_cat_name || item.__light_cat_name_outer || 'TOP';
+    }
+    if (groupMode === 'chroma') {
+      return 'TOP';
+    }
+    return item.hue_cats || 'TOP';
+  };
 
   const getGroupOrder = (item) => {
     if (groupMode !== 'lightness' || !item) return null;
@@ -104,14 +113,14 @@ function Gallery({ items, runQueryById, meta }) {
   }
 
   // Force section order in lightness mode: Light → Medium → Dark
-  if (groupMode === 'lightness') {
-    sections.sort((a, b) => {
-      const ra = a.groupOrder ?? 999;
-      const rb = b.groupOrder ?? 999;
-      if (ra !== rb) return ra - rb;
-      return String(a.groupName).localeCompare(String(b.groupName));
-    });
-  }
+    if (groupMode === 'lightness') {
+      sections.sort((a, b) => {
+        const ra = a.groupOrder ?? 999;
+        const rb = b.groupOrder ?? 999;
+        if (ra !== rb) return ra - rb;
+        return String(a.groupName).localeCompare(String(b.groupName));
+      });
+    }
 
   // Build jump bar names (exclude TOP) in the same order sections will render
   const groupNames = sections
@@ -131,7 +140,6 @@ function Gallery({ items, runQueryById, meta }) {
         const showHeader = groupName !== 'TOP';
         const anchorId = `section-${slugify(groupName)}`;
 
-        // When in lightness mode, sort *inside* the section: lightest → darkest
         const sectionItems = (groupMode === 'lightness')
           ? [...section.items].sort((a, b) => {
               const la = Number(a.hcl_l ?? 0), lb = Number(b.hcl_l ?? 0);
@@ -140,6 +148,15 @@ function Gallery({ items, runQueryById, meta }) {
               if (ca !== cb) return ca - cb;             // lower chroma first
               const ha = Number(a.hcl_h ?? 0), hb = Number(b.hcl_h ?? 0);
               return ha - hb;                             // then hue
+            })
+          : (groupMode === 'chroma')
+          ? [...section.items].sort((a, b) => {
+              const ca = Number(a.hcl_c ?? 0), cb = Number(b.hcl_c ?? 0);
+              if (cb !== ca) return cb - ca;             // higher chroma first
+              const ha = Number(a.hcl_h ?? 0), hb = Number(b.hcl_h ?? 0);
+              if (ha !== hb) return ha - hb;             // then hue
+              const la = Number(a.hcl_l ?? 0), lb = Number(b.hcl_l ?? 0);
+              return lb - la;                             // then lightness
             })
           : section.items;
 

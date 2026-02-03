@@ -8,7 +8,6 @@ require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
-use App\Repos\PdoClientRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Services\SavedPaletteService;
 
@@ -36,8 +35,7 @@ try {
     unset($payload['palette_id']);
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $clientRepo  = new PdoClientRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo, $clientRepo);
+    $service     = new SavedPaletteService($paletteRepo);
     $controller  = new SavedPaletteController($service);
 
     $result = $controller->updateFromPayload($paletteId, $payload);

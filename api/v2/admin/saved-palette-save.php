@@ -9,7 +9,6 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoClientRepository;
 use App\Services\SavedPaletteService;
 
 try {
@@ -34,8 +33,7 @@ try {
     }
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $clientRepo  = new PdoClientRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo, $clientRepo);
+    $service     = new SavedPaletteService($paletteRepo);
     $controller  = new SavedPaletteController($service);
 
     $result = $controller->saveFromPayload($payload);

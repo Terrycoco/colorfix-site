@@ -9,7 +9,6 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoClientRepository;
 use App\Services\SavedPaletteService;
 use App\Lib\SmtpMailer;
 
@@ -51,16 +50,14 @@ try {
     $mailer = new SmtpMailer($mailConfig);
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $clientRepo  = new PdoClientRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo, $clientRepo, $mailer);
+    $service     = new SavedPaletteService($paletteRepo, $mailer);
     $controller  = new SavedPaletteController($service);
 
     $message = isset($payload['message']) ? (string)$payload['message'] : null;
     $shareUrl = isset($payload['share_url']) ? (string)$payload['share_url'] : null;
-    $clientNameOverride = isset($payload['client_name']) ? (string)$payload['client_name'] : null;
     $subjectOverride = isset($payload['subject']) ? (string)$payload['subject'] : null;
 
-    $controller->sendEmail($paletteId, $toEmail, $message, $shareUrl, $clientNameOverride, $subjectOverride);
+    $controller->sendEmail($paletteId, $toEmail, $message, $shareUrl, $subjectOverride);
 
     echo json_encode(['ok' => true], JSON_UNESCAPED_SLASHES);
 } catch (\InvalidArgumentException $e) {

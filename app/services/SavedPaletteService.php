@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoClientRepository;
 use InvalidArgumentException;
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
@@ -12,18 +11,15 @@ use App\Services\EmailTemplateService;
 class SavedPaletteService
 {
     private PdoSavedPaletteRepository $repo;
-    private ?PdoClientRepository $clientRepo;
     private ?SmtpMailer $mailer;
     private EmailTemplateService $emailTemplates;
 
     public function __construct(
         PdoSavedPaletteRepository $repo,
-        ?PdoClientRepository $clientRepo = null,
         ?SmtpMailer $mailer = null,
         ?EmailTemplateService $emailTemplates = null
     ) {
         $this->repo = $repo;
-        $this->clientRepo = $clientRepo;
         $this->mailer = $mailer;
         $this->emailTemplates = $emailTemplates ?? new EmailTemplateService();
     }
@@ -37,8 +33,6 @@ class SavedPaletteService
      *  - nickname      (string|null)
      *  - notes         (string|null)
      *  - terry_fav     (bool|int|null)
-     *  - sent_to_email (string|null)
-     *  - sent_at       (string|null 'Y-m-d H:i:s')
      *
      * Returns the full palette structure: ['palette' => [...], 'members' => [...]]
      */
@@ -54,7 +48,6 @@ class SavedPaletteService
         }
 
         $members = $this->normalizeMembers($data['color_ids']);
-        $clientId = $this->resolveClientId($data);
 
         // Compute palette_hash based on brand + ordered color_ids
         $colorIdsForHash = array_column($members, 'color_id');
@@ -74,12 +67,9 @@ class SavedPaletteService
         $paletteId = $this->repo->createSavedPalette([
             'palette_hash'  => $paletteHash,
             'brand'         => $brand,
-            'client_id'     => $clientId,
             'nickname'      => $data['nickname']      ?? null,
             'notes'         => $data['notes']         ?? null,
             'terry_fav'     => $data['terry_fav']     ?? 0,
-            'sent_to_email' => $data['sent_to_email'] ?? null,
-            'sent_at'       => $data['sent_at']       ?? null,
         ]);
 
         // Attach members
@@ -94,89 +84,175 @@ class SavedPaletteService
         return $full;
     }
 
+    /**
+     * Overwrite an existing saved palette, including members.
+     */
+    public function overwriteSavedPalette(int $paletteId, array $data): array
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
+        }
+
+        $brand = trim((string)($data['brand'] ?? ''));
+        if ($brand === '') {
+            throw new InvalidArgumentException('brand is required');
+        }
+
+        if (empty($data['color_ids'])) {
+            throw new InvalidArgumentException('At least one color_id is required');
+        }
+
+        $existing = $this->repo->getSavedPaletteById($paletteId);
+        if (!$existing) {
+            throw new InvalidArgumentException('Saved palette not found');
+        }
+
+        $members = $this->normalizeMembers($data['color_ids']);
+        $colorIdsForHash = array_column($members, 'color_id');
+        $hashInput       = $brand . ':' . implode(',', $colorIdsForHash);
+        $paletteHash     = hash('sha256', $hashInput);
+
+        $this->repo->updateSavedPalette($paletteId, [
+            'palette_hash'  => $paletteHash,
+            'brand'         => $brand,
+            'nickname'      => $data['nickname']      ?? null,
+            'notes'         => $data['notes']         ?? null,
+            'terry_fav'     => $data['terry_fav']     ?? 0,
+        ]);
+
+        $this->repo->replaceMembers($paletteId, $members);
+
+        $full = $this->repo->getFullPalette($paletteId);
+        if ($full === null) {
+            throw new \RuntimeException('Failed to load saved palette after overwrite');
+        }
+
+        return $full;
+    }
+
     public function deleteSavedPalette(int $savedPaletteId): void
     {
         if ($savedPaletteId <= 0) {
             throw new InvalidArgumentException('saved_palette_id required');
         }
+        $photos = $this->repo->getPhotosForPalette($savedPaletteId);
+        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../..'), '/');
+        foreach ($photos as $photo) {
+            $rel = (string)($photo['rel_path'] ?? '');
+            if ($rel === '' || !str_starts_with($rel, '/photos/')) {
+                continue;
+            }
+            $abs = $docRoot . $rel;
+            if (is_file($abs)) {
+                @unlink($abs);
+            }
+        }
+        $this->repo->deletePhotosForPalette($savedPaletteId);
         $this->repo->deleteMembersForPalette($savedPaletteId);
         $this->repo->deleteViewsForPalette($savedPaletteId);
         $this->repo->deleteSavedPalette($savedPaletteId);
     }
-    private function resolveClientId(array $data): ?int
+
+    /**
+     * Replace palette members (colors + roles) and update palette_hash.
+     */
+    public function updateSavedPaletteMembers(int $paletteId, array $members): array
     {
-        $email = trim((string)($data['client_email'] ?? ''));
-        $name  = trim((string)($data['client_name'] ?? ''));
-        $phone = trim((string)($data['client_phone'] ?? ''));
-        $notes = trim((string)($data['client_notes'] ?? ''));
-        $explicitId = isset($data['client_id']) ? (int)$data['client_id'] : null;
-
-        if ($explicitId) {
-            if ($this->clientRepo) {
-                $existing = $this->clientRepo->findById($explicitId);
-                if ($existing) {
-                    $updates = [];
-                    if ($name !== '' && $existing['name'] !== $name) {
-                        $updates['name'] = $name;
-                    }
-                    if ($email !== '' && ($existing['email'] ?? '') !== $email) {
-                        $updates['email'] = $email;
-                    }
-                    if ($phone !== '' && ($existing['phone'] ?? '') !== $phone) {
-                        $updates['phone'] = $phone;
-                    }
-                    if ($notes !== '' && ($existing['notes'] ?? '') !== $notes) {
-                        $updates['notes'] = $notes;
-                    }
-                    if ($updates) {
-                        $this->clientRepo->update($explicitId, $updates);
-                    }
-                }
-            }
-            return $explicitId;
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
         }
 
-        if (!$this->clientRepo) {
-            return null;
+        if (empty($members)) {
+            throw new InvalidArgumentException('members must be a non-empty array');
         }
 
-        if ($email === '' && $name === '' && $phone === '') {
-            return null;
+        $existing = $this->repo->getSavedPaletteById($paletteId);
+        if (!$existing) {
+            throw new InvalidArgumentException('Saved palette not found');
         }
 
-        $existing = $email !== '' ? $this->clientRepo->findByEmail($email) : null;
-        if ($existing) {
-            $updates = [];
-            if ($name !== '' && $existing['name'] !== $name) {
-                $updates['name'] = $name;
-            }
-            if ($phone !== '' && ($existing['phone'] ?? '') !== $phone) {
-                $updates['phone'] = $phone;
-            }
-            if ($notes !== '' && ($existing['notes'] ?? '') !== $notes) {
-                $updates['notes'] = $notes;
-            }
-            if ($updates) {
-                $this->clientRepo->update((int)$existing['id'], $updates);
-            }
-            return (int)$existing['id'];
+        $normalized = $this->normalizeMembers($members);
+        $colorIdsForHash = array_column($normalized, 'color_id');
+        $brand = trim((string)($existing['brand'] ?? ''));
+        if ($brand === '') {
+            throw new InvalidArgumentException('brand is required');
         }
 
-        if ($email === '' && $name === '') {
-            return null;
-        }
+        $hashInput   = $brand . ':' . implode(',', $colorIdsForHash);
+        $paletteHash = hash('sha256', $hashInput);
 
-        return $this->clientRepo->create([
-            'name'  => $name !== '' ? $name : ($email ?: 'Client'),
-            'email' => $email !== '' ? $email : sprintf('unknown-%s@invalid.local', uniqid()),
-            'phone' => $phone !== '' ? $phone : null,
-            'notes' => $notes !== '' ? $notes : null,
+        $this->repo->updateSavedPalette($paletteId, [
+            'palette_hash' => $paletteHash,
         ]);
+
+        $this->repo->replaceMembers($paletteId, $normalized);
+
+        $full = $this->repo->getFullPalette($paletteId);
+        if ($full === null) {
+            throw new \RuntimeException('Failed to load saved palette after update');
+        }
+
+        return $full;
     }
 
     /**
+     * Update photo metadata for a palette.
+     *
+     * $photos: array of ['id' => int, 'photo_type' => string, 'trigger_color_id' => ?int, 'caption' => ?string]
+     */
+    public function updateSavedPalettePhotos(int $paletteId, array $photos): void
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
+        }
+
+        if (empty($photos)) {
+            return;
+        }
+
+        $existing = $this->repo->getSavedPaletteById($paletteId);
+        if (!$existing) {
+            throw new InvalidArgumentException('Saved palette not found');
+        }
+
+        foreach ($photos as $photo) {
+            if (!is_array($photo)) {
+                continue;
+            }
+            $photoId = isset($photo['id']) ? (int)$photo['id'] : 0;
+            if ($photoId <= 0) {
+                continue;
+            }
+
+            $photoType = isset($photo['photo_type']) ? trim((string)$photo['photo_type']) : '';
+            if (!in_array($photoType, ['full', 'zoom'], true)) {
+                $photoType = 'full';
+            }
+
+            $triggerId = null;
+            if (array_key_exists('trigger_color_id', $photo)) {
+                $triggerId = (int)$photo['trigger_color_id'];
+                if ($triggerId <= 0) {
+                    $triggerId = null;
+                }
+            }
+
+            $caption = null;
+            if (array_key_exists('caption', $photo)) {
+                $cap = trim((string)$photo['caption']);
+                $caption = $cap === '' ? null : $cap;
+            }
+
+            $this->repo->updatePhoto($photoId, $paletteId, [
+                'photo_type' => $photoType,
+                'trigger_color_id' => $triggerId,
+                'caption' => $caption,
+            ]);
+        }
+    }
+    /**
      * Normalize color_ids into the shape expected by addMembers():
-     *  - always an array of ['color_id' => int, 'order_index' => int]
+     *  - always an array of ['color_id' => int, 'order_index' => int, 'role' => ?string]
      */
     private function normalizeMembers(array $colorIds): array
     {
@@ -192,11 +268,12 @@ class SavedPaletteService
                 if (!is_numeric($cid)) {
                     continue;
                 }
-                $normalized[] = [
-                    'color_id'    => (int)$cid,
-                    'order_index' => $order++,
-                ];
-            }
+            $normalized[] = [
+                'color_id'    => (int)$cid,
+                'order_index' => $order++,
+                'role'        => null,
+            ];
+        }
             if (!empty($normalized)) {
                 return $normalized;
             }
@@ -211,9 +288,17 @@ class SavedPaletteService
             if (!is_numeric($item['color_id'])) {
                 continue;
             }
+            $role = null;
+            if (array_key_exists('role', $item)) {
+                $role = is_string($item['role']) ? trim($item['role']) : null;
+                if ($role === '') {
+                    $role = null;
+                }
+            }
             $normalized[] = [
                 'color_id'    => (int)$item['color_id'],
                 'order_index' => isset($item['order_index']) ? (int)$item['order_index'] : $order,
+                'role'        => $role,
             ];
             $order++;
         }
@@ -290,7 +375,6 @@ class SavedPaletteService
         string $toEmail,
         ?string $message = null,
         ?string $shareUrl = null,
-        ?string $clientNameOverride = null,
         ?string $subjectOverride = null
     ): void
     {
@@ -317,12 +401,6 @@ class SavedPaletteService
             $shareUrl = sprintf('https://colorfix.terrymarr.com/palette/%s/share', $palette['palette_hash'] ?? $paletteId);
         }
 
-        if ($clientNameOverride !== null && $clientNameOverride !== '') {
-            $palette['client_name'] = $clientNameOverride;
-        } elseif ($clientName !== '' && empty($palette['client_name'])) {
-            $palette['client_name'] = $clientName;
-        }
-
         [$subject, $html, $text] = $this->emailTemplates->renderPaletteEmail(
             $palette,
             $members,
@@ -333,10 +411,6 @@ class SavedPaletteService
 
         $this->mailer->send($toEmail, $subject, $html, $text);
 
-        $this->repo->updateSavedPalette($paletteId, [
-            'sent_to_email' => $toEmail,
-            'sent_at'       => date('Y-m-d H:i:s'),
-        ]);
     }
 
     /**
@@ -367,20 +441,7 @@ class SavedPaletteService
     }
 
     /**
-     * Convenience: find all palettes that were sent to a particular email.
-     */
-    public function findPalettesByEmail(string $email): array
-    {
-        $email = trim($email);
-        if ($email === '') {
-            return [];
-        }
-
-        return $this->repo->findPalettesByEmail($email);
-    }
-
-    /**
-     * Update metadata/client info for an existing saved palette.
+     * Update metadata for an existing saved palette.
      */
     public function updateSavedPalette(int $paletteId, array $data): array
     {
@@ -405,30 +466,8 @@ class SavedPaletteService
             $fields['notes'] = $notes === '' ? null : $notes;
         }
 
-        if (array_key_exists('sent_to_email', $data)) {
-            $email = trim((string)$data['sent_to_email']);
-            $fields['sent_to_email'] = $email === '' ? null : $email;
-        }
-
-        if (array_key_exists('sent_at', $data)) {
-            $sentAt = trim((string)$data['sent_at']);
-            $fields['sent_at'] = $sentAt === '' ? null : $sentAt;
-        }
-
         if (array_key_exists('terry_fav', $data)) {
             $fields['terry_fav'] = (int) (bool) $data['terry_fav'];
-        }
-
-        $clientKeys = ['client_id', 'client_name', 'client_email', 'client_phone', 'client_notes'];
-        $shouldUpdateClient = false;
-        foreach ($clientKeys as $ck) {
-            if (array_key_exists($ck, $data)) {
-                $shouldUpdateClient = true;
-                break;
-            }
-        }
-        if ($shouldUpdateClient) {
-            $fields['client_id'] = $this->resolveClientId($data);
         }
 
         if (!empty($fields)) {

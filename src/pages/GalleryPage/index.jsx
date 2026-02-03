@@ -130,9 +130,11 @@ const GalleryPage = () => {
     navigate(`${location.pathname}?${sp.toString()}`, { replace: true });
   }
 
-  const groupMode = (paramObj.group_mode === 'lightness') ? 'lightness' : 'hue';
+  const groupMode = ['lightness', 'chroma'].includes(paramObj.group_mode) ? paramObj.group_mode : 'hue';
   function setGroupMode(next) {
-    setUrlParamAndNavigate('group_mode', next === 'lightness' ? 'lightness' : 'hue');
+    const allowed = ['hue', 'lightness', 'chroma'];
+    const mode = allowed.includes(next) ? next : 'hue';
+    setUrlParamAndNavigate('group_mode', mode === 'hue' ? 'hue' : mode);
   }
 
   // Initial / route-change
@@ -192,6 +194,16 @@ const GalleryPage = () => {
           >
             <span className="btn-label-full">Group by Lightness</span>
             <span className="btn-label-short">By Lightness</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setGroupMode('chroma')}
+            aria-pressed={groupMode === 'chroma'}
+            className={`btn ${groupMode === 'chroma' ? 'btn-active' : ''}`}
+            title="Group by Chroma"
+          >
+            <span className="btn-label-full">Group by Chroma</span>
+            <span className="btn-label-short">By Chroma</span>
           </button>
         </div>
       )}

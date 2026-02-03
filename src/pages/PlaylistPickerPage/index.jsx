@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-picker.css";
 
@@ -8,6 +8,7 @@ const SET_URL = "/api/v2/playlist-instance-sets/get.php";
 export default function PlaylistPickerPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const setId = Number(searchParams.get("psi") || 0);
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
@@ -61,6 +62,8 @@ export default function PlaylistPickerPage() {
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (setId) params.set("psi", String(setId));
+    const returnTo = buildReturnTo(location, searchParams);
+    if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
     return `/playlist/${playlistInstanceId}${qs ? `?${qs}` : ""}`;
   };
@@ -71,6 +74,8 @@ export default function PlaylistPickerPage() {
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
+    const returnTo = buildReturnTo(location, searchParams);
+    if (returnTo) params.set("return_to", returnTo);
     params.set("psi", String(targetSetId));
     const qs = params.toString();
     return `/picker${qs ? `?${qs}` : ""}`;
@@ -144,4 +149,11 @@ export default function PlaylistPickerPage() {
 
 function formatTitle(value) {
   return String(value || "").replace(/\s*--\s*/g, " — ").trim();
+}
+
+function buildReturnTo(location, searchParams) {
+  const params = new URLSearchParams(searchParams);
+  params.delete("return_to");
+  const qs = params.toString();
+  return `${location.pathname}${qs ? `?${qs}` : ""}`;
 }
