@@ -13,6 +13,8 @@ use App\Repos\PdoColorRepository;
 use App\Repos\PdoMaskBlendSettingRepository;
 use App\Services\PhotoRenderingService;
 use App\Services\MaskBlendService;
+use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 use RuntimeException;
 
 function respond(array $payload, int $status = 200): void {
@@ -200,6 +202,16 @@ try {
                 $renderInfo = $renderService->cacheAppliedPalette($latest);
                 $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 0, updated_at = NOW() WHERE id = :id")
                     ->execute([':id' => $paletteId]);
+                if (!empty($renderInfo['render_rel_path'])) {
+                    $library = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+                    $library->syncAppliedPalettePhoto([
+                        'id' => $paletteId,
+                        'title' => $title ?? null,
+                        'display_title' => $displayTitle ?? null,
+                        'tags' => $tags ?? null,
+                        'alt_text' => $altText ?? null,
+                    ], (string)$renderInfo['render_rel_path']);
+                }
             } catch (Throwable $renderEx) {
                 $renderError = $renderEx->getMessage();
             }

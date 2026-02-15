@@ -4,8 +4,8 @@ declare(strict_types=1);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
 header('Content-Type: application/json; charset=UTF-8');
 
-require_once __DIR__ . '/../../autoload.php';
-require_once __DIR__ . '/../../db.php';
+require_once __DIR__ . '/../../../autoload.php';
+require_once __DIR__ . '/../../../db.php';
 
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
@@ -59,7 +59,7 @@ try {
     $htmlBody = trim((string)($payload['html_body'] ?? ''));
     $title = trim((string)($payload['title'] ?? ''));
 
-    $mailConfigPath = dirname(__DIR__, 3) . '/config/mail.php';
+    $mailConfigPath = dirname(__DIR__, 4) . '/config/mail.php';
     if (!is_file($mailConfigPath)) {
         throw new RuntimeException('Missing mail.php config at ' . $mailConfigPath);
     }

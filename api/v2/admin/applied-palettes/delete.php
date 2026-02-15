@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../../db.php';
 
 use PDO;
 use App\Repos\PdoAppliedPaletteRepository;
+use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -27,6 +29,7 @@ try {
     }
 
     $repo = new PdoAppliedPaletteRepository($pdo);
+    $library = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
     $assetId = null;
     $stmt = $pdo->prepare("SELECT asset_id FROM applied_palettes WHERE id = :id LIMIT 1");
     $stmt->execute([':id' => $paletteId]);
@@ -45,6 +48,7 @@ try {
     $debug['shares_deleted'] = execDelete($pdo, "DELETE FROM applied_palette_shares WHERE applied_palette_id = :id", [':id' => $paletteId]);
     $debug['client_links_deleted'] = execDelete($pdo, "DELETE FROM client_applied_palettes WHERE applied_palette_id = :id", [':id' => $paletteId]);
     $debug['palette_deleted'] = execDelete($pdo, "DELETE FROM applied_palettes WHERE id = :id", [':id' => $paletteId]);
+    $library->deleteAppliedPalettePhoto($paletteId);
 
     // Fallback: if nothing deleted and we have an asset id, attempt delete by asset id.
     if (

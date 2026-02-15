@@ -45,6 +45,47 @@ class PhotoLibraryService
         $this->repo->deleteBySource('saved_palette_photo', $photoId);
     }
 
+    public function syncAppliedPalettePhoto(array $palette, string $relPath, array $overrides = []): int
+    {
+        $paletteId = isset($palette['id']) ? (int)$palette['id'] : 0;
+        $relPath = trim($relPath);
+        if ($paletteId <= 0 || $relPath === '') {
+            return 0;
+        }
+        $sourceType = 'applied_palette';
+        $title = $palette['display_title'] ?? $palette['title'] ?? null;
+        $data = [
+            'source_type' => $sourceType,
+            'source_id' => $paletteId,
+            'rel_path' => $relPath,
+            'title' => $overrides['title'] ?? $title,
+            'tags' => $overrides['tags'] ?? ($palette['tags'] ?? null),
+            'alt_text' => $overrides['alt_text'] ?? ($palette['alt_text'] ?? null),
+        ];
+
+        $existingId = $this->repo->findIdBySourceAndRel($sourceType, $paletteId, $relPath);
+        if ($existingId) {
+            $updateData = ['rel_path' => $relPath];
+            if (array_key_exists('title', $overrides)) $updateData['title'] = $overrides['title'];
+            if (array_key_exists('tags', $overrides)) $updateData['tags'] = $overrides['tags'];
+            if (array_key_exists('alt_text', $overrides)) $updateData['alt_text'] = $overrides['alt_text'];
+            $this->repo->update($existingId, $updateData);
+            return $existingId;
+        }
+
+        $data['show_in_gallery'] = array_key_exists('show_in_gallery', $overrides) ? (int)$overrides['show_in_gallery'] : 0;
+        $data['has_palette'] = array_key_exists('has_palette', $overrides) ? (int)$overrides['has_palette'] : 1;
+        return $this->repo->insert($data);
+    }
+
+    public function deleteAppliedPalettePhoto(int $paletteId): void
+    {
+        if ($paletteId <= 0) {
+            return;
+        }
+        $this->repo->deleteBySource('applied_palette', $paletteId);
+    }
+
     public function syncExtraPhoto(int $photoId, string $role, string $relPath, array $overrides = []): int
     {
         $role = trim($role);

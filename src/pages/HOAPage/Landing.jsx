@@ -13,10 +13,9 @@ export default function HOALandingPage() {
     <main className="hoa-page">
       <h1>HOA Exterior Color Playlists</h1>
         <p className="hoa-subhead">
-          A visual system that shows approved exterior color schemes<br /> 
-          on each home model — so homeowners choose confidently <br />
-          and boards approve consistently.
+          A visual system for presenting approved exterior color schemes on each home model
         </p>
+        <p><strong>Designed to reduce approval disputes and streamline architectural review.</strong></p>
            <figure className="hoa-hero-image">
           <img
             src="/images/hoa-landing-hero.png"

@@ -169,10 +169,11 @@ try {
     $zoomByColor = [];
     if ($colorIds) {
       $placeholders = implode(',', array_fill(0, count($colorIds), '?'));
-      $sqlPhotos = "
+
+      $sqlSaved = "
         SELECT m.color_id,
-               p.id AS photo_id,
-               p.rel_path,
+               pl.photo_library_id,
+               pl.rel_path,
                p.photo_type,
                p.trigger_color_id,
                p.order_index,
@@ -185,38 +186,96 @@ try {
             ON p.saved_palette_id = m.saved_palette_id
           JOIN saved_palettes sp
             ON sp.id = m.saved_palette_id
+          JOIN photo_library pl
+            ON pl.source_type = 'saved_palette_photo'
+           AND pl.source_id = p.id
          WHERE m.color_id IN ($placeholders)
-           AND COALESCE(sp.palette_type, 'exterior') <> 'hoa'
+           AND pl.show_in_gallery = 1
+           AND pl.has_palette = 1
          ORDER BY m.color_id ASC, p.order_index ASC, p.id ASC
       ";
 
-      $stmtPhotos = $pdo->prepare($sqlPhotos);
-      $stmtPhotos->execute(array_keys($colorIds));
-      $photoRows = $stmtPhotos->fetchAll(PDO::FETCH_ASSOC);
+      $stmtSaved = $pdo->prepare($sqlSaved);
+      $stmtSaved->execute(array_keys($colorIds));
+      $savedRows = $stmtSaved->fetchAll(PDO::FETCH_ASSOC);
+
+      $sqlApplied = "
+        SELECT ape.color_id,
+               pl.photo_library_id,
+               pl.rel_path,
+               ap.id AS applied_palette_id,
+               ap.title,
+               ap.display_title
+          FROM applied_palette_entries ape
+          JOIN applied_palettes ap
+            ON ap.id = ape.applied_palette_id
+          JOIN photo_library pl
+            ON pl.source_type = 'applied_palette'
+           AND pl.source_id = ap.id
+         WHERE ape.color_id IN ($placeholders)
+           AND pl.show_in_gallery = 1
+           AND pl.has_palette = 1
+         ORDER BY ape.color_id ASC, ap.id ASC
+      ";
+
+      $stmtApplied = $pdo->prepare($sqlApplied);
+      $stmtApplied->execute(array_keys($colorIds));
+      $appliedRows = $stmtApplied->fetchAll(PDO::FETCH_ASSOC);
+
+      $photoRows = array_merge($savedRows, $appliedRows);
 
       $byColor = [];
       foreach ($photoRows as $row) {
         $cid = (int)$row['color_id'];
-        $pid = (int)$row['saved_palette_id'];
-        if (!$cid || !$pid) continue;
+        if (!$cid) continue;
         if (!isset($byColor[$cid])) $byColor[$cid] = [];
-        if (!isset($byColor[$cid][$pid])) {
-          $byColor[$cid][$pid] = [
-            'palette' => [
-              'id' => $pid,
-              'hash' => $row['palette_hash'] ?? null,
-              'nickname' => $row['nickname'] ?? null,
-              'brand' => $row['brand'] ?? null,
-            ],
-            'photos' => [],
+
+        if (!empty($row['saved_palette_id'])) {
+          $pid = (int)$row['saved_palette_id'];
+          $paletteKey = "saved:{$pid}";
+          if (!isset($byColor[$cid][$paletteKey])) {
+            $byColor[$cid][$paletteKey] = [
+              'palette' => [
+                'kind' => 'saved',
+                'id' => $pid,
+                'hash' => $row['palette_hash'] ?? null,
+                'nickname' => $row['nickname'] ?? null,
+                'brand' => $row['brand'] ?? null,
+              ],
+              'photos' => [],
+            ];
+          }
+          $byColor[$cid][$paletteKey]['photos'][] = [
+            'photo_id' => (int)$row['photo_library_id'],
+            'rel_path' => $row['rel_path'] ?? null,
+            'photo_type' => $row['photo_type'] ?? null,
+            'trigger_color_id' => isset($row['trigger_color_id']) ? (int)$row['trigger_color_id'] : null,
+          ];
+          continue;
+        }
+
+        if (!empty($row['applied_palette_id'])) {
+          $pid = (int)$row['applied_palette_id'];
+          $paletteKey = "applied:{$pid}";
+          if (!isset($byColor[$cid][$paletteKey])) {
+            $title = $row['display_title'] ?? $row['title'] ?? null;
+            $byColor[$cid][$paletteKey] = [
+              'palette' => [
+                'kind' => 'applied',
+                'id' => $pid,
+                'nickname' => $title,
+                'brand' => null,
+              ],
+              'photos' => [],
+            ];
+          }
+          $byColor[$cid][$paletteKey]['photos'][] = [
+            'photo_id' => (int)$row['photo_library_id'],
+            'rel_path' => $row['rel_path'] ?? null,
+            'photo_type' => 'full',
+            'trigger_color_id' => $cid,
           ];
         }
-        $byColor[$cid][$pid]['photos'][] = [
-          'photo_id' => (int)$row['photo_id'],
-          'rel_path' => $row['rel_path'] ?? null,
-          'photo_type' => $row['photo_type'] ?? null,
-          'trigger_color_id' => isset($row['trigger_color_id']) ? (int)$row['trigger_color_id'] : null,
-        ];
       }
 
       foreach ($byColor as $cid => $palettes) {
@@ -303,6 +362,7 @@ try {
                 'photo_type' => $photo['photo_type'] ?? null,
                 'palette_id' => $palette['id'] ?? null,
                 'palette_hash' => $palette['hash'] ?? null,
+                'ap_id' => ($palette['kind'] ?? '') === 'applied' ? ($palette['id'] ?? null) : null,
                 'palette_name' => $palette['nickname'] ?? null,
                 'palette_brand' => $palette['brand'] ?? null,
                 'source_color_id' => $cid,
@@ -331,6 +391,7 @@ try {
                 'photo_type' => $zphoto['photo_type'] ?? null,
                 'palette_id' => $zpalette['id'] ?? null,
                 'palette_hash' => $zpalette['hash'] ?? null,
+                'ap_id' => ($zpalette['kind'] ?? '') === 'applied' ? ($zpalette['id'] ?? null) : null,
                 'palette_name' => $zpalette['nickname'] ?? null,
                 'palette_brand' => $zpalette['brand'] ?? null,
                 'source_color_id' => $cid,

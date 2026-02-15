@@ -7,6 +7,9 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -33,8 +36,10 @@ try {
         $params[':source_type'] = $sourceType;
     }
     if ($q !== '') {
-        $where[] = '(photo_library.title LIKE :q OR photo_library.tags LIKE :q OR photo_library.rel_path LIKE :q)';
-        $params[':q'] = '%' . $q . '%';
+        $where[] = '(photo_library.title LIKE :q_title OR photo_library.tags LIKE :q_tags OR photo_library.rel_path LIKE :q_path)';
+        $params[':q_title'] = '%' . $q . '%';
+        $params[':q_tags'] = '%' . $q . '%';
+        $params[':q_path'] = '%' . $q . '%';
     }
 
     $joins = "";
@@ -43,6 +48,28 @@ try {
         $where[] = "photo_library.source_type = 'saved_palette_photo'";
         $where[] = "spp.saved_palette_id = :palette_id";
         $params[':palette_id'] = $paletteId;
+    }
+
+    if ($sourceType === '' || $sourceType === 'applied_palette') {
+        $repo = new PdoPhotoLibraryRepository($pdo);
+        $library = new PhotoLibraryService($repo);
+        $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
+        $publicRoot = rtrim(dirname(__DIR__, 4), '/');
+
+        $paletteRows = $pdo->query("SELECT id, title, display_title, tags, alt_text FROM applied_palettes ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($paletteRows as $row) {
+            $paletteId = (int)$row['id'];
+            if ($paletteId <= 0) continue;
+            $renderRel = "/photos/rendered/ap_{$paletteId}.jpg";
+            $renderAbs = $docRoot . $renderRel;
+            if (!is_file($renderAbs)) {
+                $altAbs = $publicRoot . $renderRel;
+                if (!is_file($altAbs)) {
+                    continue;
+                }
+            }
+            $library->syncAppliedPalettePhoto($row, $renderRel);
+        }
     }
 
     $sql = "SELECT photo_library.photo_library_id,

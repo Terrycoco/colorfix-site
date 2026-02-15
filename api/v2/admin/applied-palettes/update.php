@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoAppliedPaletteRepository;
+use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -46,6 +48,20 @@ try {
 
     if ($fields) {
         $repo->updatePalette($paletteId, $fields);
+    }
+
+    $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
+    $renderRel = "/photos/rendered/ap_{$paletteId}.jpg";
+    $renderAbs = $docRoot . $renderRel;
+    if (is_file($renderAbs)) {
+        $library = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+        $library->syncAppliedPalettePhoto([
+            'id' => $paletteId,
+            'title' => $title ?? null,
+            'display_title' => $displayTitle ?? null,
+            'tags' => $tags ?? null,
+            'alt_text' => $altText ?? null,
+        ], $renderRel);
     }
 
     echo json_encode(['ok' => true]);

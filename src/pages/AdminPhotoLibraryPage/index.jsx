@@ -11,6 +11,7 @@ const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 
 const SOURCE_OPTIONS = [
   { value: "saved_palette", label: "Saved Palette" },
+  { value: "applied_palette", label: "Applied Palette" },
   { value: "progression", label: "Progression" },
   { value: "article", label: "Article" },
 ];
@@ -129,6 +130,10 @@ export default function AdminPhotoLibraryPage() {
       setUploadStatus({ error: "Select at least one photo.", success: "" });
       return;
     }
+    if (uploadForm.source_type === "applied_palette") {
+      setUploadStatus({ error: "Applied palette photos are auto-synced; no upload needed.", success: "" });
+      return;
+    }
     if (uploadForm.source_type === "saved_palette" && !uploadForm.palette_id) {
       setUploadStatus({ error: "Choose a saved palette.", success: "" });
       return;
@@ -224,7 +229,7 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const showSavedFields = uploadForm.source_type === "saved_palette";
-  const showLibraryFields = uploadForm.source_type !== "saved_palette";
+  const showLibraryFields = uploadForm.source_type !== "saved_palette" && uploadForm.source_type !== "applied_palette";
 
   useEffect(() => {
     if (uploadForm.source_type === "saved_palette" && uploadForm.palette_id) {
@@ -369,6 +374,11 @@ export default function AdminPhotoLibraryPage() {
             </button>
           </div>
         </form>
+        {uploadForm.source_type === "applied_palette" && (
+          <div className="admin-photo-library__hint">
+            Applied palette photos are auto-synced when a render is cached.
+          </div>
+        )}
       </section>
 
       <section className="admin-photo-library__section">
@@ -392,6 +402,7 @@ export default function AdminPhotoLibraryPage() {
             >
               <option value="">All</option>
               <option value="saved_palette_photo">Saved palette</option>
+              <option value="applied_palette">Applied palette</option>
               <option value="progression">Progression</option>
               <option value="article">Article</option>
               <option value="extra_photo">Extras</option>

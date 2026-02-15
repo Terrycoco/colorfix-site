@@ -4,7 +4,11 @@ const PictureSwatchItem = ({ item }) => {
   const brand = item?.palette_brand ? String(item.palette_brand).toUpperCase() : "";
   const name = item?.palette_name || "Saved Palette";
   const meta = brand ? brand : (item?.palette_id ? `Palette #${item.palette_id}` : "");
-  const to = item?.palette_hash ? `/palette/${item.palette_hash}/share` : undefined;
+  const to = item?.palette_hash
+    ? `/palette/${item.palette_hash}/share`
+    : item?.ap_id
+      ? `/view/${item.ap_id}`
+      : undefined;
 
   return (
     <PictureSwatch
