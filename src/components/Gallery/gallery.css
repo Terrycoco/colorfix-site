@@ -132,6 +132,13 @@
 
 
 /* ----- Gallery toggle buttons ----- */
+.gallery-controls {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: nowrap;
+}
+
 .gallery-controls .btn {
   appearance: none;
   border: 1px solid #d6dbe1;
@@ -149,9 +156,16 @@
 }
 
 @media (max-width: 700px) {
+  .gallery-controls {
+    gap: 6px;
+  }
+
   .gallery-controls .btn {
-    padding: 6px 10px;
-    font-size: 0.85rem;
+    padding: 6px 6px;
+    font-size: 0.75rem;
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
   }
 
   .gallery-controls .btn .btn-label-full {
@@ -179,4 +193,32 @@
   color: #fff;
   border-color: #ff9f1a;
   box-shadow: none;
+}
+
+.back-to-top {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  border: none;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.25);
+  cursor: pointer;
+}
+
+.back-to-top:hover {
+  background: #1a1a1a;
+}
+
+@media (max-width: 700px) {
+  .back-to-top {
+    right: 12px;
+    bottom: 12px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
 }

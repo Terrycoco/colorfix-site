@@ -46,6 +46,7 @@ class PdoPlaylistRepository
                 playlist_id,
                 order_index,
                 ap_id,
+                palette_hash,
                 image_url,
                 title,
                 subtitle,
@@ -79,6 +80,7 @@ class PdoPlaylistRepository
 
             $items[] = new PlaylistItem(
                 (string)($row['ap_id'] ?? ''),
+                $row['palette_hash'] ?? null,
                 $row['image_url'] ?? null,
                 $row['title'] ?? null,
                 $row['subtitle'] ?? null,

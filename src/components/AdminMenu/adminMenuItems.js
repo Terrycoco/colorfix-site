@@ -12,6 +12,7 @@ export const adminMenuItems = [
     label: "Palettes",
     items: [
       { label: "Saved Palettes", href: "/admin/saved-palettes" },
+      { label: "Kickers", href: "/admin/kickers" },
       { label: "Applied Palettes", href: "/admin/applied-palettes" },
       { label: "Mask Tester", href: "/admin/mask-tester" },
     ],
@@ -48,6 +49,8 @@ export const adminMenuItems = [
     label: "Tools",
     items: [
       { label: "Search Presets", href: "/admin/search-presets" },
+      { label: "Ideas/ToDos", href: "/admin/ideas" },
+      { label: "Photo Library", href: "/admin/photo-library" },
       { label: "SQL Builder", href: "/admin/sql" },
       { label: "Items", href: "/admin/items" },
       { label: "Filters", href: "/admin/filters" },

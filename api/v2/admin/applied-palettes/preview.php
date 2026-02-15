@@ -53,6 +53,7 @@ try {
         $palette->displayTitle,
         $palette->notes,
         $palette->tags,
+        $palette->kickerId,
         $palette->photoId,
         $palette->assetId,
         $entries

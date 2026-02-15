@@ -36,6 +36,8 @@ $assetId = trim((string)($input['asset_id'] ?? ''));
 $title = trim((string)($input['title'] ?? ($input['nickname'] ?? '')));
 $displayTitle = trim((string)($input['display_title'] ?? ''));
 $notes = trim((string)($input['notes'] ?? ''));
+$altText = array_key_exists('alt_text', $input) ? trim((string)($input['alt_text'] ?? '')) : '';
+$kickerId = isset($input['kicker_id']) ? (int)($input['kicker_id'] ?: 0) : null;
 $entries = $input['entries'] ?? [];
 $clientId = isset($input['client_id']) ? (int)$input['client_id'] : null;
 $clientPayload = isset($input['client']) && is_array($input['client']) ? $input['client'] : null;
@@ -84,6 +86,8 @@ try {
         'title' => $title,
         'display_title' => $displayTitle !== '' ? $displayTitle : null,
         'notes' => $notes,
+        'alt_text' => $altText !== '' ? $altText : null,
+        'kicker_id' => $kickerId ?: null,
     ]);
     $paletteId = $palette['id'];
 

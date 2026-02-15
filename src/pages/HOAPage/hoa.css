@@ -223,3 +223,24 @@
 .hoa-secondary-cta {
   margin-top: 16px;
 }
+.hoa-section {
+  list-style: none;
+  padding-left: 0;
+}
+
+.hoa-section li {
+  position: relative;
+  padding-left: 1.2rem;
+  margin-bottom: 0.75rem;
+}
+
+.hoa-section li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  background-color: rgba(0,0,0,0.4);
+  border-radius: 50%;
+}

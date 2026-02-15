@@ -8,6 +8,7 @@
 
 .board-scroller{
   position: sticky; top: 0; width: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
   background:#000; color:#fff; border-bottom:1px solid #111;
   z-index: var(--board-scroller-z-index);
 }
@@ -17,7 +18,7 @@
   position: relative; /* anchor absolute centering */
   max-width: var(--cap, 1320px);
   margin-inline: auto;
-  height: var(--bar-h);
+  height: calc(var(--bar-h) + env(safe-area-inset-top, 0px));
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -98,7 +99,7 @@
 .sticky-palette-wrapper {
   z-index: 10000;
   position: sticky;
-  top: var(--bar-h, 40px);
+  top: calc(var(--bar-h, 40px) + env(safe-area-inset-top, 0px));
   transform: translateZ(0);
   will-change: opacity;
   contain: paint;

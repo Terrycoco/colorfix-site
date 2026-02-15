@@ -32,7 +32,8 @@ export default function AppliedPaletteViewPage() {
     if (!paletteNumericId) return;
     setState({ loading: true, error: "", data: null });
     const controller = new AbortController();
-    fetch(`${API_URL}?source=applied&id=${paletteNumericId}`, { signal: controller.signal })
+    const psiQuery = psiParam ? `&psi=${encodeURIComponent(psiParam)}` : "";
+    fetch(`${API_URL}?source=applied&id=${paletteNumericId}${psiQuery}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((res) => {
         if (!res?.ok || !res?.data) throw new Error(res?.error || "Failed to load palette");

@@ -124,8 +124,12 @@ final class PlayerExperienceService
         $count = 0;
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
-            if ($type !== 'palette') continue;
+            if (in_array($type, ['intro', 'before', 'text'], true)) {
+                continue;
+            }
             if (!empty($item->exclude_from_thumbs)) continue;
+            $hasPalette = !empty($item->ap_id) || !empty($item->palette_hash);
+            if (!$hasPalette) continue;
             $count++;
             if ($count > 1) return true;
         }

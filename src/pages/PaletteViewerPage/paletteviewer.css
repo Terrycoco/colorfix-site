@@ -87,4 +87,4 @@
 .pv-detail__hex { font-size:12px; color:#8fa2b9; }
 
 /* Footer */
-.pv-footer { padding:12px 24px 24px; color:#8b97a5; font-size:12px; border-top:1px solid var(--pv-border); }
+.pv-footer { padding:12px 24px 24px; color:#8b97a5; font-size: 8px; border-top:1px solid var(--pv-border); }

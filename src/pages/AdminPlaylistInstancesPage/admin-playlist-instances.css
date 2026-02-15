@@ -61,6 +61,14 @@
   cursor: pointer;
 }
 
+.panel-controls button:disabled,
+.panel-actions button:disabled,
+.primary-btn:disabled,
+.mobile-share button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .primary-btn {
   border-color: #111;
 }
@@ -120,6 +128,12 @@
   flex-direction: column;
 }
 
+.mobile-share__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .mobile-share__title {
   font-weight: 600;
   font-size: 14px;
@@ -177,6 +191,10 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid #ddd;
+}
+
+.form-grid .kicker-dropdown {
+  width: 100%;
 }
 
 .checkbox-row {

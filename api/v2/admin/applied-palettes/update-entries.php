@@ -43,7 +43,9 @@ if (!is_array($entries) || !count($entries)) {
 $title = array_key_exists('title', $input) ? trim((string)$input['title']) : null;
 $displayTitle = array_key_exists('display_title', $input) ? trim((string)$input['display_title']) : null;
 $notes = array_key_exists('notes', $input) ? trim((string)$input['notes']) : null;
+$altText = array_key_exists('alt_text', $input) ? trim((string)$input['alt_text']) : null;
 $tags = normalizeTags($input['tags'] ?? null);
+$kickerId = array_key_exists('kicker_id', $input) ? (int)($input['kicker_id'] ?: 0) : null;
 $clearRender = !empty($input['clear_render']);
 $renderOptions = isset($input['render']) && is_array($input['render']) ? $input['render'] : [];
 $cacheRender = !empty($renderOptions['cache']);
@@ -69,7 +71,9 @@ try {
     if ($title !== null) $fields['title'] = $title === '' ? null : $title;
     if ($displayTitle !== null) $fields['display_title'] = $displayTitle === '' ? null : $displayTitle;
     if ($notes !== null) $fields['notes'] = $notes === '' ? null : $notes;
+    if ($altText !== null) $fields['alt_text'] = $altText === '' ? null : $altText;
     if (array_key_exists('tags', $input)) $fields['tags'] = $tags;
+    if (array_key_exists('kicker_id', $input)) $fields['kicker_id'] = $kickerId ?: null;
     if ($fields) {
         $paletteRepo->updatePalette($paletteId, $fields);
     }

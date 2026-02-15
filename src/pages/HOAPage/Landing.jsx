@@ -53,12 +53,13 @@ export default function HOALandingPage() {
       </section>
 
       <section className="hoa-section">
-        <h2>How it works</h2>
-        <ol>
-          <li>HOA provides approved colors and schemes</li>
-          <li>Each scheme is rendered on each HOA home model</li>
-          <li>Homeowners pick their exact model and tap through schemes</li>
-          <li>Boards review the same visuals homeowners see</li>
+     <h2>How it works</h2>
+<ol>
+  <li>HOA provides its approved colors and schemes</li>
+  <li>ColorFix renders those schemes on each HOA home model</li>
+  <li>Homeowners select their model and tap through approved options</li>
+  <li>Boards review the same visuals homeowners see</li>
+
                <div className="hoa-secondary-cta">
         <a className="cta-button cta-button--link" href="/hoa/explain">
           See what homeowners submit for approval

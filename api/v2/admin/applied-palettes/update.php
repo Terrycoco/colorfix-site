@@ -27,7 +27,9 @@ try {
     $title = array_key_exists('title', $payload) ? trim((string)$payload['title']) : null;
     $displayTitle = array_key_exists('display_title', $payload) ? trim((string)$payload['display_title']) : null;
     $notes = array_key_exists('notes', $payload) ? trim((string)$payload['notes']) : null;
+    $altText = array_key_exists('alt_text', $payload) ? trim((string)$payload['alt_text']) : null;
     $tags = normalizeTags($payload['tags'] ?? null);
+    $kickerId = array_key_exists('kicker_id', $payload) ? (int)($payload['kicker_id'] ?: 0) : null;
 
     $repo = new PdoAppliedPaletteRepository($pdo);
     if (!$repo->findById($paletteId)) {
@@ -38,7 +40,9 @@ try {
     if ($title !== null) $fields['title'] = $title === '' ? null : $title;
     if ($displayTitle !== null) $fields['display_title'] = $displayTitle === '' ? null : $displayTitle;
     if ($notes !== null) $fields['notes'] = $notes === '' ? null : $notes;
+    if ($altText !== null) $fields['alt_text'] = $altText === '' ? null : $altText;
     if (array_key_exists('tags', $payload)) $fields['tags'] = $tags;
+    if (array_key_exists('kicker_id', $payload)) $fields['kicker_id'] = $kickerId ?: null;
 
     if ($fields) {
         $repo->updatePalette($paletteId, $fields);

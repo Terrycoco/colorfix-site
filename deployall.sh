@@ -15,6 +15,7 @@ run() {
 
 run "deployapp.sh"
 run "deployapi.sh"
+run "deploycontent.sh"
 run "deploydb.sh"
 
 echo "✅ all deploys finished"

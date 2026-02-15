@@ -31,3 +31,6 @@ dist-ssr
 
 # Local scratch files (not part of the app)
 tmp_partial.jsx
+
+# Local secrets
+config/mail.local.php

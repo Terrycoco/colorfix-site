@@ -10,13 +10,21 @@ export default function CTALayout({
 
   return (
     <div className={`cta-layout cta-layout--${layout}`}>
-      {ctas.map((cta) => (
-        <CTAButton
-          key={cta.cta_id}
-          cta={cta}
-          onClick={onCtaClick}
-        />
-      ))}
+      {ctas.map((cta) => {
+        if (!cta) return null;
+        const isSpacer = cta.variant === "spacer" || cta.key === "spacer";
+        if (isSpacer) {
+          return <div key={cta.cta_id} className="cta-spacer" aria-hidden="true" />;
+        }
+
+        return (
+          <CTAButton
+            key={cta.cta_id}
+            cta={cta}
+            onClick={onCtaClick}
+          />
+        );
+      })}
     </div>
   );
 }

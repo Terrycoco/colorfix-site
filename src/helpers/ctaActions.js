@@ -94,7 +94,7 @@ function getPaletteItems(data) {
     const type = (item?.type || "normal").toLowerCase();
     if (type === "intro" || type === "before" || type === "text") return false;
     if (item?.exclude_from_thumbs) return false;
-    return Boolean(item?.ap_id);
+    return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
   });
 }
 
@@ -102,7 +102,8 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const palettes = getPaletteItems(data);
   if (!palettes.length) return;
   const apId = palettes[0].ap_id;
-  if (!apId) return;
+  const paletteHash = palettes[0].palette_hash;
+  if (!apId && !paletteHash) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
     params.set("add_cta_group", String(cta.params.add_cta_group));
@@ -116,7 +117,9 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (demo) params.set("demo", "1");
   if (returnTo) params.set("return_to", returnTo);
   const qs = params.toString();
-  const url = `/view/${apId}${qs ? `?${qs}` : ""}`;
+  const url = paletteHash
+    ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
+    : `/view/${apId}${qs ? `?${qs}` : ""}`;
   if (navigate) {
     navigate(url);
     return;

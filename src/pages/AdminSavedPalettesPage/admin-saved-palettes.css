@@ -131,6 +131,15 @@
   flex-wrap: wrap;
 }
 
+.asp-card-kicker {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a94a3;
+  margin-bottom: 0.2rem;
+}
+
 .asp-pill {
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
@@ -184,6 +193,24 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.asp-photo-url {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #5b6472;
+  margin: 10px 0 12px;
+}
+
+.asp-photo-url input {
+  width: 100%;
+  border: 1px solid #d4d9e2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  background: #f8f9fb;
 }
 
 .asp-photo-thumb {
@@ -386,6 +413,14 @@
   gap: 0.6rem;
 }
 
+.asp-kicker-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #1f2937;
+}
+
 .asp-member-list-head {
   display: flex;
   align-items: center;
@@ -396,6 +431,16 @@
 .asp-member-list-head h3 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.asp-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.asp-member-fuzzy {
+  min-width: 220px;
 }
 
 .asp-upload-btn {

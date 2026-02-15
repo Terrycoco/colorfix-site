@@ -25,10 +25,19 @@ export default function PaletteViewer({
   const colorGroups = useMemo(() => groupEntriesByColor(swatches), [swatches]);
   const title = formatTitle(meta?.title || "ColorFix Palette");
   const notes = meta?.notes || "";
+  const kicker = meta?.kicker || "";
+  const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
+  const photoAlt = meta?.photo_alt || "Palette photo";
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
+  const seoTitle = kicker
+    ? `${kicker} – ${title} | ColorFix`
+    : `${title} | ColorFix`;
+  const seoDescription = kicker ? `Take a look at this palette: ${kicker}.` : shareText;
+  const showExteriorNote = (paletteType === "exterior" || paletteType === "hoa")
+    && colorGroups.some((group) => group.int_only);
 
   const handleBack = () => {
     if (onBack) {
@@ -47,14 +56,16 @@ export default function PaletteViewer({
   useEffect(() => {
     if (typeof document === "undefined") return;
     const ogTags = [
-      ["og:title", shareTitle],
-      ["og:description", shareText],
+      ["og:title", seoTitle],
+      ["og:description", seoDescription],
       ["og:image", photoUrl],
     ];
     const prev = ogTags.map(([property]) => {
       const el = document.querySelector(`meta[property="${property}"]`);
       return { property, el, content: el?.getAttribute("content") ?? null };
     });
+    const metaDescEl = document.querySelector(`meta[name="description"]`);
+    const prevMetaDesc = metaDescEl?.getAttribute("content") ?? null;
     ogTags.forEach(([property, content]) => {
       if (!content) return;
       let el = document.querySelector(`meta[property="${property}"]`);
@@ -65,8 +76,17 @@ export default function PaletteViewer({
       }
       el.setAttribute("content", content);
     });
+    if (seoDescription) {
+      let el = metaDescEl;
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute("name", "description");
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", seoDescription);
+    }
     const prevTitle = document.title;
-    document.title = shareTitle;
+    document.title = seoTitle;
     return () => {
       prev.forEach(({ property, el, content }) => {
         if (!el) return;
@@ -76,9 +96,16 @@ export default function PaletteViewer({
           el.setAttribute("content", content);
         }
       });
+      if (metaDescEl) {
+        if (prevMetaDesc == null) {
+          metaDescEl.remove();
+        } else {
+          metaDescEl.setAttribute("content", prevMetaDesc);
+        }
+      }
       document.title = prevTitle;
     };
-  }, [shareTitle, shareText, photoUrl]);
+  }, [seoTitle, seoDescription, photoUrl]);
 
   const isMobileShare = () => {
     if (typeof window === "undefined") return false;
@@ -179,19 +206,24 @@ export default function PaletteViewer({
         {photoUrl && (
           <div className="apv-column apv-column--photo">
             <div className="apv-photo-wrap" onClick={() => setPhotoExpanded(true)}>
-              <img src={photoUrl} alt="Palette photo" className="apv-photo" />
+              <img src={photoUrl} alt={photoAlt} className="apv-photo" />
             </div>
             {insetPhotos.length > 0 && (
               <div className="apv-photo-insets apv-photo-insets--below">
-                {insetPhotos.map((src, idx) => (
-                  <img
-                    key={`${src}-${idx}`}
-                    src={src}
-                    alt="Palette inset"
-                    className="apv-photo-inset"
-                    loading="lazy"
-                  />
-                ))}
+                {insetPhotos.map((photo, idx) => {
+                  const url = typeof photo === "string" ? photo : photo?.url;
+                  if (!url) return null;
+                  const alt = typeof photo === "string" ? "Palette inset" : (photo?.alt_text || "Palette inset");
+                  return (
+                    <img
+                      key={`${url}-${idx}`}
+                      src={url}
+                      alt={alt}
+                      className="apv-photo-inset"
+                      loading="lazy"
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -199,6 +231,7 @@ export default function PaletteViewer({
 
         <div className="apv-column apv-column--details">
           <div className="apv-info">
+            {kicker && <div className="apv-kicker">{kicker}</div>}
             <h1>{title}</h1>
             {notes && <p className="apv-notes">{notes}</p>}
           </div>
@@ -216,6 +249,11 @@ export default function PaletteViewer({
                       <div className="apv-name">
                         {group.name || `Color #${group.id}`}
                         {group.code ? `, ${group.code}` : ""}
+                        {showExteriorNote && group.int_only && (
+                          <span className="apv-int-only" aria-label="Not recommended for exteriors">
+                            *
+                          </span>
+                        )}
                       </div>
                       {(group.brand || group.brand_name) && (
                         <div className="apv-brand">
@@ -233,11 +271,16 @@ export default function PaletteViewer({
               ))}
             </div>
           )}
+          {showExteriorNote && (
+            <div className="apv-footnote">
+              * Color is not recommended for exteriors. See manufacturer specifications.
+            </div>
+          )}
         </div>
       </div>
       {photoExpanded && photoUrl && (
         <div className="apv-photo-fullscreen" onClick={() => setPhotoExpanded(false)}>
-          <img src={photoUrl} alt="Palette photo full view" />
+          <img src={photoUrl} alt={photoAlt} />
           <div className="apv-photo-fullscreen-hint">Tap to close</div>
         </div>
       )}
@@ -252,7 +295,7 @@ export default function PaletteViewer({
           <div className="apv-branding">
             <span>Brought to you by </span>
             <a href="/" className="apv-branding-link">ColorFix</a>
-            <span>.</span>
+           
           </div>
         </div>
       )}
@@ -328,10 +371,14 @@ function groupEntriesByColor(entries) {
         brand: entry.brand || "",
         brand_name: entry.brand_name || "",
         masks: [],
+        int_only: false,
       });
       order.push(key);
     }
     const group = groups.get(key);
+    if (entry.int_only) {
+      group.int_only = true;
+    }
     if (entry.role && !group.masks.includes(entry.role)) {
       group.masks.push(entry.role);
     }

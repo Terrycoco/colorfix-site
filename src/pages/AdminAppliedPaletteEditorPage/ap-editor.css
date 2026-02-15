@@ -204,6 +204,10 @@
   font-size: 14px;
 }
 
+.ap-fields .kicker-dropdown {
+  width: 100%;
+}
+
 .ap-actions-row {
   display: flex;
   gap: 10px;

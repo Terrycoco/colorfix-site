@@ -66,6 +66,7 @@ $items = array_map(static function ($instance) {
         'cta_context_key' => $instance->ctaContextKey,
         'audience' => $instance->audience,
         'cta_overrides' => $instance->ctaOverrides,
+        'kicker_id' => $instance->kickerId,
         'is_active' => $instance->isActive ? 1 : 0,
     ];
 }, $instances);

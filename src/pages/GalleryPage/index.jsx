@@ -22,6 +22,7 @@ const GalleryPage = () => {
   const [searchItems, setSearchItems] = useState([]);
   const [insertItems, setInsertItems] = useState([]);
   const [meta, setMeta] = useState(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   // Decide if this page is a swatch gallery.
   // 1) meta.item_type === 'swatch' (preferred when present)
@@ -161,6 +162,13 @@ const GalleryPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(searchFilters?.brands || [])]);
 
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 500);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Optional: scrub lingering group_mode on non-swatch pages
   useEffect(() => {
     if (meta && !isSwatch && searchParams.has('group_mode')) {
@@ -174,7 +182,7 @@ const GalleryPage = () => {
       <TopSpacer />
 
       {isSwatch && (
-        <div className="gallery-controls" style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+        <div className="gallery-controls">
           <button
             type="button"
             onClick={() => setGroupMode('hue')}
@@ -183,7 +191,7 @@ const GalleryPage = () => {
             title="Group by Hue"
           >
             <span className="btn-label-full">Group by Hue</span>
-            <span className="btn-label-short">Sort by Hue</span>
+            <span className="btn-label-short">Hue</span>
           </button>
           <button
             type="button"
@@ -193,7 +201,7 @@ const GalleryPage = () => {
             title="Group by Lightness"
           >
             <span className="btn-label-full">Group by Lightness</span>
-            <span className="btn-label-short">By Lightness</span>
+            <span className="btn-label-short">Lightness</span>
           </button>
           <button
             type="button"
@@ -203,7 +211,7 @@ const GalleryPage = () => {
             title="Group by Chroma"
           >
             <span className="btn-label-full">Group by Chroma</span>
-            <span className="btn-label-short">By Chroma</span>
+            <span className="btn-label-short">Chroma</span>
           </button>
         </div>
       )}
@@ -213,6 +221,15 @@ const GalleryPage = () => {
         runQueryById={runQueryById}
         meta={meta}
       />
+      {showBackToTop && (
+        <button
+          type="button"
+          className="back-to-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          Back to top
+        </button>
+      )}
     </div>
   );
 };

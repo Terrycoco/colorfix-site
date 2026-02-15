@@ -5,6 +5,7 @@ namespace App\Services;
 
 use App\Repos\PdoPhotoRepository;
 use App\Services\PhotoRenderingService;
+use App\Services\PhotoLibraryService;
 
 /**
  * PhotosUploadService
@@ -31,7 +32,8 @@ final class PhotosUploadService
     public function __construct(
         private PdoPhotoRepository $repo,
         private string $photosRoot, // e.g., $_SERVER['DOCUMENT_ROOT'].'/colorfix/photos'
-        private \PDO $pdo
+        private \PDO $pdo,
+        private ?PhotoLibraryService $photoLibrary = null
     ) {}
     private array $assetPathOverrides = [];
 
@@ -252,7 +254,12 @@ final class PhotosUploadService
 
         [$width, $height, $bytes] = $this->probeImage($destPath, $mime);
 
-        $this->repo->upsertVariant($photoId, 'extras', $role, $this->publicPath($destPath), $mime, $bytes, $width, $height, []);
+        $publicPath = $this->publicPath($destPath);
+        $this->repo->upsertVariant($photoId, 'extras', $role, $publicPath, $mime, $bytes, $width, $height, []);
+
+        if ($this->photoLibrary) {
+            $this->photoLibrary->syncExtraPhoto($photoId, $role, $publicPath);
+        }
 
         return [
             'ok'      => true,

@@ -43,6 +43,11 @@ try {
         $filters['q'] = $q;
     }
 
+    $paletteType = isset($_GET['palette_type']) ? strtolower(trim((string)$_GET['palette_type'])) : '';
+    if ($paletteType !== '') {
+        $filters['palette_type'] = $paletteType;
+    }
+
     $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 50;
     $limit = max(1, min(200, $limit));
 

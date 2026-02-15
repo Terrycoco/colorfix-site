@@ -32,6 +32,10 @@
   min-width: 260px;
 }
 
+.ap-title-editor .kicker-dropdown {
+  min-width: 260px;
+}
+
 .app-bar {
   display: flex;
   align-items: center;
@@ -248,6 +252,10 @@
   padding: 6px 8px;
   font-size: 14px;
   font-weight: 400;
+}
+
+.save-palette-fields .kicker-dropdown {
+  width: 100%;
 }
 .save-palette-fields textarea {
   resize: vertical;

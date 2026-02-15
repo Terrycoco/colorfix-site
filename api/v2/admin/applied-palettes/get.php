@@ -48,6 +48,8 @@ try {
             'display_title' => $palette->displayTitle,
             'notes' => $palette->notes,
             'tags' => $palette->tags,
+            'kicker_id' => $palette->kickerId,
+            'alt_text' => $palette->altText,
             'photo_id' => $palette->photoId,
             'asset_id' => $palette->assetId,
             'needs_rerender' => !empty($meta['needs_rerender']),

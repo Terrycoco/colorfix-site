@@ -5,6 +5,7 @@ import MaskBlendHistory from "@components/MaskBlendHistory";
 import MaskOverlayModal from "@components/MaskOverlayModal";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import MaskSettingsGrid from "@components/MaskSettingsGrid";
+import KickerDropdown from "@components/KickerDropdown";
 import AppliedPaletteMaskEditor from "@components/AppliedPaletteMaskEditor";
 import PhotoSearchPicker from "@components/PhotoSearchPicker";
 import { API_FOLDER } from "@helpers/config";
@@ -172,6 +173,8 @@ export default function AdminMaskTesterPage({
   const [saveTitle, setSaveTitle] = useState("");
   const [saveDisplayTitle, setSaveDisplayTitle] = useState("");
   const [saveNotes, setSaveNotes] = useState("");
+  const [saveKickerId, setSaveKickerId] = useState("");
+  const [saveAltText, setSaveAltText] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
@@ -200,6 +203,8 @@ export default function AdminMaskTesterPage({
   const [apMetaTitle, setApMetaTitle] = useState("");
   const [apMetaDisplayTitle, setApMetaDisplayTitle] = useState("");
   const [apMetaNotes, setApMetaNotes] = useState("");
+  const [apMetaKickerId, setApMetaKickerId] = useState("");
+  const [apMetaAltText, setApMetaAltText] = useState("");
   const [apMetaSaving, setApMetaSaving] = useState(false);
   const [apMetaError, setApMetaError] = useState("");
   const [apMetaNotice, setApMetaNotice] = useState("");
@@ -980,6 +985,8 @@ export default function AdminMaskTesterPage({
       setApMetaTitle(data?.palette?.title || "");
       setApMetaDisplayTitle(data?.palette?.display_title || "");
       setApMetaNotes(data?.palette?.notes || "");
+      setApMetaKickerId(data?.palette?.kicker_id ? String(data.palette.kicker_id) : "");
+      setApMetaAltText(data?.palette?.alt_text || "");
       const map = {};
       (data.entries || []).forEach((e) => {
         const hexRaw = e.color_hex || e.color_hex6 || e.hex6 || "";
@@ -1141,12 +1148,14 @@ export default function AdminMaskTesterPage({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          palette_id: apPalette.palette.id,
-          title: apMetaTitle.trim(),
-          display_title: apMetaDisplayTitle.trim(),
-          notes: apMetaNotes.trim(),
-        }),
+          body: JSON.stringify({
+            palette_id: apPalette.palette.id,
+            title: apMetaTitle.trim(),
+            display_title: apMetaDisplayTitle.trim(),
+            notes: apMetaNotes.trim(),
+            kicker_id: apMetaKickerId || null,
+            alt_text: apMetaAltText.trim(),
+          }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) {
@@ -1162,6 +1171,8 @@ export default function AdminMaskTesterPage({
                 title: apMetaTitle.trim(),
                 display_title: apMetaDisplayTitle.trim(),
                 notes: apMetaNotes.trim(),
+                kicker_id: apMetaKickerId || null,
+                alt_text: apMetaAltText.trim(),
               },
             }
           : prev
@@ -1470,6 +1481,7 @@ export default function AdminMaskTesterPage({
         body: JSON.stringify({
           palette_id: apPalette.palette.id,
           entries,
+          kicker_id: apMetaKickerId || null,
           render: rerender ? { cache: true } : undefined,
           clear_render: rerender,
         }),
@@ -2988,6 +3000,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
     setSaveTitle("");
     setSaveDisplayTitle("");
     setSaveNotes("");
+    setSaveKickerId("");
+    setSaveAltText("");
     setExistingPaletteId("");
     setExistingLoadError("");
     if (asset?.asset_id) {
@@ -3011,8 +3025,12 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       setSaveTitle(selected.title || "");
       setSaveDisplayTitle(selected.display_title || "");
       setSaveNotes(selected.notes || "");
+      setSaveKickerId(selected.kicker_id ? String(selected.kicker_id) : "");
+      setSaveAltText(selected.alt_text || "");
     } else {
       setSaveMode("new");
+      setSaveKickerId("");
+      setSaveAltText("");
     }
   }
 
@@ -3210,6 +3228,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       title: saveTitle.trim(),
       notes: saveNotes.trim(),
       render: saveRenderChoice,
+      kicker_id: saveKickerId || null,
+      alt_text: saveAltText.trim(),
       entries: normalizedEntries,
     };
     const signature = JSON.stringify(signaturePayload);
@@ -3252,6 +3272,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
       title: saveTitle.trim(),
       display_title: saveDisplayTitle.trim(),
       notes: saveNotes.trim(),
+      kicker_id: saveKickerId || null,
+      alt_text: saveAltText.trim(),
       entries: paletteEntries.map((entry) => ({
         mask_role: entry.mask_role,
         color_id: entry.color_id,
@@ -3283,6 +3305,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
             title: saveTitle.trim(),
             display_title: saveDisplayTitle.trim(),
             notes: saveNotes.trim(),
+            kicker_id: saveKickerId || null,
+            alt_text: saveAltText.trim(),
             entries: payload.entries,
             render: payload.render,
             clear_render: shouldCacheRender,
@@ -3320,6 +3344,8 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
           title: saveTitle.trim(),
           display_title: saveDisplayTitle.trim(),
           notes: saveNotes.trim(),
+          kicker_id: saveKickerId || null,
+          alt_text: saveAltText.trim(),
           asset_id: asset?.asset_id || (idx >= 0 ? next[idx]?.asset_id : undefined),
         };
         if (idx >= 0) {
@@ -3473,6 +3499,21 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
               type="text"
               value={apMetaDisplayTitle}
               onChange={(e) => setApMetaDisplayTitle(e.target.value)}
+            />
+          </label>
+          <label>
+            Kicker (optional)
+            <KickerDropdown
+              value={apMetaKickerId}
+              onChange={(next) => setApMetaKickerId(next || "")}
+            />
+          </label>
+          <label>
+            Photo Alt Text (SEO)
+            <input
+              type="text"
+              value={apMetaAltText}
+              onChange={(e) => setApMetaAltText(e.target.value)}
             />
           </label>
           <button
@@ -4235,6 +4276,22 @@ async function handleOverlaySave(mask, { overrideSettings = null } = {}) {
                   onChange={(e) => setSaveNotes(e.target.value)}
                   rows={2}
                   placeholder="Optional internal notes"
+                />
+              </label>
+              <label>
+                Kicker (optional)
+                <KickerDropdown
+                  value={saveKickerId}
+                  onChange={(next) => setSaveKickerId(next || "")}
+                />
+              </label>
+              <label>
+                Photo Alt Text (SEO)
+                <input
+                  type="text"
+                  value={saveAltText}
+                  onChange={(e) => setSaveAltText(e.target.value)}
+                  placeholder="Optional alt text for the photo"
                 />
               </label>
             </div>

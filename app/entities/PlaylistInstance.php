@@ -29,6 +29,7 @@ final class PlaylistInstance
         public bool $skipIntroOnReplay,
         public bool $hideStars,
         public bool $isActive,
-        public ?int $createdFromInstance
+        public ?int $createdFromInstance,
+        public ?int $kickerId
     ) {}
 }

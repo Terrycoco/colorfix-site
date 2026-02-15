@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import KickerDropdown from "@components/KickerDropdown";
 import "./admin-applied.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
@@ -35,6 +36,8 @@ export default function AdminAppliedPalettesPage() {
     displayTitle: "",
     notes: "",
     tags: "",
+    kicker_id: "",
+    alt_text: "",
     status: { saving: false, error: "", success: "" },
   });
 
@@ -171,6 +174,8 @@ export default function AdminAppliedPalettesPage() {
       displayTitle: item.display_title || "",
       notes: item.notes || "",
       tags: item.tags || "",
+      kicker_id: item.kicker_id ? String(item.kicker_id) : "",
+      alt_text: item.alt_text || "",
       status: { saving: false, error: "", success: "" },
     });
   };
@@ -183,6 +188,8 @@ export default function AdminAppliedPalettesPage() {
       displayTitle: "",
       notes: "",
       tags: "",
+      kicker_id: "",
+      alt_text: "",
       status: { saving: false, error: "", success: "" },
     });
   };
@@ -204,6 +211,8 @@ export default function AdminAppliedPalettesPage() {
           display_title: editModal.displayTitle,
           notes: editModal.notes,
           tags: editModal.tags,
+          kicker_id: editModal.kicker_id || null,
+          alt_text: editModal.alt_text || null,
         }),
       });
       const data = await res.json();
@@ -543,6 +552,20 @@ export default function AdminAppliedPalettesPage() {
               <input
                 value={editModal.tags}
                 onChange={(e) => setEditModal((prev) => ({ ...prev, tags: e.target.value }))}
+              />
+            </label>
+            <label>
+              Kicker (optional)
+              <KickerDropdown
+                value={editModal.kicker_id}
+                onChange={(next) => setEditModal((prev) => ({ ...prev, kicker_id: next || "" }))}
+              />
+            </label>
+            <label>
+              Photo Alt Text (SEO)
+              <input
+                value={editModal.alt_text}
+                onChange={(e) => setEditModal((prev) => ({ ...prev, alt_text: e.target.value }))}
               />
             </label>
             {editModal.status.error && <div className="error">{editModal.status.error}</div>}

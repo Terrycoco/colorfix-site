@@ -186,6 +186,7 @@ try {
           JOIN saved_palettes sp
             ON sp.id = m.saved_palette_id
          WHERE m.color_id IN ($placeholders)
+           AND COALESCE(sp.palette_type, 'exterior') <> 'hoa'
          ORDER BY m.color_id ASC, p.order_index ASC, p.id ASC
       ";
 

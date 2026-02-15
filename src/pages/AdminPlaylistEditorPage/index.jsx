@@ -7,6 +7,8 @@ const GET_URL = `${API_FOLDER}/v2/admin/playlists/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlists/save.php`;
 const SAVE_ITEMS_URL = `${API_FOLDER}/v2/admin/playlist-items/save.php`;
 const AP_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
+const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 
 const emptyPlaylist = {
   playlist_id: null,
@@ -18,6 +20,7 @@ const emptyPlaylist = {
 const emptyItem = {
   playlist_item_id: null,
   ap_id: "",
+  palette_hash: "",
   image_url: "",
   title: "",
   subtitle: "",
@@ -40,6 +43,9 @@ export default function AdminPlaylistEditorPage() {
   const [items, setItems] = useState([]);
   const [expandedItems, setExpandedItems] = useState({});
   const [apOptions, setApOptions] = useState([]);
+  const [savedOptions, setSavedOptions] = useState([]);
+  const [playlistTypes, setPlaylistTypes] = useState([]);
+  const [customType, setCustomType] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
@@ -59,6 +65,14 @@ export default function AdminPlaylistEditorPage() {
     fetchAppliedPalettes();
   }, []);
 
+  useEffect(() => {
+    fetchPlaylistTypes();
+  }, []);
+
+  useEffect(() => {
+    fetchSavedPalettes();
+  }, []);
+
   async function fetchPlaylist(id) {
     setLoading(true);
     setError("");
@@ -74,12 +88,17 @@ export default function AdminPlaylistEditorPage() {
         type: data.playlist.type,
         is_active: Boolean(data.playlist.is_active),
       });
+      const typeValue = String(data.playlist.type || "").trim();
+      if (typeValue && !playlistTypes.includes(typeValue)) {
+        setCustomType(typeValue);
+      }
       setItems(
         (data.items || []).map((item) => ({
           ...emptyItem,
           ...item,
           playlist_item_id: item.playlist_item_id ?? null,
           ap_id: item.ap_id ?? "",
+          palette_hash: item.palette_hash ?? "",
           image_url: item.image_url ?? "",
           title: item.title ?? "",
           subtitle: item.subtitle ?? "",
@@ -113,12 +132,77 @@ export default function AdminPlaylistEditorPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) return;
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const options = (data.items || []).map((row) => ({
-        id: row.id,
-        title: (row.title || `Applied Palette ${row.id}`) + (row.display_title ? ` — ${row.display_title}` : ""),
-        renderUrl: row.render_rel_path ? `${origin}${row.render_rel_path}` : "",
-      }));
+      const options = (data.items || []).map((row) => {
+        const title = (row.title || `Applied Palette ${row.id}`) + (row.display_title ? ` — ${row.display_title}` : "");
+        return {
+          key: `applied:${row.id}`,
+          kind: "applied",
+          id: row.id,
+          title,
+          renderUrl: row.render_rel_path ? `${origin}${row.render_rel_path}` : "",
+          label: title,
+        };
+      });
       setApOptions(options);
+    } catch (err) {
+      // optional convenience list; ignore errors
+    }
+  }
+
+  async function fetchSavedPalettes() {
+    try {
+      const qs = new URLSearchParams();
+      qs.set("limit", "500");
+      qs.set("with_photos", "1");
+      qs.set("_", Date.now().toString());
+      const res = await fetch(`${SAVED_LIST_URL}?${qs.toString()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return;
+      const options = (data.items || [])
+        .filter((row) => row.palette_hash)
+        .map((row) => {
+        const label = (row.nickname || "").trim() || `Saved #${row.id}`;
+        const photos = Array.isArray(row.photos) ? row.photos : [];
+        const fullPhoto = photos.find((photo) => photo.photo_type === "full") || photos[0];
+        return {
+          key: `saved:${row.palette_hash}`,
+          kind: "saved",
+          palette_hash: row.palette_hash,
+          title: label,
+          renderUrl: fullPhoto?.rel_path || "",
+          label,
+        };
+      });
+      setSavedOptions(options);
+    } catch (err) {
+      // optional convenience list; ignore errors
+    }
+  }
+
+  const paletteOptions = useMemo(() => {
+    return [...apOptions, ...savedOptions].sort((a, b) => a.label.localeCompare(b.label));
+  }, [apOptions, savedOptions]);
+
+  async function fetchPlaylistTypes() {
+    try {
+      const qs = new URLSearchParams();
+      qs.set("limit", "500");
+      qs.set("_", Date.now().toString());
+      const res = await fetch(`${PLAYLISTS_LIST_URL}?${qs.toString()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) return;
+      const types = Array.from(
+        new Set(
+          (data.items || [])
+            .map((row) => String(row?.type || "").trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b));
+      setPlaylistTypes(types);
     } catch (err) {
       // optional convenience list; ignore errors
     }
@@ -129,6 +213,20 @@ export default function AdminPlaylistEditorPage() {
     setSaveStatus("");
     setSaveError("");
   }
+
+  const isCustomType = useMemo(() => {
+    if (!playlist.type) return false;
+    return !playlistTypes.includes(playlist.type);
+  }, [playlist.type, playlistTypes]);
+
+  const handleTypeSelect = (value) => {
+    if (value === "__custom__") {
+      updatePlaylist("type", customType);
+      return;
+    }
+    setCustomType("");
+    updatePlaylist("type", value);
+  };
 
   function toggleExpanded(key) {
     setExpandedItems((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -148,16 +246,37 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
-  function applyAppliedPalette(index, apId) {
-    const match = apOptions.find((option) => String(option.id) === String(apId));
+  function applyPaletteOption(index, optionKey) {
+    if (!optionKey) {
+      setItems((prev) =>
+        prev.map((item, idx) =>
+          idx === index ? { ...item, ap_id: "", palette_hash: "" } : item
+        )
+      );
+      setSaveStatus("");
+      setSaveError("");
+      return;
+    }
+    const match = paletteOptions.find((option) => option.key === optionKey);
+    if (!match) return;
     setItems((prev) =>
       prev.map((item, idx) => {
         if (idx !== index) return item;
+        if (match.kind === "saved") {
+          return {
+            ...item,
+            ap_id: "",
+            palette_hash: match.palette_hash || "",
+            image_url: match.renderUrl || item.image_url,
+            title: item.title || match.title || "",
+          };
+        }
         return {
           ...item,
-          ap_id: apId ? String(apId) : "",
-          image_url: match?.renderUrl || item.image_url,
-          title: item.title || match?.title || "",
+          ap_id: String(match.id || ""),
+          palette_hash: "",
+          image_url: match.renderUrl || item.image_url,
+          title: item.title || match.title || "",
         };
       })
     );
@@ -214,6 +333,7 @@ export default function AdminPlaylistEditorPage() {
         items: items.map((item) => ({
           ...item,
           ap_id: item.ap_id === "" ? null : item.ap_id,
+          palette_hash: item.palette_hash === "" ? null : item.palette_hash,
           duration_ms: item.duration_ms === "" ? null : item.duration_ms,
         })),
       };
@@ -279,11 +399,29 @@ export default function AdminPlaylistEditorPage() {
         </label>
         <label>
           Type
-          <input
-            type="text"
-            value={playlist.type}
-            onChange={(e) => updatePlaylist("type", e.target.value)}
-          />
+          <select
+            value={isCustomType || !playlist.type ? "__custom__" : playlist.type}
+            onChange={(e) => handleTypeSelect(e.target.value)}
+          >
+            <option value="__custom__">Custom…</option>
+            {playlistTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+          {(isCustomType || !playlist.type) && (
+            <input
+              type="text"
+              placeholder="Enter new type"
+              value={customType}
+              onChange={(e) => {
+                const next = e.target.value;
+                setCustomType(next);
+                updatePlaylist("type", next);
+              }}
+            />
+          )}
         </label>
         <label className="checkbox-row">
           <input
@@ -343,15 +481,21 @@ export default function AdminPlaylistEditorPage() {
                 />
               </label>
               <label className="item-cell item-ap">
-                Applied Palette
+                Palette
                 <select
-                  value={item.ap_id || ""}
-                  onChange={(e) => applyAppliedPalette(index, e.target.value)}
+                  value={
+                    item.palette_hash
+                      ? `saved:${item.palette_hash}`
+                      : item.ap_id
+                      ? `applied:${item.ap_id}`
+                      : ""
+                  }
+                  onChange={(e) => applyPaletteOption(index, e.target.value)}
                 >
                   <option value="">Select</option>
-                  {apOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.id} — {option.title}
+                  {paletteOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -384,6 +528,14 @@ export default function AdminPlaylistEditorPage() {
                     type="number"
                     value={item.ap_id}
                     onChange={(e) => updateItem(index, "ap_id", e.target.value)}
+                  />
+                </label>
+                <label className="item-cell item-wide">
+                  Palette Hash
+                  <input
+                    type="text"
+                    value={item.palette_hash}
+                    onChange={(e) => updateItem(index, "palette_hash", e.target.value)}
                   />
                 </label>
                 <label className="item-cell item-wide">

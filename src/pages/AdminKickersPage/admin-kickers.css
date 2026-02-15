@@ -1,0 +1,142 @@
+.admin-kickers {
+  padding: 24px;
+}
+
+.admin-kickers__header h1 {
+  margin: 0 0 6px;
+}
+
+.admin-kickers__header p {
+  margin: 0 0 16px;
+  color: #5a6570;
+}
+
+.admin-kickers__error,
+.admin-kickers__status {
+  margin: 12px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.admin-kickers__error {
+  background: #ffe3e3;
+  color: #9d1c1c;
+}
+
+.admin-kickers__status {
+  background: #e7f3ff;
+  color: #1f4b82;
+}
+
+.admin-kickers__section {
+  margin-top: 24px;
+}
+
+.admin-kickers__row {
+  display: grid;
+  grid-template-columns: 1.6fr 1.4fr 0.6fr 0.6fr auto;
+  gap: 12px;
+  align-items: center;
+  max-width: 900px;
+}
+
+.admin-kickers__row input[type="text"],
+.admin-kickers__row input[type="number"] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d0d7df;
+}
+
+.admin-kickers__row button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #c7d2e6;
+  background: #0f1f3d;
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-kickers__toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  color: #2d3a45;
+}
+
+.admin-kickers__loading {
+  padding: 16px 0;
+  color: #5a6570;
+}
+
+.admin-kickers__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e9ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-kickers__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.admin-kickers__table th,
+.admin-kickers__table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef1f5;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-kickers__table th {
+  background: #f7f9fc;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #52606b;
+}
+
+.admin-kickers__table input[type="text"],
+.admin-kickers__table input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #d0d7df;
+}
+
+.admin-kickers__usage {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #6a7682;
+}
+
+.admin-kickers__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-kickers__actions button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #c7d2e6;
+  background: #0f1f3d;
+  color: #fff;
+  font-weight: 600;
+}
+
+.admin-kickers__actions .admin-kickers__danger {
+  background: #fff;
+  color: #a63a3a;
+  border-color: #f1b8b8;
+}
+
+.admin-kickers__empty {
+  text-align: center;
+  color: #6a7682;
+  padding: 18px 12px;
+}

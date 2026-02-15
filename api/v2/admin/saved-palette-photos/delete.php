@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 
 function respond(int $code, array $payload): void {
     http_response_code($code);
@@ -32,6 +34,8 @@ try {
     }
 
     $repo = new PdoSavedPaletteRepository($pdo);
+    $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
+    $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
     $photo = $repo->getPhotoById($photoId);
     if (!$photo) {
         respond(404, ['ok' => false, 'error' => 'Photo not found']);
@@ -47,6 +51,7 @@ try {
     }
 
     $repo->deletePhoto($photoId);
+    $photoLibrary->deleteSavedPalettePhoto($photoId);
 
     respond(200, ['ok' => true]);
 } catch (\Throwable $e) {

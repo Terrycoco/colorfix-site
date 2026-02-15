@@ -48,6 +48,31 @@
   width: 100%;
 }
 
+.player-end-links {
+  display: flex;
+  justify-content: center;
+  margin-top: 22px;
+}
+
+.player-end-links .cta-layout--stacked {
+  align-items: center;
+}
+
+.player-end-links .cta-button--link {
+  color: #fff;
+  text-align: center;
+}
+
+.player-end-links .cta-button--link:hover {
+  color: #fff;
+  opacity: 0.8;
+}
+
+.player-end-links .cta-layout--stacked .cta-button--link,
+.player-end-links .cta-layout--inline .cta-button--link {
+  align-self: center;
+}
+
 
 .player-end-branding {
   position: absolute;

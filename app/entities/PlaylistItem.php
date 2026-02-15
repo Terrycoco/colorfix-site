@@ -7,6 +7,7 @@ class PlaylistItem
 {
     public function __construct(
         public string $ap_id,
+        public ?string $palette_hash,
         public ?string $image_url,
         public ?string $title = null,
         public ?string $subtitle = null,

@@ -198,6 +198,10 @@
   padding: 6px 10px;
   font-size: 14px;
 }
+
+.admin-ap__modal-panel .kicker-dropdown {
+  width: 100%;
+}
 .admin-ap__modal-divider {
   font-size: 13px;
   text-transform: uppercase;

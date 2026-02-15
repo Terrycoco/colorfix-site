@@ -39,6 +39,9 @@ const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
 const AdminRolesMasksPage = lazy(() => import ('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
+const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
+const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
+const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
 const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
@@ -203,6 +206,18 @@ function AppRouter() {
             <Route
               path="saved-palettes"
               element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes…')}
+            />
+            <Route
+              path="kickers"
+              element={renderWithSuspense(AdminKickersPage, 'Loading kickers…')}
+            />
+            <Route
+              path="ideas"
+              element={renderWithSuspense(AdminIdeasPage, 'Loading ideas…')}
+            />
+            <Route
+              path="photo-library"
+              element={renderWithSuspense(AdminPhotoLibraryPage, 'Loading photo library…')}
             />
             <Route
               path="applied-palettes"

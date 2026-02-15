@@ -78,7 +78,8 @@ try {
         !empty($payload['skip_intro_on_replay']),
         !empty($payload['hide_stars']),
         isset($payload['is_active']) ? (bool)$payload['is_active'] : true,
-        isset($payload['created_from_instance']) && $payload['created_from_instance'] !== '' ? (int)$payload['created_from_instance'] : null
+        isset($payload['created_from_instance']) && $payload['created_from_instance'] !== '' ? (int)$payload['created_from_instance'] : null,
+        isset($payload['kicker_id']) && $payload['kicker_id'] !== '' ? (int)$payload['kicker_id'] : null
     );
 
     $repo = new PdoPlaylistInstanceRepository($pdo);

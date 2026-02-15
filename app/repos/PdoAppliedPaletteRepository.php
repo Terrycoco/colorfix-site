@@ -23,6 +23,8 @@ class PdoAppliedPaletteRepository
             $row['display_title'] ?? null,
             $row['notes'] ?? null,
             $row['tags'] ?? null,
+            isset($row['kicker_id']) ? (int)$row['kicker_id'] : null,
+            $row['alt_text'] ?? null,
             (int)$row['photo_id'],
             (string)$row['asset_id'],
             $entries
@@ -100,6 +102,7 @@ class PdoAppliedPaletteRepository
                    e.blend_mode, e.blend_opacity,
                    e.lightness_offset, e.tint_hex, e.tint_opacity,
                    c.name AS color_name, c.code AS color_code, c.brand AS color_brand, c.brand_name AS color_brand_name, c.hex6 AS color_hex6,
+                   c.int_only AS color_int_only,
                    c.hcl_l AS color_hcl_l,
                    mbs.blend_mode AS setting_blend_mode,
                    mbs.blend_opacity AS setting_blend_opacity,
@@ -136,8 +139,8 @@ class PdoAppliedPaletteRepository
     public function insertPalette(array $data): array
     {
         $sql = "INSERT INTO applied_palettes
-                (photo_id, asset_id, title, display_title, notes, tags, created_at, updated_at)
-                VALUES (:photo_id, :asset_id, :title, :display_title, :notes, :tags, NOW(), NOW())";
+                (photo_id, asset_id, title, display_title, notes, tags, kicker_id, alt_text, created_at, updated_at)
+                VALUES (:photo_id, :asset_id, :title, :display_title, :notes, :tags, :kicker_id, :alt_text, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':photo_id' => $data['photo_id'],
@@ -146,6 +149,8 @@ class PdoAppliedPaletteRepository
             ':display_title' => $data['display_title'] ?? null,
             ':notes' => $data['notes'] ?? null,
             ':tags' => $data['tags'] ?? null,
+            ':kicker_id' => $data['kicker_id'] ?? null,
+            ':alt_text' => $data['alt_text'] ?? null,
         ]);
         return [
             'id' => (int)$this->pdo->lastInsertId(),
@@ -203,7 +208,7 @@ class PdoAppliedPaletteRepository
     {
         $cols = [];
         $params = [':id' => $id];
-        foreach (['title', 'display_title', 'notes', 'tags'] as $key) {
+        foreach (['title', 'display_title', 'notes', 'tags', 'kicker_id', 'alt_text'] as $key) {
             if (array_key_exists($key, $fields)) {
                 $cols[] = "{$key} = :{$key}";
                 $params[":{$key}"] = $fields[$key];
@@ -213,5 +218,19 @@ class PdoAppliedPaletteRepository
         $sql = "UPDATE applied_palettes SET " . implode(', ', $cols) . ", updated_at = NOW() WHERE id = :id";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+    }
+
+    public function getKickerText(int $kickerId): ?string
+    {
+        if ($kickerId <= 0) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare("SELECT display_text FROM kickers WHERE kicker_id = :id");
+        $stmt->execute([':id' => $kickerId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || !isset($row['display_text'])) {
+            return null;
+        }
+        return (string)$row['display_text'];
     }
 }

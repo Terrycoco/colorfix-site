@@ -24,6 +24,10 @@ const BoardScroller = () => {
   const filterIsActive   = count > 0;   
   const [pulse, setPulse] = useState(false);
   const [showSticky, setShowSticky] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 768px)").matches;
+  });
 
 
     //USE EFFECTS
@@ -42,6 +46,15 @@ useEffect(() => {
     return () => clearTimeout(t);
   }
 }, [location.state?.openBrandFilter, navigate, setOpen]);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  const mq = window.matchMedia("(max-width: 768px)");
+  const handler = (e) => setIsMobile(e.matches);
+  handler(mq);
+  mq.addEventListener("change", handler);
+  return () => mq.removeEventListener("change", handler);
+}, []);
 
 
 
@@ -147,6 +160,7 @@ const togglePaletteBar = () => {
 //HANDLERS
 const goToPalette = (e) => {
     e?.preventDefault?.(); e?.stopPropagation?.();
+    setPaletteCollapsed(false);
     if (isPaletteRoute) {
 
      // Scroll to the new hero id
@@ -183,7 +197,7 @@ const goToPalette = (e) => {
 
         {/* RIGHT (funnel to the left of the logo) */}
         <div className="scroller-right">
-          {hasSwatches && (
+          {hasSwatches && !isMobile && (
             <button
               type="button"
               className="palette-toggle-btn"

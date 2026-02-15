@@ -2,10 +2,12 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { useAppState } from "@context/AppStateContext";
+import KickerDropdown from "@components/KickerDropdown";
 import { isAdmin } from "@helpers/authHelper";
 import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 import SwatchGallery from "@components/SwatchGallery";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import EditableSwatch from "@components/EditableSwatch";
 import "./mypalette.css";
 
 /* ---------- Helpers ---------- */
@@ -128,9 +130,16 @@ const activeBrandCodes = useMemo(() => {
     overwrite_id: "",
     nickname: "",
     notes: "",
+    private_notes: "",
     terry_fav: false,
+    kicker_id: "",
+    palette_type: "exterior",
   });
   const [saveStatus, setSaveStatus] = useState({ loading: false, error: "", success: "" });
+  const [savedPaletteId, setSavedPaletteId] = useState(null);
+  const [rolesModalOpen, setRolesModalOpen] = useState(false);
+  const [roleRows, setRoleRows] = useState([]);
+  const [roleStatus, setRoleStatus] = useState({ loading: false, error: "", success: "" });
   const [savedPaletteOptions, setSavedPaletteOptions] = useState([]);
   const [savedPaletteOptionsStatus, setSavedPaletteOptionsStatus] = useState({
     loading: false,
@@ -139,6 +148,7 @@ const activeBrandCodes = useMemo(() => {
   const printUrl = "/print/my-palette";
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const CLEAR_ON = ["/v2/get-friends.php"];
 
@@ -171,17 +181,45 @@ const activeBrandCodes = useMemo(() => {
       const isHue = /get-(similar-hue|opposite-hue)\.php$/.test(endpoint);
       const isFriends = /\/v2\/get-friends\.php$/.test(endpoint);
 
+      const brandsQS = buildBrandsQS(searchFilters);
+      const neighborQS = isFriends && includeNeighbors ? "&include_neighbors=1" : "";
+
+      if (isHue) {
+        const anchorList = (Array.isArray(palette) ? palette : [])
+          .map((item) => item?.color ?? item)
+          .filter((item) => item && Number(item?.id ?? 0) > 0);
+        const groupPromises = anchorList.map(async (anchor, index) => {
+          const qs = new URLSearchParams();
+          qs.set("ids", String(anchor.id));
+          if (tol != null) qs.set("tol", String(tol));
+          qs.set("_cb", String(Date.now()) + "-" + index); // cache-buster
+          const url = `${API_FOLDER}/${endpoint}?${qs.toString()}${brandsQS}`;
+          const data = await fetchJsonStrict(url);
+          const rows = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+          const groupHeader = anchor?.name || `Color ${anchor.id}`;
+          return rows.map((row) => ({
+            ...row,
+            group_header: groupHeader,
+            group_order: index,
+          }));
+        });
+
+        const grouped = await Promise.all(groupPromises);
+        const combined = grouped.flat();
+        setFriends(combined);
+        setNoResultsFound(combined.length === 0);
+        setNeighborsUsed(null);
+        return;
+      }
+
       const qs = new URLSearchParams();
-      qs.set("ids", isHue ? String(anchorColorIds[0]) : anchorColorIds.join(","));
-      if (isHue && tol != null) qs.set("tol", String(tol));
+      qs.set("ids", anchorColorIds.join(","));
       if (isFriends) {
         const modeToSend = mode ?? friendsMode;
         qs.set("mode", modeToSend);
       }
       qs.set("_cb", String(Date.now())); // cache-buster
 
-      const brandsQS = buildBrandsQS(searchFilters);
-      const neighborQS = isFriends && includeNeighbors ? "&include_neighbors=1" : "";
       const url = `${API_FOLDER}/${endpoint}?${qs.toString()}${brandsQS}${neighborQS}`;
 
       const data = await fetchJsonStrict(url);
@@ -241,15 +279,40 @@ const activeBrandCodes = useMemo(() => {
       if (key === "chroma") return Number.isFinite(c) ? c : Number.POSITIVE_INFINITY;
       return Number.isFinite(l) ? l : Number.POSITIVE_INFINITY;
     };
-    return [...(friends || [])].sort((a, b) => {
-      const av = getMetric(a);
-      const bv = getMetric(b);
-      if (av !== bv) return av - bv;
-      const an = String(a?.color?.name ?? a?.name ?? a?.color_code ?? "").toLowerCase();
-      const bn = String(b?.color?.name ?? b?.name ?? b?.color_code ?? "").toLowerCase();
-      return an.localeCompare(bn);
+    const sortItems = (items) =>
+      [...items].sort((a, b) => {
+        const av = getMetric(a);
+        const bv = getMetric(b);
+        if (av !== bv) return av - bv;
+        const an = String(a?.color?.name ?? a?.name ?? a?.color_code ?? "").toLowerCase();
+        const bn = String(b?.color?.name ?? b?.name ?? b?.color_code ?? "").toLowerCase();
+        return an.localeCompare(bn);
+      });
+
+    const hasGroupHeaders = (friends || []).some((item) => item?.group_header);
+    if (!hasGroupHeaders) {
+      return sortItems(friends || []);
+    }
+
+    const grouped = new Map();
+    (friends || []).forEach((item) => {
+      const header = String(item?.group_header ?? "Other");
+      const order = Number.isFinite(Number(item?.group_order)) ? Number(item.group_order) : 9999;
+      if (!grouped.has(header)) {
+        grouped.set(header, { order, items: [] });
+      }
+      grouped.get(header).items.push(item);
     });
+
+    return Array.from(grouped.entries())
+      .sort((a, b) => a[1].order - b[1].order || a[0].localeCompare(b[0]))
+      .flatMap(([, group]) => sortItems(group.items));
   }, [friends, resultsSort]);
+
+  const hasGroupHeaders = useMemo(
+    () => (friends || []).some((item) => item?.group_header),
+    [friends]
+  );
 
   function runAndRemember(endpoint, tol = null, mode = null) {
     setCurrentEndpoint(endpoint);
@@ -280,6 +343,13 @@ const activeBrandCodes = useMemo(() => {
     handler(mq);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 500);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -556,6 +626,7 @@ const activeBrandCodes = useMemo(() => {
 
   function openSaveModal() {
     setSaveStatus({ loading: false, error: "", success: "" });
+    setSavedPaletteId(null);
     setSaveModalOpen(true);
   }
 
@@ -630,7 +701,10 @@ const activeBrandCodes = useMemo(() => {
         color_ids: paletteColorIds,
         nickname: saveForm.nickname || null,
         notes: saveForm.notes || null,
+        private_notes: saveForm.private_notes || null,
         terry_fav: !!saveForm.terry_fav,
+        kicker_id: saveForm.kicker_id ? Number(saveForm.kicker_id) : null,
+        palette_type: saveForm.palette_type || "exterior",
         ...(overwriteId > 0 ? { palette_id: overwriteId } : {}),
       };
       const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-save.php`, {
@@ -653,10 +727,93 @@ const activeBrandCodes = useMemo(() => {
             : `Saved palette #${newId}`
           : "Palette saved",
       });
+      if (newId) {
+        setSavedPaletteId(Number(newId));
+        const basePalette = Array.isArray(palette) ? palette : [];
+        setRoleRows(
+          basePalette.map((swatch, index) => ({
+            key: swatch?.id ?? swatch?.color?.id ?? `row-${index}`,
+            color: swatch?.color ?? swatch,
+            role: "",
+          }))
+        );
+      }
     } catch (err) {
       setSaveStatus({ loading: false, error: err?.message || "Failed to save", success: "" });
     }
   }
+
+  const openRolesModal = () => {
+    if (!savedPaletteId) return;
+    if (!roleRows.length) {
+      const basePalette = Array.isArray(palette) ? palette : [];
+      setRoleRows(
+        basePalette.map((swatch, index) => ({
+          key: swatch?.id ?? swatch?.color?.id ?? `row-${index}`,
+          color: swatch?.color ?? swatch,
+          role: "",
+        }))
+      );
+    }
+    setRoleStatus({ loading: false, error: "", success: "" });
+    setRolesModalOpen(true);
+  };
+
+  const closeRolesModal = () => {
+    if (roleStatus.loading) return;
+    setRolesModalOpen(false);
+  };
+
+  const handleRoleColorChange = (index, color) => {
+    setRoleRows((prev) =>
+      prev.map((row, idx) => (idx === index ? { ...row, color } : row))
+    );
+  };
+
+  const handleRoleFieldChange = (index, value) => {
+    setRoleRows((prev) =>
+      prev.map((row, idx) => (idx === index ? { ...row, role: value } : row))
+    );
+  };
+
+  const handleSaveRoles = async (event) => {
+    event.preventDefault();
+    if (!savedPaletteId) {
+      setRoleStatus({ loading: false, error: "Save the palette first.", success: "" });
+      return;
+    }
+    const members = roleRows
+      .map((row, index) => {
+        const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
+        if (!colorId) return null;
+        const role = row?.role?.trim() || null;
+        return { color_id: colorId, order_index: index, role };
+      })
+      .filter(Boolean);
+    if (!members.length) {
+      setRoleStatus({ loading: false, error: "Add at least one color.", success: "" });
+      return;
+    }
+    setRoleStatus({ loading: true, error: "", success: "" });
+    try {
+      const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-update.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palette_id: savedPaletteId,
+          members,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "Failed to save roles");
+      }
+      setRoleStatus({ loading: false, error: "", success: "Roles saved." });
+    } catch (err) {
+      setRoleStatus({ loading: false, error: err?.message || "Failed to save roles", success: "" });
+    }
+  };
 
   /* ---------- Render ---------- */
   return (
@@ -762,27 +919,29 @@ const activeBrandCodes = useMemo(() => {
             {friends.length > 0 && (
               <div className="myp-results-sort">
                 <span className="myp-results-label">Sort by:</span>
-                <button
-                  type="button"
-                  className={`myp-sort-btn${resultsSort === "hue" ? " is-active" : ""}`}
-                  onClick={() => setResultsSort((prev) => (prev === "hue" ? "" : "hue"))}
-                >
-                  Hue
-                </button>
-                <button
-                  type="button"
-                  className={`myp-sort-btn${resultsSort === "chroma" ? " is-active" : ""}`}
-                  onClick={() => setResultsSort((prev) => (prev === "chroma" ? "" : "chroma"))}
-                >
-                  Chroma
-                </button>
-                <button
-                  type="button"
-                  className={`myp-sort-btn${resultsSort === "lightness" ? " is-active" : ""}`}
-                  onClick={() => setResultsSort((prev) => (prev === "lightness" ? "" : "lightness"))}
-                >
-                  Lightness
-                </button>
+                <div className="myp-results-buttons">
+                  <button
+                    type="button"
+                    className={`myp-sort-btn${resultsSort === "hue" ? " is-active" : ""}`}
+                    onClick={() => setResultsSort((prev) => (prev === "hue" ? "" : "hue"))}
+                  >
+                    Hue
+                  </button>
+                  <button
+                    type="button"
+                    className={`myp-sort-btn${resultsSort === "chroma" ? " is-active" : ""}`}
+                    onClick={() => setResultsSort((prev) => (prev === "chroma" ? "" : "chroma"))}
+                  >
+                    Chroma
+                  </button>
+                  <button
+                    type="button"
+                    className={`myp-sort-btn${resultsSort === "lightness" ? " is-active" : ""}`}
+                    onClick={() => setResultsSort((prev) => (prev === "lightness" ? "" : "lightness"))}
+                  >
+                    Lightness
+                  </button>
+                </div>
               </div>
             )}
             <SwatchGallery
@@ -792,9 +951,9 @@ const activeBrandCodes = useMemo(() => {
               swatchPropName="color"
               gap={16}
               aspectRatio="5 / 4"
-              groupBy={resultsSort ? null : "group_header"}
-              groupOrderBy={resultsSort ? null : "group_order"}
-              showGroupHeaders={!resultsSort}
+              groupBy={hasGroupHeaders ? "group_header" : (resultsSort ? null : "group_header")}
+              groupOrderBy={hasGroupHeaders ? "group_order" : (resultsSort ? null : "group_order")}
+              showGroupHeaders={hasGroupHeaders ? true : !resultsSort}
               onSelectColor={onResultsPick}
               emptyMessage=""
             />
@@ -932,13 +1091,41 @@ const activeBrandCodes = useMemo(() => {
                 />
               </label>
               <label>
-                Notes
+                Public Notes (shown in viewer)
                 <textarea
                   name="notes"
                   rows={3}
                   value={saveForm.notes}
                   onChange={handleSaveFieldChange}
                 />
+              </label>
+              <label>
+                Private Notes (for me)
+                <textarea
+                  name="private_notes"
+                  rows={3}
+                  value={saveForm.private_notes}
+                  onChange={handleSaveFieldChange}
+                />
+              </label>
+              <label>
+                Kicker (optional)
+                <KickerDropdown
+                  value={saveForm.kicker_id}
+                  onChange={(next) => setSaveForm((prev) => ({ ...prev, kicker_id: next || "" }))}
+                />
+              </label>
+              <label>
+                Palette Type
+                <select
+                  name="palette_type"
+                  value={saveForm.palette_type}
+                  onChange={handleSaveFieldChange}
+                >
+                  <option value="exterior">Exterior</option>
+                  <option value="interior">Interior</option>
+                  <option value="hoa">HOA</option>
+                </select>
               </label>
               <label className="checkbox-row">
                 <input
@@ -951,6 +1138,11 @@ const activeBrandCodes = useMemo(() => {
               </label>
               {saveStatus.error && <div className="save-error">{saveStatus.error}</div>}
               {saveStatus.success && <div className="save-success">{saveStatus.success}</div>}
+              {saveStatus.success && savedPaletteId && (
+                <button type="button" className="ghost" onClick={openRolesModal}>
+                  Edit Colors / Roles
+                </button>
+              )}
               <div className="save-actions">
                 <button
                   type="button"
@@ -967,6 +1159,63 @@ const activeBrandCodes = useMemo(() => {
             </form>
           </div>
         </div>
+      )}
+      {rolesModalOpen && (
+        <div className="myp-save-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="myp-save-modal myp-role-modal">
+            <div className="save-modal-head">
+              <h2>Edit Colors & Roles</h2>
+              <button
+                type="button"
+                className="close-btn"
+                onClick={closeRolesModal}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+            <form className="save-form" onSubmit={handleSaveRoles}>
+              <div className="role-rows">
+                {roleRows.map((row, index) => (
+                  <div key={row.key || index} className="role-row">
+                    <EditableSwatch
+                      value={row.color}
+                      onChange={(color) => handleRoleColorChange(index, color)}
+                      showName
+                      size="sm"
+                      placement="top"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Role (e.g. trim, body, door)"
+                      value={row.role}
+                      onChange={(e) => handleRoleFieldChange(index, e.target.value)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {roleStatus.error && <div className="save-error">{roleStatus.error}</div>}
+              {roleStatus.success && <div className="save-success">{roleStatus.success}</div>}
+              <div className="save-actions">
+                <button type="button" className="ghost" onClick={closeRolesModal} disabled={roleStatus.loading}>
+                  Close
+                </button>
+                <button type="submit" className="primary" disabled={roleStatus.loading}>
+                  {roleStatus.loading ? "Saving…" : "Save Roles"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showBackToTop && (
+        <button
+          type="button"
+          className="back-to-top"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
+          Back to top
+        </button>
       )}
     </div>
   );

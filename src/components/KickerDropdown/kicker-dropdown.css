@@ -1,0 +1,23 @@
+.kicker-dropdown {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.kicker-dropdown select {
+  min-width: 180px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #cfd6df;
+  background: #fff;
+}
+
+.kicker-dropdown__manage {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #cfd6df;
+  background: #f5f7fa;
+  font-weight: 700;
+  line-height: 1;
+}

@@ -81,15 +81,17 @@ export default function PlaylistThumbsPage() {
       if (type === "intro" || type === "before" || type === "text") continue;
       if (item?.exclude_from_thumbs) continue;
       const apId = item?.ap_id ?? null;
-      if (!apId) continue;
-      const key = String(apId);
+      const paletteHash = item?.palette_hash ?? null;
+      if (!apId && !paletteHash) continue;
+      const key = paletteHash ? `saved:${paletteHash}` : `applied:${apId}`;
       if (seen.has(key)) continue;
       seen.add(key);
       list.push({
         ap_id: apId,
-        title: formatTitle(item?.title || `Palette ${apId}`),
+        palette_hash: paletteHash,
+        title: formatTitle(item?.title || (paletteHash ? "Saved Palette" : `Palette ${apId}`)),
         image_url: item?.image_url || "",
-        is_liked: likedSet.has(String(apId)),
+        is_liked: apId ? likedSet.has(String(apId)) : false,
       });
     }
     return list;
@@ -152,10 +154,12 @@ export default function PlaylistThumbsPage() {
               const returnTo = buildReturnTo(location.pathname, location.search);
               if (returnTo) params.set("return_to", returnTo);
               const qs = params.toString();
-              const href = `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
+              const href = palette.palette_hash
+                ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
+                : `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
               return (
                 <a
-                  key={palette.ap_id}
+                  key={palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`}
                   className="playlist-thumbs__card"
                   href={href}
                 >

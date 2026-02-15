@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
 use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 use App\Services\SavedPaletteService;
 
 try {
@@ -25,6 +27,11 @@ try {
         echo json_encode(['ok' => false, 'error' => 'Invalid JSON body'], JSON_UNESCAPED_SLASHES);
         exit;
     }
+    $debugLine = '[' . date('Y-m-d H:i:s') . '] saved-palette-update payload: ' . json_encode([
+        'palette_id' => $payload['palette_id'] ?? null,
+        'kicker_id' => $payload['kicker_id'] ?? null,
+    ]) . PHP_EOL;
+    @file_put_contents(__DIR__ . '/../../kicker_debug.log', $debugLine, FILE_APPEND);
 
     $paletteId = isset($payload['palette_id']) ? (int)$payload['palette_id'] : 0;
     if ($paletteId <= 0) {
@@ -35,10 +42,18 @@ try {
     unset($payload['palette_id']);
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo);
+    $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
+    $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
+    $service     = new SavedPaletteService($paletteRepo, null, null, $photoLibrary);
     $controller  = new SavedPaletteController($service);
 
     $result = $controller->updateFromPayload($paletteId, $payload);
+    if (array_key_exists('kicker_id', $payload)) {
+        $kickerId = ($payload['kicker_id'] === '' || $payload['kicker_id'] === null)
+            ? null
+            : (int)$payload['kicker_id'];
+        $paletteRepo->updateSavedPalette($paletteId, ['kicker_id' => $kickerId]);
+    }
 
     echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_SLASHES);
 } catch (\InvalidArgumentException $e) {

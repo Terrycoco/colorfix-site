@@ -51,7 +51,12 @@ class SavedPaletteController
             'color_ids'     => $payload['color_ids'],
             'nickname'      => isset($payload['nickname']) ? (string)$payload['nickname'] : null,
             'notes'         => isset($payload['notes']) ? (string)$payload['notes'] : null,
+            'private_notes' => isset($payload['private_notes']) ? (string)$payload['private_notes'] : null,
             'terry_fav'     => isset($payload['terry_fav']) ? (bool)$payload['terry_fav'] : false,
+            'kicker_id'     => isset($payload['kicker_id']) && $payload['kicker_id'] !== ''
+                ? (int)$payload['kicker_id']
+                : null,
+            'palette_type'  => isset($payload['palette_type']) ? (string)$payload['palette_type'] : null,
         ];
 
         if ($paletteId > 0) {
@@ -138,13 +143,22 @@ class SavedPaletteController
         $allowed = [
             'nickname',
             'notes',
+            'private_notes',
             'terry_fav',
+            'kicker_id',
+            'palette_type',
         ];
 
         $data = [];
         foreach ($allowed as $key) {
             if (array_key_exists($key, $payload)) {
-                $data[$key] = $payload[$key];
+                if ($key === 'kicker_id') {
+                    $data[$key] = ($payload[$key] === '' || $payload[$key] === null)
+                        ? null
+                        : (int)$payload[$key];
+                } else {
+                    $data[$key] = $payload[$key];
+                }
             }
         }
 

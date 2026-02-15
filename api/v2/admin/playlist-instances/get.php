@@ -59,5 +59,6 @@ respond([
         'hide_stars' => $instance->hideStars ? 1 : 0,
         'is_active' => $instance->isActive ? 1 : 0,
         'created_from_instance' => $instance->createdFromInstance,
+        'kicker_id' => $instance->kickerId,
     ],
 ]);

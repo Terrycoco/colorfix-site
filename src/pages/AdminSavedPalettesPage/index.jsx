@@ -4,6 +4,8 @@ import { API_FOLDER } from "@helpers/config";
 import { useAppState } from "@context/AppStateContext";
 import { isAdmin } from "@helpers/authHelper";
 import EditableSwatch from "@components/EditableSwatch";
+import KickerDropdown from "@components/KickerDropdown";
+import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import "./admin-saved-palettes.css";
 
 const BRAND_CHOICES = [
@@ -29,7 +31,10 @@ const emptyEditForm = {
   palette_id: null,
   nickname: "",
   notes: "",
+  private_notes: "",
   terry_fav: false,
+  kicker_id: "",
+  palette_type: "exterior",
 };
 
 const emptySendForm = {
@@ -71,6 +76,13 @@ function memberToSwatch(member) {
     chip_num: member?.color_chip_num ?? "",
     cluster_id: member?.color_cluster_id ?? 0,
   };
+}
+
+function buildFullUrl(relPath) {
+  if (!relPath) return "";
+  if (/^https?:\/\//i.test(relPath)) return relPath;
+  if (typeof window === "undefined") return relPath;
+  return `${window.location.origin}${relPath.startsWith("/") ? "" : "/"}${relPath}`;
 }
 
 export default function AdminSavedPalettesPage() {
@@ -179,7 +191,10 @@ export default function AdminSavedPalettesPage() {
       palette_id: Number(palette.id) || palette.id,
       nickname: palette.nickname || "",
       notes: palette.notes || "",
+      private_notes: palette.private_notes || "",
       terry_fav: Number(palette.terry_fav) === 1,
+      kicker_id: palette.kicker_id || "",
+      palette_type: palette.palette_type || "exterior",
     });
     const members = (palette.members || []).map((member, index) => ({
       key: member.id ?? `${member.color_id}-${index}`,
@@ -192,6 +207,7 @@ export default function AdminSavedPalettesPage() {
       photo_type: photo.photo_type || "full",
       trigger_color_id: photo.trigger_color_id ?? null,
       caption: photo.caption || "",
+      alt_text: photo.alt_text || "",
       order_index: photo.order_index ?? index,
     }));
     setEditMembers(members);
@@ -238,6 +254,18 @@ export default function AdminSavedPalettesPage() {
     ]);
   };
 
+  const handleAddMemberWithColor = (color) => {
+    if (!color?.id) return;
+    setEditMembers((prev) => [
+      ...prev,
+      {
+        key: `new-${Date.now()}`,
+        color,
+        role: "",
+      },
+    ]);
+  };
+
   const handleRemoveMember = (index) => {
     setEditMembers((prev) => prev.filter((_, idx) => idx !== index));
   };
@@ -264,7 +292,10 @@ export default function AdminSavedPalettesPage() {
         ...added.map((photo, index) => ({
           id: photo.id,
           rel_path: photo.rel_path,
+          photo_type: photo.photo_type || "full",
+          trigger_color_id: photo.trigger_color_id ?? null,
           caption: photo.caption || "",
+          alt_text: photo.alt_text || "",
           order_index: photo.order_index ?? prev.length + index,
         })),
       ]);
@@ -322,11 +353,14 @@ export default function AdminSavedPalettesPage() {
       const payload = {
         ...editForm,
         terry_fav: editForm.terry_fav ? 1 : 0,
+        kicker_id: editForm.kicker_id ? Number(editForm.kicker_id) : null,
+        palette_type: editForm.palette_type || "exterior",
         members,
         photos: editPhotos.map((photo) => ({
           id: photo.id,
           photo_type: photo.photo_type || "full",
           trigger_color_id: photo.trigger_color_id || null,
+          alt_text: photo.alt_text || "",
         })),
       };
       const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-update.php`, {
@@ -536,6 +570,7 @@ export default function AdminSavedPalettesPage() {
           <article key={item.id} className="asp-card">
             <header className="asp-card-header">
               <div>
+                {item.kicker_text && <div className="asp-card-kicker">{item.kicker_text}</div>}
                 <div className="asp-card-title">
                   <strong>{item.nickname || "(untitled palette)"}</strong>
                   {Number(item.terry_fav) === 1 && <span className="asp-pill">Fav</span>}
@@ -557,6 +592,21 @@ export default function AdminSavedPalettesPage() {
                   </div>
                 ))}
               </div>
+            )}
+            {item.photos?.length > 0 && (
+              <label className="asp-photo-url">
+                Front photo URL
+                <input
+                  type="text"
+                  readOnly
+                  value={buildFullUrl(
+                    (item.photos || []).find((photo) => photo.photo_type === "full")?.rel_path
+                    || item.photos?.[0]?.rel_path
+                    || ""
+                  )}
+                  onFocus={(e) => e.target.select()}
+                />
+              </label>
             )}
 
             <div className="asp-swatches">
@@ -665,6 +715,12 @@ export default function AdminSavedPalettesPage() {
                             </option>
                           ))}
                         </select>
+                        <input
+                          type="text"
+                          placeholder="Alt text (SEO)"
+                          value={photo.alt_text || ""}
+                          onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
+                        />
                         <button
                           type="button"
                           className="ghost"
@@ -684,10 +740,38 @@ export default function AdminSavedPalettesPage() {
               <div className="asp-member-list">
                 <div className="asp-member-list-head">
                   <h3>Palette Colors</h3>
-                  <button type="button" className="ghost" onClick={handleAddMember}>
-                    Add Color
-                  </button>
+                  <div className="asp-member-actions">
+                    <FuzzySearchColorSelect
+                      className="asp-member-fuzzy"
+                      onSelect={handleAddMemberWithColor}
+                      showLabel={false}
+                      autoFocus={false}
+                      preventAutoFocus
+                      compact
+                    />
+                    <button type="button" className="ghost" onClick={handleAddMember}>
+                      Add Color
+                    </button>
+                  </div>
                 </div>
+                <label className="asp-kicker-field">
+                  <span>Kicker (optional)</span>
+                  <KickerDropdown
+                    value={editForm.kicker_id}
+                    onChange={(next) => setEditForm((prev) => ({ ...prev, kicker_id: next || "" }))}
+                  />
+                </label>
+                <label>
+                  Palette Type
+                  <select
+                    value={editForm.palette_type}
+                    onChange={(e) => handleEditField("palette_type", e.target.value)}
+                  >
+                    <option value="exterior">Exterior</option>
+                    <option value="interior">Interior</option>
+                    <option value="hoa">HOA</option>
+                  </select>
+                </label>
                 <div className="asp-member-rows">
                   {editMembers.map((row, index) => (
                     <div key={row.key || index} className="asp-member-row">
@@ -728,11 +812,19 @@ export default function AdminSavedPalettesPage() {
               </label>
 
               <label>
-                Internal Notes (for me)
+                Public Notes (shown in viewer)
                 <textarea
                   rows={3}
                   value={editForm.notes}
                   onChange={(e) => handleEditField("notes", e.target.value)}
+                />
+              </label>
+              <label>
+                Private Notes (for me)
+                <textarea
+                  rows={3}
+                  value={editForm.private_notes}
+                  onChange={(e) => handleEditField("private_notes", e.target.value)}
                 />
               </label>
 

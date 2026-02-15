@@ -1,0 +1,22 @@
+/* Container for embedded usage inside articles */
+.player-embed {
+  width: 100%;
+  max-width: 720px;
+  margin: 16px auto;
+}
+
+/* Hide the exit button in embedded mode (no Player.jsx changes needed) */
+.player-embed .player-root.player-embedded .player-exit {
+  display: none;
+}
+
+/* Make the stage feel like an inline module, not a full-screen takeover */
+.player-embed .player-root.player-embedded {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Constrain height for article flow */
+.player-embed .player-root.player-embedded .player-stage {
+  height: min(60vh, 520px);
+}

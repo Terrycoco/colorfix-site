@@ -9,6 +9,7 @@ import {
   getMaskBlendSettingForColor,
   mergeMaskBlendSetting,
 } from "@helpers/maskRenderUtils";
+import KickerDropdown from "@components/KickerDropdown";
 import MaskSettingsGrid from "@components/MaskSettingsGrid";
 import "./ap-editor.css";
 
@@ -32,8 +33,8 @@ export default function AdminAppliedPaletteEditorPage() {
   const [renderInfo, setRenderInfo] = useState(null);
   const [entryMap, setEntryMap] = useState({});
   const [entryBaseline, setEntryBaseline] = useState({});
-  const [meta, setMeta] = useState({ title: "", display_title: "", notes: "", tags: "" });
-  const [metaBaseline, setMetaBaseline] = useState({ title: "", display_title: "", notes: "", tags: "" });
+  const [meta, setMeta] = useState({ title: "", display_title: "", notes: "", tags: "", kicker_id: "", alt_text: "" });
+  const [metaBaseline, setMetaBaseline] = useState({ title: "", display_title: "", notes: "", tags: "", kicker_id: "", alt_text: "" });
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -82,7 +83,9 @@ export default function AdminAppliedPaletteEditorPage() {
       meta.title !== metaBaseline.title ||
       meta.display_title !== metaBaseline.display_title ||
       meta.notes !== metaBaseline.notes ||
-      meta.tags !== metaBaseline.tags
+      meta.tags !== metaBaseline.tags ||
+      meta.kicker_id !== metaBaseline.kicker_id ||
+      meta.alt_text !== metaBaseline.alt_text
     ) {
       return true;
     }
@@ -167,6 +170,8 @@ export default function AdminAppliedPaletteEditorPage() {
         display_title: data.palette?.display_title || "",
         notes: data.palette?.notes || "",
         tags: data.palette?.tags || "",
+        kicker_id: data.palette?.kicker_id ? String(data.palette.kicker_id) : "",
+        alt_text: data.palette?.alt_text || "",
       };
       setMeta(paletteMeta);
       setMetaBaseline(paletteMeta);
@@ -414,6 +419,8 @@ export default function AdminAppliedPaletteEditorPage() {
           display_title: meta.display_title,
           notes: meta.notes,
           tags: meta.tags,
+          kicker_id: meta.kicker_id || null,
+          alt_text: meta.alt_text || null,
           entries: entriesForSave,
           clear_render: clearCache || rerender,
           render: rerender ? { cache: true } : undefined,
@@ -476,6 +483,8 @@ export default function AdminAppliedPaletteEditorPage() {
         display_title: meta.display_title,
         notes: meta.notes,
         tags: meta.tags,
+        kicker_id: meta.kicker_id || null,
+        alt_text: meta.alt_text || null,
         entries: entriesForSave,
         render: rerender ? { cache: true } : undefined,
       };
@@ -603,6 +612,20 @@ export default function AdminAppliedPaletteEditorPage() {
                 <input
                   value={meta.tags}
                   onChange={(e) => setMeta((prev) => ({ ...prev, tags: e.target.value }))}
+                />
+              </label>
+              <label>
+                <span>Kicker (optional)</span>
+                <KickerDropdown
+                  value={meta.kicker_id}
+                  onChange={(next) => setMeta((prev) => ({ ...prev, kicker_id: next || "" }))}
+                />
+              </label>
+              <label>
+                <span>Photo Alt Text (SEO)</span>
+                <input
+                  value={meta.alt_text}
+                  onChange={(e) => setMeta((prev) => ({ ...prev, alt_text: e.target.value }))}
                 />
               </label>
               <label className="ap-check">

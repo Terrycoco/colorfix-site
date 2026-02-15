@@ -22,16 +22,19 @@ class PdoSavedPaletteRepository
      *  - palette_hash (string, optional but recommended)
      *  - brand        (string, e.g. 'de', 'behr')
      *  - nickname     (string|null)
-     *  - notes        (string|null)
+     *  - notes         (string|null)
+     *  - private_notes (string|null)
      *  - terry_fav    (bool|int|null)
+     *  - kicker_id    (int|null)
+     *  - palette_type (string|null)
      */
     public function createSavedPalette(array $data): int
     {
         $sql = "
             INSERT INTO saved_palettes
-                (palette_hash, brand, nickname, notes, terry_fav, created_at)
+                (palette_hash, brand, nickname, notes, private_notes, terry_fav, kicker_id, palette_type, created_at)
             VALUES
-                (:palette_hash, :brand, :nickname, :notes, :terry_fav, NOW())
+                (:palette_hash, :brand, :nickname, :notes, :private_notes, :terry_fav, :kicker_id, :palette_type, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -41,7 +44,10 @@ class PdoSavedPaletteRepository
             ':brand'         => $data['brand'],
             ':nickname'      => $data['nickname'] ?? null,
             ':notes'         => $data['notes'] ?? null,
+            ':private_notes' => $data['private_notes'] ?? null,
             ':terry_fav'     => isset($data['terry_fav']) ? (int) (bool) $data['terry_fav'] : 0,
+            ':kicker_id'     => isset($data['kicker_id']) ? (int) $data['kicker_id'] : null,
+            ':palette_type'  => $data['palette_type'] ?? 'exterior',
         ]);
 
         return (int) $this->pdo->lastInsertId();
@@ -64,7 +70,10 @@ class PdoSavedPaletteRepository
             'brand',
             'nickname',
             'notes',
+            'private_notes',
             'terry_fav',
+            'kicker_id',
+            'palette_type',
         ];
 
         $setParts = [];
@@ -150,6 +159,20 @@ class PdoSavedPaletteRepository
         return $row !== false ? $row : null;
     }
 
+    public function getKickerText(int $kickerId): ?string
+    {
+        if ($kickerId <= 0) {
+            return null;
+        }
+        $stmt = $this->pdo->prepare("SELECT display_text FROM kickers WHERE kicker_id = :id");
+        $stmt->execute([':id' => $kickerId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row || !isset($row['display_text'])) {
+            return null;
+        }
+        return (string)$row['display_text'];
+    }
+
     public function getFullPaletteByHash(string $hash): ?array
     {
         $palette = $this->getSavedPaletteByHash($hash);
@@ -214,6 +237,7 @@ class PdoSavedPaletteRepository
                    photo_type,
                    trigger_color_id,
                    caption,
+                   alt_text,
                    order_index,
                    created_at
               FROM saved_palette_photos
@@ -256,13 +280,13 @@ class PdoSavedPaletteRepository
     /**
      * Add a photo row for a palette.
      */
-    public function addPhoto(int $savedPaletteId, string $relPath, ?string $caption, int $orderIndex): int
+    public function addPhoto(int $savedPaletteId, string $relPath, ?string $caption, ?string $altText, int $orderIndex): int
     {
         $sql = "
             INSERT INTO saved_palette_photos
-                (saved_palette_id, rel_path, photo_type, trigger_color_id, caption, order_index, created_at)
+                (saved_palette_id, rel_path, photo_type, trigger_color_id, caption, alt_text, order_index, created_at)
             VALUES
-                (:saved_palette_id, :rel_path, :photo_type, :trigger_color_id, :caption, :order_index, NOW())
+                (:saved_palette_id, :rel_path, :photo_type, :trigger_color_id, :caption, :alt_text, :order_index, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -272,6 +296,7 @@ class PdoSavedPaletteRepository
             ':photo_type'       => 'full',
             ':trigger_color_id' => null,
             ':caption'          => $caption,
+            ':alt_text'         => $altText,
             ':order_index'      => $orderIndex,
         ]);
 
@@ -301,6 +326,7 @@ class PdoSavedPaletteRepository
             'photo_type',
             'trigger_color_id',
             'caption',
+            'alt_text',
             'order_index',
         ];
 
@@ -442,6 +468,7 @@ class PdoSavedPaletteRepository
                    c.hcl_h      AS color_hcl_h,
                    c.hcl_c      AS color_hcl_c,
                    c.hcl_l      AS color_hcl_l,
+                   c.int_only   AS color_int_only,
                    c.chip_num   AS color_chip_num,
                    c.cluster_id AS color_cluster_id
               FROM saved_palette_members m
@@ -502,6 +529,7 @@ class PdoSavedPaletteRepository
      * $filters:
      *   - brand (string)
      *   - terry_fav (bool|int)
+     *   - palette_type (string)
      */
     public function listPalettes(array $filters = [], int $limit = 50, int $offset = 0): array
     {
@@ -518,17 +546,28 @@ class PdoSavedPaletteRepository
             $params[':terry_fav'] = (int) (bool) $filters['terry_fav'];
         }
 
+        if (!empty($filters['palette_type'])) {
+            $where[] = 'p.palette_type = :palette_type';
+            $params[':palette_type'] = $filters['palette_type'];
+        }
+
         if (!empty($filters['q'])) {
             $where[] = '('
                 . 'p.nickname LIKE :q_nickname '
-                . 'OR p.notes LIKE :q_notes'
+                . 'OR p.notes LIKE :q_notes '
+                . 'OR p.private_notes LIKE :q_private_notes '
+                . 'OR p.palette_type LIKE :q_type'
                 . ')';
             $likeValue = '%' . $filters['q'] . '%';
             $params[':q_nickname']    = $likeValue;
             $params[':q_notes']       = $likeValue;
+            $params[':q_private_notes'] = $likeValue;
+            $params[':q_type']        = $likeValue;
         }
 
-        $sql = "SELECT p.* FROM saved_palettes p";
+        $sql = "SELECT p.*, k.display_text AS kicker_text
+                FROM saved_palettes p
+                LEFT JOIN kickers k ON k.kicker_id = p.kicker_id";
 
         if (!empty($where)) {
             $sql .= ' WHERE ' . implode(' AND ', $where);

@@ -7,21 +7,25 @@ use App\Repos\PdoSavedPaletteRepository;
 use InvalidArgumentException;
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
+use App\Services\PhotoLibraryService;
 
 class SavedPaletteService
 {
     private PdoSavedPaletteRepository $repo;
     private ?SmtpMailer $mailer;
     private EmailTemplateService $emailTemplates;
+    private ?PhotoLibraryService $photoLibrary;
 
     public function __construct(
         PdoSavedPaletteRepository $repo,
         ?SmtpMailer $mailer = null,
-        ?EmailTemplateService $emailTemplates = null
+        ?EmailTemplateService $emailTemplates = null,
+        ?PhotoLibraryService $photoLibrary = null
     ) {
         $this->repo = $repo;
         $this->mailer = $mailer;
         $this->emailTemplates = $emailTemplates ?? new EmailTemplateService();
+        $this->photoLibrary = $photoLibrary;
     }
 
     /**
@@ -69,7 +73,10 @@ class SavedPaletteService
             'brand'         => $brand,
             'nickname'      => $data['nickname']      ?? null,
             'notes'         => $data['notes']         ?? null,
+            'private_notes' => $data['private_notes'] ?? null,
             'terry_fav'     => $data['terry_fav']     ?? 0,
+            'kicker_id'     => $data['kicker_id']     ?? null,
+            'palette_type'  => $this->normalizePaletteType($data['palette_type'] ?? null),
         ]);
 
         // Attach members
@@ -117,7 +124,10 @@ class SavedPaletteService
             'brand'         => $brand,
             'nickname'      => $data['nickname']      ?? null,
             'notes'         => $data['notes']         ?? null,
+            'private_notes' => $data['private_notes'] ?? null,
             'terry_fav'     => $data['terry_fav']     ?? 0,
+            'kicker_id'     => $data['kicker_id']     ?? null,
+            'palette_type'  => $this->normalizePaletteType($data['palette_type'] ?? null),
         ]);
 
         $this->repo->replaceMembers($paletteId, $members);
@@ -138,6 +148,9 @@ class SavedPaletteService
         $photos = $this->repo->getPhotosForPalette($savedPaletteId);
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../..'), '/');
         foreach ($photos as $photo) {
+            if ($this->photoLibrary && !empty($photo['id'])) {
+                $this->photoLibrary->deleteSavedPalettePhoto((int)$photo['id']);
+            }
             $rel = (string)($photo['rel_path'] ?? '');
             if ($rel === '' || !str_starts_with($rel, '/photos/')) {
                 continue;
@@ -198,7 +211,7 @@ class SavedPaletteService
     /**
      * Update photo metadata for a palette.
      *
-     * $photos: array of ['id' => int, 'photo_type' => string, 'trigger_color_id' => ?int, 'caption' => ?string]
+     * $photos: array of ['id' => int, 'photo_type' => string, 'trigger_color_id' => ?int, 'caption' => ?string, 'alt_text' => ?string]
      */
     public function updateSavedPalettePhotos(int $paletteId, array $photos): void
     {
@@ -243,11 +256,24 @@ class SavedPaletteService
                 $caption = $cap === '' ? null : $cap;
             }
 
+            $altText = null;
+            if (array_key_exists('alt_text', $photo)) {
+                $alt = trim((string)$photo['alt_text']);
+                $altText = $alt === '' ? null : $alt;
+            }
+
             $this->repo->updatePhoto($photoId, $paletteId, [
                 'photo_type' => $photoType,
                 'trigger_color_id' => $triggerId,
                 'caption' => $caption,
+                'alt_text' => $altText,
             ]);
+            if ($this->photoLibrary) {
+                $updatedPhoto = $this->repo->getPhotoById($photoId);
+                if ($updatedPhoto) {
+                    $this->photoLibrary->syncSavedPalettePhoto($updatedPhoto);
+                }
+            }
         }
     }
     /**
@@ -466,8 +492,17 @@ class SavedPaletteService
             $fields['notes'] = $notes === '' ? null : $notes;
         }
 
+        if (array_key_exists('private_notes', $data)) {
+            $notes = trim((string)$data['private_notes']);
+            $fields['private_notes'] = $notes === '' ? null : $notes;
+        }
+
         if (array_key_exists('terry_fav', $data)) {
             $fields['terry_fav'] = (int) (bool) $data['terry_fav'];
+        }
+
+        if (array_key_exists('palette_type', $data)) {
+            $fields['palette_type'] = $this->normalizePaletteType($data['palette_type']);
         }
 
         if (!empty($fields)) {
@@ -480,5 +515,15 @@ class SavedPaletteService
         }
 
         return $full;
+    }
+
+    private function normalizePaletteType(?string $value): string
+    {
+        $type = strtolower(trim((string)($value ?? '')));
+        $allowed = ['interior', 'exterior', 'hoa'];
+        if (!in_array($type, $allowed, true)) {
+            return 'exterior';
+        }
+        return $type;
     }
 }

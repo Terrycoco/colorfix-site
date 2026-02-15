@@ -63,6 +63,7 @@ $itemSql = <<<SQL
       playlist_id,
       order_index,
       ap_id,
+      palette_hash,
       image_url,
       title,
       subtitle,

@@ -149,7 +149,7 @@ export default function PlayerPage() {
       const type = (item?.type || "normal").toLowerCase();
       if (type === "intro" || type === "before" || type === "text") return false;
       if (item?.exclude_from_thumbs) return false;
-      return Boolean(item?.ap_id);
+      return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
     });
   }, [data?.items]);
 
@@ -267,6 +267,13 @@ const visibleCTAs = useMemo(
   [ctas, likedCount]
 );
 
+const { primaryCTAs, linkCTAs } = useMemo(() => {
+  return {
+    primaryCTAs: visibleCTAs.filter((cta) => cta?.variant !== "link"),
+    linkCTAs: visibleCTAs.filter((cta) => cta?.variant === "link"),
+  };
+}, [visibleCTAs]);
+
   if (loading) return null;
   if (error) return <div className="player-error">{error}</div>;
 
@@ -288,12 +295,25 @@ const visibleCTAs = useMemo(
         />
         {playbackEnded && (
           <PlayerEndScreen onExit={handleExit}>
-            {visibleCTAs.length > 0 && (
-              <CTALayout
-                layout="stacked"
-                ctas={visibleCTAs}
-                onCtaClick={handleCta}
-              />
+            {(primaryCTAs.length > 0 || linkCTAs.length > 0) && (
+              <>
+                {primaryCTAs.length > 0 && (
+                  <CTALayout
+                    layout="stacked"
+                    ctas={primaryCTAs}
+                    onCtaClick={handleCta}
+                  />
+                )}
+                {linkCTAs.length > 0 && (
+                  <div className="player-end-links">
+                    <CTALayout
+                      layout="stacked"
+                      ctas={linkCTAs}
+                      onCtaClick={handleCta}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </PlayerEndScreen>
         )}

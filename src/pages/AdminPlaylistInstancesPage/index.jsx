@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
+import KickerDropdown from "@components/KickerDropdown";
+import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-playlist-instances.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
@@ -9,6 +11,8 @@ const SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instances/save.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const CTA_GROUPS_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 const CTA_GROUP_ITEMS_URL = `${API_FOLDER}/v2/admin/cta-group-items/list.php`;
+const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
+const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/playlist-instances/send-email.php`;
 
 const AUDIENCE_OPTIONS = [
   { value: "any", label: "Any" },
@@ -43,6 +47,7 @@ const emptyInstance = {
   hide_stars: false,
   is_active: true,
   created_from_instance: "",
+  kicker_id: "",
 };
 
 function coerceBoolean(value) {
@@ -64,10 +69,22 @@ export default function AdminPlaylistInstancesPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
+  const [emailTemplates, setEmailTemplates] = useState([]);
+  const [emailModal, setEmailModal] = useState({
+    open: false,
+    templateKey: "",
+    toEmail: "",
+    subject: "",
+    message: "",
+    htmlBody: "",
+    status: { loading: false, error: "", success: "" },
+  });
+  const [sendFormat, setSendFormat] = useState("html");
 
   useEffect(() => {
     fetchPlaylists();
     fetchCtaGroups();
+    fetchEmailTemplates();
   }, []);
 
   useEffect(() => {
@@ -195,6 +212,7 @@ export default function AdminPlaylistInstancesPage() {
         hide_stars: coerceBoolean(data.item?.hide_stars),
         demo_enabled: coerceBoolean(data.item?.demo_enabled),
         is_active: coerceBoolean(data.item?.is_active),
+        kicker_id: data.item?.kicker_id ? String(data.item.kicker_id) : "",
       };
       setForm(next);
       setCtaOverrides(parseOverrides(data.item?.cta_overrides));
@@ -245,6 +263,33 @@ export default function AdminPlaylistInstancesPage() {
     return `${SHARE_FOLDER}/playlist.php?id=${id}`;
   }
 
+  function hydrateTemplate(text, { title, link }) {
+    return String(text || "")
+      .replace(/\{title\}/gi, title || "")
+      .replace(/\{link\}/gi, link || "");
+  }
+
+  function hydrateHtmlTemplate(html, { title, link }) {
+    return String(html || "")
+      .replace(/\{\{\s*title\s*\}\}/gi, title || "")
+      .replace(/\{\{\s*link\s*\}\}/gi, link || "")
+      .replace(/\{title\}/gi, title || "")
+      .replace(/\{link\}/gi, link || "");
+  }
+
+  async function fetchEmailTemplates() {
+    try {
+      const res = await fetch(`${EMAIL_TEMPLATES_URL}?_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load templates");
+      setEmailTemplates(data.templates || []);
+    } catch (err) {
+      setEmailTemplates([]);
+    }
+  }
+
   function handleShare() {
     const id = activeId;
     if (!id) return;
@@ -258,6 +303,101 @@ export default function AdminPlaylistInstancesPage() {
     }
     const body = encodeURIComponent(url);
     window.location.href = `sms:&body=${body}`;
+  }
+
+  function openEmailModal() {
+    if (!activeId) return;
+    const shareUrl = buildShareUrl(activeId);
+    const instanceLabel = form.instance_name || form.display_title || `Instance #${activeId}`;
+    const fallbackTemplate = emailTemplates[0] || null;
+    const templateKey = fallbackTemplate?.key || "";
+    const subject = hydrateTemplate(fallbackTemplate?.subject || "Your ColorFix playlist", {
+      title: instanceLabel,
+      link: shareUrl,
+    });
+    const message = hydrateTemplate(fallbackTemplate?.message || "I wanted to share this ColorFix playlist with you.", {
+      title: instanceLabel,
+      link: shareUrl,
+    });
+    const htmlBody = hydrateHtmlTemplate(fallbackTemplate?.html || "", {
+      title: instanceLabel,
+      link: shareUrl,
+    });
+    setEmailModal({
+      open: true,
+      templateKey,
+      toEmail: "",
+      subject,
+      message,
+      htmlBody,
+      status: { loading: false, error: "", success: "" },
+    });
+    setSendFormat(htmlBody ? "html" : "text");
+  }
+
+  function closeEmailModal() {
+    setEmailModal((prev) => ({ ...prev, open: false }));
+  }
+
+  function handleTemplateChange(nextKey) {
+    const shareUrl = buildShareUrl(activeId);
+    const instanceLabel = form.instance_name || form.display_title || `Instance #${activeId}`;
+    const template = emailTemplates.find((item) => item.key === nextKey);
+    setEmailModal((prev) => ({
+      ...prev,
+      templateKey: nextKey,
+      subject: hydrateTemplate(template?.subject || prev.subject, { title: instanceLabel, link: shareUrl }),
+      message: hydrateTemplate(template?.message || prev.message, { title: instanceLabel, link: shareUrl }),
+      htmlBody: hydrateHtmlTemplate(template?.html || prev.htmlBody, { title: instanceLabel, link: shareUrl }),
+      status: { loading: false, error: "", success: "" },
+    }));
+    const nextHtml = hydrateHtmlTemplate(template?.html || "", { title: instanceLabel, link: shareUrl });
+    setSendFormat(nextHtml ? "html" : "text");
+  }
+
+  async function handleSendEmail() {
+    if (!activeId) return;
+    const toEmail = emailModal.toEmail.trim();
+    if (!toEmail) {
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: "Recipient email required.", success: "" },
+      }));
+      return;
+    }
+    setEmailModal((prev) => ({
+      ...prev,
+      status: { loading: true, error: "", success: "" },
+    }));
+    try {
+      const shareUrl = buildShareUrl(activeId);
+      const res = await fetch(SEND_EMAIL_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playlist_instance_id: activeId,
+          to_email: toEmail,
+          subject: emailModal.subject,
+          message: emailModal.message,
+          html_body: sendFormat === "html" ? emailModal.htmlBody : "",
+          title: form.instance_name || form.display_title || `Instance #${activeId}`,
+          share_url: shareUrl,
+          template_key: emailModal.templateKey,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to send email");
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: "", success: "Email sent." },
+      }));
+    } catch (err) {
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: err?.message || "Failed to send email", success: "" },
+      }));
+    }
   }
 
   async function handleSave() {
@@ -274,6 +414,7 @@ export default function AdminPlaylistInstancesPage() {
         demo_enabled: Boolean(form.demo_enabled),
         cta_overrides: ctaOverrides,
         created_from_instance: form.created_from_instance === "" ? null : Number(form.created_from_instance),
+        kicker_id: form.kicker_id === "" ? null : Number(form.kicker_id),
       };
       const res = await fetch(SAVE_URL, {
         method: "POST",
@@ -479,9 +620,14 @@ export default function AdminPlaylistInstancesPage() {
           ) : (
             <div className="mobile-share__selected">Select an instance to share</div>
           )}
-          <button type="button" className="primary-btn" onClick={handleShare} disabled={!activeId}>
-            Share via Text
-          </button>
+          <div className="mobile-share__actions">
+            <button type="button" className="primary-btn" onClick={handleShare} disabled={!activeId}>
+              Share via Text
+            </button>
+            <button type="button" onClick={openEmailModal} disabled={!activeId}>
+              Email Link
+            </button>
+          </div>
           {activeId && (
             <div className="mobile-share__hint">
               Link: {buildShareUrl(activeId)}
@@ -564,6 +710,14 @@ export default function AdminPlaylistInstancesPage() {
                 value={form.display_title || ""}
                 onChange={(e) => updateForm("display_title", e.target.value)}
                 placeholder="Shown to viewers (thumbnail title)"
+              />
+            </label>
+
+            <label>
+              Kicker (optional)
+              <KickerDropdown
+                value={form.kicker_id}
+                onChange={(next) => updateForm("kicker_id", next || "")}
               />
             </label>
 
@@ -760,9 +914,38 @@ export default function AdminPlaylistInstancesPage() {
         </div>
 
 
-        {saveStatus && <div className="panel-status success">{saveStatus}</div>}
-        {saveError && <div className="panel-status error">{saveError}</div>}
+      {saveStatus && <div className="panel-status success">{saveStatus}</div>}
+      {saveError && <div className="panel-status error">{saveError}</div>}
       </div>
+      <EmailShareModal
+        open={emailModal.open}
+        title="Send Playlist Link"
+        templates={emailTemplates}
+        templateKey={emailModal.templateKey}
+        onTemplateChange={handleTemplateChange}
+        toEmail={emailModal.toEmail}
+        onToEmailChange={(value) =>
+          setEmailModal((prev) => ({ ...prev, toEmail: value, status: { ...prev.status, error: "", success: "" } }))
+        }
+        subject={emailModal.subject}
+        onSubjectChange={(value) =>
+          setEmailModal((prev) => ({ ...prev, subject: value, status: { ...prev.status, error: "", success: "" } }))
+        }
+        htmlBody={emailModal.htmlBody}
+        onHtmlBodyChange={(value) =>
+          setEmailModal((prev) => ({ ...prev, htmlBody: value, status: { ...prev.status, error: "", success: "" } }))
+        }
+        message={emailModal.message}
+        onMessageChange={(value) =>
+          setEmailModal((prev) => ({ ...prev, message: value, status: { ...prev.status, error: "", success: "" } }))
+        }
+        sendFormat={sendFormat}
+        onSendFormatChange={setSendFormat}
+        shareLink={buildShareUrl(activeId)}
+        status={emailModal.status}
+        onSend={handleSendEmail}
+        onClose={closeEmailModal}
+      />
     </div>
   );
 }

@@ -9,6 +9,8 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Controllers\SavedPaletteController;
 use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 use App\Services\SavedPaletteService;
 
 try {
@@ -34,7 +36,9 @@ try {
     }
 
     $paletteRepo = new PdoSavedPaletteRepository($pdo);
-    $service     = new SavedPaletteService($paletteRepo);
+    $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
+    $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
+    $service     = new SavedPaletteService($paletteRepo, null, null, $photoLibrary);
     $controller  = new SavedPaletteController($service);
 
     $controller->deleteSavedPalette($paletteId);

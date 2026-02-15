@@ -7,6 +7,8 @@ use App\Repos\PdoPhotoRepository;
 use App\Services\PhotoRenderingService;
 use App\Services\MaskOverlayService;
 use App\Services\PhotosUploadService;
+use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 use PDO;
 use RuntimeException;
 
@@ -280,7 +282,9 @@ class PhotosController
         }
 
         $repo = new PdoPhotoRepository($this->pdo);
-        $svc  = new PhotosUploadService($repo, $photosRoot, $this->pdo);
+        $photoLibraryRepo = new PdoPhotoLibraryRepository($this->pdo);
+        $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
+        $svc  = new PhotosUploadService($repo, $photosRoot, $this->pdo, $photoLibrary);
 
         // Resolve/create photo
         if ($assetIdIn !== '') {

@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 
 function respond(int $code, array $payload): void {
     http_response_code($code);
@@ -36,6 +38,8 @@ try {
     }
 
     $repo = new PdoSavedPaletteRepository($pdo);
+    $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
+    $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
     if (!$repo->getSavedPaletteById($paletteId)) {
         respond(404, ['ok' => false, 'error' => 'Saved palette not found']);
     }
@@ -78,16 +82,19 @@ try {
         }
 
         $relPath = "/photos/uploads/saved-palettes/{$paletteId}/{$filename}";
-        $photoId = $repo->addPhoto($paletteId, $relPath, null, $orderIndex);
-        $added[] = [
+        $photoId = $repo->addPhoto($paletteId, $relPath, null, null, $orderIndex);
+        $photoRow = [
             'id' => $photoId,
             'saved_palette_id' => $paletteId,
             'rel_path' => $relPath,
             'photo_type' => 'full',
             'trigger_color_id' => null,
             'caption' => null,
+            'alt_text' => null,
             'order_index' => $orderIndex,
         ];
+        $photoLibrary->syncSavedPalettePhoto($photoRow);
+        $added[] = $photoRow;
         $orderIndex++;
     }
 

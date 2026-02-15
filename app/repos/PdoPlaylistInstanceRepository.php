@@ -39,7 +39,8 @@ final class PdoPlaylistInstanceRepository
               skip_intro_on_replay,
               hide_stars,
               is_active,
-              created_from_instance
+              created_from_instance,
+              kicker_id
             FROM playlist_instances
             WHERE playlist_instance_id = :id
             LIMIT 1
@@ -77,7 +78,8 @@ final class PdoPlaylistInstanceRepository
             (bool)$row['skip_intro_on_replay'],
             (bool)$row['hide_stars'],
             (bool)$row['is_active'],
-            $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null
+            $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null,
+            $row['kicker_id'] !== null ? (int)$row['kicker_id'] : null
         );
     }
 
@@ -107,7 +109,8 @@ final class PdoPlaylistInstanceRepository
             skip_intro_on_replay,
             hide_stars,
             is_active,
-            created_from_instance
+            created_from_instance,
+            kicker_id
             ) VALUES (
             :playlist_id,
             :instance_name,
@@ -131,7 +134,8 @@ final class PdoPlaylistInstanceRepository
             :skip_intro_on_replay,
             :hide_stars,
             :is_active,
-            :created_from_instance
+            :created_from_instance,
+            :kicker_id
             )
             SQL;
 
@@ -160,6 +164,7 @@ final class PdoPlaylistInstanceRepository
             'hide_stars' => $instance->hideStars ? 1 : 0,
             'is_active' => $instance->isActive ? 1 : 0,
             'created_from_instance' => $instance->createdFromInstance,
+            'kicker_id' => $instance->kickerId,
         ]);
 
         $instance->id = (int)$this->pdo->lastInsertId();
@@ -197,7 +202,8 @@ final class PdoPlaylistInstanceRepository
             skip_intro_on_replay = :skip_intro_on_replay,
             hide_stars = :hide_stars,
             is_active = :is_active,
-            created_from_instance = :created_from_instance
+            created_from_instance = :created_from_instance,
+            kicker_id = :kicker_id
             WHERE playlist_instance_id = :id
             SQL;
 
@@ -227,6 +233,7 @@ final class PdoPlaylistInstanceRepository
             'hide_stars' => $instance->hideStars ? 1 : 0,
             'is_active' => $instance->isActive ? 1 : 0,
             'created_from_instance' => $instance->createdFromInstance,
+            'kicker_id' => $instance->kickerId,
         ]);
     }
 
@@ -270,7 +277,8 @@ final class PdoPlaylistInstanceRepository
               skip_intro_on_replay,
               hide_stars,
               is_active,
-              created_from_instance
+              created_from_instance,
+              kicker_id
             FROM playlist_instances
             SQL;
 
@@ -314,7 +322,8 @@ final class PdoPlaylistInstanceRepository
                 (bool)$row['skip_intro_on_replay'],
                 (bool)$row['hide_stars'],
                 (bool)$row['is_active'],
-                $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null
+                $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null,
+                $row['kicker_id'] !== null ? (int)$row['kicker_id'] : null
             );
         }
 
