@@ -41,9 +41,11 @@ export default function AdminPhotoLibraryPage() {
 
   const [filters, setFilters] = useState(defaultFilters);
   const [items, setItems] = useState([]);
+  const [dirtyIds, setDirtyIds] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState("");
 
   const [savedPalettes, setSavedPalettes] = useState([]);
 
@@ -116,6 +118,11 @@ export default function AdminPhotoLibraryPage() {
     setItems((prev) =>
       prev.map((item) => (item.photo_library_id === id ? { ...item, [key]: value } : item))
     );
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
   const resetUpload = () => {
@@ -202,8 +209,44 @@ export default function AdminPhotoLibraryPage() {
         throw new Error(data?.error || "Save failed");
       }
       setRefreshKey((prev) => prev + 1);
+      setDirtyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.photo_library_id);
+        return next;
+      });
     } catch (err) {
       setError(err?.message || "Failed to save row");
+    }
+  };
+
+  const handleSaveAll = async () => {
+    if (!dirtyIds.size) return;
+    setError("");
+    const dirtyItems = items.filter((row) => dirtyIds.has(row.photo_library_id));
+    try {
+      for (const item of dirtyItems) {
+        const res = await fetch(UPDATE_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            photo_library_id: item.photo_library_id,
+            title: item.title,
+            tags: item.tags,
+            alt_text: item.alt_text,
+            show_in_gallery: !!item.show_in_gallery,
+            has_palette: !!item.has_palette,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || `Save failed for #${item.photo_library_id}`);
+        }
+      }
+      setDirtyIds(new Set());
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setError(err?.message || "Failed to save rows");
     }
   };
 
@@ -424,6 +467,12 @@ export default function AdminPhotoLibraryPage() {
               </select>
             </label>
           )}
+          <div className="admin-photo-library__save-all">
+            <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
+              Save All
+            </button>
+            {dirtyIds.size > 0 && <div className="admin-photo-library__dirty-count">{dirtyIds.size} unsaved</div>}
+          </div>
         </div>
 
         {loading ? (
@@ -433,6 +482,7 @@ export default function AdminPhotoLibraryPage() {
             <table className="admin-photo-library__table">
               <thead>
                 <tr>
+                  <th>ID</th>
                   <th>Preview</th>
                   <th>Title</th>
                   <th>Tags</th>
@@ -444,11 +494,27 @@ export default function AdminPhotoLibraryPage() {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.photo_library_id}>
+                  <tr key={item.photo_library_id} className={dirtyIds.has(item.photo_library_id) ? "is-dirty" : ""}>
                     <td>
-                      <a href={item.rel_path} target="_blank" rel="noreferrer">
+                      <div className="admin-photo-library__id">
+                        <span>{item.photo_library_id}</span>
+                        <button
+                          type="button"
+                          className="ghost admin-photo-library__copy"
+                          onClick={() => navigator.clipboard.writeText(String(item.photo_library_id))}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-photo-library__thumb"
+                        onClick={() => setPreviewUrl(item.rel_path)}
+                      >
                         <img src={item.rel_path} alt="" />
-                      </a>
+                      </button>
                     </td>
                     <td>
                       <input
@@ -499,6 +565,9 @@ export default function AdminPhotoLibraryPage() {
                       <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
                         Save
                       </button>
+                      <a className="ghost" href={item.rel_path} download>
+                        Download
+                      </a>
                       {(item.source_type === "progression" || item.source_type === "article") && (
                         <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
                           Delete
@@ -509,7 +578,7 @@ export default function AdminPhotoLibraryPage() {
                 ))}
                 {!items.length && (
                   <tr>
-                    <td colSpan={7} className="admin-photo-library__empty">No photos yet.</td>
+                    <td colSpan={8} className="admin-photo-library__empty">No photos yet.</td>
                   </tr>
                 )}
               </tbody>
@@ -517,6 +586,20 @@ export default function AdminPhotoLibraryPage() {
           </div>
         )}
       </section>
+
+      {previewUrl && (
+        <div
+          className="admin-photo-library__preview"
+          role="button"
+          tabIndex={0}
+          onClick={() => setPreviewUrl("")}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setPreviewUrl("");
+          }}
+        >
+          <img src={previewUrl} alt="" />
+        </div>
+      )}
     </div>
   );
 }

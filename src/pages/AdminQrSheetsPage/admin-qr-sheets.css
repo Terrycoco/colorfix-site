@@ -1,0 +1,192 @@
+.admin-qr-sheets {
+  padding: 24px 28px 60px;
+  color: #111827;
+}
+
+.admin-qr-sheets__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.admin-qr-sheets__header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.admin-qr-sheets__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.admin-qr-sheets__actions button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-qr-sheets__editor {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(300px, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-qr-sheets__editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-qr-sheets__editor input,
+.admin-qr-sheets__editor select {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.admin-qr-sheets__grid {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.admin-qr-sheets__card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  text-align: center;
+  max-width: 520px;
+}
+
+.admin-qr-sheets__label {
+  font-weight: 700;
+  font-size: 44px;
+  color: #d97706;
+  text-transform: none;
+  width: 100%;
+  line-height: 1.1;
+  padding-bottom: 0;
+  margin-bottom: 20px;
+}
+
+.admin-qr-sheets__card img {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+
+.admin-qr-sheets__placeholder {
+  width: 200px;
+  height: 200px;
+  border: 1px dashed #cbd5f5;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.admin-qr-sheets__url {
+  font-size: 11px;
+  color: #6b7280;
+  word-break: break-word;
+}
+
+.admin-qr-sheets__download {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+@media print {
+  body,
+  html {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .navbar-layout,
+  .navbar-layout *,
+  .navbar,
+  .nav-links,
+  .nav-brand {
+    display: none !important;
+  }
+  .navbar-layout,
+  .navbar-layout *,
+  .navbar {
+    display: none !important;
+  }
+  .navbar,
+  .admin-menu,
+  .admin-qr-sheets__header,
+  .admin-qr-sheets__editor,
+  .admin-qr-sheets__actions {
+    display: none !important;
+  }
+
+  .admin-qr-sheets {
+    padding: 0;
+  }
+
+  .admin-qr-sheets__card {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    page-break-inside: avoid;
+    min-height: 100vh;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+  }
+
+  .admin-qr-sheets__grid {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .admin-qr-sheets__label {
+    font-size: 56px;
+  }
+
+  .admin-qr-sheets__card img {
+    width: 220px;
+    height: 220px;
+  }
+
+  .admin-qr-sheets__subline {
+    font-size: 24px;
+  }
+}
+.admin-qr-sheets__subline {
+  font-size: 20px;
+  color: #374151;
+  width: 100%;
+  text-align: center;
+}

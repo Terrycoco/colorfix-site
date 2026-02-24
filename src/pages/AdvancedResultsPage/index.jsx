@@ -6,6 +6,7 @@ import { toWheelRange } from '@helpers/hueHelper';
 import { runAdvancedSearch } from '@data/advancedSearch';
 import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 import SwatchGallery from '@components/SwatchGallery';
+import '@components/Gallery/gallery.css';
 
 const DEFAULT_LIMIT = 600;
 
@@ -70,7 +71,7 @@ function buildPayloadFromQuery(search) {
 }
 
 export default function AdvancedResultsPage() {
-  const { advancedSearch, searchFilters } = useAppState();
+  const { advancedSearch, searchFilters, showPalette } = useAppState();
   const location = useLocation();
   const queryPayload = useMemo(() => buildPayloadFromQuery(location.search), [location.search]);
 
@@ -79,6 +80,9 @@ export default function AdvancedResultsPage() {
     hueMin, hueMax, cMin, cMax, lMin, lMax, hex6, supercatSlug
   } = advancedSearch || {};
   const [state, setState] = useState({ loading: true, error: '', rows: [], total: 0 });
+  const [sortMode, setSortMode] = useState('hue');
+  const [showSortPeek, setShowSortPeek] = useState(true);
+  const lastScrollRef = useRef(0);
 
   // brand codes helper
   const getBrandCodes = (sf) =>
@@ -143,18 +147,82 @@ export default function AdvancedResultsPage() {
     return () => abort.abort();
   }, [payloadOnSubmit]);
 
-  // Instant brand filtering (only in HEX mode; no new fetches)
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      const last = lastScrollRef.current;
+      const delta = y - last;
+      const goingDown = delta > 2;
+      const goingUp = delta < -2;
+      if (goingUp) {
+        setShowSortPeek(true);
+      } else if (goingDown) {
+        setShowSortPeek(false);
+      }
+
+      lastScrollRef.current = y;
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onWheel = (e) => {
+      if (typeof e.deltaY !== 'number') return;
+      if (e.deltaY < 0) setShowSortPeek(true);
+      if (e.deltaY > 0) setShowSortPeek(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') {
+        setShowSortPeek(true);
+      }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'End') {
+        setShowSortPeek(false);
+      }
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  // Instant brand filtering (always applied client-side)
   const clientFilteredRows = useMemo(() => {
-    if (!activeHex) return state.rows; // non-HEX mode already server-filtered on submit
     const active = getBrandCodes(searchFilters);
     if (!active.length) return state.rows;
     return state.rows.filter(r => {
-      const b = (r.brand ?? r?.color?.brand ?? '').toString().toLowerCase();
+      const b = (r.brand ?? r?.color?.brand ?? '').toString().trim().toLowerCase();
       return active.includes(b);
     });
-  }, [state.rows, searchFilters, activeHex]);
+  }, [state.rows, searchFilters]);
 
   const items = clientFilteredRows;
+  const sortedItems = useMemo(() => {
+    if (!items.length) return items;
+    const getValue = (row) => {
+      const swatch = row?.color ?? row;
+      const raw = sortMode === 'chroma'
+        ? swatch?.hcl_c
+        : sortMode === 'lightness'
+          ? swatch?.hcl_l
+          : swatch?.hcl_h;
+      const num = Number(raw);
+      return Number.isFinite(num) ? num : null;
+    };
+    return [...items].sort((a, b) => {
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      return aVal - bVal;
+    });
+  }, [items, sortMode]);
 
   if (state.loading) return <div className="gallery-status">Searching…</div>;
   if (state.error)   return <div className="gallery-status">Error: {state.error}</div>;
@@ -162,8 +230,37 @@ export default function AdvancedResultsPage() {
 
   return (
     <div className="gallery">
+      <div className={`gallery-controls adv-results-controls${showSortPeek ? " is-peek" : ""}${showPalette ? " has-palette" : ""}`}>
+        <button
+          type="button"
+          onClick={() => setSortMode('hue')}
+          aria-pressed={sortMode === 'hue'}
+          className={`btn ${sortMode === 'hue' ? 'btn-active' : ''}`}
+          title="Sort by Hue"
+        >
+          Hue
+        </button>
+        <button
+          type="button"
+          onClick={() => setSortMode('chroma')}
+          aria-pressed={sortMode === 'chroma'}
+          className={`btn ${sortMode === 'chroma' ? 'btn-active' : ''}`}
+          title="Sort by Chroma"
+        >
+          Chroma
+        </button>
+        <button
+          type="button"
+          onClick={() => setSortMode('lightness')}
+          aria-pressed={sortMode === 'lightness'}
+          className={`btn ${sortMode === 'lightness' ? 'btn-active' : ''}`}
+          title="Sort by Lightness"
+        >
+          Lightness
+        </button>
+      </div>
       <SwatchGallery
-        items={items}
+        items={sortedItems}
         SwatchComponent={PaletteSwatch}
         swatchPropName="color"
         className="sg-palette"

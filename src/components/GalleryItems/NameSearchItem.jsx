@@ -15,6 +15,7 @@ export default function NameSearchItem({ item }) {
   const [showInput, setShowInput] = useState(false);
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
   const [openingFromRect, setOpeningFromRect] = useState(null);
+  const [didSubmit, setDidSubmit] = useState(false);
 
   const { clearSearchFilters, noResults, setNoResults } = useAppState();
   const submittingRef = useRef(false);
@@ -40,6 +41,7 @@ export default function NameSearchItem({ item }) {
         setActive(false);
         setTerm('');
         setOpeningFromRect(null);
+        setDidSubmit(false);
       }
     };
 
@@ -59,11 +61,13 @@ export default function NameSearchItem({ item }) {
       setActive(false);
       setTerm('');
       setOpeningFromRect(null);
+      setDidSubmit(false);
       return;
     }
     submittingRef.current = true;
     clearSearchFilters();
     setNoResults(false);
+    setDidSubmit(true);
     navigate(
       `/results/18?name=${encodeURIComponent('%' + term + '%')}&code=${encodeURIComponent('%' + term + '%')}`
     );
@@ -76,6 +80,8 @@ export default function NameSearchItem({ item }) {
     // Preserve the tile's space so the gallery doesn't reflow
     if (rect) setPlaceholderHeight(rect.height);
 
+    setNoResults(false);
+    setDidSubmit(false);
     setActive(true);
     setShowInput(true);
 
@@ -167,10 +173,10 @@ export default function NameSearchItem({ item }) {
               >
                 Search
               </button>
-
-              {noResults && (
+              {noResults && didSubmit && (
                 <div className="search-error">Sorry, no results found.</div>
               )}
+
             </form>
           ) : (
             <div className="search-label">{item.label}</div>

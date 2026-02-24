@@ -23,6 +23,8 @@ const GalleryPage = () => {
   const [insertItems, setInsertItems] = useState([]);
   const [meta, setMeta] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [showSortPeek, setShowSortPeek] = useState(true);
+  const lastScrollRef = useRef(0);
 
   // Decide if this page is a swatch gallery.
   // 1) meta.item_type === 'swatch' (preferred when present)
@@ -36,7 +38,7 @@ const GalleryPage = () => {
     return ('hex6' in first) || ('hcl_l' in first);
   }, [meta?.item_type, searchItems]);
 
-  const { searchFilters, setNoResults, brandFiltersAppliedSeq } = useAppState();
+  const { searchFilters, setNoResults, brandFiltersAppliedSeq, showPalette } = useAppState();
 
   useEffect(() => {
     return () => { if (abortRef.current) abortRef.current.abort(); };
@@ -101,8 +103,19 @@ const GalleryPage = () => {
         return;
       }
 
-      setNoResults(false);
-      setSearchItems(data.results || []);
+      const brandCodes = Array.isArray(searchFilters?.brands)
+        ? searchFilters.brands.map((s) => String(s).trim().toLowerCase()).filter(Boolean)
+        : [];
+      const shouldFilterBrands = (data?.meta?.item_type || '').toLowerCase() === 'swatch';
+      const filteredResults = (brandCodes.length && shouldFilterBrands)
+        ? (data.results || []).filter((row) => {
+            const b = String(row?.brand ?? row?.color?.brand ?? "").trim().toLowerCase();
+            return b && brandCodes.includes(b);
+          })
+        : (data.results || []);
+
+      setNoResults(filteredResults.length === 0);
+      setSearchItems(filteredResults);
       setInsertItems(data.inserts || []);
       setMeta(data.meta);
 
@@ -163,10 +176,49 @@ const GalleryPage = () => {
   }, [JSON.stringify(searchFilters?.brands || [])]);
 
   useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 500);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setShowBackToTop(y > 500);
+
+      const last = lastScrollRef.current;
+      const delta = y - last;
+      const goingDown = delta > 2;
+      const goingUp = delta < -2;
+      if (goingUp) {
+        setShowSortPeek(true);
+      } else if (goingDown) {
+        setShowSortPeek(false);
+      }
+
+      lastScrollRef.current = y;
+    };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onWheel = (e) => {
+      if (typeof e.deltaY !== 'number') return;
+      if (e.deltaY < 0) setShowSortPeek(true);
+      if (e.deltaY > 0) setShowSortPeek(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'Home') {
+        setShowSortPeek(true);
+      }
+      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ' || e.key === 'End') {
+        setShowSortPeek(false);
+      }
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, []);
 
   // Optional: scrub lingering group_mode on non-swatch pages
@@ -182,7 +234,7 @@ const GalleryPage = () => {
       <TopSpacer />
 
       {isSwatch && (
-        <div className="gallery-controls">
+        <div className={`gallery-controls${showSortPeek ? " is-peek" : ""}${showPalette ? " has-palette" : ""}`}>
           <button
             type="button"
             onClick={() => setGroupMode('hue')}

@@ -41,6 +41,8 @@ const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
+const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
+const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
@@ -63,6 +65,7 @@ const StandAloneLayout = lazy(() => import('@layout/StandAloneLayout'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
+const ArticlePage = lazy(() => import('@pages/ArticlePage'));
 
 
 function AppRouter() {
@@ -127,7 +130,7 @@ function AppRouter() {
             <Route path="adv-results" element={<AdvancedResultsPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="about" element={<AboutPage />} />
-           <Route path="matches" element={<MatchResultsPage />} />
+            <Route path="matches" element={<MatchResultsPage />} />
            <Route path="quick-find" element={<QuickFindPage />} />
            <Route path="browse-palettes" element={<BrowsePalettesPage />} />
            <Route path="palette/:id/brands" element={<PaletteTranslationPage  />} />
@@ -135,6 +138,7 @@ function AppRouter() {
            <Route path="/hoa" element={<HOALandingPage />} />
             <Route path="/hoa/explain" element={<HOAExplainerPage />} />
             <Route path="/hoa/contact" element={<HOAContactPage />} />
+            <Route path="articles/:id" element={renderWithSuspense(ArticlePage, 'Loading article…')} />
 
            
           </Route>
@@ -214,6 +218,14 @@ function AppRouter() {
             <Route
               path="ideas"
               element={renderWithSuspense(AdminIdeasPage, 'Loading ideas…')}
+            />
+            <Route
+              path="articles"
+              element={renderWithSuspense(AdminArticlesPage, 'Loading articles…')}
+            />
+            <Route
+              path="qr-sheets"
+              element={renderWithSuspense(AdminQrSheetsPage, 'Loading QR sheets…')}
             />
             <Route
               path="photo-library"

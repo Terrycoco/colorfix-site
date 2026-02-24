@@ -44,6 +44,7 @@ export default function MyPalettePage() {
     brandFiltersAppliedSeq,
     paletteCollapsed,
     reorderPalette,
+    showPalette,
   } = useAppState();
 
   // Compute active brand codes (supports .brands or .brand; array/Set/string)
@@ -118,6 +119,7 @@ const activeBrandCodes = useMemo(() => {
   const [tolOpp, setTolOpp] = useState(0);
 
   const heroRef = useRef(null);
+  const paletteGridRef = useRef(null);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -140,6 +142,8 @@ const activeBrandCodes = useMemo(() => {
   const [rolesModalOpen, setRolesModalOpen] = useState(false);
   const [roleRows, setRoleRows] = useState([]);
   const [roleStatus, setRoleStatus] = useState({ loading: false, error: "", success: "" });
+  const [copyStatus, setCopyStatus] = useState("");
+  const copyTimerRef = useRef(null);
   const [savedPaletteOptions, setSavedPaletteOptions] = useState([]);
   const [savedPaletteOptionsStatus, setSavedPaletteOptionsStatus] = useState({
     loading: false,
@@ -149,6 +153,8 @@ const activeBrandCodes = useMemo(() => {
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [showSortPeek, setShowSortPeek] = useState(true);
+  const lastScrollRef = useRef(0);
 
   const CLEAR_ON = ["/v2/get-friends.php"];
 
@@ -346,10 +352,57 @@ const activeBrandCodes = useMemo(() => {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 500);
+    const onScroll = () => {
+      const y = window.scrollY;
+      setShowBackToTop(y > 500);
+
+      const last = lastScrollRef.current;
+      const delta = y - last;
+      const goingDown = delta > 2;
+      const goingUp = delta < -2;
+      if (goingUp) {
+        setShowSortPeek(true);
+      } else if (goingDown) {
+        setShowSortPeek(false);
+      }
+
+      lastScrollRef.current = y;
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onWheel = (e) => {
+      if (typeof e.deltaY !== "number") return;
+      if (e.deltaY < 0) setShowSortPeek(true);
+      if (e.deltaY > 0) setShowSortPeek(false);
+    };
+    const onKeyDown = (e) => {
+      if (e.key === "ArrowUp" || e.key === "PageUp" || e.key === "Home") {
+        setShowSortPeek(true);
+      }
+      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " " || e.key === "End") {
+        setShowSortPeek(false);
+      }
+    };
+    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -815,6 +868,38 @@ const activeBrandCodes = useMemo(() => {
     }
   };
 
+  const pushCopyStatus = (message) => {
+    setCopyStatus(message);
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = setTimeout(() => setCopyStatus(""), 2000);
+  };
+
+  async function handleCopyPalette() {
+    const node = paletteGridRef.current;
+    if (!node) {
+      pushCopyStatus("No palette to copy yet.");
+      return;
+    }
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(node, {
+        backgroundColor: "#ffffff",
+        scale: window.devicePixelRatio || 2,
+      });
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("Failed to create image.");
+      if (!navigator.clipboard?.write) {
+        throw new Error("Clipboard copy not available in this browser.");
+      }
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      pushCopyStatus("Copied.");
+    } catch (err) {
+      pushCopyStatus(err?.message || "Unable to copy palette.");
+    }
+  }
+
   /* ---------- Render ---------- */
   return (
     <div className="mypage">
@@ -848,6 +933,11 @@ const activeBrandCodes = useMemo(() => {
                   Save
                 </button>
                 {!isMobile && (
+                  <button className="myp-clear-btn myp-copy-btn" type="button" onClick={handleCopyPalette}>
+                    Copy
+                  </button>
+                )}
+                {!isMobile && (
                   <button className="myp-clear-btn" type="button" onClick={() => navigate("/print/my-palette")}>
                     Print
                   </button>
@@ -856,6 +946,9 @@ const activeBrandCodes = useMemo(() => {
             )}
           </div>
      
+          <span className="myp-copy-status" aria-live="polite">
+            {copyStatus}
+          </span>
           <div className="myp-header-spacer" aria-hidden="true" />
         </div>
 
@@ -871,7 +964,7 @@ const activeBrandCodes = useMemo(() => {
             </div>
           ) : (
             <div className="myp-row">
-              <div className="sg-root sg-palette myp-palette-grid">
+              <div className="sg-root sg-palette myp-palette-grid" ref={paletteGridRef}>
                 <div className="sg-grid">
                   {paletteFallback.map((swatch, index) => {
                     const swatchId = getSwatchId(swatch);
@@ -917,7 +1010,7 @@ const activeBrandCodes = useMemo(() => {
           <>
             {noResultsFound && <div className="no-results">No results for the current filter.</div>}
             {friends.length > 0 && (
-              <div className="myp-results-sort">
+              <div className={`myp-results-sort${showSortPeek ? " is-peek" : ""}${showPalette ? " has-palette" : ""}`}>
                 <span className="myp-results-label">Sort by:</span>
                 <div className="myp-results-buttons">
                   <button

@@ -1,6 +1,7 @@
 .admin-menu {
   position: relative;
   display: inline-flex;
+  z-index: 30000;
 }
 
 .admin-menu__trigger {
@@ -24,7 +25,7 @@
   padding: 8px 0;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   min-width: 200px;
-  z-index: 5000;
+  z-index: 30001;
 }
 
 .admin-menu__group {
@@ -59,6 +60,7 @@
   padding: 8px 0;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   min-width: 220px;
+  z-index: 30002;
 }
 
 .admin-menu__item {

@@ -48,6 +48,8 @@ export const adminMenuItems = [
   {
     label: "Tools",
     items: [
+      { label: "Articles", href: "/admin/articles" },
+      { label: "QR Sheets", href: "/admin/qr-sheets" },
       { label: "Search Presets", href: "/admin/search-presets" },
       { label: "Ideas/ToDos", href: "/admin/ideas" },
       { label: "Photo Library", href: "/admin/photo-library" },

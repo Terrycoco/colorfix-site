@@ -30,7 +30,7 @@
   --search-item-background: #cdd8e0;
   --search-item-background-hover: #B9C7D3;
   --sticky-palette-bar-height: 70px;
-  --board-scroller-z-index: 4000;
+  --board-scroller-z-index: 12000;
   --modals-z-index: 5000;
 }
 }
@@ -124,4 +124,3 @@ button, .button, [role="button"], label, a {
     -webkit-text-size-adjust: 100% !important;
   }
 }
-

@@ -88,6 +88,37 @@
   margin-bottom: 12px;
 }
 
+.admin-photo-library__save-all {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.admin-photo-library__save-all button {
+  border-radius: 10px;
+  border: 1px solid #ccd6ea;
+  background: #0b1b3a;
+  color: #fff;
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-photo-library__save-all button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-photo-library__dirty-count {
+  font-size: 12px;
+  color: #6a778b;
+}
+
+.admin-photo-library__table tr.is-dirty {
+  box-shadow: inset 4px 0 0 #f59e0b;
+}
+
 .admin-photo-library__filters label {
   display: flex;
   flex-direction: column;
@@ -141,6 +172,19 @@
   border: 1px solid #e2e6f0;
 }
 
+.admin-photo-library__thumb {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.admin-photo-library__thumb:focus-visible {
+  outline: 2px solid #0b1b3a;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
 .admin-photo-library__table input {
   width: 100%;
   border-radius: 8px;
@@ -173,12 +217,27 @@
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
+  text-decoration: none;
+  text-align: center;
 }
 
 .admin-photo-library__row-actions .danger {
   border-color: #c04b4b;
   background: #c04b4b;
   color: #fff;
+}
+
+.admin-photo-library__id {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #1b2433;
+}
+
+.admin-photo-library__copy {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .admin-photo-library__error,
@@ -206,4 +265,23 @@
 
 .admin-photo-library__loading {
   color: #6a778b;
+}
+
+.admin-photo-library__preview {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 15, 30, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: zoom-out;
+  padding: 24px;
+}
+
+.admin-photo-library__preview img {
+  max-width: min(1200px, 92vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
 }
