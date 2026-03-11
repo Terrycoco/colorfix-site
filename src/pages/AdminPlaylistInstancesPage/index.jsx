@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
 import KickerDropdown from "@components/KickerDropdown";
@@ -9,8 +9,7 @@ const LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const GET_URL = `${API_FOLDER}/v2/admin/playlist-instances/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instances/save.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
-const CTA_GROUPS_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
-const CTA_GROUP_ITEMS_URL = `${API_FOLDER}/v2/admin/cta-group-items/list.php`;
+const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
 const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/playlist-instances/send-email.php`;
 
@@ -33,8 +32,6 @@ const emptyInstance = {
   intro_subtitle: "",
   intro_body: "",
   intro_image_url: "",
-  cta_group_id: "",
-  palette_viewer_cta_group_id: "",
   demo_enabled: false,
   audience: "any",
   cta_context_key: "default",
@@ -50,6 +47,8 @@ const emptyInstance = {
   kicker_id: "",
 };
 
+const DRAFT_KEY = "admin:playlist-instance-draft";
+
 function coerceBoolean(value) {
   return Boolean(value);
 }
@@ -59,9 +58,7 @@ export default function AdminPlaylistInstancesPage() {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [playlists, setPlaylists] = useState([]);
-  const [ctaGroups, setCtaGroups] = useState([]);
-  const [ctaGroupItems, setCtaGroupItems] = useState([]);
-  const [ctaOverrides, setCtaOverrides] = useState({});
+  const [ctaLibrary, setCtaLibrary] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
@@ -80,10 +77,38 @@ export default function AdminPlaylistInstancesPage() {
     status: { loading: false, error: "", success: "" },
   });
   const [sendFormat, setSendFormat] = useState("html");
+  const [ctaPickerOpen, setCtaPickerOpen] = useState(false);
+  const [dragCtaId, setDragCtaId] = useState(null);
+  const didLoadDraft = useRef(false);
+
+  useEffect(() => {
+    if (didLoadDraft.current) return;
+    if (form.playlist_instance_id) return;
+    try {
+      const raw = window.sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setForm((prev) => ({ ...prev, ...parsed, playlist_instance_id: null }));
+        didLoadDraft.current = true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [form.playlist_instance_id]);
+
+  useEffect(() => {
+    if (form.playlist_instance_id) return;
+    try {
+      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+    } catch {
+      /* ignore */
+    }
+  }, [form]);
 
   useEffect(() => {
     fetchPlaylists();
-    fetchCtaGroups();
+    fetchCtas();
     fetchEmailTemplates();
   }, []);
 
@@ -96,26 +121,7 @@ export default function AdminPlaylistInstancesPage() {
     fetchInstance(activeId);
   }, [activeId]);
 
-  useEffect(() => {
-    const groupId = form.cta_group_id;
-    if (!groupId) {
-      setCtaGroupItems([]);
-      return;
-    }
-    fetchCtaGroupItems(groupId);
-  }, [form.cta_group_id]);
-
-  useEffect(() => {
-    if (!ctaGroupItems.length) return;
-    setCtaOverrides((prev) => {
-      const allowed = new Set(ctaGroupItems.map((item) => String(item.cta_id)));
-      const next = {};
-      Object.entries(prev || {}).forEach(([key, value]) => {
-        if (allowed.has(String(key))) next[key] = value;
-      });
-      return next;
-    });
-  }, [ctaGroupItems]);
+  // CTA groups no longer used for instances
 
 
   async function fetchPlaylists() {
@@ -131,31 +137,19 @@ export default function AdminPlaylistInstancesPage() {
     }
   }
 
-  async function fetchCtaGroups() {
+  async function fetchCtas() {
     try {
-      const res = await fetch(`${CTA_GROUPS_URL}?_=${Date.now()}`, {
+      const res = await fetch(`${CTAS_LIST_URL}?_=${Date.now()}`, {
         credentials: "include",
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA groups");
-      setCtaGroups(data.items || []);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTAs");
+      setCtaLibrary(data.items || []);
     } catch (err) {
-      // optional convenience list
+      setError(err?.message || "Failed to load CTAs");
     }
   }
 
-  async function fetchCtaGroupItems(groupId) {
-    try {
-      const res = await fetch(`${CTA_GROUP_ITEMS_URL}?group_id=${groupId}&_=${Date.now()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA group items");
-      setCtaGroupItems(data.items || []);
-    } catch (err) {
-      setCtaGroupItems([]);
-    }
-  }
 
   function parseOverrides(raw) {
     if (!raw) return {};
@@ -214,8 +208,10 @@ export default function AdminPlaylistInstancesPage() {
         is_active: coerceBoolean(data.item?.is_active),
         kicker_id: data.item?.kicker_id ? String(data.item.kicker_id) : "",
       };
-      setForm(next);
-      setCtaOverrides(parseOverrides(data.item?.cta_overrides));
+      setForm({
+        ...next,
+        cta_overrides: parseOverrides(data.item?.cta_overrides),
+      });
       setSaveStatus("");
       setSaveError("");
     } catch (err) {
@@ -229,9 +225,9 @@ export default function AdminPlaylistInstancesPage() {
     setSaveError("");
   }
 
-  function updateOverride(ctaId, key, value) {
-    setCtaOverrides((prev) => {
-      const next = { ...prev };
+  function updateCtaOverride(ctaId, key, value) {
+    setForm((prev) => {
+      const next = { ...(prev.cta_overrides || {}) };
       const base = next[ctaId] && typeof next[ctaId] === "object" ? { ...next[ctaId] } : {};
       if (value === "" || value === null || value === undefined) {
         delete base[key];
@@ -243,7 +239,7 @@ export default function AdminPlaylistInstancesPage() {
       } else {
         next[ctaId] = base;
       }
-      return next;
+      return { ...prev, cta_overrides: next };
     });
     setSaveStatus("");
     setSaveError("");
@@ -251,9 +247,17 @@ export default function AdminPlaylistInstancesPage() {
 
   function handleNew() {
     setActiveId(null);
-    setForm(emptyInstance);
-    setCtaOverrides({});
-    setCtaGroupItems([]);
+    try {
+      const raw = window.sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setForm((prev) => ({ ...prev, ...parsed, playlist_instance_id: null }));
+      } else {
+        setForm(emptyInstance);
+      }
+    } catch {
+      setForm(emptyInstance);
+    }
     setSaveStatus("");
     setSaveError("");
   }
@@ -405,14 +409,14 @@ export default function AdminPlaylistInstancesPage() {
     setSaveError("");
     setSaveStatus("");
     try {
+      if (missingArticleIds.length > 0) {
+        throw new Error("Article CTA requires an Article ID.");
+      }
       const payload = {
         ...form,
         playlist_id: Number(form.playlist_id) || 0,
-        cta_group_id: form.cta_group_id === "" ? null : Number(form.cta_group_id),
-        palette_viewer_cta_group_id:
-          form.palette_viewer_cta_group_id === "" ? null : Number(form.palette_viewer_cta_group_id),
         demo_enabled: Boolean(form.demo_enabled),
-        cta_overrides: ctaOverrides,
+        cta_overrides: form.cta_overrides || {},
         created_from_instance: form.created_from_instance === "" ? null : Number(form.created_from_instance),
         kicker_id: form.kicker_id === "" ? null : Number(form.kicker_id),
       };
@@ -425,6 +429,11 @@ export default function AdminPlaylistInstancesPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
       setSaveStatus("Saved");
+      try {
+        window.sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* ignore */
+      }
       const newId = data.playlist_instance_id;
       setActiveId(newId);
       setForm((prev) => ({ ...prev, playlist_instance_id: newId }));
@@ -459,113 +468,86 @@ export default function AdminPlaylistInstancesPage() {
     }));
   }, [playlists]);
 
-  const ctaGroupOptions = useMemo(() => {
-    return ctaGroups.map((row) => ({
-      id: row.id,
-      label: `${row.label} (${row.key})`,
-      audience: (row.audience || "").toLowerCase(),
-    }));
-  }, [ctaGroups]);
 
-  function filterCtaGroupsByAudience(options, audience) {
-    const target = String(audience || "").toLowerCase();
-    if (!target || target === "any" || target === "all") return options;
-    return options.filter((opt) => {
-      if (!opt.audience) return true;
-      if (opt.audience === "any") return true;
-      return opt.audience === target;
+  const overrideMeta = useMemo(() => {
+    const raw = form.cta_overrides || {};
+    const extra = Array.isArray(raw._cta_ids) ? raw._cta_ids.map(String) : [];
+    return {
+      extraIds: extra,
+    };
+  }, [form.cta_overrides]);
+
+  const groupItemIds = useMemo(() => new Set(), []);
+
+  const selectedCtas = useMemo(() => {
+    const map = new Map();
+    ctaLibrary.forEach((cta) => {
+      map.set(String(cta.cta_id), cta);
     });
-  }
+    const selected = [];
+    overrideMeta.extraIds.forEach((id) => {
+      if (groupItemIds.has(id)) return;
+      const cta = map.get(id);
+      if (cta) selected.push(cta);
+    });
+    return selected;
+  }, [ctaLibrary, groupItemIds, overrideMeta]);
 
-  const filteredCtaGroupOptions = useMemo(
-    () => filterCtaGroupsByAudience(ctaGroupOptions, form.audience),
-    [ctaGroupOptions, form.audience]
-  );
+  const availableCtas = useMemo(() => {
+    const selectedIds = new Set(selectedCtas.map((cta) => String(cta.cta_id)));
+    return ctaLibrary.filter((cta) => !selectedIds.has(String(cta.cta_id)));
+  }, [ctaLibrary, selectedCtas]);
 
-  const parsedGroupItems = useMemo(() => {
-    return ctaGroupItems.map((item) => {
-      let params = {};
-      if (item?.params) {
-        try {
-          params = typeof item.params === "string" ? JSON.parse(item.params) : item.params;
-        } catch {
-          params = {};
+  const missingArticleIds = useMemo(() => {
+    return selectedCtas
+      .filter((cta) => cta?.type_action_key === "article_link")
+      .filter((cta) => {
+        const overrides = (form.cta_overrides || {})[cta.cta_id] || {};
+        let baseParams = {};
+        if (cta?.params) {
+          try {
+            baseParams = typeof cta.params === "string" ? JSON.parse(cta.params) : cta.params;
+          } catch {
+            baseParams = {};
+          }
         }
-      }
-      const overrides = ctaOverrides[item.cta_id] || {};
-      const mergedParams = { ...(params || {}), ...(overrides || {}) };
-      return {
-        ...item,
-        baseParams: params || {},
-        overrideParams: overrides,
-        mergedParams,
-      };
+        const articleId = overrides.article_id || baseParams.article_id;
+        return !articleId;
+      })
+      .map((cta) => cta.cta_id);
+  }, [selectedCtas, form.cta_overrides]);
+
+  function updateOverrideMeta(next) {
+    updateForm("cta_overrides", {
+      ...(form.cta_overrides || {}),
+      ...next,
     });
-  }, [ctaGroupItems, ctaOverrides]);
-
-  function renderParams(item) {
-    const action = item?.type_action_key || "";
-    const params = item?.mergedParams || {};
-    const ctaId = item?.cta_id;
-    if (!ctaId) return null;
-
-    if (action === "navigate") {
-      return (
-        <div className="cta-param-row">
-          <label>
-            url
-            <input
-              type="text"
-              value={params.url || ""}
-              onChange={(e) => updateOverride(ctaId, "url", e.target.value)}
-            />
-          </label>
-          <label>
-            target
-            <input
-              type="text"
-              value={params.target || ""}
-              onChange={(e) => updateOverride(ctaId, "target", e.target.value)}
-              placeholder="_blank"
-            />
-          </label>
-        </div>
-      );
-    }
-
-    if (action === "jump_to_item") {
-      return (
-        <div className="cta-param-row">
-          <label>
-            item_index
-            <input
-              type="number"
-              value={params.item_index ?? ""}
-              onChange={(e) => updateOverride(ctaId, "item_index", e.target.value)}
-            />
-          </label>
-        </div>
-      );
-    }
-
-    if (action === "replay_filtered") {
-      return (
-        <div className="cta-param-row">
-          <label>
-            filter
-            <input
-              type="text"
-              value={params.filter || ""}
-              onChange={(e) => updateOverride(ctaId, "filter", e.target.value)}
-              placeholder="liked"
-            />
-          </label>
-        </div>
-      );
-    }
-
-    return <div className="cta-param-muted">No params</div>;
   }
+
+  function addCtaToInstance(ctaId) {
+    const id = String(ctaId);
+    const next = overrideMeta.extraIds.slice();
+    if (!next.includes(id)) next.push(id);
+    updateOverrideMeta({ _cta_ids: next });
+  }
+
+  function removeCtaFromInstance(ctaId) {
+    const id = String(ctaId);
+    const next = overrideMeta.extraIds.filter((value) => value !== id);
+    updateOverrideMeta({ _cta_ids: next });
+  }
+
+  function reorderSelectedCtas(fromId, toId) {
+    if (!fromId || !toId || fromId === toId) return;
+    const ids = overrideMeta.extraIds.slice();
+    const fromIndex = ids.indexOf(fromId);
+    const toIndex = ids.indexOf(toId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    ids.splice(fromIndex, 1);
+    ids.splice(toIndex, 0, fromId);
+    updateOverrideMeta({ _cta_ids: ids });
+  }
+
 
   return (
     <div className="admin-playlist-instances">
@@ -670,7 +652,6 @@ export default function AdminPlaylistInstancesPage() {
                 if (!form.playlist_instance_id) return;
                 const params = new URLSearchParams();
                 if (form.audience && form.audience !== "any") params.set("aud", form.audience);
-                if (form.cta_group_id) params.set("add_cta_group", form.cta_group_id);
                 if (form.demo_enabled) params.set("demo", "1");
                 const suffix = params.toString();
                 navigate(`/admin/player-preview/${form.playlist_instance_id || ""}${suffix ? `?${suffix}` : ""}`);
@@ -806,39 +787,6 @@ export default function AdminPlaylistInstancesPage() {
         <div className="instance-section cta-section">
           <div className="section-title">CTA Settings</div>
           <div className="cta-controls">
-            <label className="cta-group">
-              <span>Player CTA Group</span>
-              <span className="cta-label-note">All will get default</span>
-              <select
-                className="cta-group-select"
-                value={form.cta_group_id}
-                onChange={(e) => updateForm("cta_group_id", e.target.value)}
-              >
-                <option value="">None</option>
-                {filteredCtaGroupOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="cta-group">
-              <span>Palette Viewer CTA Group</span>
-              <select
-                className="cta-group-select"
-                value={form.palette_viewer_cta_group_id}
-                onChange={(e) => updateForm("palette_viewer_cta_group_id", e.target.value)}
-              >
-                <option value="">None</option>
-                {filteredCtaGroupOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <label className="cta-context">
               Audience
               <select
@@ -854,19 +802,23 @@ export default function AdminPlaylistInstancesPage() {
             </label>
           </div>
 
+          <div className="cta-picker-trigger">
+            <button type="button" className="primary-btn" onClick={() => setCtaPickerOpen(true)}>
+              CTAs
+            </button>
+            <span className="cta-picker-note">Add/remove CTAs for this instance</span>
+          </div>
+
           <div className="cta-group-list">
-            {!form.cta_group_id && (
-              <div className="cta-empty">Select a CTA group to edit parameters.</div>
+            {selectedCtas.length === 0 && (
+              <div className="cta-empty">No CTAs selected for this instance.</div>
             )}
-            {form.cta_group_id && parsedGroupItems.map((item) => (
-              <div key={item.cta_id} className="cta-item">
+            {selectedCtas.map((cta) => (
+              <div key={cta.cta_id} className="cta-item">
                 <div className="cta-item-head">
-                  <div className="cta-item-title">{item.label}</div>
-                  <div className="cta-item-meta">
-                    {item.type_label} ({item.type_action_key})
-                  </div>
+                  <div className="cta-item-title">{cta.label}</div>
+                  <div className="cta-item-meta">{cta.type_label}</div>
                 </div>
-                {renderParams(item)}
               </div>
             ))}
           </div>
@@ -917,6 +869,166 @@ export default function AdminPlaylistInstancesPage() {
       {saveStatus && <div className="panel-status success">{saveStatus}</div>}
       {saveError && <div className="panel-status error">{saveError}</div>}
       </div>
+
+      {ctaPickerOpen && (
+        <div className="cta-picker-modal" role="dialog" aria-modal="true">
+          <div className="cta-picker-backdrop" onClick={() => setCtaPickerOpen(false)} />
+          <div className="cta-picker-panel">
+            <div className="cta-picker-header">
+              <div className="cta-picker-title">Pick CTAs for This Instance</div>
+              <div className="cta-picker-actions">
+                <button
+                  type="button"
+                  className="cta-picker-save"
+                  onClick={handleSave}
+                  disabled={(!form.playlist_instance_id && !form.playlist_id) || missingArticleIds.length > 0}
+                >
+                  Save CTAs
+                </button>
+                <button type="button" className="cta-picker-close" onClick={() => setCtaPickerOpen(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="cta-dual-list">
+              <div className="cta-dual-column">
+                <div className="cta-dual-title">All CTAs</div>
+                <div className="cta-dual-listbox">
+                  {availableCtas.length === 0 && (
+                    <div className="cta-empty">No more CTAs to add.</div>
+                  )}
+                  {availableCtas.map((cta) => (
+                    <button
+                      key={cta.cta_id}
+                      type="button"
+                      className="cta-dual-row"
+                      onDoubleClick={() => addCtaToInstance(cta.cta_id)}
+                    >
+                      <div className="row-title">{cta.label}</div>
+                      <div className="row-meta">{cta.type_label}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="cta-dual-hint">Double click to add</div>
+              </div>
+              <div className="cta-dual-column">
+                <div className="cta-dual-title">Selected for This Instance</div>
+                <div className="cta-dual-listbox">
+                  {selectedCtas.length === 0 && (
+                    <div className="cta-empty">No CTAs selected.</div>
+                  )}
+                  {selectedCtas.map((cta) => (
+                    <button
+                      key={cta.cta_id}
+                      type="button"
+                      className="cta-dual-row"
+                      onDoubleClick={() => removeCtaFromInstance(cta.cta_id)}
+                      draggable
+                      onDragStart={() => setDragCtaId(String(cta.cta_id))}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (!dragCtaId) return;
+                        reorderSelectedCtas(dragCtaId, String(cta.cta_id));
+                        setDragCtaId(null);
+                      }}
+                    >
+                      <div className="row-title">{cta.label}</div>
+                      <div className="row-meta">{cta.type_label}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="cta-dual-hint">Double click to remove</div>
+                {selectedCtas.map((cta) => {
+                  const isArticle = cta.type_action_key === "article_link";
+                  if (!isArticle) return null;
+                  const overrides = (form.cta_overrides || {})[cta.cta_id] || {};
+                  let baseParams = {};
+                  if (cta?.params) {
+                    try {
+                      baseParams = typeof cta.params === "string" ? JSON.parse(cta.params) : cta.params;
+                    } catch {
+                      baseParams = {};
+                    }
+                  }
+                  const displayArticleId = overrides.article_id || baseParams.article_id || "";
+                  const displayTitle = overrides.title || baseParams.title || "";
+                  const displayDek = overrides.dek || baseParams.dek || "";
+                  return (
+                    <div key={`ov-${cta.cta_id}`} className="cta-override-card">
+                      <div className="cta-override-title">Article Link Overrides</div>
+                      <label>
+                        Article ID
+                        <input
+                          type="number"
+                          value={displayArticleId}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "article_id", e.target.value)}
+                          required
+                        />
+                      </label>
+                      <label>
+                        Title (non-button text)
+                        <input
+                          type="text"
+                          value={displayTitle}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "title", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Subtitle (non-button text)
+                        <input
+                          type="text"
+                          value={displayDek}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "dek", e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+                {selectedCtas.map((cta) => {
+                  if (cta.type_action_key !== "watch_next") return null;
+                  const overrides = (form.cta_overrides || {})[cta.cta_id] || {};
+                  let baseParams = {};
+                  if (cta?.params) {
+                    try {
+                      baseParams = typeof cta.params === "string" ? JSON.parse(cta.params) : cta.params;
+                    } catch {
+                      baseParams = {};
+                    }
+                  }
+                  const displaySetId =
+                    overrides.playlist_instance_set_id ||
+                    overrides.set_id ||
+                    baseParams.playlist_instance_set_id ||
+                    baseParams.set_id ||
+                    "";
+                  const displaySubtitle = overrides.subtitle || baseParams.subtitle || baseParams.dek || "";
+                  return (
+                    <div key={`ov-watch-${cta.cta_id}`} className="cta-override-card">
+                      <div className="cta-override-title">Watch Next Overrides</div>
+                      <label>
+                        Playlist Set ID (optional)
+                        <input
+                          type="number"
+                          value={displaySetId}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "playlist_instance_set_id", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Subtitle (optional)
+                        <input
+                          type="text"
+                          value={displaySubtitle}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "subtitle", e.target.value)}
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <EmailShareModal
         open={emailModal.open}
         title="Send Playlist Link"

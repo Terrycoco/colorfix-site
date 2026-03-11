@@ -10,6 +10,8 @@ require_once __DIR__ . '/../../../db.php';
 use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Services\PhotoRenderingService;
+use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -39,6 +41,14 @@ try {
 
     $pdo->prepare("UPDATE applied_palettes SET needs_rerender = 0, updated_at = NOW() WHERE id = :id")
         ->execute([':id' => $paletteId]);
+
+    try {
+        $library = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+        $renderRel = "/photos/rendered/ap_{$paletteId}.jpg";
+        $library->syncAppliedPalettePhoto($palette, $renderRel);
+    } catch (\Throwable $e) {
+        // Non-fatal: keep render response even if library sync fails.
+    }
 
     echo json_encode([
         'ok' => true,

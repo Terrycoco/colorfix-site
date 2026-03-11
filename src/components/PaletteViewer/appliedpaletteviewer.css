@@ -123,6 +123,8 @@
 .apv-photo {
   width: 100%;
   display: block;
+  max-height: 72vh;
+  object-fit: contain;
 }
 
 .apv-photo-insets {
@@ -132,6 +134,14 @@
   flex-wrap: wrap;
 }
 
+.apv-photo-inset-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 .apv-photo-inset {
   width: 180px;
   height: 120px;
@@ -139,6 +149,14 @@
   border-radius: 10px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+
+.apv-photo-inset-caption {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
 }
 
 @media (max-width: 720px) {

@@ -2,7 +2,7 @@
   position: absolute;
   inset: 0;
   height: 100%;
-  padding: 24px 16px;
+  padding: 24px 16px calc(240px + env(safe-area-inset-bottom));
 
   display: flex;
   flex-direction: column;
@@ -10,6 +10,8 @@
 
   background: #000;
   z-index: 20;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .player-end-screen .player-exit {
@@ -24,6 +26,8 @@
   align-items: center;
   justify-content: center;
   gap: 24px;
+  padding-bottom: calc(260px + env(safe-area-inset-bottom));
+  padding-top: 56px;
 }
 
 .player-replay-btn {
@@ -46,6 +50,9 @@
   flex-direction: column;
   gap: 12px;
   width: 100%;
+  padding-bottom: 120px;
+  position: relative;
+  z-index: 10;
 }
 
 .player-end-links {
@@ -73,9 +80,20 @@
   align-self: center;
 }
 
+.player-end-links .cta-article-link {
+  align-self: center;
+}
+
+@media (max-width: 640px) {
+  .player-end-screen-inner {
+    justify-content: flex-start;
+    padding-top: 24px;
+  }
+}
+
 
 .player-end-branding {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: calc(16px + env(safe-area-inset-bottom) + var(--ios-browser-bar, 0px));
@@ -87,6 +105,10 @@
 
   color: rgba(255, 255, 255, 0.75);
   pointer-events: none;
+  z-index: 5;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.88);
+  box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.45);
 }
 
 @supports (-webkit-touch-callout: none) {

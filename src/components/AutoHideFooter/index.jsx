@@ -87,6 +87,11 @@ export default function AutoHideFooter({
   // Reveal on common "scroll down" keys
   useEffect(() => {
     const onKeyDown = (e) => {
+      const target = e?.target;
+      const tag = target?.tagName?.toLowerCase?.() || "";
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) {
+        return;
+      }
       const k = e.key;
       if (k === "ArrowDown" || k === "PageDown" || k === " " || k === "End") {
         show();

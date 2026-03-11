@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
+import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
 import "./player.css";
 
 const Player = forwardRef(function Player({
@@ -26,6 +27,7 @@ const Player = forwardRef(function Player({
   const [playbackMode, setPlaybackMode] = useState("all"); // "all" | "liked"
   const [titleIndex, setTitleIndex] = useState(safeStart);
   const [titleVisible, setTitleVisible] = useState(false);
+  const [titleReady, setTitleReady] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [fadeReady, setFadeReady] = useState(false);
   const [prevIndex, setPrevIndex] = useState(null);
@@ -37,6 +39,8 @@ const Player = forwardRef(function Player({
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
   const [cacheBustEnabled, setCacheBustEnabled] = useState(true);
   const [showAdvanceHint, setShowAdvanceHint] = useState(true);
+  const [currentImageUrl, setCurrentImageUrl] = useState("");
+  const [prevImageUrl, setPrevImageUrl] = useState("");
   const didInitRef = useRef(false);
   const endEmitRef = useRef(null);
   const currentImgRef = useRef(null);
@@ -44,6 +48,16 @@ const Player = forwardRef(function Player({
   const titleRef = useRef(null);
   const didLikeInteractRef = useRef(false);
   const cacheBustRef = useRef(Date.now());
+
+function queueFadeReady(img, stageEl) {
+    // Ensure at least one paint happens at opacity 0 before we flip to ready.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setFadeReady(true);
+        updateOverlayPositions(img, stageEl);
+      });
+    });
+  }
 
   function handleExit() {
     if (onAbort) {
@@ -59,6 +73,28 @@ const Player = forwardRef(function Player({
     }
   }
 
+  function handleBack(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (playbackState !== "playing") return;
+    if (activeIndex <= 0) return;
+    const prev = activeIndex - 1;
+    setPrevIndex(activeIndex);
+    if (currentImageUrl) {
+      setPrevImageUrl(currentImageUrl);
+    }
+    setActiveIndex(prev);
+    setTitleVisible(false);
+    setTitleReady(false);
+    setImageLoaded(false);
+    setFadeReady(false);
+    setTitleIndex(prev);
+    setIsFading(true);
+    setTitleFull(false);
+  }
+
   useEffect(() => {
     if (!didInitRef.current) {
       didInitRef.current = true;
@@ -69,6 +105,7 @@ const Player = forwardRef(function Player({
     setActiveIndex(safeStart);
     setTitleIndex(safeStart);
     setTitleVisible(false);
+    setTitleReady(false);
     setImageLoaded(false);
     setFadeReady(false);
     setPrevIndex(null);
@@ -87,20 +124,51 @@ const Player = forwardRef(function Player({
     didLikeInteractRef.current = false;
   }, [slides, playlistInstanceId]);
 
+  const isPaletteItem = (item) => {
+    if (!item) return false;
+    return Boolean(item.ap_id || item.palette_hash);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const seen = new Set();
+
+    function preload(url) {
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+      const img = new Image();
+      img.decoding = "async";
+      img.src = withCacheBust(url);
+    }
+
+    (slides || []).forEach((item) => {
+      const value = item?.image_url || "";
+      if (isPaletteItem(item)) return;
+      if (!value) return;
+      const parsed = parsePhotoRef(value);
+      if (parsed.url) {
+        preload(parsed.url);
+        return;
+      }
+      if (!isAssetRef(value)) {
+        preload(value);
+        return;
+      }
+      const assetId = extractAssetId(value);
+      fetchAssetUrl(assetId).then((url) => {
+        if (!cancelled) preload(url);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slides, cacheBustEnabled]);
+
+
   useEffect(() => {
     writeLikedSet(playlistInstanceId, likedSet);
   }, [likedSet, playlistInstanceId]);
-
-  useEffect(() => {
-    if (playbackState !== "playing") return;
-    if (activeIndex !== 0) {
-      if (showAdvanceHint) setShowAdvanceHint(false);
-      return;
-    }
-    if (!showAdvanceHint) return;
-    const timer = setTimeout(() => setShowAdvanceHint(false), 2200);
-    return () => clearTimeout(timer);
-  }, [activeIndex, playbackState, showAdvanceHint]);
 
   function isItemStarrable(item) {
     if (hideStars) return false;
@@ -145,8 +213,12 @@ useEffect(() => {
 
     const nextIndex = activeIndex + 1;
     setPrevIndex(activeIndex);
+    if (currentImageUrl) {
+      setPrevImageUrl(currentImageUrl);
+    }
     setActiveIndex(nextIndex);
     setTitleVisible(false);
+    setTitleReady(false);
     setImageLoaded(false);
     setFadeReady(false);
     setTitleIndex(nextIndex);
@@ -158,6 +230,7 @@ function startPlayback(nextMode, nextIndex = 0) {
   setPlaybackMode(nextMode);
   setPlaybackState("playing");
   setTitleVisible(false);
+  setTitleReady(false);
   setImageLoaded(false);
   setFadeReady(false);
   setTitleIndex(nextIndex);
@@ -191,10 +264,11 @@ function startPlayback(nextMode, nextIndex = 0) {
   const title = playItems[titleIndex]?.title || "";
   const subtitle = (playItems[titleIndex]?.subtitle || "").trim();
   const titleMode = playItems[titleIndex]?.title_mode || "animated";
+  const transitionMode = (currentItem?.transition || "animation").toLowerCase();
   const subtitleOffset = subtitle ? 0 : 18;
   const currentType = (currentItem?.type || "normal").toLowerCase();
   const isIntro = currentType === "intro" || currentType === "text";
-  const introNoImage = isIntro && !currentItem?.image_url;
+  const introNoImage = isIntro && !currentImageUrl;
   const introLayoutKey = isIntro
     ? ((currentItem?.layout || "").toString().toLowerCase().trim() || (currentType === "text" ? "text" : "default"))
     : null;
@@ -202,6 +276,52 @@ function startPlayback(nextMode, nextIndex = 0) {
   const isStarrable = isItemStarrable(currentItem);
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
+
+  useEffect(() => {
+    let cancelled = false;
+    const value = currentItem?.image_url || "";
+    const parsed = parsePhotoRef(value);
+    if (parsed.url) {
+      setCurrentImageUrl(parsed.url);
+      return () => { cancelled = true; };
+    }
+    if (!value) {
+      setCurrentImageUrl("");
+      return () => {};
+    }
+    if (!isAssetRef(value)) {
+      setCurrentImageUrl(value);
+      return () => {};
+    }
+    const assetId = extractAssetId(value);
+    fetchAssetUrl(assetId).then((url) => {
+      if (!cancelled) setCurrentImageUrl(url || "");
+    });
+    return () => { cancelled = true; };
+  }, [currentItem?.image_url]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const value = prevItem?.image_url || "";
+    const parsed = parsePhotoRef(value);
+    if (parsed.url) {
+      setPrevImageUrl(parsed.url);
+      return () => { cancelled = true; };
+    }
+    if (!value) {
+      setPrevImageUrl("");
+      return () => {};
+    }
+    if (!isAssetRef(value)) {
+      setPrevImageUrl(value);
+      return () => {};
+    }
+    const assetId = extractAssetId(value);
+    fetchAssetUrl(assetId).then((url) => {
+      if (!cancelled) setPrevImageUrl(url || "");
+    });
+    return () => { cancelled = true; };
+  }, [prevItem?.image_url]);
 
   function withCacheBust(url) {
     if (!url) return url;
@@ -239,6 +359,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       setTitleIndex(0);
       setPrevIndex(null);
       setIsFading(false);
+      setTitleReady(false);
     }
   }, [playItems, activeIndex]);
 
@@ -270,20 +391,25 @@ function startPlayback(nextMode, nextIndex = 0) {
     setTitleFull(renderW >= stageRect.width * 0.98);
     const baseLeft = Math.max(0, leftOffset + 12);
     const baseTop = Math.max(0, bottomOffset + renderH - 6);
+    const isTallImage = renderH >= stageRect.height * 0.9;
     const titleEl = titleRef.current;
     if (titleEl) {
       const titleRect = titleEl.getBoundingClientRect();
       const titleWidth = titleRect.width;
       const titleHeight = titleRect.height;
       const maxLeft = Math.max(0, leftOffset + renderW - titleWidth - 8);
-      const portraitTop = bottomOffset + renderH + 8;
+      const portraitTop = isTallImage
+        ? Math.max(0, stageRect.height - titleHeight - 12)
+        : bottomOffset + renderH + 8;
       const maxTop = Math.max(0, stageRect.height - titleHeight - 8);
       setTitlePos({
         left: Math.min(baseLeft, maxLeft),
         top: isPortraitMobile ? Math.min(portraitTop, maxTop) : Math.max(0, baseTop - titleHeight),
       });
     } else {
-      const portraitTop = bottomOffset + renderH + 8;
+      const portraitTop = isTallImage
+        ? Math.max(0, stageRect.height - 24 - 12)
+        : bottomOffset + renderH + 8;
       const maxTop = Math.max(0, stageRect.height - 24);
       setTitlePos({
         left: baseLeft,
@@ -297,33 +423,59 @@ function startPlayback(nextMode, nextIndex = 0) {
   }
 
   useEffect(() => {
-    if (!imageLoaded) return;
+    if (!imageLoaded || !fadeReady) return;
     if (titleMode === "static") {
       setTitleVisible(true);
+      setTitleReady(true);
       return undefined;
     }
     const timer = setTimeout(() => {
       setTitleVisible(true);
-    }, 180);
+      requestAnimationFrame(() => {
+        updateOverlayPositions(currentImgRef.current, stageRef.current);
+        setTitleReady(true);
+      });
+    }, 120);
     return () => clearTimeout(timer);
-  }, [imageLoaded, currentIndex, titleMode]);
+  }, [imageLoaded, fadeReady, currentIndex, titleMode]);
+
+  useEffect(() => {
+    if (!titleVisible || !titleReady) return;
+    const titleEl = titleRef.current;
+    const stageEl = stageRef.current;
+    const imgEl = currentImgRef.current;
+    if (!titleEl || !stageEl) return;
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      updateOverlayPositions(imgEl, stageEl);
+    });
+    ro.observe(titleEl);
+    return () => ro.disconnect();
+  }, [titleVisible, titleReady, currentIndex]);
+
+  useEffect(() => {
+    if (imageLoaded && fadeReady) return;
+    setTitleVisible(false);
+    setTitleReady(false);
+  }, [imageLoaded, fadeReady, currentIndex]);
 
   useEffect(() => {
     if (!isIntro) return;
-    if (currentItem?.image_url) return;
+    if (currentImageUrl) return;
     setImageLoaded(true);
     setFadeReady(true);
-  }, [isIntro, currentIndex, currentItem?.image_url]);
+  }, [isIntro, currentIndex, currentImageUrl]);
 
 
   useEffect(() => {
-    if (!isFading || !fadeReady) return;
+    if (!isFading || !fadeReady || !imageLoaded) return;
+    // Match the CSS dissolve timings (fade-in 1400ms + fade-out 600ms).
     const timer = setTimeout(() => {
       setPrevIndex(null);
       setIsFading(false);
-    }, 1700);
+    }, 2000);
     return () => clearTimeout(timer);
-  }, [isFading, fadeReady]);
+  }, [isFading, fadeReady, imageLoaded]);
 
   useEffect(() => {
     function handleResize() {
@@ -349,10 +501,14 @@ function startPlayback(nextMode, nextIndex = 0) {
     if (!img || imageLoaded) return;
     if (img.complete && img.naturalWidth) {
       setImageLoaded(true);
-      requestAnimationFrame(() => setFadeReady(true));
-      updateOverlayPositions(img, stageRef.current);
+      const maybeDecode = typeof img.decode === "function" ? img.decode() : Promise.resolve();
+      Promise.resolve(maybeDecode)
+        .catch(() => {})
+        .finally(() => {
+          queueFadeReady(img, stageRef.current);
+        });
     }
-  }, [currentIndex, playItems, imageLoaded]);
+  }, [currentIndex, currentImageUrl, playItems, imageLoaded]);
 
   return (
     <div className={`player-root${embedded ? " player-embedded" : ""}`}>
@@ -364,6 +520,16 @@ function startPlayback(nextMode, nextIndex = 0) {
       >
         ×
       </button>
+      {playbackState === "playing" && activeIndex > 0 && !isIntro && (
+        <button
+          className="player-back"
+          type="button"
+          onClick={handleBack}
+          aria-label="Go back one slide"
+        >
+          ←
+        </button>
+      )}
 
       <div
         className="player-stage"
@@ -379,25 +545,30 @@ function startPlayback(nextMode, nextIndex = 0) {
         }}
       >
         <div className="player-image-frame">
-          {prevItem?.image_url && (
+          {prevImageUrl && (
             <img
-              key={`prev-${prevIndex}-${prevItem.image_url}`}
-              src={withCacheBust(prevItem.image_url)}
+              key={`prev-${prevIndex}-${prevImageUrl}`}
+              src={withCacheBust(prevImageUrl)}
               alt=""
-              className={`player-image is-prev${fadeReady ? " fade-out is-ready" : ""}`}
+              className={`player-image is-prev${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
             />
           )}
-          {currentItem?.image_url && (
+          {currentImageUrl && (
             <img
-              key={`cur-${currentIndex}-${currentItem.image_url}`}
-              src={withCacheBust(currentItem.image_url)}
+              key={`cur-${currentIndex}-${currentImageUrl}`}
+              src={withCacheBust(currentImageUrl)}
               alt={currentItem.title || ""}
-              className={`player-image is-current${isFading ? " fade-in" : ""}${fadeReady ? " is-ready" : ""}`}
+              className={`player-image is-current${isFading ? " fade-in" : ""}${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " is-ready" : " is-loading"}`}
               ref={currentImgRef}
               onLoad={(e) => {
+                const img = e.currentTarget;
                 setImageLoaded(true);
-                requestAnimationFrame(() => setFadeReady(true));
-                updateOverlayPositions(e.currentTarget, stageRef.current);
+                const maybeDecode = typeof img.decode === "function" ? img.decode() : Promise.resolve();
+                Promise.resolve(maybeDecode)
+                  .catch(() => {})
+                  .finally(() => {
+                    queueFadeReady(img, stageRef.current);
+                  });
               }}
             />
           )}
@@ -440,7 +611,7 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
-          {titleVisible && isIntro && IntroRenderer && (
+          {imageLoaded && fadeReady && titleVisible && titleReady && isIntro && IntroRenderer && (
             <div
               className={`player-title is-static${introNoImage ? " is-intro-full" : ""}`}
               style={
@@ -457,7 +628,7 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
-          {title && titleVisible && !isIntro && (
+          {imageLoaded && fadeReady && title && titleVisible && titleReady && !isIntro && (
             <div
               className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}`}
               style={{
@@ -470,10 +641,14 @@ function startPlayback(nextMode, nextIndex = 0) {
               {subtitle && <span className="player-subtitle-text">{subtitle}</span>}
             </div>
           )}
+          {!imageLoaded && currentImageUrl && (
+            <div className="player-loading" aria-label="Loading image">
+              <div className="player-loading-spinner" />
+            </div>
+          )}
         </div>
         {showAdvanceHint &&
           playbackState === "playing" &&
-          activeIndex === 0 &&
           !isIntro &&
           (imageLoaded || introNoImage) && (
             <div className="player-advance-hint">Tap screen to advance</div>

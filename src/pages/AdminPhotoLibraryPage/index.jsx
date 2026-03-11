@@ -6,8 +6,17 @@ const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 const UPDATE_URL = `${API_FOLDER}/v2/admin/photo-library/update.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/photo-library/delete.php`;
 const UPLOAD_URL = `${API_FOLDER}/v2/admin/photo-library/upload.php`;
+const REPLACE_URL = `${API_FOLDER}/v2/admin/photo-library/replace.php`;
 const SAVED_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
+const BACKFILL_EXTERIORS_URL = `${API_FOLDER}/v2/admin/photo-library/backfill-exteriors.php`;
+const GROUPS_LIST_URL = `${API_FOLDER}/v2/admin/photo-groups/list.php`;
+const GROUPS_CREATE_URL = `${API_FOLDER}/v2/admin/photo-groups/create.php`;
+const GROUPS_DELETE_URL = `${API_FOLDER}/v2/admin/photo-groups/delete.php`;
+const GROUPS_ITEMS_URL = `${API_FOLDER}/v2/admin/photo-groups/items.php`;
+const GROUPS_ITEMS_ALL_URL = `${API_FOLDER}/v2/admin/photo-groups/items-all.php`;
+const GROUPS_ADD_URL = `${API_FOLDER}/v2/admin/photo-groups/add-item.php`;
+const GROUPS_REMOVE_URL = `${API_FOLDER}/v2/admin/photo-groups/remove-item.php`;
 
 const SOURCE_OPTIONS = [
   { value: "saved_palette", label: "Saved Palette" },
@@ -31,12 +40,27 @@ const defaultFilters = {
   q: "",
   source_type: "",
   palette_id: "",
+  tag_mode: "include",
 };
+
+const normalizeTagToken = (token) => {
+  const value = String(token || "").trim().toLowerCase();
+  if (!value) return "";
+  if (value === "cyan" || value === "teal") return "teal";
+  return value;
+};
+
+const parseTagTokens = (value) =>
+  String(value || "")
+    .split(",")
+    .map((token) => normalizeTagToken(token))
+    .filter(Boolean);
 
 export default function AdminPhotoLibraryPage() {
   const [uploadForm, setUploadForm] = useState(defaultUpload);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState({ error: "", success: "" });
+  const [replaceStatus, setReplaceStatus] = useState("");
   const [files, setFiles] = useState([]);
 
   const [filters, setFilters] = useState(defaultFilters);
@@ -46,8 +70,18 @@ export default function AdminPhotoLibraryPage() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [replaceFiles, setReplaceFiles] = useState({});
+  const [replacingId, setReplacingId] = useState(null);
+  const [backfillStatus, setBackfillStatus] = useState("");
 
   const [savedPalettes, setSavedPalettes] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupId, setGroupId] = useState("");
+  const [groupItems, setGroupItems] = useState(() => new Set());
+  const [groupedItems, setGroupedItems] = useState(() => new Set());
+  const [newGroupTitle, setNewGroupTitle] = useState("");
+  const [groupStatus, setGroupStatus] = useState("");
+  const [groupFilterMode, setGroupFilterMode] = useState("group");
 
   useEffect(() => {
     let active = true;
@@ -72,12 +106,90 @@ export default function AdminPhotoLibraryPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    async function loadGroups() {
+      try {
+        const res = await fetch(`${GROUPS_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load groups");
+        if (!active) return;
+        setGroups(Array.isArray(data.items) ? data.items : []);
+      } catch {
+        if (!active) return;
+        setGroups([]);
+      }
+    }
+    loadGroups();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadGroupItems() {
+      if (!groupId) {
+        setGroupItems(new Set());
+        return;
+      }
+      if (groupId === "__ungrouped__") {
+        setGroupItems(new Set());
+        return;
+      }
+      try {
+        const res = await fetch(`${GROUPS_ITEMS_URL}?group_id=${groupId}&_=${Date.now()}`, { credentials: "include" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load group");
+        if (!active) return;
+        setGroupItems(new Set((data.items || []).map(String)));
+      } catch {
+        if (!active) return;
+        setGroupItems(new Set());
+      }
+    }
+    loadGroupItems();
+    return () => {
+      active = false;
+    };
+  }, [groupId, refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadGroupedItems() {
+      try {
+        const res = await fetch(`${GROUPS_ITEMS_ALL_URL}?_=${Date.now()}`, { credentials: "include" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load grouped items");
+        if (!active) return;
+        setGroupedItems(new Set((data.items || []).map(String)));
+      } catch {
+        if (!active) return;
+        setGroupedItems(new Set());
+      }
+    }
+    loadGroupedItems();
+    return () => {
+      active = false;
+    };
+  }, [refreshKey]);
+
   const paletteOptions = useMemo(() => {
     return savedPalettes.map((palette) => ({
       id: palette.id,
       label: palette.nickname || palette.palette_hash || `Saved #${palette.id}`,
     }));
   }, [savedPalettes]);
+
+  const groupOptions = useMemo(() => {
+    return [
+      { id: "__ungrouped__", label: "Ungrouped" },
+      ...groups.map((group) => ({
+        id: String(group.group_id),
+        label: group.title,
+      })),
+    ];
+  }, [groups]);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +198,8 @@ export default function AdminPhotoLibraryPage() {
       setError("");
       try {
         const params = new URLSearchParams();
-        if (filters.q.trim()) params.set("q", filters.q.trim());
+        // Tag search is handled client-side to support include/exclude logic.
+        if (filters.tag_mode) params.set("tag_mode", filters.tag_mode);
         if (filters.source_type) params.set("source_type", filters.source_type);
         if (filters.palette_id) params.set("palette_id", filters.palette_id);
         params.set("limit", "200");
@@ -123,6 +236,56 @@ export default function AdminPhotoLibraryPage() {
       next.add(id);
       return next;
     });
+  };
+
+  const withCacheBuster = (src, updatedAt) => {
+    if (!src || !updatedAt) return src;
+    const sep = src.includes("?") ? "&" : "?";
+    const stamp = Date.parse(updatedAt);
+    if (!Number.isFinite(stamp)) return src;
+    return `${src}${sep}v=${stamp}`;
+  };
+
+  const handleReplaceFileChange = (id, file) => {
+    setReplaceFiles((prev) => ({ ...prev, [id]: file || null }));
+  };
+
+  const handleReplace = async (item) => {
+    const id = item.photo_library_id;
+    const file = replaceFiles[id];
+    if (!file) return;
+    setError("");
+    setReplaceStatus("");
+    setReplacingId(id);
+    try {
+      const formData = new FormData();
+      formData.append("photo_library_id", String(id));
+      formData.append("photo", file);
+      const res = await fetch(REPLACE_URL, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Replace failed");
+      }
+      if (data?.written_to) {
+        setReplaceStatus(`Replaced #${id} -> ${data.written_to}`);
+      } else {
+        setReplaceStatus(`Replaced #${id}.`);
+      }
+      setReplaceFiles((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setError(err?.message || "Replace failed");
+    } finally {
+      setReplacingId(null);
+    }
   };
 
   const resetUpload = () => {
@@ -191,6 +354,9 @@ export default function AdminPhotoLibraryPage() {
   const handleLibrarySave = async (item) => {
     setError("");
     try {
+      if (replaceFiles[item.photo_library_id]) {
+        await handleReplace(item);
+      }
       const res = await fetch(UPDATE_URL, {
         method: "POST",
         credentials: "include",
@@ -200,6 +366,7 @@ export default function AdminPhotoLibraryPage() {
           title: item.title,
           tags: item.tags,
           alt_text: item.alt_text,
+          note: item.note,
           show_in_gallery: !!item.show_in_gallery,
           has_palette: !!item.has_palette,
         }),
@@ -229,14 +396,15 @@ export default function AdminPhotoLibraryPage() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            photo_library_id: item.photo_library_id,
-            title: item.title,
-            tags: item.tags,
-            alt_text: item.alt_text,
-            show_in_gallery: !!item.show_in_gallery,
-            has_palette: !!item.has_palette,
-          }),
+            body: JSON.stringify({
+              photo_library_id: item.photo_library_id,
+              title: item.title,
+              tags: item.tags,
+              alt_text: item.alt_text,
+              note: item.note,
+              show_in_gallery: !!item.show_in_gallery,
+              has_palette: !!item.has_palette,
+            }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) {
@@ -271,8 +439,147 @@ export default function AdminPhotoLibraryPage() {
     }
   };
 
+  const handleBackfill = async () => {
+    if (!window.confirm("Scan /photos/exteriors/*/*/prepared/base.jpg and add to Photo Library?")) return;
+    setBackfillStatus("");
+    setError("");
+    try {
+      const res = await fetch(BACKFILL_EXTERIORS_URL, { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Backfill failed");
+      setBackfillStatus(`Added ${data.added} (skipped ${data.skipped}).`);
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setBackfillStatus(err?.message || "Backfill failed");
+    }
+  };
+
   const showSavedFields = uploadForm.source_type === "saved_palette";
   const showLibraryFields = uploadForm.source_type !== "saved_palette" && uploadForm.source_type !== "applied_palette";
+
+  const tagFilteredItems = useMemo(() => {
+    const tokens = parseTagTokens(filters.q);
+    if (!tokens.length) return items;
+    const mode = filters.tag_mode === "exclude" ? "exclude" : "include";
+    return items.filter((item) => {
+      const tagList = parseTagTokens(item.tags);
+      if (!tagList.length) return mode === "exclude";
+      if (mode === "include") {
+        return tokens.every((token) => tagList.includes(token));
+      }
+      return tokens.every((token) => !tagList.includes(token));
+    });
+  }, [items, filters.q, filters.tag_mode]);
+
+  const inGroup = (photoId) => groupItems.has(String(photoId));
+
+  const filteredItems = useMemo(() => {
+    if (!groupId || groupFilterMode === "all") return tagFilteredItems;
+    if (groupId === "__ungrouped__") {
+      return tagFilteredItems.filter((item) => !groupedItems.has(String(item.photo_library_id)));
+    }
+    return tagFilteredItems.filter((item) => inGroup(item.photo_library_id));
+  }, [tagFilteredItems, groupId, groupFilterMode, groupItems, groupedItems]);
+
+  async function handleCreateGroup() {
+    const title = newGroupTitle.trim();
+    if (!title) return;
+    setGroupStatus("");
+    try {
+      const res = await fetch(GROUPS_CREATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Create failed");
+      setNewGroupTitle("");
+      setGroupId(String(data.group_id));
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setGroupStatus(err?.message || "Create failed");
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!groupId) return;
+    if (!window.confirm("Delete this group? Photos will not be deleted.")) return;
+    setGroupStatus("");
+    try {
+      const res = await fetch(GROUPS_DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: Number(groupId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Delete failed");
+      setGroupId("");
+      setGroupItems(new Set());
+      setRefreshKey((prev) => prev + 1);
+    } catch (err) {
+      setGroupStatus(err?.message || "Delete failed");
+    }
+  }
+
+  async function handleAddToGroup(photoId) {
+    if (!groupId) return;
+    if (groupId === "__ungrouped__") return;
+    try {
+      const anchor = document.querySelector(`#photo-row-${photoId}`);
+      const res = await fetch(GROUPS_ADD_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: Number(groupId), photo_library_id: Number(photoId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Add failed");
+      setGroupItems((prev) => new Set(prev).add(String(photoId)));
+      setGroupedItems((prev) => {
+        const next = new Set(prev);
+        next.add(String(photoId));
+        return next;
+      });
+      if (anchor) {
+        anchor.scrollIntoView({ block: "center" });
+      }
+    } catch (err) {
+      setGroupStatus(err?.message || "Add failed");
+    }
+  }
+
+  async function handleRemoveFromGroup(photoId) {
+    if (!groupId) return;
+    if (groupId === "__ungrouped__") return;
+    try {
+      const anchor = document.querySelector(`#photo-row-${photoId}`);
+      const res = await fetch(GROUPS_REMOVE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: Number(groupId), photo_library_id: Number(photoId) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Remove failed");
+      setGroupItems((prev) => {
+        const next = new Set(prev);
+        next.delete(String(photoId));
+        return next;
+      });
+      setGroupedItems((prev) => {
+        const next = new Set(prev);
+        next.delete(String(photoId));
+        return next;
+      });
+      if (anchor) {
+        anchor.scrollIntoView({ block: "center" });
+      }
+    } catch (err) {
+      setGroupStatus(err?.message || "Remove failed");
+    }
+  }
 
   useEffect(() => {
     if (uploadForm.source_type === "saved_palette" && uploadForm.palette_id) {
@@ -295,6 +602,7 @@ export default function AdminPhotoLibraryPage() {
         <h2>Upload Photos</h2>
         {uploadStatus.error && <div className="admin-photo-library__error">{uploadStatus.error}</div>}
         {uploadStatus.success && <div className="admin-photo-library__status">{uploadStatus.success}</div>}
+        {replaceStatus && <div className="admin-photo-library__status">{replaceStatus}</div>}
         <form className="admin-photo-library__upload" onSubmit={handleUploadSubmit}>
           <label>
             Type
@@ -427,16 +735,76 @@ export default function AdminPhotoLibraryPage() {
       <section className="admin-photo-library__section">
         <h2>Library</h2>
         {error && <div className="admin-photo-library__error">{error}</div>}
+        {backfillStatus && <div className="admin-photo-library__status">{backfillStatus}</div>}
         <div className="admin-photo-library__filters">
-          <label>
-            Search
-            <input
-              type="text"
-              value={filters.q}
-              onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-              placeholder="title, tags, path…"
-            />
+          <label className="admin-photo-library__tag-filter">
+            Tags
+            <div className="admin-photo-library__tag-input">
+              <input
+                type="text"
+                value={filters.q}
+                onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+                placeholder="tag, tag"
+              />
+              <button
+                type="button"
+                className={`admin-photo-library__tag-toggle${filters.tag_mode === "exclude" ? " is-active" : ""}`}
+                onClick={() =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    tag_mode: prev.tag_mode === "exclude" ? "include" : "exclude",
+                  }))
+                }
+                title={filters.tag_mode === "exclude" ? "Excluding tags" : "Include tags"}
+                aria-label={filters.tag_mode === "exclude" ? "Exclude tags" : "Include tags"}
+              >
+                ×
+              </button>
+            </div>
           </label>
+          <label>
+            Group
+            <select
+              value={groupId}
+              onChange={(e) => {
+                setGroupId(e.target.value);
+                setGroupFilterMode("group");
+              }}
+            >
+              <option value="">All photos</option>
+              {groupOptions.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="admin-photo-library__group-actions">
+            <div className="admin-photo-library__group-create">
+              <input
+                type="text"
+                value={newGroupTitle}
+                onChange={(e) => setNewGroupTitle(e.target.value)}
+                placeholder="New group title"
+              />
+              <button type="button" onClick={handleCreateGroup} disabled={!newGroupTitle.trim()}>
+                Add Group
+              </button>
+            </div>
+            {groupId && (
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setGroupFilterMode((prev) => (prev === "group" ? "all" : "group"))}
+              >
+                {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
+              </button>
+            )}
+            <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId}>
+              Delete Group
+            </button>
+            {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
+          </div>
           <label>
             Type
             <select
@@ -468,6 +836,9 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
           <div className="admin-photo-library__save-all">
+            <button type="button" onClick={handleBackfill}>
+              Sync Base Photos
+            </button>
             <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
               Save All
             </button>
@@ -484,16 +855,14 @@ export default function AdminPhotoLibraryPage() {
                 <tr>
                   <th>ID</th>
                   <th>Preview</th>
-                  <th>Title</th>
-                  <th>Tags</th>
-                  <th>Alt Text</th>
+                  <th>Text</th>
                   <th>Type</th>
                   <th>Flags</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {filteredItems.map((item) => (
                   <tr key={item.photo_library_id} className={dirtyIds.has(item.photo_library_id) ? "is-dirty" : ""}>
                     <td>
                       <div className="admin-photo-library__id">
@@ -511,31 +880,38 @@ export default function AdminPhotoLibraryPage() {
                       <button
                         type="button"
                         className="admin-photo-library__thumb"
-                        onClick={() => setPreviewUrl(item.rel_path)}
+                        onClick={() => setPreviewUrl(withCacheBuster(item.rel_path, item.updated_at))}
                       >
-                        <img src={item.rel_path} alt="" />
+                        <img src={withCacheBuster(item.rel_path, item.updated_at)} alt="" />
                       </button>
                     </td>
                     <td>
-                      <input
-                        type="text"
-                        value={item.title || ""}
-                        onChange={(e) => handleLibraryField(item.photo_library_id, "title", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={item.tags || ""}
-                        onChange={(e) => handleLibraryField(item.photo_library_id, "tags", e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="text"
-                        value={item.alt_text || ""}
-                        onChange={(e) => handleLibraryField(item.photo_library_id, "alt_text", e.target.value)}
-                      />
+                      <div className="admin-photo-library__text-stack">
+                        <input
+                          type="text"
+                          value={item.title || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "title", e.target.value)}
+                          placeholder="title"
+                        />
+                        <input
+                          type="text"
+                          value={item.tags || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "tags", e.target.value)}
+                          placeholder="tags"
+                        />
+                        <input
+                          type="text"
+                          value={item.alt_text || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "alt_text", e.target.value)}
+                          placeholder="alt text"
+                        />
+                        <input
+                          type="text"
+                          value={item.note || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "note", e.target.value)}
+                          placeholder="note"
+                        />
+                      </div>
                     </td>
                     <td>
                       <div className="admin-photo-library__meta">
@@ -544,30 +920,66 @@ export default function AdminPhotoLibraryPage() {
                       </div>
                     </td>
                     <td>
-                      <label className="admin-photo-library__check">
-                        <input
-                          type="checkbox"
-                          checked={!!item.show_in_gallery}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "show_in_gallery", e.target.checked)}
-                        />
-                        Gallery
-                      </label>
-                      <label className="admin-photo-library__check">
-                        <input
-                          type="checkbox"
-                          checked={!!item.has_palette}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "has_palette", e.target.checked)}
-                        />
-                        Palette
-                      </label>
+                      <div className="admin-photo-library__flags">
+                        <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.show_in_gallery}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "show_in_gallery", e.target.checked)}
+                          />
+                          Gallery
+                        </label>
+                        <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.has_palette}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "has_palette", e.target.checked)}
+                          />
+                          Palette
+                        </label>
+                      </div>
                     </td>
                     <td className="admin-photo-library__row-actions">
-                      <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
-                        Save
-                      </button>
-                      <a className="ghost" href={item.rel_path} download>
-                        Download
-                      </a>
+                      <div className="admin-photo-library__row-actions-top">
+                        <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
+                          Save
+                        </button>
+                        <a className="ghost" href={withCacheBuster(item.rel_path, item.updated_at)} download>
+                          Download
+                        </a>
+                        {groupId && groupId !== "__ungrouped__" && (
+                          inGroup(item.photo_library_id) ? (
+                            <button
+                              type="button"
+                              className="ghost danger"
+                              onClick={() => handleRemoveFromGroup(item.photo_library_id)}
+                            >
+                              Remove
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => handleAddToGroup(item.photo_library_id)}
+                            >
+                              Add
+                            </button>
+                          )
+                        )}
+                      </div>
+                      <label className="admin-photo-library__replace">
+                        Replace
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            handleReplaceFileChange(
+                              item.photo_library_id,
+                              (e.target.files && e.target.files[0]) || null
+                            )
+                          }
+                        />
+                      </label>
                       {(item.source_type === "progression" || item.source_type === "article") && (
                         <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
                           Delete

@@ -1,4 +1,6 @@
 import CTAButton from "./CTAButton";
+import ArticleLinkCta from "./ArticleLinkCta";
+import WatchNextCta from "./WatchNextCta";
 import "./cta.css";
 
 export default function CTALayout({
@@ -17,6 +19,25 @@ export default function CTALayout({
           return <div key={cta.cta_id} className="cta-spacer" aria-hidden="true" />;
         }
 
+        const key = (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
+        if (key === "article_link") {
+          return (
+            <ArticleLinkCta
+              key={cta.cta_id}
+              cta={cta}
+              onClick={onCtaClick}
+            />
+          );
+        }
+        if (key === "watch_next") {
+          return (
+            <WatchNextCta
+              key={cta.cta_id}
+              cta={cta}
+              onClick={onCtaClick}
+            />
+          );
+        }
         return (
           <CTAButton
             key={cta.cta_id}

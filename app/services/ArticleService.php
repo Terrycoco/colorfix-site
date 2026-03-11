@@ -41,6 +41,8 @@ class ArticleService
             'slug' => $slug,
             'meta_description' => $payload['meta_description'] ?? null,
             'hero_asset_id' => $payload['hero_asset_id'] ?? null,
+            'cta_overrides' => $payload['cta_overrides'] ?? null,
+            'featured' => !empty($payload['featured']) ? 1 : 0,
             'published_at' => $payload['published_at'] ?? null,
         ];
 
@@ -48,6 +50,10 @@ class ArticleService
             $this->repo->updateArticle($articleId, $data);
         } else {
             $articleId = $this->repo->createArticle($data);
+        }
+
+        if (!empty($data['featured'])) {
+            $this->repo->clearFeaturedExcept($articleId);
         }
 
         $tagIds = $this->normalizeTagIds($payload['tags'] ?? []);
@@ -108,37 +114,82 @@ class ArticleService
 
     private function syncSections(int $articleId, array $sections): void
     {
+        $sections = $this->normalizeSectionOrder($sections);
         $existing = $this->repo->listSections($articleId);
         $existingIds = array_map(static fn(array $row) => (int)$row['id'], $existing);
         $keepIds = [];
 
-        foreach ($sections as $section) {
-            if (!is_array($section)) continue;
-            $sectionId = isset($section['id']) ? (int)$section['id'] : 0;
-            if (!empty($section['delete']) && $sectionId > 0) {
-                $this->repo->deleteSection($sectionId);
-                continue;
+        $this->repo->beginTransaction();
+        try {
+            if ($articleId > 0) {
+                $this->repo->bumpSectionSortOrders($articleId, 10000);
             }
-            $data = [
-                'sort_order' => $section['sort_order'] ?? 0,
-                'kind' => $section['kind'] ?? 'text',
-                'heading' => $section['heading'] ?? null,
-                'body' => $section['body'] ?? null,
-                'asset_id' => $section['asset_id'] ?? null,
-                'palette_id' => $section['palette_id'] ?? null,
-            ];
-            if ($sectionId > 0) {
-                $this->repo->updateSection($sectionId, $data);
-                $keepIds[] = $sectionId;
-            } else {
-                $newId = $this->repo->createSection($articleId, $data);
-                $keepIds[] = $newId;
-            }
-        }
 
-        $toDelete = array_diff($existingIds, $keepIds);
-        foreach ($toDelete as $id) {
-            $this->repo->deleteSection((int)$id);
+            foreach ($sections as $section) {
+                if (!is_array($section)) continue;
+                $sectionId = isset($section['id']) ? (int)$section['id'] : 0;
+                if (!empty($section['delete']) && $sectionId > 0) {
+                    $this->repo->deleteSection($sectionId);
+                    continue;
+                }
+                $data = [
+                    'sort_order' => $section['sort_order'] ?? 0,
+                    'kind' => $section['kind'] ?? 'text',
+                    'heading' => $section['heading'] ?? null,
+                    'heading_level' => $section['heading_level'] ?? null,
+                    'body' => $section['body'] ?? null,
+                    'caption' => $section['caption'] ?? null,
+                    'asset_id' => $section['asset_id'] ?? null,
+                    'palette_id' => $section['palette_id'] ?? null,
+                ];
+                if ($sectionId > 0) {
+                    $this->repo->updateSection($sectionId, $data);
+                    $keepIds[] = $sectionId;
+                } else {
+                    $newId = $this->repo->createSection($articleId, $data);
+                    $keepIds[] = $newId;
+                }
+            }
+
+            $toDelete = array_diff($existingIds, $keepIds);
+            foreach ($toDelete as $id) {
+                $this->repo->deleteSection((int)$id);
+            }
+
+            $this->repo->commit();
+        } catch (\Throwable $e) {
+            $this->repo->rollBack();
+            throw $e;
         }
+    }
+
+    private function normalizeSectionOrder(array $sections): array
+    {
+        $indexed = [];
+        foreach ($sections as $idx => $section) {
+            if (!is_array($section)) continue;
+            $sortRaw = $section['sort_order'] ?? $idx;
+            $sort = is_numeric($sortRaw) ? (float)$sortRaw : (float)$idx;
+            $indexed[] = [
+                'idx' => $idx,
+                'sort' => $sort,
+                'section' => $section,
+            ];
+        }
+        usort($indexed, static function (array $a, array $b): int {
+            if ($a['sort'] === $b['sort']) {
+                return $a['idx'] <=> $b['idx'];
+            }
+            return $a['sort'] <=> $b['sort'];
+        });
+        $normalized = [];
+        $i = 0;
+        foreach ($indexed as $entry) {
+            $section = $entry['section'];
+            $section['sort_order'] = $i;
+            $normalized[] = $section;
+            $i++;
+        }
+        return $normalized;
     }
 }

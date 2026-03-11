@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CTASection from "@components/CTASection";
 import "./playlist-thumbs.css";
@@ -97,13 +98,32 @@ export default function PlaylistThumbsPage() {
     return list;
   }, [items, likedSet]);
 
+  const [thumbUrlByKey, setThumbUrlByKey] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    palettes.forEach((palette) => {
+      const key = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
+      const value = palette.image_url || "";
+      if (!isAssetRef(value)) return;
+      const assetId = extractAssetId(value);
+      if (!assetId) return;
+      fetchAssetUrl(assetId).then((url) => {
+        if (!cancelled && url) {
+          setThumbUrlByKey((prev) => ({ ...prev, [key]: url }));
+        }
+      });
+    });
+    return () => { cancelled = true; };
+  }, [palettes]);
+
   if (loading) return <div className="playlist-thumbs__status">Loading palettes…</div>;
   if (error) return <div className="playlist-thumbs__status error">{error}</div>;
 
   const handleBackToPlaylist = () => {
-    if (!playlistId) return;
-    if (isHoaView) {
-      navigate("/hoa");
+    const safeReturn = resolveReturnTo(returnToParam);
+    if (safeReturn) {
+      navigate(safeReturn);
       return;
     }
     const params = new URLSearchParams();
@@ -112,12 +132,22 @@ export default function PlaylistThumbsPage() {
     if (psiParam !== "") params.set("psi", psiParam);
     if (thumbParam !== "") params.set("thumb", thumbParam);
     if (demoParam !== "") params.set("demo", demoParam);
-    if (returnToParam !== "") params.set("return_to", returnToParam);
-    params.set("end", "1");
     const qs = params.toString();
-    navigate(`/playlist/${playlistId}${qs ? `?${qs}` : ""}`);
+    navigate(`/player/${playlistId}${qs ? `?${qs}` : ""}`);
   };
   const handleCtaClick = () => handleBackToPlaylist();
+  const handleBackToPrevious = () => {
+    const safeReturn = resolveReturnTo(returnToParam);
+    if (safeReturn) {
+      navigate(safeReturn);
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    handleBackToPlaylist();
+  };
 
   return (
     <div className="playlist-thumbs playlist-thumbs--end">
@@ -157,15 +187,22 @@ export default function PlaylistThumbsPage() {
               const href = palette.palette_hash
                 ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
                 : `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
+              const cardKey = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
+              const parsed = parsePhotoRef(palette.image_url);
+              const resolvedUrl = parsed.url
+                ? parsed.url
+                : isAssetRef(palette.image_url)
+                ? thumbUrlByKey[cardKey] || ""
+                : palette.image_url;
               return (
                 <a
-                  key={palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`}
+                  key={cardKey}
                   className="playlist-thumbs__card"
                   href={href}
                 >
                   <div className="playlist-thumbs__image">
-                    {palette.image_url ? (
-                      <img src={palette.image_url} alt={palette.title} loading="lazy" />
+                    {resolvedUrl ? (
+                      <img src={resolvedUrl} alt={palette.title} loading="lazy" />
                     ) : (
                       <div className="playlist-thumbs__placeholder">No Image</div>
                     )}
@@ -189,6 +226,15 @@ export default function PlaylistThumbsPage() {
               );
             })}
           </div>
+        </div>
+        <div className="playlist-thumbs__footer">
+          <button
+            type="button"
+            className="playlist-thumbs__back"
+            onClick={handleBackToPrevious}
+          >
+            Back to playlist
+          </button>
         </div>
       </div>
       <CTASection
@@ -218,4 +264,12 @@ function buildReturnTo(pathname, search) {
   params.delete("return_to");
   const qs = params.toString();
   return `${pathname}${qs ? `?${qs}` : ""}`;
+}
+
+function resolveReturnTo(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed.startsWith("/")) return "";
+  if (trimmed.startsWith("//")) return "";
+  return trimmed;
 }

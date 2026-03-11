@@ -45,6 +45,20 @@
   border-color: #111;
 }
 
+.danger-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #7a0000;
+  background: #fff;
+  color: #7a0000;
+  cursor: pointer;
+}
+
+.danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .playlist-form {
   background: #fff;
   border-radius: 12px;
@@ -112,7 +126,7 @@
 
 .item-row {
   display: grid;
-  grid-template-columns: 40px 90px 1fr 1fr 1.1fr 180px;
+  grid-template-columns: 40px 90px minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
   gap: 10px;
   align-items: end;
 }
@@ -150,13 +164,27 @@
 
 .item-actions {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   align-items: center;
   justify-content: flex-start;
 }
 
 .item-actions {
   justify-content: flex-end;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+}
+
+.item-photo {
+  grid-column: 1 / span 3;
+}
+
+.item-transition {
+  grid-column: 4 / span 2;
+}
+
+.item-transition select {
+  max-width: 220px;
 }
 
 .item-actions button {
@@ -193,6 +221,31 @@
 
 .item-wide textarea {
   resize: vertical;
+}
+
+.item-inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.item-inline-btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #f3f3f3;
+  color: #111;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.item-picker {
+  margin-top: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
 }
 
 @media (max-width: 1200px) {

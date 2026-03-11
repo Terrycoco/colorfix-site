@@ -94,6 +94,7 @@ export default function PhotoSearchPicker({
   pageSize = DEFAULT_LIMIT,
   emptyText = "No photos matched.",
   autoSearch = true,
+  fallbackToTextOnEmpty = true,
   onPick,
   onQueryChange,
 }) {
@@ -120,8 +121,8 @@ export default function PhotoSearchPicker({
     setError("");
 
     const params = new URLSearchParams();
-    if (nextQ) params.set("q", nextQ);
-    if (nextTags) params.set("tags", nextTags);
+    const mergedQ = nextQ || nextTags;
+    if (mergedQ) params.set("q", mergedQ);
     params.set("page", String(nextPage));
     params.set("limit", String(pageSize));
     params.set("_", String(Date.now()));

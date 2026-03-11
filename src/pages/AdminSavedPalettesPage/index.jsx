@@ -6,6 +6,7 @@ import { isAdmin } from "@helpers/authHelper";
 import EditableSwatch from "@components/EditableSwatch";
 import KickerDropdown from "@components/KickerDropdown";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import PhotoPickerModal from "@components/PhotoPickerModal";
 import "./admin-saved-palettes.css";
 
 const BRAND_CHOICES = [
@@ -49,6 +50,7 @@ const emptySendForm = {
 const DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-delete.php`;
 const PHOTO_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const PHOTO_DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/delete.php`;
+const PHOTO_LIBRARY_ADD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/add-from-library.php`;
 
 function formatDate(value) {
   if (!value) return "—";
@@ -104,6 +106,7 @@ export default function AdminSavedPalettesPage() {
   const [editStatus, setEditStatus] = useState({ loading: false, error: "" });
   const [editMembers, setEditMembers] = useState([]);
   const [editPhotos, setEditPhotos] = useState([]);
+  const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendForm, setSendForm] = useState(emptySendForm);
@@ -205,6 +208,7 @@ export default function AdminSavedPalettesPage() {
       id: photo.id,
       rel_path: photo.rel_path,
       photo_type: photo.photo_type || "full",
+      trigger_mode: photo.trigger_mode || "any",
       trigger_color_id: photo.trigger_color_id ?? null,
       caption: photo.caption || "",
       alt_text: photo.alt_text || "",
@@ -293,6 +297,7 @@ export default function AdminSavedPalettesPage() {
           id: photo.id,
           rel_path: photo.rel_path,
           photo_type: photo.photo_type || "full",
+          trigger_mode: photo.trigger_mode || "any",
           trigger_color_id: photo.trigger_color_id ?? null,
           caption: photo.caption || "",
           alt_text: photo.alt_text || "",
@@ -302,6 +307,47 @@ export default function AdminSavedPalettesPage() {
       setPhotoStatus({ loading: false, error: "" });
     } catch (err) {
       setPhotoStatus({ loading: false, error: err?.message || "Failed to upload photos" });
+    }
+  };
+
+  const handlePhotoPickFromLibrary = async (item) => {
+    if (!editForm.palette_id || !item?.image_url) return;
+    setPhotoStatus({ loading: true, error: "" });
+    try {
+      const payload = {
+        palette_id: editForm.palette_id,
+        rel_path: item.image_url,
+        photo_type: "full",
+        trigger_mode: "any",
+      };
+      const res = await fetch(PHOTO_LIBRARY_ADD_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      const photo = json.photo || {};
+      setEditPhotos((prev) => [
+        ...prev,
+        {
+          id: photo.id,
+          rel_path: photo.rel_path,
+          photo_type: photo.photo_type || "full",
+          trigger_mode: photo.trigger_mode || "any",
+          trigger_color_id: photo.trigger_color_id ?? null,
+          caption: photo.caption || "",
+          alt_text: photo.alt_text || "",
+          order_index: photo.order_index ?? prev.length,
+        },
+      ]);
+      setPhotoStatus({ loading: false, error: "" });
+      setPhotoPickerOpen(false);
+    } catch (err) {
+      setPhotoStatus({ loading: false, error: err?.message || "Failed to attach photo" });
     }
   };
 
@@ -329,9 +375,24 @@ export default function AdminSavedPalettesPage() {
   const handlePhotoField = (photoId, field, value) => {
     setEditPhotos((prev) =>
       prev.map((photo) =>
-        photo.id === photoId ? { ...photo, [field]: value } : photo
+        photo.id === photoId
+          ? applyPhotoFieldUpdate(photo, field, value)
+          : photo
       )
     );
+  };
+
+  const applyPhotoFieldUpdate = (photo, field, value) => {
+    const next = { ...photo, [field]: value };
+    if (field === "trigger_mode" && value !== "color") {
+      next.trigger_color_id = null;
+    }
+    if (next.photo_type === "before") {
+      next.trigger_mode = "none";
+      next.trigger_color_id = null;
+      next.caption = "Before";
+    }
+    return next;
   };
 
   const handleEditSubmit = async (event) => {
@@ -359,8 +420,10 @@ export default function AdminSavedPalettesPage() {
         photos: editPhotos.map((photo) => ({
           id: photo.id,
           photo_type: photo.photo_type || "full",
+          trigger_mode: photo.trigger_mode || "any",
           trigger_color_id: photo.trigger_color_id || null,
           alt_text: photo.alt_text || "",
+          caption: photo.caption || "",
         })),
       };
       const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-update.php`, {
@@ -669,8 +732,9 @@ export default function AdminSavedPalettesPage() {
 
             <form className="asp-modal-form" onSubmit={handleEditSubmit}>
               <div className="asp-photo-editor">
-                <div className="asp-member-list-head">
-                  <h3>Photos</h3>
+              <div className="asp-member-list-head">
+                <h3>Photos</h3>
+                <div className="asp-photo-actions">
                   <label className="asp-upload-btn">
                     Upload
                     <input
@@ -681,7 +745,23 @@ export default function AdminSavedPalettesPage() {
                       disabled={photoStatus.loading}
                     />
                   </label>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setPhotoPickerOpen(true)}
+                    disabled={photoStatus.loading}
+                  >
+                    Library
+                  </button>
+                  <button
+                    type="submit"
+                    className="asp-save-top"
+                    disabled={editStatus.loading}
+                  >
+                    {editStatus.loading ? "Saving…" : "Save"}
+                  </button>
                 </div>
+              </div>
                 {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
                 {editPhotos.length > 0 ? (
                   <div className="asp-photo-grid">
@@ -694,6 +774,15 @@ export default function AdminSavedPalettesPage() {
                         >
                           <option value="full">Full</option>
                           <option value="zoom">Zoom</option>
+                          <option value="before">Before</option>
+                        </select>
+                        <select
+                          value={photo.trigger_mode || "any"}
+                          onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
+                        >
+                          <option value="any">Trigger: any color</option>
+                          <option value="none">Trigger: none</option>
+                          <option value="color">Trigger: specific color</option>
                         </select>
                         <select
                           value={photo.trigger_color_id || ""}
@@ -704,8 +793,9 @@ export default function AdminSavedPalettesPage() {
                               e.target.value ? Number(e.target.value) : null
                             )
                           }
+                          disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
                         >
-                          <option value="">Trigger: any color</option>
+                          <option value="">Pick color</option>
                           {editMembers.map((row) => (
                             <option
                               key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
@@ -923,6 +1013,12 @@ export default function AdminSavedPalettesPage() {
           </div>
         </div>
       )}
+      <PhotoPickerModal
+        open={photoPickerOpen}
+        title="Pick Photo"
+        onClose={() => setPhotoPickerOpen(false)}
+        onPick={handlePhotoPickFromLibrary}
+      />
     </section>
   );
 }

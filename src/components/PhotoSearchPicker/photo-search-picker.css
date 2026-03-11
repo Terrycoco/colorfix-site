@@ -38,9 +38,9 @@
 }
 
 .psb-btn {
-  border: 1px solid #bcbcbc;
-  background: #fff;
-  color: #111;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 10px;
@@ -48,9 +48,9 @@
 }
 
 .psb-btn.psb-primary {
-  background: #111;
-  border-color: #111;
-  color: #fff;
+  background: #ff7a00;
+  border-color: #ff7a00;
+  color: #111;
 }
 
 .photo-grid {

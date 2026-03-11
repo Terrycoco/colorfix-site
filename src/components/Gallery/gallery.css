@@ -5,6 +5,20 @@
   padding-top: 1rem;
 }
 
+.gallery-hero {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.gallery-hero-item {
+  max-width: 360px;
+  width: auto;
+  overflow: visible;
+}
+
 
 .gallery-grid {
   display: block;

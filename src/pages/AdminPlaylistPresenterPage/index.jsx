@@ -132,12 +132,16 @@ export default function AdminPlaylistPresenterPage() {
         parsedParams = cta.params;
       }
       const key = cta?.key || cta?.action_key || cta?.action || "";
+      let variant = cta?.variant ?? parsedParams.variant;
+      if (!variant && key === "article_link") {
+        variant = "link";
+      }
       return {
         cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
         label: cta?.label ?? "",
         key,
         enabled: cta?.enabled ?? true,
-        variant: cta?.variant ?? parsedParams.variant,
+        variant,
         display_mode: cta?.display_mode ?? parsedParams.display_mode,
         icon: cta?.icon ?? parsedParams.icon,
         params: parsedParams,

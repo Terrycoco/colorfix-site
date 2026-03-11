@@ -37,4 +37,29 @@ SQL;
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function getByIds(array $ctaIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ctaIds))));
+        if (!$ids) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $orderBy = implode(',', array_fill(0, count($ids), '?'));
+        $sql = <<<SQL
+SELECT
+  c.cta_id     AS cta_id,
+  c.label,
+  c.params,
+  t.action_key
+FROM ctas c
+JOIN cta_types t
+  ON t.cta_type_id = c.cta_type_id
+WHERE c.cta_id IN ({$placeholders})
+  AND c.is_active = 1
+  AND t.is_active = 1
+ORDER BY FIELD(c.cta_id, {$orderBy})
+SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(array_merge($ids, $ids));
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

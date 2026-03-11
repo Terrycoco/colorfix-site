@@ -238,8 +238,13 @@ class SavedPaletteService
             }
 
             $photoType = isset($photo['photo_type']) ? trim((string)$photo['photo_type']) : '';
-            if (!in_array($photoType, ['full', 'zoom'], true)) {
+            if (!in_array($photoType, ['full', 'zoom', 'before'], true)) {
                 $photoType = 'full';
+            }
+
+            $triggerMode = isset($photo['trigger_mode']) ? strtolower(trim((string)$photo['trigger_mode'])) : 'any';
+            if (!in_array($triggerMode, ['any', 'none', 'color'], true)) {
+                $triggerMode = 'any';
             }
 
             $triggerId = null;
@@ -256,6 +261,15 @@ class SavedPaletteService
                 $caption = $cap === '' ? null : $cap;
             }
 
+            if ($photoType === 'before') {
+                $triggerId = null;
+                $caption = 'Before';
+                $triggerMode = 'none';
+            }
+            if ($triggerMode !== 'color') {
+                $triggerId = null;
+            }
+
             $altText = null;
             if (array_key_exists('alt_text', $photo)) {
                 $alt = trim((string)$photo['alt_text']);
@@ -264,6 +278,7 @@ class SavedPaletteService
 
             $this->repo->updatePhoto($photoId, $paletteId, [
                 'photo_type' => $photoType,
+                'trigger_mode' => $triggerMode,
                 'trigger_color_id' => $triggerId,
                 'caption' => $caption,
                 'alt_text' => $altText,

@@ -27,6 +27,7 @@ export default function PlayerPage() {
   const [error, setError] = useState("");
   const [likedCount, setLikedCount] = useState(0);
   const [playbackEnded, setPlaybackEnded] = useState(false);
+  const [watchNextCta, setWatchNextCta] = useState(null);
   const playerRef = useRef(null);
   const thumbsEnabled =
     thumbParam === "1" || thumbParam.toLowerCase() === "true" || Boolean(data?.thumbs_enabled);
@@ -94,15 +95,7 @@ export default function PlayerPage() {
   }, [data?.playlist_instance_id, endParam]);
 
   function handleExit() {
-    if (returnTo) {
-      navigate(returnTo);
-      return;
-    }
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/");
-    }
+    navigate("/");
   }
 
   const firstNonIntroIndex = useMemo(() => {
@@ -205,12 +198,15 @@ const ctas = useMemo(() => {
       parsedParams = cta.params;
     }
 
-    const key = cta?.key || cta?.action_key || cta?.action || "";
+    const key = (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
 
-    const variant = resolveVariant(
+    let variant = resolveVariant(
       cta?.variant ?? parsedParams.variant ?? parsedParams.style,
       key.toLowerCase().includes("back")
     );
+    if (!variant && key === "article_link") {
+      variant = "link";
+    }
     return {
       cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
       label: cta?.label ?? "",
@@ -267,12 +263,101 @@ const visibleCTAs = useMemo(
   [ctas, likedCount]
 );
 
-const { primaryCTAs, linkCTAs } = useMemo(() => {
-  return {
-    primaryCTAs: visibleCTAs.filter((cta) => cta?.variant !== "link"),
-    linkCTAs: visibleCTAs.filter((cta) => cta?.variant === "link"),
-  };
-}, [visibleCTAs]);
+  const baseVisibleCTAs = useMemo(
+    () => visibleCTAs.filter((cta) => (cta?.key || "") !== "watch_next"),
+    [visibleCTAs]
+  );
+
+  const orderedCTAs = useMemo(() => {
+    if (watchNextCta) return [...baseVisibleCTAs, watchNextCta];
+    return baseVisibleCTAs;
+  }, [baseVisibleCTAs, watchNextCta]);
+
+  useEffect(() => {
+    if (!data || !visibleCTAs.length) {
+      setWatchNextCta(null);
+      return;
+    }
+    const baseCta = visibleCTAs.find((cta) => (cta?.key || "") === "watch_next");
+    if (!baseCta) {
+      setWatchNextCta(null);
+      return;
+    }
+
+    const setId =
+      Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id) ||
+      Number((data?.playlist_instance_set_ids || [])[0]) ||
+      3;
+    if (!setId) {
+      setWatchNextCta(null);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/v2/playlist-instance-sets/get.php?id=${setId}&_=${Date.now()}`, {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || "Failed to load playlist set");
+        }
+        if (cancelled) return;
+        const items = Array.isArray(payload?.set?.items) ? payload.set.items : [];
+        const playlistItems = items
+          .filter((item) => (item?.item_type || "instance") !== "set")
+          .filter((item) => item?.playlist_instance_id);
+
+        const setItemIds = playlistItems.map((item) => Number(item.playlist_instance_id));
+        const currentId = Number(data?.playlist_instance_id);
+        const seen = readWatchNextSeen(setId);
+        const nextItem = playlistItems.find((item) => {
+          const pid = Number(item.playlist_instance_id);
+          if (!pid || pid === currentId) return false;
+          return !seen.includes(pid);
+        });
+
+        if (!nextItem) {
+          setWatchNextCta(null);
+          return;
+        }
+
+        const resolvedTitle = nextItem.title || baseCta?.params?.title || "Next Playlist";
+        const resolvedSubtitle = baseCta?.params?.subtitle || baseCta?.params?.dek || "";
+        const resolvedThumb = nextItem.photo_url || "";
+        const resolved = {
+          ...baseCta,
+          key: "watch_next",
+          params: {
+            ...(baseCta?.params || {}),
+            playlist_instance_id: Number(nextItem.playlist_instance_id),
+            title: resolvedTitle,
+            subtitle: resolvedSubtitle,
+            thumbnail_url: resolvedThumb,
+          },
+          data: {
+            ...(baseCta?.data || {}),
+            playlist_instance_id: Number(nextItem.playlist_instance_id),
+          },
+        };
+        setWatchNextCta(resolved);
+
+        if (playbackEnded && currentId && setItemIds.includes(currentId)) {
+          markWatchNextSeen(setId, currentId);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setWatchNextCta(null);
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, visibleCTAs, playbackEnded]);
 
   if (loading) return null;
   if (error) return <div className="player-error">{error}</div>;
@@ -295,25 +380,12 @@ const { primaryCTAs, linkCTAs } = useMemo(() => {
         />
         {playbackEnded && (
           <PlayerEndScreen onExit={handleExit}>
-            {(primaryCTAs.length > 0 || linkCTAs.length > 0) && (
-              <>
-                {primaryCTAs.length > 0 && (
-                  <CTALayout
-                    layout="stacked"
-                    ctas={primaryCTAs}
-                    onCtaClick={handleCta}
-                  />
-                )}
-                {linkCTAs.length > 0 && (
-                  <div className="player-end-links">
-                    <CTALayout
-                      layout="stacked"
-                      ctas={linkCTAs}
-                      onCtaClick={handleCta}
-                    />
-                  </div>
-                )}
-              </>
+            {orderedCTAs.length > 0 && (
+              <CTALayout
+                layout="stacked"
+                ctas={orderedCTAs}
+                onCtaClick={handleCta}
+              />
             )}
           </PlayerEndScreen>
         )}
@@ -321,4 +393,27 @@ const { primaryCTAs, linkCTAs } = useMemo(() => {
 
     </div>
   );
+}
+
+function readWatchNextSeen(setId) {
+  if (typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(`cf_watch_next_seen_${setId}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markWatchNextSeen(setId, playlistInstanceId) {
+  if (typeof sessionStorage === "undefined") return;
+  const current = readWatchNextSeen(setId);
+  if (current.includes(playlistInstanceId)) return;
+  const next = [...current, playlistInstanceId];
+  try {
+    sessionStorage.setItem(`cf_watch_next_seen_${setId}`, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
 }

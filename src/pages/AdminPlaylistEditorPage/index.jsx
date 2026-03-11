@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
+import PhotoPickerModal from "@components/PhotoPickerModal";
+import { makePhotoRef, parsePhotoRef } from "@helpers/assetImage";
 import "./admin-playlist-editor.css";
 
 const GET_URL = `${API_FOLDER}/v2/admin/playlists/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlists/save.php`;
 const SAVE_ITEMS_URL = `${API_FOLDER}/v2/admin/playlist-items/save.php`;
+const DELETE_URL = `${API_FOLDER}/v2/admin/playlists/delete.php`;
 const AP_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
@@ -22,6 +25,7 @@ const emptyItem = {
   ap_id: "",
   palette_hash: "",
   image_url: "",
+  photo_library_id: "",
   title: "",
   subtitle: "",
   subtitle_2: "",
@@ -35,6 +39,8 @@ const emptyItem = {
   exclude_from_thumbs: false,
   is_active: true,
 };
+
+const DRAFT_KEY = "admin:playlist-draft";
 
 export default function AdminPlaylistEditorPage() {
   const { playlistId } = useParams();
@@ -51,6 +57,9 @@ export default function AdminPlaylistEditorPage() {
   const [saveStatus, setSaveStatus] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [photoPickerIndex, setPhotoPickerIndex] = useState(null);
+  const didLoadDraft = useRef(false);
 
   useEffect(() => {
     if (!playlistId) {
@@ -60,6 +69,32 @@ export default function AdminPlaylistEditorPage() {
     }
     fetchPlaylist(playlistId);
   }, [playlistId]);
+
+  useEffect(() => {
+    if (didLoadDraft.current) return;
+    if (playlistId) return;
+    try {
+      const raw = window.sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.playlist) setPlaylist((prev) => ({ ...prev, ...parsed.playlist, playlist_id: null }));
+        if (Array.isArray(parsed.items)) setItems(parsed.items);
+        didLoadDraft.current = true;
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [playlistId]);
+
+  useEffect(() => {
+    if (playlistId) return;
+    try {
+      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ playlist, items }));
+    } catch {
+      /* ignore */
+    }
+  }, [playlistId, playlist, items]);
 
   useEffect(() => {
     fetchAppliedPalettes();
@@ -100,6 +135,8 @@ export default function AdminPlaylistEditorPage() {
           ap_id: item.ap_id ?? "",
           palette_hash: item.palette_hash ?? "",
           image_url: item.image_url ?? "",
+          photo_library_id:
+            item.photo_library_id ?? parsePhotoRef(item.image_url || "").photoId ?? "",
           title: item.title ?? "",
           subtitle: item.subtitle ?? "",
           subtitle_2: item.subtitle_2 ?? "",
@@ -305,6 +342,11 @@ export default function AdminPlaylistEditorPage() {
     });
   }
 
+  const getPhotoLibraryId = (item) => {
+    if (item?.photo_library_id) return item.photo_library_id;
+    return parsePhotoRef(item?.image_url || "").photoId || "";
+  };
+
   async function handleSave() {
     setSaving(true);
     setSaveStatus("");
@@ -349,6 +391,11 @@ export default function AdminPlaylistEditorPage() {
       }
 
       setSaveStatus("Saved");
+      try {
+        window.sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* ignore */
+      }
       await fetchPlaylist(playlistIdToSave);
       if (!playlistId) {
         navigate(`/admin/playlists/${playlistIdToSave}`, { replace: true });
@@ -357,6 +404,31 @@ export default function AdminPlaylistEditorPage() {
       setSaveError(err?.message || "Save failed");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeletePlaylist() {
+    if (!playlist.playlist_id) return;
+    if (!window.confirm(`Delete playlist #${playlist.playlist_id}?`)) return;
+    setSaveStatus("");
+    setSaveError("");
+    setDeleting(true);
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlist_id: playlist.playlist_id }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      const data = JSON.parse(text);
+      if (!data?.ok) throw new Error(data?.error || "Delete failed");
+      navigate("/admin/playlists");
+    } catch (err) {
+      setSaveError(err?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -379,6 +451,16 @@ export default function AdminPlaylistEditorPage() {
           <button type="button" onClick={() => navigate("/admin/playlist-instances")}>
             Back to Instances
           </button>
+          {playlist.playlist_id && (
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={handleDeletePlaylist}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          )}
           <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save"}
           </button>
@@ -500,6 +582,35 @@ export default function AdminPlaylistEditorPage() {
                   ))}
                 </select>
               </label>
+              <div className="item-cell item-photo">
+                Photo
+                <div className="item-inline">
+                  <input
+                    type="text"
+                    value={getPhotoLibraryId(item)}
+                    placeholder="Pick a photo"
+                    onChange={(e) => updateItem(index, "photo_library_id", e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="item-inline-btn"
+                    onClick={() => setPhotoPickerIndex(index)}
+                  >
+                    Pick Photo
+                  </button>
+                </div>
+              </div>
+              <label className="item-cell item-transition">
+                Transition Into
+                <select
+                  value={item.transition || ""}
+                  onChange={(e) => updateItem(index, "transition", e.target.value)}
+                >
+                  <option value="">(default animation)</option>
+                  <option value="animation">animation</option>
+                  <option value="cut">cut</option>
+                </select>
+              </label>
               <div className="item-actions">
                 <div className="item-move">
                   <button type="button" onClick={() => moveItem(index, -1)}>↑</button>
@@ -514,28 +625,12 @@ export default function AdminPlaylistEditorPage() {
 
             {expandedItems[index] && (
               <div className="item-row item-row--details">
-                <label className="item-cell item-wide">
-                  Image URL
-                  <input
-                    type="text"
-                    value={item.image_url}
-                    onChange={(e) => updateItem(index, "image_url", e.target.value)}
-                  />
-                </label>
                 <label className="item-cell">
                   AP ID
                   <input
                     type="number"
                     value={item.ap_id}
                     onChange={(e) => updateItem(index, "ap_id", e.target.value)}
-                  />
-                </label>
-                <label className="item-cell item-wide">
-                  Palette Hash
-                  <input
-                    type="text"
-                    value={item.palette_hash}
-                    onChange={(e) => updateItem(index, "palette_hash", e.target.value)}
                   />
                 </label>
                 <label className="item-cell item-wide">
@@ -584,14 +679,6 @@ export default function AdminPlaylistEditorPage() {
                   </select>
                 </label>
                 <label className="item-cell">
-                  Transition
-                  <input
-                    type="text"
-                    value={item.transition}
-                    onChange={(e) => updateItem(index, "transition", e.target.value)}
-                  />
-                </label>
-                <label className="item-cell">
                   Duration
                   <input
                     type="number"
@@ -623,6 +710,18 @@ export default function AdminPlaylistEditorPage() {
 
       {saveStatus && <div className="panel-status success">{saveStatus}</div>}
       {saveError && <div className="panel-status error">{saveError}</div>}
+
+      <PhotoPickerModal
+        open={photoPickerIndex != null}
+        onClose={() => setPhotoPickerIndex(null)}
+        onPick={(picked) => {
+          if (!picked?.photo_library_id) return;
+          const pid = String(picked.photo_library_id);
+          updateItem(photoPickerIndex, "photo_library_id", pid);
+          updateItem(photoPickerIndex, "image_url", makePhotoRef(pid, picked.image_url || ""));
+          setPhotoPickerIndex(null);
+        }}
+      />
     </div>
   );
 }

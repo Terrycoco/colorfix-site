@@ -268,11 +268,24 @@ const GalleryPage = () => {
         </div>
       )}
 
-      <Gallery
-        items={mergeWithInserts(searchItems, insertItems)}
-        runQueryById={runQueryById}
-        meta={meta}
-      />
+      {(() => {
+        const mergedItems = mergeWithInserts(searchItems, insertItems);
+        const isHue = groupMode === 'hue';
+        const isWheelItem = (item) => {
+          const t = String(item?.item_type || '').toLowerCase();
+          return t === 'colorwheel' || t === 'colorwheel-ticked';
+        };
+        const heroItems = isHue ? mergedItems.filter(isWheelItem) : [];
+        const galleryItems = isHue ? mergedItems.filter((item) => !isWheelItem(item)) : mergedItems;
+        return (
+          <Gallery
+            items={galleryItems}
+            heroItems={heroItems}
+            runQueryById={runQueryById}
+            meta={meta}
+          />
+        );
+      })()}
       {showBackToTop && (
         <button
           type="button"

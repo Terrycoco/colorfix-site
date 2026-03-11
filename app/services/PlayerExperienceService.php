@@ -6,6 +6,7 @@ namespace App\Services;
 use App\Repos\PdoPlaylistRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoCtaRepository;
+use App\Repos\PdoArticleRepository;
 use App\Entities\Playlist;
 use App\Entities\PlaylistItem;
 use App\Entities\PlaylistInstance;
@@ -44,30 +45,55 @@ final class PlayerExperienceService
 
         // 3. Flatten playlist items
         $items = $this->flattenItems($playlist);
+        $this->hydrateItemImagesFromLibrary($items);
         $startIndex = $this->normalizeStartIndex($start, count($items));
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
-        $ctas = [];
-        $ctaRepo = null;
-        if ($instance->ctaGroupId !== null) {
-            $ctaRepo = new PdoCtaRepository($this->pdo);
-            $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
-        }
-        if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
-            if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
-            $extra = $ctaRepo->getByGroupId($addCtaGroupId);
-            if ($extra) {
-                $ctas = $this->mergeCtas($ctas, $extra);
-            }
-        }
-        if (!empty($ctas) && !empty($instance->ctaOverrides)) {
+        $overrides = [];
+        if (!empty($instance->ctaOverrides)) {
             $decoded = json_decode($instance->ctaOverrides, true);
             if (is_array($decoded)) {
-                $ctas = $this->applyCtaOverrides($ctas, $decoded);
+                $overrides = $decoded;
             }
         }
 
+        $ctas = [];
+        $ctaRepo = null;
+
+        $overrideIds = $overrides['_cta_ids'] ?? null;
+        if (is_array($overrideIds)) {
+            // If explicit CTA ids are provided, use only those.
+            $ctaRepo = new PdoCtaRepository($this->pdo);
+            $ctas = $ctaRepo->getByIds($overrideIds);
+        } else {
+            if ($instance->ctaGroupId !== null) {
+                $ctaRepo = new PdoCtaRepository($this->pdo);
+                $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
+            }
+            if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
+                if ($instance->ctaGroupId !== null && (int)$instance->ctaGroupId === (int)$addCtaGroupId) {
+                    // Avoid re-adding the same default group.
+                    $addCtaGroupId = null;
+                }
+            }
+            if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
+                if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
+                $extra = $ctaRepo->getByGroupId($addCtaGroupId);
+                if ($extra) {
+                    $ctas = $this->mergeCtas($ctas, $extra);
+                }
+            }
+            $ctas = $this->applyCtaInclusions($ctas, $overrides);
+        }
+
+        if (!empty($ctas)) {
+            $ctas = $this->applyCtaExclusions($ctas, $overrides);
+            $ctas = $this->applyCtaOverrides($ctas, $overrides);
+            $ctas = $this->hydrateArticleCtas($ctas);
+        }
+
         $thumbsEnabled = $this->shouldUseThumbs($items);
+        $setIds = $this->findPlaylistInstanceSetIds($instance->id ?? 0);
 
         // 5. Return full playback plan
         $displayTitle = $instance->displayTitle ?? $instance->instanceName ?? $playlist->title;
@@ -91,6 +117,7 @@ final class PlayerExperienceService
             'share_description'    => $instance->shareDescription,
             'share_image_url'      => $instance->shareImageUrl,
             'hide_stars'           => $instance->hideStars,
+            'playlist_instance_set_ids' => $setIds,
         ];
     }
 
@@ -119,6 +146,55 @@ final class PlayerExperienceService
     /**
      * @param PlaylistItem[] $items
      */
+    private function hydrateItemImagesFromLibrary(array $items): void
+    {
+        $needs = [];
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            $photoId = $item->photo_library_id ?? null;
+            if (!$photoId) continue;
+            $imageUrl = (string)($item->image_url ?? '');
+            $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
+            if ($needsUrl) {
+                $needs[$photoId] = true;
+            }
+        }
+        if (!$needs) return;
+        $ids = array_keys($needs);
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id, rel_path FROM photo_library WHERE photo_library_id IN ({$placeholders})"
+        );
+        $stmt->execute($ids);
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $map[(int)$row['photo_library_id']] = $row['rel_path'] ?? '';
+        }
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            $photoId = $item->photo_library_id ?? null;
+            if (!$photoId) continue;
+            $imageUrl = (string)($item->image_url ?? '');
+            $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
+            if (!$needsUrl) continue;
+            $resolved = $map[(int)$photoId] ?? '';
+            if ($resolved !== '') {
+                $item->image_url = $resolved;
+            }
+        }
+    }
+
+    private function isPhotoRefWithoutUrl(string $value): bool
+    {
+        if (!str_starts_with($value, 'photo:')) return false;
+        $parts = explode('|', $value, 2);
+        if (count($parts) < 2) return true;
+        return trim($parts[1]) === '';
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
     private function shouldUseThumbs(array $items): bool
     {
         $count = 0;
@@ -134,6 +210,23 @@ final class PlayerExperienceService
             if ($count > 1) return true;
         }
         return false;
+    }
+
+    /**
+     * @return int[]
+     */
+    private function findPlaylistInstanceSetIds(int $playlistInstanceId): array
+    {
+        if ($playlistInstanceId <= 0) return [];
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT playlist_instance_set_id
+             FROM playlist_instance_set_items
+             WHERE playlist_instance_id = :pid
+             ORDER BY playlist_instance_set_id ASC"
+        );
+        $stmt->execute(['pid' => $playlistInstanceId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        return array_values(array_map('intval', $rows));
     }
 
     /**
@@ -189,5 +282,77 @@ final class PlayerExperienceService
         }
 
         return $base;
+    }
+
+    private function applyCtaInclusions(array $ctas, array $overrides): array
+    {
+        $extra = $overrides['_cta_ids'] ?? [];
+        if (!is_array($extra) || !$extra) return $ctas;
+        $repo = new PdoCtaRepository($this->pdo);
+        $rows = $repo->getByIds($extra);
+        if (!$rows) return $ctas;
+        $seen = [];
+        foreach ($ctas as $cta) {
+            $id = $cta['cta_id'] ?? null;
+            if ($id !== null) $seen[(string)$id] = true;
+        }
+        foreach ($rows as $row) {
+            $id = $row['cta_id'] ?? null;
+            if ($id !== null && isset($seen[(string)$id])) continue;
+            if ($id !== null) $seen[(string)$id] = true;
+            $ctas[] = $row;
+        }
+        return $ctas;
+    }
+
+    private function applyCtaExclusions(array $ctas, array $overrides): array
+    {
+        $exclude = $overrides['_cta_exclude_ids'] ?? [];
+        if (!is_array($exclude) || !$exclude) return $ctas;
+        $set = array_fill_keys(array_map('strval', $exclude), true);
+        return array_values(array_filter($ctas, function ($cta) use ($set) {
+            $id = $cta['cta_id'] ?? null;
+            return $id === null ? true : !isset($set[(string)$id]);
+        }));
+    }
+
+    private function hydrateArticleCtas(array $ctas): array
+    {
+        $repo = new PdoArticleRepository($this->pdo);
+        foreach ($ctas as $idx => $cta) {
+            $actionKey = (string)($cta['action_key'] ?? $cta['action'] ?? $cta['key'] ?? '');
+            if ($actionKey !== 'article_link') {
+                continue;
+            }
+            $params = $this->decodeParams($cta['params'] ?? null);
+            $articleId = (int)($params['article_id'] ?? $params['articleId'] ?? 0);
+            if ($articleId <= 0) {
+                continue;
+            }
+            $article = $repo->getArticleById($articleId);
+            if (!$article) {
+                continue;
+            }
+            if (empty($params['title']) && !empty($article['title'])) {
+                $params['title'] = $article['title'];
+            }
+            if (empty($params['dek']) && !empty($article['dek'])) {
+                $params['dek'] = $article['dek'];
+            }
+            if (empty($params['url'])) {
+                $params['url'] = "/articles/{$articleId}";
+            }
+            $cta['params'] = json_encode($params, JSON_UNESCAPED_SLASHES);
+            $ctas[$idx] = $cta;
+        }
+        return $ctas;
+    }
+
+    private function decodeParams(mixed $value): array
+    {
+        if (is_array($value)) return $value;
+        if (!is_string($value) || trim($value) === '') return [];
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 
 use App\Entities\Palette;
 use App\Repos\PdoAppliedPaletteRepository;
+use App\Repos\PdoAppliedPalettePhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use RuntimeException;
@@ -16,17 +17,20 @@ class PaletteViewerService
     private PdoSavedPaletteRepository $savedRepo;
     private PhotoRenderingService $renderService;
     private ?PdoPlaylistInstanceRepository $playlistInstanceRepo;
+    private ?PdoAppliedPalettePhotoRepository $appliedPhotoRepo;
 
     public function __construct(
         PdoAppliedPaletteRepository $appliedRepo,
         PdoSavedPaletteRepository $savedRepo,
         PhotoRenderingService $renderService,
-        ?PdoPlaylistInstanceRepository $playlistInstanceRepo = null
+        ?PdoPlaylistInstanceRepository $playlistInstanceRepo = null,
+        ?PdoAppliedPalettePhotoRepository $appliedPhotoRepo = null
     ) {
         $this->appliedRepo = $appliedRepo;
         $this->savedRepo = $savedRepo;
         $this->renderService = $renderService;
         $this->playlistInstanceRepo = $playlistInstanceRepo;
+        $this->appliedPhotoRepo = $appliedPhotoRepo;
     }
 
     public function getApplied(int $paletteId, ?int $playlistInstanceId = null): array
@@ -55,6 +59,7 @@ class PaletteViewerService
         }
 
         $entries = $palette->entries ?? [];
+        $photos = $this->appliedPhotoRepo ? $this->appliedPhotoRepo->getPhotosForPalette($paletteId) : [];
         $swatches = [];
         foreach ($entries as $entry) {
             $swatches[] = [
@@ -69,6 +74,25 @@ class PaletteViewerService
             ];
         }
 
+        $insets = [];
+        foreach ($photos as $photo) {
+            if (($photo['photo_type'] ?? '') === 'before' && !empty($photo['rel_path'])) {
+                $insets[] = [
+                    'url' => $photo['rel_path'],
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => 'Before',
+                ];
+            }
+        }
+        foreach ($photos as $photo) {
+            if (($photo['photo_type'] ?? '') === 'zoom' && !empty($photo['rel_path'])) {
+                $insets[] = [
+                    'url' => $photo['rel_path'],
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => $photo['caption'] ?? null,
+                ];
+            }
+        }
         $meta = [
             'source' => 'applied',
             'id' => $palette->id ?? null,
@@ -76,7 +100,7 @@ class PaletteViewerService
             'notes' => $palette->notes ?: '',
             'photo_url' => $render['render_url'] ?? '',
             'photo_alt' => $palette->altText ?: null,
-            'inset_photos' => [],
+            'inset_photos' => $insets,
             'kicker' => $kickerText,
         ];
 
@@ -115,10 +139,20 @@ class PaletteViewerService
 
         $insets = [];
         foreach ($photos as $photo) {
+            if (($photo['photo_type'] ?? '') === 'before' && !empty($photo['rel_path'])) {
+                $insets[] = [
+                    'url' => $photo['rel_path'],
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => 'Before',
+                ];
+            }
+        }
+        foreach ($photos as $photo) {
             if (($photo['photo_type'] ?? '') === 'zoom' && !empty($photo['rel_path'])) {
                 $insets[] = [
                     'url' => $photo['rel_path'],
                     'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => $photo['caption'] ?? null,
                 ];
             }
         }

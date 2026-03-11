@@ -956,11 +956,6 @@ const activeBrandCodes = useMemo(() => {
           {isPaletteEmpty ? (
             <div className="myp-empty">
               <p>You have no colors saved yet. Enter a color name to start your palette.</p>
-              <FuzzySearchColorSelect
-                onSelect={onFuzzyPick}
-                className="myp-empty-fuzzy"
-                mobileBreakpoint={0}
-              />
             </div>
           ) : (
             <div className="myp-row">

@@ -12,10 +12,11 @@ export default function PaletteViewer({
   footer,
   showShare = false,
   shareTitle = "Palette by ColorFix",
-  shareText = "I wanted to share this color palette with you.\n\nThe link shows the colors together so you can get a feel for the overall look.\n\nWhat do you think?",
+  shareText = "Here's a ColorFix palette I wanted to share with you.",
   shareUrl,
 }) {
   const [photoExpanded, setPhotoExpanded] = useState(false);
+  const [expandedPhoto, setExpandedPhoto] = useState(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareForm, setShareForm] = useState({
     toEmail: "",
@@ -205,7 +206,13 @@ export default function PaletteViewer({
       <div className="apv-content">
         {photoUrl && (
           <div className="apv-column apv-column--photo">
-            <div className="apv-photo-wrap" onClick={() => setPhotoExpanded(true)}>
+            <div
+              className="apv-photo-wrap"
+              onClick={() => {
+                setExpandedPhoto({ url: photoUrl, alt: photoAlt || "" });
+                setPhotoExpanded(true);
+              }}
+            >
               <img src={photoUrl} alt={photoAlt} className="apv-photo" />
             </div>
             {insetPhotos.length > 0 && (
@@ -214,14 +221,24 @@ export default function PaletteViewer({
                   const url = typeof photo === "string" ? photo : photo?.url;
                   if (!url) return null;
                   const alt = typeof photo === "string" ? "Palette inset" : (photo?.alt_text || "Palette inset");
+                  const caption = typeof photo === "string" ? "" : (photo?.caption || "");
                   return (
-                    <img
+                    <figure
                       key={`${url}-${idx}`}
-                      src={url}
-                      alt={alt}
-                      className="apv-photo-inset"
-                      loading="lazy"
-                    />
+                      className="apv-photo-inset-figure"
+                      onClick={() => {
+                        setExpandedPhoto({ url, alt });
+                        setPhotoExpanded(true);
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={alt}
+                        className="apv-photo-inset"
+                        loading="lazy"
+                      />
+                      {caption && <figcaption className="apv-photo-inset-caption">{caption}</figcaption>}
+                    </figure>
                   );
                 })}
               </div>
@@ -278,9 +295,15 @@ export default function PaletteViewer({
           )}
         </div>
       </div>
-      {photoExpanded && photoUrl && (
-        <div className="apv-photo-fullscreen" onClick={() => setPhotoExpanded(false)}>
-          <img src={photoUrl} alt={photoAlt} />
+      {photoExpanded && expandedPhoto?.url && (
+        <div
+          className="apv-photo-fullscreen"
+          onClick={() => {
+            setPhotoExpanded(false);
+            setExpandedPhoto(null);
+          }}
+        >
+          <img src={expandedPhoto.url} alt={expandedPhoto.alt || ""} />
           <div className="apv-photo-fullscreen-hint">Tap to close</div>
         </div>
       )}

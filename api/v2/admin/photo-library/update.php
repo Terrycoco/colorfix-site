@@ -32,6 +32,7 @@ try {
     if (array_key_exists('title', $payload)) $fields['title'] = trim((string)$payload['title']);
     if (array_key_exists('tags', $payload)) $fields['tags'] = trim((string)$payload['tags']);
     if (array_key_exists('alt_text', $payload)) $fields['alt_text'] = trim((string)$payload['alt_text']);
+    if (array_key_exists('note', $payload)) $fields['note'] = trim((string)$payload['note']);
     if (array_key_exists('show_in_gallery', $payload)) $fields['show_in_gallery'] = !empty($payload['show_in_gallery']);
     if (array_key_exists('has_palette', $payload)) $fields['has_palette'] = !empty($payload['has_palette']);
 

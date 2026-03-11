@@ -181,6 +181,13 @@
   color: #444;
 }
 
+.pi-photo-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .pi-item-value {
   font-size: 12px;
   font-weight: 600;

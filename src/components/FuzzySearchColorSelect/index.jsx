@@ -210,6 +210,10 @@ function pick(color) {
   }, [query]);
 
   function handleKeyDown(e) {
+    if (e.key === " ") {
+      // Allow space in input, but prevent global key handlers from firing
+      e.stopPropagation();
+    }
     if (open && results.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();

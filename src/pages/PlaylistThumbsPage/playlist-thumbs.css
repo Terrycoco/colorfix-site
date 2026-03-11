@@ -96,6 +96,12 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.playlist-thumbs__footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+}
+
 .playlist-thumbs__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -19,6 +19,7 @@ export default function AdminIdeasPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [showDone, setShowDone] = useState(false);
 
   const selectedIdeaId = form.idea_id;
 
@@ -29,6 +30,11 @@ export default function AdminIdeasPage() {
       is_done: idea.is_done,
     }));
   }, [ideas]);
+
+  const visibleIdeaOptions = useMemo(() => {
+    if (showDone) return ideaOptions;
+    return ideaOptions.filter((idea) => !idea.is_done || idea.idea_id === selectedIdeaId);
+  }, [ideaOptions, showDone, selectedIdeaId]);
 
   useEffect(() => {
     loadIdeas();
@@ -181,12 +187,20 @@ export default function AdminIdeasPage() {
             <span>Find idea</span>
             <select value={form.idea_id || ""} onChange={handleSelectChange}>
               <option value="">New idea…</option>
-              {ideaOptions.map((idea) => (
+              {visibleIdeaOptions.map((idea) => (
                 <option key={idea.idea_id} value={idea.idea_id}>
                   {idea.title}{idea.is_done ? " (done)" : ""}
                 </option>
               ))}
             </select>
+          </label>
+          <label className="admin-ideas__field admin-ideas__field--inline">
+            <input
+              type="checkbox"
+              checked={showDone}
+              onChange={(e) => setShowDone(e.target.checked)}
+            />
+            Show done
           </label>
           <div className="admin-ideas__actions">
             <button type="button" className="admin-ideas__btn" onClick={() => setForm(emptyForm)}>

@@ -235,6 +235,7 @@ class PdoSavedPaletteRepository
                    saved_palette_id,
                    rel_path,
                    photo_type,
+                   trigger_mode,
                    trigger_color_id,
                    caption,
                    alt_text,
@@ -284,9 +285,9 @@ class PdoSavedPaletteRepository
     {
         $sql = "
             INSERT INTO saved_palette_photos
-                (saved_palette_id, rel_path, photo_type, trigger_color_id, caption, alt_text, order_index, created_at)
+                (saved_palette_id, rel_path, photo_type, trigger_mode, trigger_color_id, caption, alt_text, order_index, created_at)
             VALUES
-                (:saved_palette_id, :rel_path, :photo_type, :trigger_color_id, :caption, :alt_text, :order_index, NOW())
+                (:saved_palette_id, :rel_path, :photo_type, :trigger_mode, :trigger_color_id, :caption, :alt_text, :order_index, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -294,6 +295,7 @@ class PdoSavedPaletteRepository
             ':saved_palette_id' => $savedPaletteId,
             ':rel_path'         => $relPath,
             ':photo_type'       => 'full',
+            ':trigger_mode'     => 'any',
             ':trigger_color_id' => null,
             ':caption'          => $caption,
             ':alt_text'         => $altText,
@@ -324,6 +326,7 @@ class PdoSavedPaletteRepository
 
         $allowed = [
             'photo_type',
+            'trigger_mode',
             'trigger_color_id',
             'caption',
             'alt_text',

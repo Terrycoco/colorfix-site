@@ -9,6 +9,7 @@ class PlaylistItem
         public string $ap_id,
         public ?string $palette_hash,
         public ?string $image_url,
+        public ?int $photo_library_id = null,
         public ?string $title = null,
         public ?string $subtitle = null,
         public ?string $type = null,

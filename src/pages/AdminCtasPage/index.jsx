@@ -3,21 +3,8 @@ import { API_FOLDER } from "@helpers/config";
 import "./admin-ctas.css";
 
 const TYPES_LIST_URL = `${API_FOLDER}/v2/admin/cta-types/list.php`;
-const TYPES_SAVE_URL = `${API_FOLDER}/v2/admin/cta-types/save.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 const CTAS_SAVE_URL = `${API_FOLDER}/v2/admin/ctas/save.php`;
-const GROUPS_LIST_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
-const GROUPS_SAVE_URL = `${API_FOLDER}/v2/admin/cta-groups/save.php`;
-const GROUP_ITEMS_LIST_URL = `${API_FOLDER}/v2/admin/cta-group-items/list.php`;
-const GROUP_ITEMS_SAVE_URL = `${API_FOLDER}/v2/admin/cta-group-items/save.php`;
-
-const emptyType = {
-  cta_type_id: null,
-  action_key: "",
-  label: "",
-  description: "",
-  is_active: true,
-};
 
 const emptyCta = {
   cta_id: null,
@@ -27,13 +14,6 @@ const emptyCta = {
   is_active: true,
 };
 
-const emptyGroup = {
-  id: null,
-  key: "",
-  label: "",
-  description: "",
-  audience: "homeowner",
-};
 
 function toBool(value) {
   return Boolean(value);
@@ -73,35 +53,14 @@ function updateParamsString(current, key, value) {
 export default function AdminCtasPage() {
   const [types, setTypes] = useState([]);
   const [ctas, setCtas] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [activeGroupId, setActiveGroupId] = useState(null);
-
-  const [typeForm, setTypeForm] = useState(emptyType);
   const [ctaForm, setCtaForm] = useState(emptyCta);
-  const [groupForm, setGroupForm] = useState(emptyGroup);
-
-  const [groupItems, setGroupItems] = useState([]);
-  const [selectedGroupIndex, setSelectedGroupIndex] = useState(null);
-  const [selectedAvailableId, setSelectedAvailableId] = useState(null);
 
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [showTypes, setShowTypes] = useState(false);
-
   useEffect(() => {
     fetchTypes();
     fetchCtas();
-    fetchGroups();
   }, []);
-
-  useEffect(() => {
-    if (activeGroupId) {
-      fetchGroupItems(activeGroupId);
-    } else {
-      setGroupItems([]);
-    }
-    setSelectedGroupIndex(null);
-  }, [activeGroupId]);
 
   async function fetchTypes() {
     try {
@@ -123,84 +82,19 @@ export default function AdminCtasPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTAs");
-      setCtas(data.items || []);
+      const raw = data.items || [];
+      const items = Array.isArray(raw) ? raw : Object.values(raw || {});
+      items.sort((a, b) => (Number(b.cta_id) || 0) - (Number(a.cta_id) || 0));
+      setCtas(items);
     } catch (err) {
       setError(err?.message || "Failed to load CTAs");
     }
-  }
-
-  async function fetchGroups() {
-    try {
-      const res = await fetch(`${GROUPS_LIST_URL}?_=${Date.now()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA groups");
-      setGroups(data.items || []);
-    } catch (err) {
-      setError(err?.message || "Failed to load CTA groups");
-    }
-  }
-
-  async function fetchGroupItems(groupId) {
-    try {
-      const res = await fetch(`${GROUP_ITEMS_LIST_URL}?group_id=${groupId}&_=${Date.now()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load group items");
-      const items = (data.items || [])
-        .map((item) => ({
-          cta_id: Number(item.cta_id),
-          order_index: Number(item.order_index) || 0,
-        }))
-        .sort((a, b) => a.order_index - b.order_index);
-      setGroupItems(items);
-    } catch (err) {
-      setError(err?.message || "Failed to load group items");
-    }
-  }
-
-  function updateTypeForm(field, value) {
-    setTypeForm((prev) => ({ ...prev, [field]: value }));
-    setStatus("");
-    setError("");
   }
 
   function updateCtaForm(field, value) {
     setCtaForm((prev) => ({ ...prev, [field]: value }));
     setStatus("");
     setError("");
-  }
-
-  function updateGroupForm(field, value) {
-    setGroupForm((prev) => ({ ...prev, [field]: value }));
-    setStatus("");
-    setError("");
-  }
-
-  async function saveType() {
-    setStatus("");
-    setError("");
-    try {
-      const payload = {
-        ...typeForm,
-        is_active: toBool(typeForm.is_active),
-      };
-      const res = await fetch(TYPES_SAVE_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save CTA type");
-      setStatus("CTA type saved");
-      setTypeForm((prev) => ({ ...prev, cta_type_id: data.cta_type_id }));
-      fetchTypes();
-    } catch (err) {
-      setError(err?.message || "Failed to save CTA type");
-    }
   }
 
   async function saveCta() {
@@ -218,8 +112,17 @@ export default function AdminCtasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save CTA");
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data?.ok) {
+        const fallback = text ? text.slice(0, 200) : "Failed to save CTA";
+        throw new Error(data?.error || fallback);
+      }
       setStatus("CTA saved");
       setCtaForm((prev) => ({ ...prev, cta_id: data.cta_id }));
       fetchCtas();
@@ -228,107 +131,39 @@ export default function AdminCtasPage() {
     }
   }
 
-  async function saveGroup() {
+  async function saveCtaAsNew() {
     setStatus("");
     setError("");
     try {
-      const payload = { ...groupForm };
-      const res = await fetch(GROUPS_SAVE_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save CTA group");
-      setStatus("CTA group saved");
-      setGroupForm((prev) => ({ ...prev, id: data.id }));
-      setActiveGroupId(Number(data.id) || null);
-      fetchGroups();
-    } catch (err) {
-      setError(err?.message || "Failed to save CTA group");
-    }
-  }
-
-  async function saveGroupItems() {
-    if (!activeGroupId) return;
-    setStatus("");
-    setError("");
-    try {
-      const items = groupItems.map((item, index) => ({
-        cta_id: Number(item.cta_id),
-        order_index: index + 1,
-      }));
       const payload = {
-        group_id: activeGroupId,
-        items,
+        ...ctaForm,
+        cta_id: null,
+        cta_type_id: Number(ctaForm.cta_type_id) || 0,
+        is_active: toBool(ctaForm.is_active),
       };
-      const res = await fetch(GROUP_ITEMS_SAVE_URL, {
+      const res = await fetch(CTAS_SAVE_URL, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save group items");
-      setStatus("Group items saved");
-      fetchGroupItems(activeGroupId);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data?.ok) {
+        const fallback = text ? text.slice(0, 200) : "Failed to save CTA";
+        throw new Error(data?.error || fallback);
+      }
+      setStatus(`CTA saved (#${data.cta_id})`);
+      setCtaForm((prev) => ({ ...prev, cta_id: data.cta_id }));
+      fetchCtas();
     } catch (err) {
-      setError(err?.message || "Failed to save group items");
+      setError(err?.message || "Failed to save CTA");
     }
-  }
-
-  function handleSelectGroupItem(index) {
-    setSelectedGroupIndex(index);
-    const item = groupItems[index];
-    if (!item) return;
-    const hit = ctas.find((cta) => Number(cta.cta_id) === Number(item.cta_id));
-    if (!hit) return;
-    setCtaForm({
-      cta_id: hit.cta_id,
-      cta_type_id: hit.cta_type_id,
-      label: hit.label || "",
-      params: normalizeParams(hit.params),
-      is_active: toBool(hit.is_active),
-    });
-  }
-
-  function handleAddToGroup() {
-    if (!activeGroupId || !selectedAvailableId) return;
-    setGroupItems((prev) => [
-      ...prev,
-      { cta_id: Number(selectedAvailableId), order_index: prev.length + 1 },
-    ]);
-    setSelectedGroupIndex(groupItems.length);
-    const hit = ctas.find((cta) => Number(cta.cta_id) === Number(selectedAvailableId));
-    if (hit) {
-      setCtaForm({
-        cta_id: hit.cta_id,
-        cta_type_id: hit.cta_type_id,
-        label: hit.label || "",
-        params: normalizeParams(hit.params),
-        is_active: toBool(hit.is_active),
-      });
-    }
-  }
-
-  function handleRemoveFromGroup() {
-    if (selectedGroupIndex == null) return;
-    setGroupItems((prev) => prev.filter((_, idx) => idx !== selectedGroupIndex));
-    setSelectedGroupIndex(null);
-  }
-
-  function moveGroupItem(delta) {
-    if (selectedGroupIndex == null) return;
-    setGroupItems((prev) => {
-      const next = [...prev];
-      const targetIndex = selectedGroupIndex + delta;
-      if (targetIndex < 0 || targetIndex >= next.length) return prev;
-      const [moved] = next.splice(selectedGroupIndex, 1);
-      next.splice(targetIndex, 0, moved);
-      return next;
-    });
-    setSelectedGroupIndex((prev) => (prev == null ? prev : prev + delta));
   }
 
   const typeOptions = useMemo(
@@ -339,11 +174,6 @@ export default function AdminCtasPage() {
         action_key: row.action_key,
       })),
     [types]
-  );
-
-  const activeGroup = useMemo(
-    () => groups.find((group) => String(group.id) === String(activeGroupId)),
-    [groups, activeGroupId]
   );
 
   const selectedActionKey = useMemo(() => {
@@ -359,6 +189,12 @@ export default function AdminCtasPage() {
         return 'Example: {"item_index":2}';
       case "replay_filtered":
         return 'Example: {"filter":"liked"}';
+      case "article_link":
+        return 'Example: {"article_id":123,"title":"Gray But Not Boring","dek":"Soft neutrals..."}';
+      case "playlist_link":
+        return 'Example: {"playlist_instance_id":123,"title":"My Playlist"}';
+      case "watch_next":
+        return 'Example: {"playlist_instance_set_id":3,"subtitle":"More like this"}';
       case "see_colors_used":
         return "Example: (optional)";
       case "share":
@@ -375,215 +211,77 @@ export default function AdminCtasPage() {
   const themeValue = (ctaParams.theme || "").toString();
   const alignValue = (ctaParams.align || "").toString();
   const widthValue = (ctaParams.width || "").toString();
+  const articleIdValue = (ctaParams.article_id || ctaParams.articleId || "").toString();
+  const articleTitleValue = (ctaParams.title || "").toString();
+  const articleDekValue = (ctaParams.dek || ctaParams.subtitle || "").toString();
+  const playlistInstanceValue = (ctaParams.playlist_instance_id || ctaParams.playlistInstanceId || "").toString();
+  const playlistSetValue = (ctaParams.playlist_instance_set_id || ctaParams.set_id || "").toString();
+  const watchNextSubtitleValue = (ctaParams.subtitle || ctaParams.dek || "").toString();
+  const noteValue = (ctaParams.note || "").toString();
+
+  const ctaErrors = useMemo(() => {
+    const errors = [];
+    if (!ctaForm.cta_type_id) errors.push("Select an action.");
+    if (!ctaForm.label.trim()) errors.push("Label is required.");
+    if (selectedActionKey === "article_link" && !articleIdValue) {
+      errors.push("Article ID is required.");
+    }
+    if (selectedActionKey === "navigate" && !(ctaParams.url || "").toString().trim()) {
+      errors.push("URL is required.");
+    }
+    if (selectedActionKey === "jump_to_item" && (ctaParams.item_index === undefined || ctaParams.item_index === "")) {
+      errors.push("Item index is required.");
+    }
+    return errors;
+  }, [ctaForm.cta_type_id, ctaForm.label, selectedActionKey, articleIdValue, ctaParams]);
+
+  const canSaveCta = ctaErrors.length === 0;
 
   return (
     <div className="admin-ctas">
       <div className="cta-column">
         <div className="cta-panel">
           <div className="panel-header">
-            <div className="panel-title">CTA Groups</div>
+            <div className="panel-title">CTA Library</div>
             <button
               type="button"
               className="primary-btn"
               onClick={() => {
-                setGroupForm(emptyGroup);
-                setActiveGroupId(null);
+                setCtaForm(emptyCta);
               }}
             >
-              New Group
+              New CTA
             </button>
           </div>
-          <label>
-            Select group
-            <select
-              value={activeGroupId || ""}
-              onChange={(e) => {
-                const id = e.target.value ? Number(e.target.value) : null;
-                setActiveGroupId(id);
-                const hit = groups.find((g) => Number(g.id) === Number(id));
-                if (hit) {
-                  setGroupForm({
-                    id: hit.id,
-                    key: hit.key,
-                    label: hit.label,
-                    description: hit.description || "",
-                    audience: hit.audience || "homeowner",
-                  });
+          <div className="cta-listbox-items">
+            {ctas.length === 0 && <div className="cta-listbox-empty">No CTAs yet.</div>}
+            {ctas.map((cta) => (
+              <button
+                key={cta.cta_id}
+                type="button"
+                className="cta-listbox-row"
+                onClick={() =>
+                  setCtaForm({
+                    cta_id: cta.cta_id,
+                    cta_type_id: cta.cta_type_id,
+                    label: cta.label || "",
+                    params: normalizeParams(cta.params),
+                    is_active: toBool(cta.is_active),
+                  })
                 }
-              }}
-            >
-              <option value="">Select group</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.label} (ID {group.id})
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="form-grid">
-            <label>
-              Group ID
-              <input type="text" value={groupForm.id ?? ""} readOnly />
-            </label>
-            <label>
-              Group key
-              <input
-                type="text"
-                value={groupForm.key}
-                onChange={(e) => updateGroupForm("key", e.target.value)}
-              />
-            </label>
-            <label>
-              Label
-              <input
-                type="text"
-                value={groupForm.label}
-                onChange={(e) => updateGroupForm("label", e.target.value)}
-              />
-            </label>
-            <label>
-              Audience
-              <select
-                value={groupForm.audience || "homeowner"}
-                onChange={(e) => updateGroupForm("audience", e.target.value)}
               >
-                <option value="any">Any</option>
-                <option value="homeowner">Homeowner</option>
-                <option value="hoa">HOA</option>
-                <option value="contractor">Contractor</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-            <label className="full-width">
-              Description
-              <textarea
-                rows={3}
-                value={groupForm.description || ""}
-                onChange={(e) => updateGroupForm("description", e.target.value)}
-              />
-            </label>
-          </div>
-          <div className="panel-actions">
-            <button type="button" className="primary-btn" onClick={saveGroup}>
-              Save Group
-            </button>
+                <div className="row-title">{cta.label}</div>
+                <div className="row-meta">
+                  #{cta.cta_id} • {cta.type_label || "Unknown type"}
+                  {(() => {
+                    const note = parseParams(cta.params).note;
+                    return note ? ` • ${note}` : "";
+                  })()}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className="cta-panel">
-          <div className="panel-header">
-            <div className="panel-title">Group Items</div>
-            <div className="panel-status">
-              {activeGroup ? `Editing: ${activeGroup.label}` : "Select a group"}
-            </div>
-          </div>
-          <div className="cta-dual">
-            <div className="cta-listbox">
-              <div className="cta-listbox-title">In group</div>
-              <div className="cta-listbox-items">
-                {groupItems.length === 0 && (
-                  <div className="cta-listbox-empty">No CTAs in this group.</div>
-                )}
-                {groupItems.map((item, index) => {
-                  const cta = ctas.find((row) => Number(row.cta_id) === Number(item.cta_id));
-                  return (
-                    <button
-                      key={`${item.cta_id}-${index}`}
-                      type="button"
-                      className={`cta-listbox-row${index === selectedGroupIndex ? " active" : ""}`}
-                      onClick={() => handleSelectGroupItem(index)}
-                    >
-                      <div className="row-title">{cta?.label || `CTA #${item.cta_id}`}</div>
-                      <div className="row-meta">{cta?.type_label || ""}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="cta-dual-actions">
-              <button
-                type="button"
-                className="cta-arrow"
-                onClick={handleAddToGroup}
-                disabled={!selectedAvailableId || !activeGroupId}
-                title="Add to group"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                className="cta-arrow"
-                onClick={handleRemoveFromGroup}
-                disabled={selectedGroupIndex == null}
-                title="Remove from group"
-              >
-                →
-              </button>
-              <button
-                type="button"
-                className="cta-arrow"
-                onClick={() => moveGroupItem(-1)}
-                disabled={selectedGroupIndex == null || selectedGroupIndex === 0}
-                title="Move up"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="cta-arrow"
-                onClick={() => moveGroupItem(1)}
-                disabled={selectedGroupIndex == null || selectedGroupIndex === groupItems.length - 1}
-                title="Move down"
-              >
-                ↓
-              </button>
-            </div>
-            <div className="cta-listbox">
-              <div className="cta-listbox-title">
-                Available CTAs
-                <button
-                  type="button"
-                  className="secondary-btn"
-                  onClick={() => {
-                    setCtaForm(emptyCta);
-                    setSelectedGroupIndex(null);
-                  }}
-                >
-                  Add New
-                </button>
-              </div>
-              <div className="cta-listbox-items">
-                {ctas.map((cta) => (
-                  <button
-                    key={cta.cta_id}
-                    type="button"
-                    className={`cta-listbox-row${Number(selectedAvailableId) === Number(cta.cta_id) ? " active" : ""}`}
-                    onClick={() => {
-                      setSelectedAvailableId(cta.cta_id);
-                      setCtaForm({
-                        cta_id: cta.cta_id,
-                        cta_type_id: cta.cta_type_id,
-                        label: cta.label || "",
-                        params: normalizeParams(cta.params),
-                        is_active: toBool(cta.is_active),
-                      });
-                    }}
-                  >
-                    <div className="row-title">{cta.label}</div>
-                    <div className="row-meta">{cta.type_label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="panel-actions">
-            <button type="button" className="primary-btn" onClick={saveGroupItems} disabled={!activeGroupId}>
-              Save Group Items
-            </button>
-          </div>
-        </div>
-
-  
       </div>
 
       <div className="cta-column">
@@ -599,6 +297,10 @@ export default function AdminCtasPage() {
             </button>
           </div>
           <div className="form-grid">
+            <label>
+              CTA ID (read-only)
+              <input type="text" value={ctaForm.cta_id ?? ""} readOnly />
+            </label>
             <label>
               Action (what it DOES when clicked)
               <select
@@ -622,6 +324,89 @@ export default function AdminCtasPage() {
                 onChange={(e) => updateCtaForm("label", e.target.value)}
               />
             </label>
+            <label className="full-width">
+              Note (short internal reminder)
+              <input
+                type="text"
+                value={noteValue}
+                onChange={(e) =>
+                  updateCtaForm("params", updateParamsString(ctaForm.params, "note", e.target.value))
+                }
+                placeholder="Where this CTA is used, or any reminder"
+              />
+            </label>
+            {selectedActionKey === "article_link" && (
+              <>
+                <label>
+                  Article ID
+                  <input
+                    type="number"
+                    value={articleIdValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "article_id", e.target.value))}
+                  />
+                </label>
+                <label className="full-width">
+                  Title (optional override)
+                  <input
+                    type="text"
+                    value={articleTitleValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "title", e.target.value))}
+                  />
+                </label>
+                <label className="full-width">
+                  Dek (optional override)
+                  <input
+                    type="text"
+                    value={articleDekValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "dek", e.target.value))}
+                  />
+                </label>
+              </>
+            )}
+            {selectedActionKey === "playlist_link" && (
+              <>
+                <label>
+                  Playlist instance ID
+                  <input
+                    type="number"
+                    value={playlistInstanceValue}
+                    onChange={(e) =>
+                      updateCtaForm("params", updateParamsString(ctaForm.params, "playlist_instance_id", e.target.value))
+                    }
+                  />
+                </label>
+                <label className="full-width">
+                  Playlist title (optional)
+                  <input
+                    type="text"
+                    value={(ctaParams.title || "").toString()}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "title", e.target.value))}
+                  />
+                </label>
+              </>
+            )}
+            {selectedActionKey === "watch_next" && (
+              <>
+                <label>
+                  Playlist set ID (optional)
+                  <input
+                    type="number"
+                    value={playlistSetValue}
+                    onChange={(e) =>
+                      updateCtaForm("params", updateParamsString(ctaForm.params, "playlist_instance_set_id", e.target.value))
+                    }
+                  />
+                </label>
+                <label className="full-width">
+                  Subtitle (optional)
+                  <input
+                    type="text"
+                    value={watchNextSubtitleValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "subtitle", e.target.value))}
+                  />
+                </label>
+              </>
+            )}
             <label className="full-width">
               Params (JSON)
               <textarea
@@ -691,15 +476,24 @@ export default function AdminCtasPage() {
             </label>
           </div>
           <div className="panel-actions">
-            <button type="button" className="primary-btn" onClick={saveCta}>
+            <button type="button" className="primary-btn" onClick={saveCta} disabled={!canSaveCta}>
               Save CTA
             </button>
-            <button type="button" className="secondary-btn" onClick={() => setShowTypes(true)}>
-              Manage Types
+            <button type="button" className="secondary-btn" onClick={saveCtaAsNew} disabled={!canSaveCta}>
+              Save As New
             </button>
           </div>
+          {ctaErrors.length > 0 && (
+            <div className="cta-form-errors">
+              {ctaErrors.map((err) => (
+                <div key={err} className="cta-form-error">
+                  {err}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-              <div className="cta-panel cta-cheatsheet">
+        <div className="cta-panel cta-cheatsheet">
           <div className="panel-header">
             <div className="panel-title">CTA Params Cheat Sheet</div>
           </div>
@@ -749,86 +543,6 @@ export default function AdminCtasPage() {
         </div>
       )}
 
-      {showTypes && (
-        <div className="cta-modal">
-          <div className="cta-modal__backdrop" onClick={() => setShowTypes(false)} />
-          <div className="cta-modal__panel" role="dialog" aria-modal="true">
-            <div className="panel-header">
-              <div className="panel-title">CTA Actions</div>
-              <div className="panel-actions">
-                <button type="button" className="secondary-btn" onClick={() => setTypeForm(emptyType)}>
-                  New Action
-                </button>
-                <button type="button" className="primary-btn" onClick={() => setShowTypes(false)}>
-                  Done
-                </button>
-              </div>
-            </div>
-            <div className="cta-modal__body">
-              <div className="panel-list">
-                {types.map((type) => (
-                  <button
-                    key={type.cta_type_id}
-                    type="button"
-                    className={`list-row${String(typeForm.cta_type_id) === String(type.cta_type_id) ? " active" : ""}`}
-                    onClick={() =>
-                      setTypeForm({
-                        cta_type_id: type.cta_type_id,
-                        action_key: type.action_key,
-                        label: type.label,
-                        description: type.description || "",
-                        is_active: toBool(type.is_active),
-                      })
-                    }
-                  >
-                    <div className="row-title">{type.label}</div>
-                    <div className="row-meta">{type.action_key}</div>
-                  </button>
-                ))}
-              </div>
-              <div className="form-grid">
-                <label>
-                  Action key
-                  <input
-                    type="text"
-                    value={typeForm.action_key}
-                    onChange={(e) => updateTypeForm("action_key", e.target.value)}
-                  />
-                </label>
-                <label>
-                  Label (what user sees)
-                  <input
-                    type="text"
-                    value={typeForm.label}
-                    onChange={(e) => updateTypeForm("label", e.target.value)}
-                  />
-                </label>
-                <label className="full-width">
-                  Description
-                  <textarea
-                    rows={2}
-                    value={typeForm.description || ""}
-                    onChange={(e) => updateTypeForm("description", e.target.value)}
-                  />
-                </label>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(typeForm.is_active)}
-                    onChange={(e) => updateTypeForm("is_active", e.target.checked)}
-                  />
-                  Active
-                </label>
-              </div>
-              <div className="panel-actions">
-                <button type="button" className="primary-btn" onClick={saveType}>
-                  Save Type
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

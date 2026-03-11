@@ -1,0 +1,199 @@
+/* =========================================
+   Featured Article Tile (Link card)
+   File: FeaturedArticleItem.css
+   Requires JSX wrapper: .featured-content
+   ========================================= */
+
+.featured-article {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+
+  background: #ffffff;
+  border: 1px solid #e6e7eb;
+  border-radius: 18px;
+  overflow: hidden;
+
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+/* hover polish (no color changes) */
+.featured-article:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
+  border-color: #d7dbe3;
+}
+
+.featured-article:visited {
+  color: inherit;
+  text-decoration: none;
+}
+
+.featured-article:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 3px;
+}
+
+/* -----------------------------------------
+   Kicker (editorial label, not CTA)
+   ----------------------------------------- */
+.featured-article .kicker {
+  display: block;
+
+  padding: 14px 16px 10px 16px;
+  margin: 0;
+
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6b7280;
+
+  border-bottom: 1px solid #eef0f4;
+
+  /* wrapping safety */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* -----------------------------------------
+   Image (full-bleed, auto-crop)
+   ----------------------------------------- */
+.featured-article .featured-media {
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+
+  /* consistent card-like crop */
+  height: 160px;
+  background: #f3f4f6;
+}
+
+.featured-article .featured-media img {
+  width: 100%;
+  height: 100%;
+  display: block;
+
+  object-fit: cover;
+  object-position: center;
+}
+
+.featured-article__image-placeholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+/* -----------------------------------------
+   Text block (THIS is where padding lives)
+   ----------------------------------------- */
+.featured-article .featured-content {
+  padding: 14px 16px 16px 16px;
+}
+
+/* Headline */
+.featured-article h3 {
+  margin: 0 0 6px 0;
+  font-family: "Playfair Display", serif;
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.12;
+  color: #111827;
+
+  /* wrapping safety */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Dek */
+.featured-article .dek {
+  margin: 0 0 12px 0;
+  font-size: 14.5px;
+  font-weight: 520;
+  line-height: 1.35;
+  color: #374151;
+
+  /* never clamp or clip */
+  display: block;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
+}
+
+/* CTA (clearly different from kicker) */
+.featured-article .cta {
+  margin: 0;
+  padding: 0;
+
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+
+  text-transform: none;
+  letter-spacing: 0;
+
+  color: #1f4ed8;
+}
+
+.featured-article:hover .cta {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* =========================================
+   Mobile tuning
+   ========================================= */
+@media (max-width: 640px) {
+  .featured-article {
+    border-radius: 18px;
+  }
+
+  .featured-article .kicker {
+    padding: 14px 14px 10px 14px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+  }
+
+  .featured-article .featured-media {
+    height: 190px; /* taller crop for phones */
+  }
+
+  .featured-article .featured-content {
+    padding: 14px 14px 16px 14px;
+  }
+
+  .featured-article h3 {
+    font-size: 24px;
+    line-height: 1.08;
+    margin-bottom: 6px;
+  }
+
+  .featured-article .dek {
+    font-size: 15px;
+    line-height: 1.35;
+    margin-bottom: 12px;
+  }
+
+  .featured-article .cta {
+    font-size: 13px;
+  }
+}

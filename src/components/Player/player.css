@@ -68,14 +68,12 @@
 /* Incoming image */
 .fade-in {
   opacity: 0;
-  transition: opacity 1200ms ease-in-out;
 }
 
 /* Outgoing image */
 .fade-out {
   opacity: 1;
-  transition: opacity 400ms ease-in-out;
-  transition-delay: 1200ms;
+  transition: none;
 }
 
 .fade-in.is-ready {
@@ -83,7 +81,11 @@
 }
 
 .fade-out.is-ready {
-  opacity: 0;
+  opacity: 1;
+}
+
+.fade-cut {
+  transition: opacity 200ms ease-in-out;
 }
 
 /* ===============================
@@ -92,18 +94,18 @@
 
 .player-exit {
   position: absolute;
-  top: calc(8px + env(safe-area-inset-top));
-  right: calc(8px + env(safe-area-inset-right));
+  top: calc(6px + env(safe-area-inset-top));
+  right: calc(6px + env(safe-area-inset-right));
   z-index: 60;
 
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.35);
 
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
 
   display: flex;
@@ -119,13 +121,33 @@
 @media (orientation: landscape) and (max-height: 500px) {
   .player-exit {
     top: calc(6px + env(safe-area-inset-top));
-    left: calc(6px + env(safe-area-inset-left));
-    right: auto;
-    width: 34px;
-    height: 34px;
+    right: calc(6px + env(safe-area-inset-right));
+    left: auto;
+    width: 30px;
+    height: 30px;
     font-size: 20px;
     opacity: 0.95;
   }
+}
+
+.player-back {
+  position: absolute;
+  top: calc(6px + env(safe-area-inset-top));
+  left: calc(6px + env(safe-area-inset-left));
+  z-index: 60;
+
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
 
@@ -153,6 +175,41 @@
   position: absolute;
   inset: 0;
   z-index: 2;
+  opacity: 1;
+  transition: opacity 2000ms ease-in-out;
+}
+
+.player-image.is-current.is-loading {
+  opacity: 0;
+}
+
+.player-image.is-current:not(.is-ready) {
+  opacity: 0;
+}
+
+.player-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.player-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  animation: player-spin 0.9s linear infinite;
+}
+
+@keyframes player-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* LIKE STAR */
@@ -233,8 +290,8 @@
 
   opacity: 0;
   transform: translateX(-12px);
-  animation: title-enter 1500ms ease-out forwards;
-  animation-delay: 1200ms;
+  animation: title-enter 2000ms ease-out forwards;
+  animation-delay: 0ms;
   animation-fill-mode: both;
   
 }

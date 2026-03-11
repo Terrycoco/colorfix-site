@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAppState } from '@context/AppStateContext';
 import GalleryGrid from './GalleryGrid';
 import GalleryItem from './GalleryItem';
 import SwatchItem from '../GalleryItems/SwatchItem';
@@ -12,7 +13,10 @@ import ButtonItem from '../GalleryItems/ButtonItem';
 import HeaderItem from '../GalleryItems/HeaderItem';
 import NameSearchItem from '../GalleryItems/NameSearchItem';
 import WheelItem from '../GalleryItems/WheelItem';
+import ColorWheelItem from '../GalleryItems/ColorWheelItem';
+import ColorWheelTicked from '../GalleryItems/ColorWheelTicked';
 import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
+import FeaturedArticleItem from '../GalleryItems/FeaturedArticleItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
@@ -30,6 +34,12 @@ const renderContent = (item) => {
     case 'button':      return <ButtonItem key={key} item={item} />;
     case 'name-search': return <NameSearchItem key={key} item={item} />;
     case 'wheel':       return <WheelItem key={key} item={item} />;
+    case 'colorwheel':  return <ColorWheelItem key={key} item={item} />;
+    case 'colorwheel-ticked':
+    case 'wheel-ticked':
+      return <ColorWheelTicked key={key} item={item} />;
+    case 'featured-article':
+      return <FeaturedArticleItem key={key} item={item} />;
     default:            return null;
   }
 };
@@ -43,8 +53,9 @@ function slugify(s) {
     .replace(/^\-+|\-+$/g, '') || 'top';
 }
 
-function Gallery({ items, runQueryById, meta }) {
+function Gallery({ items, runQueryById, meta, heroItems = [] }) {
   const location = useLocation();
+  const { categories = [] } = useAppState();
   const hideDisclaimerRoutes = ['/results/4', '/results/3', '/results/2'];
   const shouldHideDisclaimer = hideDisclaimerRoutes.some(route => location.pathname === route);
 
@@ -79,6 +90,36 @@ function Gallery({ items, runQueryById, meta }) {
     return null;
   };
 
+  const hueOrderMap = useMemo(() => {
+    const map = new Map();
+    if (!Array.isArray(categories)) return map;
+    categories.forEach((cat) => {
+      if (!cat?.name || String(cat.type || '').toLowerCase() !== 'hue') return;
+      const key = String(cat.name).trim().toLowerCase();
+      const order = Number(cat.sort_order);
+      if (Number.isFinite(order)) map.set(key, order);
+      else if (Number.isFinite(cat.hue_min)) map.set(key, Number(cat.hue_min));
+    });
+    return map;
+  }, [categories]);
+
+  const getHueGroupOrder = (item) => {
+    if (groupMode !== 'hue' || !item) return null;
+    const candidates = [
+      item.hue_cat_order,
+      item.hue_order,
+      item.hue_cat_sort,
+      item.__hue_cat_order_outer,
+    ];
+    for (const c of candidates) {
+      const num = Number(c);
+      if (Number.isFinite(num)) return num;
+    }
+    const label = String(item.hue_cats || '').trim().toLowerCase();
+    if (label && hueOrderMap.has(label)) return hueOrderMap.get(label);
+    return null;
+  };
+
   // ---- Coalesce by group name (first-seen order), so each group renders ONCE ----
   const sections = [];
   const seen = new Map(); // groupName -> section { groupName, items: [], groupOrder }
@@ -96,31 +137,51 @@ function Gallery({ items, runQueryById, meta }) {
     }
 
     const label = getGroupLabel(item);
-    const orderVal = getGroupOrder(item);
+    const orderVal = getGroupOrder(item) ?? getHueGroupOrder(item);
     lastLabel = label || lastLabel;
     lastOrder = (orderVal != null ? orderVal : lastOrder);
 
     if (!seen.has(label)) {
-      const section = { groupName: label || 'TOP', items: [], groupOrder: orderVal != null ? orderVal : (lastOrder != null ? lastOrder : 999) };
+      const section = {
+        groupName: label || 'TOP',
+        items: [],
+        groupOrder: orderVal != null ? orderVal : (lastOrder != null ? lastOrder : 999),
+        orderDefined: orderVal != null
+      };
       seen.set(label, section);
       sections.push(section);
     }
     const section = seen.get(label);
     if (orderVal != null) {
       section.groupOrder = Math.min(section.groupOrder ?? 999, orderVal);
+      section.orderDefined = true;
     }
     section.items.push(item);
   }
 
   // Force section order in lightness mode: Light → Medium → Dark
-    if (groupMode === 'lightness') {
-      sections.sort((a, b) => {
-        const ra = a.groupOrder ?? 999;
-        const rb = b.groupOrder ?? 999;
-        if (ra !== rb) return ra - rb;
-        return String(a.groupName).localeCompare(String(b.groupName));
-      });
+  if (groupMode === 'lightness' || groupMode === 'hue') {
+    sections.sort((a, b) => {
+      const ra = a.groupOrder ?? 999;
+      const rb = b.groupOrder ?? 999;
+      if (ra !== rb) return ra - rb;
+      return String(a.groupName).localeCompare(String(b.groupName));
+    });
+  }
+
+  // For hue mode, rotate so the highest defined order comes first (wraps Magentas/Reds before Reds)
+  if (groupMode === 'hue') {
+    const defined = sections.filter((s) => s.orderDefined);
+    if (defined.length > 1) {
+      const maxOrder = Math.max(...defined.map((s) => s.groupOrder ?? 0));
+      const pivotIdx = sections.findIndex((s) => s.orderDefined && (s.groupOrder ?? 0) === maxOrder);
+      if (pivotIdx > 0) {
+        const rotated = sections.slice(pivotIdx).concat(sections.slice(0, pivotIdx));
+        sections.length = 0;
+        sections.push(...rotated);
+      }
     }
+  }
 
   // Build jump bar names (exclude TOP) in the same order sections will render
   const groupNames = sections
@@ -130,6 +191,19 @@ function Gallery({ items, runQueryById, meta }) {
   return (
     <div className="gallery w-full max-w-6xl mx-auto">
       {meta?.has_header == 1 && <HeaderItem meta={meta} />}
+
+      {heroItems.length > 0 && (
+        <div className="gallery-hero">
+          {heroItems.map((item) => (
+            <div
+              key={item.id || item.query_id || `${Math.random()}-hero`}
+              className="gallery-hero-item"
+            >
+              {renderContent(item)}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1 gap-2">
         <div className="flex gap-2">{/* other controls here */}</div>

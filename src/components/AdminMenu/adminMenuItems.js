@@ -12,6 +12,7 @@ export const adminMenuItems = [
     label: "Palettes",
     items: [
       { label: "Saved Palettes", href: "/admin/saved-palettes" },
+      { label: "Palette Photos", href: "/admin/palette-photos" },
       { label: "Kickers", href: "/admin/kickers" },
       { label: "Applied Palettes", href: "/admin/applied-palettes" },
       { label: "Mask Tester", href: "/admin/mask-tester" },

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import PhotoPickerModal from "@components/PhotoPickerModal";
 import "./admin-playlist-instance-sets.css";
 
 const SETS_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instance-sets/list.php`;
@@ -23,6 +24,7 @@ const emptyItem = {
   target_set_id: "",
   title: "",
   photo_url: "",
+  photo_library_id: "",
 };
 
 export default function AdminPlaylistInstanceSetsPage() {
@@ -36,6 +38,7 @@ export default function AdminPlaylistInstanceSetsPage() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [expectedSaveCount, setExpectedSaveCount] = useState(0);
+  const [photoPicker, setPhotoPicker] = useState({ open: false, mode: "", index: null });
 
   useEffect(() => {
     fetchSets();
@@ -93,6 +96,7 @@ export default function AdminPlaylistInstanceSetsPage() {
         ...item,
         item_type: item?.item_type || "instance",
         target_set_id: item?.target_set_id ?? "",
+        photo_library_id: item?.photo_library_id ?? "",
       }));
       setSetItems(normalized);
       if (expectedSaveCount > 0 && items.length === 0) {
@@ -190,8 +194,8 @@ export default function AdminPlaylistInstanceSetsPage() {
       setError("title required");
       return;
     }
-    if (!newItem.photo_url.trim()) {
-      setError("photo_url required");
+    if (!newItem.photo_library_id && !newItem.photo_url.trim()) {
+      setError("Pick a photo.");
       return;
     }
     let setId = activeSetId;
@@ -221,6 +225,7 @@ export default function AdminPlaylistInstanceSetsPage() {
         target_set_id: itemType === "set" ? targetSetId : null,
         title: newItem.title.trim(),
         photo_url: newItem.photo_url.trim(),
+        photo_library_id: newItem.photo_library_id ? Number(newItem.photo_library_id) : null,
         sort_order: prev.length + 1,
       },
     ]);
@@ -271,12 +276,12 @@ export default function AdminPlaylistInstanceSetsPage() {
       const invalid = itemsList.find((item) => {
         const itemType = item?.item_type || "instance";
         if (!String(item.title || "").trim()) return true;
-        if (!String(item.photo_url || "").trim()) return true;
+        if (!String(item.photo_url || "").trim() && !Number(item.photo_library_id)) return true;
         if (itemType === "set") return !Number(item.target_set_id);
         return !Number(item.playlist_instance_id);
       });
       if (invalid) {
-        setError("Each item needs a target (playlist or set), title, and photo URL.");
+        setError("Each item needs a target (playlist or set), title, and photo.");
         return;
       }
       setExpectedSaveCount(itemsList.length);
@@ -290,6 +295,7 @@ export default function AdminPlaylistInstanceSetsPage() {
             (item.item_type || "instance") === "set" ? Number(item.target_set_id) || null : null,
           title: item.title || "",
           photo_url: item.photo_url || "",
+          photo_library_id: item.photo_library_id ? Number(item.photo_library_id) : null,
           sort_order: index + 1,
         })),
       };
@@ -372,6 +378,22 @@ export default function AdminPlaylistInstanceSetsPage() {
           {!safeSets.length && <div className="panel-empty">No sets yet.</div>}
         </div>
       </div>
+      <PhotoPickerModal
+        open={photoPicker.open}
+        title="Pick Photo"
+        onClose={() => setPhotoPicker({ open: false, mode: "", index: null })}
+        onPick={(photo) => {
+          if (!photo) return;
+          if (photoPicker.mode === "new") {
+            updateNewItem("photo_library_id", photo.photo_library_id);
+            updateNewItem("photo_url", photo.image_url || "");
+          } else if (photoPicker.mode === "item" && photoPicker.index != null) {
+            handleEditItem(photoPicker.index, "photo_library_id", photo.photo_library_id);
+            handleEditItem(photoPicker.index, "photo_url", photo.image_url || "");
+          }
+          setPhotoPicker({ open: false, mode: "", index: null });
+        }}
+      />
 
       <div className="pi-panel">
         <div className="panel-header">
@@ -489,12 +511,22 @@ export default function AdminPlaylistInstanceSetsPage() {
                   />
                 </label>
                 <label className="pi-item-field">
-                  Photo URL
-                  <input
-                    type="text"
-                    value={item.photo_url || ""}
-                    onChange={(e) => handleEditItem(index, "photo_url", e.target.value)}
-                  />
+                  Photo
+                  <div className="pi-photo-row">
+                    <input
+                      type="text"
+                      value={item.photo_library_id || item.photo_url || ""}
+                      readOnly
+                      placeholder="Pick a photo"
+                    />
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => setPhotoPicker({ open: true, mode: "item", index })}
+                    >
+                      Pick Photo
+                    </button>
+                  </div>
                 </label>
               </div>
               <div className="pi-item-actions">
@@ -567,13 +599,22 @@ export default function AdminPlaylistInstanceSetsPage() {
             />
           </label>
           <label className="full-width">
-            Photo URL
-            <input
-              type="text"
-              value={newItem.photo_url}
-              onChange={(e) => updateNewItem("photo_url", e.target.value)}
-              placeholder="https://..."
-            />
+            Photo
+            <div className="pi-photo-row">
+              <input
+                type="text"
+                value={newItem.photo_library_id || newItem.photo_url}
+                readOnly
+                placeholder="Pick a photo"
+              />
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setPhotoPicker({ open: true, mode: "new", index: null })}
+              >
+                Pick Photo
+              </button>
+            </div>
           </label>
           <button type="button" className="secondary-btn" onClick={handleAddItem} disabled={loading}>
             Add New Item

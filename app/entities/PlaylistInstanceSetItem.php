@@ -13,6 +13,7 @@ final class PlaylistInstanceSetItem
         public ?int $targetSetId,
         public string $title,
         public string $photoUrl,
+        public ?int $photoLibraryId,
         public int $sortOrder
     ) {}
 }

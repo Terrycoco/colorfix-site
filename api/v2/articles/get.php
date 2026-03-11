@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
 use App\Repos\PdoArticleRepository;
+use App\Repos\PdoCtaRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -57,7 +58,7 @@ try {
     $photoMap = [];
     if ($photoIds) {
         $placeholders = implode(',', array_fill(0, count($photoIds), '?'));
-        $stmt = $pdo->prepare("SELECT photo_library_id, rel_path, title, alt_text FROM photo_library WHERE photo_library_id IN ($placeholders)");
+        $stmt = $pdo->prepare("SELECT photo_library_id, rel_path, title, alt_text, updated_at FROM photo_library WHERE photo_library_id IN ($placeholders)");
         $stmt->execute($photoIds);
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $photoMap[(int)$row['photo_library_id']] = [
@@ -65,6 +66,7 @@ try {
                 'rel_path' => $row['rel_path'],
                 'title' => $row['title'],
                 'alt_text' => $row['alt_text'],
+                'updated_at' => $row['updated_at'] ?? null,
             ];
         }
     }
@@ -83,6 +85,41 @@ try {
         return $section;
     }, $sections);
 
+    $ctas = [];
+    $overrides = [];
+    if (!empty($article['cta_overrides'])) {
+        $decoded = json_decode((string)$article['cta_overrides'], true);
+        if (is_array($decoded)) {
+            $overrides = $decoded;
+        }
+    }
+    $ctaIds = $overrides['_cta_ids'] ?? [];
+    if (is_array($ctaIds)) {
+        $ctaIds = array_values(array_filter(array_map('intval', $ctaIds)));
+    } else {
+        $ctaIds = [];
+    }
+    if ($ctaIds) {
+        $ctaRepo = new PdoCtaRepository($pdo);
+        $ctas = $ctaRepo->getByIds($ctaIds);
+        if ($ctas) {
+            foreach ($ctas as $idx => $cta) {
+                $ctaId = $cta['cta_id'] ?? null;
+                if ($ctaId === null) continue;
+                $key = (string)$ctaId;
+                if (!isset($overrides[$key]) || !is_array($overrides[$key])) continue;
+                $base = [];
+                if (!empty($cta['params'])) {
+                    $parsed = json_decode((string)$cta['params'], true);
+                    if (is_array($parsed)) $base = $parsed;
+                }
+                $merged = array_merge($base, $overrides[$key]);
+                $cta['params'] = json_encode($merged, JSON_UNESCAPED_SLASHES);
+                $ctas[$idx] = $cta;
+            }
+        }
+    }
+
     respond([
         'ok' => true,
         'item' => [
@@ -90,6 +127,7 @@ try {
             'tags' => $tags,
             'hero' => $heroPhoto,
             'sections' => $sections,
+            'ctas' => $ctas,
         ],
     ]);
 } catch (Throwable $e) {

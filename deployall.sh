@@ -14,6 +14,7 @@ run() {
 }
 
 run "deployapp.sh"
+run "deployscripts.sh"
 run "deployapi.sh"
 run "deploycontent.sh"
 run "deploydb.sh"

@@ -31,8 +31,8 @@ $sql = <<<SQL
     t.action_key AS type_action_key,
     t.label AS type_label
   FROM ctas c
-  JOIN cta_types t ON t.cta_type_id = c.cta_type_id
-  ORDER BY c.cta_id ASC
+  LEFT JOIN cta_types t ON t.cta_type_id = c.cta_type_id
+  ORDER BY c.cta_id DESC
 SQL;
 
 $stmt = $pdo->prepare($sql);

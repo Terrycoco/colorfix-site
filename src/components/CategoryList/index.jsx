@@ -61,6 +61,9 @@ const CategoryList = forwardRef(function CategoryList(_props, ref) {
     { key: "lrv_max", label: "LRV Max" }
   ];
 
+  const wheelRegenNote =
+    "Note: After changing hue categories, run `npm run regen-wheel` to rebuild baked wheels.";
+
   const handleSort = (key) => {
     if (key === "actions") return; // not sortable
     if (key === sortField) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -127,6 +130,7 @@ const CategoryList = forwardRef(function CategoryList(_props, ref) {
 
   return (
     <div className="cat-admin">
+      <div className="text-xs opacity-70 mb-2">{wheelRegenNote}</div>
       <div className="table-wrap">
         <table className="cat-table">
           {/* ONE place to control widths */}

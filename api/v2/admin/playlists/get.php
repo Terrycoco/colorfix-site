@@ -56,7 +56,9 @@ if (!$playlist) {
 }
 
 $hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
+$hasPhotoLibraryId = columnExists($pdo, 'playlist_items', 'photo_library_id');
 $excludeSelect = $hasExcludeFromThumbs ? 'exclude_from_thumbs' : '0 AS exclude_from_thumbs';
+$photoSelect = $hasPhotoLibraryId ? 'photo_library_id' : 'NULL AS photo_library_id';
 $itemSql = <<<SQL
     SELECT
       playlist_item_id,
@@ -65,6 +67,7 @@ $itemSql = <<<SQL
       ap_id,
       palette_hash,
       image_url,
+      {$photoSelect},
       title,
       subtitle,
       subtitle_2,

@@ -13,6 +13,201 @@
   font-size: 14px;
 }
 
+.admin-articles__cta {
+  margin: 16px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.admin-articles__cta-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.admin-articles__cta-header button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.admin-articles__cta-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.admin-articles__cta-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fafafa;
+}
+
+.admin-articles__cta-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.admin-articles__cta-meta {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.admin-articles__cta-empty {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.admin-articles__cta-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-articles__cta-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.admin-articles__cta-panel {
+  position: relative;
+  width: min(980px, 92vw);
+  max-height: 85vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.admin-articles__cta-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-articles__cta-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-articles__cta-actions button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.admin-articles__cta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.admin-articles__cta-col-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.admin-articles__cta-listbox {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+  min-height: 240px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-articles__cta-row {
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: #111827;
+}
+
+.admin-articles__cta-row .row-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.admin-articles__cta-row .row-meta {
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.admin-articles__cta-row:hover {
+  border-color: #111827;
+  background: #f9fafb;
+}
+
+.admin-articles__cta-hint {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+.admin-articles__cta-override {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-articles__cta-override-title {
+  font-weight: 600;
+  font-size: 12px;
+  color: #111827;
+}
+
+.admin-articles__cta-override label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.admin-articles__cta-override input {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .admin-articles__cta-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .admin-articles__error,
 .admin-articles__status {
   margin-top: 12px;
@@ -297,6 +492,20 @@
   font-size: 12px;
 }
 
+.admin-articles__heading-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 48px;
+}
+
+.admin-articles__heading-field {
+  flex: 1;
+}
+
+.admin-articles__heading-level {
+  width: 160px;
+}
+
 .admin-articles__asset-row {
   display: flex;
   align-items: center;
@@ -311,6 +520,15 @@
   padding: 6px 8px;
   font-size: 11px;
   background: #fff;
+}
+
+.admin-articles__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 12px;
 }
 
 .admin-articles__slug {

@@ -8,6 +8,9 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoAppliedPaletteRepository;
+use App\Repos\PdoAppliedPalettePhotoRepository;
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
@@ -22,6 +25,7 @@ try {
     }
 
     $repo = new PdoAppliedPaletteRepository($pdo);
+    $photoRepo = new PdoAppliedPalettePhotoRepository($pdo);
     $palette = $repo->findById($id);
     if (!$palette) {
         http_response_code(404);
@@ -39,6 +43,30 @@ try {
     $thumbRel = "/photos/rendered/ap_{$id}-thumb.jpg";
     $renderAbs = is_file($docRoot . $renderRel) ? $docRoot . $renderRel : $publicRoot . $renderRel;
     $thumbAbs = is_file($docRoot . $thumbRel) ? $docRoot . $thumbRel : $publicRoot . $thumbRel;
+
+    $photos = $photoRepo->getPhotosForPalette($id);
+    $renderRelPath = is_file($renderAbs) ? $renderRel : (is_file($publicRoot . $renderRel) ? $renderRel : null);
+    if ($renderRelPath) {
+        $hasRender = false;
+        foreach ($photos as $photo) {
+            if (($photo['rel_path'] ?? '') === $renderRelPath) {
+                $hasRender = true;
+                break;
+            }
+        }
+        if (!$hasRender) {
+            $orderIndex = $photoRepo->getMaxPhotoOrder($id) + 1;
+            $photoId = $photoRepo->addPhoto($id, $renderRelPath, null, null, $orderIndex);
+            if ($photoId > 0) {
+                $row = $photoRepo->getPhotoById($photoId);
+                if ($row) {
+                    $photoLibrary = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+                    $photoLibrary->syncAppliedPaletteAttachmentPhoto($row);
+                }
+                $photos = $photoRepo->getPhotosForPalette($id);
+            }
+        }
+    }
 
     echo json_encode([
         'ok' => true,
@@ -59,6 +87,7 @@ try {
             'render_thumb_rel_path' => is_file($thumbAbs) ? $thumbRel : null,
         ],
         'entries' => $palette->entries,
+        'photos' => $photos,
     ], JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
     http_response_code(500);

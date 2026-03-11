@@ -88,6 +88,7 @@ try {
             'saved_palette_id' => $paletteId,
             'rel_path' => $relPath,
             'photo_type' => 'full',
+            'trigger_mode' => 'any',
             'trigger_color_id' => null,
             'caption' => null,
             'alt_text' => null,

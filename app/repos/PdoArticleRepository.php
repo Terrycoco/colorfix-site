@@ -12,9 +12,9 @@ class PdoArticleRepository
     public function createArticle(array $data): int
     {
         $sql = "INSERT INTO articles
-                (type, status, title, dek, slug, meta_description, hero_asset_id, published_at, created_at, updated_at)
+                (type, status, title, dek, slug, meta_description, hero_asset_id, cta_overrides, featured, published_at, created_at, updated_at)
                 VALUES
-                (:type, :status, :title, :dek, :slug, :meta_description, :hero_asset_id, :published_at, NOW(), NOW())";
+                (:type, :status, :title, :dek, :slug, :meta_description, :hero_asset_id, :cta_overrides, :featured, :published_at, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':type' => $data['type'],
@@ -24,6 +24,8 @@ class PdoArticleRepository
             ':slug' => $data['slug'],
             ':meta_description' => $data['meta_description'] ?? null,
             ':hero_asset_id' => $data['hero_asset_id'] ?? null,
+            ':cta_overrides' => $data['cta_overrides'] ?? null,
+            ':featured' => !empty($data['featured']) ? 1 : 0,
             ':published_at' => $data['published_at'] ?? null,
         ]);
         return (int)$this->pdo->lastInsertId();
@@ -40,6 +42,8 @@ class PdoArticleRepository
             'slug',
             'meta_description',
             'hero_asset_id',
+            'cta_overrides',
+            'featured',
             'published_at',
         ];
         $setParts = [];
@@ -143,6 +147,41 @@ class PdoArticleRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function clearFeaturedExcept(int $articleId): void
+    {
+        $stmt = $this->pdo->prepare("UPDATE articles SET featured = 0 WHERE id <> :id");
+        $stmt->execute([':id' => $articleId]);
+    }
+
+    public function getFeaturedOrLatest(?string $type = null): ?array
+    {
+        $params = [];
+        $typeWhere = '';
+        if ($type !== null && $type !== '') {
+            $typeWhere = ' AND type = :type';
+            $params[':type'] = $type;
+        }
+
+        $sqlFeatured = "SELECT * FROM articles
+                        WHERE status = 'published'
+                          AND featured = 1{$typeWhere}
+                        ORDER BY published_at DESC, id DESC
+                        LIMIT 1";
+        $stmt = $this->pdo->prepare($sqlFeatured);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) return $row;
+
+        $sqlLatest = "SELECT * FROM articles
+                      WHERE status = 'published'{$typeWhere}
+                      ORDER BY published_at DESC, id DESC
+                      LIMIT 1";
+        $stmt = $this->pdo->prepare($sqlLatest);
+        $stmt->execute($params);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function listSections(int $articleId): array
     {
         $stmt = $this->pdo->prepare("SELECT * FROM article_sections WHERE article_id = :id ORDER BY sort_order ASC, id ASC");
@@ -150,19 +189,49 @@ class PdoArticleRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function beginTransaction(): void
+    {
+        $this->pdo->beginTransaction();
+    }
+
+    public function commit(): void
+    {
+        $this->pdo->commit();
+    }
+
+    public function rollBack(): void
+    {
+        if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+    }
+
+    public function bumpSectionSortOrders(int $articleId, int $offset): void
+    {
+        $stmt = $this->pdo->prepare("
+            UPDATE article_sections
+               SET sort_order = sort_order + :offset
+             WHERE article_id = :id
+        ");
+        $stmt->execute([
+            ':offset' => $offset,
+            ':id' => $articleId,
+        ]);
+    }
+
     public function createSection(int $articleId, array $data): int
     {
         $sql = "INSERT INTO article_sections
-                (article_id, sort_order, kind, heading, body, asset_id, palette_id, created_at, updated_at)
+                (article_id, sort_order, kind, heading, heading_level, body, caption, asset_id, palette_id, created_at, updated_at)
                 VALUES
-                (:article_id, :sort_order, :kind, :heading, :body, :asset_id, :palette_id, NOW(), NOW())";
+                (:article_id, :sort_order, :kind, :heading, :heading_level, :body, :caption, :asset_id, :palette_id, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':article_id' => $articleId,
             ':sort_order' => $data['sort_order'] ?? 0,
             ':kind' => $data['kind'] ?? 'text',
             ':heading' => $data['heading'] ?? null,
+            ':heading_level' => $data['heading_level'] ?? null,
             ':body' => $data['body'] ?? null,
+            ':caption' => $data['caption'] ?? null,
             ':asset_id' => $data['asset_id'] ?? null,
             ':palette_id' => $data['palette_id'] ?? null,
         ]);
@@ -172,7 +241,7 @@ class PdoArticleRepository
     public function updateSection(int $sectionId, array $fields): void
     {
         if (empty($fields)) return;
-        $allowed = ['sort_order', 'kind', 'heading', 'body', 'asset_id', 'palette_id'];
+        $allowed = ['sort_order', 'kind', 'heading', 'heading_level', 'body', 'caption', 'asset_id', 'palette_id'];
         $setParts = [];
         $params = [':id' => $sectionId];
         foreach ($fields as $column => $value) {

@@ -26,6 +26,7 @@ final class PdoPlaylistInstanceSetItemRepository
                 target_set_id,
                 title,
                 photo_url,
+                photo_library_id,
                 sort_order
             FROM playlist_instance_set_items
             WHERE playlist_instance_set_id = :set_id
@@ -44,6 +45,7 @@ final class PdoPlaylistInstanceSetItemRepository
                 $row['target_set_id'] !== null ? (int)$row['target_set_id'] : null,
                 (string)$row['title'],
                 (string)$row['photo_url'],
+                $row['photo_library_id'] !== null ? (int)$row['photo_library_id'] : null,
                 (int)$row['sort_order']
             );
         }
@@ -68,6 +70,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     target_set_id,
                     title,
                     photo_url,
+                    photo_library_id,
                     sort_order
                 ) VALUES (
                     :set_id,
@@ -76,6 +79,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     :target_set_id,
                     :title,
                     :photo_url,
+                    :photo_library_id,
                     :sort_order
                 )
                 SQL;
@@ -96,6 +100,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     'target_set_id' => $targetSetId,
                     'title' => (string)($item['title'] ?? ''),
                     'photo_url' => (string)($item['photo_url'] ?? ''),
+                    'photo_library_id' => isset($item['photo_library_id']) ? (int)$item['photo_library_id'] : null,
                     'sort_order' => (int)($item['sort_order'] ?? 0),
                 ]);
             }

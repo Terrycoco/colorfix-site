@@ -1,11 +1,17 @@
 # Serve SPA entry point for all routes
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /colorfix/
+
   RewriteRule ^index\.html$ - [L]
+  RewriteRule ^colorfix/index\.html$ - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /colorfix/index.html [L]
+  RewriteRule ^colorfix/.*$ /colorfix/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
 </IfModule>
 
 # Caching rules

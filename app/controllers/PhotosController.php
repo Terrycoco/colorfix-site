@@ -345,6 +345,15 @@ class PhotosController
             $res = $svc->saveBase($photoId, 'prepared', $files['prepared_base']);
             $touched[] = ['kind'=>'prepared', 'role'=>'', 'w'=>$res['width'], 'h'=>$res['height']];
             if ($res['width'] && $res['height']) $syncPhotoSize((int)$res['width'], (int)$res['height']);
+            if (!empty($res['path'])) {
+                $photoLibrary->syncAssetPhoto($photoId, $res['path'], [
+                    'title' => $photo['title'] ?? null,
+                    'tags' => $tagsCsv !== '' ? $tagsCsv : null,
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'show_in_gallery' => 0,
+                    'has_palette' => 0,
+                ]);
+            }
         }
 
         if ($hasTexture) {

@@ -7,6 +7,7 @@ const GET_URL = `${API_FOLDER}/v2/admin/articles/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/articles/save.php`;
 const TAGS_URL = `${API_FOLDER}/v2/admin/articles/tags.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/articles/delete.php`;
+const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 
 const emptyArticle = {
   id: null,
@@ -17,12 +18,14 @@ const emptyArticle = {
   slug: "",
   meta_description: "",
   hero_asset_id: "",
+  cta_overrides: "",
+  featured: false,
   published_at: "",
   tags: [],
   sections: [],
 };
 
-const sectionKinds = ["text", "image", "palette_link", "cta", "embed", "list"];
+const sectionKinds = ["text", "image", "palette_link", "cta", "embed", "list", "header"];
 const articleTypes = ["colorfix", "theme", "guide"];
 
 function slugify(value = "") {
@@ -48,6 +51,9 @@ export default function AdminArticlesPage() {
   const [filters, setFilters] = useState({ q: "", tags: "", type: "", status: "" });
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyArticle);
+  const [ctas, setCtas] = useState([]);
+  const [showCtaPicker, setShowCtaPicker] = useState(false);
+  const [ctaDraft, setCtaDraft] = useState({ ids: [], overrides: {} });
   const [showEditor, setShowEditor] = useState(false);
   const [showList, setShowList] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -63,6 +69,7 @@ export default function AdminArticlesPage() {
   useEffect(() => {
     loadTags();
     loadArticles();
+    loadCtas();
   }, []);
 
   async function loadTags() {
@@ -102,6 +109,19 @@ export default function AdminArticlesPage() {
     }
   }
 
+  async function loadCtas() {
+    try {
+      const res = await fetch(`${CTAS_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTAs");
+      const items = Array.isArray(data.items) ? data.items : Object.values(data.items || {});
+      items.sort((a, b) => (Number(b.cta_id) || 0) - (Number(a.cta_id) || 0));
+      setCtas(items);
+    } catch {
+      setCtas([]);
+    }
+  }
+
   async function loadArticle(id) {
     setError("");
     try {
@@ -122,6 +142,8 @@ export default function AdminArticlesPage() {
         slug: item.slug || "",
         meta_description: item.meta_description || "",
         hero_asset_id: item.hero_asset_id || "",
+        cta_overrides: item.cta_overrides || "",
+        featured: !!item.featured,
         published_at: item.published_at || "",
         tags: Array.isArray(item.tags) ? item.tags : [],
         tagsText: Array.isArray(item.tags)
@@ -140,6 +162,72 @@ export default function AdminArticlesPage() {
     setShowEditor(true);
   }
 
+  function parseCtaOverrides(raw) {
+    if (!raw) return { ids: [], overrides: {} };
+    let obj = raw;
+    if (typeof raw === "string") {
+      try {
+        obj = JSON.parse(raw);
+      } catch {
+        obj = {};
+      }
+    }
+    if (!obj || typeof obj !== "object") return { ids: [], overrides: {} };
+    const ids = Array.isArray(obj._cta_ids)
+      ? obj._cta_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    const overrides = { ...obj };
+    delete overrides._cta_ids;
+    return { ids, overrides };
+  }
+
+  function openCtaPicker() {
+    const parsed = parseCtaOverrides(form.cta_overrides);
+    setCtaDraft(parsed);
+    setShowCtaPicker(true);
+  }
+
+  function saveCtaPicker() {
+    const payload = { ...ctaDraft.overrides, _cta_ids: ctaDraft.ids };
+    setForm((prev) => ({ ...prev, cta_overrides: JSON.stringify(payload) }));
+    setShowCtaPicker(false);
+  }
+
+  function addCtaToArticle(ctaId) {
+    setCtaDraft((prev) => {
+      if (prev.ids.includes(ctaId)) return prev;
+      return { ...prev, ids: [...prev.ids, ctaId] };
+    });
+  }
+
+  function removeCtaFromArticle(ctaId) {
+    setCtaDraft((prev) => ({
+      ...prev,
+      ids: prev.ids.filter((id) => id !== ctaId),
+      overrides: Object.fromEntries(
+        Object.entries(prev.overrides).filter(([key]) => String(key) !== String(ctaId))
+      ),
+    }));
+  }
+
+  function updateCtaOverride(ctaId, key, value) {
+    setCtaDraft((prev) => {
+      const next = { ...prev.overrides };
+      const current = { ...(next[ctaId] || {}) };
+      if (value === "" || value === null || value === undefined) {
+        delete current[key];
+      } else {
+        current[key] = value;
+      }
+      if (Object.keys(current).length === 0) {
+        delete next[ctaId];
+      } else {
+        next[ctaId] = current;
+      }
+      return { ...prev, overrides: next };
+    });
+  }
+
   async function handleSave() {
     setStatus("");
     setError("");
@@ -149,19 +237,6 @@ export default function AdminArticlesPage() {
     }
     if (!form.slug.trim()) {
       setError("Slug is required.");
-      return;
-    }
-    const sortValues = (form.sections || [])
-      .map((section) => Number(section.sort_order || 0).toFixed(2))
-      .filter(Boolean);
-    const sortSet = new Set();
-    const dupes = sortValues.filter((value) => {
-      if (sortSet.has(value)) return true;
-      sortSet.add(value);
-      return false;
-    });
-    if (dupes.length) {
-      setError("Section sort order must be unique. Adjust duplicates (use decimals like 2.1).");
       return;
     }
     setSaving(true);
@@ -318,7 +393,9 @@ export default function AdminArticlesPage() {
       sort_order: `${nextSort}.0`,
       kind: "text",
       heading: "",
+      heading_level: "h2",
       body: "",
+      caption: "",
       asset_id: "",
       palette_id: "",
     };
@@ -372,14 +449,35 @@ export default function AdminArticlesPage() {
       slug: article.slug || "",
       meta_description: article.meta_description || "",
       hero_asset_id: article.hero_asset_id ? Number(article.hero_asset_id) : null,
+      cta_overrides: article.cta_overrides || "",
+      featured: !!article.featured,
       published_at: publishedAt,
       tags,
-      sections: (article.sections || []).map((section) => {
+      sections: (() => {
+        const rawSections = Array.isArray(article.sections) ? article.sections : [];
+        const ordered = rawSections
+          .map((section, idx) => ({
+            idx,
+            sort: Number(section.sort_order),
+            section,
+          }))
+          .sort((a, b) => {
+            if (Number.isNaN(a.sort) && Number.isNaN(b.sort)) return a.idx - b.idx;
+            if (Number.isNaN(a.sort)) return 1;
+            if (Number.isNaN(b.sort)) return -1;
+            if (a.sort === b.sort) return a.idx - b.idx;
+            return a.sort - b.sort;
+          })
+          .map((entry) => entry.section);
+        return ordered;
+      })().map((section, idx) => {
         const sectionPayload = {
-          sort_order: Number(section.sort_order) || 0,
+          sort_order: idx,
           kind: section.kind || "text",
           heading: section.heading || null,
+          heading_level: section.heading_level || null,
           body: section.body || null,
+          caption: section.caption || null,
           asset_id: section.asset_id ? Number(section.asset_id) : null,
           palette_id: section.palette_id ? Number(section.palette_id) : null,
         };
@@ -603,6 +701,14 @@ export default function AdminArticlesPage() {
                 }
               />
             </label>
+            <label className="admin-articles__checkbox">
+              <input
+                type="checkbox"
+                checked={!!form.featured}
+                onChange={(e) => setForm((prev) => ({ ...prev, featured: e.target.checked }))}
+              />
+              Featured article
+            </label>
             <label>
               Published At
               <input
@@ -638,11 +744,37 @@ export default function AdminArticlesPage() {
             />
           </label>
 
-        <label className="admin-articles__field">
-          Tags (comma separated)
-          <input
-            type="text"
-            value={form.tagsText || ""}
+          <div className="admin-articles__cta">
+            <div className="admin-articles__cta-header">
+              <h3>Article CTAs</h3>
+              <button type="button" onClick={openCtaPicker}>
+                Pick CTAs
+              </button>
+            </div>
+            <div className="admin-articles__cta-list">
+              {(() => {
+                const parsed = parseCtaOverrides(form.cta_overrides);
+                const selected = parsed.ids
+                  .map((id) => ctas.find((row) => Number(row.cta_id) === Number(id)))
+                  .filter(Boolean);
+                if (selected.length === 0) {
+                  return <div className="admin-articles__cta-empty">No CTAs selected.</div>;
+                }
+                return selected.map((cta) => (
+                  <div key={cta.cta_id} className="admin-articles__cta-item">
+                    <div className="admin-articles__cta-title">{cta.label}</div>
+                    <div className="admin-articles__cta-meta">{cta.type_label}</div>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+
+          <label className="admin-articles__field">
+            Tags (comma separated)
+            <input
+              type="text"
+              value={form.tagsText || ""}
             onChange={(e) => setForm((prev) => ({ ...prev, tagsText: e.target.value }))}
             placeholder="door, exterior, adobe"
           />
@@ -663,6 +795,7 @@ export default function AdminArticlesPage() {
                     Sort
                     <input
                       type="number"
+                      step="0.1"
                       value={section.sort_order ?? 0}
                       onChange={(e) =>
                         handleSectionChange(section.id, { sort_order: e.target.value })
@@ -710,16 +843,33 @@ export default function AdminArticlesPage() {
                     />
                   </label>
                 </div>
-                <label>
-                  Heading
-                  <input
-                    type="text"
-                    value={section.heading || ""}
-                    onChange={(e) =>
-                      handleSectionChange(section.id, { heading: e.target.value })
-                    }
-                  />
-                </label>
+                <div className="admin-articles__heading-row">
+                  <label className="admin-articles__heading-field">
+                    Heading
+                    <input
+                      type="text"
+                      value={section.heading || ""}
+                      onChange={(e) =>
+                        handleSectionChange(section.id, { heading: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="admin-articles__heading-level">
+                    Heading Level
+                    <select
+                      value={section.heading_level || "h2"}
+                      onChange={(e) =>
+                        handleSectionChange(section.id, { heading_level: e.target.value })
+                      }
+                    >
+                      {["h1", "h2", "h3", "h4", "h5", "h6"].map((level) => (
+                        <option key={level} value={level}>
+                          {level.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <label>
                   Body
                   <textarea
@@ -730,6 +880,18 @@ export default function AdminArticlesPage() {
                     }
                   />
                 </label>
+                {section.kind === "image" && (
+                  <label>
+                    Caption
+                    <input
+                      type="text"
+                      value={section.caption || ""}
+                      onChange={(e) =>
+                        handleSectionChange(section.id, { caption: e.target.value })
+                      }
+                    />
+                  </label>
+                )}
                 <div className="admin-articles__section-actions">
                   <button
                     type="button"
@@ -758,6 +920,127 @@ export default function AdminArticlesPage() {
           )}
         </section>
       </div>
+
+      {showCtaPicker && (
+        <div className="admin-articles__cta-modal" role="dialog" aria-modal="true">
+          <div className="admin-articles__cta-backdrop" onClick={() => setShowCtaPicker(false)} />
+          <div className="admin-articles__cta-panel">
+            <div className="admin-articles__cta-panel-header">
+              <div className="admin-articles__cta-title">Pick CTAs for This Article</div>
+              <div className="admin-articles__cta-actions">
+                <button type="button" onClick={saveCtaPicker}>
+                  Save CTAs
+                </button>
+                <button type="button" onClick={() => setShowCtaPicker(false)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="admin-articles__cta-grid">
+              <div className="admin-articles__cta-col">
+                <div className="admin-articles__cta-col-title">All CTAs</div>
+                <div className="admin-articles__cta-listbox">
+                  {ctas
+                    .filter((cta) => !ctaDraft.ids.includes(Number(cta.cta_id)))
+                    .map((cta) => (
+                      <button
+                        key={cta.cta_id}
+                        type="button"
+                        className="admin-articles__cta-row"
+                        onDoubleClick={() => addCtaToArticle(Number(cta.cta_id))}
+                      >
+                        <div className="row-title">{cta.label}</div>
+                        <div className="row-meta">{cta.type_label}</div>
+                      </button>
+                    ))}
+                </div>
+                <div className="admin-articles__cta-hint">Double click to add</div>
+              </div>
+              <div className="admin-articles__cta-col">
+                <div className="admin-articles__cta-col-title">Selected</div>
+                <div className="admin-articles__cta-listbox">
+                  {ctaDraft.ids.length === 0 && (
+                    <div className="admin-articles__cta-empty">No CTAs selected.</div>
+                  )}
+                  {ctaDraft.ids.map((id) => {
+                    const cta = ctas.find((row) => Number(row.cta_id) === Number(id));
+                    if (!cta) return null;
+                    return (
+                      <button
+                        key={cta.cta_id}
+                        type="button"
+                        className="admin-articles__cta-row"
+                        onDoubleClick={() => removeCtaFromArticle(Number(cta.cta_id))}
+                      >
+                        <div className="row-title">{cta.label}</div>
+                        <div className="row-meta">{cta.type_label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="admin-articles__cta-hint">Double click to remove</div>
+
+                {ctaDraft.ids.map((id) => {
+                  const cta = ctas.find((row) => Number(row.cta_id) === Number(id));
+                  if (!cta) return null;
+                  const actionKey = cta.type_action_key || cta.action_key || "";
+                  if (actionKey !== "playlist_link") return null;
+                  const overrides = ctaDraft.overrides[id] || {};
+                  const baseParams = (() => {
+                    try {
+                      return typeof cta.params === "string" ? JSON.parse(cta.params) : (cta.params || {});
+                    } catch {
+                      return {};
+                    }
+                  })();
+                  const labelValue = overrides.label || cta.label || "";
+                  const titleValue = overrides.title || baseParams.title || "";
+                  const subtitleValue = overrides.subtitle || baseParams.subtitle || baseParams.dek || "";
+                  const playlistValue = overrides.playlist_instance_id || baseParams.playlist_instance_id || "";
+                  return (
+                    <div key={`ov-${cta.cta_id}`} className="admin-articles__cta-override">
+                      <div className="admin-articles__cta-override-title">Playlist Link Overrides</div>
+                      <label>
+                        Label (button text)
+                        <input
+                          type="text"
+                          value={labelValue}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "label", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Title (non-button text)
+                        <input
+                          type="text"
+                          value={titleValue}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "title", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Subtitle (non-button text)
+                        <input
+                          type="text"
+                          value={subtitleValue}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "subtitle", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        Playlist Instance ID
+                        <input
+                          type="number"
+                          value={playlistValue}
+                          onChange={(e) => updateCtaOverride(cta.cta_id, "playlist_instance_id", e.target.value)}
+                          required
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

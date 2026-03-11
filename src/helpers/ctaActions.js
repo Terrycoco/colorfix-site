@@ -12,7 +12,7 @@ function runShare({ data, shareFolder }) {
   if (data?.share_enabled === false) return;
   const url = buildShareUrl(shareFolder, data.playlist_instance_id);
   const title = data?.share_title || data?.title || "ColorFix Playlist";
-  const text = data?.share_description || "";
+  const text = data?.share_description || "I'm sharing a playlist I found on ColorFix";
   if (navigator.share) {
     navigator.share({ title, text, url }).catch(() => {});
     return;
@@ -54,6 +54,58 @@ function runNavigate({ navigate, cta, psi, thumb, demo }) {
     return;
   }
   window.open(url, target, "noopener");
+}
+
+function runArticleLink({ navigate, cta }) {
+  const params = cta?.params || {};
+  const articleId = params.article_id || params.articleId;
+  const baseUrl = params.url || (articleId ? `/articles/${articleId}` : "");
+  if (!baseUrl) return;
+  const playlistInstanceId = cta?.data?.playlist_instance_id;
+  const playlistTitle = cta?.data?.display_title || cta?.data?.title || "";
+  const defaultReturnTo = playlistInstanceId ? `/playlist/${playlistInstanceId}` : "";
+  const url = appendParams(baseUrl, {
+    playlist_instance_id: playlistInstanceId || undefined,
+    playlist_title: playlistTitle || undefined,
+    return_to: params.return_to || defaultReturnTo || undefined,
+  });
+  const target = params.target || "_self";
+  if (navigate && url.startsWith("/")) {
+    navigate(url);
+    return;
+  }
+  window.open(url, target, "noopener");
+}
+
+function runPlaylistLink({ navigate, cta }) {
+  const params = cta?.params || {};
+  const playlistInstanceId = params.playlist_instance_id || params.playlistInstanceId || cta?.data?.playlist_instance_id;
+  const url = params.url || (playlistInstanceId ? `/playlist/${playlistInstanceId}` : "");
+  if (!url) return;
+  const target = params.target || "_self";
+  if (navigate && url.startsWith("/")) {
+    navigate(url);
+    return;
+  }
+  window.open(url, target, "noopener");
+}
+
+function appendParams(url, params) {
+  const entries = Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (!entries.length) return url;
+  try {
+    const isAbsolute = /^https?:\/\//i.test(url);
+    const base = isAbsolute ? url : `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    const next = new URL(base);
+    entries.forEach(([key, value]) => {
+      if (!next.searchParams.has(key)) next.searchParams.set(key, String(value));
+    });
+    return isAbsolute ? next.toString() : `${next.pathname}${next.search}${next.hash}`;
+  } catch {
+    const sep = url.includes("?") ? "&" : "?";
+    const qs = new URLSearchParams(entries).toString();
+    return qs ? `${url}${sep}${qs}` : url;
+  }
 }
 
 function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }) {
@@ -167,6 +219,9 @@ export function buildCtaHandlers({
     copy_link: () => runCopyLink({ data, shareFolder }),
     share_playlist: () => runShare({ data, shareFolder }),
     navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data }, psi, thumb, demo }),
+    article_link: (cta) => runArticleLink({ navigate, cta }),
+    playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
+    watch_next: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
     see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }),
     to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
     to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),

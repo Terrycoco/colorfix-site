@@ -107,12 +107,16 @@ export default function AdminPlayerPage() {
 
       const key = cta?.key || cta?.action_key || cta?.action || "";
 
+      let variant = cta?.variant ?? parsedParams.variant;
+      if (!variant && key === "article_link") {
+        variant = "link";
+      }
       return {
         cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
         label: cta?.label ?? "",
         key,
         enabled: cta?.enabled ?? true,
-        variant: cta?.variant ?? parsedParams.variant,
+        variant,
         display_mode: cta?.display_mode ?? parsedParams.display_mode,
         icon: cta?.icon ?? parsedParams.icon,
         params: parsedParams,
@@ -136,12 +140,7 @@ export default function AdminPlayerPage() {
     });
   }, [ctas, likedCount, paletteCount]);
 
-  const { primaryCTAs, linkCTAs } = useMemo(() => {
-    return {
-      primaryCTAs: visibleCTAs.filter((cta) => cta?.variant !== "link"),
-      linkCTAs: visibleCTAs.filter((cta) => cta?.variant === "link"),
-    };
-  }, [visibleCTAs]);
+  const orderedCTAs = useMemo(() => visibleCTAs, [visibleCTAs]);
 
   return (
     <div className="admin-player-page">
@@ -170,33 +169,16 @@ export default function AdminPlayerPage() {
               />
               {playbackEnded && (
                 <PlayerEndScreen showBranding={false} onExit={() => navigate(-1)}>
-                  {(primaryCTAs.length > 0 || linkCTAs.length > 0) && (
-                    <>
-                      {primaryCTAs.length > 0 && (
-                        <CTALayout
-                          layout="stacked"
-                          ctas={primaryCTAs}
-                          onCtaClick={(cta) => {
-                            const key = getCtaKey(cta);
-                            if (!key) return;
-                            ctaHandlers[key]?.(cta);
-                          }}
-                        />
-                      )}
-                      {linkCTAs.length > 0 && (
-                        <div className="player-end-links">
-                          <CTALayout
-                            layout="stacked"
-                            ctas={linkCTAs}
-                            onCtaClick={(cta) => {
-                              const key = getCtaKey(cta);
-                              if (!key) return;
-                              ctaHandlers[key]?.(cta);
-                            }}
-                          />
-                        </div>
-                      )}
-                    </>
+                  {orderedCTAs.length > 0 && (
+                    <CTALayout
+                      layout="stacked"
+                      ctas={orderedCTAs}
+                      onCtaClick={(cta) => {
+                        const key = getCtaKey(cta);
+                        if (!key) return;
+                        ctaHandlers[key]?.(cta);
+                      }}
+                    />
                   )}
                 </PlayerEndScreen>
               )}

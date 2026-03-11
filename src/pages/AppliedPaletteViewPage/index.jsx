@@ -167,19 +167,15 @@ export default function AppliedPaletteViewPage() {
 
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
-    try {
-      const url = new URL(window.location.href);
-      if (isAdminView) {
-        url.searchParams.delete("admin");
-      }
-      return url.toString();
-    } catch {
-      return window.location.href || "";
+    const hash = meta?.palette_hash || "";
+    if (hash) {
+      return `${window.location.origin}/palette/${hash}/share`;
     }
-  }, [isAdminView]);
+    return window.location.href || "";
+  }, [meta?.palette_hash]);
 
   const shareTitle = meta?.title || "ColorFix Palette";
-  const shareMessage = `Check out ${shareTitle} from ColorFix: ${shareUrl}`;
+  const shareMessage = `I'm sharing a palette I found on ColorFix: ${shareUrl}`;
   const smsLink = `sms:&body=${encodeURIComponent(shareMessage)}`;
   const emailLink = `mailto:?subject=${encodeURIComponent("Your ColorFix Palette")}&body=${encodeURIComponent(shareMessage)}`;
 

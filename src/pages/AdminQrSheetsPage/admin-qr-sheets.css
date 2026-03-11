@@ -30,6 +30,11 @@
   cursor: pointer;
 }
 
+.admin-qr-sheets__actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .admin-qr-sheets__editor {
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -93,6 +98,13 @@
   object-fit: contain;
   margin-top: 10px;
   margin-bottom: 14px;
+}
+
+.admin-qr-sheets__card img.admin-qr-sheets__wheel {
+  width: 360px;
+  height: 360px;
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .admin-qr-sheets__placeholder {
@@ -178,6 +190,15 @@
   .admin-qr-sheets__card img {
     width: 220px;
     height: 220px;
+  }
+
+  .admin-qr-sheets__card img.admin-qr-sheets__wheel {
+    width: 7.5in;
+    height: 7.5in;
+  }
+
+  .admin-qr-sheets__label {
+    margin-bottom: 24px;
   }
 
   .admin-qr-sheets__subline {

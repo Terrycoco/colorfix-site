@@ -40,6 +40,7 @@ class PdoPlaylistRepository
     private function getItemsFromDb(string $playlistId): ?array
     {
         $excludeSelect = $this->getExcludeFromThumbsSelect();
+        $photoSelect = $this->getPhotoLibraryIdSelect();
         $sql = <<<SQL
             SELECT
                 playlist_item_id,
@@ -48,6 +49,7 @@ class PdoPlaylistRepository
                 ap_id,
                 palette_hash,
                 image_url,
+                {$photoSelect},
                 title,
                 subtitle,
                 item_type,
@@ -82,6 +84,7 @@ class PdoPlaylistRepository
                 (string)($row['ap_id'] ?? ''),
                 $row['palette_hash'] ?? null,
                 $row['image_url'] ?? null,
+                isset($row['photo_library_id']) ? (int)$row['photo_library_id'] : null,
                 $row['title'] ?? null,
                 $row['subtitle'] ?? null,
                 $row['item_type'] ?? null,
@@ -115,13 +118,30 @@ class PdoPlaylistRepository
         return $cached;
     }
 
+    private function getPhotoLibraryIdSelect(): string
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+        $sql = <<<SQL
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'playlist_items'
+              AND COLUMN_NAME = 'photo_library_id'
+            SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $hasColumn = (int)$stmt->fetchColumn() > 0;
+        $cached = $hasColumn ? 'photo_library_id' : 'NULL AS photo_library_id';
+        return $cached;
+    }
+
     private function getPlaylistMeta(string $playlistId): ?array
     {
         $sql = <<<SQL
             SELECT playlist_id, title, type
             FROM playlists
             WHERE playlist_id = :playlist_id
-              AND is_active = 1
             LIMIT 1
             SQL;
 

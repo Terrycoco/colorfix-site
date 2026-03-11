@@ -9,6 +9,19 @@ class PdoPhotoLibraryRepository
 {
     public function __construct(private PDO $pdo) {}
 
+    public function findById(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id, source_type, source_id, rel_path, title
+               FROM photo_library
+              WHERE photo_library_id = :id
+              LIMIT 1"
+        );
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function findIdBySourceAndRel(string $sourceType, ?int $sourceId, string $relPath): ?int
     {
         $stmt = $this->pdo->prepare(
@@ -41,9 +54,9 @@ class PdoPhotoLibraryRepository
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO photo_library
-                (source_type, source_id, rel_path, title, tags, alt_text, show_in_gallery, has_palette, created_at)
+                (source_type, source_id, rel_path, title, tags, alt_text, note, show_in_gallery, has_palette, created_at)
              VALUES
-                (:source_type, :source_id, :rel_path, :title, :tags, :alt_text, :show_in_gallery, :has_palette, NOW())"
+                (:source_type, :source_id, :rel_path, :title, :tags, :alt_text, :note, :show_in_gallery, :has_palette, NOW())"
         );
         $stmt->execute([
             ':source_type' => $data['source_type'],
@@ -52,6 +65,7 @@ class PdoPhotoLibraryRepository
             ':title' => $data['title'] ?? null,
             ':tags' => $data['tags'] ?? null,
             ':alt_text' => $data['alt_text'] ?? null,
+            ':note' => $data['note'] ?? null,
             ':show_in_gallery' => !empty($data['show_in_gallery']) ? 1 : 0,
             ':has_palette' => !empty($data['has_palette']) ? 1 : 0,
         ]);
@@ -60,7 +74,7 @@ class PdoPhotoLibraryRepository
 
     public function update(int $id, array $data): void
     {
-        $allowed = ['rel_path', 'title', 'tags', 'alt_text', 'show_in_gallery', 'has_palette'];
+        $allowed = ['rel_path', 'title', 'tags', 'alt_text', 'note', 'show_in_gallery', 'has_palette'];
         $setParts = [];
         $params = [':id' => $id];
         foreach ($allowed as $key) {

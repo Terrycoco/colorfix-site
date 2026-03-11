@@ -39,6 +39,7 @@ const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
 const AdminRolesMasksPage = lazy(() => import ('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import ('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
+const AdminPalettePhotosPage = lazy(() => import('@pages/AdminPalettePhotosPage'));
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
@@ -210,6 +211,10 @@ function AppRouter() {
             <Route
               path="saved-palettes"
               element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes…')}
+            />
+            <Route
+              path="palette-photos"
+              element={renderWithSuspense(AdminPalettePhotosPage, 'Loading palette photos…')}
             />
             <Route
               path="kickers"

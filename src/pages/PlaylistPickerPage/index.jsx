@@ -81,6 +81,19 @@ export default function PlaylistPickerPage() {
     return `/picker${qs ? `?${qs}` : ""}`;
   };
 
+  const handleBackToPrevious = () => {
+    const safeReturn = resolveReturnTo(searchParams.get("return_to") ?? "");
+    if (safeReturn) {
+      navigate(safeReturn);
+      return;
+    }
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/");
+  };
+
   const handleExit = () => {
     if (isHoaView) {
       navigate("/hoa");
@@ -142,6 +155,15 @@ export default function PlaylistPickerPage() {
             ))}
           </div>
         </div>
+        <div className="playlist-thumbs__footer">
+          <button
+            type="button"
+            className="playlist-thumbs__back"
+            onClick={handleBackToPrevious}
+          >
+            Back to playlist
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -156,4 +178,12 @@ function buildReturnTo(location, searchParams) {
   params.delete("return_to");
   const qs = params.toString();
   return `${location.pathname}${qs ? `?${qs}` : ""}`;
+}
+
+function resolveReturnTo(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed.startsWith("/")) return "";
+  if (trimmed.startsWith("//")) return "";
+  return trimmed;
 }

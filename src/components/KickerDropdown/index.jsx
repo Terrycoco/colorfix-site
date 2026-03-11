@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import "./kicker-dropdown.css";
 
@@ -11,7 +10,6 @@ export default function KickerDropdown({
   includeBlank = true,
   disabled = false,
 }) {
-  const navigate = useNavigate();
   const [kickers, setKickers] = useState([]);
 
   useEffect(() => {
@@ -58,8 +56,26 @@ export default function KickerDropdown({
       </select>
       <button
         type="button"
+        className="kicker-dropdown__refresh"
+        onClick={async () => {
+          try {
+            const res = await fetch(`${LIST_URL}?_=${Date.now()}`, { credentials: "include" });
+            const data = await res.json();
+            if (!res.ok || !data?.ok) return;
+            setKickers(Array.isArray(data.items) ? data.items : []);
+          } catch {
+            /* ignore */
+          }
+        }}
+        title="Refresh kickers"
+        aria-label="Refresh kickers"
+      >
+        ↻
+      </button>
+      <button
+        type="button"
         className="kicker-dropdown__manage"
-        onClick={() => navigate("/admin/kickers")}
+        onClick={() => window.open("/admin/kickers", "_blank", "noopener")}
         title="Manage kickers"
         aria-label="Manage kickers"
       >

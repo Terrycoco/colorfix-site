@@ -9,6 +9,7 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 
 use App\Repos\PdoAppliedPaletteRepository;
+use App\Repos\PdoAppliedPalettePhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
@@ -32,11 +33,12 @@ try {
     }
 
     $appliedRepo = new PdoAppliedPaletteRepository($pdo);
+    $appliedPhotoRepo = new PdoAppliedPalettePhotoRepository($pdo);
     $savedRepo = new PdoSavedPaletteRepository($pdo);
     $photoRepo = new PdoPhotoRepository($pdo);
     $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
     $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
-    $svc = new PaletteViewerService($appliedRepo, $savedRepo, $renderSvc, $playlistInstanceRepo);
+    $svc = new PaletteViewerService($appliedRepo, $savedRepo, $renderSvc, $playlistInstanceRepo, $appliedPhotoRepo);
 
     if ($source === 'applied') {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

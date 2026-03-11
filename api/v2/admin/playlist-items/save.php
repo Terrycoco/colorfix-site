@@ -54,6 +54,7 @@ if (!is_array($items)) {
 try {
     $pdo->beginTransaction();
     $hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
+    $hasPhotoLibraryId = columnExists($pdo, 'playlist_items', 'photo_library_id');
     $stmt = $pdo->prepare('UPDATE playlist_items SET order_index = order_index + 10000 WHERE playlist_id = :playlist_id');
     $stmt->execute(['playlist_id' => $playlistId]);
 
@@ -67,6 +68,7 @@ try {
             'ap_id' => isset($item['ap_id']) && $item['ap_id'] !== '' ? (int)$item['ap_id'] : null,
             'palette_hash' => isset($item['palette_hash']) && $item['palette_hash'] !== '' ? (string)$item['palette_hash'] : null,
             'image_url' => $item['image_url'] ?? null,
+            'photo_library_id' => isset($item['photo_library_id']) && $item['photo_library_id'] !== '' ? (int)$item['photo_library_id'] : null,
             'title' => $item['title'] ?? null,
             'subtitle' => $item['subtitle'] ?? null,
             'subtitle_2' => $item['subtitle_2'] ?? null,
@@ -82,6 +84,9 @@ try {
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
         }
+        if (!$hasPhotoLibraryId) {
+            unset($data['photo_library_id']);
+        }
 
         $columns = [
             'playlist_id',
@@ -89,6 +94,7 @@ try {
             'ap_id',
             'palette_hash',
             'image_url',
+            'photo_library_id',
             'title',
             'subtitle',
             'subtitle_2',
@@ -101,6 +107,9 @@ try {
             'duration_ms',
             'is_active',
         ];
+        if (!$hasPhotoLibraryId) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
+        }
         if ($hasExcludeFromThumbs) {
             $columns[] = 'exclude_from_thumbs';
         }

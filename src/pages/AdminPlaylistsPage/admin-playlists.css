@@ -55,12 +55,42 @@
 }
 
 .list-row {
-  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid #eee;
   background: #fafafa;
-  padding: 10px 12px;
+  padding: 6px;
   border-radius: 8px;
+}
+
+.list-row-main {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
+  flex: 1;
+}
+
+.list-row-main:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+.list-row-delete {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d6d6d6;
+  background: #fff;
+  color: #7a0000;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.list-row-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .row-title {

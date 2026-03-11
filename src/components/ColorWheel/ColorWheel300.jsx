@@ -1,38 +1,95 @@
+import { useEffect, useMemo, useState } from 'react';
 import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
-import Paths300 from './wheel-300-svg.js';
 import LabelArcs from '@components/ColorWheel/LabelArcs';
 
+const BASES = {
+  labels: '/wheels/wheel-300-labels.svg',
+  'labels-degrees': '/wheels/wheel-300-labels-degrees.svg',
+};
 
+export default function ColorWheel300({
+  currentColor,
+  children,
+  base = 'labels',
+  staticBase = true,
+}) {
+  const hue = Number(currentColor?.hcl_h);
+  const hasHue = Number.isFinite(hue);
+  const [inlineBase, setInlineBase] = useState(null);
+  const baseSrc = BASES[base] || BASES.labels;
 
+  useEffect(() => {
+    if (staticBase) {
+      setInlineBase(null);
+      return;
+    }
+    let alive = true;
+    import('./wheel-300-svg.js')
+      .then((mod) => {
+        if (alive) setInlineBase(mod.default || null);
+      })
+      .catch(() => {
+        if (alive) setInlineBase(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [staticBase, base]);
 
-export default function ColorWheel300({ currentColor, children }) {
-  //get angles of current scheme
-   //const angleDefs = scheme?.angles || [];
-
-
-
+  const fallbackSvg = useMemo(() => {
+    if (!inlineBase) return null;
+    return (
+      <svg
+        className="wheel300-base wheel300-fallback"
+        height={300}
+        width={300}
+        viewBox="0 0 300 300"
+        aria-hidden="true"
+      >
+        <g dangerouslySetInnerHTML={{ __html: inlineBase }} />
+        <LabelArcs width={300} />
+      </svg>
+    );
+  }, [inlineBase]);
 
   return (
-    <svg id="wheel300" height={300} width={300} viewBox="0 0 300 300"
-      alt="HCL Color Wheel"
-      className="max-w-full h-auto my-4"
-    
-    >
-      <g 
-          dangerouslySetInnerHTML={{ __html: Paths300 }}>
-      </g>
-      <LabelArcs width={300} />
-      <ColorWheelIndicator
+    <div className="wheel300-stack" aria-label="HCL Color Wheel">
+      {staticBase && !inlineBase && (
+        <img
+          className="wheel300-base"
+          src={baseSrc}
+          alt="HCL Color Wheel"
+          onError={async () => {
+            try {
+              const mod = await import('./wheel-300-svg.js');
+              setInlineBase(mod.default || null);
+            } catch {
+              setInlineBase(null);
+            }
+          }}
+        />
+      )}
+      {inlineBase && fallbackSvg}
+      <svg
+        id="wheel300"
+        className="wheel300-overlay"
+        height={300}
+        width={300}
+        viewBox="0 0 300 300"
+        aria-hidden="true"
+      >
+        {hasHue && (
+          <ColorWheelIndicator
             key={'base'}
-            hue={(currentColor?.hcl_h) % 360}
+            hue={hue % 360}
             center={150}
             radius={150}
             strokeColor="black"
           />
-
-     {children}
-
-    </svg>
+        )}
+        {children}
+      </svg>
+    </div>
   );
 }
 

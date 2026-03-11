@@ -4,6 +4,7 @@ import { API_FOLDER } from "@helpers/config";
 import "./admin-playlists.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const DELETE_URL = `${API_FOLDER}/v2/admin/playlists/delete.php`;
 
 export default function AdminPlaylistsPage() {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ export default function AdminPlaylistsPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchPlaylists();
@@ -30,6 +32,30 @@ export default function AdminPlaylistsPage() {
       setError(err?.message || "Failed to load playlists");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDelete(row) {
+    if (!row?.playlist_id) return;
+    if (!window.confirm(`Delete playlist #${row.playlist_id}?`)) return;
+    setError("");
+    setDeletingId(row.playlist_id);
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlist_id: row.playlist_id }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      const data = JSON.parse(text);
+      if (!data?.ok) throw new Error(data?.error || "Delete failed");
+      setItems((prev) => prev.filter((item) => item.playlist_id !== row.playlist_id));
+    } catch (err) {
+      setError(err?.message || "Delete failed");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -72,17 +98,29 @@ export default function AdminPlaylistsPage() {
 
         <div className="panel-list">
           {filtered.map((row) => (
-            <button
+            <div
               key={row.playlist_id}
-              type="button"
               className="list-row"
-              onClick={() => navigate(`/admin/playlists/${row.playlist_id}`)}
             >
-              <div className="row-title">{row.title || "Untitled"}</div>
-              <div className="row-meta">
-                #{row.playlist_id} • {row.type} • {row.is_active ? "Active" : "Inactive"}
-              </div>
-            </button>
+              <button
+                type="button"
+                className="list-row-main"
+                onClick={() => navigate(`/admin/playlists/${row.playlist_id}`)}
+              >
+                <div className="row-title">{row.title || "Untitled"}</div>
+                <div className="row-meta">
+                  #{row.playlist_id} • {row.type} • {row.is_active ? "Active" : "Inactive"}
+                </div>
+              </button>
+              <button
+                type="button"
+                className="list-row-delete"
+                onClick={() => handleDelete(row)}
+                disabled={deletingId === row.playlist_id}
+              >
+                {deletingId === row.playlist_id ? "Deleting..." : "Delete"}
+              </button>
+            </div>
           ))}
         </div>
       </div>
