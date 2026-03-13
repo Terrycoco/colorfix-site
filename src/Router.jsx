@@ -5,22 +5,22 @@ import App from './App.jsx';
 import MainLayout from '@layout/MainLayout';
 import ScrollToTop from '@layout/ScrollToTop';
 
-import AboutPage from '@pages/AboutPage';
-import LoginPage from '@pages/login/LoginPage';
-import SearchPage from '@pages/SearchPage';
-import MobileDetailPage from '@pages/MobileDetailPage';
-import GalleryPage from '@pages/GalleryPage';
-import SideBySidePage from '@pages/SideBySidePage';
-import MyPalettePage from '@pages/MyPalettePage';
-import AdvancedSearchPage from '@pages/AdvancedSearchPage';
-import AdvancedResultsPage from '@pages/AdvancedResultsPage';
-import MatchResultsPage from '@pages/MatchResultsPage';
-import QuickFindPage from '@pages/QuickFindPage';
-import BrowsePalettesPage from '@pages/BrowsePalettesPage';
-import PaletteTranslationPage from '@pages/PaletteTranslationPage';
-import { HOALandingPage, HOAExplainerPage, HOAContactPage } from "@pages/HOAPage";
-
-
+const AboutPage = lazy(() => import('@pages/AboutPage'));
+const LoginPage = lazy(() => import('@pages/login/LoginPage'));
+const SearchPage = lazy(() => import('@pages/SearchPage'));
+const MobileDetailPage = lazy(() => import('@pages/MobileDetailPage'));
+const GalleryPage = lazy(() => import('@pages/GalleryPage'));
+const SideBySidePage = lazy(() => import('@pages/SideBySidePage'));
+const MyPalettePage = lazy(() => import('@pages/MyPalettePage'));
+const AdvancedSearchPage = lazy(() => import('@pages/AdvancedSearchPage'));
+const AdvancedResultsPage = lazy(() => import('@pages/AdvancedResultsPage'));
+const MatchResultsPage = lazy(() => import('@pages/MatchResultsPage'));
+const QuickFindPage = lazy(() => import('@pages/QuickFindPage'));
+const BrowsePalettesPage = lazy(() => import('@pages/BrowsePalettesPage'));
+const PaletteTranslationPage = lazy(() => import('@pages/PaletteTranslationPage'));
+const HOALandingPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOALandingPage })));
+const HOAExplainerPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAExplainerPage })));
+const HOAContactPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAContactPage })));
 
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
 const CategoryEditPage = lazy(() => import('@pages/CategoryEditPage'));
@@ -43,6 +43,7 @@ const AdminPalettePhotosPage = lazy(() => import('@pages/AdminPalettePhotosPage'
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
+const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
@@ -122,23 +123,23 @@ function AppRouter() {
           {/* USER-FACING PAGES ⤵ wrapped by MainLayout (capped, centered) */}
           <Route element={<MainLayout />}>
             <Route index element={<Navigate to="/results/4" replace />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="results/:queryId" element={<GalleryPage />} />
-            <Route path="color/:id" element={<MobileDetailPage />} />
-            <Route path="sbs" element={<SideBySidePage />} />
-            <Route path="my-palette" element={<MyPalettePage />} />
-            <Route path="adv-search" element={<AdvancedSearchPage />} />
-            <Route path="adv-results" element={<AdvancedResultsPage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="about" element={<AboutPage />} />
-            <Route path="matches" element={<MatchResultsPage />} />
-           <Route path="quick-find" element={<QuickFindPage />} />
-           <Route path="browse-palettes" element={<BrowsePalettesPage />} />
-           <Route path="palette/:id/brands" element={<PaletteTranslationPage  />} />
-           <Route path="/palette/translate" element={<PaletteTranslationPage />} />   
-           <Route path="/hoa" element={<HOALandingPage />} />
-            <Route path="/hoa/explain" element={<HOAExplainerPage />} />
-            <Route path="/hoa/contact" element={<HOAContactPage />} />
+            <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
+            <Route path="results/:queryId" element={renderWithSuspense(GalleryPage, 'Loading results…')} />
+            <Route path="color/:id" element={renderWithSuspense(MobileDetailPage, 'Loading color…')} />
+            <Route path="sbs" element={renderWithSuspense(SideBySidePage, 'Loading comparison…')} />
+            <Route path="my-palette" element={renderWithSuspense(MyPalettePage, 'Loading palette…')} />
+            <Route path="adv-search" element={renderWithSuspense(AdvancedSearchPage, 'Loading search…')} />
+            <Route path="adv-results" element={renderWithSuspense(AdvancedResultsPage, 'Loading results…')} />
+            <Route path="login" element={renderWithSuspense(LoginPage, 'Loading login…')} />
+            <Route path="about" element={renderWithSuspense(AboutPage, 'Loading about…')} />
+            <Route path="matches" element={renderWithSuspense(MatchResultsPage, 'Loading matches…')} />
+           <Route path="quick-find" element={renderWithSuspense(QuickFindPage, 'Loading quick find…')} />
+           <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />
+           <Route path="palette/:id/brands" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
+           <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />   
+           <Route path="/hoa" element={renderWithSuspense(HOALandingPage, 'Loading HOA…')} />
+            <Route path="/hoa/explain" element={renderWithSuspense(HOAExplainerPage, 'Loading HOA info…')} />
+            <Route path="/hoa/contact" element={renderWithSuspense(HOAContactPage, 'Loading contact…')} />
             <Route path="articles/:id" element={renderWithSuspense(ArticlePage, 'Loading article…')} />
 
            
@@ -227,6 +228,10 @@ function AppRouter() {
             <Route
               path="articles"
               element={renderWithSuspense(AdminArticlesPage, 'Loading articles…')}
+            />
+            <Route
+              path="projects"
+              element={renderWithSuspense(AdminProjectsPage, 'Loading projects…')}
             />
             <Route
               path="qr-sheets"

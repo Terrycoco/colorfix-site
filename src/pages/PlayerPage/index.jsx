@@ -5,6 +5,7 @@ import CTALayout from "@components/cta/CTALayout";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
 import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
+import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
 import './playerpage.css';
 
 export default function PlayerPage() {
@@ -19,6 +20,7 @@ export default function PlayerPage() {
   const demoParam = searchParams.get("demo") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
   const returnToParam = searchParams.get("return_to") ?? "";
+  const debugTimingParam = searchParams.get("debug_timing") ?? "";
   const returnTo = resolveReturnTo(returnToParam);
 
 
@@ -67,6 +69,7 @@ export default function PlayerPage() {
     if (startParam !== "") params.set("start", startParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
+    if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
     params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
@@ -79,13 +82,21 @@ export default function PlayerPage() {
         if (!payload?.ok || !payload?.data) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
+        if (payload?.timing_ms && typeof window !== "undefined") {
+          console.log("player-playlist timing_ms", payload.timing_ms);
+        }
         setData(payload.data);
       })
       .catch((err) => {
         setError(err?.message || "Failed to load playlist");
       })
       .finally(() => setLoading(false));
-  }, [playlistId, start, searchParams, addCtaGroup, ctaAudience]);
+  }, [playlistId, start, searchParams, addCtaGroup, ctaAudience, debugTimingParam]);
+
+  useEffect(() => {
+    if (!data?.playlist_instance_id) return;
+    recordLastPlaylistInstanceId(data.playlist_instance_id);
+  }, [data?.playlist_instance_id]);
 
 
 
@@ -191,7 +202,7 @@ const ctas = useMemo(() => {
         if (decoded && typeof decoded === "object") {
           parsedParams = decoded;
         }
-      } catch (err) {
+      } catch {
         parsedParams = {};
       }
     } else if (cta?.params && typeof cta.params === "object") {
@@ -312,10 +323,15 @@ const visibleCTAs = useMemo(
 
         const setItemIds = playlistItems.map((item) => Number(item.playlist_instance_id));
         const currentId = Number(data?.playlist_instance_id);
+        const currentPlaylistId = Number(data?.playlist_id);
         const seen = readWatchNextSeen(setId);
+        const seenPlaylistIds = readWatchNextSeenPlaylists(setId);
         const nextItem = playlistItems.find((item) => {
           const pid = Number(item.playlist_instance_id);
+          const playlistItemId = Number(item.playlist_id);
           if (!pid || pid === currentId) return false;
+          if (playlistItemId && currentPlaylistId && playlistItemId === currentPlaylistId) return false;
+          if (playlistItemId && seenPlaylistIds.includes(playlistItemId)) return false;
           return !seen.includes(pid);
         });
 
@@ -324,7 +340,7 @@ const visibleCTAs = useMemo(
           return;
         }
 
-        const resolvedTitle = nextItem.title || baseCta?.params?.title || "Next Playlist";
+        const resolvedTitle = nextItem.title || baseCta?.params?.title || "Suggested Playlists";
         const resolvedSubtitle = baseCta?.params?.subtitle || baseCta?.params?.dek || "";
         const resolvedThumb = nextItem.photo_url || "";
         const resolved = {
@@ -340,14 +356,18 @@ const visibleCTAs = useMemo(
           data: {
             ...(baseCta?.data || {}),
             playlist_instance_id: Number(nextItem.playlist_instance_id),
+            playlist_id: Number(nextItem.playlist_id) || undefined,
           },
         };
         setWatchNextCta(resolved);
 
         if (playbackEnded && currentId && setItemIds.includes(currentId)) {
           markWatchNextSeen(setId, currentId);
+          if (currentPlaylistId) {
+            markWatchNextSeenPlaylist(setId, currentPlaylistId);
+          }
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setWatchNextCta(null);
         }
@@ -379,7 +399,7 @@ const visibleCTAs = useMemo(
             }}
         />
         {playbackEnded && (
-          <PlayerEndScreen onExit={handleExit}>
+          <PlayerEndScreen scrollable={Boolean(watchNextCta)}>
             {orderedCTAs.length > 0 && (
               <CTALayout
                 layout="stacked"
@@ -413,6 +433,29 @@ function markWatchNextSeen(setId, playlistInstanceId) {
   const next = [...current, playlistInstanceId];
   try {
     sessionStorage.setItem(`cf_watch_next_seen_${setId}`, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function readWatchNextSeenPlaylists(setId) {
+  if (typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(`cf_watch_next_seen_playlist_${setId}`);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markWatchNextSeenPlaylist(setId, playlistId) {
+  if (typeof sessionStorage === "undefined") return;
+  const current = readWatchNextSeenPlaylists(setId);
+  if (current.includes(playlistId)) return;
+  const next = [...current, playlistId];
+  try {
+    sessionStorage.setItem(`cf_watch_next_seen_playlist_${setId}`, JSON.stringify(next));
   } catch {
     // ignore
   }

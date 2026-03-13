@@ -5,8 +5,8 @@ cat-text {
 
 .wheel300-stack {
   position: relative;
-  width: 300px;
-  height: 300px;
+  width: min(100%, var(--wheel-size, 300px));
+  aspect-ratio: 1 / 1;
   max-width: 100%;
   overflow: visible;
 }

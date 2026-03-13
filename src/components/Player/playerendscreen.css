@@ -1,8 +1,8 @@
 .player-end-screen {
   position: absolute;
   inset: 0;
-  height: 100%;
   padding: 24px 16px calc(240px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 
   display: flex;
   flex-direction: column;
@@ -10,8 +10,24 @@
 
   background: #000;
   z-index: 20;
+  overflow: hidden;
+}
+
+.player-end-screen.has-actions {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.player-end-screen.has-actions::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.player-end-screen.is-empty {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 .player-end-screen .player-exit {
@@ -28,6 +44,14 @@
   gap: 24px;
   padding-bottom: calc(260px + env(safe-area-inset-bottom));
   padding-top: 56px;
+}
+
+.player-end-screen-inner.has-actions {
+  min-height: max-content;
+}
+
+.player-end-screen-inner.is-empty {
+  padding-bottom: 0;
 }
 
 .player-replay-btn {
@@ -87,7 +111,7 @@
 @media (max-width: 640px) {
   .player-end-screen-inner {
     justify-content: flex-start;
-    padding-top: 24px;
+    padding-top: calc(72px + env(safe-area-inset-top));
   }
 }
 
@@ -109,6 +133,7 @@
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.88);
   box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -120,5 +145,14 @@
 .player-end-branding strong {
   font-weight: 600;
   color: var(--brand-color);
+}
 
+.player-end-branding-link {
+  color: inherit;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.player-end-branding-link:hover {
+  opacity: 0.9;
 }

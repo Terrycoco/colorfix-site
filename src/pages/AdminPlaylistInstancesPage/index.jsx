@@ -18,6 +18,7 @@ const AUDIENCE_OPTIONS = [
   { value: "hoa", label: "HOA" },
   { value: "homeowner", label: "Homeowner" },
   { value: "contractor", label: "Contractor" },
+  { value: "pinterest", label: "Pinterest" },
   { value: "admin", label: "Admin" },
 ];
 
@@ -56,6 +57,7 @@ function coerceBoolean(value) {
 export default function AdminPlaylistInstancesPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [audienceFilter, setAudienceFilter] = useState("all");
   const [items, setItems] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [ctaLibrary, setCtaLibrary] = useState([]);
@@ -262,6 +264,21 @@ export default function AdminPlaylistInstancesPage() {
     setSaveError("");
   }
 
+  function handleDuplicate() {
+    const sourceId = form.playlist_instance_id;
+    if (!sourceId) return;
+    setActiveId(null);
+    setForm({
+      ...emptyInstance,
+      ...form,
+      playlist_instance_id: null,
+      created_from_instance: sourceId,
+      cta_overrides: JSON.parse(JSON.stringify(form.cta_overrides || {})),
+    });
+    setSaveStatus("");
+    setSaveError("");
+  }
+
   function buildShareUrl(id) {
     if (!id) return "";
     return `${SHARE_FOLDER}/playlist.php?id=${id}`;
@@ -307,6 +324,12 @@ export default function AdminPlaylistInstancesPage() {
     }
     const body = encodeURIComponent(url);
     window.location.href = `sms:&body=${body}`;
+  }
+
+  function handleCopyLink() {
+    const id = activeId || form.playlist_instance_id;
+    if (!id || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(buildShareUrl(id)).catch(() => {});
   }
 
   function openEmailModal() {
@@ -451,15 +474,26 @@ export default function AdminPlaylistInstancesPage() {
       const bLabel = String(b?.instance_name || b?.display_title || b?.playlist_instance_id || "").toLowerCase();
       return aLabel.localeCompare(bLabel);
     });
-    if (!query.trim()) return sorted;
-    const needle = query.trim().toLowerCase();
     return sorted.filter((item) => {
+      const itemAudience = String(item?.audience || "any").toLowerCase();
+      if (audienceFilter !== "all" && itemAudience !== audienceFilter) {
+        return false;
+      }
+      if (!query.trim()) return true;
+      const needle = query.trim().toLowerCase();
       const name = (item?.instance_name || "").toLowerCase();
       const displayTitle = (item?.display_title || "").toLowerCase();
       const id = String(item?.playlist_instance_id || "");
       return name.includes(needle) || displayTitle.includes(needle) || id.includes(needle);
     });
-  }, [items, query]);
+  }, [audienceFilter, items, query]);
+
+  const audienceLabelMap = useMemo(() => {
+    return AUDIENCE_OPTIONS.reduce((acc, option) => {
+      acc[option.value] = option.label;
+      return acc;
+    }, {});
+  }, []);
 
   const playlistOptions = useMemo(() => {
     return playlists.map((row) => ({
@@ -569,6 +603,14 @@ export default function AdminPlaylistInstancesPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
+            <option value="all">All audiences</option>
+            {AUDIENCE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <button type="button" onClick={fetchInstances}>
             Refresh
           </button>
@@ -588,7 +630,9 @@ export default function AdminPlaylistInstancesPage() {
               <div className="row-title">
                 #{item.playlist_instance_id} {item.instance_name || "Untitled"}
               </div>
-          
+              <div className="row-audience">
+                {audienceLabelMap[item.audience] || item.audience || "Any"}
+              </div>
             </button>
           ))}
         </div>
@@ -603,6 +647,9 @@ export default function AdminPlaylistInstancesPage() {
             <div className="mobile-share__selected">Select an instance to share</div>
           )}
           <div className="mobile-share__actions">
+            <button type="button" onClick={handleCopyLink} disabled={!activeId}>
+              Copy Link
+            </button>
             <button type="button" className="primary-btn" onClick={handleShare} disabled={!activeId}>
               Share via Text
             </button>
@@ -612,7 +659,7 @@ export default function AdminPlaylistInstancesPage() {
           </div>
           {activeId && (
             <div className="mobile-share__hint">
-              Link: {buildShareUrl(activeId)}
+              {buildShareUrl(activeId)}
             </div>
           )}
         </div>
@@ -624,12 +671,26 @@ export default function AdminPlaylistInstancesPage() {
             {form.playlist_instance_id ? `Instance #${form.playlist_instance_id}` : "New Instance"}
           </div>
           <div className="panel-actions">
-             <button
+            <button
               type="button"
               className="primary-btn"
               onClick={() => navigate("/admin/playlists/new")}
             >
               New Playlist
+            </button>
+            <button
+              type="button"
+              onClick={handleDuplicate}
+              disabled={!form.playlist_instance_id}
+            >
+              Copy Instance
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              disabled={!form.playlist_instance_id}
+            >
+              Copy Link
             </button>
             <button
               type="button"

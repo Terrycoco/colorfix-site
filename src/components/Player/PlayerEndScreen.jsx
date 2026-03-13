@@ -3,12 +3,15 @@ import "./playerendscreen.css";
 export default function PlayerEndScreen({
   children = null,
   showBranding = true,
-  onExit,
+  scrollable = false,
 }) {
+  const hasActions = Boolean(children);
+  const canScroll = hasActions && scrollable;
+
   return (
-    <div className="player-end-screen">
-      <div className="player-end-screen-inner">
-        {children && (
+    <div className={`player-end-screen${canScroll ? " has-actions" : " is-empty"}`}>
+      <div className={`player-end-screen-inner${canScroll ? " has-actions" : " is-empty"}`}>
+        {hasActions && (
           <div className="player-end-actions">
             {children}
           </div>
@@ -17,7 +20,10 @@ export default function PlayerEndScreen({
 
       {showBranding && (
         <div className="player-end-branding">
-          Brought to you by <strong>ColorFix</strong>
+          Brought to you by{" "}
+          <a href="/" className="player-end-branding-link">
+            <strong>ColorFix</strong>
+          </a>
         </div>
       )}
     </div>

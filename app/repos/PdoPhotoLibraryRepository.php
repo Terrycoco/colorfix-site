@@ -22,6 +22,23 @@ class PdoPhotoLibraryRepository
         return $row ?: null;
     }
 
+    public function findIdBySource(string $sourceType, ?int $sourceId): ?int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id
+               FROM photo_library
+              WHERE source_type = :source_type
+                AND source_id <=> :source_id
+              LIMIT 1"
+        );
+        $stmt->execute([
+            ':source_type' => $sourceType,
+            ':source_id' => $sourceId,
+        ]);
+        $id = $stmt->fetchColumn();
+        return $id ? (int)$id : null;
+    }
+
     public function findIdBySourceAndRel(string $sourceType, ?int $sourceId, string $relPath): ?int
     {
         $stmt = $this->pdo->prepare(

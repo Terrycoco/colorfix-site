@@ -49,6 +49,13 @@ class PhotoLibraryService
             $fallbackType = $sourceType === 'saved_before' ? 'saved_palette_photo' : 'saved_before';
             $existingId = $this->repo->findIdBySourceAndRel($fallbackType, $sourceId, $relPath);
         }
+        if (!$existingId) {
+            $existingId = $this->repo->findIdBySource($sourceType, $sourceId);
+        }
+        if (!$existingId) {
+            $fallbackType = $sourceType === 'saved_before' ? 'saved_palette_photo' : 'saved_before';
+            $existingId = $this->repo->findIdBySource($fallbackType, $sourceId);
+        }
         if ($existingId) {
             $this->repo->update($existingId, $data);
             return $existingId;

@@ -91,6 +91,7 @@ class PdoAppliedPalettePhotoRepository
         }
 
         $allowed = [
+            'rel_path',
             'photo_type',
             'trigger_mode',
             'trigger_color_id',

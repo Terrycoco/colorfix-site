@@ -12,6 +12,7 @@ const DELETE_URL = `${API_FOLDER}/v2/admin/playlists/delete.php`;
 const AP_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
+const PHOTO_LIBRARY_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
 const emptyPlaylist = {
   playlist_id: null,
@@ -59,6 +60,7 @@ export default function AdminPlaylistEditorPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [photoPickerIndex, setPhotoPickerIndex] = useState(null);
+  const [photoThumbs, setPhotoThumbs] = useState({});
   const didLoadDraft = useRef(false);
 
   useEffect(() => {
@@ -107,6 +109,54 @@ export default function AdminPlaylistEditorPage() {
   useEffect(() => {
     fetchSavedPalettes();
   }, []);
+
+  useEffect(() => {
+    const missingIds = Array.from(new Set(
+      items
+        .map((item) => {
+          const photoId = String(getPhotoLibraryId(item) || "").trim();
+          if (!photoId) return "";
+          const parsed = parsePhotoRef(item?.image_url || "");
+          if (parsed.url) return "";
+          if (item?.image_url && !String(item.image_url).startsWith("photo:")) return "";
+          if (photoThumbs[photoId]) return "";
+          return photoId;
+        })
+        .filter(Boolean)
+    ));
+    if (missingIds.length === 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("photo_library_ids", missingIds.join(","));
+        params.set("limit", String(Math.max(missingIds.length, 1)));
+        params.set("_", Date.now().toString());
+        const res = await fetch(`${PHOTO_LIBRARY_LIST_URL}?${params.toString()}`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok || cancelled) return;
+        setPhotoThumbs((prev) => {
+          const next = { ...prev };
+          for (const row of data.items || []) {
+            const id = String(row?.photo_library_id || "").trim();
+            if (!id) continue;
+            next[id] = row?.rel_path || "";
+          }
+          return next;
+        });
+      } catch {
+        // ignore thumb lookups; editor should remain usable
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items, photoThumbs]);
 
   async function fetchPlaylist(id) {
     setLoading(true);
@@ -181,7 +231,7 @@ export default function AdminPlaylistEditorPage() {
         };
       });
       setApOptions(options);
-    } catch (err) {
+    } catch {
       // optional convenience list; ignore errors
     }
   }
@@ -213,7 +263,7 @@ export default function AdminPlaylistEditorPage() {
         };
       });
       setSavedOptions(options);
-    } catch (err) {
+    } catch {
       // optional convenience list; ignore errors
     }
   }
@@ -240,7 +290,7 @@ export default function AdminPlaylistEditorPage() {
         )
       ).sort((a, b) => a.localeCompare(b));
       setPlaylistTypes(types);
-    } catch (err) {
+    } catch {
       // optional convenience list; ignore errors
     }
   }
@@ -345,6 +395,14 @@ export default function AdminPlaylistEditorPage() {
   const getPhotoLibraryId = (item) => {
     if (item?.photo_library_id) return item.photo_library_id;
     return parsePhotoRef(item?.image_url || "").photoId || "";
+  };
+
+  const getItemPhotoThumb = (item) => {
+    const parsed = parsePhotoRef(item?.image_url || "");
+    if (parsed.url) return parsed.url;
+    if (item?.image_url && !String(item.image_url).startsWith("photo:")) return item.image_url;
+    const photoId = String(getPhotoLibraryId(item) || "").trim();
+    return photoThumbs[photoId] || "";
   };
 
   async function handleSave() {
@@ -585,6 +643,16 @@ export default function AdminPlaylistEditorPage() {
               <div className="item-cell item-photo">
                 Photo
                 <div className="item-inline">
+                  {getItemPhotoThumb(item) ? (
+                    <img
+                      className="item-photo-thumb"
+                      src={getItemPhotoThumb(item)}
+                      alt=""
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="item-photo-thumb item-photo-thumb--empty" aria-hidden="true" />
+                  )}
                   <input
                     type="text"
                     value={getPhotoLibraryId(item)}

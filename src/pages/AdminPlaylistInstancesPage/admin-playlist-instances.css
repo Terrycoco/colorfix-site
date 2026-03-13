@@ -52,6 +52,13 @@
   border: 1px solid #ddd;
 }
 
+.panel-controls select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
 .panel-controls button,
 .panel-actions button,
 .primary-btn {
@@ -117,6 +124,13 @@
 .row-meta {
   font-size: 12px;
   color: #666;
+}
+
+.row-audience {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8a8a8a;
+  text-transform: none;
 }
 
 .mobile-share {

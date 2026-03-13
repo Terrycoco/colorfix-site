@@ -7,15 +7,16 @@ use App\Services\PhotoCompressionService;
 
 function usage(): void
 {
-    echo "Usage: php scripts/compress_photos.php [--root=PATH] [--min-mb=MB] [--quality=Q] [--png-level=LEVEL] [--strip] [--dry-run] [--full]\n";
-    echo "Defaults: --root=../photos --min-mb=1 --quality=88 --png-level=9 (no strip, saved-palettes only)\n";
+    echo "Usage: php scripts/compress_photos.php [--root=PATH] [--min-mb=MB] [--quality=Q] [--png-level=LEVEL] [--max-dim=PX] [--strip] [--dry-run] [--full]\n";
+    echo "Defaults: --root=../photos --min-mb=1 --quality=92 --png-level=9 (no strip, no resize, saved-palettes only)\n";
 }
 
 $opts = [
     'root' => null,
     'min_mb' => 1,
-    'quality' => 88,
+    'quality' => 92,
     'png_level' => 9,
+    'max_dim' => 0,
     'dry_run' => false,
     'strip' => false,
     'skip_scope' => false,
@@ -30,6 +31,8 @@ foreach ($argv as $arg) {
         $opts['quality'] = (int)substr($arg, 10);
     } elseif (str_starts_with($arg, '--png-level=')) {
         $opts['png_level'] = (int)substr($arg, 12);
+    } elseif (str_starts_with($arg, '--max-dim=')) {
+        $opts['max_dim'] = (int)substr($arg, 10);
     } elseif ($arg === '--dry-run') {
         $opts['dry_run'] = true;
     } elseif ($arg === '--strip') {
@@ -57,6 +60,7 @@ try {
         'quality' => $opts['quality'],
         'min_bytes' => $minBytes,
         'png_level' => $opts['png_level'],
+        'max_dim' => $opts['max_dim'],
         'dry_run' => $opts['dry_run'],
         'strip' => $opts['strip'],
         'skip_scope' => $opts['skip_scope'],
@@ -70,6 +74,7 @@ echo "Root: {$result['root']}\n";
 echo "Min bytes: {$result['min_bytes']}\n";
 echo "JPEG quality: {$result['quality']}\n";
 echo "PNG level: {$result['png_level']}\n";
+echo "Max dimension: {$result['max_dim']}\n";
 echo "Strip metadata: " . (!empty($result['strip']) ? 'yes' : 'no') . "\n";
 echo "Dry run: " . ($result['dry_run'] ? 'yes' : 'no') . "\n";
 echo "JPEG compressed: {$result['jpeg_count']}\n";

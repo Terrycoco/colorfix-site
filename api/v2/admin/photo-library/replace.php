@@ -8,11 +8,31 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoAppliedPalettePhotoRepository;
 
 function respond(int $code, array $payload): void {
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+function refreshPlaylistPhotoRefs(PDO $pdo, int $photoLibraryId, string $newRelPath): void
+{
+    if ($photoLibraryId <= 0 || $newRelPath === '') {
+        return;
+    }
+
+    $prefix = 'photo:' . $photoLibraryId . '|';
+    $stmt = $pdo->prepare(
+        "UPDATE playlist_items
+            SET image_url = :image_url
+          WHERE photo_library_id = :photo_library_id"
+    );
+    $stmt->execute([
+        ':image_url' => $prefix . $newRelPath,
+        ':photo_library_id' => $photoLibraryId,
+    ]);
 }
 
 try {
@@ -59,11 +79,20 @@ try {
 
     $relPathRaw = (string)$row['rel_path'];
     $relPath = $relPathRaw === '' ? '' : ('/' . ltrim($relPathRaw, '/'));
+    $sourceType = (string)($row['source_type'] ?? '');
+    $sourceId = isset($row['source_id']) ? (int)$row['source_id'] : 0;
     $publicRoot = realpath(__DIR__ . '/../../../..') ?: rtrim(__DIR__ . '/../../../..', '/');
     $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? $publicRoot), '/');
 
-    $primaryAbs = $docRoot . $relPath;
-    $fallbackAbs = $publicRoot . $relPath;
+    $pathInfo = pathinfo($relPath);
+    $dirPart = (string)($pathInfo['dirname'] ?? '');
+    $filenamePart = (string)($pathInfo['filename'] ?? 'photo');
+    $newRelPath = ($dirPart === '' || $dirPart === '.')
+        ? '/' . $filenamePart . '.' . $ext
+        : rtrim($dirPart, '/') . '/' . $filenamePart . '.' . $ext;
+
+    $primaryAbs = $docRoot . $newRelPath;
+    $fallbackAbs = $publicRoot . $newRelPath;
 
     $ensureDir = static function (string $path): void {
         $dir = dirname($path);
@@ -94,13 +123,41 @@ try {
         }
     }
 
-    // Touch row updated_at (rel_path unchanged)
-    $repo->update($id, ['rel_path' => $relPathRaw]);
+    if ($newRelPath !== $relPath) {
+        $oldPrimaryAbs = $docRoot . $relPath;
+        $oldFallbackAbs = $publicRoot . $relPath;
+        if (is_file($oldPrimaryAbs) && $oldPrimaryAbs !== $primaryAbs) {
+            @unlink($oldPrimaryAbs);
+        }
+        if ($oldFallbackAbs !== $oldPrimaryAbs && is_file($oldFallbackAbs) && $oldFallbackAbs !== $fallbackAbs) {
+            @unlink($oldFallbackAbs);
+        }
+    }
+
+    $repo->update($id, ['rel_path' => ltrim($newRelPath, '/') === $relPathRaw ? $relPathRaw : $newRelPath]);
+
+    if ($sourceId > 0) {
+        if ($sourceType === 'saved_palette_photo' || $sourceType === 'saved_before') {
+            $savedRepo = new PdoSavedPaletteRepository($pdo);
+            $photo = $savedRepo->getPhotoById($sourceId);
+            if ($photo) {
+                $savedRepo->updatePhoto($sourceId, (int)$photo['saved_palette_id'], ['rel_path' => $newRelPath]);
+            }
+        } elseif ($sourceType === 'applied_palette_photo' || $sourceType === 'applied_before') {
+            $appliedRepo = new PdoAppliedPalettePhotoRepository($pdo);
+            $photo = $appliedRepo->getPhotoById($sourceId);
+            if ($photo) {
+                $appliedRepo->updatePhoto($sourceId, (int)$photo['applied_palette_id'], ['rel_path' => $newRelPath]);
+            }
+        }
+    }
+
+    refreshPlaylistPhotoRefs($pdo, $id, $newRelPath);
 
     $writtenPath = $writtenTo ?? null;
     respond(200, [
         'ok' => true,
-        'rel_path' => $relPathRaw,
+        'rel_path' => $newRelPath,
         'written_to' => $writtenPath,
         'doc_root' => $docRoot,
         'public_root' => $publicRoot,

@@ -482,3 +482,22 @@
     flex: 2;
   }
 }
+
+.apv-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.apv-back-to-playlist {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 720px) {
+  .apv-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

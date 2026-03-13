@@ -166,8 +166,8 @@ const handleFindSchemeMatches = async (scheme = selectedScheme) => {
 
 
 
-        <Column>
-            <ColorWheel300 currentColor={currentColorDetail} />
+        <Column width="1/2" className="detail-wheel-column">
+            <ColorWheel300 currentColor={currentColorDetail} base="labels-420" size={540} />
        
             <p className="descr text-sm mt-4">
              {currentColorDetail.hue_cats}
@@ -219,5 +219,3 @@ const handleFindSchemeMatches = async (scheme = selectedScheme) => {
     </div>
   );
 }
-
-

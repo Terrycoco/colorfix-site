@@ -27,6 +27,7 @@ $playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
 $mode = trim((string)($_GET['mode'] ?? ''));
 $addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null;
+$debugTiming = isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0';
 
 if ($playlistInstanceId <= 0) {
     respond(['ok' => false, 'error' => 'playlist_instance_id required'], 400);
@@ -36,10 +37,15 @@ try {
     $service = new PlayerExperienceService($pdo);
     $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start, $mode, $addGroupId);
 
-    respond([
+    $payload = [
         'ok'   => true,
         'data' => $plan,
-    ]);
+    ];
+    if ($debugTiming) {
+        $payload['timing_ms'] = $service->getLastTiming();
+    }
+
+    respond($payload);
 } catch (RuntimeException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 404);
 } catch (Throwable $e) {

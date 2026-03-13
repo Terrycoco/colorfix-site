@@ -22,8 +22,8 @@ try {
     }
 
     $sourceType = isset($_POST['source_type']) ? trim((string)$_POST['source_type']) : '';
-    if (!in_array($sourceType, ['progression', 'article'], true)) {
-        respond(400, ['ok' => false, 'error' => 'source_type must be progression or article']);
+    if (!in_array($sourceType, ['progression', 'article', 'pin'], true)) {
+        respond(400, ['ok' => false, 'error' => 'source_type must be progression, article, or pin']);
     }
 
     if (empty($_FILES['photos'])) {
@@ -49,7 +49,11 @@ try {
     $hasPalette = !empty($_POST['has_palette']);
 
     $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
-    $folderBase = $sourceType === 'article' ? 'articles' : 'progressions';
+    $folderBase = match ($sourceType) {
+        'article' => 'articles',
+        'pin' => 'pins',
+        default => 'progressions',
+    };
     $photosRoot = $docRoot . '/photos/' . $folderBase . '/' . $series;
     if (!is_dir($photosRoot) && !mkdir($photosRoot, 0775, true) && !is_dir($photosRoot)) {
         respond(500, ['ok' => false, 'error' => 'Failed to create upload directory']);

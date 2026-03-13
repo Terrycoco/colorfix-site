@@ -50,6 +50,19 @@
     max-width: 30%;
 }
 
+.detail-wheel-column {
+  align-items: center;
+}
+
+.detail-wheel-column .wheel300-stack {
+  width: min(540px, 100%);
+}
+
+.detail-wheel-column .descr {
+  max-width: 540px;
+  width: 100%;
+}
+
 .gallery-scroll-container {
   max-height: 70vh;       /* or a fixed px value */
   overflow-y: auto;

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import "./photo-picker-modal.css";
 
 export default function PhotoPickerModal({
   open = false,
   title = "Pick Photo",
+  sourceType = "",
   onClose,
   onPick,
 }) {
@@ -40,16 +41,15 @@ export default function PhotoPickerModal({
     }
   }, [query]);
 
-  if (!open) return null;
-
   const listUrl = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
-  const runSearch = async () => {
+  const runSearch = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("q", query.trim());
+      if (sourceType) params.set("source_type", sourceType);
       params.set("limit", "200");
       params.set("_", String(Date.now()));
       const res = await fetch(`${listUrl}?${params.toString()}`, { credentials: "include" });
@@ -62,7 +62,14 @@ export default function PhotoPickerModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [listUrl, query, sourceType]);
+
+  useEffect(() => {
+    if (!open) return;
+    void runSearch();
+  }, [open, runSearch]);
+
+  if (!open) return null;
 
   return (
     <div className="ppm-overlay" role="dialog" aria-modal="true">

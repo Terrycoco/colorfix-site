@@ -44,6 +44,7 @@ $rows = array_map(static function ($item) {
     return [
         'id' => $item->id,
         'playlist_instance_id' => $item->playlistInstanceId,
+        'playlist_id' => $item->playlistId,
         'item_type' => $item->itemType,
         'target_set_id' => $item->targetSetId,
         'title' => $item->title,

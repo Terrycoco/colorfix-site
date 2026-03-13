@@ -288,8 +288,8 @@ export default function MobileDetailPage() {
 
 
 
-            <div className="py-4">
-            <ColorWheel300 currentColor={currentColorDetail} />
+            <div className="py-4 detail-wheel-wrap">
+            <ColorWheel300 currentColor={currentColorDetail} base="labels-420" size={900} />
             </div>
 
 

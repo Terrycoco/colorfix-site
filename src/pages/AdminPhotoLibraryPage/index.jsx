@@ -23,6 +23,7 @@ const SOURCE_OPTIONS = [
   { value: "applied_palette", label: "Applied Palette" },
   { value: "progression", label: "Progression" },
   { value: "article", label: "Article" },
+  { value: "pin", label: "Pin" },
 ];
 
 const defaultUpload = {
@@ -73,6 +74,7 @@ export default function AdminPhotoLibraryPage() {
   const [replaceFiles, setReplaceFiles] = useState({});
   const [replacingId, setReplacingId] = useState(null);
   const [backfillStatus, setBackfillStatus] = useState("");
+  const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
 
   const [savedPalettes, setSavedPalettes] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -181,6 +183,26 @@ export default function AdminPhotoLibraryPage() {
     }));
   }, [savedPalettes]);
 
+  const uploadSeriesLabel = useMemo(() => {
+    if (uploadForm.source_type === "pin") return "Project folder";
+    return "Series (folder label)";
+  }, [uploadForm.source_type]);
+
+  const uploadSeriesPlaceholder = useMemo(() => {
+    if (uploadForm.source_type === "pin") return "mojdeh-interior-makeover";
+    return "ranch-demo";
+  }, [uploadForm.source_type]);
+
+  const uploadTitlePrefixLabel = useMemo(() => {
+    if (uploadForm.source_type === "pin") return "Title prefix";
+    return "Title prefix";
+  }, [uploadForm.source_type]);
+
+  const uploadTitlePrefixPlaceholder = useMemo(() => {
+    if (uploadForm.source_type === "pin") return "Mojdeh pin";
+    return "Ranch progression";
+  }, [uploadForm.source_type]);
+
   const groupOptions = useMemo(() => {
     return [
       { id: "__ungrouped__", label: "Ungrouped" },
@@ -198,8 +220,6 @@ export default function AdminPhotoLibraryPage() {
       setError("");
       try {
         const params = new URLSearchParams();
-        // Tag search is handled client-side to support include/exclude logic.
-        if (filters.tag_mode) params.set("tag_mode", filters.tag_mode);
         if (filters.source_type) params.set("source_type", filters.source_type);
         if (filters.palette_id) params.set("palette_id", filters.palette_id);
         params.set("limit", "200");
@@ -221,7 +241,7 @@ export default function AdminPhotoLibraryPage() {
     return () => {
       active = false;
     };
-  }, [filters, refreshKey]);
+  }, [filters.source_type, filters.palette_id, refreshKey]);
 
   const handleUploadField = (key, value) => {
     setUploadForm((prev) => ({ ...prev, [key]: value }));
@@ -234,6 +254,15 @@ export default function AdminPhotoLibraryPage() {
     setDirtyIds((prev) => {
       const next = new Set(prev);
       next.add(id);
+      return next;
+    });
+  };
+
+  const togglePath = (id) => {
+    setExpandedPathIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -637,24 +666,24 @@ export default function AdminPhotoLibraryPage() {
 
           {showLibraryFields && (
             <label>
-              Series (folder label)
+              {uploadSeriesLabel}
               <input
                 type="text"
                 value={uploadForm.series}
                 onChange={(e) => handleUploadField("series", e.target.value)}
-                placeholder="ranch-demo"
+                placeholder={uploadSeriesPlaceholder}
               />
             </label>
           )}
 
           {showLibraryFields && (
             <label>
-              Title prefix
+              {uploadTitlePrefixLabel}
               <input
                 type="text"
                 value={uploadForm.title_prefix}
                 onChange={(e) => handleUploadField("title_prefix", e.target.value)}
-                placeholder="Ranch progression"
+                placeholder={uploadTitlePrefixPlaceholder}
               />
             </label>
           )}
@@ -884,6 +913,30 @@ export default function AdminPhotoLibraryPage() {
                       >
                         <img src={withCacheBuster(item.rel_path, item.updated_at)} alt="" />
                       </button>
+                      <div className="admin-photo-library__thumb-name">
+                        {item.filename || ""}
+                      </div>
+                      <div className="admin-photo-library__thumb-actions">
+                        <button
+                          type="button"
+                          className="ghost admin-photo-library__thumb-action"
+                          onClick={() => togglePath(item.photo_library_id)}
+                        >
+                          {expandedPathIds.has(item.photo_library_id) ? "Hide path" : "Path"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost admin-photo-library__thumb-action"
+                          onClick={() => navigator.clipboard.writeText(item.rel_path || "")}
+                        >
+                          Copy path
+                        </button>
+                      </div>
+                      {expandedPathIds.has(item.photo_library_id) && (
+                        <div className="admin-photo-library__thumb-path">
+                          {item.rel_path || ""}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className="admin-photo-library__text-stack">
@@ -947,6 +1000,9 @@ export default function AdminPhotoLibraryPage() {
                         <a className="ghost" href={withCacheBuster(item.rel_path, item.updated_at)} download>
                           Download
                         </a>
+                        <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
+                          Delete
+                        </button>
                         {groupId && groupId !== "__ungrouped__" && (
                           inGroup(item.photo_library_id) ? (
                             <button
@@ -979,12 +1035,10 @@ export default function AdminPhotoLibraryPage() {
                             )
                           }
                         />
+                        <span className="admin-photo-library__replace-name">
+                          {replaceFiles[item.photo_library_id]?.name || "No file chosen"}
+                        </span>
                       </label>
-                      {(item.source_type === "progression" || item.source_type === "article") && (
-                        <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
-                          Delete
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ))}

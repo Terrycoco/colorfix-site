@@ -15,6 +15,9 @@ use RuntimeException;
 
 final class PlayerExperienceService
 {
+    /** @var array<string, float> */
+    private array $lastTiming = [];
+
     public function __construct(
         private PDO $pdo
     ) {}
@@ -25,17 +28,22 @@ final class PlayerExperienceService
         ?string $ctaContext = null,
         ?int $addCtaGroupId = null
     ): array {
+        $startedAt = microtime(true);
+
         // 1. Load playlist instance
         $instanceRepo = new PdoPlaylistInstanceRepository($this->pdo);
         $instance = $instanceRepo->getById($playlistInstanceId);
+        $this->markTiming('load_instance', $startedAt);
 
         if (!$instance instanceof PlaylistInstance) {
             throw new RuntimeException("Playlist instance not found: {$playlistInstanceId}");
         }
 
         // 2. Load playlist
+        $playlistStartedAt = microtime(true);
         $playlistRepo = new PdoPlaylistRepository($this->pdo);
         $playlist = $playlistRepo->getById((string)$instance->playlistId);
+        $this->markTiming('load_playlist', $playlistStartedAt);
 
         if (!$playlist instanceof Playlist) {
             throw new RuntimeException(
@@ -44,11 +52,14 @@ final class PlayerExperienceService
         }
 
         // 3. Flatten playlist items
+        $itemsStartedAt = microtime(true);
         $items = $this->flattenItems($playlist);
-        $this->hydrateItemImagesFromLibrary($items);
+        $this->hydrateItemImages($items);
+        $this->markTiming('hydrate_items', $itemsStartedAt);
         $startIndex = $this->normalizeStartIndex($start, count($items));
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
+        $ctaStartedAt = microtime(true);
         $overrides = [];
         if (!empty($instance->ctaOverrides)) {
             $decoded = json_decode($instance->ctaOverrides, true);
@@ -91,9 +102,13 @@ final class PlayerExperienceService
             $ctas = $this->applyCtaOverrides($ctas, $overrides);
             $ctas = $this->hydrateArticleCtas($ctas);
         }
+        $this->markTiming('load_ctas', $ctaStartedAt);
 
+        $setsStartedAt = microtime(true);
         $thumbsEnabled = $this->shouldUseThumbs($items);
         $setIds = $this->findPlaylistInstanceSetIds($instance->id ?? 0);
+        $this->markTiming('load_sets', $setsStartedAt);
+        $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
 
         // 5. Return full playback plan
         $displayTitle = $instance->displayTitle ?? $instance->instanceName ?? $playlist->title;
@@ -122,6 +137,14 @@ final class PlayerExperienceService
     }
 
     /**
+     * @return array<string, float>
+     */
+    public function getLastTiming(): array
+    {
+        return $this->lastTiming;
+    }
+
+    /**
      * @return PlaylistItem[]
      */
     private function flattenItems(Playlist $playlist): array
@@ -146,21 +169,61 @@ final class PlayerExperienceService
     /**
      * @param PlaylistItem[] $items
      */
-    private function hydrateItemImagesFromLibrary(array $items): void
+    private function hydrateItemImages(array $items): void
     {
-        $needs = [];
+        $photoIds = [];
+        $assetIds = [];
         foreach ($items as $item) {
             if (!$item instanceof PlaylistItem) continue;
             $photoId = $item->photo_library_id ?? null;
-            if (!$photoId) continue;
             $imageUrl = (string)($item->image_url ?? '');
-            $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
-            if ($needsUrl) {
-                $needs[$photoId] = true;
+            if ($photoId) {
+                $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
+                if ($needsUrl) {
+                    $photoIds[$photoId] = true;
+                }
+                continue;
+            }
+            $assetId = $this->extractAssetId($imageUrl);
+            if ($assetId !== '') {
+                $assetIds[$assetId] = true;
             }
         }
-        if (!$needs) return;
-        $ids = array_keys($needs);
+
+        $photoUrlMap = $this->loadPhotoLibraryUrls(array_keys($photoIds));
+        $assetUrlMap = $this->loadAssetVariantUrls(array_keys($assetIds));
+
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            $imageUrl = (string)($item->image_url ?? '');
+            $photoId = $item->photo_library_id ?? null;
+            if ($photoId) {
+                $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
+                if (!$needsUrl) continue;
+                $resolved = $photoUrlMap[(int)$photoId] ?? '';
+                if ($resolved !== '') {
+                    $item->image_url = $resolved;
+                }
+                continue;
+            }
+
+            $assetId = $this->extractAssetId($imageUrl);
+            if ($assetId === '') continue;
+            $resolved = $assetUrlMap[$assetId] ?? '';
+            if ($resolved !== '') {
+                $item->image_url = $resolved;
+            }
+        }
+    }
+
+    /**
+     * @param int[] $photoIds
+     * @return array<int, string>
+     */
+    private function loadPhotoLibraryUrls(array $photoIds): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $photoIds)));
+        if (!$ids) return [];
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $this->pdo->prepare(
             "SELECT photo_library_id, rel_path FROM photo_library WHERE photo_library_id IN ({$placeholders})"
@@ -168,20 +231,69 @@ final class PlayerExperienceService
         $stmt->execute($ids);
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $map[(int)$row['photo_library_id']] = $row['rel_path'] ?? '';
+            $map[(int)$row['photo_library_id']] = (string)($row['rel_path'] ?? '');
         }
-        foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) continue;
-            $photoId = $item->photo_library_id ?? null;
-            if (!$photoId) continue;
-            $imageUrl = (string)($item->image_url ?? '');
-            $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
-            if (!$needsUrl) continue;
-            $resolved = $map[(int)$photoId] ?? '';
-            if ($resolved !== '') {
-                $item->image_url = $resolved;
-            }
+        return $map;
+    }
+
+    /**
+     * @param string[] $assetIds
+     * @return array<string, string>
+     */
+    private function loadAssetVariantUrls(array $assetIds): array
+    {
+        $ids = array_values(array_filter(array_map(
+            static fn($id) => trim((string)$id),
+            $assetIds
+        )));
+        if (!$ids) return [];
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $sql = <<<SQL
+            SELECT
+                p.asset_id,
+                v.path,
+                v.kind,
+                v.role
+            FROM photos p
+            JOIN photos_variants v
+              ON v.photo_id = p.id
+            WHERE p.asset_id IN ({$placeholders})
+              AND (
+                v.kind = 'thumb'
+                OR (v.kind = 'prepared' AND v.role = '')
+                OR v.kind = 'prepared_base'
+                OR (v.kind = 'repaired' AND v.role = '')
+                OR v.kind = 'repaired_base'
+              )
+            ORDER BY
+                CASE
+                    WHEN v.kind = 'thumb' THEN 0
+                    WHEN v.kind = 'prepared' AND v.role = '' THEN 1
+                    WHEN v.kind = 'prepared_base' THEN 2
+                    WHEN v.kind = 'repaired' AND v.role = '' THEN 3
+                    ELSE 4
+                END ASC,
+                v.id ASC
+            SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($ids);
+
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $assetId = trim((string)($row['asset_id'] ?? ''));
+            if ($assetId === '' || isset($map[$assetId])) continue;
+            $path = trim((string)($row['path'] ?? ''));
+            if ($path === '') continue;
+            $map[$assetId] = $path;
         }
+        return $map;
+    }
+
+    private function extractAssetId(string $value): string
+    {
+        if (!str_starts_with($value, 'asset:')) return '';
+        return trim(substr($value, strlen('asset:')));
     }
 
     private function isPhotoRefWithoutUrl(string $value): bool
@@ -354,5 +466,10 @@ final class PlayerExperienceService
         if (!is_string($value) || trim($value) === '') return [];
         $decoded = json_decode($value, true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function markTiming(string $key, float $startedAt): void
+    {
+        $this->lastTiming[$key] = round((microtime(true) - $startedAt) * 1000, 1);
     }
 }

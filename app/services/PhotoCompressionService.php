@@ -12,12 +12,14 @@ final class PhotoCompressionService
             throw new \RuntimeException("Invalid root directory: {$root}");
         }
 
-        $quality = (int)($options['quality'] ?? 88);
+        $quality = (int)($options['quality'] ?? 92);
         $quality = max(50, min(100, $quality));
         $minBytes = (int)($options['min_bytes'] ?? (1 * 1024 * 1024));
         $minBytes = max(0, $minBytes);
         $pngLevel = (int)($options['png_level'] ?? 9);
         $pngLevel = max(0, min(9, $pngLevel));
+        $maxDim = (int)($options['max_dim'] ?? 0);
+        $maxDim = max(0, $maxDim);
         $dryRun = !empty($options['dry_run']);
         $strip = !empty($options['strip']);
         $scope = $options['scope'] ?? 'saved-palettes';
@@ -58,6 +60,7 @@ final class PhotoCompressionService
                 'root' => $root,
                 'quality' => $quality,
                 'png_level' => $pngLevel,
+                'max_dim' => $maxDim,
                 'min_bytes' => $minBytes,
                 'dry_run' => true,
                 'jpeg_count' => count($jpegPaths),
@@ -66,10 +69,16 @@ final class PhotoCompressionService
             ];
         }
 
-        $jpegArgs = ['-interlace', 'Plane', '-quality', (string)$quality];
-        if ($strip) $jpegArgs = array_merge(['-strip'], $jpegArgs);
-        $pngArgs = ['-define', "png:compression-level={$pngLevel}"];
-        if ($strip) $pngArgs = array_merge(['-strip'], $pngArgs);
+        $jpegArgs = ['-auto-orient', '-interlace', 'Plane', '-quality', (string)$quality];
+        if ($maxDim > 0) {
+            $jpegArgs = array_merge($jpegArgs, ['-resize', "{$maxDim}x{$maxDim}>"]);
+        }
+        if ($strip) $jpegArgs[] = '-strip';
+        $pngArgs = ['-auto-orient', '-define', "png:compression-level={$pngLevel}"];
+        if ($maxDim > 0) {
+            $pngArgs = array_merge($pngArgs, ['-resize', "{$maxDim}x{$maxDim}>"]);
+        }
+        if ($strip) $pngArgs[] = '-strip';
 
         $jpegCompressed = $this->runMogrifyChunks($jpegPaths, $jpegArgs);
         $pngCompressed = $this->runMogrifyChunks($pngPaths, $pngArgs);
@@ -81,6 +90,7 @@ final class PhotoCompressionService
             'root' => $root,
             'quality' => $quality,
             'png_level' => $pngLevel,
+            'max_dim' => $maxDim,
             'min_bytes' => $minBytes,
             'strip' => $strip,
             'dry_run' => false,

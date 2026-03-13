@@ -5,7 +5,8 @@ export default function WatchNextCta({ cta, onClick, disabled = false }) {
   if (cta.enabled === false) return null;
   const params = cta.params || {};
   const rawTitle = params.title || cta.label || "Next Playlist";
-  const title = rawTitle.replace(/^watch next[:\s-]*/i, "").trim();
+  const strippedTitle = rawTitle.replace(/^watch next[:\s-]*/i, "").trim();
+  const title = strippedTitle || rawTitle || "Suggested Playlists";
   const subtitle = params.subtitle || params.dek || "";
   const thumbnailUrl = params.thumbnail_url || params.thumb_url || "";
 

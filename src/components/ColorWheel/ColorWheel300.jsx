@@ -1,22 +1,42 @@
 import { useEffect, useMemo, useState } from 'react';
 import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
 import LabelArcs from '@components/ColorWheel/LabelArcs';
+import './wheel.css';
 
 const BASES = {
-  labels: '/wheels/wheel-300-labels.svg',
-  'labels-degrees': '/wheels/wheel-300-labels-degrees.svg',
+  labels: {
+    src: '/wheels/wheel-300-labels.svg',
+    radiusRatio: 142.5 / 420,
+  },
+  'labels-degrees': {
+    src: '/wheels/wheel-300-labels-degrees.svg',
+    radiusRatio: 142.5 / 420,
+  },
+  'labels-420': {
+    src: '/wheels/wheel-420-labels.svg',
+    radiusRatio: 199.5 / 540,
+  },
+  'labels-degrees-420': {
+    src: '/wheels/wheel-420-labels-degrees.svg',
+    radiusRatio: 199.5 / 540,
+  },
 };
+
+const WHEEL_CENTER = 150;
 
 export default function ColorWheel300({
   currentColor,
   children,
   base = 'labels',
   staticBase = true,
+  size = 300,
 }) {
   const hue = Number(currentColor?.hcl_h);
   const hasHue = Number.isFinite(hue);
   const [inlineBase, setInlineBase] = useState(null);
-  const baseSrc = BASES[base] || BASES.labels;
+  const baseConfig = BASES[base] || BASES.labels;
+  const baseSrc = baseConfig.src;
+  const wheelRadius = 300 * baseConfig.radiusRatio;
 
   useEffect(() => {
     if (staticBase) {
@@ -53,7 +73,11 @@ export default function ColorWheel300({
   }, [inlineBase]);
 
   return (
-    <div className="wheel300-stack" aria-label="HCL Color Wheel">
+    <div
+      className="wheel300-stack"
+      aria-label="HCL Color Wheel"
+      style={{ '--wheel-size': `${size}px` }}
+    >
       {staticBase && !inlineBase && (
         <img
           className="wheel300-base"
@@ -82,8 +106,8 @@ export default function ColorWheel300({
           <ColorWheelIndicator
             key={'base'}
             hue={hue % 360}
-            center={150}
-            radius={150}
+            center={WHEEL_CENTER}
+            radius={wheelRadius}
             strokeColor="black"
           />
         )}

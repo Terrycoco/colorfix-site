@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import CTASection from "@components/CTASection";
 import "./playlist-thumbs.css";
+import { getLastPlaylistInstanceId, recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
 
 export default function PlaylistThumbsPage() {
   const { playlistId } = useParams();
@@ -21,8 +21,8 @@ export default function PlaylistThumbsPage() {
   const psiParam = searchParams.get("psi") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
-  const returnToParam = searchParams.get("return_to") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
+  const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
 
   useEffect(() => {
     if (!playlistId) {
@@ -54,6 +54,12 @@ export default function PlaylistThumbsPage() {
       })
       .finally(() => setLoading(false));
   }, [playlistId, addCtaGroup]);
+
+  useEffect(() => {
+    if (!playlistId) return;
+    recordLastPlaylistInstanceId(playlistId);
+    setLastPlaylistInstanceId(String(playlistId));
+  }, [playlistId]);
 
   useEffect(() => {
     if (!playlistId || typeof window === "undefined") {
@@ -99,6 +105,8 @@ export default function PlaylistThumbsPage() {
   }, [items, likedSet]);
 
   const [thumbUrlByKey, setThumbUrlByKey] = useState({});
+  const shouldShowBackToPlaylist =
+    Boolean(lastPlaylistInstanceId) && Boolean(playlistId) && String(lastPlaylistInstanceId) === String(playlistId);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,32 +129,12 @@ export default function PlaylistThumbsPage() {
   if (error) return <div className="playlist-thumbs__status error">{error}</div>;
 
   const handleBackToPlaylist = () => {
-    const safeReturn = resolveReturnTo(returnToParam);
-    if (safeReturn) {
-      navigate(safeReturn);
-      return;
-    }
-    const params = new URLSearchParams();
-    if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
-    if (ctaAudience !== "") params.set("aud", ctaAudience);
-    if (psiParam !== "") params.set("psi", psiParam);
-    if (thumbParam !== "") params.set("thumb", thumbParam);
-    if (demoParam !== "") params.set("demo", demoParam);
-    const qs = params.toString();
-    navigate(`/player/${playlistId}${qs ? `?${qs}` : ""}`);
+    const targetId = lastPlaylistInstanceId || playlistId;
+    if (!targetId) return;
+    navigate(`/playlist/${targetId}`);
   };
-  const handleCtaClick = () => handleBackToPlaylist();
-  const handleBackToPrevious = () => {
-    const safeReturn = resolveReturnTo(returnToParam);
-    if (safeReturn) {
-      navigate(safeReturn);
-      return;
-    }
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    handleBackToPlaylist();
+  const handleExit = () => {
+    navigate("/");
   };
 
   return (
@@ -154,7 +142,7 @@ export default function PlaylistThumbsPage() {
       <button
         type="button"
         className="playlist-thumbs__exit"
-        onClick={handleBackToPlaylist}
+        onClick={handleExit}
         aria-label="Exit playlist"
       >
         ×
@@ -174,6 +162,13 @@ export default function PlaylistThumbsPage() {
         <div className="playlist-thumbs__grid-wrap">
           <div className="playlist-thumbs__grid">
             {palettes.map((palette) => {
+              const cardKey = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
+              const parsed = parsePhotoRef(palette.image_url);
+              const resolvedUrl = parsed.url
+                ? parsed.url
+                : isAssetRef(palette.image_url)
+                ? thumbUrlByKey[cardKey] || ""
+                : palette.image_url;
               const params = new URLSearchParams();
               if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
               else if (paletteViewerCtaGroupId !== "") params.set("add_cta_group", paletteViewerCtaGroupId);
@@ -183,17 +178,13 @@ export default function PlaylistThumbsPage() {
               if (demoParam !== "") params.set("demo", demoParam);
               const returnTo = buildReturnTo(location.pathname, location.search);
               if (returnTo) params.set("return_to", returnTo);
+              if (resolvedUrl) {
+                params.set("photo_url", resolvedUrl);
+              }
               const qs = params.toString();
               const href = palette.palette_hash
                 ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
                 : `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
-              const cardKey = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
-              const parsed = parsePhotoRef(palette.image_url);
-              const resolvedUrl = parsed.url
-                ? parsed.url
-                : isAssetRef(palette.image_url)
-                ? thumbUrlByKey[cardKey] || ""
-                : palette.image_url;
               return (
                 <a
                   key={cardKey}
@@ -228,29 +219,17 @@ export default function PlaylistThumbsPage() {
           </div>
         </div>
         <div className="playlist-thumbs__footer">
-          <button
-            type="button"
-            className="playlist-thumbs__back"
-            onClick={handleBackToPrevious}
-          >
-            Back to playlist
-          </button>
+          {shouldShowBackToPlaylist && (
+            <button
+              type="button"
+              className="playlist-thumbs__back"
+              onClick={handleBackToPlaylist}
+            >
+              Back to playlist
+            </button>
+          )}
         </div>
       </div>
-      <CTASection
-        className="cta-section--transparent cta-section--left cta-section--on-dark cta-section--desktop-row-split"
-        ctas={[
-          {
-            cta_id: "back-to-playlist",
-            label: "Back to playlist",
-            key: "back_to_playlist",
-            variant: "link",
-            enabled: true,
-            params: {},
-          },
-        ]}
-        onCtaClick={handleCtaClick}
-      />
     </div>
   );
 }
@@ -264,12 +243,4 @@ function buildReturnTo(pathname, search) {
   params.delete("return_to");
   const qs = params.toString();
   return `${pathname}${qs ? `?${qs}` : ""}`;
-}
-
-function resolveReturnTo(value) {
-  if (!value) return "";
-  const trimmed = String(value).trim();
-  if (!trimmed.startsWith("/")) return "";
-  if (trimmed.startsWith("//")) return "";
-  return trimmed;
 }

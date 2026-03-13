@@ -19,18 +19,21 @@ final class PdoPlaylistInstanceSetItemRepository
     {
         $sql = <<<SQL
             SELECT
-                id,
-                playlist_instance_set_id,
-                playlist_instance_id,
-                item_type,
-                target_set_id,
-                title,
-                photo_url,
-                photo_library_id,
-                sort_order
-            FROM playlist_instance_set_items
-            WHERE playlist_instance_set_id = :set_id
-            ORDER BY sort_order ASC, id ASC
+                psi.id,
+                psi.playlist_instance_set_id,
+                psi.playlist_instance_id,
+                pi.playlist_id,
+                psi.item_type,
+                psi.target_set_id,
+                psi.title,
+                psi.photo_url,
+                psi.photo_library_id,
+                psi.sort_order
+            FROM playlist_instance_set_items psi
+            LEFT JOIN playlist_instances pi
+              ON pi.playlist_instance_id = psi.playlist_instance_id
+            WHERE psi.playlist_instance_set_id = :set_id
+            ORDER BY psi.sort_order ASC, psi.id ASC
             SQL;
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['set_id' => $setId]);
@@ -41,6 +44,7 @@ final class PdoPlaylistInstanceSetItemRepository
                 (int)$row['id'],
                 (int)$row['playlist_instance_set_id'],
                 $row['playlist_instance_id'] !== null ? (int)$row['playlist_instance_id'] : null,
+                $row['playlist_id'] !== null ? (int)$row['playlist_id'] : null,
                 (string)($row['item_type'] ?? 'instance'),
                 $row['target_set_id'] !== null ? (int)$row['target_set_id'] : null,
                 (string)$row['title'],

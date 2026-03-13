@@ -46,10 +46,20 @@ export async function fetchAssetUrl(assetId) {
     return cached;
   }
 
-  const req = fetch(`${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(id)}&_=${Date.now()}`)
+  const req = fetch(`${API_FOLDER}/v2/photos/get.php?asset_id=${encodeURIComponent(id)}`)
     .then((res) => res.json())
     .then((data) => {
-      const url = data?.rel_path || data?.full_url || data?.url || data?.thumb_url || "";
+      const url =
+        data?.rel_path ||
+        data?.full_url ||
+        data?.url ||
+        data?.thumb_url ||
+        data?.prepared_url ||
+        data?.repaired_url ||
+        data?.prepared_tiers?.medium ||
+        data?.prepared_tiers?.light ||
+        data?.prepared_tiers?.dark ||
+        "";
       return url;
     })
     .catch(() => "");

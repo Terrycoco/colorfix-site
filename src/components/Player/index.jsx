@@ -37,7 +37,7 @@ const Player = forwardRef(function Player({
   const [starPos, setStarPos] = useState({ left: 0, top: 0 });
   const [likedSet, setLikedSet] = useState(() => new Set());
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
-  const [cacheBustEnabled, setCacheBustEnabled] = useState(true);
+  const [cacheBustEnabled, setCacheBustEnabled] = useState(false);
   const [showAdvanceHint, setShowAdvanceHint] = useState(true);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
   const [prevImageUrl, setPrevImageUrl] = useState("");
@@ -118,7 +118,7 @@ function queueFadeReady(img, stageEl) {
 
   useEffect(() => {
     cacheBustRef.current = Date.now();
-    setCacheBustEnabled(true);
+    setCacheBustEnabled(false);
     setLikedSet(readLikedSet(playlistInstanceId));
     setShowAdvanceHint(true);
     didLikeInteractRef.current = false;

@@ -24,10 +24,21 @@ try {
     $q = trim((string)($_GET['q'] ?? ''));
     $sourceType = trim((string)($_GET['source_type'] ?? ''));
     $paletteId = isset($_GET['palette_id']) ? (int)$_GET['palette_id'] : 0;
+    $photoLibraryIdsRaw = trim((string)($_GET['photo_library_ids'] ?? ''));
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
     $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
     $limit = max(1, min(300, $limit));
     $offset = max(0, $offset);
+    $photoLibraryIds = [];
+    if ($photoLibraryIdsRaw !== '') {
+        foreach (explode(',', $photoLibraryIdsRaw) as $part) {
+            $id = (int)trim($part);
+            if ($id > 0) {
+                $photoLibraryIds[$id] = $id;
+            }
+        }
+        $photoLibraryIds = array_values($photoLibraryIds);
+    }
 
     $where = [];
     $params = [];
@@ -40,6 +51,15 @@ try {
         $params[':q_title'] = '%' . $q . '%';
         $params[':q_tags'] = '%' . $q . '%';
         $params[':q_path'] = '%' . $q . '%';
+    }
+    if ($photoLibraryIds) {
+        $placeholders = [];
+        foreach ($photoLibraryIds as $idx => $id) {
+            $key = ':photo_library_id_' . $idx;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+        $where[] = 'photo_library.photo_library_id IN (' . implode(', ', $placeholders) . ')';
     }
 
     $joins = "";
@@ -58,9 +78,9 @@ try {
 
         $paletteRows = $pdo->query("SELECT id, title, display_title, tags, alt_text FROM applied_palettes ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
         foreach ($paletteRows as $row) {
-            $paletteId = (int)$row['id'];
-            if ($paletteId <= 0) continue;
-            $renderRel = "/photos/rendered/ap_{$paletteId}.jpg";
+            $appliedPaletteId = (int)$row['id'];
+            if ($appliedPaletteId <= 0) continue;
+            $renderRel = "/photos/rendered/ap_{$appliedPaletteId}.jpg";
             $renderAbs = $docRoot . $renderRel;
             if (!is_file($renderAbs)) {
                 $altAbs = $publicRoot . $renderRel;
@@ -100,11 +120,14 @@ try {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     $items = array_map(static function(array $row): array {
+        $relPath = (string)$row['rel_path'];
+        $filename = basename(parse_url($relPath, PHP_URL_PATH) ?: $relPath);
         return [
             'photo_library_id' => (int)$row['photo_library_id'],
             'source_type' => (string)$row['source_type'],
             'source_id' => $row['source_id'] !== null ? (int)$row['source_id'] : null,
-            'rel_path' => (string)$row['rel_path'],
+            'rel_path' => $relPath,
+            'filename' => $filename,
             'title' => $row['title'] ?? '',
             'tags' => $row['tags'] ?? '',
             'alt_text' => $row['alt_text'] ?? '',

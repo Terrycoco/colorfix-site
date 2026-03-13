@@ -9,6 +9,7 @@ final class PlaylistInstanceSetItem
         public ?int $id,
         public int $setId,
         public ?int $playlistInstanceId,
+        public ?int $playlistId,
         public string $itemType,
         public ?int $targetSetId,
         public string $title,

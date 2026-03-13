@@ -315,13 +315,16 @@ export default function AdminPalettePhotosPage() {
     );
   };
 
-  const handlePhotoUpload = async (files) => {
+  const handlePhotoUpload = async (files, replacePhotoId = null) => {
     if (!editForm.palette_id || !files?.length) return;
     setPhotoStatus({ loading: true, error: "" });
     const uploadUrl = isApplied ? APPLIED_PHOTO_UPLOAD_URL : SAVED_PHOTO_UPLOAD_URL;
     try {
       const formData = new FormData();
       formData.append("palette_id", String(editForm.palette_id));
+      if (!isApplied && replacePhotoId) {
+        formData.append("replace_photo_id", String(replacePhotoId));
+      }
       Array.from(files).forEach((file) => formData.append("photos[]", file));
       const res = await fetch(uploadUrl, {
         method: "POST",
@@ -333,9 +336,8 @@ export default function AdminPalettePhotosPage() {
         throw new Error(json.error || `HTTP ${res.status}`);
       }
       const added = Array.isArray(json.photos) ? json.photos : [];
-      setEditPhotos((prev) => [
-        ...prev,
-        ...added.map((photo, index) => ({
+      setEditPhotos((prev) => {
+        const normalized = added.map((photo, index) => ({
           id: photo.id,
           rel_path: photo.rel_path,
           photo_type: photo.photo_type || "full",
@@ -344,8 +346,13 @@ export default function AdminPalettePhotosPage() {
           caption: photo.caption || "",
           alt_text: photo.alt_text || "",
           order_index: photo.order_index ?? prev.length + index,
-        })),
-      ]);
+        }));
+        if (isApplied || !replacePhotoId) {
+          return [...prev, ...normalized];
+        }
+        const first = normalized[0];
+        return prev.map((photo) => (photo.id === replacePhotoId ? { ...photo, ...first } : photo));
+      });
       setPhotoStatus({ loading: false, error: "" });
     } catch (err) {
       setPhotoStatus({ loading: false, error: err?.message || "Failed to upload photos" });
@@ -635,6 +642,20 @@ export default function AdminPalettePhotosPage() {
                       >
                         Remove
                       </button>
+                      {!isApplied && (
+                        <label className="asp-upload-btn ghost">
+                          Replace
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              handlePhotoUpload(e.target.files, photo.id);
+                              e.target.value = "";
+                            }}
+                            disabled={photoStatus.loading}
+                          />
+                        </label>
+                      )}
                     </div>
                   ))}
                 </div>
