@@ -245,8 +245,8 @@ const goToPalette = (e) => {
       onClose={() => setOpen(false)}
     />
 
-    <div className={`sticky-palette-wrapper ${(showSticky && hasSwatches && !paletteCollapsed) ? 'is-visible' : 'is-hidden'}`}>
-      {hasSwatches && !paletteCollapsed && (
+    <div className={`sticky-palette-wrapper ${(showSticky && hasSwatches && !paletteCollapsed && !isMobile) ? 'is-visible' : 'is-hidden'}`}>
+      {hasSwatches && !paletteCollapsed && !isMobile && (
         <div className="sticky-palette__inner">
           <StickyPaletteBar />
         </div>

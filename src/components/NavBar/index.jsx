@@ -63,6 +63,7 @@ function NavBar() {
     { label: 'Home', path: '/' },
     { label: 'Search Colors', path: '/search' },
     { label: 'Palettes', path: '/palette' },
+    { label: 'Hire Terry', path: '/hire-terry' },
     { label: 'About', path: '/about' },
     user
       ? { label: 'Log Out', action: handleLogout }

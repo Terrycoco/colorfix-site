@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppState } from '@context/AppStateContext';
 import {API_FOLDER} from '@helpers/config';
+import { makePhotoRef, parsePhotoRef } from '@helpers/assetImage';
 import ItemEditForm from './ItemEditForm';
 
 
@@ -14,6 +15,7 @@ const emptyItem = {
       query_id: '',
       item_type: '',
       image_url: '',
+      photo_library_id: '',
       body: '',
       target_url: '',
       is_clickable: 0,
@@ -55,6 +57,7 @@ export default function ItemEditPage() {
         item_type: item.item_type || '',
         query_id: item.query_id || '',
         image_url: item.image_url || '',
+        photo_library_id: parsePhotoRef(item.image_url || '').photoId || '',
         body: item.body || '',
         target_url: item.target_url || '',
         is_clickable: item.is_clickable || 0,
@@ -84,10 +87,18 @@ export default function ItemEditPage() {
   const handleSave = (e) => {
     e.preventDefault();
     console.log('Submitting this formData:', formData);
+    const parsedImage = parsePhotoRef(formData.image_url || '');
+    const payload = {
+      ...formData,
+      image_url: formData.photo_library_id
+        ? makePhotoRef(formData.photo_library_id, parsedImage.url || '')
+        : formData.image_url,
+    };
+    delete payload.photo_library_id;
     fetch(`${API_FOLDER}/upsert-item.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
+      body: JSON.stringify(payload),
     })
       .then(res => res.json())
       .then(data => {
@@ -124,7 +135,22 @@ export default function ItemEditPage() {
         <div className="w-1/2">
         <ItemEditForm
             formData={formData}
-            updateField={(field, value) => setFormData({ ...formData, [field]: value })}
+            updateField={(field, value) => {
+              if (field === 'photo_library_id') {
+                const currentParsed = parsePhotoRef(formData.image_url || '');
+                setFormData({
+                  ...formData,
+                  photo_library_id: value,
+                  image_url: value
+                    ? makePhotoRef(value, currentParsed.url || '')
+                    : currentParsed.photoId
+                      ? ''
+                      : formData.image_url,
+                });
+                return;
+              }
+              setFormData({ ...formData, [field]: value });
+            }}
             handleSubmit={handleSave}
             queries={queries}
             onNew={() => setFormData(emptyItem)}

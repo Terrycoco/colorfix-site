@@ -17,6 +17,7 @@ import ColorWheelItem from '../GalleryItems/ColorWheelItem';
 import ColorWheelTicked from '../GalleryItems/ColorWheelTicked';
 import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
 import FeaturedArticleItem from '../GalleryItems/FeaturedArticleItem';
+import PlaylistItem from '../GalleryItems/PlaylistItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
@@ -32,6 +33,7 @@ const renderContent = (item) => {
     case 'back':        return <BackItem key={key} item={item} />;
     case 'brand':       return <BrandItem key={key} item={item} />;
     case 'button':      return <ButtonItem key={key} item={item} />;
+    case 'playlist':    return <PlaylistItem key={key} item={item} />;
     case 'name-search': return <NameSearchItem key={key} item={item} />;
     case 'wheel':       return <WheelItem key={key} item={item} />;
     case 'colorwheel':  return <ColorWheelItem key={key} item={item} />;

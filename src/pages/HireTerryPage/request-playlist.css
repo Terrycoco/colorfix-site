@@ -1,0 +1,435 @@
+/* PAGE */
+
+.request-playlist-page {
+  padding: 36px 18px 60px;
+  color: #0f172a;
+}
+
+.request-playlist-section {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* HERO */
+
+.request-playlist-hero {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 28px;
+}
+
+.request-playlist-hero h1 {
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.request-playlist-intro {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #334155;
+}
+
+.request-playlist-subcopy {
+  font-size: 15px;
+  color: #64748b;
+}
+
+/* FORM CARD */
+
+.request-playlist-form {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 22px;
+  padding: 34px 34px 36px;
+}
+
+/* GRID */
+
+.request-playlist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+/* FIELDS */
+
+.request-playlist-field {
+  margin-bottom: 28px;
+}
+
+.request-playlist-field label {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+/* INPUTS */
+
+.request-playlist-field input,
+.request-playlist-field select,
+.request-playlist-field textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.request-playlist-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.request-playlist-field input:focus,
+.request-playlist-field select:focus,
+.request-playlist-field textarea:focus {
+  outline: none;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148,163,184,.18);
+}
+
+/* FILE UPLOAD */
+
+.request-playlist-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.request-playlist-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.request-playlist-upload-btn:hover {
+  background: #d1d5db;
+}
+
+.request-playlist-field input[type="file"] {
+  display: none;
+}
+
+/* UPLOAD HINT ROW */
+
+.request-playlist-upload-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.request-playlist-upload-note {
+  font-size: 14px;
+  color: #475569;
+  margin: 0;
+}
+
+.request-playlist-photo-hint {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.request-playlist-photo-hint:hover {
+  color: #0f172a;
+}
+
+/* HELP TEXT */
+
+.request-playlist-help {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #475569;
+  max-width: 520px;
+}
+
+/* FILE LIST */
+
+.request-playlist-files {
+  margin-top: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.request-playlist-files__count {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.request-playlist-files__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.request-playlist-files__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.request-playlist-files__item:first-child {
+  border-top: none;
+}
+
+.request-playlist-files__remove {
+  border: none;
+  background: none;
+  color: #dc2626;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.request-playlist-files__remove:hover {
+  text-decoration: underline;
+}
+
+/* SUMMARY BOX */
+
+.request-playlist-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin-top: 8px;
+}
+
+.request-playlist-summary h2 {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.request-playlist-summary ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.request-playlist-summary li {
+  margin-bottom: 6px;
+  color: #475569;
+  font-size: 14px;
+}
+
+/* BUTTON */
+
+.request-playlist-actions {
+  margin-top: 26px;
+}
+
+.request-playlist-submit {
+  padding: 16px 30px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: white;
+  font-weight: 800;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+}
+
+.request-playlist-submit:hover {
+  background: #1e293b;
+}
+
+.request-playlist-submit:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+/* STATUS */
+
+.request-playlist-status {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.request-playlist-status.is-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.request-playlist-status.is-success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+/* MODAL */
+
+.request-playlist-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.request-playlist-modal {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  position: relative;
+}
+
+.request-playlist-modal h2 {
+  margin-bottom: 12px;
+}
+
+.request-playlist-modal-list {
+  padding-left: 18px;
+}
+
+.request-playlist-modal-list li {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.request-playlist-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  border: none;
+  background: none;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+/* MOBILE */
+
+@media (max-width: 720px) {
+
+  .request-playlist-page {
+    padding: 26px 14px 40px;
+  }
+
+  .request-playlist-hero h1 {
+    font-size: 28px;
+  }
+
+  .request-playlist-intro {
+    font-size: 16px;
+  }
+
+  .request-playlist-subcopy {
+    font-size: 14px;
+  }
+
+  .request-playlist-form {
+    padding: 22px 18px;
+  }
+
+  .request-playlist-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .request-playlist-upload-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .request-playlist-upload-hint-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .request-playlist-submit {
+    width: 100%;
+  }
+
+  .request-playlist-modal {
+    max-height: 86vh;
+    overflow-y: auto;
+  }
+
+}/* FIRST textarea — which spaces/views */
+#spaces {
+  min-height: 110px;
+}
+
+/* SECOND textarea — goals */
+#goals {
+  min-height: 180px;
+}
+
+.request-playlist-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.request-playlist-summary li {
+  margin-bottom: 12px;
+  line-height: 1.6;
+  font-size: 15px;
+  color: #475569;
+}
+
+/* spacing between paragraphs in upload section */
+.request-playlist-help p {
+  margin-bottom: 14px;
+}
+
+/* extra breathing room after the photo button */
+.request-playlist-upload-row {
+  margin-bottom: 16px;
+}
+
+/* spacing under the "How to take a good photo" link */
+.request-playlist-photo-hint {
+  display: inline-block;
+  margin: 10px 0 14px;
+}
+
+.request-playlist-help {
+  line-height: 1.65;
+}
+
+.request-playlist-help > * {
+  margin-bottom: 14px;
+}
+
+.request-playlist-summary li {
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.request-playlist-help {
+  line-height: 1.45;
+  font-size: 15px;
+  max-width: 560px;
+}
+
+.request-playlist-help p {
+  margin-bottom: 14px;
+}

@@ -6,3 +6,9 @@
   display: block; /* override any flex or grid */
   height: auto;
  }
+
+@media (max-width: 768px) {
+ .page {
+  padding-top: 0;
+ }
+}

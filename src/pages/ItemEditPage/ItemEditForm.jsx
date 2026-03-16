@@ -1,3 +1,21 @@
+const ITEM_TYPE_OPTIONS = [
+  'back',
+  'brand',
+  'button',
+  'colorwheel',
+  'colorwheel-ticked',
+  'featured-article',
+  'image',
+  'name-search',
+  'picture-swatch',
+  'playlist',
+  'quote',
+  'search',
+  'swatch',
+  'wheel',
+  'wheel-ticked',
+];
+
 export default function ItemEditForm ({formData, updateField, handleSubmit, queries, onNew}) {
 
 const handleNew = () => {
@@ -71,7 +89,6 @@ return (
 
   <div>
     <label className="block font-medium">Insert With Query</label>
-    {console.log('queries:', queries)}
     <select
       value={formData.query_id}
       onChange={(e) => updateField('query_id', parseInt(e.target.value))}
@@ -86,22 +103,39 @@ return (
 
   <div>
     <label className="block font-medium">Item Type</label>
-    <input
-      type="text"
+    <select
       value={formData.item_type}
       onChange={(e) => updateField('item_type', e.target.value)}
       className="w-full border px-2 py-1"
-    />
+    >
+      <option value="">-- Select Item Type --</option>
+      {ITEM_TYPE_OPTIONS.map((type) => (
+        <option key={type} value={type}>
+          {type}
+        </option>
+      ))}
+    </select>
   </div>
 
   <div>
-    <label className="block font-medium">Image URL</label>
-    <input
-      type="text"
-      value={formData.image_url}
-      onChange={(e) => updateField('image_url', e.target.value)}
-      className="w-full border px-2 py-1"
-    />
+    <label className="block font-medium">Photo Library ID</label>
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        value={formData.photo_library_id || ''}
+        onChange={(e) => updateField('photo_library_id', e.target.value)}
+        className="w-full border px-2 py-1"
+        placeholder="Pick a photo or enter its id"
+      />
+      <a
+        href="/admin/photo-library"
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 rounded bg-gray-200 px-3 py-1.5 hover:bg-gray-300"
+      >
+        Library
+      </a>
+    </div>
   </div>
 
   <div>

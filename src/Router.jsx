@@ -6,6 +6,8 @@ import MainLayout from '@layout/MainLayout';
 import ScrollToTop from '@layout/ScrollToTop';
 
 const AboutPage = lazy(() => import('@pages/AboutPage'));
+const HireTerryPage = lazy(() => import('@pages/HireTerryPage'));
+const RequestPlaylistPage = lazy(() => import('@pages/HireTerryPage/RequestPlaylistPage'));
 const LoginPage = lazy(() => import('@pages/login/LoginPage'));
 const SearchPage = lazy(() => import('@pages/SearchPage'));
 const MobileDetailPage = lazy(() => import('@pages/MobileDetailPage'));
@@ -132,6 +134,8 @@ function AppRouter() {
             <Route path="adv-results" element={renderWithSuspense(AdvancedResultsPage, 'Loading results…')} />
             <Route path="login" element={renderWithSuspense(LoginPage, 'Loading login…')} />
             <Route path="about" element={renderWithSuspense(AboutPage, 'Loading about…')} />
+            <Route path="hire-terry" element={renderWithSuspense(HireTerryPage, 'Loading service page…')} />
+            <Route path="hire-terry/request-playlist" element={renderWithSuspense(RequestPlaylistPage, 'Loading request page…')} />
             <Route path="matches" element={renderWithSuspense(MatchResultsPage, 'Loading matches…')} />
            <Route path="quick-find" element={renderWithSuspense(QuickFindPage, 'Loading quick find…')} />
            <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />

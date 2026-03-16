@@ -1,0 +1,264 @@
+.hire-terry-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 32px 20px 72px;
+  color: #1f2937;
+}
+
+.hire-terry-section {
+  margin-bottom: 48px;
+}
+
+.hire-terry-hero {
+  text-align: center;
+}
+
+.hire-terry-hero-images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.hire-terry-hero-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #e5e7eb;
+}
+
+.hire-terry-hero-image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.hire-terry-hero-label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.72);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hire-terry-hero h1 {
+  margin: 0 0 12px;
+  font-family: inherit;
+  font-size: 2.1rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hire-terry-hero-intro {
+  margin: 0 auto 10px;
+  max-width: 720px;
+  font-size: 1.08rem;
+  line-height: 1.55;
+  font-weight: 600;
+  color: #374151;
+}
+
+.hire-terry-hero p {
+  margin: 0 auto 20px;
+  max-width: 720px;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+.primary-cta {
+  display: inline-block;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.98rem;
+  line-height: 1;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.primary-cta:hover,
+.primary-cta:focus-visible {
+  background: #1f2937;
+  transform: translateY(-1px);
+}
+
+.hire-terry-section h2 {
+  margin: 0 0 18px;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hire-terry-steps__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.hire-terry-step {
+  padding: 22px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.hire-terry-step__number {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 34px;
+  text-align: center;
+}
+
+.hire-terry-step p {
+  margin: 0;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.hire-terry-list {
+  margin: 0;
+  padding-left: 22px;
+  color: #4b5563;
+}
+
+.hire-terry-list li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.hire-terry-pricing__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.hire-terry-price-card {
+  padding: 24px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.hire-terry-price-card h3 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hire-terry-price-card__price {
+  margin-bottom: 10px;
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hire-terry-price-card p {
+  margin: 0;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.hire-terry-final-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+@media (max-width: 820px) {
+  .hire-terry-page {
+    padding: 24px 16px 56px;
+  }
+
+  .hire-terry-hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .hire-terry-steps__grid,
+  .hire-terry-pricing__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .hire-terry-hero-images {
+    grid-template-columns: 1fr;
+  }
+
+  .hire-terry-hero h1 {
+    font-size: 1.6rem;
+  }
+
+  .hire-terry-hero-intro,
+  .hire-terry-hero p {
+    max-width: 100%;
+  }
+
+  .primary-cta {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Pricing adjustments for per-photo model */
+
+.hire-terry-pricing__grid {
+  align-items: stretch;
+}
+
+.hire-terry-price-card p {
+  margin: 6px 0;
+}
+
+.hire-terry-price-card p:first-of-type {
+  margin-top: 10px;
+}
+
+.hire-terry-price-card__price {
+  margin-bottom: 8px;
+}
+
+/* Make example list easier to scan */
+
+.hire-terry-price-card h3 + p {
+  margin-top: 10px;
+}
+
+.hire-terry-price-card p:last-child {
+  margin-bottom: 0;
+}
+
+
+.hire-terry-price-card--single {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+
+.hire-terry-pricing-note {
+  margin-top: 10px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
