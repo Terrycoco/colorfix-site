@@ -31,11 +31,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 $name = trim((string)($_POST['name'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
 $projectType = trim((string)($_POST['projectType'] ?? ''));
-$goals = trim((string)($_POST['goals'] ?? ''));
-$notes = trim((string)($_POST['notes'] ?? ''));
+$spaces = trim((string)($_POST['spaces'] ?? ''));
+$preferences = trim((string)($_POST['preferences'] ?? ''));
 
-if ($name === '' || $email === '' || $projectType === '' || $goals === '') {
-    respond(['ok' => false, 'error' => 'name, email, project type, and goals are required'], 400);
+if ($name === '' || $email === '' || $projectType === '' || $spaces === '' || $preferences === '') {
+    respond(['ok' => false, 'error' => 'name, email, project type, spaces/views, and goals/preferences are required'], 400);
 }
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     respond(['ok' => false, 'error' => 'Valid email required'], 400);
@@ -113,8 +113,8 @@ $mailer = new SmtpMailer(require $mailConfigPath);
 $toEmail = 'terry@terrymarr.com';
 $subject = 'playlist request';
 
-$safeGoals = $goals !== '' ? nl2br(htmlspecialchars($goals, ENT_QUOTES, 'UTF-8')) : '—';
-$safeNotes = $notes !== '' ? nl2br(htmlspecialchars($notes, ENT_QUOTES, 'UTF-8')) : '—';
+$safeSpaces = $spaces !== '' ? nl2br(htmlspecialchars($spaces, ENT_QUOTES, 'UTF-8')) : '—';
+$safePreferences = $preferences !== '' ? nl2br(htmlspecialchars($preferences, ENT_QUOTES, 'UTF-8')) : '—';
 $safeName = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
 $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
 $safeProjectType = htmlspecialchars($projectType, ENT_QUOTES, 'UTF-8');
@@ -136,13 +136,13 @@ $htmlBody = "
 <p><strong>Name:</strong> {$safeName}</p>
 <p><strong>Email:</strong> {$safeEmail}</p>
 <p><strong>Project type:</strong> {$safeProjectType}</p>
-<p><strong>Goals:</strong><br />{$safeGoals}</p>
-<p><strong>Notes:</strong><br />{$safeNotes}</p>
+<p><strong>Spaces or views to include:</strong><br />{$safeSpaces}</p>
+<p><strong>Goals and color preferences:</strong><br />{$safePreferences}</p>
 {$fileListHtml}
 ";
 
-$textBody = "Name: {$name}\nEmail: {$email}\nProject type: {$projectType}\nGoals:\n" . ($goals !== '' ? $goals : '—') .
-    "\n\nNotes:\n" . ($notes !== '' ? $notes : '—') .
+$textBody = "Name: {$name}\nEmail: {$email}\nProject type: {$projectType}\nSpaces or views to include:\n" . ($spaces !== '' ? $spaces : '—') .
+    "\n\nGoals and color preferences:\n" . ($preferences !== '' ? $preferences : '—') .
     "\n\n{$fileListText}";
 
 try {

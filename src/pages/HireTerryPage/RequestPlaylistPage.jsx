@@ -78,8 +78,8 @@ export default function RequestPlaylistPage() {
     name: "",
     email: "",
     projectType: "",
-    goals: "",
-    notes: "",
+    spaces: "",
+    preferences: "",
     photos: [],
   });
 
@@ -137,8 +137,8 @@ export default function RequestPlaylistPage() {
       body.append("name", form.name);
       body.append("email", form.email);
       body.append("projectType", form.projectType);
-      body.append("goals", form.goals);
-      body.append("notes", form.notes);
+      body.append("spaces", form.spaces);
+      body.append("preferences", form.preferences);
       Array.from(form.photos || []).forEach((file) => body.append("photos[]", file));
 
       const res = await fetch(REQUEST_PLAYLIST_URL, {
@@ -170,8 +170,8 @@ export default function RequestPlaylistPage() {
         name: "",
         email: "",
         projectType: "",
-        goals: "",
-        notes: "",
+        spaces: "",
+        preferences: "",
         photos: [],
       });
 
@@ -306,8 +306,8 @@ export default function RequestPlaylistPage() {
               name="spaces"
               rows="7"
               placeholder="Examples: living room, dining room, front exterior, fireplace view"
-              value={form.goals}
-              onChange={(e) => updateField("goals", e.target.value)}
+              value={form.spaces}
+              onChange={(e) => updateField("spaces", e.target.value)}
               required
             />
           </div>
@@ -323,8 +323,8 @@ export default function RequestPlaylistPage() {
 Are there colors you love or strongly dislike?
 
 Are there lighting issues, furniture pieces, architectural features, or materials Terry should take into account?"
-    value={form.notes}
-    onChange={(e) => updateField("notes", e.target.value)}
+    value={form.preferences}
+    onChange={(e) => updateField("preferences", e.target.value)}
     required
   />
 </div>
