@@ -8,6 +8,8 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Repos\PdoClientRepository;
+use App\Services\ClientService;
 use App\Services\PhotoLibraryService;
 
 function respond(int $code, array $payload): void {
@@ -22,8 +24,8 @@ try {
     }
 
     $sourceType = isset($_POST['source_type']) ? trim((string)$_POST['source_type']) : '';
-    if (!in_array($sourceType, ['progression', 'article', 'pin'], true)) {
-        respond(400, ['ok' => false, 'error' => 'source_type must be progression, article, or pin']);
+    if (!in_array($sourceType, ['progression', 'article', 'pin', 'client'], true)) {
+        respond(400, ['ok' => false, 'error' => 'source_type must be progression, article, pin, or client']);
     }
 
     if (empty($_FILES['photos'])) {
@@ -47,13 +49,38 @@ try {
     $altText = trim((string)($_POST['alt_text'] ?? ''));
     $showInGallery = !empty($_POST['show_in_gallery']);
     $hasPalette = !empty($_POST['has_palette']);
+    $clientName = trim((string)($_POST['client_name'] ?? ''));
+    $clientEmail = trim((string)($_POST['client_email'] ?? ''));
+    $clientId = null;
+    $clientFolder = '';
 
     $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
     $folderBase = match ($sourceType) {
         'article' => 'articles',
         'pin' => 'pins',
+        'client' => 'clients',
         default => 'progressions',
     };
+    if ($sourceType === 'client') {
+        if ($clientEmail === '') {
+            respond(400, ['ok' => false, 'error' => 'client_email required for client uploads']);
+        }
+        $clientService = new ClientService(new PdoClientRepository($pdo));
+        $client = $clientService->findOrCreateByEmail($clientEmail, $clientName !== '' ? $clientName : null);
+        $clientId = (int)$client['id'];
+        $folderLabelRaw = $client['name'] !== '' ? $client['name'] : $client['email'];
+        $folderLabel = preg_replace('/[^a-zA-Z0-9_-]+/', '-', strtolower((string)$folderLabelRaw));
+        $folderLabel = trim((string)$folderLabel, '-');
+        if ($folderLabel === '') {
+            $folderLabel = 'client';
+        }
+        $clientFolder = 'client-' . $clientId . '-' . $folderLabel;
+        $series = $clientFolder;
+        if ($titlePrefix === '') {
+            $titlePrefix = $client['name'] !== '' ? $client['name'] : $client['email'];
+        }
+    }
+
     $photosRoot = $docRoot . '/photos/' . $folderBase . '/' . $series;
     if (!is_dir($photosRoot) && !mkdir($photosRoot, 0775, true) && !is_dir($photosRoot)) {
         respond(500, ['ok' => false, 'error' => 'Failed to create upload directory']);
@@ -97,6 +124,8 @@ try {
         $title = $titlePrefix !== '' ? trim($titlePrefix . ' ' . $baseName) : $baseName;
 
         $libraryId = $library->createStandalone($sourceType, $relPath, [
+            'source_id' => $clientId,
+            'client_id' => $clientId,
             'title' => $title,
             'tags' => $tags !== '' ? $tags : null,
             'alt_text' => $altText !== '' ? $altText : null,
@@ -109,6 +138,7 @@ try {
                 'photo_library_id' => $libraryId,
                 'rel_path' => $relPath,
                 'title' => $title,
+                'client_id' => $clientId,
             ];
         }
     }

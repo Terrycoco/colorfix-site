@@ -194,10 +194,12 @@ export function buildCtaHandlers({
   demo,
   returnTo,
 } = {}) {
+  const replayStartIndex = data?.skip_intro_on_replay ? firstNonIntroIndex : 0;
+
   return {
     replay: () => {
       setPlaybackEnded?.(false);
-      playerRef?.current?.replay({ likedOnly: false, startIndex: firstNonIntroIndex });
+      playerRef?.current?.replay({ likedOnly: false, startIndex: replayStartIndex });
     },
     replay_liked: () => {
       setPlaybackEnded?.(false);

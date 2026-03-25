@@ -54,6 +54,7 @@ try {
         $palette->notes,
         $palette->tags,
         $palette->kickerId,
+        $palette->altText,
         $palette->photoId,
         $palette->assetId,
         $entries

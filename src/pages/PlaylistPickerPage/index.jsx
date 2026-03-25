@@ -29,7 +29,7 @@ export default function PlaylistPickerPage() {
     }
     setLoading(true);
     setError("");
-    fetch(`${SET_URL}?id=${setId}`, { headers: { Accept: "application/json" } })
+    fetch(`${SET_URL}?id=${setId}&_=${Date.now()}`, { headers: { Accept: "application/json" } })
       .then((r) => r.json())
       .then((payload) => {
         if (!payload?.ok || !payload?.set) {
@@ -52,6 +52,7 @@ export default function PlaylistPickerPage() {
       item_type: item.item_type || "instance",
       target_set_id: item.target_set_id,
       title: formatTitle(item.title || ""),
+      subtitle: formatTitle(item.subtitle || ""),
       photo_url: item.photo_url || "",
     }));
   }, [items]);
@@ -95,19 +96,14 @@ export default function PlaylistPickerPage() {
   };
 
   const handleExit = () => {
-    if (isHoaView) {
-      navigate("/hoa");
-      return;
-    }
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
     navigate("/");
   };
 
   if (loading) return <div className="playlist-thumbs__status">Loading…</div>;
   if (error) return <div className="playlist-thumbs__status error">{error}</div>;
+  const safeReturn = resolveReturnTo(searchParams.get("return_to") ?? "");
+  const showBackButton = Boolean(safeReturn);
+  const backLabel = safeReturn.startsWith("/picker") ? "Back to previous set" : "Back to playlist";
 
   return (
     <div className="playlist-thumbs playlist-thumbs--end playlist-picker">
@@ -151,19 +147,24 @@ export default function PlaylistPickerPage() {
                   )}
                 </div>
                 <div className="playlist-thumbs__title">{tile.title}</div>
+                {tile.subtitle && (
+                  <div className="playlist-picker__card-subtitle">{tile.subtitle}</div>
+                )}
               </a>
             ))}
           </div>
         </div>
-        <div className="playlist-thumbs__footer">
-          <button
-            type="button"
-            className="playlist-thumbs__back"
-            onClick={handleBackToPrevious}
-          >
-            Back to playlist
-          </button>
-        </div>
+        {showBackButton && (
+          <div className="playlist-thumbs__footer">
+            <button
+              type="button"
+              className="playlist-thumbs__back"
+              onClick={handleBackToPrevious}
+            >
+              {backLabel}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

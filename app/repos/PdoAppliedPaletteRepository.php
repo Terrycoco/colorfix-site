@@ -75,6 +75,16 @@ class PdoAppliedPaletteRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function listAllBasic(): array
+    {
+        $stmt = $this->pdo->query("
+            SELECT id, title, display_title, notes, tags, kicker_id, alt_text, photo_id, asset_id
+            FROM applied_palettes
+            ORDER BY id ASC
+        ");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     public function recordShare(int $paletteId, int $clientId, array $data): int
     {
         $sql = "INSERT INTO applied_palette_shares

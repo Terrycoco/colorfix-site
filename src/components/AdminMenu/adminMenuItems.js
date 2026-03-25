@@ -51,10 +51,12 @@ export const adminMenuItems = [
     items: [
       { label: "Articles", href: "/admin/articles" },
       { label: "Projects", href: "/admin/projects" },
+      { label: "View Counts", href: "/admin/user-events" },
       { label: "QR Sheets", href: "/admin/qr-sheets" },
       { label: "Search Presets", href: "/admin/search-presets" },
       { label: "Ideas/ToDos", href: "/admin/ideas" },
       { label: "Photo Library", href: "/admin/photo-library" },
+      { label: "Clients", href: "/admin/clients" },
       { label: "SQL Builder", href: "/admin/sql" },
       { label: "Items", href: "/admin/items" },
       { label: "Filters", href: "/admin/filters" },

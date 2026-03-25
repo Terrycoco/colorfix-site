@@ -26,6 +26,8 @@ final class PdoPlaylistInstanceSetItemRepository
                 psi.item_type,
                 psi.target_set_id,
                 psi.title,
+                psi.subtitle,
+                pi.display_subtitle,
                 psi.photo_url,
                 psi.photo_library_id,
                 psi.sort_order
@@ -40,14 +42,18 @@ final class PdoPlaylistInstanceSetItemRepository
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $items = [];
         foreach ($rows as $row) {
+            $itemType = (string)($row['item_type'] ?? 'instance');
             $items[] = new PlaylistInstanceSetItem(
                 (int)$row['id'],
                 (int)$row['playlist_instance_set_id'],
                 $row['playlist_instance_id'] !== null ? (int)$row['playlist_instance_id'] : null,
                 $row['playlist_id'] !== null ? (int)$row['playlist_id'] : null,
-                (string)($row['item_type'] ?? 'instance'),
+                $itemType,
                 $row['target_set_id'] !== null ? (int)$row['target_set_id'] : null,
                 (string)$row['title'],
+                $itemType === 'set'
+                    ? (string)($row['subtitle'] ?? '')
+                    : (string)($row['display_subtitle'] ?? ''),
                 (string)$row['photo_url'],
                 $row['photo_library_id'] !== null ? (int)$row['photo_library_id'] : null,
                 (int)$row['sort_order']
@@ -73,6 +79,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     item_type,
                     target_set_id,
                     title,
+                    subtitle,
                     photo_url,
                     photo_library_id,
                     sort_order
@@ -82,6 +89,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     :item_type,
                     :target_set_id,
                     :title,
+                    :subtitle,
                     :photo_url,
                     :photo_library_id,
                     :sort_order
@@ -103,6 +111,7 @@ final class PdoPlaylistInstanceSetItemRepository
                     'item_type' => $itemType,
                     'target_set_id' => $targetSetId,
                     'title' => (string)($item['title'] ?? ''),
+                    'subtitle' => (string)($item['subtitle'] ?? ''),
                     'photo_url' => (string)($item['photo_url'] ?? ''),
                     'photo_library_id' => isset($item['photo_library_id']) ? (int)$item['photo_library_id'] : null,
                     'sort_order' => (int)($item['sort_order'] ?? 0),

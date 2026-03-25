@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import ClientPickerModal from "@components/ClientPickerModal";
 import "./admin-photo-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 const UPDATE_URL = `${API_FOLDER}/v2/admin/photo-library/update.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/photo-library/delete.php`;
+const USAGE_URL = `${API_FOLDER}/v2/admin/photo-library/usage.php`;
 const UPLOAD_URL = `${API_FOLDER}/v2/admin/photo-library/upload.php`;
 const REPLACE_URL = `${API_FOLDER}/v2/admin/photo-library/replace.php`;
 const SAVED_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
+const CLIENTS_LIST_URL = `${API_FOLDER}/v2/admin/clients/list.php`;
 const BACKFILL_EXTERIORS_URL = `${API_FOLDER}/v2/admin/photo-library/backfill-exteriors.php`;
 const GROUPS_LIST_URL = `${API_FOLDER}/v2/admin/photo-groups/list.php`;
 const GROUPS_CREATE_URL = `${API_FOLDER}/v2/admin/photo-groups/create.php`;
@@ -22,6 +25,7 @@ const SOURCE_OPTIONS = [
   { value: "saved_palette", label: "Saved Palette" },
   { value: "applied_palette", label: "Applied Palette" },
   { value: "progression", label: "Progression" },
+  { value: "client", label: "Client" },
   { value: "article", label: "Article" },
   { value: "pin", label: "Pin" },
 ];
@@ -31,6 +35,9 @@ const defaultUpload = {
   palette_id: "",
   series: "",
   title_prefix: "",
+  client_name: "",
+  client_email: "",
+  client_id: "",
   tags: "",
   alt_text: "",
   show_in_gallery: false,
@@ -41,7 +48,6 @@ const defaultFilters = {
   q: "",
   source_type: "",
   palette_id: "",
-  tag_mode: "include",
 };
 
 const normalizeTagToken = (token) => {
@@ -57,6 +63,36 @@ const parseTagTokens = (value) =>
     .map((token) => normalizeTagToken(token))
     .filter(Boolean);
 
+const buildClientGroupId = (clientId) => `client:${clientId}`;
+
+function isClientGroupId(value) {
+  return String(value || "").startsWith("client:");
+}
+
+function parseClientGroupId(value) {
+  const raw = String(value || "");
+  if (!raw.startsWith("client:")) return 0;
+  const id = Number(raw.slice("client:".length));
+  return Number.isFinite(id) ? id : 0;
+}
+
+function formatDeleteUsageMessage(item, usages = []) {
+  const header = [
+    `Can't delete Photo Library #${item?.photo_library_id || "?"}.`,
+    "",
+    "This asset is still being used here:",
+  ];
+
+  const lines = usages.map((usage) => {
+    const label = usage?.label || "Unknown usage";
+    const detail = usage?.detail ? ` (${usage.detail})` : "";
+    const path = usage?.admin_path ? ` -> ${usage.admin_path}` : "";
+    return `- ${label}${detail}${path}`;
+  });
+
+  return [...header, ...lines, "", "Remove those references first, then delete it from Photo Library."].join("\n");
+}
+
 export default function AdminPhotoLibraryPage() {
   const [uploadForm, setUploadForm] = useState(defaultUpload);
   const [uploading, setUploading] = useState(false);
@@ -65,6 +101,7 @@ export default function AdminPhotoLibraryPage() {
   const [files, setFiles] = useState([]);
 
   const [filters, setFilters] = useState(defaultFilters);
+  const [searchInput, setSearchInput] = useState("");
   const [items, setItems] = useState([]);
   const [dirtyIds, setDirtyIds] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
@@ -77,6 +114,9 @@ export default function AdminPhotoLibraryPage() {
   const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
 
   const [savedPalettes, setSavedPalettes] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [clientPickerOpen, setClientPickerOpen] = useState(false);
+  const [clientTargetPhotoId, setClientTargetPhotoId] = useState(null);
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState("");
   const [groupItems, setGroupItems] = useState(() => new Set());
@@ -110,6 +150,29 @@ export default function AdminPhotoLibraryPage() {
 
   useEffect(() => {
     let active = true;
+    async function loadClients() {
+      try {
+        const params = new URLSearchParams();
+        params.set("limit", "500");
+        params.set("_", Date.now().toString());
+        const res = await fetch(`${CLIENTS_LIST_URL}?${params.toString()}`, { credentials: "include" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load clients");
+        if (!active) return;
+        setClients(Array.isArray(data.items) ? data.items : []);
+      } catch {
+        if (!active) return;
+        setClients([]);
+      }
+    }
+    loadClients();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     async function loadGroups() {
       try {
         const res = await fetch(`${GROUPS_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
@@ -135,7 +198,7 @@ export default function AdminPhotoLibraryPage() {
         setGroupItems(new Set());
         return;
       }
-      if (groupId === "__ungrouped__") {
+      if (groupId === "__ungrouped__" || isClientGroupId(groupId)) {
         setGroupItems(new Set());
         return;
       }
@@ -185,11 +248,13 @@ export default function AdminPhotoLibraryPage() {
 
   const uploadSeriesLabel = useMemo(() => {
     if (uploadForm.source_type === "pin") return "Project folder";
+    if (uploadForm.source_type === "client") return "Client folder";
     return "Series (folder label)";
   }, [uploadForm.source_type]);
 
   const uploadSeriesPlaceholder = useMemo(() => {
     if (uploadForm.source_type === "pin") return "mojdeh-interior-makeover";
+    if (uploadForm.source_type === "client") return "Auto from client";
     return "ranch-demo";
   }, [uploadForm.source_type]);
 
@@ -204,14 +269,22 @@ export default function AdminPhotoLibraryPage() {
   }, [uploadForm.source_type]);
 
   const groupOptions = useMemo(() => {
+    const clientOptions = clients
+      .filter((client) => Number(client.id) > 0)
+      .map((client) => ({
+        id: buildClientGroupId(client.id),
+        label: client.name ? `${client.name} (Client)` : `${client.email} (Client)`,
+      }));
+
     return [
       { id: "__ungrouped__", label: "Ungrouped" },
+      ...clientOptions,
       ...groups.map((group) => ({
         id: String(group.group_id),
         label: group.title,
       })),
     ];
-  }, [groups]);
+  }, [clients, groups]);
 
   useEffect(() => {
     let active = true;
@@ -220,6 +293,7 @@ export default function AdminPhotoLibraryPage() {
       setError("");
       try {
         const params = new URLSearchParams();
+        if (filters.q) params.set("q", filters.q);
         if (filters.source_type) params.set("source_type", filters.source_type);
         if (filters.palette_id) params.set("palette_id", filters.palette_id);
         params.set("limit", "200");
@@ -241,10 +315,39 @@ export default function AdminPhotoLibraryPage() {
     return () => {
       active = false;
     };
-  }, [filters.source_type, filters.palette_id, refreshKey]);
+  }, [filters.q, filters.source_type, filters.palette_id, refreshKey]);
 
   const handleUploadField = (key, value) => {
     setUploadForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleClientSelect = (value) => {
+    if (!value) {
+      setUploadForm((prev) => ({
+        ...prev,
+        client_id: "",
+        client_name: "",
+        client_email: "",
+      }));
+      return;
+    }
+    if (value === "__new__") {
+      setUploadForm((prev) => ({
+        ...prev,
+        client_id: "__new__",
+        client_name: "",
+        client_email: "",
+      }));
+      return;
+    }
+    const selected = clients.find((client) => String(client.id) === String(value));
+    if (!selected) return;
+    setUploadForm((prev) => ({
+      ...prev,
+      client_id: String(selected.id),
+      client_name: selected.name || "",
+      client_email: selected.email || "",
+    }));
   };
 
   const handleLibraryField = (id, key, value) => {
@@ -256,6 +359,49 @@ export default function AdminPhotoLibraryPage() {
       next.add(id);
       return next;
     });
+  };
+
+  const patchLibraryItem = (id, fields) => {
+    setItems((prev) =>
+      prev.map((item) => (
+        item.photo_library_id === id
+          ? { ...item, ...fields }
+          : item
+      ))
+    );
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  const handleClientPicked = (client) => {
+    if (!client) return;
+    if (clientTargetPhotoId) {
+      patchLibraryItem(clientTargetPhotoId, {
+        source_type: "client",
+        client_id: Number(client.id) || null,
+        client_name: client.name || "",
+        client_email: client.email || "",
+      });
+    } else {
+      setUploadForm((prev) => ({
+        ...prev,
+        client_id: String(client.id || ""),
+        client_name: client.name || "",
+        client_email: client.email || "",
+      }));
+    }
+    setClients((prev) => {
+      const existing = prev.some((item) => Number(item.id) === Number(client.id));
+      if (existing) {
+        return prev.map((item) => (Number(item.id) === Number(client.id) ? client : item));
+      }
+      return [client, ...prev];
+    });
+    setClientTargetPhotoId(null);
+    setClientPickerOpen(false);
   };
 
   const togglePath = (id) => {
@@ -273,6 +419,20 @@ export default function AdminPhotoLibraryPage() {
     const stamp = Date.parse(updatedAt);
     if (!Number.isFinite(stamp)) return src;
     return `${src}${sep}v=${stamp}`;
+  };
+
+  const formatUpdatedAt = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const parsed = new Date(raw.replace(" ", "T"));
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
   const handleReplaceFileChange = (id, file) => {
@@ -337,6 +497,10 @@ export default function AdminPhotoLibraryPage() {
       setUploadStatus({ error: "Choose a saved palette.", success: "" });
       return;
     }
+    if (uploadForm.source_type === "client" && !uploadForm.client_email.trim()) {
+      setUploadStatus({ error: "Client email is required for client uploads.", success: "" });
+      return;
+    }
     setUploading(true);
     setUploadStatus({ error: "", success: "" });
     try {
@@ -355,6 +519,8 @@ export default function AdminPhotoLibraryPage() {
         formData.append("source_type", uploadForm.source_type);
         formData.append("series", uploadForm.series || "");
         formData.append("title_prefix", uploadForm.title_prefix || "");
+        formData.append("client_name", uploadForm.client_name || "");
+        formData.append("client_email", uploadForm.client_email || "");
         formData.append("tags", uploadForm.tags || "");
         formData.append("alt_text", uploadForm.alt_text || "");
         if (uploadForm.show_in_gallery) formData.append("show_in_gallery", "1");
@@ -386,19 +552,25 @@ export default function AdminPhotoLibraryPage() {
       if (replaceFiles[item.photo_library_id]) {
         await handleReplace(item);
       }
+      const payload = {
+        photo_library_id: item.photo_library_id,
+        source_type: item.source_type,
+        title: item.title,
+        tags: item.tags,
+        alt_text: item.alt_text,
+        note: item.note,
+        show_in_gallery: !!item.show_in_gallery,
+        has_palette: !!item.has_palette,
+      };
+      if (item.source_type === "client" || item.client_id) {
+        payload.client_name = item.client_name || "";
+        payload.client_email = item.client_email || "";
+      }
       const res = await fetch(UPDATE_URL, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          photo_library_id: item.photo_library_id,
-          title: item.title,
-          tags: item.tags,
-          alt_text: item.alt_text,
-          note: item.note,
-          show_in_gallery: !!item.show_in_gallery,
-          has_palette: !!item.has_palette,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
@@ -421,19 +593,25 @@ export default function AdminPhotoLibraryPage() {
     const dirtyItems = items.filter((row) => dirtyIds.has(row.photo_library_id));
     try {
       for (const item of dirtyItems) {
+        const payload = {
+          photo_library_id: item.photo_library_id,
+          source_type: item.source_type,
+          title: item.title,
+          tags: item.tags,
+          alt_text: item.alt_text,
+          note: item.note,
+          show_in_gallery: !!item.show_in_gallery,
+          has_palette: !!item.has_palette,
+        };
+        if (item.source_type === "client" || item.client_id) {
+          payload.client_name = item.client_name || "";
+          payload.client_email = item.client_email || "";
+        }
         const res = await fetch(UPDATE_URL, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              photo_library_id: item.photo_library_id,
-              title: item.title,
-              tags: item.tags,
-              alt_text: item.alt_text,
-              note: item.note,
-              show_in_gallery: !!item.show_in_gallery,
-              has_palette: !!item.has_palette,
-            }),
+            body: JSON.stringify(payload),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) {
@@ -448,9 +626,22 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const handleLibraryDelete = async (item) => {
-    if (!window.confirm("Delete this photo from the library?")) return;
     setError("");
     try {
+      const usageRes = await fetch(`${USAGE_URL}?photo_library_id=${encodeURIComponent(item.photo_library_id)}`, {
+        credentials: "include",
+      });
+      const usageData = await usageRes.json().catch(() => ({}));
+      if (!usageRes.ok || !usageData?.ok) {
+        throw new Error(usageData?.error || "Failed to check photo usage");
+      }
+      if (Array.isArray(usageData.usages) && usageData.usages.length > 0) {
+        window.alert(formatDeleteUsageMessage(item, usageData.usages));
+        return;
+      }
+
+      if (!window.confirm("Delete this photo from the library?")) return;
+
       const res = await fetch(DELETE_URL, {
         method: "POST",
         credentials: "include",
@@ -459,6 +650,10 @@ export default function AdminPhotoLibraryPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
+        if (res.status === 409 && Array.isArray(data?.usages) && data.usages.length > 0) {
+          window.alert(formatDeleteUsageMessage(item, data.usages));
+          return;
+        }
         throw new Error(data?.error || "Delete failed");
       }
       setItems((prev) => prev.filter((row) => row.photo_library_id !== item.photo_library_id));
@@ -485,30 +680,31 @@ export default function AdminPhotoLibraryPage() {
 
   const showSavedFields = uploadForm.source_type === "saved_palette";
   const showLibraryFields = uploadForm.source_type !== "saved_palette" && uploadForm.source_type !== "applied_palette";
-
-  const tagFilteredItems = useMemo(() => {
-    const tokens = parseTagTokens(filters.q);
-    if (!tokens.length) return items;
-    const mode = filters.tag_mode === "exclude" ? "exclude" : "include";
-    return items.filter((item) => {
-      const tagList = parseTagTokens(item.tags);
-      if (!tagList.length) return mode === "exclude";
-      if (mode === "include") {
-        return tokens.every((token) => tagList.includes(token));
-      }
-      return tokens.every((token) => !tagList.includes(token));
-    });
-  }, [items, filters.q, filters.tag_mode]);
+  const showClientFields = uploadForm.source_type === "client";
+  const showSeriesField = showLibraryFields && !showClientFields;
 
   const inGroup = (photoId) => groupItems.has(String(photoId));
 
   const filteredItems = useMemo(() => {
-    if (!groupId || groupFilterMode === "all") return tagFilteredItems;
+    if (!groupId || groupFilterMode === "all") return items;
     if (groupId === "__ungrouped__") {
-      return tagFilteredItems.filter((item) => !groupedItems.has(String(item.photo_library_id)));
+      return items.filter((item) => (
+        !groupedItems.has(String(item.photo_library_id)) &&
+        Number(item.client_id || 0) <= 0
+      ));
     }
-    return tagFilteredItems.filter((item) => inGroup(item.photo_library_id));
-  }, [tagFilteredItems, groupId, groupFilterMode, groupItems, groupedItems]);
+    if (isClientGroupId(groupId)) {
+      const clientId = parseClientGroupId(groupId);
+      if (!clientId) return items;
+      return items.filter((item) => Number(item.client_id) === clientId);
+    }
+    return items.filter((item) => inGroup(item.photo_library_id));
+  }, [items, groupId, groupFilterMode, groupItems, groupedItems]);
+
+  const getDisplaySourceType = (item) => {
+    if (Number(item?.client_id || 0) > 0) return "client";
+    return item?.source_type || "";
+  };
 
   async function handleCreateGroup() {
     const title = newGroupTitle.trim();
@@ -533,6 +729,7 @@ export default function AdminPhotoLibraryPage() {
 
   async function handleDeleteGroup() {
     if (!groupId) return;
+    if (isClientGroupId(groupId)) return;
     if (!window.confirm("Delete this group? Photos will not be deleted.")) return;
     setGroupStatus("");
     try {
@@ -664,7 +861,57 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
 
-          {showLibraryFields && (
+          {showClientFields && (
+            <label>
+              Existing client
+              <div className="admin-photo-library__client-picker">
+                <select
+                  value={uploadForm.client_id}
+                  onChange={(e) => handleClientSelect(e.target.value)}
+                >
+                  <option value="">Pick client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name ? `${client.name} (${client.email})` : client.email}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setClientPickerOpen(true)}
+                >
+                  Client…
+                </button>
+              </div>
+            </label>
+          )}
+
+          {showClientFields && (
+            <label>
+              Client name
+              <input
+                type="text"
+                value={uploadForm.client_name}
+                onChange={(e) => handleUploadField("client_name", e.target.value)}
+                placeholder="Mojdeh"
+              />
+            </label>
+          )}
+
+          {showClientFields && (
+            <label>
+              Client email
+              <input
+                type="email"
+                value={uploadForm.client_email}
+                onChange={(e) => handleUploadField("client_email", e.target.value)}
+                placeholder="mojdeh@example.com"
+              />
+            </label>
+          )}
+
+          {showSeriesField && (
             <label>
               {uploadSeriesLabel}
               <input
@@ -766,31 +1013,36 @@ export default function AdminPhotoLibraryPage() {
         {error && <div className="admin-photo-library__error">{error}</div>}
         {backfillStatus && <div className="admin-photo-library__status">{backfillStatus}</div>}
         <div className="admin-photo-library__filters">
-          <label className="admin-photo-library__tag-filter">
-            Tags
-            <div className="admin-photo-library__tag-input">
+          <form
+            className="admin-photo-library__tag-filter"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setFilters((prev) => ({ ...prev, q: searchInput.trim() }));
+            }}
+          >
+            <label>
+              Search
               <input
                 type="text"
-                value={filters.q}
-                onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-                placeholder="tag, tag"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="title, tags, path, or photo id"
               />
+            </label>
+            <div className="admin-photo-library__tag-input">
+              <button type="submit">Search</button>
               <button
                 type="button"
-                className={`admin-photo-library__tag-toggle${filters.tag_mode === "exclude" ? " is-active" : ""}`}
-                onClick={() =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    tag_mode: prev.tag_mode === "exclude" ? "include" : "exclude",
-                  }))
-                }
-                title={filters.tag_mode === "exclude" ? "Excluding tags" : "Include tags"}
-                aria-label={filters.tag_mode === "exclude" ? "Exclude tags" : "Include tags"}
+                className="ghost"
+                onClick={() => {
+                  setSearchInput("");
+                  setFilters((prev) => ({ ...prev, q: "" }));
+                }}
               >
-                ×
+                Clear
               </button>
             </div>
-          </label>
+          </form>
           <label>
             Group
             <select
@@ -820,7 +1072,7 @@ export default function AdminPhotoLibraryPage() {
                 Add Group
               </button>
             </div>
-            {groupId && (
+            {groupId && !isClientGroupId(groupId) && (
               <button
                 type="button"
                 className="ghost"
@@ -829,7 +1081,7 @@ export default function AdminPhotoLibraryPage() {
                 {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
               </button>
             )}
-            <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId}>
+            <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId || isClientGroupId(groupId)}>
               Delete Group
             </button>
             {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
@@ -844,7 +1096,9 @@ export default function AdminPhotoLibraryPage() {
               <option value="saved_palette_photo">Saved palette</option>
               <option value="applied_palette">Applied palette</option>
               <option value="progression">Progression</option>
+              <option value="client">Client</option>
               <option value="article">Article</option>
+              <option value="pin">Pin</option>
               <option value="extra_photo">Extras</option>
             </select>
           </label>
@@ -909,13 +1163,18 @@ export default function AdminPhotoLibraryPage() {
                       <button
                         type="button"
                         className="admin-photo-library__thumb"
-                        onClick={() => setPreviewUrl(withCacheBuster(item.rel_path, item.updated_at))}
+                        onClick={() => setPreviewUrl(item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at))}
                       >
-                        <img src={withCacheBuster(item.rel_path, item.updated_at)} alt="" />
+                        <img src={item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at)} alt="" />
                       </button>
                       <div className="admin-photo-library__thumb-name">
                         {item.filename || ""}
                       </div>
+                      {item.updated_at ? (
+                        <div className="admin-photo-library__thumb-updated">
+                          Updated: {formatUpdatedAt(item.updated_at)}
+                        </div>
+                      ) : null}
                       <div className="admin-photo-library__thumb-actions">
                         <button
                           type="button"
@@ -927,14 +1186,14 @@ export default function AdminPhotoLibraryPage() {
                         <button
                           type="button"
                           className="ghost admin-photo-library__thumb-action"
-                          onClick={() => navigator.clipboard.writeText(item.rel_path || "")}
+                          onClick={() => navigator.clipboard.writeText(item.raw_rel_path || item.rel_path || "")}
                         >
                           Copy path
                         </button>
                       </div>
                       {expandedPathIds.has(item.photo_library_id) && (
                         <div className="admin-photo-library__thumb-path">
-                          {item.rel_path || ""}
+                          {item.raw_rel_path || item.rel_path || ""}
                         </div>
                       )}
                     </td>
@@ -964,12 +1223,23 @@ export default function AdminPhotoLibraryPage() {
                           onChange={(e) => handleLibraryField(item.photo_library_id, "note", e.target.value)}
                           placeholder="note"
                         />
+                        {item.source_type === "client" && (
+                          <>
+                            <input
+                              type="text"
+                              value={item.client_name || ""}
+                              onChange={(e) => handleLibraryField(item.photo_library_id, "client_name", e.target.value)}
+                              placeholder="client name"
+                            />
+                          </>
+                        )}
                       </div>
                     </td>
                     <td>
                       <div className="admin-photo-library__meta">
-                        <div>{item.source_type}</div>
+                        <div>{getDisplaySourceType(item)}</div>
                         {item.source_id && <div className="muted">#{item.source_id}</div>}
+                        {item.client_name ? <div className="muted">Client: {item.client_name}</div> : null}
                       </div>
                     </td>
                     <td>
@@ -994,16 +1264,26 @@ export default function AdminPhotoLibraryPage() {
                     </td>
                     <td className="admin-photo-library__row-actions">
                       <div className="admin-photo-library__row-actions-top">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => {
+                            setClientTargetPhotoId(item.photo_library_id);
+                            setClientPickerOpen(true);
+                          }}
+                        >
+                          Client…
+                        </button>
                         <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
                           Save
                         </button>
-                        <a className="ghost" href={withCacheBuster(item.rel_path, item.updated_at)} download>
+                        <a className="ghost" href={item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at)} download>
                           Download
                         </a>
                         <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
                           Delete
                         </button>
-                        {groupId && groupId !== "__ungrouped__" && (
+                        {groupId && groupId !== "__ungrouped__" && !isClientGroupId(groupId) && (
                           inGroup(item.photo_library_id) ? (
                             <button
                               type="button"
@@ -1066,6 +1346,15 @@ export default function AdminPhotoLibraryPage() {
           <img src={previewUrl} alt="" />
         </div>
       )}
+
+      <ClientPickerModal
+        open={clientPickerOpen}
+        onClose={() => {
+          setClientPickerOpen(false);
+          setClientTargetPhotoId(null);
+        }}
+        onPick={handleClientPicked}
+      />
     </div>
   );
 }

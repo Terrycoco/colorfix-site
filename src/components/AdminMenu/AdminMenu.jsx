@@ -9,6 +9,7 @@ export default function AdminMenu() {
   const [hovered, setHovered] = useState(null);
   const menuRef = useRef(null);
   const hoverTimerRef = useRef(null);
+  const touchHandledRef = useRef(false);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -17,8 +18,8 @@ export default function AdminMenu() {
         setHovered(null);
       }
     }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (open) document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
   }, [open]);
 
   useEffect(() => {
@@ -46,12 +47,44 @@ export default function AdminMenu() {
 
   if (!admin) return null;
 
+  function toggleMenu(e) {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    setOpen((v) => {
+      const next = !v;
+      if (!next) {
+        setHovered(null);
+      } else {
+        setHovered(null);
+      }
+      return next;
+    });
+  }
+
+  function handleTouchEnd(e) {
+    touchHandledRef.current = true;
+    toggleMenu(e);
+    window.setTimeout(() => {
+      touchHandledRef.current = false;
+    }, 250);
+  }
+
+  function handleClick(e) {
+    if (touchHandledRef.current) {
+      e?.preventDefault?.();
+      e?.stopPropagation?.();
+      return;
+    }
+    toggleMenu(e);
+  }
+
   return (
     <div className="admin-menu" ref={menuRef}>
       <button
         type="button"
         className="admin-menu__trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleClick}
+        onTouchEnd={handleTouchEnd}
         aria-haspopup="menu"
         aria-expanded={open}
       >

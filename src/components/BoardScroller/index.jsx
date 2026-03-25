@@ -193,10 +193,6 @@ const goToPalette = (e) => {
           >
             <PaletteOutlineIcon className="palette-icon" title="My Palette" />
           </button>
-        </div>
-
-        {/* RIGHT (funnel to the left of the logo) */}
-        <div className="scroller-right">
           {hasSwatches && !isMobile && (
             <button
               type="button"
@@ -208,6 +204,10 @@ const goToPalette = (e) => {
               {paletteArrowIcon}
             </button>
           )}
+        </div>
+
+        {/* RIGHT (funnel to the left of the logo) */}
+        <div className="scroller-right">
   <span
   ref={btnRef}
   className={`mini-brand-wrap ${filterIsActive ? 'has-active' : ''} ${pulse ? 'pulse' : ''}`}

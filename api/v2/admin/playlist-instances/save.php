@@ -32,6 +32,7 @@ $id = isset($payload['playlist_instance_id']) ? (int)$payload['playlist_instance
 $playlistId = isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : 0;
 $instanceName = trim((string)($payload['instance_name'] ?? ''));
 $displayTitle = trim((string)($payload['display_title'] ?? ''));
+$displaySubtitle = trim((string)($payload['display_subtitle'] ?? ''));
 $introLayout = trim((string)($payload['intro_layout'] ?? 'default'));
 $ctaContextKey = trim((string)($payload['cta_context_key'] ?? ''));
 $audience = trim((string)($payload['audience'] ?? ''));
@@ -59,6 +60,7 @@ try {
         $playlistId,
         $instanceName,
         $displayTitle !== '' ? $displayTitle : null,
+        $displaySubtitle !== '' ? $displaySubtitle : null,
         $payload['instance_notes'] ?? null,
         $introLayout,
         $payload['intro_title'] ?? null,

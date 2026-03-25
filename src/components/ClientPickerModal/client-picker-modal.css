@@ -1,0 +1,162 @@
+.cpm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+}
+
+.cpm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(9, 13, 22, 0.52);
+}
+
+.cpm-panel {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  margin: 24px auto;
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+}
+
+.cpm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.cpm-title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.cpm-close,
+.cpm-search-btn,
+.cpm-primary {
+  border: 1px solid #cfd7e7;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cpm-close {
+  background: #fff;
+  color: #1b2433;
+  border-color: #b8c4da;
+}
+
+.cpm-close:hover {
+  background: #f4f7fb;
+  color: #1b2433;
+}
+
+.cpm-search,
+.cpm-create {
+  display: grid;
+  gap: 10px;
+}
+
+.cpm-label,
+.cpm-create label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: #5f6b7d;
+}
+
+.cpm-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.cpm-search-row input,
+.cpm-create input {
+  width: 100%;
+  border: 1px solid #d5ddef;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.cpm-search-btn,
+.cpm-primary {
+  background: #0b1b3a;
+  color: #fff;
+}
+
+.cpm-status {
+  margin-top: 12px;
+  color: #5f6b7d;
+}
+
+.cpm-status.error {
+  color: #b42323;
+}
+
+.cpm-results {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.cpm-card {
+  text-align: left;
+  border: 1px solid #e1e7f0;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.cpm-card:hover {
+  border-color: #97abd0;
+  background: #f7faff;
+}
+
+.cpm-card-name {
+  font-weight: 700;
+  color: #1b2433;
+}
+
+.cpm-card-meta {
+  color: #66758c;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.cpm-divider {
+  margin: 18px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e8edf6;
+  font-size: 13px;
+  font-weight: 700;
+  color: #44536b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cpm-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 640px) {
+  .cpm-panel {
+    width: calc(100vw - 16px);
+    margin: 8px auto;
+    padding: 16px;
+    max-height: calc(100vh - 16px);
+  }
+
+  .cpm-search-row {
+    grid-template-columns: 1fr;
+  }
+}

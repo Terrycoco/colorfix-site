@@ -10,6 +10,7 @@ final class PlaylistInstance
         public int $playlistId,
         public string $instanceName,
         public ?string $displayTitle,
+        public ?string $displaySubtitle,
         public ?string $instanceNotes,
         public string $introLayout,
         public ?string $introTitle,

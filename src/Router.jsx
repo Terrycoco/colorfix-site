@@ -46,8 +46,10 @@ const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
 const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
+const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
+const AdminClientsPage = lazy(() => import('@pages/AdminClientsPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
 const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
@@ -238,12 +240,20 @@ function AppRouter() {
               element={renderWithSuspense(AdminProjectsPage, 'Loading projects…')}
             />
             <Route
+              path="user-events"
+              element={renderWithSuspense(AdminUserEventsPage, 'Loading view counts…')}
+            />
+            <Route
               path="qr-sheets"
               element={renderWithSuspense(AdminQrSheetsPage, 'Loading QR sheets…')}
             />
             <Route
               path="photo-library"
               element={renderWithSuspense(AdminPhotoLibraryPage, 'Loading photo library…')}
+            />
+            <Route
+              path="clients"
+              element={renderWithSuspense(AdminClientsPage, 'Loading clients…')}
             />
             <Route
               path="applied-palettes"

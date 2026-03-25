@@ -2,6 +2,7 @@
   position: relative;
   display: inline-flex;
   z-index: 30000;
+  overflow: visible;
 }
 
 .admin-menu__trigger {
@@ -13,6 +14,8 @@
   color: #fff;
   cursor: pointer;
   font-size: 13px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .admin-menu__panel {
@@ -26,10 +29,11 @@
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   min-width: 200px;
   z-index: 30001;
+  overflow: visible;
 }
 
 .admin-menu__group {
-  position: relative;
+  position: static;
   padding: 6px 14px;
   cursor: default;
 }
@@ -53,14 +57,46 @@
 .admin-menu__submenu {
   position: absolute;
   top: 0;
-  left: 100%;
-  margin-left: 6px;
+  left: calc(100% + 6px);
+  margin-left: 0;
   background: #fff;
   border-radius: 12px;
   padding: 8px 0;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   min-width: 220px;
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
   z-index: 30002;
+}
+
+@media (max-width: 768px) {
+  .admin-menu__panel {
+    position: fixed;
+    top: calc(max(env(safe-area-inset-top, 0px), 10px) + 44px);
+    left: 8px;
+    right: auto;
+    width: min(44vw, 220px);
+    min-width: 160px;
+    max-width: calc(50vw - 12px);
+    overflow: visible;
+  }
+
+  .admin-menu__group {
+    position: static;
+  }
+
+  .admin-menu__submenu {
+    position: fixed;
+    top: calc(max(env(safe-area-inset-top, 0px), 10px) + 44px);
+    left: calc(8px + min(44vw, 220px) + 6px);
+    width: min(44vw, 220px);
+    min-width: 160px;
+    max-width: calc(50vw - 18px);
+    max-height: calc(100vh - max(env(safe-area-inset-top, 0px), 10px) - 56px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  }
 }
 
 .admin-menu__item {

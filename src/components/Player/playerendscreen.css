@@ -96,7 +96,8 @@
 
 .player-end-links .cta-button--link:hover {
   color: #fff;
-  opacity: 0.8;
+  opacity: 1;
+  text-decoration: underline;
 }
 
 .player-end-links .cta-layout--stacked .cta-button--link,

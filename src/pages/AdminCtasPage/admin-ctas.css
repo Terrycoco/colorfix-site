@@ -180,15 +180,19 @@
   overflow: auto;
   max-height: 360px;
   padding-right: 2px;
+  align-items: stretch;
 }
 
 .cta-listbox-row {
+  display: flex;
+  flex-direction: column;
   text-align: left;
   border: 1px solid #e5e5e5;
   background: #fff;
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
+  align-items: flex-start;
 }
 
 .cta-listbox-row.active {

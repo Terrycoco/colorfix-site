@@ -131,6 +131,7 @@ final class PlayerExperienceService
             'share_title'          => $instance->shareTitle,
             'share_description'    => $instance->shareDescription,
             'share_image_url'      => $instance->shareImageUrl,
+            'skip_intro_on_replay' => $instance->skipIntroOnReplay,
             'hide_stars'           => $instance->hideStars,
             'playlist_instance_set_ids' => $setIds,
         ];
@@ -178,10 +179,7 @@ final class PlayerExperienceService
             $photoId = $item->photo_library_id ?? null;
             $imageUrl = (string)($item->image_url ?? '');
             if ($photoId) {
-                $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
-                if ($needsUrl) {
-                    $photoIds[$photoId] = true;
-                }
+                $photoIds[$photoId] = true;
                 continue;
             }
             $assetId = $this->extractAssetId($imageUrl);
@@ -198,11 +196,9 @@ final class PlayerExperienceService
             $imageUrl = (string)($item->image_url ?? '');
             $photoId = $item->photo_library_id ?? null;
             if ($photoId) {
-                $needsUrl = $imageUrl === '' || $this->isPhotoRefWithoutUrl($imageUrl);
-                if (!$needsUrl) continue;
                 $resolved = $photoUrlMap[(int)$photoId] ?? '';
                 if ($resolved !== '') {
-                    $item->image_url = $resolved;
+                    $item->image_url = "photo:{$photoId}|{$resolved}";
                 }
                 continue;
             }
@@ -226,12 +222,14 @@ final class PlayerExperienceService
         if (!$ids) return [];
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $this->pdo->prepare(
-            "SELECT photo_library_id, rel_path FROM photo_library WHERE photo_library_id IN ({$placeholders})"
+            "SELECT photo_library_id, rel_path, updated_at FROM photo_library WHERE photo_library_id IN ({$placeholders})"
         );
         $stmt->execute($ids);
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $map[(int)$row['photo_library_id']] = (string)($row['rel_path'] ?? '');
+            $relPath = (string)($row['rel_path'] ?? '');
+            $updatedAt = (string)($row['updated_at'] ?? '');
+            $map[(int)$row['photo_library_id']] = $this->appendCacheBuster($relPath, $updatedAt);
         }
         return $map;
     }
@@ -302,6 +300,22 @@ final class PlayerExperienceService
         $parts = explode('|', $value, 2);
         if (count($parts) < 2) return true;
         return trim($parts[1]) === '';
+    }
+
+    private function appendCacheBuster(string $url, string $updatedAt): string
+    {
+        $url = trim($url);
+        if ($url === '' || $updatedAt === '') {
+            return $url;
+        }
+
+        $stamp = strtotime($updatedAt);
+        if ($stamp === false || $stamp <= 0) {
+            return $url;
+        }
+
+        $sep = str_contains($url, '?') ? '&' : '?';
+        return $url . $sep . 'v=' . $stamp;
     }
 
     /**

@@ -17,21 +17,29 @@ function respond(int $code, array $payload): void {
     exit;
 }
 
-function refreshPlaylistPhotoRefs(PDO $pdo, int $photoLibraryId, string $newRelPath): void
+function refreshPlaylistPhotoRefs(PDO $pdo, int $photoLibraryId, string $newRelPath, ?int $cacheStamp = null): void
 {
     if ($photoLibraryId <= 0 || $newRelPath === '') {
         return;
     }
 
+    $resolvedPath = $newRelPath;
+    if ($cacheStamp && $cacheStamp > 0) {
+        $sep = str_contains($resolvedPath, '?') ? '&' : '?';
+        $resolvedPath .= $sep . 'v=' . $cacheStamp;
+    }
     $prefix = 'photo:' . $photoLibraryId . '|';
     $stmt = $pdo->prepare(
         "UPDATE playlist_items
-            SET image_url = :image_url
-          WHERE photo_library_id = :photo_library_id"
+            SET image_url = :image_url,
+                photo_library_id = COALESCE(photo_library_id, :photo_library_id)
+          WHERE photo_library_id = :photo_library_id
+             OR image_url LIKE :legacy_ref"
     );
     $stmt->execute([
-        ':image_url' => $prefix . $newRelPath,
+        ':image_url' => $prefix . $resolvedPath,
         ':photo_library_id' => $photoLibraryId,
+        ':legacy_ref' => $prefix . '%',
     ]);
 }
 
@@ -87,9 +95,16 @@ try {
     $pathInfo = pathinfo($relPath);
     $dirPart = (string)($pathInfo['dirname'] ?? '');
     $filenamePart = (string)($pathInfo['filename'] ?? 'photo');
+    try {
+        $hash = bin2hex(random_bytes(6));
+    } catch (Throwable) {
+        $hash = substr(sha1(uniqid((string)microtime(true), true)), 0, 12);
+    }
+    $baseName = preg_replace('/_[a-f0-9]{8,16}$/i', '', $filenamePart) ?: $filenamePart;
+    $newFileName = $baseName . '_' . $hash . '.' . $ext;
     $newRelPath = ($dirPart === '' || $dirPart === '.')
-        ? '/' . $filenamePart . '.' . $ext
-        : rtrim($dirPart, '/') . '/' . $filenamePart . '.' . $ext;
+        ? '/' . $newFileName
+        : rtrim($dirPart, '/') . '/' . $newFileName;
 
     $primaryAbs = $docRoot . $newRelPath;
     $fallbackAbs = $publicRoot . $newRelPath;
@@ -117,9 +132,9 @@ try {
 
     if ($primaryAbs !== $fallbackAbs && is_file($writtenTo)) {
         $copyTarget = $writtenTo === $primaryAbs ? $fallbackAbs : $primaryAbs;
-        if (!is_file($copyTarget)) {
-            $ensureDir($copyTarget);
-            @copy($writtenTo, $copyTarget);
+        $ensureDir($copyTarget);
+        if (!@copy($writtenTo, $copyTarget)) {
+            respond(500, ['ok' => false, 'error' => 'Failed to sync replacement image']);
         }
     }
 
@@ -135,6 +150,15 @@ try {
     }
 
     $repo->update($id, ['rel_path' => ltrim($newRelPath, '/') === $relPathRaw ? $relPathRaw : $newRelPath]);
+
+    $fresh = $repo->findById($id);
+    $cacheStamp = null;
+    if (!empty($fresh['updated_at'])) {
+        $stamp = strtotime((string)$fresh['updated_at']);
+        if ($stamp !== false && $stamp > 0) {
+            $cacheStamp = $stamp;
+        }
+    }
 
     if ($sourceId > 0) {
         if ($sourceType === 'saved_palette_photo' || $sourceType === 'saved_before') {
@@ -152,7 +176,7 @@ try {
         }
     }
 
-    refreshPlaylistPhotoRefs($pdo, $id, $newRelPath);
+    refreshPlaylistPhotoRefs($pdo, $id, $newRelPath, $cacheStamp);
 
     $writtenPath = $writtenTo ?? null;
     respond(200, [

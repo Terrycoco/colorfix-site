@@ -59,6 +59,7 @@ $items = array_map(static function ($instance) {
         'playlist_id' => $instance->playlistId,
         'instance_name' => $instance->instanceName,
         'display_title' => $instance->displayTitle,
+        'display_subtitle' => $instance->displaySubtitle,
         'instance_notes' => $instance->instanceNotes,
         'cta_group_id' => $instance->ctaGroupId,
         'palette_viewer_cta_group_id' => $instance->paletteViewerCtaGroupId,

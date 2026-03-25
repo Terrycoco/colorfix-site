@@ -7,6 +7,13 @@
   min-height: 0;
 }
 
+@media (max-width: 768px) {
+  .main-layout {
+    padding-top: 8px;
+    padding-bottom: 24px;
+  }
+}
+
 /* TEMP CenterGuard: force top-level children to align to the same cap as the nav */
 .main-layout { --cap: var(--cap, 1320px); --gutter-x: var(--gutter-x, clamp(16px,4vw,32px)); }
 

@@ -7,6 +7,9 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryUsageService;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -28,16 +31,25 @@ try {
         respond(['ok' => false, 'error' => 'photo_library_id required'], 400);
     }
 
-    $stmt = $pdo->prepare('SELECT source_type, rel_path FROM photo_library WHERE photo_library_id = :id');
-    $stmt->execute([':id' => $id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $repo = new PdoPhotoLibraryRepository($pdo);
+    $row = $repo->findById($id);
     if (!$row) {
         respond(['ok' => false, 'error' => 'Photo not found'], 404);
     }
 
+    $usageService = new PhotoLibraryUsageService($repo);
+    $usages = $usageService->getUsageSummary($id);
+    if ($usages) {
+        respond([
+            'ok' => false,
+            'error' => 'Photo is still in use elsewhere',
+            'usages' => $usages,
+        ], 409);
+    }
+
     $sourceType = (string)$row['source_type'];
     $rel = (string)($row['rel_path'] ?? '');
-    if (in_array($sourceType, ['progression', 'article'], true) && $rel !== '' && str_starts_with($rel, '/photos/')) {
+    if (in_array($sourceType, ['progression', 'article', 'pin', 'client'], true) && $rel !== '' && str_starts_with($rel, '/photos/')) {
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
         $abs = $docRoot . $rel;
         if (is_file($abs)) {

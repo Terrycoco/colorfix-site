@@ -61,6 +61,7 @@ export default function AdminPlaylistEditorPage() {
   const [deleting, setDeleting] = useState(false);
   const [photoPickerIndex, setPhotoPickerIndex] = useState(null);
   const [photoThumbs, setPhotoThumbs] = useState({});
+  const [previewPhoto, setPreviewPhoto] = useState(null);
   const didLoadDraft = useRef(false);
 
   useEffect(() => {
@@ -116,9 +117,6 @@ export default function AdminPlaylistEditorPage() {
         .map((item) => {
           const photoId = String(getPhotoLibraryId(item) || "").trim();
           if (!photoId) return "";
-          const parsed = parsePhotoRef(item?.image_url || "");
-          if (parsed.url) return "";
-          if (item?.image_url && !String(item.image_url).startsWith("photo:")) return "";
           if (photoThumbs[photoId]) return "";
           return photoId;
         })
@@ -144,7 +142,9 @@ export default function AdminPlaylistEditorPage() {
           for (const row of data.items || []) {
             const id = String(row?.photo_library_id || "").trim();
             if (!id) continue;
-            next[id] = row?.rel_path || "";
+            const imageUrl = String(row?.image_url || row?.rel_path || "").trim();
+            if (!imageUrl) continue;
+            next[id] = imageUrl;
           }
           return next;
         });
@@ -398,11 +398,12 @@ export default function AdminPlaylistEditorPage() {
   };
 
   const getItemPhotoThumb = (item) => {
+    const photoId = String(getPhotoLibraryId(item) || "").trim();
+    if (photoId && photoThumbs[photoId]) return photoThumbs[photoId];
     const parsed = parsePhotoRef(item?.image_url || "");
     if (parsed.url) return parsed.url;
     if (item?.image_url && !String(item.image_url).startsWith("photo:")) return item.image_url;
-    const photoId = String(getPhotoLibraryId(item) || "").trim();
-    return photoThumbs[photoId] || "";
+    return "";
   };
 
   async function handleSave() {
@@ -644,12 +645,25 @@ export default function AdminPlaylistEditorPage() {
                 Photo
                 <div className="item-inline">
                   {getItemPhotoThumb(item) ? (
-                    <img
-                      className="item-photo-thumb"
-                      src={getItemPhotoThumb(item)}
-                      alt=""
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      className="item-photo-thumb-btn"
+                      onClick={() =>
+                        setPreviewPhoto({
+                          src: getItemPhotoThumb(item),
+                          title: item?.title || `Photo #${getPhotoLibraryId(item) || ""}`,
+                          photoLibraryId: getPhotoLibraryId(item) || "",
+                        })
+                      }
+                      aria-label={`Preview photo ${getPhotoLibraryId(item) || ""}`}
+                    >
+                      <img
+                        className="item-photo-thumb"
+                        src={getItemPhotoThumb(item)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    </button>
                   ) : (
                     <div className="item-photo-thumb item-photo-thumb--empty" aria-hidden="true" />
                   )}
@@ -776,6 +790,14 @@ export default function AdminPlaylistEditorPage() {
         ))}
       </div>
 
+      <div className="items-actions items-actions--bottom">
+        <button type="button" onClick={() => addItem("intro")}>Add Intro</button>
+        <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
+        <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
+
       {saveStatus && <div className="panel-status success">{saveStatus}</div>}
       {saveError && <div className="panel-status error">{saveError}</div>}
 
@@ -790,6 +812,38 @@ export default function AdminPlaylistEditorPage() {
           setPhotoPickerIndex(null);
         }}
       />
+
+      {previewPhoto?.src && (
+        <div
+          className="playlist-photo-preview-backdrop"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="playlist-photo-preview-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="playlist-photo-preview-close"
+              onClick={() => setPreviewPhoto(null)}
+              aria-label="Close photo preview"
+            >
+              ×
+            </button>
+            <div className="playlist-photo-preview-meta">
+              <div className="playlist-photo-preview-title">{previewPhoto.title || "Photo Preview"}</div>
+              {previewPhoto.photoLibraryId ? (
+                <div className="playlist-photo-preview-subtitle">Photo Library #{previewPhoto.photoLibraryId}</div>
+              ) : null}
+            </div>
+            <img
+              className="playlist-photo-preview-image"
+              src={previewPhoto.src}
+              alt=""
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

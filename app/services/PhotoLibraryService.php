@@ -237,7 +237,8 @@ class PhotoLibraryService
         }
         $data = [
             'source_type' => $sourceType,
-            'source_id' => null,
+            'source_id' => array_key_exists('source_id', $overrides) ? $overrides['source_id'] : null,
+            'client_id' => array_key_exists('client_id', $overrides) ? $overrides['client_id'] : null,
             'rel_path' => $relPath,
             'title' => $overrides['title'] ?? null,
             'tags' => $overrides['tags'] ?? null,

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `project_links` (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `project_links` (
+INSERT IGNORE INTO `project_links` (
   `project_id`,
   `asset_type`,
   `asset_id`,
@@ -35,7 +35,7 @@ INSERT INTO `project_links` (
   'Original living room photo for Mojdeh project.'
 );
 
-INSERT INTO `project_links` (
+INSERT IGNORE INTO `project_links` (
   `project_id`,
   `asset_type`,
   `asset_id`,
@@ -51,7 +51,7 @@ INSERT INTO `project_links` (
   'Updated living room photo for Mojdeh project.'
 );
 
-INSERT INTO `project_links` (
+INSERT IGNORE INTO `project_links` (
   `project_id`,
   `asset_type`,
   `asset_id`,
@@ -67,7 +67,7 @@ INSERT INTO `project_links` (
   'Primary playlist for Mojdeh Interior Makeover.'
 );
 
-INSERT INTO `project_links` (
+INSERT IGNORE INTO `project_links` (
   `project_id`,
   `asset_type`,
   `asset_id`,
@@ -83,7 +83,7 @@ INSERT INTO `project_links` (
   'Palette used for the main living room after concept.'
 );
 
-INSERT INTO `project_links` (
+INSERT IGNORE INTO `project_links` (
   `project_id`,
   `asset_type`,
   `asset_id`,

@@ -6,6 +6,14 @@ if (PHP_SAPI !== 'cli') {
 
 require __DIR__ . '/../db.php';
 
+function closeMigrationConnection(): void
+{
+    global $pdo;
+    if (isset($pdo) && $pdo instanceof PDO) {
+        $pdo = null;
+    }
+}
+
 $migrationsDir = dirname(__DIR__, 1) . '/../database/migrations';
 if (!is_dir($migrationsDir)) {
     exit("Migrations directory not found: {$migrationsDir}\n");
@@ -18,6 +26,7 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (PDOException $e) {
     fwrite(STDERR, "Failed to ensure schema_migrations exists: {$e->getMessage()}\n");
+    closeMigrationConnection();
     exit(1);
 }
 
@@ -56,8 +65,10 @@ foreach ($files as $file) {
         }
         echo " failed!\n";
         fwrite(STDERR, $e->getMessage() . "\n");
+        closeMigrationConnection();
         exit(1);
     }
 }
 
 echo "✅ All migrations applied.\n";
+closeMigrationConnection();

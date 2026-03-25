@@ -39,6 +39,7 @@ respond([
         'playlist_id' => $instance->playlistId,
         'instance_name' => $instance->instanceName,
         'display_title' => $instance->displayTitle,
+        'display_subtitle' => $instance->displaySubtitle,
         'instance_notes' => $instance->instanceNotes,
         'intro_layout' => $instance->introLayout,
         'intro_title' => $instance->introTitle,

@@ -7,6 +7,9 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Repos\PdoClientRepository;
+use App\Services\ClientService;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -29,15 +32,31 @@ try {
     }
 
     $fields = [];
+    if (array_key_exists('source_type', $payload)) $fields['source_type'] = trim((string)$payload['source_type']);
     if (array_key_exists('title', $payload)) $fields['title'] = trim((string)$payload['title']);
     if (array_key_exists('tags', $payload)) $fields['tags'] = trim((string)$payload['tags']);
     if (array_key_exists('alt_text', $payload)) $fields['alt_text'] = trim((string)$payload['alt_text']);
     if (array_key_exists('note', $payload)) $fields['note'] = trim((string)$payload['note']);
     if (array_key_exists('show_in_gallery', $payload)) $fields['show_in_gallery'] = !empty($payload['show_in_gallery']);
     if (array_key_exists('has_palette', $payload)) $fields['has_palette'] = !empty($payload['has_palette']);
+    if (array_key_exists('client_email', $payload)) {
+        $clientEmail = trim((string)$payload['client_email']);
+        if ($clientEmail === '') {
+            $fields['client_id'] = null;
+        } else {
+            $clientName = trim((string)($payload['client_name'] ?? ''));
+            $clientService = new ClientService(new PdoClientRepository($pdo));
+            $client = $clientService->findOrCreateByEmail($clientEmail, $clientName !== '' ? $clientName : null);
+            $fields['client_id'] = (int)$client['id'];
+        }
+    }
 
     if (!$fields) {
         respond(['ok' => false, 'error' => 'No fields to update'], 400);
+    }
+
+    if (isset($fields['source_type']) && $fields['source_type'] === '') {
+        unset($fields['source_type']);
     }
 
     $setParts = [];

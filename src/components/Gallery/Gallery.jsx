@@ -171,20 +171,6 @@ function Gallery({ items, runQueryById, meta, heroItems = [] }) {
     });
   }
 
-  // For hue mode, rotate so the highest defined order comes first (wraps Magentas/Reds before Reds)
-  if (groupMode === 'hue') {
-    const defined = sections.filter((s) => s.orderDefined);
-    if (defined.length > 1) {
-      const maxOrder = Math.max(...defined.map((s) => s.groupOrder ?? 0));
-      const pivotIdx = sections.findIndex((s) => s.orderDefined && (s.groupOrder ?? 0) === maxOrder);
-      if (pivotIdx > 0) {
-        const rotated = sections.slice(pivotIdx).concat(sections.slice(0, pivotIdx));
-        sections.length = 0;
-        sections.push(...rotated);
-      }
-    }
-  }
-
   // Build jump bar names (exclude TOP) in the same order sections will render
   const groupNames = sections
     .map(s => s.groupName)
@@ -234,7 +220,14 @@ function Gallery({ items, runQueryById, meta, heroItems = [] }) {
               const la = Number(a.hcl_l ?? 0), lb = Number(b.hcl_l ?? 0);
               return lb - la;                             // then lightness
             })
-          : section.items;
+          : [...section.items].sort((a, b) => {
+              const ha = Number(a.hcl_h ?? 0), hb = Number(b.hcl_h ?? 0);
+              if (ha !== hb) return ha - hb;             // lower hue first
+              const la = Number(a.hcl_l ?? 0), lb = Number(b.hcl_l ?? 0);
+              if (lb !== la) return lb - la;             // lighter first
+              const ca = Number(a.hcl_c ?? 0), cb = Number(b.hcl_c ?? 0);
+              return ca - cb;                            // softer first
+            });
 
         return (
           <React.Fragment key={`section-${slugify(groupName)}-${idx}`}>

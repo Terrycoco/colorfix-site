@@ -94,8 +94,8 @@
 
 .player-exit {
   position: absolute;
-  top: calc(6px + env(safe-area-inset-top));
-  right: calc(6px + env(safe-area-inset-right));
+  top: calc(16px + env(safe-area-inset-top));
+  right: calc(16px + env(safe-area-inset-right));
   z-index: 60;
 
   width: 30px;
@@ -120,8 +120,8 @@
 
 @media (orientation: landscape) and (max-height: 500px) {
   .player-exit {
-    top: calc(6px + env(safe-area-inset-top));
-    right: calc(6px + env(safe-area-inset-right));
+    top: calc(16px + env(safe-area-inset-top));
+    right: calc(16px + env(safe-area-inset-right));
     left: auto;
     width: 30px;
     height: 30px;
@@ -132,8 +132,8 @@
 
 .player-back {
   position: absolute;
-  top: calc(6px + env(safe-area-inset-top));
-  left: calc(6px + env(safe-area-inset-left));
+  top: calc(16px + env(safe-area-inset-top));
+  left: calc(16px + env(safe-area-inset-left));
   z-index: 60;
 
   width: 30px;

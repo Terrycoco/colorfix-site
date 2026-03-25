@@ -1,0 +1,193 @@
+.admin-user-events {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px;
+  align-items: start;
+}
+
+.admin-user-events__sidebar,
+.admin-user-events__panel {
+  background: #fff;
+  border: 1px solid #e7e3dc;
+  border-radius: 28px;
+  padding: 22px;
+  box-shadow: 0 10px 24px rgba(33, 31, 28, 0.05);
+}
+
+.admin-user-events__sidebar {
+  position: sticky;
+  top: 20px;
+}
+
+.admin-user-events__sidebar-header h1,
+.admin-user-events__panel-header h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.admin-user-events__sidebar-header p,
+.admin-user-events__panel-subtitle,
+.admin-user-events__secondary,
+.admin-user-events__total-meta {
+  color: #7e7b74;
+}
+
+.admin-user-events__sidebar-header p {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.admin-user-events__filters {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.admin-user-events__filters input,
+.admin-user-events__filters select {
+  width: 100%;
+  border: 1px solid #d9d5ce;
+  border-radius: 18px;
+  padding: 14px 16px;
+  font-size: 16px;
+  background: #fff;
+}
+
+.admin-user-events__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: #2c2924;
+}
+
+.admin-user-events__checkbox input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.admin-user-events__totals {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.admin-user-events__total-card {
+  border: 1px solid #ebe6de;
+  border-radius: 20px;
+  padding: 16px;
+  background: #faf7f1;
+}
+
+.admin-user-events__total-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7e7b74;
+}
+
+.admin-user-events__total-value {
+  margin-top: 6px;
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 700;
+  color: #222;
+}
+
+.admin-user-events__main {
+  min-width: 0;
+}
+
+.admin-user-events__panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.admin-user-events__message,
+.admin-user-events__empty {
+  border-radius: 18px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.admin-user-events__message--error {
+  border: 1px solid #f1b4b4;
+  background: #fff5f5;
+  color: #aa2b2b;
+}
+
+.admin-user-events__empty {
+  border: 1px dashed #ddd7ce;
+  background: #fcfbf8;
+  color: #6e6a63;
+}
+
+.admin-user-events__table-wrap {
+  overflow-x: auto;
+}
+
+.admin-user-events__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 960px;
+}
+
+.admin-user-events__table th,
+.admin-user-events__table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eee9e1;
+  text-align: left;
+  vertical-align: top;
+  font-size: 15px;
+}
+
+.admin-user-events__table th {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7e7b74;
+}
+
+.admin-user-events__instance-link {
+  color: #1d3f84;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.admin-user-events__instance-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 1100px) {
+  .admin-user-events {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-events__sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 700px) {
+  .admin-user-events {
+    padding: 12px;
+  }
+
+  .admin-user-events__sidebar,
+  .admin-user-events__panel {
+    border-radius: 22px;
+    padding: 18px;
+  }
+
+  .admin-user-events__panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

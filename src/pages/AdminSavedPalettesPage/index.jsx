@@ -48,7 +48,6 @@ const emptySendForm = {
 };
 
 const DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-delete.php`;
-const PHOTO_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const PHOTO_DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/delete.php`;
 const PHOTO_LIBRARY_ADD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/add-from-library.php`;
 
@@ -85,6 +84,65 @@ function buildFullUrl(relPath) {
   if (/^https?:\/\//i.test(relPath)) return relPath;
   if (typeof window === "undefined") return relPath;
   return `${window.location.origin}${relPath.startsWith("/") ? "" : "/"}${relPath}`;
+}
+
+function collapseMembersByColor(members = []) {
+  const groups = new Map();
+  const order = [];
+
+  members.forEach((member, index) => {
+    const colorId = Number(member?.color_id || member?.color?.id || member?.color?.color_id || 0);
+    const fallbackKey = String(member?.color_code || member?.color_name || member?.id || index);
+    const key = colorId > 0 ? `id:${colorId}` : `fallback:${fallbackKey}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        color_id: colorId || null,
+        color_name: member?.color_name || member?.color?.name || "",
+        color_code: member?.color_code || member?.color?.code || "",
+        color_hex6: member?.color_hex6 || (member?.color?.hex || "").replace(/^#/, ""),
+        color_brand: member?.color_brand || member?.color?.brand || "",
+        color_hcl_h: member?.color_hcl_h ?? member?.color?.hcl_h ?? 0,
+        color_hcl_c: member?.color_hcl_c ?? member?.color?.hcl_c ?? 0,
+        color_hcl_l: member?.color_hcl_l ?? member?.color?.hcl_l ?? 0,
+        color_chip_num: member?.color_chip_num ?? member?.color?.chip_num ?? "",
+        color_cluster_id: member?.color_cluster_id ?? member?.color?.cluster_id ?? 0,
+        roles: [],
+      });
+      order.push(key);
+    }
+
+    const group = groups.get(key);
+    const rawRoles = String(member?.role || "")
+      .split(",")
+      .map((role) => role.trim())
+      .filter(Boolean);
+
+    rawRoles.forEach((role) => {
+      if (!group.roles.includes(role)) {
+        group.roles.push(role);
+      }
+    });
+  });
+
+  return order.map((key, index) => {
+    const group = groups.get(key);
+    return {
+      id: group.color_id || `${key}-${index}`,
+      color_id: group.color_id,
+      color_name: group.color_name,
+      color_code: group.color_code,
+      color_hex6: group.color_hex6,
+      color_brand: group.color_brand,
+      color_hcl_h: group.color_hcl_h,
+      color_hcl_c: group.color_hcl_c,
+      color_hcl_l: group.color_hcl_l,
+      color_chip_num: group.color_chip_num,
+      color_cluster_id: group.color_cluster_id,
+      role: group.roles.join(", "),
+    };
+  });
 }
 
 export default function AdminSavedPalettesPage() {
@@ -190,6 +248,7 @@ export default function AdminSavedPalettesPage() {
   };
 
   const openEditModal = (palette) => {
+    const collapsedMembers = collapseMembersByColor(palette.members || []);
     setEditForm({
       palette_id: Number(palette.id) || palette.id,
       nickname: palette.nickname || "",
@@ -199,7 +258,7 @@ export default function AdminSavedPalettesPage() {
       kicker_id: palette.kicker_id || "",
       palette_type: palette.palette_type || "exterior",
     });
-    const members = (palette.members || []).map((member, index) => ({
+    const members = collapsedMembers.map((member, index) => ({
       key: member.id ?? `${member.color_id}-${index}`,
       color: memberToSwatch(member),
       role: member.role || "",
@@ -272,49 +331,6 @@ export default function AdminSavedPalettesPage() {
 
   const handleRemoveMember = (index) => {
     setEditMembers((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handlePhotoUpload = async (files, replacePhotoId = null) => {
-    if (!editForm.palette_id || !files?.length) return;
-    setPhotoStatus({ loading: true, error: "" });
-    try {
-      const formData = new FormData();
-      formData.append("palette_id", String(editForm.palette_id));
-      if (replacePhotoId) {
-        formData.append("replace_photo_id", String(replacePhotoId));
-      }
-      Array.from(files).forEach((file) => formData.append("photos[]", file));
-      const res = await fetch(PHOTO_UPLOAD_URL, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`);
-      }
-      const added = Array.isArray(json.photos) ? json.photos : [];
-      setEditPhotos((prev) => {
-        const normalized = added.map((photo, index) => ({
-          id: photo.id,
-          rel_path: photo.rel_path,
-          photo_type: photo.photo_type || "full",
-          trigger_mode: photo.trigger_mode || "any",
-          trigger_color_id: photo.trigger_color_id ?? null,
-          caption: photo.caption || "",
-          alt_text: photo.alt_text || "",
-          order_index: photo.order_index ?? prev.length + index,
-        }));
-        if (!replacePhotoId) {
-          return [...prev, ...normalized];
-        }
-        const first = normalized[0];
-        return prev.map((photo) => (photo.id === replacePhotoId ? { ...photo, ...first } : photo));
-      });
-      setPhotoStatus({ loading: false, error: "" });
-    } catch (err) {
-      setPhotoStatus({ loading: false, error: err?.message || "Failed to upload photos" });
-    }
   };
 
   const handlePhotoPickFromLibrary = async (item) => {
@@ -407,14 +423,33 @@ export default function AdminSavedPalettesPage() {
     if (!editForm.palette_id) return;
     setEditStatus({ loading: true, error: "" });
     try {
-    const members = editMembers
+      const members = collapseMembersByColor(
+        editMembers
         .map((row, index) => {
           const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
           if (!colorId) return null;
           const role = row?.role?.trim() || null;
-          return { color_id: colorId, order_index: index, role };
+          return {
+            color_id: colorId,
+            order_index: index,
+            role,
+            color_name: row?.color?.name || "",
+            color_code: row?.color?.code || "",
+            color_hex6: (row?.color?.hex || "").replace(/^#/, ""),
+            color_brand: row?.color?.brand || "",
+            color_hcl_h: row?.color?.hcl_h ?? 0,
+            color_hcl_c: row?.color?.hcl_c ?? 0,
+            color_hcl_l: row?.color?.hcl_l ?? 0,
+            color_chip_num: row?.color?.chip_num ?? "",
+            color_cluster_id: row?.color?.cluster_id ?? 0,
+          };
         })
-        .filter(Boolean);
+        .filter(Boolean)
+      ).map((row, index) => ({
+        color_id: row.color_id,
+        order_index: index,
+        role: row.role || null,
+      }));
       if (!members.length) {
         throw new Error("Add at least one color before saving.");
       }
@@ -453,7 +488,7 @@ export default function AdminSavedPalettesPage() {
   };
 
   const openSendModal = (palette) => {
-    const colors = (palette.members || []).slice(0, 5).map((member) => ({
+    const colors = collapseMembersByColor(palette.members || []).slice(0, 5).map((member) => ({
       id: member.id,
       name: member.color_name || "",
       code: member.color_code || "",
@@ -680,7 +715,7 @@ export default function AdminSavedPalettesPage() {
             )}
 
             <div className="asp-swatches">
-              {(item.members || []).map((member) => (
+              {collapseMembersByColor(item.members || []).map((member) => (
                 <div key={member.id} className="asp-swatch" title={`${member.color_name} (${member.color_code})`}>
                   <div className="asp-swatch-chip" style={{ backgroundColor: `#${member.color_hex6 || "ccc"}` }} />
                   <div className="asp-swatch-meta">
@@ -742,16 +777,6 @@ export default function AdminSavedPalettesPage() {
               <div className="asp-member-list-head">
                 <h3>Photos</h3>
                 <div className="asp-photo-actions">
-                  <label className="asp-upload-btn">
-                    Upload
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => handlePhotoUpload(e.target.files)}
-                      disabled={photoStatus.loading}
-                    />
-                  </label>
                   <button
                     type="button"
                     className="ghost"
@@ -826,18 +851,6 @@ export default function AdminSavedPalettesPage() {
                         >
                           Remove
                         </button>
-                        <label className="asp-upload-btn ghost">
-                          Replace
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              handlePhotoUpload(e.target.files, photo.id);
-                              e.target.value = "";
-                            }}
-                            disabled={photoStatus.loading}
-                          />
-                        </label>
                       </div>
                     ))}
                   </div>

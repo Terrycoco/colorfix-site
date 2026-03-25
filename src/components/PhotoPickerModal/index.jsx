@@ -14,7 +14,15 @@ export default function PhotoPickerModal({
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cacheNonce, setCacheNonce] = useState(() => String(Date.now()));
   const inputRef = useRef(null);
+
+  const withPickerNonce = useCallback((url) => {
+    const value = String(url || "").trim();
+    if (!value) return "";
+    const sep = value.includes("?") ? "&" : "?";
+    return `${value}${sep}picker=${cacheNonce}`;
+  }, [cacheNonce]);
 
   useEffect(() => {
     if (!open) {
@@ -23,6 +31,7 @@ export default function PhotoPickerModal({
       setLoading(false);
       return;
     }
+    setCacheNonce(String(Date.now()));
     try {
       const stored = window.sessionStorage.getItem(QUERY_KEY);
       if (stored) setQuery(stored);
@@ -66,8 +75,7 @@ export default function PhotoPickerModal({
 
   useEffect(() => {
     if (!open) return;
-    void runSearch();
-  }, [open, runSearch]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -109,7 +117,7 @@ export default function PhotoPickerModal({
             <button
               type="button"
               className="ppm-clear-btn"
-              onClick={() => { setQuery(""); setItems([]); setError(""); }}
+              onClick={() => { setQuery(""); setItems([]); setError(""); inputRef.current?.focus(); }}
             >
               Clear
             </button>
@@ -117,6 +125,9 @@ export default function PhotoPickerModal({
         </form>
         {loading && <div className="ppm-status">Loading…</div>}
         {error && <div className="ppm-status error">{error}</div>}
+        {!loading && !error && !query.trim() && (
+          <div className="ppm-status">Enter a search term, then press Enter or click Search.</div>
+        )}
         {!loading && !error && items.length === 0 && (
           <div className="ppm-status">No photos matched.</div>
         )}
@@ -128,14 +139,14 @@ export default function PhotoPickerModal({
               className="ppm-card"
               onClick={() => onPick && onPick({
                 photo_library_id: item.photo_library_id,
-                image_url: item.rel_path || "",
+                image_url: withPickerNonce(item.image_url || item.rel_path || ""),
                 title: item.title || "",
                 tags: item.tags || "",
               })}
             >
               <div className="ppm-thumb">
-                {item.rel_path ? (
-                  <img src={item.rel_path} alt="" loading="lazy" />
+                {(item.image_url || item.rel_path) ? (
+                  <img src={withPickerNonce(item.image_url || item.rel_path)} alt="" loading="lazy" />
                 ) : (
                   <div className="ppm-thumb-placeholder">No preview</div>
                 )}

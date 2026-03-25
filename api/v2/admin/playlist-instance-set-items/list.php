@@ -38,6 +38,7 @@ $rows = array_map(static function ($item) {
         'item_type' => $item->itemType,
         'target_set_id' => $item->targetSetId,
         'title' => $item->title,
+        'subtitle' => $item->subtitle,
         'photo_url' => $item->photoUrl,
         'photo_library_id' => $item->photoLibraryId,
         'sort_order' => $item->sortOrder,

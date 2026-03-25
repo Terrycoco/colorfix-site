@@ -23,6 +23,7 @@ const emptyItem = {
   item_type: "instance",
   target_set_id: "",
   title: "",
+  subtitle: "",
   photo_url: "",
   photo_library_id: "",
 };
@@ -96,6 +97,7 @@ export default function AdminPlaylistInstanceSetsPage() {
         ...item,
         item_type: item?.item_type || "instance",
         target_set_id: item?.target_set_id ?? "",
+        subtitle: item?.subtitle ?? "",
         photo_library_id: item?.photo_library_id ?? "",
       }));
       setSetItems(normalized);
@@ -136,6 +138,18 @@ export default function AdminPlaylistInstanceSetsPage() {
         } else {
           next.target_set_id = "";
         }
+        next.title = "";
+        next.subtitle = "";
+      }
+      if (field === "playlist_instance_id") {
+        const selected = instances.find((item) => String(item.playlist_instance_id) === String(value));
+        next.title = selected?.display_title || selected?.instance_name || "";
+        next.subtitle = selected?.display_subtitle || "";
+      }
+      if (field === "target_set_id") {
+        const selected = sets.find((item) => String(item.id) === String(value));
+        next.title = selected?.title || "";
+        next.subtitle = selected?.subtitle || "";
       }
       return next;
     });
@@ -177,6 +191,36 @@ export default function AdminPlaylistInstanceSetsPage() {
     return newId;
   }
 
+  function buildItemsPayload(itemsList) {
+    return itemsList.map((item, index) => ({
+      item_type: item.item_type || "instance",
+      playlist_instance_id:
+        (item.item_type || "instance") === "set" ? null : Number(item.playlist_instance_id) || null,
+      target_set_id:
+        (item.item_type || "instance") === "set" ? Number(item.target_set_id) || null : null,
+      title: item.title || "",
+      subtitle: (item.item_type || "instance") === "set" ? (item.subtitle || "") : "",
+      photo_url: item.photo_url || "",
+      photo_library_id: item.photo_library_id ? Number(item.photo_library_id) : null,
+      sort_order: index + 1,
+    }));
+  }
+
+  async function persistSetItems(setId, itemsList) {
+    const payload = {
+      set_id: setId,
+      items: buildItemsPayload(itemsList),
+    };
+    const res = await fetch(SET_ITEMS_SAVE_URL, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
+  }
+
   async function handleAddItem() {
     const itemType = newItem.item_type || "instance";
     const playlistId = Number(newItem.playlist_instance_id);
@@ -216,22 +260,35 @@ export default function AdminPlaylistInstanceSetsPage() {
       setError("Save the set before adding items.");
       return;
     }
-    setSetItems((prev) => [
-      ...prev,
+    const nextItems = [
+      ...setItems,
       {
         id: null,
         playlist_instance_id: itemType === "set" ? null : playlistId,
         item_type: itemType,
         target_set_id: itemType === "set" ? targetSetId : null,
         title: newItem.title.trim(),
+        subtitle: newItem.subtitle.trim(),
         photo_url: newItem.photo_url.trim(),
         photo_library_id: newItem.photo_library_id ? Number(newItem.photo_library_id) : null,
-        sort_order: prev.length + 1,
+        sort_order: setItems.length + 1,
       },
-    ]);
-    setNewItem(emptyItem);
-    setStatus("");
+    ];
+
+    setLoading(true);
     setError("");
+    setStatus("");
+    setSetItems(nextItems);
+    try {
+      await persistSetItems(setId, nextItems);
+      setNewItem(emptyItem);
+      setStatus("Saved");
+      await fetchSetItems(setId);
+    } catch (err) {
+      setError(err?.message || "Save failed");
+    } finally {
+      setLoading(false);
+    }
   }
 
   function handleRemoveItem(index) {
@@ -259,6 +316,18 @@ export default function AdminPlaylistInstanceSetsPage() {
         } else {
           updated.target_set_id = "";
         }
+        updated.title = "";
+        updated.subtitle = "";
+      }
+      if (field === "playlist_instance_id") {
+        const selected = instances.find((row) => String(row.playlist_instance_id) === String(value));
+        updated.title = selected?.display_title || selected?.instance_name || "";
+        updated.subtitle = selected?.display_subtitle || "";
+      }
+      if (field === "target_set_id") {
+        const selected = sets.find((row) => String(row.id) === String(value));
+        updated.title = selected?.title || "";
+        updated.subtitle = selected?.subtitle || "";
       }
       next[index] = updated;
       return next;
@@ -285,28 +354,7 @@ export default function AdminPlaylistInstanceSetsPage() {
         return;
       }
       setExpectedSaveCount(itemsList.length);
-      const payload = {
-        set_id: setId,
-        items: itemsList.map((item, index) => ({
-          item_type: item.item_type || "instance",
-          playlist_instance_id:
-            (item.item_type || "instance") === "set" ? null : Number(item.playlist_instance_id) || null,
-          target_set_id:
-            (item.item_type || "instance") === "set" ? Number(item.target_set_id) || null : null,
-          title: item.title || "",
-          photo_url: item.photo_url || "",
-          photo_library_id: item.photo_library_id ? Number(item.photo_library_id) : null,
-          sort_order: index + 1,
-        })),
-      };
-      const res = await fetch(SET_ITEMS_SAVE_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Save failed");
+      await persistSetItems(setId, itemsList);
       setStatus("Saved");
       fetchSetItems(setId);
     } catch (err) {
@@ -340,7 +388,7 @@ export default function AdminPlaylistInstanceSetsPage() {
     return safeInstances
       .map((item) => ({
         id: item.playlist_instance_id,
-        label: `#${item.playlist_instance_id} — ${item.instance_name || "Untitled"}`,
+        label: `#${item.playlist_instance_id} — ${item.display_title || item.instance_name || "Untitled"}`,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [instances]);
@@ -382,14 +430,36 @@ export default function AdminPlaylistInstanceSetsPage() {
         open={photoPicker.open}
         title="Pick Photo"
         onClose={() => setPhotoPicker({ open: false, mode: "", index: null })}
-        onPick={(photo) => {
+        onPick={async (photo) => {
           if (!photo) return;
           if (photoPicker.mode === "new") {
             updateNewItem("photo_library_id", photo.photo_library_id);
             updateNewItem("photo_url", photo.image_url || "");
           } else if (photoPicker.mode === "item" && photoPicker.index != null) {
-            handleEditItem(photoPicker.index, "photo_library_id", photo.photo_library_id);
-            handleEditItem(photoPicker.index, "photo_url", photo.image_url || "");
+            const nextItems = safeSetItems.map((item, index) =>
+              index === photoPicker.index
+                ? {
+                    ...item,
+                    photo_library_id: photo.photo_library_id,
+                    photo_url: photo.image_url || "",
+                  }
+                : item
+            );
+            setSetItems(nextItems);
+            if (activeSetId) {
+              setLoading(true);
+              setError("");
+              setStatus("");
+              try {
+                await persistSetItems(activeSetId, nextItems);
+                setStatus("Saved");
+                await fetchSetItems(activeSetId);
+              } catch (err) {
+                setError(err?.message || "Save failed");
+              } finally {
+                setLoading(false);
+              }
+            }
           }
           setPhotoPicker({ open: false, mode: "", index: null });
         }}
@@ -507,7 +577,15 @@ export default function AdminPlaylistInstanceSetsPage() {
                   <input
                     type="text"
                     value={item.title || ""}
-                    onChange={(e) => handleEditItem(index, "title", e.target.value)}
+                    readOnly
+                  />
+                </label>
+                <label className="pi-item-field">
+                  Subtitle
+                  <input
+                    type="text"
+                    value={item.subtitle || ""}
+                    readOnly
                   />
                 </label>
                 <label className="pi-item-field">
@@ -594,8 +672,17 @@ export default function AdminPlaylistInstanceSetsPage() {
             <input
               type="text"
               value={newItem.title}
-              onChange={(e) => updateNewItem("title", e.target.value)}
-              placeholder="Model A"
+              readOnly
+              placeholder="Auto-filled from selection"
+            />
+          </label>
+          <label>
+            Subtitle
+            <input
+              type="text"
+              value={newItem.subtitle}
+              readOnly
+              placeholder="Auto-filled from selection"
             />
           </label>
           <label className="full-width">

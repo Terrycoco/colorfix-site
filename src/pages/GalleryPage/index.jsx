@@ -24,6 +24,10 @@ const GalleryPage = () => {
   const [meta, setMeta] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showSortPeek, setShowSortPeek] = useState(true);
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(max-width: 768px)').matches;
+  });
   const lastScrollRef = useRef(0);
 
   // Decide if this page is a swatch gallery.
@@ -45,6 +49,15 @@ const GalleryPage = () => {
   }, []);
 
   useHashJumpAfterLayout({ offsetPx: 140 });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const handleChange = (event) => setIsMobile(event.matches);
+    setIsMobile(mq.matches);
+    mq.addEventListener('change', handleChange);
+    return () => mq.removeEventListener('change', handleChange);
+  }, []);
 
   function makeServerFilters(sf) {
     const codes = Array.isArray(sf?.brands)
@@ -231,7 +244,7 @@ const GalleryPage = () => {
 
   return (
     <div className="gallery-wrapper">
-      <TopSpacer />
+      <TopSpacer disabled={isMobile} />
 
       {isSwatch && (
         <div className={`gallery-controls${showSortPeek ? " is-peek" : ""}${showPalette ? " has-palette" : ""}`}>

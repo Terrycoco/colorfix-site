@@ -575,13 +575,17 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   gap: 8px;
   margin: 0;
   position: fixed;
-  top: calc(var(--board-scroller-height) + 4px);
+  top: auto;
+  bottom: 16px;
   left: 12px;
-  right: 12px;
+  right: auto;
+  max-width: calc(100vw - 24px);
   z-index: 12000;
   background: var(--app-background);
-  padding: 8px 0;
-  transform: translateY(-140%);
+  padding: 10px 12px;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(140%);
   opacity: 0;
   pointer-events: none;
   transition: transform 0.18s ease, opacity 0.18s ease;
@@ -594,7 +598,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 }
 
 .myp-results-sort.has-palette {
-  top: calc(var(--board-scroller-height) + var(--sticky-palette-bar-height) + 4px);
+  bottom: 16px;
 }
 
 .myp-results-label {
@@ -619,7 +623,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   display: flex;
   gap: 8px;
   flex-wrap: nowrap;
-  width: 100%;
+  width: auto;
 }
 
 .myp-sort-btn.is-active {

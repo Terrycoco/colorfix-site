@@ -27,6 +27,7 @@ const emptyInstance = {
   playlist_id: "",
   instance_name: "",
   display_title: "",
+  display_subtitle: "",
   instance_notes: "",
   intro_layout: "default",
   intro_title: "",
@@ -279,9 +280,12 @@ export default function AdminPlaylistInstancesPage() {
     setSaveError("");
   }
 
-  function buildShareUrl(id) {
+  function buildShareUrl(id, audience = "") {
     if (!id) return "";
-    return `${SHARE_FOLDER}/playlist.php?id=${id}`;
+    const params = new URLSearchParams();
+    params.set("id", String(id));
+    if (audience && audience !== "any") params.set("aud", audience);
+    return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
   }
 
   function hydrateTemplate(text, { title, link }) {
@@ -330,6 +334,12 @@ export default function AdminPlaylistInstancesPage() {
     const id = activeId || form.playlist_instance_id;
     if (!id || !navigator.clipboard?.writeText) return;
     navigator.clipboard.writeText(buildShareUrl(id)).catch(() => {});
+  }
+
+  function handleCopyPinterestLink() {
+    const id = activeId || form.playlist_instance_id;
+    if (!id || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(buildShareUrl(id, "pinterest")).catch(() => {});
   }
 
   function openEmailModal() {
@@ -460,7 +470,10 @@ export default function AdminPlaylistInstancesPage() {
       const newId = data.playlist_instance_id;
       setActiveId(newId);
       setForm((prev) => ({ ...prev, playlist_instance_id: newId }));
-      fetchInstances();
+      await fetchInstances();
+      if (newId) {
+        await fetchInstance(newId);
+      }
     } catch (err) {
       setSaveError(err?.message || "Save failed");
     } finally {
@@ -589,7 +602,14 @@ export default function AdminPlaylistInstancesPage() {
         <div className="panel-header">
           <div className="panel-title">Playlist Instances</div>
           <div className="header-actions">
-           
+            <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
+              <option value="all">All audiences</option>
+              {AUDIENCE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <button type="button" className="primary-btn" onClick={handleNew}>
               New Instance
             </button>
@@ -603,17 +623,6 @@ export default function AdminPlaylistInstancesPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
-            <option value="all">All audiences</option>
-            {AUDIENCE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={fetchInstances}>
-            Refresh
-          </button>
         </div>
 
         {loading && <div className="panel-status">Loading…</div>}
@@ -694,6 +703,13 @@ export default function AdminPlaylistInstancesPage() {
             </button>
             <button
               type="button"
+              onClick={handleCopyPinterestLink}
+              disabled={!form.playlist_instance_id}
+            >
+              Copy Pinterest URL
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 if (!form.playlist_instance_id) return;
                 const params = new URLSearchParams();
@@ -752,6 +768,16 @@ export default function AdminPlaylistInstancesPage() {
                 value={form.display_title || ""}
                 onChange={(e) => updateForm("display_title", e.target.value)}
                 placeholder="Shown to viewers (thumbnail title)"
+              />
+            </label>
+
+            <label>
+              Display subtitle
+              <input
+                type="text"
+                value={form.display_subtitle || ""}
+                onChange={(e) => updateForm("display_subtitle", e.target.value)}
+                placeholder="Shown under the title on playlist set pages"
               />
             </label>
 

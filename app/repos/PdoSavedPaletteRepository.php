@@ -159,6 +159,19 @@ class PdoSavedPaletteRepository
         return $row !== false ? $row : null;
     }
 
+    public function getSavedPaletteByPrivateNotes(string $privateNotes): ?array
+    {
+        $sql = "SELECT * FROM saved_palettes WHERE private_notes = :private_notes LIMIT 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':private_notes' => $privateNotes,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
+
     public function getKickerText(int $kickerId): ?string
     {
         if ($kickerId <= 0) {

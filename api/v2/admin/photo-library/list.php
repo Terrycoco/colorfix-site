@@ -7,13 +7,21 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Repos\PdoPhotoLibraryRepository;
-use App\Services\PhotoLibraryService;
-
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+function with_cache_buster(string $relPath, ?string $updatedAt): string {
+    $path = trim($relPath);
+    if ($path === '') return '';
+    $stamp = $updatedAt ? strtotime($updatedAt) : false;
+    if ($stamp === false || $stamp <= 0) {
+        return $path;
+    }
+    $sep = str_contains($path, '?') ? '&' : '?';
+    return $path . $sep . 'v=' . $stamp;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
@@ -47,10 +55,17 @@ try {
         $params[':source_type'] = $sourceType;
     }
     if ($q !== '') {
-        $where[] = '(photo_library.title LIKE :q_title OR photo_library.tags LIKE :q_tags OR photo_library.rel_path LIKE :q_path)';
+        $where[] = '(photo_library.title LIKE :q_title OR photo_library.tags LIKE :q_tags OR photo_library.rel_path LIKE :q_path OR clients.name LIKE :q_client_name OR clients.email LIKE :q_client_email'
+            . (ctype_digit($q) ? ' OR CAST(photo_library.photo_library_id AS CHAR) LIKE :q_photo_id' : '')
+            . ')';
         $params[':q_title'] = '%' . $q . '%';
         $params[':q_tags'] = '%' . $q . '%';
         $params[':q_path'] = '%' . $q . '%';
+        $params[':q_client_name'] = '%' . $q . '%';
+        $params[':q_client_email'] = '%' . $q . '%';
+        if (ctype_digit($q)) {
+            $params[':q_photo_id'] = $q . '%';
+        }
     }
     if ($photoLibraryIds) {
         $placeholders = [];
@@ -70,31 +85,10 @@ try {
         $params[':palette_id'] = $paletteId;
     }
 
-    if ($sourceType === '' || $sourceType === 'applied_palette') {
-        $repo = new PdoPhotoLibraryRepository($pdo);
-        $library = new PhotoLibraryService($repo);
-        $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
-        $publicRoot = rtrim(dirname(__DIR__, 4), '/');
-
-        $paletteRows = $pdo->query("SELECT id, title, display_title, tags, alt_text FROM applied_palettes ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        foreach ($paletteRows as $row) {
-            $appliedPaletteId = (int)$row['id'];
-            if ($appliedPaletteId <= 0) continue;
-            $renderRel = "/photos/rendered/ap_{$appliedPaletteId}.jpg";
-            $renderAbs = $docRoot . $renderRel;
-            if (!is_file($renderAbs)) {
-                $altAbs = $publicRoot . $renderRel;
-                if (!is_file($altAbs)) {
-                    continue;
-                }
-            }
-            $library->syncAppliedPalettePhoto($row, $renderRel);
-        }
-    }
-
     $sql = "SELECT photo_library.photo_library_id,
                    photo_library.source_type,
                    photo_library.source_id,
+                   photo_library.client_id,
                    photo_library.rel_path,
                    photo_library.title,
                    photo_library.tags,
@@ -103,8 +97,11 @@ try {
                    photo_library.show_in_gallery,
                    photo_library.has_palette,
                    photo_library.created_at,
-                   photo_library.updated_at
-            FROM photo_library{$joins}";
+                   photo_library.updated_at,
+                   clients.name AS client_name,
+                   clients.email AS client_email
+            FROM photo_library
+            LEFT JOIN clients ON clients.id = photo_library.client_id{$joins}";
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
@@ -120,13 +117,20 @@ try {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     $items = array_map(static function(array $row): array {
-        $relPath = (string)$row['rel_path'];
-        $filename = basename(parse_url($relPath, PHP_URL_PATH) ?: $relPath);
+        $rawRelPath = (string)$row['rel_path'];
+        $updatedAt = $row['updated_at'] ?? null;
+        $versionedPath = with_cache_buster($rawRelPath, $updatedAt);
+        $filename = basename(parse_url($rawRelPath, PHP_URL_PATH) ?: $rawRelPath);
         return [
             'photo_library_id' => (int)$row['photo_library_id'],
             'source_type' => (string)$row['source_type'],
             'source_id' => $row['source_id'] !== null ? (int)$row['source_id'] : null,
-            'rel_path' => $relPath,
+            'client_id' => $row['client_id'] !== null ? (int)$row['client_id'] : null,
+            'client_name' => $row['client_name'] ?? '',
+            'client_email' => $row['client_email'] ?? '',
+            'raw_rel_path' => $rawRelPath,
+            'rel_path' => $versionedPath,
+            'image_url' => $versionedPath,
             'filename' => $filename,
             'title' => $row['title'] ?? '',
             'tags' => $row['tags'] ?? '',
@@ -135,7 +139,7 @@ try {
             'show_in_gallery' => (int)$row['show_in_gallery'] === 1,
             'has_palette' => (int)$row['has_palette'] === 1,
             'created_at' => $row['created_at'],
-            'updated_at' => $row['updated_at'],
+            'updated_at' => $updatedAt,
         ];
     }, $rows);
 

@@ -21,8 +21,8 @@
 
 .playlist-thumbs__exit {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: calc(18px + env(safe-area-inset-top, 0px));
+  right: calc(18px + env(safe-area-inset-right, 0px));
   width: 46px;
   height: 46px;
   border-radius: 999px;
@@ -112,7 +112,7 @@
 
 @media (max-width: 600px) {
   .playlist-thumbs {
-    padding: 16px;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 16px;
   }
 
   .playlist-thumbs__header-row {

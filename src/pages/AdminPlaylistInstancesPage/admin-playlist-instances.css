@@ -5,6 +5,7 @@
   padding: 24px;
   min-height: calc(100vh - 40px);
   background: #f6f6f6;
+  min-width: 0;
 }
 
 .playlist-panel {
@@ -15,19 +16,30 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.header-actions select {
+  min-width: 150px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fff;
 }
 
 .panel-title {
@@ -38,6 +50,38 @@
 .panel-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.editor-panel .panel-title {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.editor-panel .panel-actions {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  justify-content: flex-start;
+  margin-top: 4px;
+  row-gap: 8px;
+  overflow: hidden;
+}
+
+.editor-panel .panel-header {
+  align-items: stretch;
+}
+
+.editor-panel .panel-actions button,
+.editor-panel .primary-btn {
+  white-space: nowrap;
+}
+
+.editor-panel {
+  min-width: 0;
 }
 
 .panel-controls {

@@ -74,23 +74,25 @@
 
 .cta-button--link {
   background: transparent;
-  color: #555;
+  color: #f3f4f6;
   border: none;
-  padding: 0;
-  font-size: 0.9rem;
-  text-decoration: underline;
-  text-align: left;
+  padding: 4px 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  text-align: center;
   width: auto;
 }
 
 .cta-button--link:hover {
-  color: #000;
+  color: #fff;
+  text-decoration: underline;
 }
 
 .cta-layout--stacked .cta-button--link,
 .cta-layout--inline .cta-button--link {
   width: auto;
-  align-self: flex-start;
+  align-self: center;
 }
 
 .cta-spacer {

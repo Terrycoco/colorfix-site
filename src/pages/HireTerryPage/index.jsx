@@ -36,9 +36,6 @@ export default function HireTerryPage() {
           contrast and focal points shape the space.
         </p>
 
-        <a className="primary-cta" href="/hire-terry/request-playlist">
-          Get Your Own Makeover Playlist
-        </a>
       </section>
 
       <section className="hire-terry-section hire-terry-steps">

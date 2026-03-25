@@ -318,7 +318,10 @@ function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, au
   const requireDemo = Boolean(params?.require_demo || params?.requireDemo);
   if (requireDemo && !isTruthyFlag(demoParam)) return false;
   const requireAud = params?.require_aud || params?.requireAud;
-  if (requireAud && String(audParam || "").toLowerCase() !== String(requireAud).toLowerCase()) return false;
+  const normalizedAud = String(audParam || "").toLowerCase().trim();
+  if (requireAud && normalizedAud && normalizedAud !== "any" && normalizedAud !== String(requireAud).toLowerCase()) {
+    return false;
+  }
   return true;
 }
 

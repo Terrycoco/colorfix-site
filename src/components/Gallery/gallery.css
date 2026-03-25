@@ -5,6 +5,12 @@
   padding-top: 1rem;
 }
 
+@media (max-width: 768px) {
+  .gallery {
+    padding-top: 0.25rem;
+  }
+}
+
 .gallery-hero {
   display: flex;
   justify-content: center;
@@ -152,26 +158,19 @@
   margin: 0;
   flex-wrap: nowrap;
   position: fixed;
-  top: calc(var(--board-scroller-height) + 4px);
-  left: 12px;
-  right: 12px;
+  top: auto;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 12000;
   background: var(--app-background);
-  padding: 8px 0;
-  transform: translateY(-140%);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.18s ease, opacity 0.18s ease;
-}
-
-.gallery-controls.is-peek {
-  transform: translateY(0);
-  opacity: 1;
+  padding: 8px 12px;
+  justify-content: center;
   pointer-events: auto;
 }
 
 .gallery-controls.has-palette {
-  top: calc(var(--board-scroller-height) + var(--sticky-palette-bar-height) + 4px);
+  top: auto;
 }
 
 .gallery-controls .btn {
@@ -191,6 +190,25 @@
 }
 
 @media (max-width: 700px) {
+  .gallery-controls {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding-top: 8px;
+    padding-right: 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    padding-left: 12px;
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    justify-content: stretch;
+  }
+
+  .gallery-controls.has-palette {
+    top: auto;
+  }
+
   .gallery-controls {
     gap: 6px;
   }

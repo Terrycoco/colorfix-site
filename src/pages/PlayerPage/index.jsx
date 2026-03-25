@@ -6,6 +6,7 @@ import PlayerEndScreen from "@components/Player/PlayerEndScreen";
 import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
+import { isHireTerryCta, trackUserEvent } from "@helpers/userEvents";
 import './playerpage.css';
 
 export default function PlayerPage() {
@@ -31,6 +32,8 @@ export default function PlayerPage() {
   const [playbackEnded, setPlaybackEnded] = useState(false);
   const [watchNextCta, setWatchNextCta] = useState(null);
   const playerRef = useRef(null);
+  const trackedOpenRef = useRef("");
+  const trackedVisibleRef = useRef("");
   const thumbsEnabled =
     thumbParam === "1" || thumbParam.toLowerCase() === "true" || Boolean(data?.thumbs_enabled);
   const demoEnabled =
@@ -97,6 +100,20 @@ export default function PlayerPage() {
     if (!data?.playlist_instance_id) return;
     recordLastPlaylistInstanceId(data.playlist_instance_id);
   }, [data?.playlist_instance_id]);
+
+  useEffect(() => {
+    const playlistInstanceId = Number(data?.playlist_instance_id || 0);
+    if (!playlistInstanceId) return;
+    const trackingKey = String(playlistInstanceId);
+    if (trackedOpenRef.current === trackingKey) return;
+    trackedOpenRef.current = trackingKey;
+
+    trackUserEvent({
+      event_type: "playlist_open",
+      playlist_instance_id: playlistInstanceId,
+      playlist_id: Number(data?.playlist_id || 0) || null,
+    });
+  }, [data?.playlist_id, data?.playlist_instance_id]);
 
 
 
@@ -165,10 +182,10 @@ export default function PlayerPage() {
 
     switch (cta.key) {
       case "replay_liked":
-        return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+        return !data?.hide_stars && likedCount > 0;
       case "replay_filtered":
         if (cta?.params?.filter === "liked") {
-          return !data?.hide_stars && likedCount > 0 && paletteCount > 1;
+          return !data?.hide_stars && likedCount > 0;
         }
         return true;
       case "to_thumbs":
@@ -189,6 +206,14 @@ export default function PlayerPage() {
   function handleCta(cta) {
     const key = getCtaKey(cta);
     if (!key) return;
+    if (isHireTerryCta(cta)) {
+      trackUserEvent({
+        event_type: "hire_terry_cta_click",
+        playlist_instance_id: Number(data?.playlist_instance_id || 0),
+        playlist_id: Number(data?.playlist_id || 0) || null,
+        cta_id: Number(cta?.cta_id || 0) || null,
+      });
+    }
     ctaHandlers[key]?.(cta);
   }
 
@@ -231,6 +256,35 @@ const ctas = useMemo(() => {
   });
 }, [data?.ctas, psiParam, thumbsEnabled, demoEnabled, ctaAudience]);
 
+useEffect(() => {
+  const fromPicker = returnTo.startsWith("/picker");
+  if (!fromPicker) return;
+
+  const setIds = new Set();
+  const pickerSetId = Number(psiParam || 0);
+  if (pickerSetId > 0) setIds.add(pickerSetId);
+
+  for (const setId of data?.playlist_instance_set_ids || []) {
+    const normalized = Number(setId || 0);
+    if (normalized > 0) setIds.add(normalized);
+  }
+
+  for (const cta of ctas || []) {
+    if ((cta?.key || "") !== "watch_next") continue;
+    const normalized = Number(
+      cta?.params?.playlist_instance_set_id ||
+      cta?.params?.set_id ||
+      0
+    );
+    if (normalized > 0) setIds.add(normalized);
+  }
+
+  for (const setId of setIds) {
+    clearWatchNextSeen(setId);
+    clearWatchNextSeenPlaylists(setId);
+  }
+}, [ctas, data?.playlist_instance_id, data?.playlist_instance_set_ids, psiParam, returnTo]);
+
 function resolveVariant(raw, isBack = false) {
   if (!raw) return isBack ? "link" : undefined;
   const normalized = String(raw).toLowerCase();
@@ -265,7 +319,10 @@ function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, au
   const requireDemo = Boolean(params?.require_demo || params?.requireDemo);
   if (requireDemo && !isTruthyFlag(demoParam)) return false;
   const requireAud = params?.require_aud || params?.requireAud;
-  if (requireAud && String(audParam || "").toLowerCase() !== String(requireAud).toLowerCase()) return false;
+  const normalizedAud = String(audParam || "").toLowerCase().trim();
+  if (requireAud && normalizedAud && normalizedAud !== "any" && normalizedAud !== String(requireAud).toLowerCase()) {
+    return false;
+  }
   return true;
 }
 
@@ -283,6 +340,26 @@ const visibleCTAs = useMemo(
     if (watchNextCta) return [...baseVisibleCTAs, watchNextCta];
     return baseVisibleCTAs;
   }, [baseVisibleCTAs, watchNextCta]);
+
+  useEffect(() => {
+    const playlistInstanceId = Number(data?.playlist_instance_id || 0);
+    if (!playlistInstanceId || !playbackEnded) return;
+
+    const hireTerryCta = orderedCTAs.find(isHireTerryCta);
+    if (!hireTerryCta) return;
+
+    const ctaKey = Number(hireTerryCta?.cta_id || 0) || "hire-terry";
+    const trackingKey = `${playlistInstanceId}:${ctaKey}`;
+    if (trackedVisibleRef.current === trackingKey) return;
+    trackedVisibleRef.current = trackingKey;
+
+    trackUserEvent({
+      event_type: "hire_terry_cta_visible",
+      playlist_instance_id: playlistInstanceId,
+      playlist_id: Number(data?.playlist_id || 0) || null,
+      cta_id: Number(hireTerryCta?.cta_id || 0) || null,
+    });
+  }, [data?.playlist_id, data?.playlist_instance_id, orderedCTAs, playbackEnded]);
 
   useEffect(() => {
     if (!data || !visibleCTAs.length) {
@@ -326,14 +403,27 @@ const visibleCTAs = useMemo(
         const currentPlaylistId = Number(data?.playlist_id);
         const seen = readWatchNextSeen(setId);
         const seenPlaylistIds = readWatchNextSeenPlaylists(setId);
-        const nextItem = playlistItems.find((item) => {
-          const pid = Number(item.playlist_instance_id);
-          const playlistItemId = Number(item.playlist_id);
+        const currentIndex = playlistItems.findIndex(
+          (item) => Number(item?.playlist_instance_id) === currentId
+        );
+        const orderedCandidates = currentIndex >= 0
+          ? [
+              ...playlistItems.slice(currentIndex + 1),
+              ...playlistItems.slice(0, currentIndex),
+            ]
+          : playlistItems;
+
+        const isEligibleNextItem = (item, { ignoreSeen = false } = {}) => {
+          const pid = Number(item?.playlist_instance_id);
+          const playlistItemId = Number(item?.playlist_id);
           if (!pid || pid === currentId) return false;
           if (playlistItemId && currentPlaylistId && playlistItemId === currentPlaylistId) return false;
+          if (ignoreSeen) return true;
           if (playlistItemId && seenPlaylistIds.includes(playlistItemId)) return false;
           return !seen.includes(pid);
-        });
+        };
+
+        const nextItem = orderedCandidates.find((item) => isEligibleNextItem(item));
 
         if (!nextItem) {
           setWatchNextCta(null);
@@ -438,6 +528,15 @@ function markWatchNextSeen(setId, playlistInstanceId) {
   }
 }
 
+function clearWatchNextSeen(setId) {
+  if (typeof sessionStorage === "undefined" || !setId) return;
+  try {
+    sessionStorage.removeItem(`cf_watch_next_seen_${setId}`);
+  } catch {
+    // ignore
+  }
+}
+
 function readWatchNextSeenPlaylists(setId) {
   if (typeof sessionStorage === "undefined") return [];
   try {
@@ -456,6 +555,15 @@ function markWatchNextSeenPlaylist(setId, playlistId) {
   const next = [...current, playlistId];
   try {
     sessionStorage.setItem(`cf_watch_next_seen_playlist_${setId}`, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+function clearWatchNextSeenPlaylists(setId) {
+  if (typeof sessionStorage === "undefined" || !setId) return;
+  try {
+    sessionStorage.removeItem(`cf_watch_next_seen_playlist_${setId}`);
   } catch {
     // ignore
   }

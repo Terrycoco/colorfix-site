@@ -2,15 +2,16 @@
 :root{
   --bar-h: 40px;
   --center-gap: 64px;   /* space we reserve around the centered palette icon */
-  --edge-pad:  6px;     /* how close back/logo sit to the edges */
+  --edge-pad:  12px;    /* how close back/logo sit to the edges */
   --right-gap: 14px;    /* spacing between funnel and logo */
 }
 
 .board-scroller{
   position: sticky; top: 0; width: 100%;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(env(safe-area-inset-top, 0px), 10px);
   background:#000; color:#fff; border-bottom:1px solid #111;
   z-index: var(--board-scroller-z-index);
+  overflow-x: clip;
 }
 
 /* centerline via grid; sides anchor to the BAR (not the cap) */
@@ -18,7 +19,7 @@
   position: relative; /* anchor absolute centering */
   max-width: var(--cap, 1320px);
   margin-inline: auto;
-  height: calc(var(--bar-h) + env(safe-area-inset-top, 0px));
+  min-height: var(--bar-h);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -28,6 +29,9 @@
 .scroller-center{
   position: absolute; left: 50%; transform: translateX(-50%);
   color:#fff; z-index: 20000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .scroller-center .icon-button{
   display:grid; place-items:center; padding:0; background:transparent; line-height:0;
@@ -46,12 +50,13 @@
 /* RIGHT: lives only to the RIGHT of (50% + center-gap) */
 .scroller-right{
   position:absolute; top:0; bottom:0;
-  right: 0;
+  right: max(var(--edge-pad), env(safe-area-inset-right, 0px));
   display:flex; align-items: center; justify-content:flex-end;
   gap: 10px;
   z-index:20000;
   pointer-events:none;           /* container never blocks the center */
   width: auto;
+  max-width: calc(50% - var(--center-gap) - max(var(--edge-pad), env(safe-area-inset-right, 0px)));
 }
 .scroller-right > *{ pointer-events:auto; }
 
@@ -64,7 +69,8 @@
   display:flex; align-items:center; justify-content:flex-start;
   gap: 12px;
   padding-left: max(var(--edge-pad), env(safe-area-inset-left, 0px));
-  pointer-events:none;
+  pointer-events:auto;
+  z-index:20000;
 }
 .scroller-left > *{ pointer-events:auto; }
 
@@ -99,7 +105,7 @@
 .sticky-palette-wrapper {
   z-index: 10000;
   position: sticky;
-  top: calc(var(--bar-h, 40px) + env(safe-area-inset-top, 0px));
+  top: calc(var(--bar-h, 40px) + max(env(safe-area-inset-top, 0px), 10px));
   transform: translateZ(0);
   will-change: opacity;
   contain: paint;
