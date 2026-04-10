@@ -288,6 +288,31 @@ export default function AdminPlaylistInstancesPage() {
     return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
   }
 
+  function openLiveUrl(instance) {
+    const id = instance?.playlist_instance_id || form.playlist_instance_id;
+    if (!id) return;
+    const audience = instance?.audience || form.audience || "";
+    const demoEnabled = Boolean(instance?.demo_enabled ?? form.demo_enabled);
+    const params = new URLSearchParams();
+    if (audience && audience !== "any") params.set("aud", audience);
+    if (demoEnabled) params.set("demo", "1");
+    const qs = params.toString();
+    const url = `${window.location.origin}/playlist/${id}${qs ? `?${qs}` : ""}`;
+    window.open(url, "_blank", "noopener");
+  }
+
+  function openPreview(instance) {
+    const id = instance?.playlist_instance_id || form.playlist_instance_id;
+    if (!id) return;
+    const audience = instance?.audience || form.audience || "";
+    const demoEnabled = Boolean(instance?.demo_enabled ?? form.demo_enabled);
+    const params = new URLSearchParams();
+    if (audience && audience !== "any") params.set("aud", audience);
+    if (demoEnabled) params.set("demo", "1");
+    const qs = params.toString();
+    navigate(`/admin/player-preview/${id}${qs ? `?${qs}` : ""}`);
+  }
+
   function hydrateTemplate(text, { title, link }) {
     return String(text || "")
       .replace(/\{title\}/gi, title || "")
@@ -595,6 +620,17 @@ export default function AdminPlaylistInstancesPage() {
     updateOverrideMeta({ _cta_ids: ids });
   }
 
+  const activeItem = useMemo(() => {
+    return items.find((item) => item.playlist_instance_id === activeId) || null;
+  }, [items, activeId]);
+
+  const activePlaylistLabel = useMemo(() => {
+    const playlistId = activeItem?.playlist_id || form.playlist_id;
+    if (!playlistId) return "";
+    const match = playlistOptions.find((opt) => String(opt.id) === String(playlistId));
+    return match?.label || `Playlist #${playlistId}`;
+  }, [activeItem?.playlist_id, form.playlist_id, playlistOptions]);
+
 
   return (
     <div className="admin-playlist-instances">
@@ -644,6 +680,80 @@ export default function AdminPlaylistInstancesPage() {
               </div>
             </button>
           ))}
+        </div>
+
+        <div className="mobile-instance-card">
+          <div className="mobile-instance-card__header">
+            <div className="mobile-instance-card__eyebrow">Selected Instance</div>
+            <div className="mobile-instance-card__title">
+              {activeItem?.instance_name || "Pick an instance"}
+            </div>
+            {activeItem?.display_title ? (
+              <div className="mobile-instance-card__subtitle">{activeItem.display_title}</div>
+            ) : null}
+            {activeItem?.display_subtitle ? (
+              <div className="mobile-instance-card__subtitle mobile-instance-card__subtitle--muted">
+                {activeItem.display_subtitle}
+              </div>
+            ) : null}
+          </div>
+
+          {activeItem ? (
+            <>
+              <div className="mobile-instance-card__meta">
+                <div>#{activeItem.playlist_instance_id}</div>
+                <div>{audienceLabelMap[activeItem.audience] || activeItem.audience || "Any"}</div>
+                <div>{activePlaylistLabel}</div>
+                <div>{activeItem.is_active ? "Active" : "Inactive"}</div>
+              </div>
+
+              {activeItem.instance_notes ? (
+                <div className="mobile-instance-card__notes">{activeItem.instance_notes}</div>
+              ) : null}
+
+              <div className="mobile-instance-card__actions">
+                <button type="button" className="primary-btn" onClick={() => openLiveUrl(activeItem)}>
+                  Play
+                </button>
+                <button type="button" onClick={() => openPreview(activeItem)}>
+                  Preview
+                </button>
+                <button type="button" onClick={handleCopyLink}>
+                  Copy Link
+                </button>
+                <button type="button" onClick={handleShare}>
+                  Share
+                </button>
+                <button type="button" onClick={openEmailModal}>
+                  Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/playlists/${activeItem.playlist_id}`)}
+                  disabled={!activeItem.playlist_id}
+                >
+                  Playlist
+                </button>
+              </div>
+
+              {selectedCtas.length > 0 ? (
+                <div className="mobile-instance-card__ctas">
+                  <div className="mobile-instance-card__label">CTAs</div>
+                  <div className="mobile-instance-card__chips">
+                    {selectedCtas.map((cta) => (
+                      <span key={cta.cta_id} className="mobile-instance-card__chip">
+                        {cta.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="mobile-instance-card__empty">
+              Tap an instance to view it, share it, or email it from your phone.
+            </div>
+          )}
         </div>
 
         <div className="mobile-share">
@@ -711,13 +821,7 @@ export default function AdminPlaylistInstancesPage() {
             <button
               type="button"
               onClick={() => {
-                if (!form.playlist_instance_id) return;
-                const params = new URLSearchParams();
-                if (form.audience && form.audience !== "any") params.set("aud", form.audience);
-                if (form.demo_enabled) params.set("demo", "1");
-                const qs = params.toString();
-                const url = `${window.location.origin}/playlist/${form.playlist_instance_id}${qs ? `?${qs}` : ""}`;
-                window.open(url, "_blank", "noopener");
+                openLiveUrl();
               }}
               disabled={!form.playlist_instance_id}
             >
@@ -726,12 +830,7 @@ export default function AdminPlaylistInstancesPage() {
             <button
               type="button"
               onClick={() => {
-                if (!form.playlist_instance_id) return;
-                const params = new URLSearchParams();
-                if (form.audience && form.audience !== "any") params.set("aud", form.audience);
-                if (form.demo_enabled) params.set("demo", "1");
-                const suffix = params.toString();
-                navigate(`/admin/player-preview/${form.playlist_instance_id || ""}${suffix ? `?${suffix}` : ""}`);
+                openPreview();
               }}
               disabled={!form.playlist_instance_id}
             >

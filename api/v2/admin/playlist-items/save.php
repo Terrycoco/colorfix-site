@@ -9,6 +9,8 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Services\PlaylistPhotoLibrarySyncService;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -55,6 +57,8 @@ try {
     $pdo->beginTransaction();
     $hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
     $hasPhotoLibraryId = columnExists($pdo, 'playlist_items', 'photo_library_id');
+    $hasSavedPaletteSetId = columnExists($pdo, 'playlist_items', 'saved_palette_set_id');
+    $playlistPhotoSync = new PlaylistPhotoLibrarySyncService($pdo);
     $stmt = $pdo->prepare('UPDATE playlist_items SET order_index = order_index + 10000 WHERE playlist_id = :playlist_id');
     $stmt->execute(['playlist_id' => $playlistId]);
 
@@ -69,6 +73,7 @@ try {
             'palette_hash' => isset($item['palette_hash']) && $item['palette_hash'] !== '' ? (string)$item['palette_hash'] : null,
             'image_url' => $item['image_url'] ?? null,
             'photo_library_id' => isset($item['photo_library_id']) && $item['photo_library_id'] !== '' ? (int)$item['photo_library_id'] : null,
+            'saved_palette_set_id' => isset($item['saved_palette_set_id']) && $item['saved_palette_set_id'] !== '' ? (int)$item['saved_palette_set_id'] : null,
             'title' => $item['title'] ?? null,
             'subtitle' => $item['subtitle'] ?? null,
             'subtitle_2' => $item['subtitle_2'] ?? null,
@@ -84,8 +89,12 @@ try {
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
         }
+        $data = $playlistPhotoSync->normalizeItemForSave($data);
         if (!$hasPhotoLibraryId) {
             unset($data['photo_library_id']);
+        }
+        if (!$hasSavedPaletteSetId) {
+            unset($data['saved_palette_set_id']);
         }
 
         $columns = [
@@ -95,6 +104,7 @@ try {
             'palette_hash',
             'image_url',
             'photo_library_id',
+            'saved_palette_set_id',
             'title',
             'subtitle',
             'subtitle_2',
@@ -109,6 +119,9 @@ try {
         ];
         if (!$hasPhotoLibraryId) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
+        }
+        if (!$hasSavedPaletteSetId) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'saved_palette_set_id'));
         }
         if ($hasExcludeFromThumbs) {
             $columns[] = 'exclude_from_thumbs';

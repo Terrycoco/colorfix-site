@@ -41,6 +41,7 @@ class ArticleService
             'slug' => $slug,
             'meta_description' => $payload['meta_description'] ?? null,
             'hero_asset_id' => $payload['hero_asset_id'] ?? null,
+            'hero_mobile_asset_id' => $payload['hero_mobile_asset_id'] ?? null,
             'cta_overrides' => $payload['cta_overrides'] ?? null,
             'featured' => !empty($payload['featured']) ? 1 : 0,
             'published_at' => $payload['published_at'] ?? null,
@@ -53,7 +54,7 @@ class ArticleService
         }
 
         if (!empty($data['featured'])) {
-            $this->repo->clearFeaturedExcept($articleId);
+            $this->repo->setExclusiveFeatured($articleId);
         }
 
         $tagIds = $this->normalizeTagIds($payload['tags'] ?? []);
@@ -122,7 +123,7 @@ class ArticleService
         $this->repo->beginTransaction();
         try {
             if ($articleId > 0) {
-                $this->repo->bumpSectionSortOrders($articleId, 10000);
+                $this->repo->moveSectionSortOrdersOutOfTheWay($articleId);
             }
 
             foreach ($sections as $section) {

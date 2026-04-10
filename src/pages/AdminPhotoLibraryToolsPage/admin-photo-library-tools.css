@@ -1,0 +1,309 @@
+.admin-photo-library-tools {
+  padding: 18px 20px 40px;
+  color: #1f2937;
+}
+
+.admin-photo-library-tools__head,
+.admin-photo-library-tools__toolbar,
+.admin-photo-library-tools__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-photo-library-tools__head h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.admin-photo-library-tools__head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.admin-photo-library-tools__modebar,
+.admin-photo-library-tools__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-photo-library-tools__btn,
+.admin-photo-library-tools__mode,
+.admin-photo-library-tools__link {
+  border: 1px solid #cfd6e3;
+  background: #fff;
+  color: #1f2937;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-photo-library-tools__icon-btn {
+  border: 1px solid #cfd6e3;
+  background: #fff;
+  color: #1f2937;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.admin-photo-library-tools__mode.is-active,
+.admin-photo-library-tools__btn--primary {
+  background: #0b1b3a;
+  border-color: #0b1b3a;
+  color: #fff;
+}
+
+.admin-photo-library-tools__btn--danger {
+  background: #fff1f1;
+  border-color: #d99;
+  color: #9a1f1f;
+}
+
+.admin-photo-library-tools__btn:disabled,
+.admin-photo-library-tools__link:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-photo-library-tools__message {
+  padding: 8px 10px;
+  border: 1px solid #d7dce5;
+  background: #fff;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.admin-photo-library-tools__message--error {
+  border-color: #e1b4b4;
+  background: #fff4f4;
+  color: #a12828;
+}
+
+.admin-photo-library-tools__message--ok {
+  border-color: #b8d7c3;
+  background: #effaf2;
+  color: #24653d;
+}
+
+.admin-photo-library-tools__summary {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.admin-photo-library-tools__merge-box {
+  border: 1px solid #d7dce5;
+  background: #fff;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.admin-photo-library-tools__merge-head {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.admin-photo-library-tools__merge-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-photo-library-tools__merge-form input {
+  width: 120px;
+  border: 1px solid #cfd6e3;
+  background: #fff;
+  color: #1f2937;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.admin-photo-library-tools__merge-arrow {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.admin-photo-library-tools__merge-status {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid #d7dce5;
+  background: #fff;
+  font-size: 13px;
+}
+
+.admin-photo-library-tools__merge-status--ok {
+  border-color: #b8d7c3;
+  background: #effaf2;
+  color: #24653d;
+}
+
+.admin-photo-library-tools__merge-status--error {
+  border-color: #e1b4b4;
+  background: #fff4f4;
+  color: #a12828;
+}
+
+.admin-photo-library-tools__merge-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.admin-photo-library-tools__merge-preview > div {
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  padding: 8px 10px;
+}
+
+.admin-photo-library-tools__merge-meta,
+.admin-photo-library-tools__sub {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 3px;
+  word-break: break-word;
+}
+
+.admin-photo-library-tools__usage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-photo-library-tools__usage-list li {
+  border: 1px solid #e4e9f3;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.admin-photo-library-tools__usage-detail,
+.admin-photo-library-tools__usage-empty {
+  margin-top: 4px;
+  color: #6a778b;
+  font-size: 13px;
+}
+
+.admin-photo-library-tools__table-wrap {
+  border: 1px solid #d7dce5;
+  background: #fff;
+  overflow: auto;
+}
+
+.admin-photo-library-tools__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-photo-library-tools__table th,
+.admin-photo-library-tools__table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 13px;
+}
+
+.admin-photo-library-tools__table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  background: #f8fafc;
+}
+
+.admin-photo-library-tools__group-row td {
+  background: #f8fafc;
+  border-bottom-color: #d7dce5;
+}
+
+.admin-photo-library-tools__group-cell {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4b5563;
+  text-transform: none;
+}
+
+.admin-photo-library-tools__thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1px solid #d7dce5;
+  background: #f3f4f6;
+  display: block;
+  cursor: zoom-in;
+}
+
+.admin-photo-library-tools__thumb--empty {
+  background: #f9fafb;
+}
+
+.admin-photo-library-tools__name,
+.admin-photo-library-tools__flag {
+  white-space: nowrap;
+}
+
+.admin-photo-library-tools__action {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-photo-library-tools__empty {
+  color: #6b7280;
+}
+
+.admin-photo-library-tools__preview {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 15, 30, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  cursor: zoom-out;
+  padding: 24px;
+}
+
+.admin-photo-library-tools__preview img {
+  max-width: min(1200px, 92vw);
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 900px) {
+  .admin-photo-library-tools__head,
+  .admin-photo-library-tools__toolbar,
+  .admin-photo-library-tools__summary {
+    display: block;
+  }
+
+  .admin-photo-library-tools__head-actions,
+  .admin-photo-library-tools__actions,
+  .admin-photo-library-tools__modebar {
+    margin-top: 8px;
+  }
+}

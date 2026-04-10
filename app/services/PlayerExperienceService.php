@@ -188,7 +188,7 @@ final class PlayerExperienceService
             }
         }
 
-        $photoUrlMap = $this->loadPhotoLibraryUrls(array_keys($photoIds));
+        $photoMetaMap = $this->loadPhotoLibraryMeta(array_keys($photoIds));
         $assetUrlMap = $this->loadAssetVariantUrls(array_keys($assetIds));
 
         foreach ($items as $item) {
@@ -196,9 +196,30 @@ final class PlayerExperienceService
             $imageUrl = (string)($item->image_url ?? '');
             $photoId = $item->photo_library_id ?? null;
             if ($photoId) {
-                $resolved = $photoUrlMap[(int)$photoId] ?? '';
+                $meta = $photoMetaMap[(int)$photoId] ?? null;
+                $resolved = (string)($meta['url'] ?? '');
                 if ($resolved !== '') {
                     $item->image_url = "photo:{$photoId}|{$resolved}";
+                }
+                $resolvedSetMeta = null;
+                if (empty($item->saved_palette_set_id) && !empty($item->palette_hash)) {
+                    $resolvedSetMeta = $this->resolveSavedPaletteSetForPhoto(
+                        (int)$photoId,
+                        (string)$item->palette_hash
+                    );
+                }
+                if (empty($item->palette_hash) && !empty($meta['palette_hash'])) {
+                    $item->palette_hash = (string)$meta['palette_hash'];
+                }
+                if (empty($item->saved_palette_set_id) && !empty($resolvedSetMeta['saved_palette_set_id'])) {
+                    $item->saved_palette_set_id = (int)$resolvedSetMeta['saved_palette_set_id'];
+                } elseif (empty($item->saved_palette_set_id) && !empty($meta['saved_palette_set_id'])) {
+                    $item->saved_palette_set_id = (int)$meta['saved_palette_set_id'];
+                }
+                if (empty($item->saved_palette_photo_type) && !empty($resolvedSetMeta['saved_palette_photo_type'])) {
+                    $item->saved_palette_photo_type = (string)$resolvedSetMeta['saved_palette_photo_type'];
+                } elseif (empty($item->saved_palette_photo_type) && !empty($meta['saved_palette_photo_type'])) {
+                    $item->saved_palette_photo_type = (string)$meta['saved_palette_photo_type'];
                 }
                 continue;
             }
@@ -214,24 +235,115 @@ final class PlayerExperienceService
 
     /**
      * @param int[] $photoIds
-     * @return array<int, string>
+     * @return array<int, array{url:string,palette_hash:?string,saved_palette_set_id:?int,saved_palette_photo_type:?string}>
      */
-    private function loadPhotoLibraryUrls(array $photoIds): array
+    private function loadPhotoLibraryMeta(array $photoIds): array
     {
         $ids = array_values(array_filter(array_map('intval', $photoIds)));
         if (!$ids) return [];
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $this->pdo->prepare(
-            "SELECT photo_library_id, rel_path, updated_at FROM photo_library WHERE photo_library_id IN ({$placeholders})"
+            "SELECT
+                pl.photo_library_id,
+                pl.rel_path,
+                pl.updated_at,
+                (
+                  SELECT spalette.palette_hash
+                    FROM saved_palette_set_photos spsp
+                    JOIN saved_palette_sets sps
+                      ON sps.id = spsp.saved_palette_set_id
+                    JOIN saved_palettes spalette
+                      ON spalette.id = sps.saved_palette_id
+                   WHERE spsp.photo_library_id = pl.photo_library_id
+                   ORDER BY sps.is_default DESC, spsp.id ASC
+                   LIMIT 1
+                ) AS palette_hash,
+                (
+                  SELECT sps.id
+                    FROM saved_palette_set_photos spsp
+                    JOIN saved_palette_sets sps
+                      ON sps.id = spsp.saved_palette_set_id
+                   WHERE spsp.photo_library_id = pl.photo_library_id
+                   ORDER BY sps.is_default DESC, spsp.id ASC
+                   LIMIT 1
+                ) AS saved_palette_set_id,
+                (
+                  SELECT spsp.photo_type
+                    FROM saved_palette_set_photos spsp
+                    JOIN saved_palette_sets sps
+                      ON sps.id = spsp.saved_palette_set_id
+                   WHERE spsp.photo_library_id = pl.photo_library_id
+                   ORDER BY sps.is_default DESC, spsp.id ASC
+                   LIMIT 1
+                ) AS saved_palette_photo_type
+             FROM photo_library pl
+             WHERE pl.photo_library_id IN ({$placeholders})"
         );
         $stmt->execute($ids);
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $relPath = (string)($row['rel_path'] ?? '');
             $updatedAt = (string)($row['updated_at'] ?? '');
-            $map[(int)$row['photo_library_id']] = $this->appendCacheBuster($relPath, $updatedAt);
+            $map[(int)$row['photo_library_id']] = [
+                'url' => $this->appendCacheBuster($relPath, $updatedAt),
+                'palette_hash' => isset($row['palette_hash']) && $row['palette_hash'] !== '' ? (string)$row['palette_hash'] : null,
+                'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0 ? (int)$row['saved_palette_set_id'] : null,
+                'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== '' ? strtolower((string)$row['saved_palette_photo_type']) : null,
+            ];
         }
         return $map;
+    }
+
+    /**
+     * @return array{saved_palette_set_id:?int,saved_palette_photo_type:?string}|null
+     */
+    private function resolveSavedPaletteSetForPhoto(int $photoLibraryId, string $paletteHash): ?array
+    {
+        $photoLibraryId = (int)$photoLibraryId;
+        $paletteHash = trim($paletteHash);
+        if ($photoLibraryId <= 0 || $paletteHash === '') {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                sps.id AS saved_palette_set_id,
+                spsp.photo_type AS saved_palette_photo_type
+             FROM saved_palette_set_photos spsp
+             JOIN saved_palette_sets sps
+               ON sps.id = spsp.saved_palette_set_id
+             JOIN saved_palettes sp
+               ON sp.id = sps.saved_palette_id
+             WHERE spsp.photo_library_id = :photo_library_id
+               AND sp.palette_hash = :palette_hash
+             ORDER BY
+               CASE
+                 WHEN spsp.photo_type = 'full' THEN 0
+                 WHEN spsp.photo_type = 'zoom' THEN 1
+                 WHEN spsp.photo_type = 'before' THEN 2
+                 ELSE 3
+               END ASC,
+               sps.is_default DESC,
+               spsp.id ASC
+             LIMIT 1"
+        );
+        $stmt->execute([
+            ':photo_library_id' => $photoLibraryId,
+            ':palette_hash' => $paletteHash,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0
+                ? (int)$row['saved_palette_set_id']
+                : null,
+            'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== ''
+                ? strtolower((string)$row['saved_palette_photo_type'])
+                : null,
+        ];
     }
 
     /**
@@ -326,10 +438,11 @@ final class PlayerExperienceService
         $count = 0;
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
-            if (in_array($type, ['intro', 'before', 'text'], true)) {
+            if (in_array($type, ['intro', 'before', 'text', 'non-palette'], true)) {
                 continue;
             }
             if (!empty($item->exclude_from_thumbs)) continue;
+            if (strtolower((string)($item->saved_palette_photo_type ?? '')) === 'before') continue;
             $hasPalette = !empty($item->ap_id) || !empty($item->palette_hash);
             if (!$hasPalette) continue;
             $count++;

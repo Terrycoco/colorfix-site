@@ -44,7 +44,27 @@ class PaletteViewerService
             throw new RuntimeException('Palette not found');
         }
 
-        $render = $this->renderService->renderAppliedPalette($palette);
+        try {
+            $render = $this->renderService->renderAppliedPalette($palette);
+        } catch (\RuntimeException $e) {
+            $message = strtolower($e->getMessage());
+            $isPreparedImageFailure = str_contains($message, 'unable to open prepared image')
+                || str_contains($message, 'no prepared_base found');
+            if (!$isPreparedImageFailure) {
+                throw $e;
+            }
+
+            $render = $this->renderService->getCachedAppliedPaletteRender($palette);
+            if (!$render) {
+                $render = [
+                    'ok' => true,
+                    'render_rel_path' => null,
+                    'render_url' => '',
+                    'width' => null,
+                    'height' => null,
+                ];
+            }
+        }
         $kickerText = $palette->kickerId
             ? $this->appliedRepo->getKickerText($palette->kickerId)
             : null;
@@ -107,14 +127,14 @@ class PaletteViewerService
         return (new Palette($meta, $swatches))->toArray();
     }
 
-    public function getSaved(string $hash): array
+    public function getSaved(string $hash, ?int $setId = null): array
     {
         $hash = trim($hash);
         if ($hash === '') {
             throw new InvalidArgumentException('hash required');
         }
 
-        $full = $this->savedRepo->getFullPaletteByHash($hash);
+        $full = $this->savedRepo->getFullPaletteByHashAndSet($hash, $setId);
         if (!$full) {
             throw new RuntimeException('Palette not found');
         }
@@ -122,6 +142,7 @@ class PaletteViewerService
         $palette = $full['palette'] ?? [];
         $members = $full['members'] ?? [];
         $photos = $full['photos'] ?? [];
+        $sets = $full['sets'] ?? [];
         $kickerText = !empty($palette['kicker_id'])
             ? $this->savedRepo->getKickerText((int)$palette['kicker_id'])
             : null;
@@ -182,6 +203,13 @@ class PaletteViewerService
             'inset_photos' => $insets,
             'kicker' => $kickerText,
             'palette_type' => $palette['palette_type'] ?? null,
+            'set_id' => $fullPhoto['saved_palette_set_id'] ?? ($sets[0]['id'] ?? null),
+            'available_sets' => array_map(static fn(array $set): array => [
+                'id' => isset($set['id']) ? (int)$set['id'] : null,
+                'slug' => $set['slug'] ?? null,
+                'title' => $set['title'] ?? null,
+                'is_default' => isset($set['is_default']) ? (int)$set['is_default'] : 0,
+            ], $sets),
         ];
 
         return (new Palette($meta, $swatches))->toArray();

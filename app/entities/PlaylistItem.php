@@ -10,6 +10,8 @@ class PlaylistItem
         public ?string $palette_hash,
         public ?string $image_url,
         public ?int $photo_library_id = null,
+        public ?int $saved_palette_set_id = null,
+        public ?string $saved_palette_photo_type = null,
         public ?string $title = null,
         public ?string $subtitle = null,
         public ?string $type = null,

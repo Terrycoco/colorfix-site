@@ -1,18 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
+import { buildImageUrl } from "@helpers/assetImage";
 import "./article-page.css";
 
 const GET_URL = `${API_FOLDER}/v2/articles/get.php`;
 
 const emdashify = (value) => String(value ?? "").replace(/--/g, "—");
 
+function sanitizeInlineHtml(value = "") {
+  const escaped = String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return escaped.replace(
+    /&lt;\s*(\/?)\s*(strong|b|i|em)\s*&gt;/gi,
+    (_, closing, tag) => `<${closing ? "/" : ""}${String(tag).toLowerCase()}>`
+  );
+}
+
 function formatBody(text = "") {
   if (!text) return null;
   return String(text)
     .split("\n")
     .map((line, idx) => (
-      <p key={`${line}-${idx}`}>{emdashify(line)}</p>
+      <p
+        key={`${line}-${idx}`}
+        dangerouslySetInnerHTML={{ __html: emdashify(sanitizeInlineHtml(line)) }}
+      />
     ));
 }
 
@@ -35,7 +51,9 @@ export default function ArticlePage() {
       setError("");
       try {
         const adminFlag = searchParams.get("admin") === "1" ? "&admin=1" : "";
-        const res = await fetch(`${GET_URL}?id=${id}${adminFlag}`, { credentials: "include" });
+        const res = await fetch(`${GET_URL}?id=${id}${adminFlag}&_=${Date.now()}`, {
+          credentials: "include",
+        });
         const text = await res.text();
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
@@ -99,15 +117,6 @@ export default function ArticlePage() {
     return <div className="article-page article-page__state">Article not found.</div>;
   }
 
-  const withCacheBuster = (src, updatedAt) => {
-    if (!src) return src;
-    if (!updatedAt) return src;
-    const sep = src.includes("?") ? "&" : "?";
-    const stamp = Date.parse(updatedAt);
-    if (!Number.isFinite(stamp)) return src;
-    return `${src}${sep}v=${stamp}`;
-  };
-
   function handleCtaClick(cta) {
     if (!cta) return;
     const key = (cta?.key || "").toLowerCase();
@@ -168,7 +177,7 @@ export default function ArticlePage() {
         {hero?.rel_path && (
           <img
             className="article-page__hero"
-            src={withCacheBuster(hero.rel_path, hero.updated_at)}
+            src={buildImageUrl(hero.rel_path, hero.updated_at || null)}
             alt={hero.alt_text || article.title || ""}
           />
         )}
@@ -181,6 +190,12 @@ export default function ArticlePage() {
       <div className="article-page__content">
         {sections.map((section) => (
           <div key={section.id} className="article-page__section">
+            {(() => {
+              const kind = String(section.kind || "text");
+              const isImageOnly = kind === "image";
+              const isImageText = kind === "image_text" || (kind === "image" && !!section.body);
+              return (
+                <>
             {(() => {
               if (!section.heading) return null;
               const level = String(section.heading_level || "h2").toLowerCase();
@@ -209,10 +224,10 @@ export default function ArticlePage() {
               </ul>
             )}
 
-            {section.kind === "image" && section.asset?.rel_path && (
+            {(isImageOnly || isImageText) && section.asset?.rel_path && (
               <figure className="article-page__figure">
                 <img
-                  src={withCacheBuster(section.asset.rel_path, section.asset.updated_at)}
+                  src={buildImageUrl(section.asset.rel_path, section.asset.updated_at || null)}
                   alt={section.asset.alt_text || section.heading || ""}
                 />
                 {section.caption ? (
@@ -222,7 +237,7 @@ export default function ArticlePage() {
                 )}
               </figure>
             )}
-            {section.kind === "image" && section.body && (
+            {isImageText && section.body && (
               <div className="article-page__text">{formatBody(section.body)}</div>
             )}
 
@@ -244,6 +259,9 @@ export default function ArticlePage() {
                 <span>Palette #{section.palette_id}</span>
               </div>
             )}
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>

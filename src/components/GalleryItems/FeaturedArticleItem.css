@@ -71,6 +71,12 @@
   background: #f3f4f6;
 }
 
+.featured-article .featured-media picture {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .featured-article .featured-media img {
   width: 100%;
   height: 100%;

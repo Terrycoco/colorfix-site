@@ -12,9 +12,9 @@ class PdoArticleRepository
     public function createArticle(array $data): int
     {
         $sql = "INSERT INTO articles
-                (type, status, title, dek, slug, meta_description, hero_asset_id, cta_overrides, featured, published_at, created_at, updated_at)
+                (type, status, title, dek, slug, meta_description, hero_asset_id, hero_mobile_asset_id, cta_overrides, featured, published_at, created_at, updated_at)
                 VALUES
-                (:type, :status, :title, :dek, :slug, :meta_description, :hero_asset_id, :cta_overrides, :featured, :published_at, NOW(), NOW())";
+                (:type, :status, :title, :dek, :slug, :meta_description, :hero_asset_id, :hero_mobile_asset_id, :cta_overrides, :featured, :published_at, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':type' => $data['type'],
@@ -24,6 +24,7 @@ class PdoArticleRepository
             ':slug' => $data['slug'],
             ':meta_description' => $data['meta_description'] ?? null,
             ':hero_asset_id' => $data['hero_asset_id'] ?? null,
+            ':hero_mobile_asset_id' => $data['hero_mobile_asset_id'] ?? null,
             ':cta_overrides' => $data['cta_overrides'] ?? null,
             ':featured' => !empty($data['featured']) ? 1 : 0,
             ':published_at' => $data['published_at'] ?? null,
@@ -42,6 +43,7 @@ class PdoArticleRepository
             'slug',
             'meta_description',
             'hero_asset_id',
+            'hero_mobile_asset_id',
             'cta_overrides',
             'featured',
             'published_at',
@@ -147,9 +149,12 @@ class PdoArticleRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function clearFeaturedExcept(int $articleId): void
+    public function setExclusiveFeatured(int $articleId): void
     {
-        $stmt = $this->pdo->prepare("UPDATE articles SET featured = 0 WHERE id <> :id");
+        $stmt = $this->pdo->prepare("
+            UPDATE articles
+               SET featured = CASE WHEN id = :id THEN 1 ELSE 0 END
+        ");
         $stmt->execute([':id' => $articleId]);
     }
 
@@ -204,15 +209,14 @@ class PdoArticleRepository
         if ($this->pdo->inTransaction()) $this->pdo->rollBack();
     }
 
-    public function bumpSectionSortOrders(int $articleId, int $offset): void
+    public function moveSectionSortOrdersOutOfTheWay(int $articleId): void
     {
         $stmt = $this->pdo->prepare("
             UPDATE article_sections
-               SET sort_order = sort_order + :offset
+               SET sort_order = (sort_order * -1) - 1
              WHERE article_id = :id
         ");
         $stmt->execute([
-            ':offset' => $offset,
             ':id' => $articleId,
         ]);
     }

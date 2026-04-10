@@ -108,13 +108,13 @@ function appendParams(url, params) {
   }
 }
 
-function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }) {
+function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }) {
   if (!data?.playlist_instance_id) return;
   if (thumb) {
     runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo });
     return;
   }
-  runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo });
+  runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef });
 }
 
 function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }) {
@@ -144,17 +144,37 @@ function getPaletteItems(data) {
   const items = data?.items || [];
   return items.filter((item) => {
     const type = (item?.type || "normal").toLowerCase();
-    if (type === "intro" || type === "before" || type === "text") return false;
+    const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
+    if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
+    if (attachedType === "before") return false;
     if (item?.exclude_from_thumbs) return false;
     return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
   });
 }
 
-function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }) {
+function isPaletteEligibleItem(item) {
+  if (!item) return false;
+  const type = (item?.type || "normal").toLowerCase();
+  const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
+  if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
+  if (attachedType === "before") return false;
+  if (item?.exclude_from_thumbs) return false;
+  return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
+}
+
+function getCurrentPaletteItem(data, playerRef) {
+  const current = playerRef?.current?.getCurrentItem?.() || null;
+  if (isPaletteEligibleItem(current)) return current;
   const palettes = getPaletteItems(data);
-  if (!palettes.length) return;
-  const apId = palettes[0].ap_id;
-  const paletteHash = palettes[0].palette_hash;
+  return palettes.length === 1 ? palettes[0] : null;
+}
+
+function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef }) {
+  const targetItem = getCurrentPaletteItem(data, playerRef);
+  if (!targetItem) return;
+  const apId = targetItem.ap_id;
+  const paletteHash = targetItem.palette_hash;
+  const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
   if (!apId && !paletteHash) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
@@ -168,6 +188,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (thumb) params.set("thumb", "1");
   if (demo) params.set("demo", "1");
   if (returnTo) params.set("return_to", returnTo);
+  if (savedPaletteSetId > 0) params.set("set_id", String(savedPaletteSetId));
   const qs = params.toString();
   const url = paletteHash
     ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
@@ -224,9 +245,9 @@ export function buildCtaHandlers({
     article_link: (cta) => runArticleLink({ navigate, cta }),
     playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
     watch_next: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
-    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo }),
+    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
     to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
-    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
+    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
     exit: () => handleExit?.(),
   };
 }

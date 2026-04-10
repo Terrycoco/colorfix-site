@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import { buildImageUrl } from "@helpers/assetImage";
 import "./photo-picker-modal.css";
 
 export default function PhotoPickerModal({
@@ -14,24 +15,17 @@ export default function PhotoPickerModal({
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [cacheNonce, setCacheNonce] = useState(() => String(Date.now()));
+  const [thumbNonce, setThumbNonce] = useState(() => String(Date.now()));
   const inputRef = useRef(null);
-
-  const withPickerNonce = useCallback((url) => {
-    const value = String(url || "").trim();
-    if (!value) return "";
-    const sep = value.includes("?") ? "&" : "?";
-    return `${value}${sep}picker=${cacheNonce}`;
-  }, [cacheNonce]);
 
   useEffect(() => {
     if (!open) {
       setItems([]);
       setError("");
       setLoading(false);
+      setThumbNonce(String(Date.now()));
       return;
     }
-    setCacheNonce(String(Date.now()));
     try {
       const stored = window.sessionStorage.getItem(QUERY_KEY);
       if (stored) setQuery(stored);
@@ -55,6 +49,7 @@ export default function PhotoPickerModal({
   const runSearch = useCallback(async () => {
     setLoading(true);
     setError("");
+    setThumbNonce(String(Date.now()));
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set("q", query.trim());
@@ -72,6 +67,13 @@ export default function PhotoPickerModal({
       setLoading(false);
     }
   }, [listUrl, query, sourceType]);
+
+  const buildPickerImageUrl = useCallback((url, updatedAt = null) => {
+    const base = buildImageUrl(url, updatedAt);
+    if (!base) return "";
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}picker=${thumbNonce}`;
+  }, [thumbNonce]);
 
   useEffect(() => {
     if (!open) return;
@@ -139,14 +141,22 @@ export default function PhotoPickerModal({
               className="ppm-card"
               onClick={() => onPick && onPick({
                 photo_library_id: item.photo_library_id,
-                image_url: withPickerNonce(item.image_url || item.rel_path || ""),
+                raw_rel_path: item.raw_rel_path || "",
+                image_url: item.raw_rel_path || item.rel_path || item.image_url || "",
                 title: item.title || "",
                 tags: item.tags || "",
               })}
             >
               <div className="ppm-thumb">
-                {(item.image_url || item.rel_path) ? (
-                  <img src={withPickerNonce(item.image_url || item.rel_path)} alt="" loading="lazy" />
+                {(item.raw_rel_path || item.rel_path || item.image_url) ? (
+                  <img
+                    src={buildPickerImageUrl(
+                      item.raw_rel_path || item.rel_path || item.image_url,
+                      item.updated_at || null
+                    )}
+                    alt=""
+                    loading="lazy"
+                  />
                 ) : (
                   <div className="ppm-thumb-placeholder">No preview</div>
                 )}

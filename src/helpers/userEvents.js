@@ -44,6 +44,7 @@ export function isHireTerryCta(cta) {
 
 export function trackUserEvent(payload) {
   if (typeof window === "undefined") return;
+  if (isAdmin() && !payload?.allow_internal_tracking) return;
 
   const body = {
     ...payload,

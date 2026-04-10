@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import PhotoSearchPicker from "@components/PhotoSearchPicker";
+import SavedPaletteEditorModal from "@components/SavedPaletteEditorModal";
 import "./uploader.css";
 
 const TEXTURE_SUGGESTIONS = [
@@ -17,6 +18,11 @@ const TEXTURE_SUGGESTIONS = [
  * Expects response shape: { ok, asset_id, photo_id, base_size, touched: [{kind,role?,w,h}] }
  */
 export default function PhotoPreparedUploader() {
+  const [savedPalettes, setSavedPalettes] = useState([]);
+  const [attachedPaletteId, setAttachedPaletteId] = useState("");
+  const [attachedPaletteSetId, setAttachedPaletteSetId] = useState("");
+  const [attachedPalettePhotoType, setAttachedPalettePhotoType] = useState("full");
+  const [paletteModalOpen, setPaletteModalOpen] = useState(false);
   const [assetId, setAssetId] = useState("");
   const [stylePrimary, setStylePrimary] = useState("");
   const [verdict, setVerdict] = useState("");
@@ -62,6 +68,23 @@ export default function PhotoPreparedUploader() {
         setMaskOptions(Array.isArray(data?.masks) ? data.masks : []);
       })
       .catch(() => setMaskOptions([]));
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_FOLDER}/v2/admin/saved-palettes.php?limit=200&with_photos=1&_=${Date.now()}`, {
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const items = Array.isArray(data?.items) ? data.items : [];
+        items.sort((a, b) => {
+          const aLabel = a?.nickname || a?.palette_hash || `Saved #${a?.id || ""}`;
+          const bLabel = b?.nickname || b?.palette_hash || `Saved #${b?.id || ""}`;
+          return aLabel.localeCompare(bLabel, undefined, { sensitivity: "base" });
+        });
+        setSavedPalettes(items);
+      })
+      .catch(() => setSavedPalettes([]));
   }, []);
 
   useEffect(() => {
@@ -134,7 +157,6 @@ export default function PhotoPreparedUploader() {
       });
 
       // Optional masks[]
-      let maskCount = 0;
       maskRows.forEach((row) => {
         if (!row.file) return;
         form.append("masks[]", row.file, row.file.name);
@@ -146,7 +168,6 @@ export default function PhotoPreparedUploader() {
         form.append("mask_opacity_medium[]", row.opacities.medium ?? 1);
         form.append("mask_mode_light[]", row.modes.light);
         form.append("mask_opacity_light[]", row.opacities.light ?? 1);
-        maskCount++;
       });
 
       console.groupCollapsed("Upload payload");
@@ -181,7 +202,12 @@ export default function PhotoPreparedUploader() {
       if (typeof json.category_path === "string") {
         setCategoryPath(json.category_path);
       }
+      const nextAssetId = json.asset_id || assetId;
       if (!assetId && json.asset_id) setAssetId(json.asset_id);
+      if (attachedPaletteId && nextAssetId) {
+        const asset = await loadExistingAsset(nextAssetId, { silent: true });
+        await attachAssetToSavedPalette(asset, attachedPaletteId, attachedPalettePhotoType);
+      }
     } catch (err) {
       setError(err?.message || String(err));
     } finally {
@@ -235,6 +261,7 @@ export default function PhotoPreparedUploader() {
         error: "",
         success: `Loaded ${normalizedId}`,
       });
+      return data;
     } catch (err) {
       setExistingAsset(null);
       setExistingMasks([]);
@@ -245,6 +272,41 @@ export default function PhotoPreparedUploader() {
       } else {
         setExistingStatus({ loading: false, error: err?.message || "Failed to load asset", success: "" });
       }
+      return null;
+    }
+  }
+
+  async function attachAssetToSavedPalette(asset, paletteId, photoType) {
+    const relPath = asset?.prepared_url || asset?.repaired_url || "";
+    if (!paletteId || !relPath) {
+      throw new Error("Uploaded photo could not be attached to a saved palette.");
+    }
+    const normalizedPath = (() => {
+      try {
+        const url = new URL(relPath, window.location.origin);
+        return url.pathname || relPath;
+      } catch {
+        return relPath;
+      }
+    })();
+    const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-photos/add-from-library.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        palette_id: Number(paletteId),
+        set_id: attachedPaletteSetId && attachedPaletteSetId !== "__new__" ? Number(attachedPaletteSetId) : null,
+        create_new_set: attachedPaletteSetId === "__new__",
+        raw_rel_path: normalizedPath,
+        rel_path: normalizedPath,
+        photo_type: photoType || "full",
+        trigger_mode: photoType === "before" ? "none" : "any",
+        caption: photoType === "before" ? "Before" : null,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.ok) {
+      throw new Error(data?.error || "Failed to attach photo to saved palette");
     }
   }
 
@@ -397,6 +459,58 @@ export default function PhotoPreparedUploader() {
             onChange={(e) => setTags(e.target.value)}
           />
         </div>
+
+        <div className="row">
+          <label>Attached Saved Palette (optional)</label>
+          <div className="asset-input-group">
+            <select
+              value={attachedPaletteId}
+              onChange={(e) => {
+                setAttachedPaletteId(e.target.value);
+                setAttachedPaletteSetId("");
+              }}
+            >
+              <option value="">None</option>
+              {savedPalettes.map((palette) => (
+                <option key={palette.id} value={palette.id}>
+                  {palette.nickname || palette.palette_hash || `Saved #${palette.id}`}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="load-asset-btn" onClick={() => setPaletteModalOpen(true)}>
+              {attachedPaletteId ? "Edit Palette" : "Create / Pick"}
+            </button>
+          </div>
+        </div>
+
+        {attachedPaletteId && (
+          <div className="row">
+            <label>Photo Group</label>
+            <select
+              value={attachedPaletteSetId}
+              onChange={(e) => setAttachedPaletteSetId(e.target.value)}
+            >
+              <option value="">Primary / Default Group</option>
+              {(savedPalettes.find((palette) => String(palette.id) === String(attachedPaletteId))?.sets || []).map((set) => (
+                <option key={set.id} value={set.id}>
+                  {set.title || set.slug || `Set #${set.id}`}
+                </option>
+              ))}
+              <option value="__new__">Create New Group</option>
+            </select>
+          </div>
+        )}
+
+        {attachedPaletteId && (
+          <div className="row">
+            <label>Palette Photo Type</label>
+            <select value={attachedPalettePhotoType} onChange={(e) => setAttachedPalettePhotoType(e.target.value)}>
+              <option value="full">Full</option>
+              <option value="before">Before</option>
+              <option value="zoom">Zoom</option>
+            </select>
+          </div>
+        )}
 
         {existingAsset && (
           <div className="existing-info">
@@ -712,6 +826,33 @@ export default function PhotoPreparedUploader() {
           </ul>
         </div>
       )}
+
+      <SavedPaletteEditorModal
+        open={paletteModalOpen}
+        paletteId={attachedPaletteId || null}
+        attachment={existingAsset?.prepared_url || existingAsset?.repaired_url ? {
+          rel_path: existingAsset.prepared_url || existingAsset.repaired_url,
+          photo_type: attachedPalettePhotoType,
+        } : null}
+        onClose={() => setPaletteModalOpen(false)}
+        onSaved={({ paletteId, palette, attachedPhoto }) => {
+          setPaletteModalOpen(false);
+          if (!paletteId) return;
+          setAttachedPaletteId(String(paletteId));
+          const pickedSetId = attachedPhoto?.saved_palette_set_id || null;
+          const defaultSet = (palette?.sets || []).find((set) => Number(set.id) === Number(pickedSetId))
+            || (palette?.sets || []).find((set) => Number(set.is_default) === 1)
+            || palette?.sets?.[0]
+            || null;
+          setAttachedPaletteSetId(defaultSet?.id ? String(defaultSet.id) : "");
+          if (palette) {
+            setSavedPalettes((prev) => {
+              const next = prev.filter((item) => String(item.id) !== String(paletteId));
+              return [palette, ...next];
+            });
+          }
+        }}
+      />
     </div>
   );
 }

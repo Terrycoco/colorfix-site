@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoClientRepository;
+use App\Repos\PdoPhotoLibraryRepository;
 use App\Services\ClientService;
 
 function respond(array $payload, int $status = 200): void {
@@ -39,6 +40,7 @@ try {
     if (array_key_exists('note', $payload)) $fields['note'] = trim((string)$payload['note']);
     if (array_key_exists('show_in_gallery', $payload)) $fields['show_in_gallery'] = !empty($payload['show_in_gallery']);
     if (array_key_exists('has_palette', $payload)) $fields['has_palette'] = !empty($payload['has_palette']);
+    if (array_key_exists('is_inactive', $payload)) $fields['is_inactive'] = !empty($payload['is_inactive']);
     if (array_key_exists('client_email', $payload)) {
         $clientEmail = trim((string)$payload['client_email']);
         if ($clientEmail === '') {
@@ -59,21 +61,7 @@ try {
         unset($fields['source_type']);
     }
 
-    $setParts = [];
-    $params = [':id' => $id];
-    foreach ($fields as $key => $value) {
-        $paramKey = ':' . $key;
-        if (in_array($key, ['show_in_gallery', 'has_palette'], true)) {
-            $params[$paramKey] = $value ? 1 : 0;
-        } else {
-            $params[$paramKey] = $value === '' ? null : $value;
-        }
-        $setParts[] = "{$key} = {$paramKey}";
-    }
-
-    $sql = "UPDATE photo_library SET " . implode(', ', $setParts) . ", updated_at = NOW() WHERE photo_library_id = :id";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    (new PdoPhotoLibraryRepository($pdo))->update($id, $fields);
 
     respond(['ok' => true]);
 } catch (Throwable $e) {

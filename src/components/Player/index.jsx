@@ -1,6 +1,13 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
-import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
+import {
+  extractAssetId,
+  fetchAssetUrl,
+  getImageRefreshEnabled,
+  isAssetRef,
+  parsePhotoRef,
+  withImageRefresh,
+} from "@helpers/assetImage";
 import "./player.css";
 
 const Player = forwardRef(function Player({
@@ -37,7 +44,7 @@ const Player = forwardRef(function Player({
   const [starPos, setStarPos] = useState({ left: 0, top: 0 });
   const [likedSet, setLikedSet] = useState(() => new Set());
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
-  const [cacheBustEnabled, setCacheBustEnabled] = useState(false);
+  const [cacheBustEnabled, setCacheBustEnabled] = useState(() => getImageRefreshEnabled());
   const [showAdvanceHint, setShowAdvanceHint] = useState(true);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
   const [prevImageUrl, setPrevImageUrl] = useState("");
@@ -47,7 +54,6 @@ const Player = forwardRef(function Player({
   const stageRef = useRef(null);
   const titleRef = useRef(null);
   const didLikeInteractRef = useRef(false);
-  const cacheBustRef = useRef(Date.now());
 
 function queueFadeReady(img, stageEl) {
     // Ensure at least one paint happens at opacity 0 before we flip to ready.
@@ -117,8 +123,7 @@ function queueFadeReady(img, stageEl) {
   }, [safeStart, playlistInstanceId]);
 
   useEffect(() => {
-    cacheBustRef.current = Date.now();
-    setCacheBustEnabled(false);
+    setCacheBustEnabled(getImageRefreshEnabled());
     setLikedSet(readLikedSet(playlistInstanceId));
     setShowAdvanceHint(true);
     didLikeInteractRef.current = false;
@@ -256,6 +261,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       );
       startPlayback(likedOnly ? "liked" : "all", clampedIndex);
     },
+    getCurrentItem: () => playItems[activeIndex] || null,
   }));
 
   const currentIndex = activeIndex;
@@ -326,8 +332,7 @@ function startPlayback(nextMode, nextIndex = 0) {
   function withCacheBust(url) {
     if (!url) return url;
     if (!cacheBustEnabled) return url;
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}v=${cacheBustRef.current}`;
+    return withImageRefresh(url, true);
   }
 
   function toggleLike(e) {

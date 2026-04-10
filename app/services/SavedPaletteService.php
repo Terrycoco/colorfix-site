@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
 use App\Services\PhotoLibraryService;
+use App\Repos\PdoPhotoLibraryRepository;
 
 class SavedPaletteService
 {
@@ -145,7 +146,21 @@ class SavedPaletteService
         if ($savedPaletteId <= 0) {
             throw new InvalidArgumentException('saved_palette_id required');
         }
-        $photos = $this->repo->getPhotosForPalette($savedPaletteId);
+        $photos = [];
+        $sets = $this->repo->getSetsForPalette($savedPaletteId);
+        if ($sets) {
+            foreach ($sets as $set) {
+                $setId = isset($set['id']) ? (int)$set['id'] : 0;
+                if ($setId <= 0) {
+                    continue;
+                }
+                foreach ($this->repo->getPhotosForPalette($savedPaletteId, $setId) as $photo) {
+                    $photos[] = $photo;
+                }
+            }
+        } else {
+            $photos = $this->repo->getPhotosForPalette($savedPaletteId);
+        }
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../..'), '/');
         foreach ($photos as $photo) {
             if ($this->photoLibrary && !empty($photo['id'])) {
@@ -291,6 +306,61 @@ class SavedPaletteService
             }
         }
     }
+
+    public function normalizePhotoLinks(?PdoPhotoLibraryRepository $photoLibraryRepo = null, bool $apply = false): array
+    {
+        $rows = $this->repo->listPhotosNeedingPathNormalization();
+        $result = [
+            'checked' => count($rows),
+            'normalized' => 0,
+            'items' => [],
+        ];
+
+        foreach ($rows as $row) {
+            $photoId = (int)($row['id'] ?? 0);
+            $paletteId = (int)($row['saved_palette_id'] ?? 0);
+            $rawRelPath = trim((string)($row['rel_path'] ?? ''));
+            if ($photoId <= 0 || $paletteId <= 0 || $rawRelPath === '') {
+                continue;
+            }
+
+            $cleanRelPath = (string)(parse_url($rawRelPath, PHP_URL_PATH) ?: $rawRelPath);
+            $nextPhotoLibraryId = null;
+            if ($photoLibraryRepo && $cleanRelPath !== '') {
+                $nextPhotoLibraryId = $photoLibraryRepo->findCanonicalIdByRelPath($cleanRelPath);
+            }
+
+            $changed = $cleanRelPath !== $rawRelPath
+                || (
+                    $nextPhotoLibraryId !== null
+                    && (int)($row['photo_library_id'] ?? 0) !== $nextPhotoLibraryId
+                );
+
+            $result['items'][] = [
+                'photo_id' => $photoId,
+                'palette_id' => $paletteId,
+                'photo_type' => (string)($row['photo_type'] ?? ''),
+                'before_rel_path' => $rawRelPath,
+                'after_rel_path' => $cleanRelPath,
+                'before_photo_library_id' => $row['photo_library_id'] !== null ? (int)$row['photo_library_id'] : null,
+                'after_photo_library_id' => $nextPhotoLibraryId,
+                'changed' => $changed,
+            ];
+
+            if (!$apply || !$changed) {
+                continue;
+            }
+
+            $fields = ['rel_path' => $cleanRelPath];
+            if ($nextPhotoLibraryId !== null) {
+                $fields['photo_library_id'] = $nextPhotoLibraryId;
+            }
+            $this->repo->updatePhoto($photoId, $paletteId, $fields);
+            $result['normalized']++;
+        }
+
+        return $result;
+    }
     /**
      * Normalize color_ids into the shape expected by addMembers():
      *  - always an array of ['color_id' => int, 'order_index' => int, 'role' => ?string]
@@ -356,9 +426,9 @@ class SavedPaletteService
      *
      * Returns null if not found.
      */
-    public function getSavedPalette(int $id): ?array
+    public function getSavedPalette(int $id, ?int $setId = null): ?array
     {
-        return $this->repo->getFullPalette($id);
+        return $this->repo->getFullPalette($id, $setId);
     }
 
     /**
@@ -378,9 +448,9 @@ class SavedPaletteService
      *   ],
      * ]
      */
-    public function getSavedPaletteWithStats(int $id): ?array
+    public function getSavedPaletteWithStats(int $id, ?int $setId = null): ?array
     {
-        $full = $this->repo->getFullPalette($id);
+        $full = $this->repo->getFullPalette($id, $setId);
         if ($full === null) {
             return null;
         }

@@ -35,12 +35,79 @@ class PdoPlaylistRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listItemRows(?int $playlistId = null): array
+    {
+        $photoSelect = $this->getPhotoLibraryIdSelect();
+        $sql = <<<SQL
+            SELECT
+                playlist_item_id,
+                playlist_id,
+                image_url,
+                {$photoSelect},
+                title,
+                item_type,
+                is_active
+            FROM playlist_items
+            SQL;
+
+        $params = [];
+        $where = [];
+        if ($playlistId !== null && $playlistId > 0) {
+            $where[] = 'playlist_id = :playlist_id';
+            $params['playlist_id'] = $playlistId;
+        }
+        if ($where) {
+            $sql .= "\nWHERE " . implode(' AND ', $where);
+        }
+        $sql .= "\nORDER BY playlist_id ASC, order_index ASC, playlist_item_id ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function updateItemImageReference(int $playlistItemId, string $imageUrl, ?int $photoLibraryId): void
+    {
+        if ($playlistItemId <= 0) {
+            return;
+        }
+
+        if ($this->hasPhotoLibraryIdColumn()) {
+            $stmt = $this->pdo->prepare(
+                "UPDATE playlist_items
+                    SET image_url = :image_url,
+                        photo_library_id = :photo_library_id
+                  WHERE playlist_item_id = :playlist_item_id"
+            );
+            $stmt->execute([
+                'image_url' => $imageUrl,
+                'photo_library_id' => $photoLibraryId,
+                'playlist_item_id' => $playlistItemId,
+            ]);
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "UPDATE playlist_items
+                SET image_url = :image_url
+              WHERE playlist_item_id = :playlist_item_id"
+        );
+        $stmt->execute([
+            'image_url' => $imageUrl,
+            'playlist_item_id' => $playlistItemId,
+        ]);
+    }
+
+    /**
      * @return PlaylistItem[]|null
      */
     private function getItemsFromDb(string $playlistId): ?array
     {
         $excludeSelect = $this->getExcludeFromThumbsSelect();
         $photoSelect = $this->getPhotoLibraryIdSelect();
+        $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
         $sql = <<<SQL
             SELECT
                 playlist_item_id,
@@ -50,6 +117,7 @@ class PdoPlaylistRepository
                 palette_hash,
                 image_url,
                 {$photoSelect},
+                {$savedPaletteSetSelect},
                 title,
                 subtitle,
                 item_type,
@@ -85,6 +153,8 @@ class PdoPlaylistRepository
                 $row['palette_hash'] ?? null,
                 $row['image_url'] ?? null,
                 isset($row['photo_library_id']) ? (int)$row['photo_library_id'] : null,
+                isset($row['saved_palette_set_id']) ? (int)$row['saved_palette_set_id'] : null,
+                null,
                 $row['title'] ?? null,
                 $row['subtitle'] ?? null,
                 $row['item_type'] ?? null,
@@ -122,17 +192,42 @@ class PdoPlaylistRepository
     {
         static $cached = null;
         if ($cached !== null) return $cached;
+        $hasColumn = $this->hasPhotoLibraryIdColumn();
+        $cached = $hasColumn ? 'photo_library_id' : 'NULL AS photo_library_id';
+        return $cached;
+    }
+
+    private function getSavedPaletteSetIdSelect(): string
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+        $sql = <<<SQL
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'playlist_items'
+              AND COLUMN_NAME = 'saved_palette_set_id'
+        SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $cached = (int)$stmt->fetchColumn() > 0 ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
+        return $cached;
+    }
+
+    private function hasPhotoLibraryIdColumn(): bool
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
         $sql = <<<SQL
             SELECT COUNT(*)
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
               AND TABLE_NAME = 'playlist_items'
               AND COLUMN_NAME = 'photo_library_id'
-            SQL;
+        SQL;
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
-        $hasColumn = (int)$stmt->fetchColumn() > 0;
-        $cached = $hasColumn ? 'photo_library_id' : 'NULL AS photo_library_id';
+        $cached = (int)$stmt->fetchColumn() > 0;
         return $cached;
     }
 

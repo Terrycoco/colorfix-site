@@ -33,16 +33,18 @@ class PdoClientRepository
 
         $like = '%' . $query . '%';
         $stmt = $this->pdo->prepare($this->baseListSql() . "
-              WHERE clients.name LIKE :query
-                 OR clients.email LIKE :query
-                 OR clients.phone LIKE :query
+              WHERE clients.name LIKE :query_name
+                 OR clients.email LIKE :query_email
+                 OR clients.phone LIKE :query_phone
               ORDER BY
                 CASE WHEN COALESCE(clients.name, '') = '' THEN 1 ELSE 0 END,
                 LOWER(COALESCE(clients.name, '')) ASC,
                 LOWER(COALESCE(clients.email, '')) ASC
               LIMIT {$limit}");
         $stmt->execute([
-            ':query' => $like,
+            ':query_name' => $like,
+            ':query_email' => $like,
+            ':query_phone' => $like,
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
@@ -101,11 +103,15 @@ class PdoClientRepository
     {
         $stmt = $this->pdo->prepare(
             "SELECT
-                (SELECT COUNT(*) FROM photo_library WHERE client_id = :id) AS photo_count,
-                (SELECT COUNT(*) FROM client_applied_palettes WHERE client_id = :id) AS applied_palette_count,
-                (SELECT COUNT(*) FROM applied_palette_shares WHERE client_id = :id) AS share_count"
+                (SELECT COUNT(*) FROM photo_library WHERE client_id = :photo_client_id) AS photo_count,
+                (SELECT COUNT(*) FROM client_applied_palettes WHERE client_id = :applied_client_id) AS applied_palette_count,
+                (SELECT COUNT(*) FROM applied_palette_shares WHERE client_id = :share_client_id) AS share_count"
         );
-        $stmt->execute([':id' => $id]);
+        $stmt->execute([
+            ':photo_client_id' => $id,
+            ':applied_client_id' => $id,
+            ':share_client_id' => $id,
+        ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         return [
             'photo_count' => (int)($row['photo_count'] ?? 0),

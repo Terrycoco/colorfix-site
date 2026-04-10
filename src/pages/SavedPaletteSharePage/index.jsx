@@ -6,12 +6,29 @@ import "./saved-palette-share.css";
 export default function SavedPaletteSharePage() {
   const { hash } = useParams();
   const [state, setState] = useState({ loading: true, error: "", data: null });
+  const returnTo = useMemo(() => {
+    if (typeof window === "undefined") return "/";
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("return_to") || "";
+    return value.startsWith("/") ? value : "/";
+  }, []);
+  const setId = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("set_id") || "";
+  }, []);
 
   useEffect(() => {
     if (!hash) return;
     const controller = new AbortController();
     setState({ loading: true, error: "", data: null });
-    fetch(`/api/v2/palette-viewer.php?source=saved&hash=${encodeURIComponent(hash)}`, {
+    const params = new URLSearchParams();
+    params.set("source", "saved");
+    params.set("hash", hash);
+    if (Number(setId || 0) > 0) {
+      params.set("set_id", String(Number(setId)));
+    }
+    fetch(`/api/v2/palette-viewer.php?${params.toString()}`, {
       signal: controller.signal,
     })
       .then((r) => r.json())
@@ -26,7 +43,7 @@ export default function SavedPaletteSharePage() {
     return () => {
       controller.abort();
     };
-  }, [hash]);
+  }, [hash, setId]);
 
   if (state.loading) {
     return (
@@ -53,6 +70,16 @@ export default function SavedPaletteSharePage() {
       swatches={swatches}
       adminMode={false}
       showBackButton={true}
+      onBack={() => {
+        if (typeof window !== "undefined") {
+          window.location.href = returnTo;
+        }
+      }}
+      onExit={() => {
+        if (typeof window !== "undefined") {
+          window.location.href = returnTo;
+        }
+      }}
       showLogo={true}
       showShare={true}
     />

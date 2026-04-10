@@ -77,13 +77,13 @@ class SavedPaletteController
      *
      * Returns null if not found.
      */
-    public function getById(int $id, bool $withStats = false): ?array
+    public function getById(int $id, bool $withStats = false, ?int $setId = null): ?array
     {
         if ($withStats) {
-            return $this->service->getSavedPaletteWithStats($id);
+            return $this->service->getSavedPaletteWithStats($id, $setId);
         }
 
-        return $this->service->getSavedPalette($id);
+        return $this->service->getSavedPalette($id, $setId);
     }
 
     /**

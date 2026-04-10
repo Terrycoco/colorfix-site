@@ -704,6 +704,27 @@ private function averageLUnderMask(\GdImage $baseIm, \GdImage $maskIm): float {
         return $this->renderApplyMap($palette->assetId, $hexMap, 'colorize', 0.9, $overrides, $outputRelPath);
     }
 
+    public function getCachedAppliedPaletteRender(AppliedPalette $palette): ?array
+    {
+        $renderRel = sprintf('/photos/rendered/ap_%d.jpg', $palette->id);
+        $renderAbs = $this->absPath($renderRel);
+        if (!is_file($renderAbs)) {
+            return null;
+        }
+
+        $size = @getimagesize($renderAbs);
+        $width = is_array($size) ? (int)($size[0] ?? 0) : 0;
+        $height = is_array($size) ? (int)($size[1] ?? 0) : 0;
+
+        return [
+            'ok' => true,
+            'render_rel_path' => $renderRel,
+            'render_url' => $this->absUrl($renderRel),
+            'width' => $width > 0 ? $width : null,
+            'height' => $height > 0 ? $height : null,
+        ];
+    }
+
     public function cacheAppliedPalette(AppliedPalette $palette): array
     {
         $renderRel = sprintf('/photos/rendered/ap_%d.jpg', $palette->id);

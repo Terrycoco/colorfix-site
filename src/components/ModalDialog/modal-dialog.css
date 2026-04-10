@@ -1,0 +1,55 @@
+.modal-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-dialog {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d5ddef;
+  border-radius: 12px;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.18);
+  padding: 14px 16px;
+}
+
+.modal-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal-dialog__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1b2433;
+}
+
+.modal-dialog__subtitle {
+  margin-top: 2px;
+  color: #6a778b;
+  font-size: 13px;
+}
+
+.modal-dialog__body {
+  color: #1f2937;
+}
+
+.modal-dialog__close {
+  border: 1px solid #cfd6e3;
+  background: #fff;
+  color: #1f2937;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+}

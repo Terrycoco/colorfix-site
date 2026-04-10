@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PhotoPickerModal from "@components/PhotoPickerModal";
@@ -9,7 +9,6 @@ const GET_URL = `${API_FOLDER}/v2/admin/playlists/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlists/save.php`;
 const SAVE_ITEMS_URL = `${API_FOLDER}/v2/admin/playlist-items/save.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/playlists/delete.php`;
-const AP_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const PHOTO_LIBRARY_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
@@ -27,6 +26,7 @@ const emptyItem = {
   palette_hash: "",
   image_url: "",
   photo_library_id: "",
+  saved_palette_set_id: "",
   title: "",
   subtitle: "",
   subtitle_2: "",
@@ -41,15 +41,12 @@ const emptyItem = {
   is_active: true,
 };
 
-const DRAFT_KEY = "admin:playlist-draft";
-
 export default function AdminPlaylistEditorPage() {
   const { playlistId } = useParams();
   const navigate = useNavigate();
   const [playlist, setPlaylist] = useState(emptyPlaylist);
   const [items, setItems] = useState([]);
   const [expandedItems, setExpandedItems] = useState({});
-  const [apOptions, setApOptions] = useState([]);
   const [savedOptions, setSavedOptions] = useState([]);
   const [playlistTypes, setPlaylistTypes] = useState([]);
   const [customType, setCustomType] = useState("");
@@ -61,47 +58,18 @@ export default function AdminPlaylistEditorPage() {
   const [deleting, setDeleting] = useState(false);
   const [photoPickerIndex, setPhotoPickerIndex] = useState(null);
   const [photoThumbs, setPhotoThumbs] = useState({});
+  const [photoInfo, setPhotoInfo] = useState({});
   const [previewPhoto, setPreviewPhoto] = useState(null);
-  const didLoadDraft = useRef(false);
 
   useEffect(() => {
     if (!playlistId) {
       setPlaylist(emptyPlaylist);
       setItems([]);
+      setExpandedItems({});
       return;
     }
     fetchPlaylist(playlistId);
   }, [playlistId]);
-
-  useEffect(() => {
-    if (didLoadDraft.current) return;
-    if (playlistId) return;
-    try {
-      const raw = window.sessionStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") {
-        if (parsed.playlist) setPlaylist((prev) => ({ ...prev, ...parsed.playlist, playlist_id: null }));
-        if (Array.isArray(parsed.items)) setItems(parsed.items);
-        didLoadDraft.current = true;
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [playlistId]);
-
-  useEffect(() => {
-    if (playlistId) return;
-    try {
-      window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ playlist, items }));
-    } catch {
-      /* ignore */
-    }
-  }, [playlistId, playlist, items]);
-
-  useEffect(() => {
-    fetchAppliedPalettes();
-  }, []);
 
   useEffect(() => {
     fetchPlaylistTypes();
@@ -148,6 +116,21 @@ export default function AdminPlaylistEditorPage() {
           }
           return next;
         });
+        setPhotoInfo((prev) => {
+          const next = { ...prev };
+          for (const row of data.items || []) {
+            const id = String(row?.photo_library_id || "").trim();
+            if (!id) continue;
+            next[id] = {
+              attachedSavedPaletteId: row?.attached_saved_palette_id ?? null,
+              attachedSavedPaletteLabel: row?.attached_saved_palette_label || "",
+              attachedSavedPaletteSetId: row?.attached_saved_palette_set_id ?? null,
+              attachedSavedPaletteSetLabel: row?.attached_saved_palette_set_label || "",
+              attachedSavedPalettePhotoType: row?.attached_saved_palette_photo_type || "",
+            };
+          }
+          return next;
+        });
       } catch {
         // ignore thumb lookups; editor should remain usable
       }
@@ -187,6 +170,7 @@ export default function AdminPlaylistEditorPage() {
           image_url: item.image_url ?? "",
           photo_library_id:
             item.photo_library_id ?? parsePhotoRef(item.image_url || "").photoId ?? "",
+          saved_palette_set_id: item.saved_palette_set_id ?? "",
           title: item.title ?? "",
           subtitle: item.subtitle ?? "",
           subtitle_2: item.subtitle_2 ?? "",
@@ -208,34 +192,6 @@ export default function AdminPlaylistEditorPage() {
     }
   }
 
-  async function fetchAppliedPalettes() {
-    try {
-      const qs = new URLSearchParams();
-      qs.set("limit", "200");
-      qs.set("_", Date.now().toString());
-      const res = await fetch(`${AP_LIST_URL}?${qs.toString()}`, {
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) return;
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const options = (data.items || []).map((row) => {
-        const title = (row.title || `Applied Palette ${row.id}`) + (row.display_title ? ` — ${row.display_title}` : "");
-        return {
-          key: `applied:${row.id}`,
-          kind: "applied",
-          id: row.id,
-          title,
-          renderUrl: row.render_rel_path ? `${origin}${row.render_rel_path}` : "",
-          label: title,
-        };
-      });
-      setApOptions(options);
-    } catch {
-      // optional convenience list; ignore errors
-    }
-  }
-
   async function fetchSavedPalettes() {
     try {
       const qs = new URLSearchParams();
@@ -249,28 +205,28 @@ export default function AdminPlaylistEditorPage() {
       if (!res.ok || !data?.ok) return;
       const options = (data.items || [])
         .filter((row) => row.palette_hash)
-        .map((row) => {
-        const label = (row.nickname || "").trim() || `Saved #${row.id}`;
-        const photos = Array.isArray(row.photos) ? row.photos : [];
-        const fullPhoto = photos.find((photo) => photo.photo_type === "full") || photos[0];
-        return {
-          key: `saved:${row.palette_hash}`,
-          kind: "saved",
-          palette_hash: row.palette_hash,
-          title: label,
-          renderUrl: fullPhoto?.rel_path || "",
-          label,
-        };
-      });
+        .reduce((acc, row) => {
+          const key = String(row.palette_hash || "").trim();
+          if (!key || acc.some((item) => item.palette_hash === key)) return acc;
+          const label = (row.nickname || "").trim() || `Saved #${row.id}`;
+          const photos = Array.isArray(row.photos) ? row.photos : [];
+          const fullPhoto = photos.find((photo) => photo.photo_type === "full") || photos[0];
+          acc.push({
+            key: `saved:${row.palette_hash}`,
+            kind: "saved",
+            id: row.id,
+            palette_hash: row.palette_hash,
+            title: label,
+            renderUrl: fullPhoto?.rel_path || "",
+            label,
+          });
+          return acc;
+        }, []);
       setSavedOptions(options);
     } catch {
       // optional convenience list; ignore errors
     }
   }
-
-  const paletteOptions = useMemo(() => {
-    return [...apOptions, ...savedOptions].sort((a, b) => a.label.localeCompare(b.label));
-  }, [apOptions, savedOptions]);
 
   async function fetchPlaylistTypes() {
     try {
@@ -333,42 +289,38 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
-  function applyPaletteOption(index, optionKey) {
-    if (!optionKey) {
-      setItems((prev) =>
-        prev.map((item, idx) =>
-          idx === index ? { ...item, ap_id: "", palette_hash: "" } : item
-        )
-      );
-      setSaveStatus("");
-      setSaveError("");
-      return;
-    }
-    const match = paletteOptions.find((option) => option.key === optionKey);
+  function applyAttachedPaletteFromPhoto(index, photoLibraryId) {
+    const info = photoInfo[String(photoLibraryId || "").trim()];
+    const attachedPaletteId = Number(info?.attachedSavedPaletteId || 0);
+    if (!attachedPaletteId) return;
+    const match = savedOptions.find((option) => Number(option.id || 0) === attachedPaletteId);
     if (!match) return;
     setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        if (match.kind === "saved") {
-          return {
-            ...item,
-            ap_id: "",
-            palette_hash: match.palette_hash || "",
-            image_url: match.renderUrl || item.image_url,
-            title: item.title || match.title || "",
-          };
-        }
-        return {
-          ...item,
-          ap_id: String(match.id || ""),
-          palette_hash: "",
-          image_url: match.renderUrl || item.image_url,
-          title: item.title || match.title || "",
-        };
-      })
+      prev.map((item, idx) => (
+        idx === index
+          ? {
+              ...item,
+              ap_id: "",
+              palette_hash: match.palette_hash || "",
+              saved_palette_set_id: info?.attachedSavedPaletteSetId ? String(info.attachedSavedPaletteSetId) : "",
+            }
+          : item
+      ))
     );
-    setSaveStatus("");
-    setSaveError("");
+  }
+
+  function getAttachedPaletteInfo(item) {
+    const photoId = String(getPhotoLibraryId(item) || "").trim();
+    return photoInfo[photoId] || null;
+  }
+
+  function getDisplayPaletteInfo(item) {
+    const info = getAttachedPaletteInfo(item);
+    if (!info) return null;
+    if (String(info.attachedSavedPalettePhotoType || "").toLowerCase() === "before") {
+      return null;
+    }
+    return info;
   }
 
   function addItem(type = "non-palette") {
@@ -435,6 +387,7 @@ export default function AdminPlaylistEditorPage() {
           ...item,
           ap_id: item.ap_id === "" ? null : item.ap_id,
           palette_hash: item.palette_hash === "" ? null : item.palette_hash,
+          saved_palette_set_id: item.saved_palette_set_id === "" ? null : item.saved_palette_set_id,
           duration_ms: item.duration_ms === "" ? null : item.duration_ms,
         })),
       };
@@ -450,11 +403,6 @@ export default function AdminPlaylistEditorPage() {
       }
 
       setSaveStatus("Saved");
-      try {
-        window.sessionStorage.removeItem(DRAFT_KEY);
-      } catch {
-        /* ignore */
-      }
       await fetchPlaylist(playlistIdToSave);
       if (!playlistId) {
         navigate(`/admin/playlists/${playlistIdToSave}`, { replace: true });
@@ -623,23 +571,25 @@ export default function AdminPlaylistEditorPage() {
               </label>
               <label className="item-cell item-ap">
                 Palette
-                <select
-                  value={
-                    item.palette_hash
-                      ? `saved:${item.palette_hash}`
-                      : item.ap_id
-                      ? `applied:${item.ap_id}`
-                      : ""
-                  }
-                  onChange={(e) => applyPaletteOption(index, e.target.value)}
-                >
-                  <option value="">Select</option>
-                  {paletteOptions.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                {getPhotoLibraryId(item) ? (
+                  <div>
+                    <input
+                      type="text"
+                      value={getDisplayPaletteInfo(item)?.attachedSavedPaletteLabel || ""}
+                      placeholder={
+                        String(getAttachedPaletteInfo(item)?.attachedSavedPalettePhotoType || "").toLowerCase() === "before"
+                          ? "Before photo does not carry a palette"
+                          : "No palette attached to this photo"
+                      }
+                      readOnly
+                    />
+                    {getDisplayPaletteInfo(item) ? (
+                      <div className="muted">From photo. Use `no palette` in Type if you do not want it shown.</div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="muted">Pick a photo first.</div>
+                )}
               </label>
               <div className="item-cell item-photo">
                 Photo
@@ -809,6 +759,7 @@ export default function AdminPlaylistEditorPage() {
           const pid = String(picked.photo_library_id);
           updateItem(photoPickerIndex, "photo_library_id", pid);
           updateItem(photoPickerIndex, "image_url", makePhotoRef(pid, picked.image_url || ""));
+          applyAttachedPaletteFromPhoto(photoPickerIndex, pid);
           setPhotoPickerIndex(null);
         }}
       />

@@ -8,6 +8,7 @@ export default function PaletteViewer({
   adminMode = false,
   showBackButton = true,
   onBack,
+  onExit,
   showLogo = true,
   footer,
   showShare = false,
@@ -43,6 +44,20 @@ export default function PaletteViewer({
   const handleBack = () => {
     if (onBack) {
       onBack();
+      return;
+    }
+    if (typeof window !== "undefined") {
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+      window.location.href = "/";
+    }
+  };
+
+  const handleExit = () => {
+    if (onExit) {
+      onExit();
       return;
     }
     if (typeof window !== "undefined") {
@@ -174,7 +189,7 @@ export default function PaletteViewer({
       <div className={`apv-shell ${adminMode ? "apv-shell--admin" : ""}`}>
       <button
         className="apv-exit"
-        onClick={handleBack}
+        onClick={handleExit}
         aria-label="Exit palette viewer"
       >
         ×

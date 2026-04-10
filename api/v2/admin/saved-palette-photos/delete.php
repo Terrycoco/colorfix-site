@@ -29,6 +29,7 @@ try {
     }
 
     $photoId = isset($payload['photo_id']) ? (int) $payload['photo_id'] : 0;
+    $unlinkOnly = !empty($payload['unlink_only']);
     if ($photoId <= 0) {
         respond(400, ['ok' => false, 'error' => 'photo_id required']);
     }
@@ -41,17 +42,31 @@ try {
         respond(404, ['ok' => false, 'error' => 'Photo not found']);
     }
 
-    $rel = (string)($photo['rel_path'] ?? '');
-    if ($rel !== '' && str_starts_with($rel, '/photos/')) {
-        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
-        $abs = $docRoot . $rel;
-        if (is_file($abs)) {
-            @unlink($abs);
+    $photoLibraryRow = null;
+    $photoLibraryId = isset($photo['photo_library_id']) ? (int)$photo['photo_library_id'] : 0;
+    if ($photoLibraryId > 0) {
+        $photoLibraryRow = $photoLibraryRepo->findById($photoLibraryId);
+    }
+
+    if (!$unlinkOnly) {
+        $rel = (string)($photo['rel_path'] ?? '');
+        $ownsPhysicalFile = $rel !== '' && str_starts_with($rel, '/photos/uploads/saved-palettes/');
+        if ($ownsPhysicalFile) {
+            $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
+            $abs = $docRoot . $rel;
+            if (is_file($abs)) {
+                @unlink($abs);
+            }
         }
     }
 
     $repo->deletePhoto($photoId);
-    $photoLibrary->deleteSavedPalettePhoto($photoId);
+    if (
+        !$unlinkOnly
+        && (($photoLibraryRow['source_type'] ?? '') === 'saved_palette_photo' || ($photoLibraryRow['source_type'] ?? '') === 'saved_before')
+    ) {
+        $photoLibrary->deleteSavedPalettePhoto($photoId);
+    }
 
     respond(200, ['ok' => true]);
 } catch (\Throwable $e) {

@@ -47,6 +47,8 @@ try {
     if ($paletteType !== '') {
         $filters['palette_type'] = $paletteType;
     }
+    $paletteId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : 0;
 
     $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 50;
     $limit = max(1, min(200, $limit));
@@ -58,15 +60,19 @@ try {
     $withPhotos  = !empty($_GET['with_photos']) && (int) $_GET['with_photos'] === 1;
 
     $rows = $controller->list($filters, $limit, $offset);
+    if ($paletteId > 0) {
+        $rows = array_values(array_filter($rows, static fn(array $row): bool => (int)($row['id'] ?? 0) === $paletteId));
+    }
 
     if (($withMembers || $withPhotos) && $rows) {
         foreach ($rows as &$row) {
-            $full = $controller->getById((int) $row['id'], false);
+            $full = $controller->getById((int) $row['id'], false, $setId > 0 ? $setId : null);
             if ($withMembers) {
                 $row['members'] = $full['members'] ?? [];
             }
             if ($withPhotos) {
                 $row['photos'] = $full['photos'] ?? [];
+                $row['sets'] = $full['sets'] ?? [];
             }
         }
         unset($row);

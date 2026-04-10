@@ -56,6 +56,7 @@ export const adminMenuItems = [
       { label: "Search Presets", href: "/admin/search-presets" },
       { label: "Ideas/ToDos", href: "/admin/ideas" },
       { label: "Photo Library", href: "/admin/photo-library" },
+      { label: "Photo Library Tools", href: "/admin/photo-library-tools" },
       { label: "Clients", href: "/admin/clients" },
       { label: "SQL Builder", href: "/admin/sql" },
       { label: "Items", href: "/admin/items" },

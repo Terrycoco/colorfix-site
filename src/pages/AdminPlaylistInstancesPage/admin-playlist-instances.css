@@ -122,6 +122,8 @@
 
 .primary-btn {
   border-color: #111;
+  background: #111;
+  color: #fff;
 }
 
 .link-btn {
@@ -141,6 +143,7 @@
   gap: 8px;
   overflow: auto;
   max-height: 70vh;
+  align-items: stretch;
 }
 
 .list-row {
@@ -153,6 +156,7 @@
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
+  width: 100%;
 }
 
 .list-row.active {
@@ -210,9 +214,112 @@
   word-break: break-all;
 }
 
+.mobile-instance-card {
+  display: none;
+  margin-top: 4px;
+  border: 1px solid #ececec;
+  border-radius: 12px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  gap: 12px;
+}
+
+.mobile-instance-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-instance-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a7a7a;
+}
+
+.mobile-instance-card__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111;
+}
+
+.mobile-instance-card__subtitle {
+  font-size: 14px;
+  color: #333;
+}
+
+.mobile-instance-card__subtitle--muted {
+  color: #6b6b6b;
+}
+
+.mobile-instance-card__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 12px;
+  color: #5e5e5e;
+}
+
+.mobile-instance-card__notes,
+.mobile-instance-card__empty {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.45;
+}
+
+.mobile-instance-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mobile-instance-card__actions button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #d5ccb9;
+  background: #f5efe3;
+  color: #2a241d;
+  font-weight: 600;
+}
+
+.mobile-instance-card__actions .primary-btn {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.mobile-instance-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.mobile-instance-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-instance-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f1f1;
+  font-size: 12px;
+  color: #333;
+}
+
 @media (max-width: 980px) {
   .editor-panel {
     display: none;
+  }
+
+  .mobile-instance-card {
+    display: flex;
+    flex-direction: column;
   }
 }
 

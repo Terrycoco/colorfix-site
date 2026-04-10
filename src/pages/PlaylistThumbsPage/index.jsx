@@ -85,17 +85,23 @@ export default function PlaylistThumbsPage() {
     const list = [];
     for (const item of items || []) {
       const type = (item?.type || "normal").toLowerCase();
-      if (type === "intro" || type === "before" || type === "text") continue;
+      const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
+      if (type === "intro" || type === "before" || type === "text" || type === "non-palette") continue;
+      if (attachedType === "before") continue;
       if (item?.exclude_from_thumbs) continue;
       const apId = item?.ap_id ?? null;
       const paletteHash = item?.palette_hash ?? null;
+      const savedPaletteSetId = Number(item?.saved_palette_set_id || 0) || null;
       if (!apId && !paletteHash) continue;
-      const key = paletteHash ? `saved:${paletteHash}` : `applied:${apId}`;
+      const key = paletteHash
+        ? `saved:${paletteHash}:${savedPaletteSetId || "default"}`
+        : `applied:${apId}`;
       if (seen.has(key)) continue;
       seen.add(key);
       list.push({
         ap_id: apId,
         palette_hash: paletteHash,
+        saved_palette_set_id: savedPaletteSetId,
         title: formatTitle(item?.title || (paletteHash ? "Saved Palette" : `Palette ${apId}`)),
         image_url: item?.image_url || "",
         is_liked: apId ? likedSet.has(String(apId)) : false,
@@ -111,7 +117,9 @@ export default function PlaylistThumbsPage() {
   useEffect(() => {
     let cancelled = false;
     palettes.forEach((palette) => {
-      const key = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
+      const key = palette.palette_hash
+        ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+        : `applied:${palette.ap_id}`;
       const value = palette.image_url || "";
       if (!isAssetRef(value)) return;
       const assetId = extractAssetId(value);
@@ -162,7 +170,9 @@ export default function PlaylistThumbsPage() {
         <div className="playlist-thumbs__grid-wrap">
           <div className="playlist-thumbs__grid">
             {palettes.map((palette) => {
-              const cardKey = palette.palette_hash ? `saved:${palette.palette_hash}` : `applied:${palette.ap_id}`;
+              const cardKey = palette.palette_hash
+                ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+                : `applied:${palette.ap_id}`;
               const parsed = parsePhotoRef(palette.image_url);
               const resolvedUrl = parsed.url
                 ? parsed.url
@@ -180,6 +190,9 @@ export default function PlaylistThumbsPage() {
               if (returnTo) params.set("return_to", returnTo);
               if (resolvedUrl) {
                 params.set("photo_url", resolvedUrl);
+              }
+              if (palette.saved_palette_set_id) {
+                params.set("set_id", String(palette.saved_palette_set_id));
               }
               const qs = params.toString();
               const href = palette.palette_hash

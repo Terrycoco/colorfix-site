@@ -40,13 +40,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 $hash = isset($_GET['hash']) ? trim((string)$_GET['hash']) : '';
+$setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : 0;
 if ($hash === '') {
     respond(['ok' => false, 'error' => 'hash required'], 400);
 }
 
 try {
     $repo = new PdoSavedPaletteRepository($pdo);
-    $full = $repo->getFullPaletteByHash($hash);
+    $full = $repo->getFullPaletteByHashAndSet($hash, $setId > 0 ? $setId : null);
     if ($full === null) {
         respond(['ok' => false, 'error' => 'palette not found'], 404);
     }
@@ -56,6 +57,7 @@ try {
         'palette' => $full['palette'],
         'members' => $full['members'] ?? [],
         'photos' => $full['photos'] ?? [],
+        'sets' => $full['sets'] ?? [],
     ]);
 } catch (\Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 500);

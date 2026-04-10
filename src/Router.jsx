@@ -23,6 +23,7 @@ const PaletteTranslationPage = lazy(() => import('@pages/PaletteTranslationPage'
 const HOALandingPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOALandingPage })));
 const HOAExplainerPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAExplainerPage })));
 const HOAContactPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAContactPage })));
+const HOA_PUBLIC_ENABLED = false;
 
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
 const CategoryEditPage = lazy(() => import('@pages/CategoryEditPage'));
@@ -49,6 +50,7 @@ const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
+const AdminPhotoLibraryToolsPage = lazy(() => import('@pages/AdminPhotoLibraryToolsPage'));
 const AdminClientsPage = lazy(() => import('@pages/AdminClientsPage'));
 const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
 const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
@@ -143,9 +145,18 @@ function AppRouter() {
            <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />
            <Route path="palette/:id/brands" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
            <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />   
-           <Route path="/hoa" element={renderWithSuspense(HOALandingPage, 'Loading HOA…')} />
-            <Route path="/hoa/explain" element={renderWithSuspense(HOAExplainerPage, 'Loading HOA info…')} />
-            <Route path="/hoa/contact" element={renderWithSuspense(HOAContactPage, 'Loading contact…')} />
+           <Route
+             path="/hoa"
+             element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOALandingPage, 'Loading HOA…') : <Navigate to="/results/4" replace />}
+           />
+            <Route
+              path="/hoa/explain"
+              element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOAExplainerPage, 'Loading HOA info…') : <Navigate to="/results/4" replace />}
+            />
+            <Route
+              path="/hoa/contact"
+              element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOAContactPage, 'Loading contact…') : <Navigate to="/results/4" replace />}
+            />
             <Route path="articles/:id" element={renderWithSuspense(ArticlePage, 'Loading article…')} />
 
            
@@ -250,6 +261,10 @@ function AppRouter() {
             <Route
               path="photo-library"
               element={renderWithSuspense(AdminPhotoLibraryPage, 'Loading photo library…')}
+            />
+            <Route
+              path="photo-library-tools"
+              element={renderWithSuspense(AdminPhotoLibraryToolsPage, 'Loading photo library tools…')}
             />
             <Route
               path="clients"

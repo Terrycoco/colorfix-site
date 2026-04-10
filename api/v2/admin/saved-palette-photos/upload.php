@@ -24,6 +24,13 @@ try {
 
     $paletteId = isset($_POST['palette_id']) ? (int) $_POST['palette_id'] : 0;
     $replacePhotoId = isset($_POST['replace_photo_id']) ? (int) $_POST['replace_photo_id'] : 0;
+    $setId = isset($_POST['set_id']) ? (int) $_POST['set_id'] : 0;
+    $setTitle = trim((string)($_POST['set_title'] ?? ''));
+    $setSlug = trim((string)($_POST['set_slug'] ?? ''));
+    $createNewSet = !empty($_POST['create_new_set']);
+    $photoType = isset($_POST['photo_type']) ? trim((string)$_POST['photo_type']) : 'full';
+    $tags = trim((string)($_POST['tags'] ?? ''));
+    $altText = trim((string)($_POST['alt_text'] ?? ''));
     if ($paletteId <= 0) {
         respond(400, ['ok' => false, 'error' => 'palette_id required']);
     }
@@ -44,6 +51,14 @@ try {
     if (!$repo->getSavedPaletteById($paletteId)) {
         respond(404, ['ok' => false, 'error' => 'Saved palette not found']);
     }
+    if ($setId <= 0 && $createNewSet) {
+        $setId = $repo->createAutoSetForPalette($paletteId);
+    } elseif ($setId <= 0 && ($setTitle !== '' || $setSlug !== '')) {
+        $setId = $repo->ensureSetForPalette($paletteId, $setTitle !== '' ? $setTitle : null, $setSlug !== '' ? $setSlug : null);
+    }
+    if (!in_array($photoType, ['full', 'before', 'zoom'], true)) {
+        $photoType = 'full';
+    }
 
     $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
     $photosRoot = $docRoot . '/photos/uploads/saved-palettes/' . $paletteId;
@@ -53,7 +68,7 @@ try {
 
     $allowed = ['jpg', 'jpeg', 'png', 'webp'];
     $added = [];
-    $orderIndex = $repo->getMaxPhotoOrder($paletteId) + 1;
+    $orderIndex = $repo->getMaxPhotoOrder($paletteId, $setId > 0 ? $setId : null) + 1;
     $replaceRow = null;
     if ($replacePhotoId > 0) {
         $replaceRow = $repo->getPhotoById($replacePhotoId);
@@ -63,6 +78,11 @@ try {
         if ($count !== 1) {
             respond(400, ['ok' => false, 'error' => 'Replace expects exactly one file']);
         }
+        if ($photoType === 'full' && $repo->hasFullPhotoInPaletteSet($paletteId, $setId > 0 ? $setId : null, (int)$replaceRow['id'])) {
+            respond(400, ['ok' => false, 'error' => 'This group already has a different Full photo. Replace that one directly or create a new group.']);
+        }
+    } elseif ($photoType === 'full' && !$createNewSet && $repo->hasFullPhotoInPaletteSet($paletteId, $setId > 0 ? $setId : null)) {
+        respond(400, ['ok' => false, 'error' => 'This group already has a Full photo. Replace the existing one or create a new group.']);
     }
 
     for ($i = 0; $i < $count; $i++) {
@@ -97,26 +117,55 @@ try {
             $photoId = (int)$replaceRow['id'];
             $oldRelPath = (string)($replaceRow['rel_path'] ?? '');
             $repo->updatePhoto($photoId, $paletteId, ['rel_path' => $relPath]);
-            $photoRow = $repo->getPhotoById($photoId) ?: array_merge($replaceRow, ['rel_path' => $relPath]);
+            $photoRow = array_merge($replaceRow, ['id' => $photoId, 'rel_path' => $relPath]);
             $oldAbsPath = $oldRelPath !== '' ? $docRoot . $oldRelPath : '';
             if ($oldRelPath !== '' && $oldRelPath !== $relPath && is_file($oldAbsPath)) {
                 @unlink($oldAbsPath);
             }
         } else {
-            $photoId = $repo->addPhoto($paletteId, $relPath, null, null, $orderIndex);
+            $photoId = $repo->addPhoto($paletteId, $relPath, null, null, $orderIndex, $setId > 0 ? $setId : null);
             $photoRow = [
                 'id' => $photoId,
                 'saved_palette_id' => $paletteId,
+                'saved_palette_set_id' => $setId > 0 ? $setId : null,
                 'rel_path' => $relPath,
-                'photo_type' => 'full',
-                'trigger_mode' => 'any',
+                'photo_type' => $photoType,
+                'trigger_mode' => $photoType === 'before' ? 'none' : 'any',
                 'trigger_color_id' => null,
-                'caption' => null,
+                'caption' => $photoType === 'before' ? 'Before' : null,
                 'alt_text' => null,
                 'order_index' => $orderIndex,
             ];
+            $repo->updatePhoto($photoId, $paletteId, [
+                'photo_type' => $photoRow['photo_type'],
+                'trigger_mode' => $photoRow['trigger_mode'],
+                'caption' => $photoRow['caption'],
+            ]);
         }
-        $photoLibrary->syncSavedPalettePhoto($photoRow);
+
+        $canonicalId = 0;
+        $existingLibraryId = $replaceRow ? (int)($replaceRow['photo_library_id'] ?? 0) : 0;
+        if ($existingLibraryId > 0) {
+            $libraryUpdate = ['rel_path' => $relPath];
+            if ($tags !== '') {
+                $libraryUpdate['tags'] = $tags;
+            }
+            if ($altText !== '') {
+                $libraryUpdate['alt_text'] = $altText;
+            }
+            $photoLibraryRepo->update($existingLibraryId, $libraryUpdate);
+            $canonicalId = $existingLibraryId;
+        } else {
+            $canonicalId = $photoLibrary->syncSavedPalettePhoto($photoRow, [
+                'tags' => $tags !== '' ? $tags : null,
+                'alt_text' => $altText !== '' ? $altText : null,
+            ]);
+        }
+
+        if ($canonicalId > 0) {
+            $repo->updatePhoto($photoId, $paletteId, ['photo_library_id' => $canonicalId]);
+            $photoRow = $repo->getPhotoById($photoId) ?: $photoRow;
+        }
         $added[] = $photoRow;
         if (!$replaceRow) {
             $orderIndex++;

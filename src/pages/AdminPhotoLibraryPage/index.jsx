@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import {
+  buildImageUrl,
+  getImageRefreshEnabled,
+  setImageRefreshEnabled,
+} from "@helpers/assetImage";
 import ClientPickerModal from "@components/ClientPickerModal";
+import ModalDialog from "@components/ModalDialog";
+import SavedPaletteEditorModal from "@components/SavedPaletteEditorModal";
 import "./admin-photo-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
@@ -12,7 +19,6 @@ const REPLACE_URL = `${API_FOLDER}/v2/admin/photo-library/replace.php`;
 const SAVED_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const CLIENTS_LIST_URL = `${API_FOLDER}/v2/admin/clients/list.php`;
-const BACKFILL_EXTERIORS_URL = `${API_FOLDER}/v2/admin/photo-library/backfill-exteriors.php`;
 const GROUPS_LIST_URL = `${API_FOLDER}/v2/admin/photo-groups/list.php`;
 const GROUPS_CREATE_URL = `${API_FOLDER}/v2/admin/photo-groups/create.php`;
 const GROUPS_DELETE_URL = `${API_FOLDER}/v2/admin/photo-groups/delete.php`;
@@ -23,7 +29,6 @@ const GROUPS_REMOVE_URL = `${API_FOLDER}/v2/admin/photo-groups/remove-item.php`;
 
 const SOURCE_OPTIONS = [
   { value: "saved_palette", label: "Saved Palette" },
-  { value: "applied_palette", label: "Applied Palette" },
   { value: "progression", label: "Progression" },
   { value: "client", label: "Client" },
   { value: "article", label: "Article" },
@@ -33,6 +38,8 @@ const SOURCE_OPTIONS = [
 const defaultUpload = {
   source_type: "saved_palette",
   palette_id: "",
+  set_id: "",
+  photo_type: "full",
   series: "",
   title_prefix: "",
   client_name: "",
@@ -48,20 +55,9 @@ const defaultFilters = {
   q: "",
   source_type: "",
   palette_id: "",
+  sort: "newest",
+  include_inactive: false,
 };
-
-const normalizeTagToken = (token) => {
-  const value = String(token || "").trim().toLowerCase();
-  if (!value) return "";
-  if (value === "cyan" || value === "teal") return "teal";
-  return value;
-};
-
-const parseTagTokens = (value) =>
-  String(value || "")
-    .split(",")
-    .map((token) => normalizeTagToken(token))
-    .filter(Boolean);
 
 const buildClientGroupId = (clientId) => `client:${clientId}`;
 
@@ -74,6 +70,24 @@ function parseClientGroupId(value) {
   if (!raw.startsWith("client:")) return 0;
   const id = Number(raw.slice("client:".length));
   return Number.isFinite(id) ? id : 0;
+}
+
+function openSavedPaletteViewerSetup(paletteId, setId = null, photoLibraryId = null) {
+  const id = Number(paletteId || 0);
+  if (!id) return;
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams();
+    params.set("type", "saved");
+    params.set("id", String(id));
+    if (Number(setId || 0) > 0) {
+      params.set("set_id", String(setId));
+    }
+    if (Number(photoLibraryId || 0) > 0) {
+      params.set("photo_library_id", String(photoLibraryId));
+    }
+    params.set("return_to", window.location.pathname + window.location.search);
+    window.location.href = `/admin/palette-photos?${params.toString()}`;
+  }
 }
 
 function formatDeleteUsageMessage(item, usages = []) {
@@ -94,29 +108,61 @@ function formatDeleteUsageMessage(item, usages = []) {
 }
 
 export default function AdminPhotoLibraryPage() {
+  const initialUrlState = (() => {
+    if (typeof window === "undefined") {
+      return {
+        filters: defaultFilters,
+        searchInput: "",
+        photoLibraryIds: "",
+      };
+    }
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q") || "";
+    const sourceType = params.get("source_type") || "";
+    const paletteId = params.get("palette_id") || "";
+    const sort = params.get("sort") || defaultFilters.sort;
+    const includeInactive = params.get("include_inactive") === "1";
+    const photoLibraryIds = params.get("photo_library_ids") || "";
+    return {
+      filters: {
+        ...defaultFilters,
+        q,
+        source_type: sourceType,
+        palette_id: paletteId,
+        sort,
+        include_inactive: includeInactive,
+      },
+      searchInput: q,
+      photoLibraryIds,
+    };
+  })();
+
   const [uploadForm, setUploadForm] = useState(defaultUpload);
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState({ error: "", success: "" });
   const [replaceStatus, setReplaceStatus] = useState("");
   const [files, setFiles] = useState([]);
 
-  const [filters, setFilters] = useState(defaultFilters);
-  const [searchInput, setSearchInput] = useState("");
+  const [filters, setFilters] = useState(initialUrlState.filters);
+  const [searchInput, setSearchInput] = useState(initialUrlState.searchInput);
+  const [photoLibraryIdsFilter, setPhotoLibraryIdsFilter] = useState(initialUrlState.photoLibraryIds);
   const [items, setItems] = useState([]);
   const [dirtyIds, setDirtyIds] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [usageModal, setUsageModal] = useState(null);
   const [replaceFiles, setReplaceFiles] = useState({});
-  const [replacingId, setReplacingId] = useState(null);
-  const [backfillStatus, setBackfillStatus] = useState("");
   const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
+  const [thumbNonce, setThumbNonce] = useState(() => String(Date.now()));
 
   const [savedPalettes, setSavedPalettes] = useState([]);
   const [clients, setClients] = useState([]);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientTargetPhotoId, setClientTargetPhotoId] = useState(null);
+  const [paletteModalOpen, setPaletteModalOpen] = useState(false);
+  const [paletteTarget, setPaletteTarget] = useState(null);
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState("");
   const [groupItems, setGroupItems] = useState(() => new Set());
@@ -124,6 +170,14 @@ export default function AdminPhotoLibraryPage() {
   const [newGroupTitle, setNewGroupTitle] = useState("");
   const [groupStatus, setGroupStatus] = useState("");
   const [groupFilterMode, setGroupFilterMode] = useState("group");
+  const [imageRefreshEnabled, setImageRefreshEnabledState] = useState(() => getImageRefreshEnabled());
+
+  function toggleImageRefresh() {
+    const next = setImageRefreshEnabled(!imageRefreshEnabled);
+    setImageRefreshEnabledState(next);
+    setRefreshKey((value) => value + 1);
+    setThumbNonce(String(Date.now()));
+  }
 
   useEffect(() => {
     let active = true;
@@ -131,6 +185,7 @@ export default function AdminPhotoLibraryPage() {
       try {
         const params = new URLSearchParams();
         params.set("limit", "200");
+        params.set("with_photos", "1");
         params.set("_", Date.now().toString());
         const res = await fetch(`${SAVED_LIST_URL}?${params.toString()}`, { credentials: "include" });
         const data = await res.json();
@@ -240,10 +295,12 @@ export default function AdminPhotoLibraryPage() {
   }, [refreshKey]);
 
   const paletteOptions = useMemo(() => {
-    return savedPalettes.map((palette) => ({
-      id: palette.id,
-      label: palette.nickname || palette.palette_hash || `Saved #${palette.id}`,
-    }));
+    return savedPalettes
+      .map((palette) => ({
+        id: palette.id,
+        label: palette.nickname || palette.palette_hash || `Saved #${palette.id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   }, [savedPalettes]);
 
   const uploadSeriesLabel = useMemo(() => {
@@ -291,11 +348,15 @@ export default function AdminPhotoLibraryPage() {
     async function loadLibrary() {
       setLoading(true);
       setError("");
+      setThumbNonce(String(Date.now()));
       try {
         const params = new URLSearchParams();
         if (filters.q) params.set("q", filters.q);
+        if (photoLibraryIdsFilter) params.set("photo_library_ids", photoLibraryIdsFilter);
         if (filters.source_type) params.set("source_type", filters.source_type);
         if (filters.palette_id) params.set("palette_id", filters.palette_id);
+        if (filters.sort) params.set("sort", filters.sort);
+        if (filters.include_inactive) params.set("include_inactive", "1");
         params.set("limit", "200");
         params.set("_", Date.now().toString());
         const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -315,7 +376,14 @@ export default function AdminPhotoLibraryPage() {
     return () => {
       active = false;
     };
-  }, [filters.q, filters.source_type, filters.palette_id, refreshKey]);
+  }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, photoLibraryIdsFilter, refreshKey]);
+
+  const buildAdminImageUrl = (url, updatedAt = null) => {
+    const base = buildImageUrl(url, updatedAt, imageRefreshEnabled);
+    if (!base) return "";
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}admin=${thumbNonce}`;
+  };
 
   const handleUploadField = (key, value) => {
     setUploadForm((prev) => ({ ...prev, [key]: value }));
@@ -376,6 +444,24 @@ export default function AdminPhotoLibraryPage() {
     });
   };
 
+  const openPaletteModalForItem = (item) => {
+    setPaletteTarget({
+      paletteId: item?.attached_saved_palette_id || null,
+      attachment: {
+        photo_library_id: item?.photo_library_id || null,
+        raw_rel_path: item?.raw_rel_path || item?.rel_path || "",
+        rel_path: item?.raw_rel_path || item?.rel_path || "",
+        image_url: item?.image_url || item?.raw_rel_path || item?.rel_path || "",
+        alt_text: item?.alt_text || "",
+        photo_type: item?.attached_saved_palette_photo_type || "full",
+        trigger_mode: item?.attached_saved_palette_trigger_mode || "any",
+        trigger_color_id: item?.attached_saved_palette_trigger_color_id || null,
+        show_in_gallery: !!item?.show_in_gallery,
+      },
+    });
+    setPaletteModalOpen(true);
+  };
+
   const handleClientPicked = (client) => {
     if (!client) return;
     if (clientTargetPhotoId) {
@@ -413,14 +499,6 @@ export default function AdminPhotoLibraryPage() {
     });
   };
 
-  const withCacheBuster = (src, updatedAt) => {
-    if (!src || !updatedAt) return src;
-    const sep = src.includes("?") ? "&" : "?";
-    const stamp = Date.parse(updatedAt);
-    if (!Number.isFinite(stamp)) return src;
-    return `${src}${sep}v=${stamp}`;
-  };
-
   const formatUpdatedAt = (value) => {
     const raw = String(value || "").trim();
     if (!raw) return "";
@@ -445,7 +523,6 @@ export default function AdminPhotoLibraryPage() {
     if (!file) return;
     setError("");
     setReplaceStatus("");
-    setReplacingId(id);
     try {
       const formData = new FormData();
       formData.append("photo_library_id", String(id));
@@ -472,8 +549,6 @@ export default function AdminPhotoLibraryPage() {
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
       setError(err?.message || "Replace failed");
-    } finally {
-      setReplacingId(null);
     }
   };
 
@@ -487,10 +562,6 @@ export default function AdminPhotoLibraryPage() {
     event.preventDefault();
     if (!files.length) {
       setUploadStatus({ error: "Select at least one photo.", success: "" });
-      return;
-    }
-    if (uploadForm.source_type === "applied_palette") {
-      setUploadStatus({ error: "Applied palette photos are auto-synced; no upload needed.", success: "" });
       return;
     }
     if (uploadForm.source_type === "saved_palette" && !uploadForm.palette_id) {
@@ -510,6 +581,11 @@ export default function AdminPhotoLibraryPage() {
       let res;
       if (uploadForm.source_type === "saved_palette") {
         formData.append("palette_id", String(uploadForm.palette_id));
+        if (uploadForm.set_id && uploadForm.set_id !== "__new__") formData.append("set_id", String(uploadForm.set_id));
+        if (uploadForm.set_id === "__new__") formData.append("create_new_set", "1");
+        formData.append("photo_type", uploadForm.photo_type || "full");
+        formData.append("tags", uploadForm.tags || "");
+        formData.append("alt_text", uploadForm.alt_text || "");
         res = await fetch(SAVED_UPLOAD_URL, {
           method: "POST",
           credentials: "include",
@@ -561,6 +637,7 @@ export default function AdminPhotoLibraryPage() {
         note: item.note,
         show_in_gallery: !!item.show_in_gallery,
         has_palette: !!item.has_palette,
+        is_inactive: !!item.is_inactive,
       };
       if (item.source_type === "client" || item.client_id) {
         payload.client_name = item.client_name || "";
@@ -602,6 +679,7 @@ export default function AdminPhotoLibraryPage() {
           note: item.note,
           show_in_gallery: !!item.show_in_gallery,
           has_palette: !!item.has_palette,
+          is_inactive: !!item.is_inactive,
         };
         if (item.source_type === "client" || item.client_id) {
           payload.client_name = item.client_name || "";
@@ -663,23 +741,28 @@ export default function AdminPhotoLibraryPage() {
     }
   };
 
-  const handleBackfill = async () => {
-    if (!window.confirm("Scan /photos/exteriors/*/*/prepared/base.jpg and add to Photo Library?")) return;
-    setBackfillStatus("");
+  const handleInvestigate = async (item) => {
     setError("");
     try {
-      const res = await fetch(BACKFILL_EXTERIORS_URL, { method: "POST", credentials: "include" });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Backfill failed");
-      setBackfillStatus(`Added ${data.added} (skipped ${data.skipped}).`);
-      setRefreshKey((prev) => prev + 1);
+      const usageRes = await fetch(`${USAGE_URL}?photo_library_id=${encodeURIComponent(item.photo_library_id)}`, {
+        credentials: "include",
+      });
+      const usageData = await usageRes.json().catch(() => ({}));
+      if (!usageRes.ok || !usageData?.ok) {
+        throw new Error(usageData?.error || "Failed to inspect photo usage");
+      }
+      setUsageModal({
+        item,
+        usages: Array.isArray(usageData.usages) ? usageData.usages : [],
+      });
     } catch (err) {
-      setBackfillStatus(err?.message || "Backfill failed");
+      setError(err?.message || "Failed to inspect row");
     }
   };
 
   const showSavedFields = uploadForm.source_type === "saved_palette";
-  const showLibraryFields = uploadForm.source_type !== "saved_palette" && uploadForm.source_type !== "applied_palette";
+  const showLibraryFields = uploadForm.source_type !== "saved_palette";
+  const showTagFields = true;
   const showClientFields = uploadForm.source_type === "client";
   const showSeriesField = showLibraryFields && !showClientFields;
 
@@ -698,7 +781,7 @@ export default function AdminPhotoLibraryPage() {
       if (!clientId) return items;
       return items.filter((item) => Number(item.client_id) === clientId);
     }
-    return items.filter((item) => inGroup(item.photo_library_id));
+    return items.filter((item) => groupItems.has(String(item.photo_library_id)));
   }, [items, groupId, groupFilterMode, groupItems, groupedItems]);
 
   const getDisplaySourceType = (item) => {
@@ -849,7 +932,10 @@ export default function AdminPhotoLibraryPage() {
               Saved Palette
               <select
                 value={uploadForm.palette_id}
-                onChange={(e) => handleUploadField("palette_id", e.target.value)}
+                onChange={(e) => {
+                  handleUploadField("palette_id", e.target.value);
+                  handleUploadField("set_id", "");
+                }}
               >
                 <option value="">Select palette</option>
                 {paletteOptions.map((palette) => (
@@ -857,6 +943,38 @@ export default function AdminPhotoLibraryPage() {
                     {palette.label}
                   </option>
                 ))}
+              </select>
+            </label>
+          )}
+
+          {showSavedFields && uploadForm.palette_id && (
+            <label>
+              Photo Group
+              <select
+                value={uploadForm.set_id}
+                onChange={(e) => handleUploadField("set_id", e.target.value)}
+              >
+                <option value="">Primary / Default Group</option>
+                {(savedPalettes.find((palette) => String(palette.id) === String(uploadForm.palette_id))?.sets || []).map((set) => (
+                  <option key={set.id} value={set.id}>
+                    {set.title || set.slug || `Set #${set.id}`}
+                  </option>
+                ))}
+                <option value="__new__">Create New Group</option>
+              </select>
+            </label>
+          )}
+
+          {showSavedFields && uploadForm.palette_id && (
+            <label>
+              Palette Photo Type
+              <select
+                value={uploadForm.photo_type}
+                onChange={(e) => handleUploadField("photo_type", e.target.value)}
+              >
+                <option value="full">Full</option>
+                <option value="before">Before</option>
+                <option value="zoom">Zoom</option>
               </select>
             </label>
           )}
@@ -935,7 +1053,7 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
 
-          {showLibraryFields && (
+          {showTagFields && (
             <label>
               Tags (comma separated)
               <input
@@ -947,7 +1065,7 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
 
-          {showLibraryFields && (
+          {showTagFields && (
             <label>
               Alt text (SEO)
               <input
@@ -1001,17 +1119,11 @@ export default function AdminPhotoLibraryPage() {
             </button>
           </div>
         </form>
-        {uploadForm.source_type === "applied_palette" && (
-          <div className="admin-photo-library__hint">
-            Applied palette photos are auto-synced when a render is cached.
-          </div>
-        )}
       </section>
 
       <section className="admin-photo-library__section">
         <h2>Library</h2>
         {error && <div className="admin-photo-library__error">{error}</div>}
-        {backfillStatus && <div className="admin-photo-library__status">{backfillStatus}</div>}
         <div className="admin-photo-library__filters">
           <form
             className="admin-photo-library__tag-filter"
@@ -1036,10 +1148,14 @@ export default function AdminPhotoLibraryPage() {
                 className="ghost"
                 onClick={() => {
                   setSearchInput("");
+                  setPhotoLibraryIdsFilter("");
                   setFilters((prev) => ({ ...prev, q: "" }));
                 }}
               >
                 Clear
+              </button>
+              <button type="button" className="ghost" onClick={toggleImageRefresh}>
+                {imageRefreshEnabled ? "Image Refresh: On" : "Image Refresh: Off"}
               </button>
             </div>
           </form>
@@ -1102,6 +1218,27 @@ export default function AdminPhotoLibraryPage() {
               <option value="extra_photo">Extras</option>
             </select>
           </label>
+          <label>
+            Sort
+            <select
+              value={filters.sort}
+              onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
+            >
+              <option value="newest">Newest uploads</option>
+              <option value="oldest">Oldest uploads</option>
+              <option value="id_desc">ID desc</option>
+              <option value="id_asc">ID asc</option>
+              <option value="title">Title</option>
+            </select>
+          </label>
+          <label className="admin-photo-library__inline-check">
+            <input
+              type="checkbox"
+              checked={!!filters.include_inactive}
+              onChange={(e) => setFilters((prev) => ({ ...prev, include_inactive: e.target.checked }))}
+            />
+            Show retired
+          </label>
           {filters.source_type === "saved_palette_photo" && (
             <label>
               Palette
@@ -1119,9 +1256,9 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
           <div className="admin-photo-library__save-all">
-            <button type="button" onClick={handleBackfill}>
-              Sync Base Photos
-            </button>
+            <a className="admin-photo-library__tools-link" href="/admin/photo-library-tools">
+              Library Tools
+            </a>
             <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
               Save All
             </button>
@@ -1140,6 +1277,7 @@ export default function AdminPhotoLibraryPage() {
                   <th>Preview</th>
                   <th>Text</th>
                   <th>Type</th>
+                  <th>Palette Set</th>
                   <th>Flags</th>
                   <th />
                 </tr>
@@ -1163,9 +1301,22 @@ export default function AdminPhotoLibraryPage() {
                       <button
                         type="button"
                         className="admin-photo-library__thumb"
-                        onClick={() => setPreviewUrl(item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at))}
+                        onClick={() =>
+                          setPreviewUrl(
+                            buildAdminImageUrl(
+                              item.raw_rel_path || item.rel_path || item.image_url,
+                              item.updated_at || null
+                            )
+                          )
+                        }
                       >
-                        <img src={item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at)} alt="" />
+                        <img
+                          src={buildAdminImageUrl(
+                            item.raw_rel_path || item.rel_path || item.image_url,
+                            item.updated_at || null
+                          )}
+                          alt=""
+                        />
                       </button>
                       <div className="admin-photo-library__thumb-name">
                         {item.filename || ""}
@@ -1243,6 +1394,76 @@ export default function AdminPhotoLibraryPage() {
                       </div>
                     </td>
                     <td>
+                      <div className="admin-photo-library__meta">
+                        {item.attached_saved_palette_id ? (
+                          <>
+                            {(() => {
+                              const type = String(item.attached_saved_palette_photo_type || "full").toLowerCase();
+                              const isBefore = type === "before";
+                              const linkCount = Number(item.attached_saved_palette_link_count || 0);
+                              const typeLabel =
+                                isBefore
+                                  ? "Before companion"
+                                  : type === "zoom"
+                                    ? "Zoom image"
+                                    : "Main image";
+                              return (
+                                <>
+                                  <div>
+                                    {linkCount > 1
+                                      ? `${linkCount} viewer links`
+                                      : isBefore
+                                      ? typeLabel
+                                      : (item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`)}
+                                  </div>
+                                  <div className="muted">
+                                    {linkCount > 1
+                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${typeLabel}`
+                                      : isBefore
+                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${item.attached_saved_palette_set_label || "Primary"}`
+                                      : `${item.attached_saved_palette_set_label || "Primary"} | ${typeLabel}`}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                            <div className="admin-photo-library__palette-actions">
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => openPaletteModalForItem(item)}
+                              >
+                                Link…
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => openSavedPaletteViewerSetup(
+                                  item.attached_saved_palette_id,
+                                  item.attached_saved_palette_set_id,
+                                  item.photo_library_id
+                                )}
+                              >
+                                Viewer
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="muted">No palette attached</div>
+                            <div className="admin-photo-library__palette-actions">
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => openPaletteModalForItem(item)}
+                              >
+                                Attach
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td>
                       <div className="admin-photo-library__flags">
                         <label className="admin-photo-library__check">
                           <input
@@ -1260,6 +1481,14 @@ export default function AdminPhotoLibraryPage() {
                           />
                           Palette
                         </label>
+                        <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.is_inactive}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "is_inactive", e.target.checked)}
+                          />
+                          Retired
+                        </label>
                       </div>
                     </td>
                     <td className="admin-photo-library__row-actions">
@@ -1274,10 +1503,26 @@ export default function AdminPhotoLibraryPage() {
                         >
                           Client…
                         </button>
+                        <button
+                          type="button"
+                          className="ghost admin-photo-library__inspect"
+                          onClick={() => handleInvestigate(item)}
+                          title="Investigate usage"
+                          aria-label={`Investigate photo ${item.photo_library_id}`}
+                        >
+                          🔎
+                        </button>
                         <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
                           Save
                         </button>
-                        <a className="ghost" href={item.image_url || withCacheBuster(item.raw_rel_path || item.rel_path, item.updated_at)} download>
+                        <a
+                          className="ghost"
+                          href={buildAdminImageUrl(
+                            item.raw_rel_path || item.rel_path || item.image_url,
+                            item.updated_at || null
+                          )}
+                          download
+                        >
                           Download
                         </a>
                         <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
@@ -1324,7 +1569,7 @@ export default function AdminPhotoLibraryPage() {
                 ))}
                 {!items.length && (
                   <tr>
-                    <td colSpan={8} className="admin-photo-library__empty">No photos yet.</td>
+                    <td colSpan={7} className="admin-photo-library__empty">No photos yet.</td>
                   </tr>
                 )}
               </tbody>
@@ -1347,6 +1592,28 @@ export default function AdminPhotoLibraryPage() {
         </div>
       )}
 
+      <ModalDialog
+        open={Boolean(usageModal)}
+        title={`Photo #${usageModal?.item?.photo_library_id || "?"}`}
+        subtitle={usageModal?.item?.title || ""}
+        onClose={() => setUsageModal(null)}
+      >
+        {usageModal?.usages?.length ? (
+          <ul className="admin-photo-library__usage-list">
+            {usageModal.usages.map((usage, index) => (
+              <li key={`${usage.usage_type || "usage"}-${usage.ref_id || index}-${index}`}>
+                <div>{usage?.label || "Unknown usage"}</div>
+                {usage?.detail ? (
+                  <div className="admin-photo-library__usage-detail">{usage.detail}</div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="admin-photo-library__usage-empty">Not currently used anywhere.</div>
+        )}
+      </ModalDialog>
+
       <ClientPickerModal
         open={clientPickerOpen}
         onClose={() => {
@@ -1354,6 +1621,26 @@ export default function AdminPhotoLibraryPage() {
           setClientTargetPhotoId(null);
         }}
         onPick={handleClientPicked}
+      />
+      <SavedPaletteEditorModal
+        open={paletteModalOpen}
+        paletteId={paletteTarget?.paletteId || null}
+        attachment={paletteTarget?.attachment || null}
+        onClose={() => {
+          setPaletteModalOpen(false);
+          setPaletteTarget(null);
+        }}
+        onSaved={({ palette }) => {
+          setPaletteModalOpen(false);
+          setPaletteTarget(null);
+          if (palette) {
+            setSavedPalettes((prev) => {
+              const next = prev.filter((item) => String(item.id) !== String(palette.id));
+              return [palette, ...next];
+            });
+          }
+          setRefreshKey((prev) => prev + 1);
+        }}
       />
     </div>
   );

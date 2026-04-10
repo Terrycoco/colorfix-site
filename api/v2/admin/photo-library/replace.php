@@ -176,6 +176,9 @@ try {
         }
     }
 
+    $savedRepo ??= new PdoSavedPaletteRepository($pdo);
+    $savedRepo->syncRelPathFromPhotoLibrary($id, $newRelPath);
+
     refreshPlaylistPhotoRefs($pdo, $id, $newRelPath, $cacheStamp);
 
     $writtenPath = $writtenTo ?? null;

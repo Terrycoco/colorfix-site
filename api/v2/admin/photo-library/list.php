@@ -32,6 +32,9 @@ try {
     $q = trim((string)($_GET['q'] ?? ''));
     $sourceType = trim((string)($_GET['source_type'] ?? ''));
     $paletteId = isset($_GET['palette_id']) ? (int)$_GET['palette_id'] : 0;
+    $includeInactive = !empty($_GET['include_inactive']) && $_GET['include_inactive'] !== '0';
+    $inactiveOnly = !empty($_GET['inactive_only']) && $_GET['inactive_only'] !== '0';
+    $sort = trim((string)($_GET['sort'] ?? 'newest'));
     $photoLibraryIdsRaw = trim((string)($_GET['photo_library_ids'] ?? ''));
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
     $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
@@ -50,22 +53,42 @@ try {
 
     $where = [];
     $params = [];
-    if ($sourceType !== '') {
+    $needsPaletteJoin = $paletteId > 0 || $sourceType === 'saved_palette_photo';
+    if ($sourceType !== '' && $sourceType !== 'saved_palette_photo') {
         $where[] = 'source_type = :source_type';
         $params[':source_type'] = $sourceType;
     }
     if ($q !== '') {
-        $where[] = '(photo_library.title LIKE :q_title OR photo_library.tags LIKE :q_tags OR photo_library.rel_path LIKE :q_path OR clients.name LIKE :q_client_name OR clients.email LIKE :q_client_email'
-            . (ctype_digit($q) ? ' OR CAST(photo_library.photo_library_id AS CHAR) LIKE :q_photo_id' : '')
-            . ')';
-        $params[':q_title'] = '%' . $q . '%';
-        $params[':q_tags'] = '%' . $q . '%';
-        $params[':q_path'] = '%' . $q . '%';
-        $params[':q_client_name'] = '%' . $q . '%';
-        $params[':q_client_email'] = '%' . $q . '%';
-        if (ctype_digit($q)) {
-            $params[':q_photo_id'] = $q . '%';
+        $tokens = array_values(array_filter(array_map(
+            static fn(string $part): string => trim($part),
+            explode(',', $q)
+        ), static fn(string $part): bool => $part !== ''));
+        if (!$tokens) {
+            $tokens = [$q];
         }
+
+        $tokenClauses = [];
+        foreach ($tokens as $idx => $token) {
+            $suffix = '_' . $idx;
+            $tokenClauses[] = '(photo_library.title LIKE :q_title' . $suffix
+                . ' OR photo_library.tags LIKE :q_tags' . $suffix
+                . ' OR photo_library.rel_path LIKE :q_path' . $suffix
+                . ' OR clients.name LIKE :q_client_name' . $suffix
+                . ' OR clients.email LIKE :q_client_email' . $suffix
+                . (ctype_digit($token) ? ' OR CAST(photo_library.photo_library_id AS CHAR) LIKE :q_photo_id' . $suffix : '')
+                . ')';
+
+            $params[':q_title' . $suffix] = '%' . $token . '%';
+            $params[':q_tags' . $suffix] = '%' . $token . '%';
+            $params[':q_path' . $suffix] = '%' . $token . '%';
+            $params[':q_client_name' . $suffix] = '%' . $token . '%';
+            $params[':q_client_email' . $suffix] = '%' . $token . '%';
+            if (ctype_digit($token)) {
+                $params[':q_photo_id' . $suffix] = $token . '%';
+            }
+        }
+
+        $where[] = '(' . implode(' AND ', $tokenClauses) . ')';
     }
     if ($photoLibraryIds) {
         $placeholders = [];
@@ -76,12 +99,19 @@ try {
         }
         $where[] = 'photo_library.photo_library_id IN (' . implode(', ', $placeholders) . ')';
     }
+    if ($inactiveOnly) {
+        $where[] = 'photo_library.is_inactive = 1';
+    } elseif (!$includeInactive) {
+        $where[] = 'photo_library.is_inactive = 0';
+    }
 
     $joins = "";
+    if ($needsPaletteJoin) {
+        $joins .= " JOIN saved_palette_set_photos spsp ON spsp.photo_library_id = photo_library.photo_library_id";
+        $joins .= " JOIN saved_palette_sets sps ON sps.id = spsp.saved_palette_set_id";
+    }
     if ($paletteId > 0) {
-        $joins .= " JOIN saved_palette_photos spp ON spp.id = photo_library.source_id";
-        $where[] = "photo_library.source_type = 'saved_palette_photo'";
-        $where[] = "spp.saved_palette_id = :palette_id";
+        $where[] = "sps.saved_palette_id = :palette_id";
         $params[':palette_id'] = $paletteId;
     }
 
@@ -96,16 +126,94 @@ try {
                    photo_library.note,
                    photo_library.show_in_gallery,
                    photo_library.has_palette,
+                   photo_library.is_inactive,
                    photo_library.created_at,
                    photo_library.updated_at,
                    clients.name AS client_name,
-                   clients.email AS client_email
+                   clients.email AS client_email,
+                   (
+                     SELECT s.saved_palette_id
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_id,
+                   (
+                     SELECT COALESCE(NULLIF(p.nickname, ''), p.palette_hash, CONCAT('Saved #', p.id))
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                       JOIN saved_palettes p
+                         ON p.id = s.saved_palette_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_label,
+                   (
+                     SELECT s.id
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_set_id,
+                   (
+                     SELECT COALESCE(NULLIF(s.title, ''), s.slug, CONCAT('Set #', s.id))
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_set_label,
+                   (
+                     SELECT sp.photo_type
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_photo_type,
+                   (
+                     SELECT sp.trigger_mode
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_trigger_mode,
+                   (
+                     SELECT sp.trigger_color_id
+                       FROM saved_palette_set_photos sp
+                       JOIN saved_palette_sets s
+                         ON s.id = sp.saved_palette_set_id
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ORDER BY s.is_default DESC, sp.id ASC
+                      LIMIT 1
+                   ) AS attached_saved_palette_trigger_color_id,
+                   (
+                     SELECT COUNT(*)
+                       FROM saved_palette_set_photos sp
+                      WHERE sp.photo_library_id = photo_library.photo_library_id
+                   ) AS attached_saved_palette_link_count
             FROM photo_library
             LEFT JOIN clients ON clients.id = photo_library.client_id{$joins}";
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
-    $sql .= ' ORDER BY updated_at DESC, created_at DESC LIMIT :limit OFFSET :offset';
+    $orderBy = match ($sort) {
+        'oldest' => 'photo_library.created_at ASC, photo_library.photo_library_id ASC',
+        'title' => 'photo_library.title ASC, photo_library.photo_library_id DESC',
+        'id_asc' => 'photo_library.photo_library_id ASC',
+        'id_desc' => 'photo_library.photo_library_id DESC',
+        default => 'photo_library.created_at DESC, photo_library.photo_library_id DESC',
+    };
+    $sql .= " ORDER BY {$orderBy} LIMIT :limit OFFSET :offset";
 
     $stmt = $pdo->prepare($sql);
     foreach ($params as $key => $value) {
@@ -119,7 +227,6 @@ try {
     $items = array_map(static function(array $row): array {
         $rawRelPath = (string)$row['rel_path'];
         $updatedAt = $row['updated_at'] ?? null;
-        $versionedPath = with_cache_buster($rawRelPath, $updatedAt);
         $filename = basename(parse_url($rawRelPath, PHP_URL_PATH) ?: $rawRelPath);
         return [
             'photo_library_id' => (int)$row['photo_library_id'],
@@ -129,8 +236,8 @@ try {
             'client_name' => $row['client_name'] ?? '',
             'client_email' => $row['client_email'] ?? '',
             'raw_rel_path' => $rawRelPath,
-            'rel_path' => $versionedPath,
-            'image_url' => $versionedPath,
+            'rel_path' => $rawRelPath,
+            'image_url' => $rawRelPath,
             'filename' => $filename,
             'title' => $row['title'] ?? '',
             'tags' => $row['tags'] ?? '',
@@ -138,8 +245,17 @@ try {
             'note' => $row['note'] ?? '',
             'show_in_gallery' => (int)$row['show_in_gallery'] === 1,
             'has_palette' => (int)$row['has_palette'] === 1,
+            'is_inactive' => (int)($row['is_inactive'] ?? 0) === 1,
             'created_at' => $row['created_at'],
             'updated_at' => $updatedAt,
+            'attached_saved_palette_id' => $row['attached_saved_palette_id'] !== null ? (int)$row['attached_saved_palette_id'] : null,
+            'attached_saved_palette_label' => $row['attached_saved_palette_label'] ?? '',
+            'attached_saved_palette_set_id' => $row['attached_saved_palette_set_id'] !== null ? (int)$row['attached_saved_palette_set_id'] : null,
+            'attached_saved_palette_set_label' => $row['attached_saved_palette_set_label'] ?? '',
+            'attached_saved_palette_photo_type' => $row['attached_saved_palette_photo_type'] ?? '',
+            'attached_saved_palette_trigger_mode' => $row['attached_saved_palette_trigger_mode'] ?? '',
+            'attached_saved_palette_trigger_color_id' => $row['attached_saved_palette_trigger_color_id'] !== null ? (int)$row['attached_saved_palette_trigger_color_id'] : null,
+            'attached_saved_palette_link_count' => (int)($row['attached_saved_palette_link_count'] ?? 0),
         ];
     }, $rows);
 

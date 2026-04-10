@@ -24,7 +24,7 @@ const FeaturedArticleItem = ({ item = {} }) => {
     };
   }, [item.body, item.description]);
 
-  const type = metadata.article_type || metadata.type || "colorfix";
+  const type = metadata.article_type || metadata.type || "";
   const kicker = item.display || item.title || metadata.kicker || "Featured Article";
 
   useEffect(() => {
@@ -34,7 +34,10 @@ const FeaturedArticleItem = ({ item = {} }) => {
     const load = async () => {
       try {
         setError("");
-        const url = `/api/v2/articles/featured.php?type=${encodeURIComponent(type)}&_=${Date.now()}`;
+        const params = new URLSearchParams();
+        if (type) params.set("type", type);
+        params.set("_", String(Date.now()));
+        const url = `/api/v2/articles/featured.php?${params.toString()}`;
         const res = await fetch(url, { signal: controller.signal });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load featured article");
@@ -55,6 +58,8 @@ const FeaturedArticleItem = ({ item = {} }) => {
 
   const article = payload?.article || null;
   const hero = payload?.hero || null;
+  const heroMobile = payload?.hero_mobile || null;
+  const primaryHero = hero || heroMobile;
 
   const withCacheBuster = (src, updatedAt) => {
     if (!src || !updatedAt) return src;
@@ -79,12 +84,20 @@ const FeaturedArticleItem = ({ item = {} }) => {
 
       {/* Full-bleed image */}
       <div className="featured-media">
-        {hero?.rel_path ? (
-          <img
-            src={withCacheBuster(hero.rel_path, hero.updated_at)}
-            alt={hero.alt_text || article?.title || ""}
-            loading="lazy"
-          />
+        {primaryHero?.rel_path ? (
+          <picture>
+            {heroMobile?.rel_path ? (
+              <source
+                media="(max-width: 640px)"
+                srcSet={withCacheBuster(heroMobile.rel_path, heroMobile.updated_at)}
+              />
+            ) : null}
+            <img
+              src={withCacheBuster(primaryHero.rel_path, primaryHero.updated_at)}
+              alt={heroMobile?.alt_text || primaryHero.alt_text || article?.title || ""}
+              loading="lazy"
+            />
+          </picture>
         ) : (
           <div className="featured-article__image-placeholder">No image</div>
         )}

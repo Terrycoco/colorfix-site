@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PaletteViewer from "@components/PaletteViewer";
-import CTASection from "@components/CTASection";
-import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { getLastPlaylistInstanceId } from "@helpers/playlistHistory";
 
 const API_URL = "/api/v2/palette-viewer.php";
-const CTA_GROUP_BY_AUDIENCE_URL = "/api/v2/cta-groups/by-audience.php";
-const CTA_GROUP_ITEMS_URL = "/api/v2/cta-group-items/list.php";
-
 export default function AppliedPaletteViewPage() {
   const { paletteId } = useParams();
   const navigate = useNavigate();
@@ -18,16 +13,12 @@ export default function AppliedPaletteViewPage() {
   }, [paletteId]);
   const [searchParams] = useSearchParams();
   const [state, setState] = useState({ loading: true, error: "", data: null });
-  const [ctaItems, setCtaItems] = useState([]);
   const [shareStatus, setShareStatus] = useState("");
   const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
   const isAdminView = (searchParams.get("admin") || "").toString() === "1";
   const ctaAudience = searchParams.get("aud") ?? "";
-  const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const psiParam = searchParams.get("psi") ?? "";
-  const thumbParam = searchParams.get("thumb") ?? "";
-  const demoParam = searchParams.get("demo") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
   const photoUrlParam = useMemo(() => searchParams.get("photo_url") ?? "", [searchParams]);
 
@@ -61,45 +52,6 @@ export default function AppliedPaletteViewPage() {
     setLastPlaylistInstanceId(getLastPlaylistInstanceId());
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCtas() {
-      setCtaItems([]);
-      const groupId = Number(addCtaGroup || 0);
-      let resolvedGroupId = groupId;
-      if (!resolvedGroupId && ctaAudience) {
-        try {
-          const res = await fetch(`${CTA_GROUP_BY_AUDIENCE_URL}?audience=${encodeURIComponent(ctaAudience)}`, {
-            headers: { Accept: "application/json" },
-          });
-          const data = await res.json();
-          if (res.ok && data?.ok && data?.group?.id) {
-            resolvedGroupId = Number(data.group.id) || 0;
-          }
-        } catch {
-          resolvedGroupId = 0;
-        }
-      }
-      if (!resolvedGroupId) return;
-      try {
-        const res = await fetch(`${CTA_GROUP_ITEMS_URL}?group_id=${resolvedGroupId}`, {
-          headers: { Accept: "application/json" },
-        });
-        const data = await res.json();
-        if (!res.ok || !data?.ok) return;
-        if (!cancelled) {
-          setCtaItems(Array.isArray(data.items) ? data.items : []);
-        }
-      } catch {
-        // ignore CTA load errors
-      }
-    }
-    loadCtas();
-    return () => {
-      cancelled = true;
-    };
-  }, [addCtaGroup, ctaAudience]);
-
   const handleBack = () => {
     if (isAdminView) {
       window.location.href = "/admin/applied-palettes";
@@ -110,69 +62,6 @@ export default function AppliedPaletteViewPage() {
     } else {
       window.location.href = "/";
     }
-  };
-
-  const ctas = useMemo(() => {
-    const raw = ctaItems || [];
-    return raw.map((cta, index) => {
-      let parsedParams = {};
-      if (typeof cta?.params === "string" && cta.params.trim() !== "") {
-        try {
-          const decoded = JSON.parse(cta.params);
-          if (decoded && typeof decoded === "object") {
-            parsedParams = decoded;
-          }
-        } catch {
-          parsedParams = {};
-        }
-      } else if (cta?.params && typeof cta.params === "object") {
-        parsedParams = cta.params;
-      }
-      const key = cta?.key || cta?.type_action_key || cta?.action_key || cta?.action || "";
-      const label = cta?.label ?? "";
-      const isBack = key.toLowerCase().includes("back") || label.trim().toLowerCase().startsWith("back");
-      const variant = resolveVariant(parsedParams.variant || parsedParams.style, isBack);
-      return {
-        cta_id: cta?.cta_id ?? `${key || "cta"}-${index}`,
-        label,
-        key,
-        enabled: resolveEnabled(
-          cta?.is_active ?? true,
-          parsedParams,
-          psiParam,
-          thumbParam,
-          demoParam,
-          ctaAudience
-        ),
-        variant,
-        display_mode: parsedParams.display_mode,
-        icon: parsedParams.icon,
-        params: parsedParams,
-      };
-    });
-  }, [ctaItems, psiParam, thumbParam, demoParam, ctaAudience]);
-
-  const ctaHandlers = useMemo(
-    () =>
-      buildCtaHandlers({
-        data: {},
-        navigate,
-        ctaAudience,
-        psi: psiParam,
-        thumb: thumbParam === "1" || thumbParam.toLowerCase() === "true",
-        demo: demoParam === "1" || demoParam.toLowerCase() === "true",
-      }),
-    [navigate, ctaAudience, psiParam, thumbParam, demoParam]
-  );
-
-  const handleCtaClick = (cta) => {
-    const key = getCtaKey(cta);
-    if (!key) return;
-    if (key === "open_share") {
-      setShareSheetOpen(true);
-      return;
-    }
-    ctaHandlers[key]?.(cta);
   };
 
   const data = state.data;
@@ -189,8 +78,6 @@ export default function AppliedPaletteViewPage() {
     navigate(`/playlist/${lastPlaylistInstanceId}`);
   };
 
-  const pageCtas = ctas;
-
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
     const hash = meta?.palette_hash || "";
@@ -200,7 +87,6 @@ export default function AppliedPaletteViewPage() {
     return window.location.href || "";
   }, [meta?.palette_hash]);
 
-  const shareTitle = meta?.title || "ColorFix Palette";
   const shareMessage = `I'm sharing a palette I found on ColorFix: ${shareUrl}`;
   const smsLink = `sms:&body=${encodeURIComponent(shareMessage)}`;
   const emailLink = `mailto:?subject=${encodeURIComponent("Your ColorFix Palette")}&body=${encodeURIComponent(shareMessage)}`;
@@ -251,11 +137,6 @@ export default function AppliedPaletteViewPage() {
           Back to playlist
         </button>
       )}
-      <CTASection
-        className="cta-section--transparent cta-section--on-dark cta-section--back-left cta-section--desktop-row-split"
-        ctas={pageCtas}
-        onCtaClick={handleCtaClick}
-      />
     </div>
   );
 
@@ -300,36 +181,4 @@ export default function AppliedPaletteViewPage() {
       )}
     </>
   );
-}
-
-function isTruthyFlag(value) {
-  if (value === true) return true;
-  if (value === false || value === null || value === undefined) return false;
-  const normalized = String(value).toLowerCase().trim();
-  return normalized === "1" || normalized === "true" || normalized === "yes";
-}
-
-function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, audParam) {
-  if (!baseEnabled) return false;
-  const requirePsi = Boolean(params?.require_psi || params?.requirePsi || params?.require_psi_id);
-  if (requirePsi && !psiParam) return false;
-  const requireThumb = Boolean(params?.require_thumb || params?.requireThumb);
-  if (requireThumb && !isTruthyFlag(thumbParam)) return false;
-  const requireDemo = Boolean(params?.require_demo || params?.requireDemo);
-  if (requireDemo && !isTruthyFlag(demoParam)) return false;
-  const requireAud = params?.require_aud || params?.requireAud;
-  const normalizedAud = String(audParam || "").toLowerCase().trim();
-  if (requireAud && normalizedAud && normalizedAud !== "any" && normalizedAud !== String(requireAud).toLowerCase()) {
-    return false;
-  }
-  return true;
-}
-
-function resolveVariant(raw, isBack = false) {
-  if (!raw) return isBack ? "link" : undefined;
-  const normalized = String(raw).toLowerCase();
-  if (normalized === "anchor" || normalized === "link") return "link";
-  if (normalized === "button") return isBack ? "link" : undefined;
-  if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
-  return isBack ? "link" : undefined;
 }

@@ -3,10 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { useAppState } from "@context/AppStateContext";
 import { isAdmin } from "@helpers/authHelper";
-import EditableSwatch from "@components/EditableSwatch";
-import KickerDropdown from "@components/KickerDropdown";
-import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
-import PhotoPickerModal from "@components/PhotoPickerModal";
+import SavedPaletteEditorModal from "@components/SavedPaletteEditorModal";
 import "./admin-saved-palettes.css";
 
 const BRAND_CHOICES = [
@@ -48,9 +45,6 @@ const emptySendForm = {
 };
 
 const DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-delete.php`;
-const PHOTO_DELETE_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/delete.php`;
-const PHOTO_LIBRARY_ADD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/add-from-library.php`;
-
 function formatDate(value) {
   if (!value) return "—";
   const dt = new Date(value.replace(" ", "T"));
@@ -84,6 +78,20 @@ function buildFullUrl(relPath) {
   if (/^https?:\/\//i.test(relPath)) return relPath;
   if (typeof window === "undefined") return relPath;
   return `${window.location.origin}${relPath.startsWith("/") ? "" : "/"}${relPath}`;
+}
+
+function openViewerSetup(palette) {
+  const paletteId = Number(palette?.id || 0);
+  if (!paletteId) return;
+  const params = new URLSearchParams();
+  params.set("type", "saved");
+  params.set("id", String(paletteId));
+  const preferred = (palette?.photos || []).find((photo) => photo?.photo_type === "full") || palette?.photos?.[0];
+  const setId = Number(preferred?.saved_palette_set_id || preferred?.set_id || 0);
+  if (setId > 0) {
+    params.set("set_id", String(setId));
+  }
+  window.location.href = `/admin/palette-photos?${params.toString()}`;
 }
 
 function collapseMembersByColor(members = []) {
@@ -162,10 +170,6 @@ export default function AdminSavedPalettesPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [editStatus, setEditStatus] = useState({ loading: false, error: "" });
-  const [editMembers, setEditMembers] = useState([]);
-  const [editPhotos, setEditPhotos] = useState([]);
-  const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
-  const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendForm, setSendForm] = useState(emptySendForm);
   const [sendStatus, setSendStatus] = useState({ loading: false, error: "", success: "" });
@@ -248,35 +252,16 @@ export default function AdminSavedPalettesPage() {
   };
 
   const openEditModal = (palette) => {
-    const collapsedMembers = collapseMembersByColor(palette.members || []);
     setEditForm({
       palette_id: Number(palette.id) || palette.id,
-      nickname: palette.nickname || "",
-      notes: palette.notes || "",
-      private_notes: palette.private_notes || "",
-      terry_fav: Number(palette.terry_fav) === 1,
-      kicker_id: palette.kicker_id || "",
-      palette_type: palette.palette_type || "exterior",
+      nickname: "",
+      notes: "",
+      private_notes: "",
+      terry_fav: false,
+      kicker_id: "",
+      palette_type: "exterior",
     });
-    const members = collapsedMembers.map((member, index) => ({
-      key: member.id ?? `${member.color_id}-${index}`,
-      color: memberToSwatch(member),
-      role: member.role || "",
-    }));
-    const photos = (palette.photos || []).map((photo, index) => ({
-      id: photo.id,
-      rel_path: photo.rel_path,
-      photo_type: photo.photo_type || "full",
-      trigger_mode: photo.trigger_mode || "any",
-      trigger_color_id: photo.trigger_color_id ?? null,
-      caption: photo.caption || "",
-      alt_text: photo.alt_text || "",
-      order_index: photo.order_index ?? index,
-    }));
-    setEditMembers(members);
-    setEditPhotos(photos);
     setEditStatus({ loading: false, error: "" });
-    setPhotoStatus({ loading: false, error: "" });
     setEditModalOpen(true);
   };
 
@@ -284,229 +269,7 @@ export default function AdminSavedPalettesPage() {
     if (editStatus.loading) return;
     setEditModalOpen(false);
     setEditForm(emptyEditForm);
-    setEditMembers([]);
-    setEditPhotos([]);
     setEditStatus({ loading: false, error: "" });
-    setPhotoStatus({ loading: false, error: "" });
-  };
-
-  const handleEditField = (name, value) => {
-    setEditForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleEditMemberColor = (index, color) => {
-    setEditMembers((prev) =>
-      prev.map((row, idx) => (idx === index ? { ...row, color } : row))
-    );
-  };
-
-  const handleEditMemberRole = (index, value) => {
-    setEditMembers((prev) =>
-      prev.map((row, idx) => (idx === index ? { ...row, role: value } : row))
-    );
-  };
-
-  const handleAddMember = () => {
-    setEditMembers((prev) => [
-      ...prev,
-      {
-        key: `new-${Date.now()}`,
-        color: null,
-        role: "",
-      },
-    ]);
-  };
-
-  const handleAddMemberWithColor = (color) => {
-    if (!color?.id) return;
-    setEditMembers((prev) => [
-      ...prev,
-      {
-        key: `new-${Date.now()}`,
-        color,
-        role: "",
-      },
-    ]);
-  };
-
-  const handleRemoveMember = (index) => {
-    setEditMembers((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handlePhotoPickFromLibrary = async (item) => {
-    if (!editForm.palette_id || !item?.image_url) return;
-    setPhotoStatus({ loading: true, error: "" });
-    try {
-      const payload = {
-        palette_id: editForm.palette_id,
-        rel_path: item.image_url,
-        photo_type: "full",
-        trigger_mode: "any",
-      };
-      const res = await fetch(PHOTO_LIBRARY_ADD_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`);
-      }
-      const photo = json.photo || {};
-      setEditPhotos((prev) => [
-        ...prev,
-        {
-          id: photo.id,
-          rel_path: photo.rel_path,
-          photo_type: photo.photo_type || "full",
-          trigger_mode: photo.trigger_mode || "any",
-          trigger_color_id: photo.trigger_color_id ?? null,
-          caption: photo.caption || "",
-          alt_text: photo.alt_text || "",
-          order_index: photo.order_index ?? prev.length,
-        },
-      ]);
-      setPhotoStatus({ loading: false, error: "" });
-      setPhotoPickerOpen(false);
-    } catch (err) {
-      setPhotoStatus({ loading: false, error: err?.message || "Failed to attach photo" });
-    }
-  };
-
-  const handleDeletePhoto = async (photoId) => {
-    if (!photoId) return;
-    setPhotoStatus({ loading: true, error: "" });
-    try {
-      const res = await fetch(PHOTO_DELETE_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo_id: photoId }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`);
-      }
-      setEditPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
-      setPhotoStatus({ loading: false, error: "" });
-    } catch (err) {
-      setPhotoStatus({ loading: false, error: err?.message || "Failed to delete photo" });
-    }
-  };
-
-  const handlePhotoField = (photoId, field, value) => {
-    setEditPhotos((prev) =>
-      prev.map((photo) =>
-        photo.id === photoId
-          ? applyPhotoFieldUpdate(photo, field, value)
-          : photo
-      )
-    );
-  };
-
-  const applyPhotoFieldUpdate = (photo, field, value) => {
-    const next = { ...photo, [field]: value };
-    if (field === "trigger_mode" && value !== "color") {
-      next.trigger_color_id = null;
-    }
-    if (next.photo_type === "before") {
-      next.trigger_mode = "none";
-      next.trigger_color_id = null;
-      next.caption = "Before";
-    }
-    return next;
-  };
-
-  const handleEditSubmit = async (event) => {
-    event.preventDefault();
-    if (!editForm.palette_id) return;
-    setEditStatus({ loading: true, error: "" });
-    try {
-      const members = collapseMembersByColor(
-        editMembers
-        .map((row, index) => {
-          const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
-          if (!colorId) return null;
-          const role = row?.role?.trim() || null;
-          return {
-            color_id: colorId,
-            order_index: index,
-            role,
-            color_name: row?.color?.name || "",
-            color_code: row?.color?.code || "",
-            color_hex6: (row?.color?.hex || "").replace(/^#/, ""),
-            color_brand: row?.color?.brand || "",
-            color_hcl_h: row?.color?.hcl_h ?? 0,
-            color_hcl_c: row?.color?.hcl_c ?? 0,
-            color_hcl_l: row?.color?.hcl_l ?? 0,
-            color_chip_num: row?.color?.chip_num ?? "",
-            color_cluster_id: row?.color?.cluster_id ?? 0,
-          };
-        })
-        .filter(Boolean)
-      ).map((row, index) => ({
-        color_id: row.color_id,
-        order_index: index,
-        role: row.role || null,
-      }));
-      if (!members.length) {
-        throw new Error("Add at least one color before saving.");
-      }
-      const payload = {
-        ...editForm,
-        terry_fav: editForm.terry_fav ? 1 : 0,
-        kicker_id: editForm.kicker_id ? Number(editForm.kicker_id) : null,
-        palette_type: editForm.palette_type || "exterior",
-        members,
-        photos: editPhotos.map((photo) => ({
-          id: photo.id,
-          photo_type: photo.photo_type || "full",
-          trigger_mode: photo.trigger_mode || "any",
-          trigger_color_id: photo.trigger_color_id || null,
-          alt_text: photo.alt_text || "",
-          caption: photo.caption || "",
-        })),
-      };
-      const res = await fetch(`${API_FOLDER}/v2/admin/saved-palette-update.php`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || `HTTP ${res.status}`);
-      }
-      setEditStatus({ loading: false, error: "" });
-      setEditModalOpen(false);
-      setEditForm(emptyEditForm);
-      setRefreshTick((tick) => tick + 1);
-    } catch (err) {
-      setEditStatus({ loading: false, error: err?.message || "Failed to update palette" });
-    }
-  };
-
-  const openSendModal = (palette) => {
-    const colors = collapseMembersByColor(palette.members || []).slice(0, 5).map((member) => ({
-      id: member.id,
-      name: member.color_name || "",
-      code: member.color_code || "",
-      hex: member.color_hex6 || "cccccc",
-    }));
-    const defaultEmail = "";
-    const defaultMessage = palette.message_template || `Here’s the palette we discussed for ${palette.nickname || "your project"}.\n\nLet me know what you think!`;
-    const defaultSubject = palette.subject_template || `ColorFix palette ideas`;
-    setSendForm({
-      palette_id: palette.id,
-      nickname: palette.nickname || "Saved Palette",
-      to_email: defaultEmail,
-      subject: defaultSubject,
-      message: defaultMessage,
-      preview_colors: colors,
-    });
-    setSendStatus({ loading: false, error: "", success: "" });
-    setSendModalOpen(true);
   };
 
   const handleDeletePalette = async (palette) => {
@@ -678,6 +441,7 @@ export default function AdminSavedPalettesPage() {
                 {item.kicker_text && <div className="asp-card-kicker">{item.kicker_text}</div>}
                 <div className="asp-card-title">
                   <strong>{item.nickname || "(untitled palette)"}</strong>
+                  <span className="asp-pill neutral">#{item.id}</span>
                   {Number(item.terry_fav) === 1 && <span className="asp-pill">Fav</span>}
                   <span className="asp-pill neutral">{(item.brand || "").toUpperCase() || "?"}</span>
                 </div>
@@ -734,6 +498,13 @@ export default function AdminSavedPalettesPage() {
               <button
                 type="button"
                 className="ghost"
+                onClick={() => openViewerSetup(item)}
+              >
+                Viewer Setup
+              </button>
+              <button
+                type="button"
+                className="ghost"
                 onClick={() => {
                   if (!item?.palette_hash) return;
                   window.location.href = `/palette/${item.palette_hash}/share`;
@@ -762,217 +533,25 @@ export default function AdminSavedPalettesPage() {
         ))}
       </div>
 
-      {editModalOpen && (
-        <div className="asp-modal-backdrop" role="dialog" aria-modal="true">
-          <div className="asp-modal">
-            <header className="asp-modal-head">
-              <h2>Edit Saved Palette</h2>
-              <button type="button" className="asp-close" onClick={closeEditModal} aria-label="Close dialog">
-                ✕
-              </button>
-            </header>
-
-            <form className="asp-modal-form" onSubmit={handleEditSubmit}>
-              <div className="asp-photo-editor">
-              <div className="asp-member-list-head">
-                <h3>Photos</h3>
-                <div className="asp-photo-actions">
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => setPhotoPickerOpen(true)}
-                    disabled={photoStatus.loading}
-                  >
-                    Library
-                  </button>
-                  <button
-                    type="submit"
-                    className="asp-save-top"
-                    disabled={editStatus.loading}
-                  >
-                    {editStatus.loading ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              </div>
-                {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
-                {editPhotos.length > 0 ? (
-                  <div className="asp-photo-grid">
-                    {editPhotos.map((photo) => (
-                      <div key={photo.id} className="asp-photo-card">
-                        <img src={photo.rel_path} alt="Palette upload" />
-                        <select
-                          value={photo.photo_type || "full"}
-                          onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
-                        >
-                          <option value="full">Full</option>
-                          <option value="zoom">Zoom</option>
-                          <option value="before">Before</option>
-                        </select>
-                        <select
-                          value={photo.trigger_mode || "any"}
-                          onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
-                        >
-                          <option value="any">Trigger: any color</option>
-                          <option value="none">Trigger: none</option>
-                          <option value="color">Trigger: specific color</option>
-                        </select>
-                        <select
-                          value={photo.trigger_color_id || ""}
-                          onChange={(e) =>
-                            handlePhotoField(
-                              photo.id,
-                              "trigger_color_id",
-                              e.target.value ? Number(e.target.value) : null
-                            )
-                          }
-                          disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
-                        >
-                          <option value="">Pick color</option>
-                          {editMembers.map((row) => (
-                            <option
-                              key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
-                              value={row.color?.id || row.color?.color_id || ""}
-                            >
-                              {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          placeholder="Alt text (SEO)"
-                          value={photo.alt_text || ""}
-                          onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => handleDeletePhoto(photo.id)}
-                          disabled={photoStatus.loading}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="asp-member-empty">No photos yet.</div>
-                )}
-              </div>
-
-              <div className="asp-member-list">
-                <div className="asp-member-list-head">
-                  <h3>Palette Colors</h3>
-                  <div className="asp-member-actions">
-                    <FuzzySearchColorSelect
-                      className="asp-member-fuzzy"
-                      onSelect={handleAddMemberWithColor}
-                      showLabel={false}
-                      autoFocus={false}
-                      preventAutoFocus
-                      compact
-                    />
-                    <button type="button" className="ghost" onClick={handleAddMember}>
-                      Add Color
-                    </button>
-                  </div>
-                </div>
-                <label className="asp-kicker-field">
-                  <span>Kicker (optional)</span>
-                  <KickerDropdown
-                    value={editForm.kicker_id}
-                    onChange={(next) => setEditForm((prev) => ({ ...prev, kicker_id: next || "" }))}
-                  />
-                </label>
-                <label>
-                  Palette Type
-                  <select
-                    value={editForm.palette_type}
-                    onChange={(e) => handleEditField("palette_type", e.target.value)}
-                  >
-                    <option value="exterior">Exterior</option>
-                    <option value="interior">Interior</option>
-                    <option value="hoa">HOA</option>
-                  </select>
-                </label>
-                <div className="asp-member-rows">
-                  {editMembers.map((row, index) => (
-                    <div key={row.key || index} className="asp-member-row">
-                      <EditableSwatch
-                        value={row.color}
-                        onChange={(color) => handleEditMemberColor(index, color)}
-                        showName
-                        size="sm"
-                        placement="top"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Role (e.g. trim, body, door)"
-                        value={row.role}
-                        onChange={(e) => handleEditMemberRole(index, e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => handleRemoveMember(index)}
-                        aria-label="Remove color"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
-                </div>
-              </div>
-
-              <label>
-                Nickname
-                <input
-                  type="text"
-                  value={editForm.nickname}
-                  onChange={(e) => handleEditField("nickname", e.target.value)}
-                />
-              </label>
-
-              <label>
-                Public Notes (shown in viewer)
-                <textarea
-                  rows={3}
-                  value={editForm.notes}
-                  onChange={(e) => handleEditField("notes", e.target.value)}
-                />
-              </label>
-              <label>
-                Private Notes (for me)
-                <textarea
-                  rows={3}
-                  value={editForm.private_notes}
-                  onChange={(e) => handleEditField("private_notes", e.target.value)}
-                />
-              </label>
-
-              <label className="asp-modal-checkbox">
-                <input
-                  type="checkbox"
-                  checked={!!editForm.terry_fav}
-                  onChange={(e) => handleEditField("terry_fav", e.target.checked)}
-                />
-                Mark as Terry favorite
-              </label>
-
-              {editStatus.error && <div className="asp-error">{editStatus.error}</div>}
-
-              <div className="asp-modal-actions">
-                <button type="button" className="ghost" onClick={closeEditModal} disabled={editStatus.loading}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={editStatus.loading}>
-                  {editStatus.loading ? "Saving…" : "Save Changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <SavedPaletteEditorModal
+        open={editModalOpen}
+        paletteId={editForm.palette_id || null}
+        showPhotoSection={false}
+        onClose={closeEditModal}
+        onSaved={(result) => {
+          if (result?.palette?.id) {
+            setItems((prev) => {
+              const next = prev.map((row) => (row.id === result.palette.id ? result.palette : row));
+              if (next.some((row) => row.id === result.palette.id)) {
+                return next;
+              }
+              return [result.palette, ...next];
+            });
+          }
+          setRefreshTick((tick) => tick + 1);
+          setEditModalOpen(false);
+        }}
+      />
 
       {sendModalOpen && (
         <div className="asp-modal-backdrop" role="dialog" aria-modal="true">
@@ -1045,12 +624,6 @@ export default function AdminSavedPalettesPage() {
           </div>
         </div>
       )}
-      <PhotoPickerModal
-        open={photoPickerOpen}
-        title="Pick Photo"
-        onClose={() => setPhotoPickerOpen(false)}
-        onPick={handlePhotoPickFromLibrary}
-      />
     </section>
   );
 }

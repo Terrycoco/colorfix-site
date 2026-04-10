@@ -168,7 +168,9 @@ export default function PlayerPage() {
     const items = data?.items || [];
     return items.filter((item) => {
       const type = (item?.type || "normal").toLowerCase();
-      if (type === "intro" || type === "before" || type === "text") return false;
+      const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
+      if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
+      if (attachedType === "before") return false;
       if (item?.exclude_from_thumbs) return false;
       return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
     });

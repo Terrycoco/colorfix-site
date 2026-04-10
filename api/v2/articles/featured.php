@@ -30,13 +30,17 @@ try {
         respond(['ok' => false, 'error' => 'No published articles'], 404);
     }
 
-    $hero = null;
-    if (!empty($article['hero_asset_id'])) {
-        $stmt = $pdo->prepare("SELECT photo_library_id, rel_path, title, alt_text, updated_at FROM photo_library WHERE photo_library_id = :id LIMIT 1");
-        $stmt->execute([':id' => (int)$article['hero_asset_id']]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row) {
-            $hero = [
+    $photoIds = array_values(array_unique(array_filter([
+        !empty($article['hero_asset_id']) ? (int)$article['hero_asset_id'] : 0,
+        !empty($article['hero_mobile_asset_id']) ? (int)$article['hero_mobile_asset_id'] : 0,
+    ])));
+    $photoMap = [];
+    if ($photoIds) {
+        $placeholders = implode(',', array_fill(0, count($photoIds), '?'));
+        $stmt = $pdo->prepare("SELECT photo_library_id, rel_path, title, alt_text, updated_at FROM photo_library WHERE photo_library_id IN ($placeholders)");
+        $stmt->execute($photoIds);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $photoMap[(int)$row['photo_library_id']] = [
                 'photo_library_id' => (int)$row['photo_library_id'],
                 'rel_path' => $row['rel_path'],
                 'title' => $row['title'],
@@ -46,7 +50,10 @@ try {
         }
     }
 
-    respond(['ok' => true, 'item' => ['article' => $article, 'hero' => $hero]]);
+    $hero = !empty($article['hero_asset_id']) ? ($photoMap[(int)$article['hero_asset_id']] ?? null) : null;
+    $heroMobile = !empty($article['hero_mobile_asset_id']) ? ($photoMap[(int)$article['hero_mobile_asset_id']] ?? null) : null;
+
+    respond(['ok' => true, 'item' => ['article' => $article, 'hero' => $hero, 'hero_mobile' => $heroMobile]]);
 } catch (Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 500);
 }

@@ -42,6 +42,23 @@ const emptyAppliedForm = {
   alt_text: "",
 };
 
+function normalizePalettePhoto(photo, fallbackOrder = 0) {
+  return {
+    id: photo.id,
+    photo_library_id: photo.photo_library_id || null,
+    saved_palette_set_id: photo.saved_palette_set_id || null,
+    rel_path: photo.rel_path,
+    photo_type: photo.photo_type || "full",
+    trigger_mode: photo.trigger_mode || "any",
+    trigger_color_id: photo.trigger_color_id ?? null,
+    caption: photo.caption || "",
+    alt_text: photo.alt_text || "",
+    order_index: photo.order_index ?? fallbackOrder,
+    set_title: photo.set_title || "",
+    set_slug: photo.set_slug || "",
+  };
+}
+
 function memberToSwatch(member) {
   const hex = member?.color_hex6 ? `#${member.color_hex6}` : "";
   return {
@@ -75,21 +92,43 @@ function entryToSwatch(entry) {
 }
 
 export default function AdminPalettePhotosPage() {
-  const [paletteType, setPaletteType] = useState("saved");
   const [savedPalettes, setSavedPalettes] = useState([]);
-  const [appliedPalettes, setAppliedPalettes] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
+  const [selectedId, setSelectedId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("id") || "";
+  });
   const [loadingPalette, setLoadingPalette] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   const [editForm, setEditForm] = useState(emptySavedForm);
   const [editMembers, setEditMembers] = useState([]);
   const [editPhotos, setEditPhotos] = useState([]);
+  const [selectedViewerSetId, setSelectedViewerSetId] = useState("");
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
+  const [libraryPhotoType, setLibraryPhotoType] = useState("full");
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
 
-  const isApplied = paletteType === "applied";
+  const isApplied = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("type") === "applied";
+  const requestedViewerSetId = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("set_id") || "";
+  }, []);
+  const requestedPhotoLibraryId = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("photo_library_id") || "";
+  }, []);
+  const returnTo = useMemo(() => {
+    if (typeof window === "undefined") return "/admin/photo-library";
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get("return_to") || "";
+    if (!value.startsWith("/admin/photo-library")) return "/admin/photo-library";
+    return value;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -115,35 +154,14 @@ export default function AdminPalettePhotosPage() {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    async function loadApplied() {
-      try {
-        const params = new URLSearchParams();
-        params.set("limit", "200");
-        params.set("_", Date.now().toString());
-        const res = await fetch(`${APPLIED_LIST_URL}?${params.toString()}`, { credentials: "include" });
-        const data = await res.json();
-        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load applied palettes");
-        if (!active) return;
-        setAppliedPalettes(Array.isArray(data.items) ? data.items : []);
-      } catch {
-        if (!active) return;
-        setAppliedPalettes([]);
-      }
-    }
-    loadApplied();
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    setSelectedId("");
+    setSelectedViewerSetId("");
     setEditMembers([]);
     setEditPhotos([]);
     setPhotoStatus({ loading: false, error: "" });
     setEditStatus({ loading: false, error: "", success: "" });
     setLoadError("");
-    setEditForm(isApplied ? emptyAppliedForm : emptySavedForm);
-  }, [paletteType]);
+    setEditForm(emptySavedForm);
+  }, []);
 
   useEffect(() => {
     if (!selectedId) {
@@ -156,34 +174,98 @@ export default function AdminPalettePhotosPage() {
     if (!isApplied) {
       const palette = savedPalettes.find((row) => String(row.id) === String(selectedId));
       if (!palette) return;
-      setEditForm({
-        palette_id: Number(palette.id) || palette.id,
-        nickname: palette.nickname || "",
-        notes: palette.notes || "",
-        private_notes: palette.private_notes || "",
-        terry_fav: Number(palette.terry_fav) === 1,
-        kicker_id: palette.kicker_id || "",
-        palette_type: palette.palette_type || "exterior",
-      });
-      const members = (palette.members || []).map((member, index) => ({
-        key: member.id ?? `${member.color_id}-${index}`,
-        color: memberToSwatch(member),
-        role: member.role || "",
-      }));
-      const photos = (palette.photos || []).map((photo, index) => ({
-        id: photo.id,
-        rel_path: photo.rel_path,
-        photo_type: photo.photo_type || "full",
-        trigger_mode: photo.trigger_mode || "any",
-        trigger_color_id: photo.trigger_color_id ?? null,
-        caption: photo.caption || "",
-        alt_text: photo.alt_text || "",
-        order_index: photo.order_index ?? index,
-      }));
-      setEditMembers(members);
-      setEditPhotos(photos);
-      setLoadError("");
-      return;
+      let active = true;
+      async function loadSavedPaletteDetails() {
+        setLoadingPalette(true);
+        setLoadError("");
+        try {
+          setEditForm({
+            palette_id: Number(palette.id) || palette.id,
+            nickname: palette.nickname || "",
+            notes: palette.notes || "",
+            private_notes: palette.private_notes || "",
+            terry_fav: Number(palette.terry_fav) === 1,
+            kicker_id: palette.kicker_id || "",
+            palette_type: palette.palette_type || "exterior",
+          });
+          const members = (palette.members || []).map((member, index) => ({
+            key: member.id ?? `${member.color_id}-${index}`,
+            color: memberToSwatch(member),
+            role: member.role || "",
+          }));
+          if (!active) return;
+          setEditMembers(members);
+
+          const sets = Array.isArray(palette.sets) ? palette.sets : [];
+          const requestedSetId = String(requestedViewerSetId || "");
+          const requestedLibraryId = String(requestedPhotoLibraryId || "");
+          let rawPhotos = Array.isArray(palette.photos) ? [...palette.photos] : [];
+
+          if (sets.length > 0) {
+            const responses = await Promise.all(
+              sets.map(async (set) => {
+                const params = new URLSearchParams();
+                params.set("id", String(palette.id));
+                params.set("set_id", String(set.id));
+                params.set("with_photos", "1");
+                params.set("limit", "200");
+                params.set("_", Date.now().toString());
+                const res = await fetch(`${SAVED_LIST_URL}?${params.toString()}`, { credentials: "include" });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.ok) {
+                  throw new Error(data?.error || "Failed to load viewer photos");
+                }
+                const paletteRow = Array.isArray(data.items)
+                  ? data.items.find((item) => String(item.id) === String(palette.id))
+                  : null;
+                const photos = Array.isArray(paletteRow?.photos) ? paletteRow.photos : [];
+                return photos.map((photo) => ({
+                  ...photo,
+                  saved_palette_set_id: photo?.saved_palette_set_id || set.id,
+                  set_title: photo?.set_title || set.title || "",
+                  set_slug: photo?.set_slug || set.slug || "",
+                }));
+              })
+            );
+            rawPhotos = responses.flat();
+          }
+
+          const seen = new Set();
+          const photos = rawPhotos
+            .filter((photo) => {
+              const key = String(photo.id || "");
+              if (!key || seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            })
+            .map((photo, index) => normalizePalettePhoto(photo, index));
+
+          if (!active) return;
+          setEditPhotos(photos);
+          const matchingPhoto = requestedLibraryId
+            ? photos.find((photo) => String(photo.photo_library_id || "") === requestedLibraryId)
+            : null;
+          const requestedExists = requestedSetId
+            && photos.some((photo) => String(photo.saved_palette_set_id || "") === requestedSetId);
+          const firstFull = photos.find((photo) => (photo.photo_type || "full") === "full");
+          setSelectedViewerSetId(
+            matchingPhoto?.saved_palette_set_id
+              ? String(matchingPhoto.saved_palette_set_id)
+              : requestedExists
+              ? requestedSetId
+              : (firstFull?.saved_palette_set_id ? String(firstFull.saved_palette_set_id) : "")
+          );
+        } catch (err) {
+          if (!active) return;
+          setLoadError(err?.message || "Failed to load saved palette");
+          setEditMembers([]);
+          setEditPhotos([]);
+        } finally {
+          if (active) setLoadingPalette(false);
+        }
+      }
+      loadSavedPaletteDetails();
+      return () => { active = false; };
     }
 
     let active = true;
@@ -212,6 +294,7 @@ export default function AdminPalettePhotosPage() {
         }));
         const photos = (data.photos || []).map((photo, index) => ({
           id: photo.id,
+          saved_palette_set_id: photo.saved_palette_set_id || null,
           rel_path: photo.rel_path,
           photo_type: photo.photo_type || "full",
           trigger_mode: photo.trigger_mode || "any",
@@ -222,6 +305,14 @@ export default function AdminPalettePhotosPage() {
         }));
         setEditMembers(members);
         setEditPhotos(photos);
+        const requestedExists = requestedViewerSetId
+          && photos.some((photo) => String(photo.saved_palette_set_id || "") === String(requestedViewerSetId));
+        const firstFull = photos.find((photo) => (photo.photo_type || "full") === "full");
+        setSelectedViewerSetId(
+          requestedExists
+            ? String(requestedViewerSetId)
+            : (firstFull?.saved_palette_set_id ? String(firstFull.saved_palette_set_id) : "")
+        );
       } catch (err) {
         if (!active) return;
         setLoadError(err?.message || "Failed to load applied palette");
@@ -234,20 +325,40 @@ export default function AdminPalettePhotosPage() {
 
     loadAppliedPalette();
     return () => { active = false; };
-  }, [selectedId, savedPalettes, isApplied]);
+  }, [selectedId, savedPalettes, isApplied, requestedViewerSetId, requestedPhotoLibraryId]);
 
-  const paletteOptions = useMemo(() => {
-    if (isApplied) {
-      return appliedPalettes.map((palette) => ({
+  const paletteOptions = useMemo(() =>
+    savedPalettes
+      .map((palette) => ({
         id: palette.id,
-        label: palette.display_title || palette.title || `Applied #${palette.id}`,
-      }));
+        label: palette.nickname || palette.palette_hash || `Saved #${palette.id}`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
+  [savedPalettes]);
+  const selectedPalette = useMemo(
+    () => savedPalettes.find((row) => String(row.id) === String(selectedId)) || null,
+    [savedPalettes, selectedId]
+  );
+  const viewerPreviewUrl = useMemo(() => {
+    const hash = selectedPalette?.palette_hash || "";
+    if (!hash) return "";
+    const params = new URLSearchParams();
+    if (Number(selectedViewerSetId || 0) > 0) {
+      params.set("set_id", String(Number(selectedViewerSetId)));
     }
-    return savedPalettes.map((palette) => ({
-      id: palette.id,
-      label: palette.nickname || palette.palette_hash || `Saved #${palette.id}`,
-    }));
-  }, [appliedPalettes, savedPalettes, isApplied]);
+    const qs = params.toString();
+    return `/palette/${encodeURIComponent(hash)}/share${qs ? `?${qs}` : ""}`;
+  }, [selectedPalette?.palette_hash, selectedViewerSetId]);
+  const viewerTestUrl = useMemo(() => {
+    const hash = selectedPalette?.palette_hash || "";
+    if (!hash || typeof window === "undefined") return "";
+    const params = new URLSearchParams();
+    if (Number(selectedViewerSetId || 0) > 0) {
+      params.set("set_id", String(Number(selectedViewerSetId)));
+    }
+    params.set("return_to", window.location.pathname + window.location.search);
+    return `/palette/${encodeURIComponent(hash)}/share?${params.toString()}`;
+  }, [selectedPalette?.palette_hash, selectedViewerSetId]);
 
   const handleEditField = (name, value) => {
     setEditForm((prev) => ({ ...prev, [name]: value }));
@@ -321,9 +432,21 @@ export default function AdminPalettePhotosPage() {
     const uploadUrl = isApplied ? APPLIED_PHOTO_UPLOAD_URL : SAVED_PHOTO_UPLOAD_URL;
     try {
       const formData = new FormData();
+      const replacePhoto = replacePhotoId
+        ? editPhotos.find((photo) => Number(photo.id) === Number(replacePhotoId)) || null
+        : null;
       formData.append("palette_id", String(editForm.palette_id));
       if (!isApplied && replacePhotoId) {
         formData.append("replace_photo_id", String(replacePhotoId));
+        if (replacePhoto?.saved_palette_set_id) {
+          formData.append("set_id", String(replacePhoto.saved_palette_set_id));
+        }
+        formData.append("photo_type", replacePhoto?.photo_type || "full");
+      } else if (!isApplied) {
+        if (selectedViewerSetId) {
+          formData.append("set_id", String(selectedViewerSetId));
+        }
+        formData.append("photo_type", libraryPhotoType || "full");
       }
       Array.from(files).forEach((file) => formData.append("photos[]", file));
       const res = await fetch(uploadUrl, {
@@ -337,20 +460,20 @@ export default function AdminPalettePhotosPage() {
       }
       const added = Array.isArray(json.photos) ? json.photos : [];
       setEditPhotos((prev) => {
-        const normalized = added.map((photo, index) => ({
-          id: photo.id,
-          rel_path: photo.rel_path,
-          photo_type: photo.photo_type || "full",
-          trigger_mode: photo.trigger_mode || "any",
-          trigger_color_id: photo.trigger_color_id ?? null,
-          caption: photo.caption || "",
-          alt_text: photo.alt_text || "",
-          order_index: photo.order_index ?? prev.length + index,
-        }));
+        const normalized = added.map((photo, index) =>
+          normalizePalettePhoto(photo, prev.length + index)
+        );
         if (isApplied || !replacePhotoId) {
+          const newFull = normalized.find((photo) => (photo.photo_type || "full") === "full");
+          if (newFull?.saved_palette_set_id) {
+            setSelectedViewerSetId(String(newFull.saved_palette_set_id));
+          }
           return [...prev, ...normalized];
         }
         const first = normalized[0];
+        if (first?.saved_palette_set_id) {
+          setSelectedViewerSetId(String(first.saved_palette_set_id));
+        }
         return prev.map((photo) => (photo.id === replacePhotoId ? { ...photo, ...first } : photo));
       });
       setPhotoStatus({ loading: false, error: "" });
@@ -364,11 +487,17 @@ export default function AdminPalettePhotosPage() {
     setPhotoStatus({ loading: true, error: "" });
     const addUrl = isApplied ? APPLIED_PHOTO_LIBRARY_ADD_URL : SAVED_PHOTO_LIBRARY_ADD_URL;
     try {
+      const photoType = libraryPhotoType || "full";
       const payload = {
         palette_id: editForm.palette_id,
+        set_id: selectedViewerSetId ? Number(selectedViewerSetId) : null,
+        photo_library_id: item.photo_library_id || null,
+        raw_rel_path: item.raw_rel_path || "",
         rel_path: item.image_url,
-        photo_type: "full",
-        trigger_mode: "any",
+        photo_type: photoType,
+        trigger_mode: photoType === "before" ? "none" : "any",
+        show_in_gallery: photoType === "before" ? 0 : 1,
+        caption: photoType === "before" ? "Before" : null,
       };
       const res = await fetch(addUrl, {
         method: "POST",
@@ -381,19 +510,14 @@ export default function AdminPalettePhotosPage() {
         throw new Error(json.error || `HTTP ${res.status}`);
       }
       const photo = json.photo || {};
+      const normalized = normalizePalettePhoto(photo, editPhotos.length);
       setEditPhotos((prev) => [
         ...prev,
-        {
-          id: photo.id,
-          rel_path: photo.rel_path,
-          photo_type: photo.photo_type || "full",
-          trigger_mode: photo.trigger_mode || "any",
-          trigger_color_id: photo.trigger_color_id ?? null,
-          caption: photo.caption || "",
-          alt_text: photo.alt_text || "",
-          order_index: photo.order_index ?? prev.length,
-        },
+        normalized,
       ]);
+      if (normalized.saved_palette_set_id) {
+        setSelectedViewerSetId(String(normalized.saved_palette_set_id));
+      }
       setPhotoStatus({ loading: false, error: "" });
       setPhotoPickerOpen(false);
     } catch (err) {
@@ -517,19 +641,68 @@ export default function AdminPalettePhotosPage() {
   };
 
   const membersReadOnly = isApplied;
+  const viewerSets = useMemo(() => {
+    if (isApplied) return [];
+    const grouped = new Map();
+    editPhotos.forEach((photo, index) => {
+      const setId = String(photo.saved_palette_set_id || "");
+      if (!setId) return;
+      if (!grouped.has(setId)) {
+        grouped.set(setId, []);
+      }
+      grouped.get(setId).push({ ...photo, _index: index });
+    });
+    return Array.from(grouped.entries()).map(([setId, photos], index) => {
+      const fullPhoto = photos.find((photo) => (photo.photo_type || "full") === "full") || null;
+      const coverPhoto = fullPhoto || photos[0] || null;
+      return {
+        key: String(setId || coverPhoto?.id || index),
+        setId: setId || null,
+        fullPhoto,
+        coverPhoto,
+        title:
+          photos[0]?.set_title ||
+          fullPhoto?.caption ||
+          fullPhoto?.alt_text ||
+          coverPhoto?.caption ||
+          coverPhoto?.alt_text ||
+          `Viewer ${index + 1}`,
+      };
+    });
+  }, [editPhotos, isApplied]);
+
+  const activeViewer = useMemo(() => {
+    if (isApplied) return null;
+    const target = viewerSets.find((set) => String(set.setId || set.coverPhoto?.id) === String(selectedViewerSetId));
+    return target || viewerSets[0] || null;
+  }, [viewerSets, selectedViewerSetId, isApplied]);
+  const selectedViewerPhotos = useMemo(() => {
+    if (isApplied) return editPhotos;
+    const activeSetId = activeViewer?.setId ? String(activeViewer.setId) : "";
+    if (!activeSetId) return [];
+    return editPhotos.filter((photo) => String(photo.saved_palette_set_id || "") === activeSetId);
+  }, [editPhotos, activeViewer, isApplied]);
 
   return (
     <section className="app-palette-photos">
       <header className="app-palette-photos__head">
-        <h1>Palette Photos</h1>
+        <div className="app-palette-photos__titlebar">
+          <div>
+            <h1>Palette Viewer Setup</h1>
+          </div>
+          <button
+            type="button"
+            className="app-palette-photos__back"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.location.href = returnTo;
+              }
+            }}
+          >
+            ← Back To Library
+          </button>
+        </div>
         <div className="app-palette-photos__selectors">
-          <label>
-            Palette Type
-            <select value={paletteType} onChange={(e) => setPaletteType(e.target.value)}>
-              <option value="saved">Saved Palette</option>
-              <option value="applied">Applied Palette</option>
-            </select>
-          </label>
           <label>
             Palette
             <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
@@ -541,6 +714,18 @@ export default function AdminPalettePhotosPage() {
               ))}
             </select>
           </label>
+          <button
+            type="button"
+            className="app-palette-photos__back"
+            onClick={() => {
+              if (viewerTestUrl && typeof window !== "undefined") {
+                window.location.href = viewerTestUrl;
+              }
+            }}
+            disabled={!viewerTestUrl}
+          >
+            Test Viewer
+          </button>
         </div>
       </header>
 
@@ -550,121 +735,166 @@ export default function AdminPalettePhotosPage() {
       {selectedId && !loadingPalette && (
         <div className="app-palette-photos__panel asp-modal">
           <header className="asp-modal-head">
-            <h2>{isApplied ? "Edit Applied Palette" : "Edit Saved Palette"}</h2>
+            <h2>Edit Viewer Setup</h2>
           </header>
 
           <form className="asp-modal-form" onSubmit={handleSave}>
-            <div className="asp-photo-editor">
-              <div className="asp-member-list-head">
-                <h3>Photos</h3>
-                <div className="asp-photo-actions">
-                  <label className="asp-upload-btn">
-                    Upload
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => handlePhotoUpload(e.target.files)}
-                      disabled={photoStatus.loading}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => setPhotoPickerOpen(true)}
-                    disabled={photoStatus.loading}
-                  >
-                    Library
-                  </button>
-                  <button
-                    type="submit"
-                    className="asp-save-top"
-                    disabled={editStatus.loading}
-                  >
-                    {editStatus.loading ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              </div>
-              {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
-              {editPhotos.length > 0 ? (
-                <div className="asp-photo-grid">
-                  {editPhotos.map((photo) => (
-                    <div key={photo.id} className="asp-photo-card">
-                      <img src={photo.rel_path} alt="Palette upload" />
+            <div className="app-palette-photos__workspace">
+              <div className="app-palette-photos__controls">
+                {!isApplied && viewerSets.length > 0 && (
+                  <div className="app-palette-photos__viewer-setup">
+                    <div className="app-palette-photos__viewer-strip">
+                      {viewerSets.map((viewer, index) => {
+                        const key = String(viewer.setId || viewer.coverPhoto?.id || index);
+                        const active = String(activeViewer?.setId || activeViewer?.coverPhoto?.id || "") === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            className={`app-palette-photos__viewer-thumb${active ? " is-active" : ""}`}
+                            onClick={() => setSelectedViewerSetId(key)}
+                          >
+                            {viewer.coverPhoto ? (
+                              <img src={viewer.coverPhoto.rel_path} alt={viewer.title} />
+                            ) : (
+                              <div className="app-palette-photos__viewer-thumb-empty">No photo</div>
+                            )}
+                            <span>{viewer.title}</span>
+                            {viewer.coverPhoto?.photo_library_id ? (
+                              <small>Photo #{viewer.coverPhoto.photo_library_id}</small>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="asp-photo-editor">
+                  <div className="asp-member-list-head">
+                    <h3>Viewer Photos</h3>
+                    <div className="asp-photo-actions">
                       <select
-                        value={photo.photo_type || "full"}
-                        onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
+                        value={libraryPhotoType}
+                        onChange={(e) => setLibraryPhotoType(e.target.value)}
+                        disabled={photoStatus.loading}
                       >
                         <option value="full">Full</option>
-                        <option value="zoom">Zoom</option>
                         <option value="before">Before</option>
+                        <option value="zoom">Zoom</option>
                       </select>
-                      <select
-                        value={photo.trigger_mode || "any"}
-                        onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
-                      >
-                        <option value="any">Trigger: any color</option>
-                        <option value="none">Trigger: none</option>
-                        <option value="color">Trigger: specific color</option>
-                      </select>
-                      <select
-                        value={photo.trigger_color_id || ""}
-                        onChange={(e) =>
-                          handlePhotoField(
-                            photo.id,
-                            "trigger_color_id",
-                            e.target.value ? Number(e.target.value) : null
-                          )
-                        }
-                        disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
-                      >
-                        <option value="">Pick color</option>
-                        {editMembers.map((row) => (
-                          <option
-                            key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
-                            value={row.color?.id || row.color?.color_id || ""}
-                          >
-                            {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder="Alt text (SEO)"
-                        value={photo.alt_text || ""}
-                        onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
-                      />
+                      <label className="asp-upload-btn">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => handlePhotoUpload(e.target.files)}
+                          disabled={photoStatus.loading}
+                        />
+                      </label>
                       <button
                         type="button"
                         className="ghost"
-                        onClick={() => handleDeletePhoto(photo.id)}
+                        onClick={() => setPhotoPickerOpen(true)}
                         disabled={photoStatus.loading}
                       >
-                        Remove
+                        Add From Library
                       </button>
-                      {!isApplied && (
-                        <label className="asp-upload-btn ghost">
-                          Replace
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              handlePhotoUpload(e.target.files, photo.id);
-                              e.target.value = "";
-                            }}
-                            disabled={photoStatus.loading}
-                          />
-                        </label>
-                      )}
+                      <button
+                        type="submit"
+                        className="asp-save-top"
+                        disabled={editStatus.loading}
+                      >
+                        {editStatus.loading ? "Saving…" : "Save"}
+                      </button>
                     </div>
-                  ))}
+                  </div>
+                  {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
+                  {selectedViewerPhotos.length > 0 ? (
+                    <div className="asp-photo-grid">
+                      {selectedViewerPhotos.map((photo) => (
+                        <div key={photo.id} className="asp-photo-card">
+                          <div className="app-palette-photos__photo-meta">
+                            Photo #{photo.photo_library_id || photo.id}
+                          </div>
+                          <img src={photo.rel_path} alt="Palette upload" />
+                          <select
+                            value={photo.photo_type || "full"}
+                            onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
+                          >
+                            <option value="full">Full</option>
+                            <option value="zoom">Zoom</option>
+                            <option value="before">Before</option>
+                          </select>
+                          <select
+                            value={photo.trigger_mode || "any"}
+                            onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
+                          >
+                            <option value="any">Trigger: any color</option>
+                            <option value="none">Trigger: none</option>
+                            <option value="color">Trigger: specific color</option>
+                          </select>
+                          <select
+                            value={photo.trigger_color_id || ""}
+                            onChange={(e) =>
+                              handlePhotoField(
+                                photo.id,
+                                "trigger_color_id",
+                                e.target.value ? Number(e.target.value) : null
+                              )
+                            }
+                            disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
+                          >
+                            <option value="">Pick color</option>
+                            {editMembers.map((row) => (
+                              <option
+                                key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
+                                value={row.color?.id || row.color?.color_id || ""}
+                              >
+                                {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            placeholder="Alt text (SEO)"
+                            value={photo.alt_text || ""}
+                            onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
+                          />
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => handleDeletePhoto(photo.id)}
+                            disabled={photoStatus.loading}
+                          >
+                            Remove
+                          </button>
+                          {!isApplied && (
+                            <label className="asp-upload-btn ghost">
+                              Replace
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  handlePhotoUpload(e.target.files, photo.id);
+                                  e.target.value = "";
+                                }}
+                                disabled={photoStatus.loading}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="asp-member-empty">
+                      {isApplied ? "No photos yet." : "No photos in this viewer yet."}
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="asp-member-empty">No photos yet.</div>
-              )}
-            </div>
 
-            <div className="asp-member-list">
+                <div className="asp-member-list">
               <div className="asp-member-list-head">
                 <h3>Palette Colors</h3>
                 {!membersReadOnly && (
@@ -742,101 +972,131 @@ export default function AdminPalettePhotosPage() {
                 ))}
                 {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
               </div>
-            </div>
+                </div>
 
-            {!isApplied && (
-              <label>
-                Nickname
-                <input
-                  type="text"
-                  value={editForm.nickname}
-                  onChange={(e) => handleEditField("nickname", e.target.value)}
-                />
-              </label>
-            )}
+                {!isApplied && (
+                  <label>
+                    Nickname
+                    <input
+                      type="text"
+                      value={editForm.nickname}
+                      onChange={(e) => handleEditField("nickname", e.target.value)}
+                    />
+                  </label>
+                )}
 
-            {isApplied && (
-              <>
+                {isApplied && (
+                  <>
+                    <label>
+                      Title
+                      <input
+                        type="text"
+                        value={editForm.title}
+                        onChange={(e) => handleEditField("title", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Display Title
+                      <input
+                        type="text"
+                        value={editForm.display_title}
+                        onChange={(e) => handleEditField("display_title", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Tags (comma separated)
+                      <input
+                        type="text"
+                        value={editForm.tags}
+                        onChange={(e) => handleEditField("tags", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Alt text (SEO)
+                      <input
+                        type="text"
+                        value={editForm.alt_text}
+                        onChange={(e) => handleEditField("alt_text", e.target.value)}
+                      />
+                    </label>
+                    <label className="asp-kicker-field">
+                      <span>Kicker (optional)</span>
+                      <KickerDropdown
+                        value={editForm.kicker_id}
+                        onChange={(next) => setEditForm((prev) => ({ ...prev, kicker_id: next || "" }))}
+                      />
+                    </label>
+                  </>
+                )}
+
                 <label>
-                  Title
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={(e) => handleEditField("title", e.target.value)}
+                  Public Notes (shown in viewer)
+                  <textarea
+                    rows={3}
+                    value={editForm.notes}
+                    onChange={(e) => handleEditField("notes", e.target.value)}
                   />
                 </label>
-                <label>
-                  Display Title
-                  <input
-                    type="text"
-                    value={editForm.display_title}
-                    onChange={(e) => handleEditField("display_title", e.target.value)}
-                  />
-                </label>
-                <label>
-                  Tags (comma separated)
-                  <input
-                    type="text"
-                    value={editForm.tags}
-                    onChange={(e) => handleEditField("tags", e.target.value)}
-                  />
-                </label>
-                <label>
-                  Alt text (SEO)
-                  <input
-                    type="text"
-                    value={editForm.alt_text}
-                    onChange={(e) => handleEditField("alt_text", e.target.value)}
-                  />
-                </label>
-                <label className="asp-kicker-field">
-                  <span>Kicker (optional)</span>
-                  <KickerDropdown
-                    value={editForm.kicker_id}
-                    onChange={(next) => setEditForm((prev) => ({ ...prev, kicker_id: next || "" }))}
-                  />
-                </label>
-              </>
-            )}
 
-            <label>
-              Public Notes (shown in viewer)
-              <textarea
-                rows={3}
-                value={editForm.notes}
-                onChange={(e) => handleEditField("notes", e.target.value)}
-              />
-            </label>
+                {!isApplied && (
+                  <label>
+                    Private Notes (for me)
+                    <textarea
+                      rows={3}
+                      value={editForm.private_notes}
+                      onChange={(e) => handleEditField("private_notes", e.target.value)}
+                    />
+                  </label>
+                )}
 
-            {!isApplied && (
-              <label>
-                Private Notes (for me)
-                <textarea
-                  rows={3}
-                  value={editForm.private_notes}
-                  onChange={(e) => handleEditField("private_notes", e.target.value)}
-                />
-              </label>
-            )}
+                {!isApplied && (
+                  <label className="asp-modal-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={!!editForm.terry_fav}
+                      onChange={(e) => handleEditField("terry_fav", e.target.checked)}
+                    />
+                    Mark as Terry favorite
+                  </label>
+                )}
 
-            {!isApplied && (
-              <label className="asp-modal-checkbox">
-                <input
-                  type="checkbox"
-                  checked={!!editForm.terry_fav}
-                  onChange={(e) => handleEditField("terry_fav", e.target.checked)}
-                />
-                Mark as Terry favorite
-              </label>
-            )}
+                {editStatus.error && <div className="asp-error">{editStatus.error}</div>}
+                {editStatus.success && <div className="asp-success">{editStatus.success}</div>}
 
-            {editStatus.error && <div className="asp-error">{editStatus.error}</div>}
-            {editStatus.success && <div className="asp-success">{editStatus.success}</div>}
+                <div className="asp-modal-actions">
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.location.href = returnTo;
+                      }
+                    }}
+                  >
+                    ← Back To Library
+                  </button>
+                  <button type="submit" disabled={editStatus.loading}>
+                    {editStatus.loading ? "Saving…" : "Save Changes"}
+                  </button>
+                </div>
+              </div>
 
-            <div className="asp-modal-actions">
-              <button type="submit" disabled={editStatus.loading}>
-                {editStatus.loading ? "Saving…" : "Save Changes"}
-              </button>
+              {!isApplied && viewerPreviewUrl && (
+                <aside className="app-palette-photos__preview-column">
+                  <div className="app-palette-photos__viewer-preview">
+                    <div className="app-palette-photos__viewer-preview-head">
+                      <strong>Live Viewer</strong>
+                      <span>Quick check only</span>
+                    </div>
+                    <iframe
+                      key={viewerPreviewUrl}
+                      className="app-palette-photos__viewer-frame"
+                      src={viewerPreviewUrl}
+                      title="Palette viewer preview"
+                    />
+                  </div>
+                </aside>
+              )}
             </div>
           </form>
         </div>

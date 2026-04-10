@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import { buildImageUrl } from "@helpers/assetImage";
+import PhotoPickerModal from "@components/PhotoPickerModal";
 import "./admin-articles.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/articles/list.php`;
@@ -18,6 +20,7 @@ const emptyArticle = {
   slug: "",
   meta_description: "",
   hero_asset_id: "",
+  hero_mobile_asset_id: "",
   cta_overrides: "",
   featured: false,
   published_at: "",
@@ -25,8 +28,43 @@ const emptyArticle = {
   sections: [],
 };
 
-const sectionKinds = ["text", "image", "palette_link", "cta", "embed", "list", "header"];
+const sectionKindOptions = [
+  { value: "text", label: "Text", help: "Text only" },
+  { value: "image", label: "Image", help: "Image only" },
+  { value: "image_text", label: "Image + Text", help: "Image and text" },
+  { value: "header", label: "Header", help: "Heading only" },
+  { value: "list", label: "List", help: "Bullet list from body lines" },
+  { value: "embed", label: "Embed", help: "Raw embed HTML" },
+  { value: "cta", label: "CTA", help: "Callout text" },
+  { value: "palette_link", label: "Palette Link", help: "Palette reference" },
+];
 const articleTypes = ["colorfix", "theme", "guide"];
+
+function normalizeSectionForEditor(section = {}) {
+  const hasImage = Number(section.asset_id) > 0;
+  const hasBody = String(section.body || "").trim() !== "";
+  const rawKind = String(section.kind || "text");
+  const kind = rawKind === "image" && hasImage && hasBody ? "image_text" : rawKind;
+  return {
+    ...section,
+    editor_key: section.editor_key || `section-${section.id ?? "new"}-${Math.random().toString(36).slice(2, 10)}`,
+    kind,
+    asset_id: section.asset_id || "",
+    palette_id: section.palette_id || "",
+    caption: section.caption || "",
+    body: section.body || "",
+    heading: section.heading || "",
+    heading_level: section.heading_level || "h2",
+  };
+}
+
+function kindUsesImage(kind) {
+  return kind === "image" || kind === "image_text";
+}
+
+function kindUsesBody(kind) {
+  return kind === "text" || kind === "image_text" || kind === "embed" || kind === "cta" || kind === "list";
+}
 
 function slugify(value = "") {
   return (
@@ -38,22 +76,15 @@ function slugify(value = "") {
   );
 }
 
-function formatTimestamp(value) {
-  if (!value) return "";
-  const date = new Date(value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
 export default function AdminArticlesPage() {
   const [articles, setArticles] = useState([]);
   const [tags, setTags] = useState([]);
   const [filters, setFilters] = useState({ q: "", tags: "", type: "", status: "" });
-  const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyArticle);
   const [ctas, setCtas] = useState([]);
   const [showCtaPicker, setShowCtaPicker] = useState(false);
   const [ctaDraft, setCtaDraft] = useState({ ids: [], overrides: {} });
+  const [photoPickerTarget, setPhotoPickerTarget] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [showList, setShowList] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -131,7 +162,6 @@ export default function AdminArticlesPage() {
       const data = JSON.parse(text);
       if (!data?.ok) throw new Error(data?.error || "Failed to load article");
       const item = data.item || {};
-      setSelectedId(item.id || null);
       setShowEditor(true);
       setForm({
         id: item.id || null,
@@ -142,6 +172,7 @@ export default function AdminArticlesPage() {
         slug: item.slug || "",
         meta_description: item.meta_description || "",
         hero_asset_id: item.hero_asset_id || "",
+        hero_mobile_asset_id: item.hero_mobile_asset_id || "",
         cta_overrides: item.cta_overrides || "",
         featured: !!item.featured,
         published_at: item.published_at || "",
@@ -149,7 +180,7 @@ export default function AdminArticlesPage() {
         tagsText: Array.isArray(item.tags)
           ? item.tags.map((tag) => tag.slug || tag.name).filter(Boolean).join(", ")
           : "",
-        sections: Array.isArray(item.sections) ? item.sections : [],
+        sections: Array.isArray(item.sections) ? item.sections.map(normalizeSectionForEditor) : [],
       });
     } catch (err) {
       setError(err?.message || "Failed to load article");
@@ -157,7 +188,6 @@ export default function AdminArticlesPage() {
   }
 
   function handleNewArticle() {
-    setSelectedId(null);
     setForm({ ...emptyArticle, tagsText: "" });
     setShowEditor(true);
   }
@@ -288,42 +318,12 @@ export default function AdminArticlesPage() {
       if (!data?.ok) throw new Error(data?.error || "Delete failed");
       setStatus("Article deleted.");
       setForm({ ...emptyArticle, tagsText: "" });
-      setSelectedId(null);
       setShowEditor(false);
       await loadArticles();
     } catch (err) {
       setError(err?.message || "Delete failed");
     } finally {
       setDeleting(false);
-    }
-  }
-
-  async function handleTogglePublished(item, isPublished) {
-    setStatus("");
-    setError("");
-    try {
-      const payload = {
-        id: item.id,
-        title: item.title,
-        slug: item.slug,
-        type: item.type,
-        status: isPublished ? "published" : "draft",
-        published_at: isPublished ? new Date().toISOString().slice(0, 19).replace("T", " ") : null,
-      };
-      const res = await fetch(SAVE_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const text = await res.text();
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-      const data = JSON.parse(text);
-      if (!data?.ok) throw new Error(data?.error || "Update failed");
-      setStatus(isPublished ? "Published." : "Unpublished.");
-      await loadArticles();
-    } catch (err) {
-      setError(err?.message || "Update failed");
     }
   }
 
@@ -390,6 +390,7 @@ export default function AdminArticlesPage() {
         : 0;
     const newSection = {
       id: `tmp-${Date.now()}`,
+      editor_key: `section-tmp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       sort_order: `${nextSort}.0`,
       kind: "text",
       heading: "",
@@ -402,20 +403,45 @@ export default function AdminArticlesPage() {
     setForm((prev) => ({ ...prev, sections: [...prev.sections, newSection] }));
   }
 
-  function handleRemoveSection(id) {
+  function handleRemoveSection(editorKey) {
     setForm((prev) => ({
       ...prev,
-      sections: prev.sections.filter((section) => section.id !== id),
+      sections: prev.sections.filter((section) => section.editor_key !== editorKey),
     }));
   }
 
-  function handleSectionChange(id, changes) {
+  function handleSectionChange(editorKey, changes) {
     setForm((prev) => ({
       ...prev,
       sections: prev.sections.map((section) =>
-        section.id === id ? { ...section, ...changes } : section
+        section.editor_key === editorKey ? normalizeSectionForEditor({ ...section, ...changes }) : section
       ),
     }));
+  }
+
+  function openHeroPhotoPicker() {
+    setPhotoPickerTarget({ type: "hero" });
+  }
+
+  function openHeroMobilePhotoPicker() {
+    setPhotoPickerTarget({ type: "hero_mobile" });
+  }
+
+  function openSectionPhotoPicker(editorKey) {
+    setPhotoPickerTarget({ type: "section", sectionId: editorKey });
+  }
+
+  function handlePickPhoto(picked) {
+    if (!picked?.photo_library_id) return;
+    const nextId = String(picked.photo_library_id);
+    if (photoPickerTarget?.type === "hero") {
+      setForm((prev) => ({ ...prev, hero_asset_id: nextId }));
+    } else if (photoPickerTarget?.type === "hero_mobile") {
+      setForm((prev) => ({ ...prev, hero_mobile_asset_id: nextId }));
+    } else if (photoPickerTarget?.type === "section" && photoPickerTarget?.sectionId != null) {
+      handleSectionChange(photoPickerTarget.sectionId, { asset_id: nextId });
+    }
+    setPhotoPickerTarget(null);
   }
 
   function buildPayload(article) {
@@ -449,6 +475,7 @@ export default function AdminArticlesPage() {
       slug: article.slug || "",
       meta_description: article.meta_description || "",
       hero_asset_id: article.hero_asset_id ? Number(article.hero_asset_id) : null,
+      hero_mobile_asset_id: article.hero_mobile_asset_id ? Number(article.hero_mobile_asset_id) : null,
       cta_overrides: article.cta_overrides || "",
       featured: !!article.featured,
       published_at: publishedAt,
@@ -471,15 +498,16 @@ export default function AdminArticlesPage() {
           .map((entry) => entry.section);
         return ordered;
       })().map((section, idx) => {
+        const kind = section.kind || "text";
         const sectionPayload = {
           sort_order: idx,
-          kind: section.kind || "text",
+          kind,
           heading: section.heading || null,
           heading_level: section.heading_level || null,
-          body: section.body || null,
-          caption: section.caption || null,
-          asset_id: section.asset_id ? Number(section.asset_id) : null,
-          palette_id: section.palette_id ? Number(section.palette_id) : null,
+          body: kindUsesBody(kind) ? section.body || null : null,
+          caption: kindUsesImage(kind) ? section.caption || null : null,
+          asset_id: kindUsesImage(kind) && section.asset_id ? Number(section.asset_id) : null,
+          palette_id: kind === "palette_link" && section.palette_id ? Number(section.palette_id) : null,
         };
         if (typeof section.id === "number") {
           sectionPayload.id = section.id;
@@ -719,7 +747,7 @@ export default function AdminArticlesPage() {
               />
             </label>
             <label>
-              Photo Library ID
+              Hero Image ID
               <div className="admin-articles__asset-row">
                 <input
                   type="number"
@@ -728,9 +756,24 @@ export default function AdminArticlesPage() {
                     setForm((prev) => ({ ...prev, hero_asset_id: e.target.value }))
                   }
                 />
-                <a href="/admin/photo-library" target="_blank" rel="noreferrer">
+                <button type="button" onClick={openHeroPhotoPicker}>
                   Find
-                </a>
+                </button>
+              </div>
+            </label>
+            <label>
+              Mobile Hero Image ID
+              <div className="admin-articles__asset-row">
+                <input
+                  type="number"
+                  value={form.hero_mobile_asset_id || ""}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, hero_mobile_asset_id: e.target.value }))
+                  }
+                />
+                <button type="button" onClick={openHeroMobilePhotoPicker}>
+                  Find
+                </button>
               </div>
             </label>
           </div>
@@ -789,7 +832,13 @@ export default function AdminArticlesPage() {
             </div>
 
             {form.sections.map((section) => (
-              <div key={section.id} className="admin-articles__section-card">
+              <div key={section.editor_key} className="admin-articles__section-card">
+                {(() => {
+                  const usesImage = kindUsesImage(section.kind);
+                  const usesBody = kindUsesBody(section.kind);
+                  const usesPalette = section.kind === "palette_link";
+                  return (
+                    <>
                 <div className="admin-articles__section-row">
                   <label>
                     Sort
@@ -798,7 +847,7 @@ export default function AdminArticlesPage() {
                       step="0.1"
                       value={section.sort_order ?? 0}
                       onChange={(e) =>
-                        handleSectionChange(section.id, { sort_order: e.target.value })
+                        handleSectionChange(section.editor_key, { sort_order: e.target.value })
                       }
                     />
                   </label>
@@ -807,41 +856,45 @@ export default function AdminArticlesPage() {
                     <select
                       value={section.kind || "text"}
                       onChange={(e) =>
-                        handleSectionChange(section.id, { kind: e.target.value })
+                        handleSectionChange(section.editor_key, { kind: e.target.value })
                       }
                     >
-                      {sectionKinds.map((kind) => (
-                        <option key={kind} value={kind}>
-                          {kind}
+                      {sectionKindOptions.map((kind) => (
+                        <option key={kind.value} value={kind.value}>
+                          {kind.label} ({kind.help})
                         </option>
                       ))}
                     </select>
                   </label>
-                  <label>
-                    Photo Library ID
-                    <div className="admin-articles__asset-row">
+                  {usesImage && (
+                    <label>
+                      Photo Library ID
+                      <div className="admin-articles__asset-row">
+                        <input
+                          type="number"
+                          value={section.asset_id || ""}
+                          onChange={(e) =>
+                            handleSectionChange(section.editor_key, { asset_id: e.target.value })
+                          }
+                        />
+                        <button type="button" onClick={() => openSectionPhotoPicker(section.editor_key)}>
+                          Find
+                        </button>
+                      </div>
+                    </label>
+                  )}
+                  {usesPalette && (
+                    <label>
+                      Palette ID
                       <input
                         type="number"
-                        value={section.asset_id || ""}
+                        value={section.palette_id || ""}
                         onChange={(e) =>
-                          handleSectionChange(section.id, { asset_id: e.target.value })
+                          handleSectionChange(section.editor_key, { palette_id: e.target.value })
                         }
                       />
-                      <a href="/admin/photo-library" target="_blank" rel="noreferrer">
-                        Find
-                      </a>
-                    </div>
-                  </label>
-                  <label>
-                    Palette ID
-                    <input
-                      type="number"
-                      value={section.palette_id || ""}
-                      onChange={(e) =>
-                        handleSectionChange(section.id, { palette_id: e.target.value })
-                      }
-                    />
-                  </label>
+                    </label>
+                  )}
                 </div>
                 <div className="admin-articles__heading-row">
                   <label className="admin-articles__heading-field">
@@ -850,7 +903,7 @@ export default function AdminArticlesPage() {
                       type="text"
                       value={section.heading || ""}
                       onChange={(e) =>
-                        handleSectionChange(section.id, { heading: e.target.value })
+                        handleSectionChange(section.editor_key, { heading: e.target.value })
                       }
                     />
                   </label>
@@ -859,7 +912,7 @@ export default function AdminArticlesPage() {
                     <select
                       value={section.heading_level || "h2"}
                       onChange={(e) =>
-                        handleSectionChange(section.id, { heading_level: e.target.value })
+                        handleSectionChange(section.editor_key, { heading_level: e.target.value })
                       }
                     >
                       {["h1", "h2", "h3", "h4", "h5", "h6"].map((level) => (
@@ -870,24 +923,39 @@ export default function AdminArticlesPage() {
                     </select>
                   </label>
                 </div>
-                <label>
-                  Body
-                  <textarea
-                    rows={6}
-                    value={section.body || ""}
-                    onChange={(e) =>
-                      handleSectionChange(section.id, { body: e.target.value })
-                    }
-                  />
-                </label>
-                {section.kind === "image" && (
+                {usesBody && (
+                  <label>
+                    {section.kind === "list" ? "List Items" : "Body"}
+                    <textarea
+                      rows={6}
+                      value={section.body || ""}
+                      onChange={(e) =>
+                        handleSectionChange(section.editor_key, { body: e.target.value })
+                      }
+                    />
+                  </label>
+                )}
+                {usesImage && section.asset?.rel_path && (
+                  <div className="admin-articles__cta-item">
+                    <div className="admin-articles__cta-title">Current image</div>
+                    <div className="admin-articles__cta-meta">
+                      {section.asset.photo_library_id || section.asset_id}
+                    </div>
+                    <img
+                      src={buildImageUrl(section.asset.rel_path, section.asset.updated_at || null)}
+                      alt={section.asset.alt_text || section.heading || ""}
+                      style={{ maxWidth: "220px", borderRadius: "12px", marginTop: "10px" }}
+                    />
+                  </div>
+                )}
+                {usesImage && (
                   <label>
                     Caption
                     <input
                       type="text"
                       value={section.caption || ""}
                       onChange={(e) =>
-                        handleSectionChange(section.id, { caption: e.target.value })
+                        handleSectionChange(section.editor_key, { caption: e.target.value })
                       }
                     />
                   </label>
@@ -896,7 +964,7 @@ export default function AdminArticlesPage() {
                   <button
                     type="button"
                     className="admin-articles__danger"
-                    onClick={() => handleRemoveSection(section.id)}
+                    onClick={() => handleRemoveSection(section.editor_key)}
                   >
                     Remove
                   </button>
@@ -904,6 +972,9 @@ export default function AdminArticlesPage() {
                     Save
                   </button>
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
 
@@ -1041,6 +1112,13 @@ export default function AdminArticlesPage() {
           </div>
         </div>
       )}
+
+      <PhotoPickerModal
+        open={photoPickerTarget != null}
+        title="Pick Article Photo"
+        onClose={() => setPhotoPickerTarget(null)}
+        onPick={handlePickPhoto}
+      />
     </div>
   );
 }
