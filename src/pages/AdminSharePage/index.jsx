@@ -1,0 +1,580 @@
+import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
+import ClientPickerModal from "@components/ClientPickerModal";
+import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
+import "./admin-share.css";
+
+const PLAYLIST_INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
+const PLAYLIST_INSTANCE_SETS_URL = `${API_FOLDER}/v2/admin/playlist-instance-sets/list.php`;
+const SAVED_PALETTES_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
+const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/share/send-email.php`;
+
+const ASSET_TYPE_OPTIONS = [
+  { value: "playlist_instance", label: "Playlist Instance" },
+  { value: "saved_palette", label: "Saved Palette" },
+  { value: "playlist_instance_set", label: "Playlist Set" },
+];
+
+const emptyRecipient = {
+  id: null,
+  name: "",
+  email: "",
+  phone: "",
+};
+
+function normalizeAssetItems(assetType, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+
+  if (assetType === "playlist_instance") {
+    return list
+      .map((row) => ({
+        ...row,
+        playlist_instance_id: row?.playlist_instance_id ?? row?.id ?? null,
+        display_title: row?.display_title ?? row?.title ?? "",
+        instance_name: row?.instance_name ?? row?.name ?? "",
+        audience: row?.audience ?? "any",
+        instance_notes: row?.instance_notes ?? row?.notes ?? "",
+      }))
+      .filter((row) => row.playlist_instance_id);
+  }
+
+  if (assetType === "saved_palette") {
+    return list
+      .map((row) => ({
+        ...row,
+        id: row?.id ?? row?.palette_id ?? row?.saved_palette_id ?? null,
+        nickname: row?.nickname ?? row?.title ?? row?.display_title ?? "",
+        brand: row?.brand ?? row?.palette_brand ?? "",
+        palette_type: row?.palette_type ?? row?.type ?? "",
+        palette_hash: row?.palette_hash ?? row?.hash ?? "",
+      }))
+      .filter((row) => row.id || row.palette_hash);
+  }
+
+  return list
+    .map((row) => ({
+      ...row,
+      id: row?.id ?? row?.set_id ?? row?.playlist_instance_set_id ?? null,
+      title: row?.title ?? row?.name ?? "",
+      handle: row?.handle ?? row?.slug ?? "",
+      context: row?.context ?? row?.subtitle ?? "",
+    }))
+    .filter((row) => row.id);
+}
+
+function isTextCapableDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /iPhone|iPad|Android|Macintosh/i.test(ua);
+}
+
+function buildSmsShareUrl(phone, body) {
+  const recipient = (phone || "").trim();
+  const encodedBody = encodeURIComponent(body);
+
+  if (typeof navigator === "undefined") {
+    return `sms:${recipient}?body=${encodedBody}`;
+  }
+
+  const ua = navigator.userAgent || "";
+  const isAppleDevice = /iPhone|iPad|Macintosh/i.test(ua);
+  const separator = recipient && isAppleDevice ? "&" : "?";
+
+  return `sms:${recipient}${separator}body=${encodedBody}`;
+}
+
+function buildAssetLabel(assetType, item) {
+  if (!item) return "";
+  if (assetType === "playlist_instance") {
+    return item.display_title || item.instance_name || `Playlist Instance #${item.playlist_instance_id}`;
+  }
+  if (assetType === "saved_palette") {
+    if (item.nickname) return item.nickname;
+    if (item.brand) return String(item.brand).toUpperCase();
+    if (item.id) return `Saved Palette #${item.id}`;
+    if (item.palette_hash) return "Saved Palette";
+    return "Saved Palette";
+  }
+  return item.title || item.handle || `Set #${item.id}`;
+}
+
+function buildAssetMeta(assetType, item) {
+  if (!item) return "";
+  if (assetType === "playlist_instance") {
+    const parts = [`#${item.playlist_instance_id}`];
+    if (item.audience && item.audience !== "any") parts.push(item.audience);
+    if (item.instance_notes) parts.push(item.instance_notes);
+    return parts.join(" · ");
+  }
+  if (assetType === "saved_palette") {
+    const parts = [];
+    if (item.id) parts.push(`#${item.id}`);
+    if (item.brand) parts.push(String(item.brand).toUpperCase());
+    if (item.palette_type) parts.push(item.palette_type);
+    return parts.join(" · ");
+  }
+  const parts = [`#${item.id}`];
+  if (item.handle) parts.push(item.handle);
+  if (item.context) parts.push(item.context);
+  return parts.join(" · ");
+}
+
+function buildShareLink(assetType, item) {
+  if (!item || typeof window === "undefined") return "";
+
+  if (assetType === "playlist_instance") {
+    const params = new URLSearchParams();
+    params.set("id", String(item.playlist_instance_id));
+    if (item.audience && item.audience !== "any") {
+      params.set("aud", item.audience);
+    }
+    return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
+  }
+
+  if (assetType === "saved_palette") {
+    if (!item.palette_hash) return "";
+    return `${window.location.origin}/palette/${encodeURIComponent(item.palette_hash)}/share`;
+  }
+
+  if (!item.id) return "";
+  return `${window.location.origin}/picker?psi=${encodeURIComponent(String(item.id))}`;
+}
+
+function buildEmailDefaults(assetType, item, shareLink) {
+  const label = buildAssetLabel(assetType, item);
+  if (assetType === "playlist_instance") {
+    return {
+      subject: `ColorFix Playlist: ${label}`,
+      message: `I wanted to share this ColorFix playlist with you.\n\n${shareLink}`,
+    };
+  }
+  if (assetType === "saved_palette") {
+    return {
+      subject: `ColorFix Palette: ${label}`,
+      message: `I wanted to share this ColorFix palette with you.\n\n${shareLink}`,
+    };
+  }
+  return {
+    subject: `ColorFix Playlist Set: ${label}`,
+    message: `I wanted to share this ColorFix playlist set with you.\n\n${shareLink}`,
+  };
+}
+
+export default function AdminSharePage() {
+  const [assetType, setAssetType] = useState("playlist_instance");
+  const [query, setQuery] = useState("");
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [recipient, setRecipient] = useState(emptyRecipient);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [status, setStatus] = useState({ error: "", success: "" });
+  const [emailModal, setEmailModal] = useState({
+    open: false,
+    toEmail: "",
+    subject: "",
+    message: "",
+    htmlBody: "",
+    status: { loading: false, error: "", success: "" },
+  });
+  const [sendFormat, setSendFormat] = useState("text");
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function loadItems() {
+      setLoading(true);
+      setError("");
+      setItems([]);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        params.set("limit", "50");
+        params.set("_", String(Date.now()));
+
+        let url = PLAYLIST_INSTANCES_URL;
+        if (assetType === "saved_palette") {
+          url = SAVED_PALETTES_URL;
+        } else if (assetType === "playlist_instance_set") {
+          url = PLAYLIST_INSTANCE_SETS_URL;
+        }
+
+        const res = await fetch(`${url}?${params.toString()}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load assets");
+        if (cancelled) return;
+        setItems(normalizeAssetItems(assetType, data.items));
+      } catch (err) {
+        if (err?.name === "AbortError") return;
+        if (cancelled) return;
+        setItems([]);
+        setError(err?.message || "Failed to load assets");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadItems();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [assetType, query]);
+
+  useEffect(() => {
+    if (!selectedAsset) return;
+    const selectedKey = getAssetKey(assetType, selectedAsset);
+    const nextMatch = items.find((item) => getAssetKey(assetType, item) === selectedKey);
+    if (nextMatch) {
+      setSelectedAsset(nextMatch);
+    }
+  }, [assetType, items, selectedAsset]);
+
+  useEffect(() => {
+    setSelectedAsset(null);
+    setStatus({ error: "", success: "" });
+  }, [assetType]);
+
+  const shareLink = useMemo(
+    () => buildShareLink(assetType, selectedAsset),
+    [assetType, selectedAsset]
+  );
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) =>
+      buildAssetLabel(assetType, a).localeCompare(buildAssetLabel(assetType, b), undefined, {
+        sensitivity: "base",
+        numeric: true,
+      })
+    );
+  }, [assetType, items]);
+
+  const canText = isTextCapableDevice();
+  const canSystemShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  function handleRecipientField(field, value) {
+    setRecipient((prev) => ({ ...prev, [field]: value }));
+    setStatus({ error: "", success: "" });
+  }
+
+  function handlePickClient(client) {
+    setRecipient({
+      id: client?.id ?? null,
+      name: client?.name || "",
+      email: client?.email || "",
+      phone: client?.phone || "",
+    });
+    setPickerOpen(false);
+    setStatus({ error: "", success: "" });
+  }
+
+  async function handleCopyLink() {
+    if (!shareLink) return;
+    if (!navigator.clipboard?.writeText) {
+      setStatus({ error: "Clipboard is not available in this browser.", success: "" });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setStatus({ error: "", success: "Share link copied." });
+    } catch {
+      setStatus({ error: "Copy failed.", success: "" });
+    }
+  }
+
+  async function handleSystemShare() {
+    if (!shareLink || !canSystemShare) return;
+    try {
+      await navigator.share({
+        title: buildAssetLabel(assetType, selectedAsset),
+        text: buildAssetLabel(assetType, selectedAsset),
+        url: shareLink,
+      });
+    } catch {
+      // ignore cancelled shares
+    }
+  }
+
+  function handleTextLink() {
+    if (!shareLink) return;
+    const body = `${buildAssetLabel(assetType, selectedAsset)} ${shareLink}`;
+    window.location.href = buildSmsShareUrl(recipient.phone, body);
+  }
+
+  function openEmailModal() {
+    if (!selectedAsset || !shareLink) return;
+    const defaults = buildEmailDefaults(assetType, selectedAsset, shareLink);
+    setEmailModal({
+      open: true,
+      toEmail: recipient.email || "",
+      subject: defaults.subject,
+      message: defaults.message,
+      htmlBody: "",
+      status: { loading: false, error: "", success: "" },
+    });
+    setSendFormat("text");
+  }
+
+  function closeEmailModal() {
+    setEmailModal((prev) => ({ ...prev, open: false }));
+  }
+
+  async function handleSendEmail() {
+    if (!selectedAsset || !shareLink) return;
+    const toEmail = emailModal.toEmail.trim();
+    if (!toEmail) {
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: "Recipient email required.", success: "" },
+      }));
+      return;
+    }
+
+    setEmailModal((prev) => ({
+      ...prev,
+      status: { loading: true, error: "", success: "" },
+    }));
+
+    try {
+      const res = await fetch(SEND_EMAIL_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset_type: assetType,
+          asset_id: getAssetId(assetType, selectedAsset),
+          share_url: shareLink,
+          title: buildAssetLabel(assetType, selectedAsset),
+          to_email: toEmail,
+          subject: emailModal.subject,
+          message: emailModal.message,
+          html_body: sendFormat === "html" ? emailModal.htmlBody : "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to send email");
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: "", success: "Email sent." },
+      }));
+      setStatus({ error: "", success: "Email sent from ColorFix." });
+    } catch (err) {
+      setEmailModal((prev) => ({
+        ...prev,
+        status: { loading: false, error: err?.message || "Failed to send email", success: "" },
+      }));
+    }
+  }
+
+  return (
+    <div className="admin-share">
+      <aside className="admin-share__sidebar">
+        <div className="admin-share__sidebar-header">
+          <h1>Admin Share</h1>
+          <p>Pick a client, choose an asset, and send it from one place.</p>
+        </div>
+
+        <section className="admin-share__panel admin-share__panel--sidebar">
+          <div className="admin-share__panel-head">
+            <div>
+              <h2>Send</h2>
+              <p>Copy, text, or email the selected asset.</p>
+            </div>
+          </div>
+
+          <div className="admin-share__summary">
+            <div className="admin-share__summary-label">Selected asset</div>
+            <div className="admin-share__summary-title">
+              {selectedAsset ? buildAssetLabel(assetType, selectedAsset) : "Nothing selected yet"}
+            </div>
+            <div className="admin-share__summary-meta">
+              {selectedAsset ? buildAssetMeta(assetType, selectedAsset) : "Pick an asset from the list on the right."}
+            </div>
+          </div>
+
+          <label className="admin-share__field">
+            <span>Share link</span>
+            <input type="text" readOnly value={shareLink} placeholder="Select an asset to build the link" />
+          </label>
+
+          <div className="admin-share__actions">
+            {canSystemShare ? (
+              <button type="button" className="admin-share__btn" onClick={handleSystemShare} disabled={!shareLink}>
+                System Share
+              </button>
+            ) : null}
+            {canText ? (
+              <button type="button" className="admin-share__btn" onClick={handleTextLink} disabled={!shareLink}>
+                Text Link
+              </button>
+            ) : null}
+            <button type="button" className="admin-share__btn" onClick={handleCopyLink} disabled={!shareLink}>
+              Copy Link
+            </button>
+            <button type="button" className="admin-share__btn admin-share__btn--primary" onClick={openEmailModal} disabled={!shareLink}>
+              Email from ColorFix
+            </button>
+          </div>
+
+          {status.error && <div className="admin-share__status admin-share__status--error">{status.error}</div>}
+          {status.success && <div className="admin-share__status admin-share__status--success">{status.success}</div>}
+        </section>
+
+        <div className="admin-share__panel admin-share__panel--sidebar">
+          <div className="admin-share__panel-head admin-share__panel-head--recipient">
+            <div>
+              <h2>Recipient</h2>
+              <p>Leave blank if you want. Use search to fill from clients.</p>
+            </div>
+            <button
+              type="button"
+              className="admin-share__icon-btn"
+              onClick={() => setPickerOpen(true)}
+              title="Search client database"
+              aria-label="Search client database"
+            >
+              <Search size={16} strokeWidth={2.2} />
+            </button>
+          </div>
+
+          <label className="admin-share__field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={recipient.name}
+              onChange={(e) => handleRecipientField("name", e.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+          <label className="admin-share__field">
+            <span>Email</span>
+            <input
+              type="email"
+              value={recipient.email}
+              onChange={(e) => handleRecipientField("email", e.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+          <label className="admin-share__field">
+            <span>Phone</span>
+            <input
+              type="text"
+              value={recipient.phone}
+              onChange={(e) => handleRecipientField("phone", e.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+
+          <div className="admin-share__actions">
+            <button type="button" className="admin-share__btn" onClick={() => setRecipient(emptyRecipient)}>
+              Clear
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <main className="admin-share__main">
+        <section className="admin-share__panel admin-share__panel--asset-browser">
+          <div className="admin-share__panel-head">
+            <div>
+              <h2>Asset</h2>
+              <p>Search the thing you want to send.</p>
+            </div>
+          </div>
+
+          <div className="admin-share__toolbar">
+            <label className="admin-share__field">
+              <span>Type</span>
+              <select value={assetType} onChange={(e) => setAssetType(e.target.value)}>
+                {ASSET_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="admin-share__field admin-share__field--grow">
+              <span>Search</span>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Title, name, handle, notes"
+              />
+            </label>
+          </div>
+
+          {error && <div className="admin-share__status admin-share__status--error">{error}</div>}
+          {loading && <div className="admin-share__status">Loading assets…</div>}
+
+          <div className="admin-share__asset-list">
+            {!loading && sortedItems.length === 0 ? (
+              <div className="admin-share__status">No assets matched.</div>
+            ) : null}
+            {sortedItems.map((item) => {
+              const assetKey = getAssetKey(assetType, item);
+              const isActive = assetKey === getAssetKey(assetType, selectedAsset);
+              return (
+                <button
+                  key={assetKey}
+                  type="button"
+                  className={`admin-share__asset-card${isActive ? " is-active" : ""}`}
+                  onClick={() => {
+                    setSelectedAsset(item);
+                    setStatus({ error: "", success: "" });
+                  }}
+                >
+                  <div className="admin-share__asset-title">{buildAssetLabel(assetType, item)}</div>
+                  <div className="admin-share__asset-meta">{buildAssetMeta(assetType, item)}</div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </main>
+
+      <ClientPickerModal
+        open={pickerOpen}
+        title="Pick Recipient"
+        onClose={() => setPickerOpen(false)}
+        onPick={handlePickClient}
+      />
+
+      <EmailShareModal
+        open={emailModal.open}
+        title={`Send ${selectedAsset ? buildAssetLabel(assetType, selectedAsset) : "Link"}`}
+        templates={[]}
+        templateKey=""
+        toEmail={emailModal.toEmail}
+        onToEmailChange={(value) => setEmailModal((prev) => ({ ...prev, toEmail: value }))}
+        subject={emailModal.subject}
+        onSubjectChange={(value) => setEmailModal((prev) => ({ ...prev, subject: value }))}
+        htmlBody={emailModal.htmlBody}
+        onHtmlBodyChange={(value) => setEmailModal((prev) => ({ ...prev, htmlBody: value }))}
+        message={emailModal.message}
+        onMessageChange={(value) => setEmailModal((prev) => ({ ...prev, message: value }))}
+        sendFormat={sendFormat}
+        onSendFormatChange={setSendFormat}
+        shareLink={shareLink}
+        status={emailModal.status}
+        onSend={handleSendEmail}
+        onClose={closeEmailModal}
+      />
+    </div>
+  );
+}
+
+function getAssetId(assetType, item) {
+  if (!item) return "";
+  if (assetType === "playlist_instance") return item.playlist_instance_id;
+  return item.id;
+}
+
+function getAssetKey(assetType, item) {
+  if (!item) return "";
+  return `${assetType}:${getAssetId(assetType, item)}`;
+}

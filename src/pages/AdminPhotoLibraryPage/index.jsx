@@ -57,6 +57,7 @@ const defaultFilters = {
   palette_id: "",
   sort: "newest",
   include_inactive: false,
+  missing_tags: false,
 };
 
 const buildClientGroupId = (clientId) => `client:${clientId}`;
@@ -107,6 +108,18 @@ function formatDeleteUsageMessage(item, usages = []) {
   return [...header, ...lines, "", "Remove those references first, then delete it from Photo Library."].join("\n");
 }
 
+function formatAiAltStatus(item) {
+  const status = item?.ai_alt_status || "";
+  if (!status && item?.ai_alt_generated_at) return "AI alt generated";
+  if (!status) return "";
+  if (status === "complete") return item?.ai_alt_generated_at ? `AI alt generated ${item.ai_alt_generated_at}` : "AI alt generated";
+  if (status === "processing") return "AI alt processing now";
+  if (status === "retry") return item?.ai_alt_next_attempt_at ? `AI alt retry ${item.ai_alt_next_attempt_at}` : "AI alt queued for retry";
+  if (status === "pending") return "AI alt queued";
+  if (status === "failed") return item?.ai_alt_error ? `AI alt failed: ${item.ai_alt_error}` : "AI alt failed";
+  return `AI alt ${status}`;
+}
+
 export default function AdminPhotoLibraryPage() {
   const initialUrlState = (() => {
     if (typeof window === "undefined") {
@@ -122,6 +135,7 @@ export default function AdminPhotoLibraryPage() {
     const paletteId = params.get("palette_id") || "";
     const sort = params.get("sort") || defaultFilters.sort;
     const includeInactive = params.get("include_inactive") === "1";
+    const missingTags = params.get("missing_tags") === "1";
     const photoLibraryIds = params.get("photo_library_ids") || "";
     return {
       filters: {
@@ -131,6 +145,7 @@ export default function AdminPhotoLibraryPage() {
         palette_id: paletteId,
         sort,
         include_inactive: includeInactive,
+        missing_tags: missingTags,
       },
       searchInput: q,
       photoLibraryIds,
@@ -156,6 +171,7 @@ export default function AdminPhotoLibraryPage() {
   const [replaceFiles, setReplaceFiles] = useState({});
   const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
   const [thumbNonce, setThumbNonce] = useState(() => String(Date.now()));
+  const [thumbStates, setThumbStates] = useState({});
 
   const [savedPalettes, setSavedPalettes] = useState([]);
   const [clients, setClients] = useState([]);
@@ -177,6 +193,18 @@ export default function AdminPhotoLibraryPage() {
     setImageRefreshEnabledState(next);
     setRefreshKey((value) => value + 1);
     setThumbNonce(String(Date.now()));
+  }
+
+  function getThumbState(photoLibraryId) {
+    return thumbStates[String(photoLibraryId)] || "loading";
+  }
+
+  function markThumbLoaded(photoLibraryId) {
+    setThumbStates((prev) => ({ ...prev, [String(photoLibraryId)]: "loaded" }));
+  }
+
+  function markThumbError(photoLibraryId) {
+    setThumbStates((prev) => ({ ...prev, [String(photoLibraryId)]: "error" }));
   }
 
   useEffect(() => {
@@ -325,6 +353,26 @@ export default function AdminPhotoLibraryPage() {
     return "Ranch progression";
   }, [uploadForm.source_type]);
 
+  const seriesOptions = useMemo(() => {
+    const labels = new Set();
+    const extractSeries = (item) => {
+      const direct = String(item?.series || "").trim();
+      if (direct) return direct;
+      const path = String(item?.raw_rel_path || item?.rel_path || item?.image_url || "").trim();
+      const match = path.match(/\/photos\/[^/]+\/([^/]+)\//i);
+      return match?.[1] ? String(match[1]).trim() : "";
+    };
+
+    (items || []).forEach((item) => {
+      const label = extractSeries(item);
+      if (label) labels.add(label);
+    });
+
+    return Array.from(labels).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+    );
+  }, [items]);
+
   const groupOptions = useMemo(() => {
     const clientOptions = clients
       .filter((client) => Number(client.id) > 0)
@@ -349,6 +397,7 @@ export default function AdminPhotoLibraryPage() {
       setLoading(true);
       setError("");
       setThumbNonce(String(Date.now()));
+      setThumbStates({});
       try {
         const params = new URLSearchParams();
         if (filters.q) params.set("q", filters.q);
@@ -357,6 +406,7 @@ export default function AdminPhotoLibraryPage() {
         if (filters.palette_id) params.set("palette_id", filters.palette_id);
         if (filters.sort) params.set("sort", filters.sort);
         if (filters.include_inactive) params.set("include_inactive", "1");
+        if (filters.missing_tags) params.set("missing_tags", "1");
         params.set("limit", "200");
         params.set("_", Date.now().toString());
         const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -376,7 +426,7 @@ export default function AdminPhotoLibraryPage() {
     return () => {
       active = false;
     };
-  }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, photoLibraryIdsFilter, refreshKey]);
+  }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey]);
 
   const buildAdminImageUrl = (url, updatedAt = null) => {
     const base = buildImageUrl(url, updatedAt, imageRefreshEnabled);
@@ -560,6 +610,10 @@ export default function AdminPhotoLibraryPage() {
 
   const handleUploadSubmit = async (event) => {
     event.preventDefault();
+    if (!uploadForm.tags.trim()) {
+      setUploadStatus({ error: "Add at least one tag before uploading photos.", success: "" });
+      return;
+    }
     if (!files.length) {
       setUploadStatus({ error: "Select at least one photo.", success: "" });
       return;
@@ -1034,10 +1088,16 @@ export default function AdminPhotoLibraryPage() {
               {uploadSeriesLabel}
               <input
                 type="text"
+                list="admin-photo-library-series-options"
                 value={uploadForm.series}
                 onChange={(e) => handleUploadField("series", e.target.value)}
                 placeholder={uploadSeriesPlaceholder}
               />
+              <datalist id="admin-photo-library-series-options">
+                {seriesOptions.map((series) => (
+                  <option key={series} value={series} />
+                ))}
+              </datalist>
             </label>
           )}
 
@@ -1239,6 +1299,14 @@ export default function AdminPhotoLibraryPage() {
             />
             Show retired
           </label>
+          <label className="admin-photo-library__inline-check">
+            <input
+              type="checkbox"
+              checked={!!filters.missing_tags}
+              onChange={(e) => setFilters((prev) => ({ ...prev, missing_tags: e.target.checked }))}
+            />
+            Missing tags
+          </label>
           {filters.source_type === "saved_palette_photo" && (
             <label>
               Palette
@@ -1298,26 +1366,39 @@ export default function AdminPhotoLibraryPage() {
                       </div>
                     </td>
                     <td>
+                      {(() => {
+                        const thumbSrc = buildAdminImageUrl(
+                          item.raw_rel_path || item.rel_path || item.image_url,
+                          item.updated_at || null
+                        );
+                        const thumbState = getThumbState(item.photo_library_id);
+                        return (
                       <button
                         type="button"
                         className="admin-photo-library__thumb"
                         onClick={() =>
                           setPreviewUrl(
-                            buildAdminImageUrl(
-                              item.raw_rel_path || item.rel_path || item.image_url,
-                              item.updated_at || null
-                            )
+                            thumbSrc
                           )
                         }
                       >
+                        {thumbState !== "loaded" ? (
+                          <div
+                            className={`admin-photo-library__thumb-placeholder${thumbState === "error" ? " is-error" : ""}`}
+                          >
+                            {thumbState === "error" ? "Missing" : "Loading..."}
+                          </div>
+                        ) : null}
                         <img
-                          src={buildAdminImageUrl(
-                            item.raw_rel_path || item.rel_path || item.image_url,
-                            item.updated_at || null
-                          )}
+                          src={thumbSrc}
                           alt=""
+                          className={thumbState === "loaded" ? "is-visible" : ""}
+                          onLoad={() => markThumbLoaded(item.photo_library_id)}
+                          onError={() => markThumbError(item.photo_library_id)}
                         />
                       </button>
+                        );
+                      })()}
                       <div className="admin-photo-library__thumb-name">
                         {item.filename || ""}
                       </div>
@@ -1368,6 +1449,12 @@ export default function AdminPhotoLibraryPage() {
                           onChange={(e) => handleLibraryField(item.photo_library_id, "alt_text", e.target.value)}
                           placeholder="alt text"
                         />
+                        {formatAiAltStatus(item) && (
+                          <div className="admin-photo-library__ai-alt-status">
+                            {formatAiAltStatus(item)}
+                            {item.ai_filename_slug ? ` · ${item.ai_filename_slug}` : ""}
+                          </div>
+                        )}
                         <input
                           type="text"
                           value={item.note || ""}

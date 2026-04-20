@@ -269,6 +269,7 @@ function startPlayback(nextMode, nextIndex = 0) {
   const prevItem = prevIndex != null ? playItems[prevIndex] || null : null;
   const title = playItems[titleIndex]?.title || "";
   const subtitle = (playItems[titleIndex]?.subtitle || "").trim();
+  const hasOverlayText = Boolean(title || subtitle);
   const titleMode = playItems[titleIndex]?.title_mode || "animated";
   const transitionMode = (currentItem?.transition || "animation").toLowerCase();
   const subtitleOffset = subtitle ? 0 : 18;
@@ -633,16 +634,16 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
-          {imageLoaded && fadeReady && title && titleVisible && titleReady && !isIntro && (
+          {imageLoaded && fadeReady && hasOverlayText && titleVisible && titleReady && !isIntro && (
             <div
-              className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}`}
+              className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}${title ? "" : " no-title"}`}
               style={{
                 left: titlePos.left,
                 top: Math.max(0, titlePos.top - subtitleOffset),
               }}
               ref={titleRef}
             >
-              <span className="player-title-text">{title}</span>
+              {title ? <span className="player-title-text">{title}</span> : null}
               {subtitle && <span className="player-subtitle-text">{subtitle}</span>}
             </div>
           )}

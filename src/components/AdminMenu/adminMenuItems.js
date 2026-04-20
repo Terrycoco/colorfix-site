@@ -1,29 +1,44 @@
 export const adminMenuItems = [
   {
-    label: "Core",
+    label: "Color DB",
     items: [
       { label: "Colors", href: "/admin/colors" },
       { label: "Categories", href: "/admin/categories" },
       { label: "Supercats", href: "/admin/supercats" },
-      { label: "Roles / Masks", href: "/admin/roles-masks" },
+     { label: "Friends", href: "/admin/friends" },
+      { label: "Missing Chips", href: "/admin/missing-chips" },
+      { label: "LRV Editor", href: "/admin/lrv-editor" },
+      { label: "Color Filters", href: "/admin/filters" },
+      
+    ],
+  },
+    {
+    label: "Site",
+    items: [
+          { label: "Photo Library", href: "/admin/photo-library" },
+      { label: "Articles", href: "/admin/articles" },
+     { label: "Kickers", href: "/admin/kickers" },
+      { label: "CTAs", href: "/admin/ctas" },
+      { label: "Projects", href: "/admin/projects" },
+      { label: "QR Sheets", href: "/admin/qr-sheets" },
+      { label: "Search Presets", href: "/admin/search-presets" },
+      { label: "Clients", href: "/admin/clients" },
+      { label: "Gallery Builder", href: "/admin/sql" },
+      { label: "Gallery Items", href: "/admin/items" },
+      { label: "Hire Terry", href: "/hire-terry"},
+
+      
     ],
   },
   {
     label: "Palettes",
     items: [
       { label: "Saved Palettes", href: "/admin/saved-palettes" },
-      { label: "Palette Photos", href: "/admin/palette-photos" },
-      { label: "Kickers", href: "/admin/kickers" },
-      { label: "Applied Palettes", href: "/admin/applied-palettes" },
-      { label: "Mask Tester", href: "/admin/mask-tester" },
+      { label: "Viewer Setup", href: "/admin/palette-photos" },
     ],
   },
-  {
-    label: "CTAs",
-    items: [
-           { label: "CTA Groups", href: "/admin/ctas" },
-    ],
-  },
+  
+ 
 
   {
     label: "Player",
@@ -49,21 +64,14 @@ export const adminMenuItems = [
   {
     label: "Tools",
     items: [
-      { label: "Articles", href: "/admin/articles" },
-      { label: "Projects", href: "/admin/projects" },
+
       { label: "View Counts", href: "/admin/user-events" },
-      { label: "QR Sheets", href: "/admin/qr-sheets" },
-      { label: "Search Presets", href: "/admin/search-presets" },
       { label: "Ideas/ToDos", href: "/admin/ideas" },
-      { label: "Photo Library", href: "/admin/photo-library" },
+      { label: "Share", href: "/admin/share" },
+  
       { label: "Photo Library Tools", href: "/admin/photo-library-tools" },
-      { label: "Clients", href: "/admin/clients" },
-      { label: "SQL Builder", href: "/admin/sql" },
-      { label: "Items", href: "/admin/items" },
-      { label: "Filters", href: "/admin/filters" },
-      { label: "Friends", href: "/admin/friends" },
-      { label: "Missing Chips", href: "/admin/missing-chips" },
-      { label: "LRV Editor", href: "/admin/lrv-editor" },
+
+
 
     ],
   },

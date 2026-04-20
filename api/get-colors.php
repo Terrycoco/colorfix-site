@@ -1,36 +1,60 @@
 <?php
-header("Content-Type: application/json");
+declare(strict_types=1);
 
-require_once 'db.php'; // DB connection
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-// Enable error reporting during development
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+@ini_set('display_errors', '0');
+@ini_set('log_errors', '1');
+
+require_once __DIR__ . '/db.php';
+
+$logFile = __DIR__ . '/get-colors-error.log';
+$log = static function (string $msg) use ($logFile): void {
+    @file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] $msg\n", FILE_APPEND);
+};
+register_shutdown_function(static function () use ($log): void {
+    $error = error_get_last();
+    if (!$error) return;
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+    if (!in_array($error['type'] ?? 0, $fatalTypes, true)) return;
+    $log(
+        'Fatal shutdown: '
+        . ($error['message'] ?? 'unknown')
+        . ' in ' . ($error['file'] ?? 'unknown')
+        . ':' . ($error['line'] ?? 0)
+    );
+});
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    // Only return summary fields needed for search + swatch display
     $sql = "
-        SELECT 
+        SELECT
             id, name, code, brand, r, g, b,
             hcl_h, hcl_c, hcl_l,
             hue_cats, neutral_cats
         FROM colors
-        ORDER BY name ASC;
+        ORDER BY name ASC
     ";
 
     $stmt = $pdo->query($sql);
-    $colors = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $colors = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
     echo json_encode([
         'status' => 'success',
-        'data' => $colors
-    ]);
-} catch (PDOException $e) {
+        'data' => $colors,
+    ], JSON_UNESCAPED_SLASHES);
+} catch (\PDOException $e) {
+    $log('PDO error: ' . $e->getMessage());
+    http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Database error: ' . $e->getMessage()
-    ]);
+        'message' => 'Database error',
+    ], JSON_UNESCAPED_SLASHES);
+} catch (\Throwable $e) {
+    $log('General error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Unexpected error',
+    ], JSON_UNESCAPED_SLASHES);
 }

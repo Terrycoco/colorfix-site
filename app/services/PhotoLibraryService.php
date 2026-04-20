@@ -275,6 +275,43 @@ class PhotoLibraryService
         return $this->repo->insert($data);
     }
 
+    public function retireMissingRelPath(string $relPath, array $overrides = []): int
+    {
+        $relPath = trim($relPath);
+        if ($relPath === '') {
+            return 0;
+        }
+
+        $existingId = $this->repo->findIdByRelPath($relPath);
+        if ($existingId) {
+            $this->repo->update($existingId, ['is_inactive' => 1]);
+            return $existingId;
+        }
+
+        $sourceType = trim((string)($overrides['source_type'] ?? ''));
+        if ($sourceType === '') {
+            $sourceType = $this->guessSourceTypeForRelPath($relPath);
+        }
+
+        $title = array_key_exists('title', $overrides)
+            ? (string)$overrides['title']
+            : $this->guessTitleForRelPath($relPath);
+
+        $id = $this->createStandalone($sourceType, $relPath, [
+            'title' => $title !== '' ? $title : null,
+            'tags' => $overrides['tags'] ?? null,
+            'alt_text' => $overrides['alt_text'] ?? null,
+            'show_in_gallery' => 0,
+            'has_palette' => 0,
+        ]);
+
+        if ($id > 0) {
+            $this->repo->update($id, ['is_inactive' => 1]);
+        }
+
+        return $id;
+    }
+
     public function deleteExtraPhoto(int $photoId, string $role): void
     {
         if ($photoId <= 0) {
@@ -400,7 +437,7 @@ class PhotoLibraryService
         return $result;
     }
 
-    public function reconcileFilesystemRows(bool $apply = false): array
+    public function reconcileFilesystemRows(bool $apply = false, ?string $onlyRelPath = null): array
     {
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 3)), '/');
         $photosRoot = $docRoot . '/photos';
@@ -425,6 +462,10 @@ class PhotoLibraryService
             'created' => 0,
             'items' => [],
         ];
+        $onlyRelPath = $onlyRelPath !== null ? trim($onlyRelPath) : null;
+        if ($onlyRelPath === '') {
+            $onlyRelPath = null;
+        }
 
         foreach ($iterator as $fileInfo) {
             if (!$fileInfo instanceof \SplFileInfo || !$fileInfo->isFile()) {
@@ -439,6 +480,9 @@ class PhotoLibraryService
             $absPath = $fileInfo->getPathname();
             $relPath = str_replace('\\', '/', substr($absPath, strlen($docRoot)));
             if ($relPath === '' || !str_starts_with($relPath, '/photos/')) {
+                continue;
+            }
+            if ($onlyRelPath !== null && $relPath !== $onlyRelPath) {
                 continue;
             }
 

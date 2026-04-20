@@ -9,6 +9,8 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Repos\PdoAudienceTypeRepository;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -30,8 +32,14 @@ $key = trim((string)($payload['key'] ?? ''));
 $label = trim((string)($payload['label'] ?? ''));
 $description = $payload['description'] ?? null;
 $audienceRaw = trim((string)($payload['audience'] ?? ''));
-$allowedAudiences = ['any', 'hoa', 'homeowner', 'contractor', 'admin'];
-$audience = in_array($audienceRaw, $allowedAudiences, true) ? $audienceRaw : 'homeowner';
+$audienceRepo = new PdoAudienceTypeRepository($pdo);
+$audience = strtolower($audienceRaw);
+if ($audience === '') {
+    $audience = (string)($audienceRepo->getFallbackKey(['homeowner', 'any']) ?? '');
+}
+if (!$audienceRepo->isAllowedKey($audience)) {
+    respond(['ok' => false, 'error' => 'Invalid audience'], 400);
+}
 
 if ($key === '') {
     respond(['ok' => false, 'error' => 'key required'], 400);

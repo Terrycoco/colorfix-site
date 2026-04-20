@@ -34,6 +34,7 @@ try {
     $paletteId = isset($_GET['palette_id']) ? (int)$_GET['palette_id'] : 0;
     $includeInactive = !empty($_GET['include_inactive']) && $_GET['include_inactive'] !== '0';
     $inactiveOnly = !empty($_GET['inactive_only']) && $_GET['inactive_only'] !== '0';
+    $missingTags = !empty($_GET['missing_tags']) && $_GET['missing_tags'] !== '0';
     $sort = trim((string)($_GET['sort'] ?? 'newest'));
     $photoLibraryIdsRaw = trim((string)($_GET['photo_library_ids'] ?? ''));
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 100;
@@ -99,6 +100,9 @@ try {
         }
         $where[] = 'photo_library.photo_library_id IN (' . implode(', ', $placeholders) . ')';
     }
+    if ($missingTags) {
+        $where[] = "(photo_library.tags IS NULL OR TRIM(photo_library.tags) = '')";
+    }
     if ($inactiveOnly) {
         $where[] = 'photo_library.is_inactive = 1';
     } elseif (!$includeInactive) {
@@ -123,6 +127,14 @@ try {
                    photo_library.title,
                    photo_library.tags,
                    photo_library.alt_text,
+                   photo_library.ai_alt_text,
+                   photo_library.ai_filename_slug,
+                   photo_library.ai_alt_model,
+                   photo_library.ai_alt_generated_at,
+                   jobs.status AS ai_alt_status,
+                   jobs.attempts AS ai_alt_attempts,
+                   jobs.next_attempt_at AS ai_alt_next_attempt_at,
+                   jobs.last_error AS ai_alt_error,
                    photo_library.note,
                    photo_library.show_in_gallery,
                    photo_library.has_palette,
@@ -202,7 +214,8 @@ try {
                       WHERE sp.photo_library_id = photo_library.photo_library_id
                    ) AS attached_saved_palette_link_count
             FROM photo_library
-            LEFT JOIN clients ON clients.id = photo_library.client_id{$joins}";
+            LEFT JOIN clients ON clients.id = photo_library.client_id
+            LEFT JOIN photo_alt_text_jobs jobs ON jobs.photo_library_id = photo_library.photo_library_id{$joins}";
     if ($where) {
         $sql .= ' WHERE ' . implode(' AND ', $where);
     }
@@ -242,6 +255,14 @@ try {
             'title' => $row['title'] ?? '',
             'tags' => $row['tags'] ?? '',
             'alt_text' => $row['alt_text'] ?? '',
+            'ai_alt_text' => $row['ai_alt_text'] ?? '',
+            'ai_filename_slug' => $row['ai_filename_slug'] ?? '',
+            'ai_alt_model' => $row['ai_alt_model'] ?? '',
+            'ai_alt_generated_at' => $row['ai_alt_generated_at'] ?? null,
+            'ai_alt_status' => $row['ai_alt_status'] ?? '',
+            'ai_alt_attempts' => (int)($row['ai_alt_attempts'] ?? 0),
+            'ai_alt_next_attempt_at' => $row['ai_alt_next_attempt_at'] ?? null,
+            'ai_alt_error' => $row['ai_alt_error'] ?? '',
             'note' => $row['note'] ?? '',
             'show_in_gallery' => (int)$row['show_in_gallery'] === 1,
             'has_palette' => (int)$row['has_palette'] === 1,

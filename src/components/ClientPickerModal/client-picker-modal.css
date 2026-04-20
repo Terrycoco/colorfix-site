@@ -105,15 +105,22 @@
   display: grid;
   gap: 10px;
   margin-top: 14px;
+  justify-items: stretch;
+  text-align: left;
 }
 
 .cpm-card {
+  width: 100%;
   text-align: left;
   border: 1px solid #e1e7f0;
   border-radius: 14px;
   background: #fff;
   padding: 12px 14px;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .cpm-card:hover {
@@ -124,12 +131,16 @@
 .cpm-card-name {
   font-weight: 700;
   color: #1b2433;
+  width: 100%;
+  text-align: left;
 }
 
 .cpm-card-meta {
   color: #66758c;
   font-size: 13px;
   margin-top: 2px;
+  width: 100%;
+  text-align: left;
 }
 
 .cpm-divider {

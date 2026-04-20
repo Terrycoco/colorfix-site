@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoClientRepository;
+use App\Services\ShareService;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -77,7 +78,8 @@ try {
         }
     }
 
-    $shareUrl = '/view/' . $palette->id;
+    $shareService = new ShareService();
+    $shareUrl = $shareService->buildSharePath('applied_palette', $palette->id);
     $note = trim((string)($payload['note'] ?? ''));
     $repo->recordShare($palette->id, $clientId, [
         'channel' => 'sms',

@@ -7,12 +7,21 @@ export default function PhotoSearcher({ onPickAsset, initialQuery = "" }) {
   const [searchQ, setSearchQ] = useState(initialQuery);
   const [searching, setSearching] = useState(false);
   const [searchRes, setSearchRes] = useState([]);
+  const [searchError, setSearchError] = useState("");
 
   async function runSearch(q) {
+    const cleanQ = q.trim();
+    if (!cleanQ) {
+      setSearchRes([]);
+      setSearchError("Enter a tag, asset id, or style before searching.");
+      return;
+    }
+
     setSearching(true);
+    setSearchError("");
     try {
       const params = new URLSearchParams();
-      if (q) params.set("q", q.trim());
+      params.set("q", cleanQ);
       // cache-buster
       params.set("_", String(Date.now()));
 
@@ -24,6 +33,7 @@ export default function PhotoSearcher({ onPickAsset, initialQuery = "" }) {
       setSearchRes(Array.isArray(j.items) ? j.items : []);
     } catch {
       setSearchRes([]);
+      setSearchError("Search failed");
     } finally {
       setSearching(false);
     }
@@ -32,7 +42,6 @@ export default function PhotoSearcher({ onPickAsset, initialQuery = "" }) {
   // Optional: auto-run if initialQuery provided
   useEffect(() => {
     if (initialQuery) runSearch(initialQuery);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
 
   return (
@@ -59,6 +68,7 @@ export default function PhotoSearcher({ onPickAsset, initialQuery = "" }) {
           {searching ? "Searching…" : "Search"}
         </button>
       </div>
+      {searchError && <div className="aup-help" style={{ color: "#b91c1c", marginTop: 8 }}>{searchError}</div>}
 
       {searchRes.length > 0 && (
         <div style={{ marginTop: 10 }}>

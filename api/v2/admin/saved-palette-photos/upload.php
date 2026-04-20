@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;
 
 function respond(int $code, array $payload): void {
@@ -48,6 +49,7 @@ try {
     $repo = new PdoSavedPaletteRepository($pdo);
     $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
     $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
+    $altTextQueue = PhotoAltTextQueueService::fromPdo($pdo);
     if (!$repo->getSavedPaletteById($paletteId)) {
         respond(404, ['ok' => false, 'error' => 'Saved palette not found']);
     }
@@ -163,6 +165,9 @@ try {
         }
 
         if ($canonicalId > 0) {
+            if ($altText === '') {
+                $altTextQueue->enqueue($canonicalId, $replaceRow !== null);
+            }
             $repo->updatePhoto($photoId, $paletteId, ['photo_library_id' => $canonicalId]);
             $photoRow = $repo->getPhotoById($photoId) ?: $photoRow;
         }

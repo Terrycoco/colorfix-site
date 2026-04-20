@@ -18,6 +18,7 @@ import ColorWheelTicked from '../GalleryItems/ColorWheelTicked';
 import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
 import FeaturedArticleItem from '../GalleryItems/FeaturedArticleItem';
 import PlaylistItem from '../GalleryItems/PlaylistItem';
+import TextItem from '../GalleryItems/TextItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
@@ -35,6 +36,7 @@ const renderContent = (item) => {
     case 'button':      return <ButtonItem key={key} item={item} />;
     case 'playlist':    return <PlaylistItem key={key} item={item} />;
     case 'name-search': return <NameSearchItem key={key} item={item} />;
+    case 'text':        return <TextItem key={key} item={item} />;
     case 'wheel':       return <WheelItem key={key} item={item} />;
     case 'colorwheel':  return <ColorWheelItem key={key} item={item} />;
     case 'colorwheel-ticked':
@@ -50,12 +52,12 @@ function slugify(s) {
   return String(s || '')
     .toLowerCase()
     .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\-]/g, '')
-    .replace(/\-+/g, '-')
-    .replace(/^\-+|\-+$/g, '') || 'top';
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'top';
 }
 
-function Gallery({ items, runQueryById, meta, heroItems = [] }) {
+function Gallery({ items, meta, heroItems = [] }) {
   const location = useLocation();
   const { categories = [] } = useAppState();
   const hideDisclaimerRoutes = ['/results/4', '/results/3', '/results/2'];

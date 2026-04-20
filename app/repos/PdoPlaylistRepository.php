@@ -34,6 +34,265 @@ class PdoPlaylistRepository
         );
     }
 
+    public function getAdminRowById(int $playlistId): ?array
+    {
+        $sql = <<<SQL
+            SELECT
+                p.playlist_id,
+                p.title,
+                p.type,
+                p.is_active,
+                p.slug,
+                p.headline,
+                p.page_title,
+                p.meta_description,
+                p.dek,
+                p.intro_html,
+                p.body_html,
+                p.hero_image_id,
+                p.hero_image_url,
+                p.hero_alt,
+                p.indexable,
+                p.published_at,
+                p.updated_at,
+                hero.rel_path AS hero_rel_path,
+                hero.alt_text AS hero_photo_alt,
+                hero.title AS hero_photo_title
+            FROM playlists p
+            LEFT JOIN photo_library hero
+              ON hero.photo_library_id = p.hero_image_id
+            WHERE p.playlist_id = :playlist_id
+            LIMIT 1
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['playlist_id' => $playlistId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        return $this->hydrateSeoRow($row);
+    }
+
+    public function findSeoLandingBySlug(string $slug): ?array
+    {
+        $sql = <<<SQL
+            SELECT
+                p.playlist_id,
+                p.title,
+                p.type,
+                p.is_active,
+                p.slug,
+                p.headline,
+                p.page_title,
+                p.meta_description,
+                p.dek,
+                p.intro_html,
+                p.body_html,
+                p.hero_image_id,
+                p.hero_image_url,
+                p.hero_alt,
+                p.indexable,
+                p.published_at,
+                p.updated_at,
+                hero.rel_path AS hero_rel_path,
+                hero.alt_text AS hero_photo_alt,
+                hero.title AS hero_photo_title,
+                shareable.playlist_instance_id AS watch_playlist_instance_id
+            FROM playlists p
+            LEFT JOIN photo_library hero
+              ON hero.photo_library_id = p.hero_image_id
+            LEFT JOIN (
+                SELECT playlist_id, MIN(playlist_instance_id) AS playlist_instance_id
+                FROM playlist_instances
+                WHERE is_active = 1
+                  AND share_enabled = 1
+                GROUP BY playlist_id
+            ) shareable
+              ON shareable.playlist_id = p.playlist_id
+            WHERE p.slug = :slug
+              AND p.is_active = 1
+              AND p.indexable = 1
+              AND p.headline IS NOT NULL
+              AND TRIM(p.headline) <> ''
+              AND p.meta_description IS NOT NULL
+              AND TRIM(p.meta_description) <> ''
+              AND p.dek IS NOT NULL
+              AND TRIM(p.dek) <> ''
+              AND p.intro_html IS NOT NULL
+              AND TRIM(p.intro_html) <> ''
+            LIMIT 1
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['slug' => $slug]);
+        return $this->hydratePublicSeoResult($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
+    }
+
+    public function findSeoLandingByPlaylistId(int $playlistId): ?array
+    {
+        $sql = <<<SQL
+            SELECT
+                p.playlist_id,
+                p.title,
+                p.type,
+                p.is_active,
+                p.slug,
+                p.headline,
+                p.page_title,
+                p.meta_description,
+                p.dek,
+                p.intro_html,
+                p.body_html,
+                p.hero_image_id,
+                p.hero_image_url,
+                p.hero_alt,
+                p.indexable,
+                p.published_at,
+                p.updated_at,
+                hero.rel_path AS hero_rel_path,
+                hero.alt_text AS hero_photo_alt,
+                hero.title AS hero_photo_title,
+                shareable.playlist_instance_id AS watch_playlist_instance_id
+            FROM playlists p
+            LEFT JOIN photo_library hero
+              ON hero.photo_library_id = p.hero_image_id
+            LEFT JOIN (
+                SELECT playlist_id, MIN(playlist_instance_id) AS playlist_instance_id
+                FROM playlist_instances
+                WHERE is_active = 1
+                  AND share_enabled = 1
+                GROUP BY playlist_id
+            ) shareable
+              ON shareable.playlist_id = p.playlist_id
+            WHERE p.playlist_id = :playlist_id
+              AND p.is_active = 1
+              AND p.indexable = 1
+              AND p.slug IS NOT NULL
+              AND TRIM(p.slug) <> ''
+              AND p.headline IS NOT NULL
+              AND TRIM(p.headline) <> ''
+              AND p.meta_description IS NOT NULL
+              AND TRIM(p.meta_description) <> ''
+              AND p.dek IS NOT NULL
+              AND TRIM(p.dek) <> ''
+              AND p.intro_html IS NOT NULL
+              AND TRIM(p.intro_html) <> ''
+            LIMIT 1
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['playlist_id' => $playlistId]);
+        return $this->hydratePublicSeoResult($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSeoLandingPages(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                p.playlist_id,
+                p.title,
+                p.type,
+                p.is_active,
+                p.slug,
+                p.headline,
+                p.page_title,
+                p.meta_description,
+                p.dek,
+                p.intro_html,
+                p.body_html,
+                p.hero_image_id,
+                p.hero_image_url,
+                p.hero_alt,
+                p.indexable,
+                p.published_at,
+                p.updated_at,
+                hero.rel_path AS hero_rel_path,
+                hero.alt_text AS hero_photo_alt,
+                hero.title AS hero_photo_title,
+                shareable.playlist_instance_id AS watch_playlist_instance_id
+            FROM playlists p
+            LEFT JOIN photo_library hero
+              ON hero.photo_library_id = p.hero_image_id
+            INNER JOIN (
+                SELECT playlist_id, MIN(playlist_instance_id) AS playlist_instance_id
+                FROM playlist_instances
+                WHERE is_active = 1
+                  AND share_enabled = 1
+                GROUP BY playlist_id
+            ) shareable
+              ON shareable.playlist_id = p.playlist_id
+            WHERE p.is_active = 1
+              AND p.indexable = 1
+              AND p.slug IS NOT NULL
+              AND p.slug <> ''
+              AND p.headline IS NOT NULL
+              AND TRIM(p.headline) <> ''
+              AND p.meta_description IS NOT NULL
+              AND TRIM(p.meta_description) <> ''
+              AND p.dek IS NOT NULL
+              AND TRIM(p.dek) <> ''
+              AND p.intro_html IS NOT NULL
+              AND TRIM(p.intro_html) <> ''
+            ORDER BY
+              COALESCE(p.published_at, p.updated_at) DESC,
+              p.playlist_id DESC
+            SQL;
+
+        $stmt = $this->pdo->query($sql);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(fn(array $row): array => $this->hydrateSeoRow($row), $rows);
+    }
+
+    public function slugExists(string $slug, ?int $excludePlaylistId = null): bool
+    {
+        $sql = 'SELECT COUNT(*) FROM playlists WHERE slug = :slug';
+        $params = ['slug' => $slug];
+        if ($excludePlaylistId !== null && $excludePlaylistId > 0) {
+            $sql .= ' AND playlist_id <> :exclude_playlist_id';
+            $params['exclude_playlist_id'] = $excludePlaylistId;
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    public function generateUniqueSlug(string $baseSlug, ?int $excludePlaylistId = null): string
+    {
+        $slug = trim($baseSlug);
+        if ($slug === '') {
+            $slug = 'playlist';
+        }
+
+        $candidate = $slug;
+        $suffix = 2;
+        while ($this->slugExists($candidate, $excludePlaylistId)) {
+            $candidate = sprintf('%s-%d', $slug, $suffix);
+            $suffix++;
+        }
+        return $candidate;
+    }
+
+    /**
+     * @param array<string, mixed>|null $row
+     * @return array<string, mixed>|null
+     */
+    private function hydratePublicSeoResult(?array $row): ?array
+    {
+        if ($row === null) {
+            return null;
+        }
+        if (empty($row['watch_playlist_instance_id'])) {
+            return null;
+        }
+
+        return $this->hydrateSeoRow($row);
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -252,6 +511,47 @@ class PdoPlaylistRepository
             'playlist_id' => (string)$row['playlist_id'],
             'title' => (string)$row['title'],
             'type' => (string)$row['type'],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function hydrateSeoRow(array $row): array
+    {
+        $heroUrl = trim((string)($row['hero_image_url'] ?? ''));
+        if ($heroUrl === '') {
+            $heroUrl = trim((string)($row['hero_rel_path'] ?? ''));
+        }
+
+        $heroAlt = trim((string)($row['hero_alt'] ?? ''));
+        if ($heroAlt === '') {
+            $heroAlt = trim((string)($row['hero_photo_alt'] ?? ''));
+        }
+
+        return [
+            'playlist_id' => (int)($row['playlist_id'] ?? 0),
+            'title' => (string)($row['title'] ?? ''),
+            'type' => (string)($row['type'] ?? ''),
+            'is_active' => (int)($row['is_active'] ?? 0),
+            'slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
+            'headline' => $row['headline'] !== null ? (string)$row['headline'] : null,
+            'page_title' => $row['page_title'] !== null ? (string)$row['page_title'] : null,
+            'meta_description' => $row['meta_description'] !== null ? (string)$row['meta_description'] : null,
+            'dek' => $row['dek'] !== null ? (string)$row['dek'] : null,
+            'intro_html' => $row['intro_html'] !== null ? (string)$row['intro_html'] : null,
+            'body_html' => $row['body_html'] !== null ? (string)$row['body_html'] : null,
+            'hero_image_id' => isset($row['hero_image_id']) && $row['hero_image_id'] !== null ? (int)$row['hero_image_id'] : null,
+            'hero_image_url' => $heroUrl !== '' ? $heroUrl : null,
+            'hero_alt' => $heroAlt !== '' ? $heroAlt : null,
+            'hero_photo_title' => $row['hero_photo_title'] !== null ? (string)$row['hero_photo_title'] : null,
+            'indexable' => (int)($row['indexable'] ?? 1),
+            'published_at' => $row['published_at'] !== null ? (string)$row['published_at'] : null,
+            'updated_at' => $row['updated_at'] !== null ? (string)$row['updated_at'] : null,
+            'watch_playlist_instance_id' => isset($row['watch_playlist_instance_id']) && $row['watch_playlist_instance_id'] !== null
+                ? (int)$row['watch_playlist_instance_id']
+                : null,
         ];
     }
 }

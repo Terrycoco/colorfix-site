@@ -1,4 +1,5 @@
 .cta-layout {
+  --cta-stack-width: 480px;
   display: flex;
   gap: 12px;
   width: 100%;
@@ -29,7 +30,7 @@
 }
 
 .cta-layout--stacked .cta-button {
-  width: min(100%, 360px);
+  width: min(100%, var(--cta-stack-width));
 }
 
 .cta-button__label {
@@ -114,7 +115,7 @@
 .cta-article-link {
   display: block;
   width: 100%;
-  max-width: 480px;
+  max-width: var(--cta-stack-width);
   margin: 14px auto 0;
 
   text-decoration: none;
@@ -194,7 +195,7 @@
 .cta-watch-next {
   display: block;
   width: 100%;
-  max-width: 360px;
+  max-width: var(--cta-stack-width);
   margin: 24px auto 0;
   padding: 12px 14px;
 

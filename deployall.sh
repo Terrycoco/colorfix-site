@@ -16,6 +16,8 @@ run() {
 run "deployapp.sh"
 run "deployscripts.sh"
 run "deployapi.sh"
+run "deployshare.sh"
+run "deploypublic.sh"
 run "deploycontent.sh"
 run "deploydb.sh"
 

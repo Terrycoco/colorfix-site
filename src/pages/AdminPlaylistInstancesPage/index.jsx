@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
+import { DEFAULT_AUDIENCE_OPTIONS, fetchAudienceOptions } from "@helpers/audienceOptions";
 import KickerDropdown from "@components/KickerDropdown";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-playlist-instances.css";
@@ -12,15 +13,6 @@ const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
 const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/playlist-instances/send-email.php`;
-
-const AUDIENCE_OPTIONS = [
-  { value: "any", label: "Any" },
-  { value: "hoa", label: "HOA" },
-  { value: "homeowner", label: "Homeowner" },
-  { value: "contractor", label: "Contractor" },
-  { value: "pinterest", label: "Pinterest" },
-  { value: "admin", label: "Admin" },
-];
 
 const emptyInstance = {
   playlist_instance_id: null,
@@ -62,6 +54,7 @@ export default function AdminPlaylistInstancesPage() {
   const [items, setItems] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [ctaLibrary, setCtaLibrary] = useState([]);
+  const [audienceOptions, setAudienceOptions] = useState(DEFAULT_AUDIENCE_OPTIONS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
@@ -83,6 +76,15 @@ export default function AdminPlaylistInstancesPage() {
   const [ctaPickerOpen, setCtaPickerOpen] = useState(false);
   const [dragCtaId, setDragCtaId] = useState(null);
   const didLoadDraft = useRef(false);
+  const activeIdRef = useRef(null);
+  const fetchInstanceSeqRef = useRef(0);
+  const fetchInstancesSeqRef = useRef(0);
+  const instanceRequestRef = useRef(null);
+  const instancesRequestRef = useRef(null);
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   useEffect(() => {
     if (didLoadDraft.current) return;
@@ -110,6 +112,7 @@ export default function AdminPlaylistInstancesPage() {
   }, [form]);
 
   useEffect(() => {
+    loadAudienceOptions();
     fetchPlaylists();
     fetchCtas();
     fetchEmailTemplates();
@@ -140,6 +143,17 @@ export default function AdminPlaylistInstancesPage() {
     }
   }
 
+  async function loadAudienceOptions() {
+    try {
+      const options = await fetchAudienceOptions();
+      if (options.length > 0) {
+        setAudienceOptions(options);
+      }
+    } catch {
+      setAudienceOptions(DEFAULT_AUDIENCE_OPTIONS);
+    }
+  }
+
   async function fetchCtas() {
     try {
       const res = await fetch(`${CTAS_LIST_URL}?_=${Date.now()}`, {
@@ -166,6 +180,12 @@ export default function AdminPlaylistInstancesPage() {
   }
 
   async function fetchInstances() {
+    if (instancesRequestRef.current) {
+      instancesRequestRef.current.abort();
+    }
+    const controller = new AbortController();
+    instancesRequestRef.current = controller;
+    const requestSeq = ++fetchInstancesSeqRef.current;
     setLoading(true);
     setError("");
     try {
@@ -174,8 +194,10 @@ export default function AdminPlaylistInstancesPage() {
       qs.set("_", Date.now().toString());
       const res = await fetch(`${LIST_URL}?${qs.toString()}`, {
         credentials: "include",
+        signal: controller.signal,
       });
       const text = await res.text();
+      if (fetchInstancesSeqRef.current !== requestSeq) return;
       let data;
       try {
         data = JSON.parse(text);
@@ -185,20 +207,36 @@ export default function AdminPlaylistInstancesPage() {
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load instances");
       setItems(data.items || []);
     } catch (err) {
+      if (err?.name === "AbortError") return;
+      if (fetchInstancesSeqRef.current !== requestSeq) return;
       setError(err?.message || "Failed to load instances");
     } finally {
-      setLoading(false);
+      if (instancesRequestRef.current === controller) {
+        instancesRequestRef.current = null;
+      }
+      if (fetchInstancesSeqRef.current === requestSeq) {
+        setLoading(false);
+      }
     }
   }
 
   async function fetchInstance(id) {
+    if (instanceRequestRef.current) {
+      instanceRequestRef.current.abort();
+    }
+    const controller = new AbortController();
+    instanceRequestRef.current = controller;
     setError("");
+    const requestSeq = ++fetchInstanceSeqRef.current;
     try {
       const res = await fetch(`${GET_URL}?id=${id}&_=${Date.now()}`, {
         credentials: "include",
+        signal: controller.signal,
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load instance");
+      if (fetchInstanceSeqRef.current !== requestSeq) return;
+      if (activeIdRef.current !== id) return;
       const next = {
         ...emptyInstance,
         ...data.item,
@@ -218,7 +256,13 @@ export default function AdminPlaylistInstancesPage() {
       setSaveStatus("");
       setSaveError("");
     } catch (err) {
+      if (err?.name === "AbortError") return;
+      if (fetchInstanceSeqRef.current !== requestSeq) return;
       setError(err?.message || "Failed to load instance");
+    } finally {
+      if (instanceRequestRef.current === controller) {
+        instanceRequestRef.current = null;
+      }
     }
   }
 
@@ -268,15 +312,20 @@ export default function AdminPlaylistInstancesPage() {
   function handleDuplicate() {
     const sourceId = form.playlist_instance_id;
     if (!sourceId) return;
+    const nextInstanceName = String(form.instance_name || "").trim();
+    const nextDisplayTitle = String(form.display_title || "").trim();
+    didLoadDraft.current = true;
     setActiveId(null);
     setForm({
       ...emptyInstance,
       ...form,
       playlist_instance_id: null,
+      instance_name: nextInstanceName ? `${nextInstanceName} Copy` : "Untitled Copy",
+      display_title: nextDisplayTitle ? `${nextDisplayTitle} Copy` : "",
       created_from_instance: sourceId,
       cta_overrides: JSON.parse(JSON.stringify(form.cta_overrides || {})),
     });
-    setSaveStatus("");
+    setSaveStatus(`Unsaved duplicate from Instance #${sourceId}`);
     setSaveError("");
   }
 
@@ -466,6 +515,7 @@ export default function AdminPlaylistInstancesPage() {
     setSaving(true);
     setSaveError("");
     setSaveStatus("");
+    const saveTargetId = form.playlist_instance_id ? Number(form.playlist_instance_id) : null;
     try {
       if (missingArticleIds.length > 0) {
         throw new Error("Article CTA requires an Article ID.");
@@ -493,10 +543,17 @@ export default function AdminPlaylistInstancesPage() {
         /* ignore */
       }
       const newId = data.playlist_instance_id;
-      setActiveId(newId);
-      setForm((prev) => ({ ...prev, playlist_instance_id: newId }));
+      const hasSwitchedInstances =
+        activeIdRef.current != null &&
+        saveTargetId != null &&
+        Number(activeIdRef.current) !== Number(saveTargetId);
+
+      if (!hasSwitchedInstances) {
+        setActiveId(newId);
+        setForm((prev) => ({ ...prev, playlist_instance_id: newId }));
+      }
       await fetchInstances();
-      if (newId) {
+      if (newId && !hasSwitchedInstances) {
         await fetchInstance(newId);
       }
     } catch (err) {
@@ -507,10 +564,19 @@ export default function AdminPlaylistInstancesPage() {
   }
 
   const filteredItems = useMemo(() => {
+    const getInstanceSortLabel = (item) => {
+      return String(item?.instance_name || item?.display_title || "").trim().toLowerCase();
+    };
+
     const sorted = [...(items || [])].sort((a, b) => {
-      const aLabel = String(a?.instance_name || a?.display_title || a?.playlist_instance_id || "").toLowerCase();
-      const bLabel = String(b?.instance_name || b?.display_title || b?.playlist_instance_id || "").toLowerCase();
-      return aLabel.localeCompare(bLabel);
+      const aLabel = getInstanceSortLabel(a);
+      const bLabel = getInstanceSortLabel(b);
+      const byLabel = aLabel.localeCompare(bLabel, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (byLabel !== 0) return byLabel;
+      return Number(a?.playlist_instance_id || 0) - Number(b?.playlist_instance_id || 0);
     });
     return sorted.filter((item) => {
       const itemAudience = String(item?.audience || "any").toLowerCase();
@@ -526,17 +592,22 @@ export default function AdminPlaylistInstancesPage() {
     });
   }, [audienceFilter, items, query]);
 
+  const duplicateNotice =
+    !form.playlist_instance_id && saveStatus.startsWith("Unsaved duplicate from Instance #")
+      ? saveStatus
+      : "";
+
   const audienceLabelMap = useMemo(() => {
-    return AUDIENCE_OPTIONS.reduce((acc, option) => {
+    return audienceOptions.reduce((acc, option) => {
       acc[option.value] = option.label;
       return acc;
     }, {});
-  }, []);
+  }, [audienceOptions]);
 
   const playlistOptions = useMemo(() => {
     return playlists.map((row) => ({
       id: row.playlist_id,
-      label: `${row.playlist_id} — ${row.title}`,
+      label: `${row.title || "Untitled"} (#${row.playlist_id})`,
     }));
   }, [playlists]);
 
@@ -640,7 +711,7 @@ export default function AdminPlaylistInstancesPage() {
           <div className="header-actions">
             <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
               <option value="all">All audiences</option>
-              {AUDIENCE_OPTIONS.map((opt) => (
+              {audienceOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
@@ -786,8 +857,11 @@ export default function AdminPlaylistInstancesPage() {
 
       <div className="playlist-panel editor-panel">
         <div className="panel-header">
-          <div className="panel-title">
-            {form.playlist_instance_id ? `Instance #${form.playlist_instance_id}` : "New Instance"}
+          <div className="panel-title-wrap">
+            <div className="panel-title">
+              {form.playlist_instance_id ? `Instance #${form.playlist_instance_id}` : "New Instance"}
+            </div>
+            {duplicateNotice ? <div className="panel-subtitle">{duplicateNotice}</div> : null}
           </div>
           <div className="panel-actions">
             <button
@@ -979,7 +1053,7 @@ export default function AdminPlaylistInstancesPage() {
                 value={form.audience || "any"}
                 onChange={(e) => updateForm("audience", e.target.value)}
               >
-                {AUDIENCE_OPTIONS.map((opt) => (
+                {audienceOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>

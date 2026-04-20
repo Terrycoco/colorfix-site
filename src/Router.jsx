@@ -47,6 +47,7 @@ const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
 const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
+const AdminSharePage = lazy(() => import('@pages/AdminSharePage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
@@ -74,6 +75,7 @@ const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
 const ArticlePage = lazy(() => import('@pages/ArticlePage'));
+const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
 
 
 function AppRouter() {
@@ -103,6 +105,10 @@ function AppRouter() {
         <Route
           path="palette/:hash/share"
           element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
+        />
+        <Route
+          path="watch"
+          element={renderWithSuspense(WatchRedirectPage, 'Loading watch link…')}
         />
         <Route element={renderWithSuspense(StandAloneLayout, 'Loading player…')}>
           <Route
@@ -249,6 +255,10 @@ function AppRouter() {
             <Route
               path="projects"
               element={renderWithSuspense(AdminProjectsPage, 'Loading projects…')}
+            />
+            <Route
+              path="share"
+              element={renderWithSuspense(AdminSharePage, 'Loading admin share…')}
             />
             <Route
               path="user-events"

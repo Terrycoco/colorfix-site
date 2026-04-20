@@ -73,9 +73,30 @@
   width: 100%;           /* ✅ constrains to screen width */
   overflow-x: hidden;    /* ✅ safety net */
 }
+
+.gallery-grid-wrap {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
 .gallery-column {
   padding-left: 0.5rem; /* gutter size */
   box-sizing: border-box; 
+}
+
+@media (max-width: 700px) {
+  .gallery-grid-wrap {
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+  }
+
+  .gallery-column {
+    padding-left: 0.3rem;
+  }
+
+  .gallery-item {
+    margin-bottom: 0.3rem;
+  }
 }
 
 

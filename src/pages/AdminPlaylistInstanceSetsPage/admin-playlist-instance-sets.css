@@ -3,6 +3,7 @@
   grid-template-columns: minmax(280px, 360px) minmax(420px, 1fr);
   gap: 16px;
   padding: 16px;
+  align-items: start;
 }
 
 .pi-panel {
@@ -13,6 +14,21 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+@media (min-width: 1101px) {
+  .admin-pi-sets > .pi-panel:first-child {
+    height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px);
+    position: sticky;
+    top: 16px;
+  }
+
+  .admin-pi-sets > .pi-panel:first-child .panel-list {
+    flex: 1;
+    max-height: none;
+    min-height: 0;
+  }
 }
 
 .panel-header {
@@ -66,9 +82,11 @@
 .panel-list {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 6px;
   overflow: auto;
   max-height: 300px;
+  text-align: left;
 }
 
 .panel-empty {
@@ -78,6 +96,8 @@
 }
 
 .list-row {
+  display: block;
+  width: 100%;
   text-align: left;
   border: 1px solid #eee;
   background: #fafafa;
@@ -92,12 +112,14 @@
 }
 
 .row-title {
+  text-align: left;
   font-weight: 600;
   color: #000;
   font-size: 13px;
 }
 
 .row-meta {
+  text-align: left;
   font-size: 11px;
   color: #666;
 }

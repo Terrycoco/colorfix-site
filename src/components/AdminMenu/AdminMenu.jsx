@@ -3,6 +3,18 @@ import { isAdmin } from "@helpers/authHelper";
 import { adminMenuItems } from "./adminMenuItems";
 import "./adminmenu.css";
 
+function normalizeHrefPath(href = "") {
+  if (!href) return "";
+  return String(href).split("?")[0].replace(/\/+$/, "") || "/";
+}
+
+function isPathMatch(currentPath, href) {
+  const target = normalizeHrefPath(href);
+  if (!target) return false;
+  if (target === "/") return currentPath === "/";
+  return currentPath === target || currentPath.startsWith(`${target}/`);
+}
+
 export default function AdminMenu() {
   const admin = isAdmin();
   const [open, setOpen] = useState(false);
@@ -10,6 +22,7 @@ export default function AdminMenu() {
   const menuRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const touchHandledRef = useRef(false);
+  const currentPath = normalizeHrefPath(window.location.pathname);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -46,6 +59,10 @@ export default function AdminMenu() {
   }
 
   if (!admin) return null;
+
+  const activeGroupIndex = adminMenuItems.findIndex((group) =>
+    group.items.some((item) => isPathMatch(currentPath, item.href))
+  );
 
   function toggleMenu(e) {
     e?.preventDefault?.();
@@ -107,48 +124,51 @@ export default function AdminMenu() {
           >
             ← Back
           </button>
-          {adminMenuItems.map((group, idx) => (
-            <div
-              key={group.label}
-              className="admin-menu__group"
-              onMouseEnter={() => {
-                cancelHoverClose();
-                setHovered(idx);
-              }}
-              onMouseLeave={scheduleHoverClose}
-              onClick={() => {
-                cancelHoverClose();
-                setHovered((prev) => (prev === idx ? null : idx));
-              }}
-            >
-              <div className="admin-menu__group-label">
-                {group.label}
-                <span className="admin-menu__chev">›</span>
-              </div>
-              {(hovered === idx) && (
-                <div
-                  className="admin-menu__submenu"
-                  role="menu"
-                  onMouseEnter={cancelHoverClose}
-                  onMouseLeave={scheduleHoverClose}
-                >
-                  {group.items.map((item) => (
-                    <a
-                      key={item.href}
-                      href={item.href}
-                      className="admin-menu__item"
-                      onClick={() => {
-                        setOpen(false);
-                        setHovered(null);
-                      }}
-                    >
-                      {item.label}
-                    </a>
-                  ))}
+          {adminMenuItems.map((group, idx) => {
+            const groupIsActive = idx === activeGroupIndex;
+            return (
+              <div
+                key={group.label}
+                className={`admin-menu__group${groupIsActive ? " is-active" : ""}`}
+                onMouseEnter={() => {
+                  cancelHoverClose();
+                  setHovered(idx);
+                }}
+                onMouseLeave={scheduleHoverClose}
+                onClick={() => {
+                  cancelHoverClose();
+                  setHovered((prev) => (prev === idx ? null : idx));
+                }}
+              >
+                <div className="admin-menu__group-label">
+                  {group.label}
+                  <span className="admin-menu__chev">›</span>
                 </div>
-              )}
-            </div>
-          ))}
+                {(hovered === idx) && (
+                  <div
+                    className="admin-menu__submenu"
+                    role="menu"
+                    onMouseEnter={cancelHoverClose}
+                    onMouseLeave={scheduleHoverClose}
+                  >
+                    {group.items.map((item) => (
+                      <a
+                        key={item.href}
+                        href={item.href}
+                        className={`admin-menu__item${isPathMatch(currentPath, item.href) ? " is-active" : ""}`}
+                        onClick={() => {
+                          setOpen(false);
+                          setHovered(null);
+                        }}
+                      >
+                        {item.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

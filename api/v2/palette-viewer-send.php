@@ -12,6 +12,7 @@ use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Services\EmailTemplateService;
 use App\Services\SavedPaletteService;
+use App\Services\ShareService;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -51,6 +52,8 @@ try {
     $mailConfig = require $mailConfigPath;
     $mailer = new SmtpMailer($mailConfig);
 
+    $shareService = new ShareService(new PdoSavedPaletteRepository($pdo));
+
     if ($source === 'saved') {
         $paletteId = isset($payload['id']) ? (int)$payload['id'] : 0;
         $hash = trim((string)($payload['hash'] ?? ''));
@@ -62,7 +65,7 @@ try {
         if ($paletteId <= 0) {
             respond(['ok' => false, 'error' => 'palette id required'], 400);
         }
-        $service = new SavedPaletteService($savedRepo, $mailer);
+        $service = new SavedPaletteService($savedRepo, $mailer, null, null, $shareService);
         $service->sendPaletteEmail($paletteId, $toEmail, $message !== '' ? $message : null, $shareUrl ?: null, $subject ?: null);
         respond(['ok' => true]);
     }
@@ -78,11 +81,7 @@ try {
         respond(['ok' => false, 'error' => 'Palette not found'], 404);
     }
 
-    if ($shareUrl === '') {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'colorfix.terrymarr.com';
-        $shareUrl = $scheme . '://' . $host . '/view/' . $palette->id;
-    }
+    $shareUrl = $shareService->resolveShareUrl('applied_palette', $palette->id, $shareUrl);
 
     $uniqueEntries = [];
     foreach ($palette->entries as $entry) {

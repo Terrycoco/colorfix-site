@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../db.php';
 use App\Repos\PdoAppliedPalettePhotoRepository;
 use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;
 
 function respond(array $payload, int $status = 200): void {
@@ -45,6 +46,7 @@ try {
     $files = $_FILES['photos'];
     $repo = new PdoAppliedPalettePhotoRepository($pdo);
     $photoLibrary = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+    $altTextQueue = PhotoAltTextQueueService::fromPdo($pdo);
 
     $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
     $photosRoot = $docRoot . '/photos/uploads/applied-palettes/' . $paletteId;
@@ -84,7 +86,10 @@ try {
             'alt_text' => null,
             'order_index' => $orderIndex - 1,
         ];
-        $photoLibrary->syncAppliedPaletteAttachmentPhoto($photoRow);
+        $photoLibraryId = $photoLibrary->syncAppliedPaletteAttachmentPhoto($photoRow);
+        if ($photoLibraryId > 0) {
+            $altTextQueue->enqueue($photoLibraryId);
+        }
         $added[] = $photoRow;
     }
 

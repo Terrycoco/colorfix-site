@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
+use App\Services\ShareService;
 
 function replace_placeholders(string $value, string $link, string $title): string
 {
@@ -48,11 +49,12 @@ try {
         exit;
     }
 
-    $shareUrl = trim((string)($payload['share_url'] ?? ''));
-    if ($shareUrl === '') {
-        $host = $_SERVER['HTTP_HOST'] ?? 'colorfix.terrymarr.com';
-        $shareUrl = sprintf('https://%s/share/playlist.php?id=%d', $host, $playlistInstanceId);
-    }
+    $shareService = new ShareService();
+    $shareUrl = $shareService->resolveShareUrl(
+        'playlist_instance',
+        $playlistInstanceId,
+        (string)($payload['share_url'] ?? '')
+    );
 
     $subject = trim((string)($payload['subject'] ?? ''));
     $message = trim((string)($payload['message'] ?? ''));

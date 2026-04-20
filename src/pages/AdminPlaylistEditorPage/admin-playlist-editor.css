@@ -76,11 +76,137 @@
   font-size: 13px;
 }
 
+.playlist-form__tools {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.playlist-form__tools button {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #f3f3f3;
+  color: #111;
+  cursor: pointer;
+}
+
 .playlist-form input,
-.playlist-form select {
+.playlist-form select,
+.playlist-form textarea {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid #ddd;
+}
+
+.playlist-seo-form {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+
+.playlist-seo-form__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.playlist-seo-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.playlist-seo-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.playlist-seo-form input,
+.playlist-seo-form select,
+.playlist-seo-form textarea {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font: inherit;
+}
+
+.playlist-seo-form textarea {
+  resize: vertical;
+}
+
+.playlist-seo-form__inline {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.playlist-seo-form__inline input {
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-seo-form__inline button {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #f3f3f3;
+  cursor: pointer;
+}
+
+.playlist-seo-form__span-2 {
+  grid-column: 1 / -1;
+}
+
+.playlist-seo-form__hero-preview {
+  margin-top: 8px;
+  max-width: 260px;
+}
+
+.playlist-seo-form__hero-preview img {
+  width: 100%;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+.playlist-seo-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 16, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1200;
+}
+
+.playlist-seo-modal {
+  width: min(980px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playlist-seo-modal .playlist-seo-form {
+  padding: 0;
+  box-shadow: none;
 }
 
 .items-header {
@@ -256,6 +382,20 @@
   background:
     linear-gradient(135deg, #f7f7f7 25%, #ededed 25%, #ededed 50%, #f7f7f7 50%, #f7f7f7 75%, #ededed 75%, #ededed 100%);
   background-size: 8px 8px;
+}
+
+@media (max-width: 900px) {
+  .playlist-seo-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playlist-seo-form__span-2 {
+    grid-column: auto;
+  }
+
+  .playlist-seo-form__inline {
+    flex-wrap: wrap;
+  }
 }
 
 .item-inline-btn {

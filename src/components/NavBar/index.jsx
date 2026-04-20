@@ -6,7 +6,7 @@ import { isAdmin } from '@helpers/authHelper';
 import { Menu, X } from 'lucide-react';
 
 function NavBar() {
-  const { loggedIn, setLoggedIn, user, setUser, showBack, paletteMode, setPaletteMode } = useAppState();
+  const { setLoggedIn, user, setUser, showBack, paletteMode, setPaletteMode } = useAppState();
   const [hamburgerOpen, setHamburgerOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const menuRef = useRef();
@@ -34,7 +34,9 @@ function NavBar() {
       localStorage.removeItem('cf_device_token');
       localStorage.removeItem('isAdmin');
       localStorage.removeItem('isTerry');
-    } catch {}
+    } catch {
+      // local storage may be unavailable in some embedded contexts
+    }
     const host = window.location.hostname;
     const isPrimaryDomain = host.endsWith('terrymarr.com');
     const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
@@ -63,6 +65,7 @@ function NavBar() {
     { label: 'Home', path: '/' },
     { label: 'Search Colors', path: '/search' },
     { label: 'Palettes', path: '/palette' },
+    { label: 'Playlists', href: '/playlists' },
     { label: 'Hire Terry', path: '/hire-terry' },
     { label: 'About', path: '/about' },
     user
@@ -162,6 +165,14 @@ function NavBar() {
                   </div>
                 )}
               </div>
+            ) : link.href ? (
+              <a
+                key={idx}
+                href={link.href}
+                className="hover:text-orange-400"
+              >
+                {link.label}
+              </a>
             ) : link.path ? (
               <Link
                 key={idx}
@@ -230,6 +241,16 @@ function NavBar() {
                           )
                         ))}
                       </ul>
+                    </li>
+                  ) : link.href ? (
+                    <li key={idx}>
+                      <a
+                        href={link.href}
+                        onClick={() => setHamburgerOpen(false)}
+                        className="block w-full px-5 py-4 text-base hover:bg-gray-800"
+                      >
+                        {link.label}
+                      </a>
                     </li>
                   ) : link.path ? (
                     <li key={idx}>

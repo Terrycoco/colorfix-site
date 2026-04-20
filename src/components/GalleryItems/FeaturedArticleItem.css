@@ -5,6 +5,8 @@
    ========================================= */
 
 .featured-article {
+  --featured-article-left-inset: 10px;
+
   display: block;
   text-decoration: none;
   color: inherit;
@@ -41,14 +43,14 @@
 .featured-article .kicker {
   display: block;
 
-  padding: 14px 16px 10px 16px;
+  padding: 14px 16px 10px var(--featured-article-left-inset);
   margin: 0;
 
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--brand-muted);
 
   border-bottom: 1px solid #eef0f4;
 
@@ -62,8 +64,8 @@
    Image (full-bleed, auto-crop)
    ----------------------------------------- */
 .featured-article .featured-media {
-  width: 100%;
-  margin: 0;
+  width: calc(100% - (var(--featured-article-left-inset) * 2));
+  margin: 0 var(--featured-article-left-inset);
   overflow: hidden;
 
   /* consistent card-like crop */
@@ -104,13 +106,13 @@
    Text block (THIS is where padding lives)
    ----------------------------------------- */
 .featured-article .featured-content {
-  padding: 14px 16px 16px 16px;
+  padding: 14px 16px 16px var(--featured-article-left-inset);
 }
 
 /* Headline */
 .featured-article h3 {
   margin: 0 0 6px 0;
-  font-family: "Playfair Display", serif;
+  font-family: "Poppins", system-ui, -apple-system, sans-serif;
   font-size: 22px;
   font-weight: 650;
   line-height: 1.12;
@@ -157,12 +159,15 @@
   text-transform: none;
   letter-spacing: 0;
 
-  color: #1f4ed8;
+  color: #4b6b8a;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .featured-article:hover .cta {
   text-decoration: underline;
   text-underline-offset: 3px;
+   color: #2f4f6f;
 }
 
 /* =========================================
@@ -174,7 +179,7 @@
   }
 
   .featured-article .kicker {
-    padding: 14px 14px 10px 14px;
+    padding: 14px 14px 10px var(--featured-article-left-inset);
     font-size: 11px;
     letter-spacing: 0.18em;
   }
@@ -184,14 +189,19 @@
   }
 
   .featured-article .featured-content {
-    padding: 14px 14px 16px 14px;
+    padding: 14px 14px 16px var(--featured-article-left-inset);
   }
 
   .featured-article h3 {
-    font-size: 24px;
-    line-height: 1.08;
+ 
+ 
     margin-bottom: 6px;
+    font-size: 1.15rem;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
   }
+
+  
 
   .featured-article .dek {
     font-size: 15px;
@@ -201,5 +211,13 @@
 
   .featured-article .cta {
     font-size: 13px;
+  }
+}
+@media (max-width: 700px) {
+
+  .featured-article .kicker {
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    line-height: 1.15;
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PhotoPickerModal from "@components/PhotoPickerModal";
@@ -18,6 +18,18 @@ const emptyPlaylist = {
   title: "",
   type: "",
   is_active: true,
+  slug: "",
+  headline: "",
+  page_title: "",
+  meta_description: "",
+  dek: "",
+  intro_html: "",
+  body_html: "",
+  hero_image_id: "",
+  hero_image_url: "",
+  hero_alt: "",
+  indexable: true,
+  published_at: "",
 };
 
 const emptyItem = {
@@ -41,6 +53,23 @@ const emptyItem = {
   is_active: true,
 };
 
+const DEFAULT_PLAYLIST_TYPES = ["teaching"];
+
+function slugifyPlaylistValue(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function toDatetimeLocal(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.replace(" ", "T").slice(0, 16);
+}
+
 export default function AdminPlaylistEditorPage() {
   const { playlistId } = useParams();
   const navigate = useNavigate();
@@ -57,19 +86,11 @@ export default function AdminPlaylistEditorPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [photoPickerIndex, setPhotoPickerIndex] = useState(null);
+  const [heroPickerOpen, setHeroPickerOpen] = useState(false);
+  const [seoModalOpen, setSeoModalOpen] = useState(false);
   const [photoThumbs, setPhotoThumbs] = useState({});
   const [photoInfo, setPhotoInfo] = useState({});
   const [previewPhoto, setPreviewPhoto] = useState(null);
-
-  useEffect(() => {
-    if (!playlistId) {
-      setPlaylist(emptyPlaylist);
-      setItems([]);
-      setExpandedItems({});
-      return;
-    }
-    fetchPlaylist(playlistId);
-  }, [playlistId]);
 
   useEffect(() => {
     fetchPlaylistTypes();
@@ -141,7 +162,7 @@ export default function AdminPlaylistEditorPage() {
     };
   }, [items, photoThumbs]);
 
-  async function fetchPlaylist(id) {
+  const fetchPlaylist = useCallback(async (id) => {
     setLoading(true);
     setError("");
     try {
@@ -155,6 +176,18 @@ export default function AdminPlaylistEditorPage() {
         title: data.playlist.title,
         type: data.playlist.type,
         is_active: Boolean(data.playlist.is_active),
+        slug: data.playlist.slug ?? "",
+        headline: data.playlist.headline ?? "",
+        page_title: data.playlist.page_title ?? "",
+        meta_description: data.playlist.meta_description ?? "",
+        dek: data.playlist.dek ?? "",
+        intro_html: data.playlist.intro_html ?? "",
+        body_html: data.playlist.body_html ?? "",
+        hero_image_id: data.playlist.hero_image_id ?? "",
+        hero_image_url: data.playlist.hero_image_url ?? "",
+        hero_alt: data.playlist.hero_alt ?? "",
+        indexable: data.playlist.indexable == null ? true : Boolean(data.playlist.indexable),
+        published_at: toDatetimeLocal(data.playlist.published_at ?? ""),
       });
       const typeValue = String(data.playlist.type || "").trim();
       if (typeValue && !playlistTypes.includes(typeValue)) {
@@ -190,7 +223,17 @@ export default function AdminPlaylistEditorPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [playlistTypes]);
+
+  useEffect(() => {
+    if (!playlistId) {
+      setPlaylist(emptyPlaylist);
+      setItems([]);
+      setExpandedItems({});
+      return;
+    }
+    fetchPlaylist(playlistId);
+  }, [playlistId, fetchPlaylist]);
 
   async function fetchSavedPalettes() {
     try {
@@ -240,9 +283,9 @@ export default function AdminPlaylistEditorPage() {
       if (!res.ok || !data?.ok) return;
       const types = Array.from(
         new Set(
-          (data.items || [])
+          [...DEFAULT_PLAYLIST_TYPES, ...(data.items || [])
             .map((row) => String(row?.type || "").trim())
-            .filter(Boolean)
+            .filter(Boolean)]
         )
       ).sort((a, b) => a.localeCompare(b));
       setPlaylistTypes(types);
@@ -324,10 +367,15 @@ export default function AdminPlaylistEditorPage() {
   }
 
   function addItem(type = "non-palette") {
-    setItems((prev) => [
-      ...prev,
-      { ...emptyItem, item_type: type },
-    ]);
+    setItems((prev) => {
+      const nextItem = { ...emptyItem, item_type: type };
+      if (type === "intro") {
+        return [nextItem, ...prev];
+      }
+      return [...prev, nextItem];
+    });
+    setSaveStatus("");
+    setSaveError("");
   }
 
   function removeItem(index) {
@@ -358,6 +406,22 @@ export default function AdminPlaylistEditorPage() {
     return "";
   };
 
+  function clearItemPhoto(index) {
+    setItems((prev) =>
+      prev.map((item, idx) => (
+        idx === index
+          ? {
+              ...item,
+              photo_library_id: "",
+              image_url: "",
+            }
+          : item
+      ))
+    );
+    setSaveStatus("");
+    setSaveError("");
+  }
+
   async function handleSave() {
     setSaving(true);
     setSaveStatus("");
@@ -368,6 +432,18 @@ export default function AdminPlaylistEditorPage() {
         title: playlist.title,
         type: playlist.type,
         is_active: playlist.is_active,
+        slug: playlist.slug,
+        headline: playlist.headline,
+        page_title: playlist.page_title,
+        meta_description: playlist.meta_description,
+        dek: playlist.dek,
+        intro_html: playlist.intro_html,
+        body_html: playlist.body_html,
+        hero_image_id: playlist.hero_image_id || null,
+        hero_image_url: playlist.hero_image_url,
+        hero_alt: playlist.hero_alt,
+        indexable: playlist.indexable,
+        published_at: playlist.published_at || null,
       };
       const res = await fetch(SAVE_URL, {
         method: "POST",
@@ -520,6 +596,18 @@ export default function AdminPlaylistEditorPage() {
           />
           Active
         </label>
+        <div className="playlist-form__tools">
+          <button type="button" onClick={() => setSeoModalOpen(true)}>
+            SEO
+          </button>
+          {playlist.slug ? (
+            <div className="muted">
+              <code>/playlists/{playlist.slug}</code>
+            </div>
+          ) : (
+            <div className="muted">No landing-page slug yet.</div>
+          )}
+        </div>
       </div>
 
       <div className="items-header">
@@ -629,6 +717,14 @@ export default function AdminPlaylistEditorPage() {
                     onClick={() => setPhotoPickerIndex(index)}
                   >
                     Pick Photo
+                  </button>
+                  <button
+                    type="button"
+                    className="item-inline-btn"
+                    onClick={() => clearItemPhoto(index)}
+                    disabled={!getPhotoLibraryId(item) && !item.image_url}
+                  >
+                    Remove Photo
                   </button>
                 </div>
               </div>
@@ -763,6 +859,199 @@ export default function AdminPlaylistEditorPage() {
           setPhotoPickerIndex(null);
         }}
       />
+
+      <PhotoPickerModal
+        open={heroPickerOpen}
+        title="Pick Hero Photo"
+        onClose={() => setHeroPickerOpen(false)}
+        onPick={(picked) => {
+          if (!picked?.photo_library_id) return;
+          updatePlaylist("hero_image_id", String(picked.photo_library_id));
+          updatePlaylist("hero_image_url", picked.image_url || "");
+          if (!String(playlist.hero_alt || "").trim()) {
+            updatePlaylist("hero_alt", playlist.headline || playlist.title);
+          }
+          setHeroPickerOpen(false);
+        }}
+      />
+
+      {seoModalOpen && (
+        <div
+          className="playlist-seo-modal-backdrop"
+          onClick={() => setSeoModalOpen(false)}
+        >
+          <div
+            className="playlist-seo-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="playlist-seo-form__header">
+              <div>
+                <div className="items-title">SEO Landing Page</div>
+                <div className="editor-subtitle">
+                  Edit the Google-facing landing page at /playlists/{'{slug}'}.
+                </div>
+              </div>
+              <button type="button" onClick={() => setSeoModalOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className="playlist-seo-form">
+              <div className="playlist-seo-form__grid">
+                <label>
+                  Slug
+                  <div className="playlist-seo-form__inline">
+                    <input
+                      type="text"
+                      value={playlist.slug}
+                      onChange={(e) => updatePlaylist("slug", e.target.value)}
+                      placeholder="where-does-the-eye-go-garage-dominant-house"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updatePlaylist(
+                          "slug",
+                          slugifyPlaylistValue(playlist.headline || playlist.title)
+                        )
+                      }
+                    >
+                      Generate
+                    </button>
+                  </div>
+                </label>
+
+                <label>
+                  Headline
+                  <input
+                    type="text"
+                    value={playlist.headline}
+                    onChange={(e) => updatePlaylist("headline", e.target.value)}
+                    placeholder="Public H1 for the landing page"
+                  />
+                </label>
+
+                <label>
+                  Page Title
+                  <input
+                    type="text"
+                    value={playlist.page_title}
+                    onChange={(e) => updatePlaylist("page_title", e.target.value)}
+                    placeholder="HTML title tag"
+                  />
+                </label>
+
+                <label>
+                  Meta Description
+                  <textarea
+                    rows={2}
+                    value={playlist.meta_description}
+                    onChange={(e) => updatePlaylist("meta_description", e.target.value)}
+                    placeholder="Short search snippet"
+                  />
+                </label>
+
+                <label>
+                  Dek
+                  <textarea
+                    rows={2}
+                    value={playlist.dek}
+                    onChange={(e) => updatePlaylist("dek", e.target.value)}
+                    placeholder="Brief intro under the headline"
+                  />
+                </label>
+
+                <label>
+                  Published At
+                  <input
+                    type="datetime-local"
+                    value={playlist.published_at}
+                    onChange={(e) => updatePlaylist("published_at", e.target.value)}
+                  />
+                </label>
+
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(playlist.indexable)}
+                    onChange={(e) => updatePlaylist("indexable", e.target.checked)}
+                  />
+                  Indexable
+                </label>
+
+                <label>
+                  Hero Alt
+                  <input
+                    type="text"
+                    value={playlist.hero_alt}
+                    onChange={(e) => updatePlaylist("hero_alt", e.target.value)}
+                    placeholder="Hero image alt text"
+                  />
+                </label>
+
+                <label className="playlist-seo-form__span-2">
+                  Hero Image URL
+                  <div className="playlist-seo-form__inline">
+                    <input
+                      type="text"
+                      value={playlist.hero_image_url}
+                      onChange={(e) => updatePlaylist("hero_image_url", e.target.value)}
+                      placeholder="/photos/... or https://..."
+                    />
+                    <button type="button" onClick={() => setHeroPickerOpen(true)}>
+                      Pick Hero Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updatePlaylist("hero_image_id", "");
+                        updatePlaylist("hero_image_url", "");
+                      }}
+                      disabled={!playlist.hero_image_id && !playlist.hero_image_url}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  {playlist.hero_image_id ? (
+                    <div className="muted">Photo Library #{playlist.hero_image_id}</div>
+                  ) : null}
+                  {playlist.hero_image_url ? (
+                    <div className="playlist-seo-form__hero-preview">
+                      <img src={playlist.hero_image_url} alt="" />
+                    </div>
+                  ) : null}
+                </label>
+
+                <label className="playlist-seo-form__span-2">
+                  Intro HTML
+                  <textarea
+                    rows={6}
+                    value={playlist.intro_html}
+                    onChange={(e) => updatePlaylist("intro_html", e.target.value)}
+                    placeholder="<p>Shorter explanatory section above the fold.</p>"
+                  />
+                </label>
+
+                <label className="playlist-seo-form__span-2">
+                  Body HTML
+                  <textarea
+                    rows={10}
+                    value={playlist.body_html}
+                    onChange={(e) => updatePlaylist("body_html", e.target.value)}
+                    placeholder="<p>Longer Google-friendly explanation.</p>"
+                  />
+                </label>
+              </div>
+
+              {playlist.slug ? (
+                <div className="muted">
+                  Landing page: <code>/playlists/{playlist.slug}</code>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       {previewPhoto?.src && (
         <div

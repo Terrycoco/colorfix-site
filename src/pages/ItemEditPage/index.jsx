@@ -22,7 +22,7 @@ const emptyItem = {
       is_pinnable: 0,
       is_active: 1,
       color: '',
-      insert_position: null
+      insert_position: ''
  };
 
 
@@ -64,7 +64,7 @@ export default function ItemEditPage() {
         is_pinnable: item.is_pinnable || 0,
         is_active: item.is_active ?? 1,
         color: item.color || '',
-        insert_position: item.insert_position || ''
+        insert_position: item.insert_position ?? ''
       });
     };
 
@@ -88,8 +88,12 @@ export default function ItemEditPage() {
     e.preventDefault();
     console.log('Submitting this formData:', formData);
     const parsedImage = parsePhotoRef(formData.image_url || '');
+    const normalizedInsertPosition = formData.insert_position === '' || formData.insert_position == null
+      ? null
+      : Number.parseFloat(formData.insert_position);
     const payload = {
       ...formData,
+      insert_position: Number.isFinite(normalizedInsertPosition) ? normalizedInsertPosition : null,
       image_url: formData.photo_library_id
         ? makePhotoRef(formData.photo_library_id, parsedImage.url || '')
         : formData.image_url,
@@ -122,12 +126,19 @@ export default function ItemEditPage() {
   return (
     <div className="flex">
 
-       <div className="w-1/4">
-        <p className="text-xs font-semibold ml-2 mt-2">All Items</p>
-        <ul>
+       <div className="w-1/4 pl-4 pr-3">
+        <p className="text-xs font-semibold mt-2">All Items</p>
+        <ul className="mt-2 space-y-1">
         {items.map(item => (
-          <li key={item.id} onClick={() => handleEdit(item)}>
+          <li
+            key={item.id}
+            onClick={() => handleEdit(item)}
+            className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100"
+          >
             {item.handle || item.display || item.name}
+            <span className="ml-2 text-xs text-gray-500">
+              [{item.insert_position ?? 'none'}]
+            </span>
           </li>
         ))}
       </ul>

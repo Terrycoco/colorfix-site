@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../db.php';
 use App\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoClientRepository;
 use App\Services\ClientService;
+use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;
 
 function respond(int $code, array $payload): void {
@@ -91,6 +92,7 @@ try {
 
     $repo = new PdoPhotoLibraryRepository($pdo);
     $library = new PhotoLibraryService($repo);
+    $altTextQueue = PhotoAltTextQueueService::fromPdo($pdo);
 
     for ($i = 0; $i < $count; $i++) {
         if (($files['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
@@ -134,6 +136,9 @@ try {
         ]);
 
         if ($libraryId > 0) {
+            if ($altText === '') {
+                $altTextQueue->enqueue($libraryId);
+            }
             $added[] = [
                 'photo_library_id' => $libraryId,
                 'rel_path' => $relPath,

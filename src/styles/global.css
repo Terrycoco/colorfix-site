@@ -1,10 +1,11 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Lato:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;700&family=Poppins:wght@500;600;700;800&display=swap');
 
 @layer base {
 :root {
   --app-background: #f8f8f8;
   --brand-color: #ff6600; /* Bright orange example */
+  --brand-muted:  #a66a3a;
   --brand-accent: #ffaa33;
   --button-color:  #f57c00; /*orange */
   --button-background:  #f57c00; /*orange */

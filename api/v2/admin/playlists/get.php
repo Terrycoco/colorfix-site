@@ -9,6 +9,8 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
+use App\Repos\PdoPlaylistRepository;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -31,6 +33,15 @@ function columnExists(PDO $pdo, string $table, string $column): bool {
     return (int)$stmt->fetchColumn() > 0;
 }
 
+function playlistSeoColumnsPresent(PDO $pdo): bool {
+    foreach (['slug', 'headline', 'page_title', 'meta_description', 'dek', 'intro_html', 'body_html', 'hero_image_id', 'hero_image_url', 'hero_alt', 'indexable', 'published_at'] as $column) {
+        if (!columnExists($pdo, 'playlists', $column)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     respond(['ok' => false, 'error' => 'GET only'], 405);
 }
@@ -40,16 +51,16 @@ if ($playlistId <= 0) {
     respond(['ok' => false, 'error' => 'playlist_id required'], 400);
 }
 
-$sql = <<<SQL
-    SELECT playlist_id, title, type, is_active
-    FROM playlists
-    WHERE playlist_id = :playlist_id
-    LIMIT 1
-    SQL;
+try {
+    if (!playlistSeoColumnsPresent($pdo)) {
+        respond(['ok' => false, 'error' => 'Playlist SEO migration has not been applied yet'], 500);
+    }
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute(['playlist_id' => $playlistId]);
-$playlist = $stmt->fetch(PDO::FETCH_ASSOC);
+    $repo = new PdoPlaylistRepository($pdo);
+    $playlist = $repo->getAdminRowById($playlistId);
+} catch (\Throwable $e) {
+    respond(['ok' => false, 'error' => 'Failed to load playlist. Playlist SEO migration may be missing.'], 500);
+}
 
 if (!$playlist) {
     respond(['ok' => false, 'error' => 'Playlist not found'], 404);

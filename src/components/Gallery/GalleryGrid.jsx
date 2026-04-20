@@ -10,7 +10,7 @@ const breakpointColumnsObj = {
 
 const GalleryGrid = ({ children }) => {
   return (
-    <div className="px-3">
+    <div className="gallery-grid-wrap">
     <Masonry
       breakpointCols={breakpointColumnsObj}
       className="gallery-masonry"

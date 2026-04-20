@@ -47,6 +47,19 @@
   font-weight: 600;
 }
 
+.panel-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.panel-subtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0b7d3e;
+}
+
 .panel-actions {
   display: flex;
   gap: 12px;

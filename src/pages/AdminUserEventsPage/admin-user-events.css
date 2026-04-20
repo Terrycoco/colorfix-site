@@ -40,6 +40,23 @@
   line-height: 1.45;
 }
 
+.admin-user-events__danger {
+  margin-top: 14px;
+  border: 1px solid #9f1d1d;
+  background: #fff7f7;
+  color: #9f1d1d;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-user-events__danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .admin-user-events__filters {
   display: grid;
   gap: 12px;

@@ -18,7 +18,14 @@ function LandingPage() {
 
       <div className="headline">
         {user && <p className="greeting">Hi, {user.firstname}</p>}
-        <h2>Welcome to <span className="brand">ColorFix!</span></h2>
+        <h2>
+          Welcome to{" "}
+          <span className="brand">
+            <span className="brand__color">Color</span>
+            <span className="brand__fix">Fix</span>
+            !
+          </span>
+        </h2>
       </div>
       <div className='tagline'>{tagline}</div>
 

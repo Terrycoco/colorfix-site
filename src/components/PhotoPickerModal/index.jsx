@@ -17,9 +17,12 @@ export default function PhotoPickerModal({
   const [error, setError] = useState("");
   const [thumbNonce, setThumbNonce] = useState(() => String(Date.now()));
   const inputRef = useRef(null);
+  const requestRef = useRef(null);
 
   useEffect(() => {
     if (!open) {
+      requestRef.current?.abort();
+      requestRef.current = null;
       setItems([]);
       setError("");
       setLoading(false);
@@ -46,27 +49,69 @@ export default function PhotoPickerModal({
 
   const listUrl = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
+  const parseJsonResponse = useCallback(async (res) => {
+    const text = await res.text();
+    const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+    const looksLikeJson = contentType.includes("application/json");
+
+    if (!text.trim()) {
+      return {};
+    }
+
+    if (!looksLikeJson && text.trim().startsWith("<")) {
+      throw new Error("Photo search returned HTML instead of JSON. The session may have expired.");
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("Photo search returned invalid JSON.");
+    }
+  }, []);
+
   const runSearch = useCallback(async () => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) {
+      requestRef.current?.abort();
+      requestRef.current = null;
+      setItems([]);
+      setLoading(false);
+      setError("Enter a tag or search term first. Blank searches are disabled.");
+      inputRef.current?.focus();
+      return;
+    }
+
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setError("");
     setThumbNonce(String(Date.now()));
     try {
       const params = new URLSearchParams();
-      if (query.trim()) params.set("q", query.trim());
+      params.set("q", cleanQuery);
       if (sourceType) params.set("source_type", sourceType);
       params.set("limit", "200");
       params.set("_", String(Date.now()));
-      const res = await fetch(`${listUrl}?${params.toString()}`, { credentials: "include" });
-      const data = await res.json();
+      const res = await fetch(`${listUrl}?${params.toString()}`, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+      const data = await parseJsonResponse(res);
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Search failed");
+      if (requestRef.current !== controller) return;
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch (err) {
+      if (err?.name === "AbortError") return;
       setItems([]);
       setError(err?.message || "Search failed");
     } finally {
-      setLoading(false);
+      if (requestRef.current === controller) {
+        requestRef.current = null;
+        setLoading(false);
+      }
     }
-  }, [listUrl, query, sourceType]);
+  }, [listUrl, parseJsonResponse, query, sourceType]);
 
   const buildPickerImageUrl = useCallback((url, updatedAt = null) => {
     const base = buildImageUrl(url, updatedAt);
@@ -106,14 +151,8 @@ export default function PhotoPickerModal({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g., door, cottage, adobe"
               ref={inputRef}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  runSearch();
-                }
-              }}
             />
-            <button type="submit" className="ppm-search-btn">
+            <button type="submit" className="ppm-search-btn" disabled={loading}>
               Search
             </button>
             <button

@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Entities\PlaylistInstance;
+use App\Repos\PdoAudienceTypeRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 
 function respond(array $payload, int $status = 200): void {
@@ -42,6 +43,14 @@ if ($ctaContextKey === '') {
 }
 if ($audience === '') {
     $audience = null;
+}
+
+$audienceRepo = new PdoAudienceTypeRepository($pdo);
+if ($audience !== null) {
+    $audience = strtolower($audience);
+    if (!$audienceRepo->isAllowedKey($audience)) {
+        respond(['ok' => false, 'error' => 'Invalid audience'], 400);
+    }
 }
 
 if ($playlistId <= 0) {

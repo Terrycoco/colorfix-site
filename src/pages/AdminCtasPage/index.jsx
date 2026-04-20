@@ -528,7 +528,7 @@ export default function AdminCtasPage() {
             </div>
             <div className="cta-cheatsheet-row">
               <div className="cta-cheatsheet-key">require_aud</div>
-              <div className="cta-cheatsheet-value">hoa | homeowner | contractor | admin</div>
+              <div className="cta-cheatsheet-value">any configured audience key</div>
             </div>
             <div className="cta-cheatsheet-note">
               Add these inside Params (JSON). Example: {"{ \"style\":\"link\", \"align\":\"center\" }"}

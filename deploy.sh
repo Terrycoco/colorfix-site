@@ -1,12 +1,12 @@
 #!/bin/bash
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/deploy-env.sh"
 
 echo "🚀 Deploying site build (dist/) via SSH..."
 
 # Configuration
 LOCAL_DIR="dist/"
-REMOTE_USER="shortgal"
-REMOTE_HOST="terrymarr.com"
 REMOTE_PATH="public_html/colorfix"
 
 # Check that build output exists
@@ -21,15 +21,15 @@ ls -l "$LOCAL_DIR"
 
 # 🧹 Clean old hashed files only in assets/
 echo "🧹 Cleaning old hashed files in assets/ on remote..."
-ssh "$REMOTE_USER@$REMOTE_HOST" <<EOF
+deploy_ssh "
   cd "$REMOTE_PATH/assets" || exit
   rm -f index-*.js index-*.css
-EOF
+"
 
 # 🚀 Upload everything from dist/ but DO NOT delete remote files outside of dist/assets
 echo "🚀 Uploading files via rsync..."
-/opt/homebrew/bin/rsync -avz \
-  -e "ssh -o StrictHostKeyChecking=no" \
-  "$LOCAL_DIR" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH"
+deploy_rsync -avz \
+  -e "$RSYNC_SSH" \
+  "$LOCAL_DIR" "$REMOTE_TARGET:$REMOTE_PATH"
 
 echo "✅ Site deployment complete."

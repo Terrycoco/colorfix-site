@@ -9,6 +9,7 @@ use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
 use App\Services\PhotoLibraryService;
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\ShareService;
 
 class SavedPaletteService
 {
@@ -16,17 +17,20 @@ class SavedPaletteService
     private ?SmtpMailer $mailer;
     private EmailTemplateService $emailTemplates;
     private ?PhotoLibraryService $photoLibrary;
+    private ShareService $shareService;
 
     public function __construct(
         PdoSavedPaletteRepository $repo,
         ?SmtpMailer $mailer = null,
         ?EmailTemplateService $emailTemplates = null,
-        ?PhotoLibraryService $photoLibrary = null
+        ?PhotoLibraryService $photoLibrary = null,
+        ?ShareService $shareService = null
     ) {
         $this->repo = $repo;
         $this->mailer = $mailer;
         $this->emailTemplates = $emailTemplates ?? new EmailTemplateService();
         $this->photoLibrary = $photoLibrary;
+        $this->shareService = $shareService ?? new ShareService($repo);
     }
 
     /**
@@ -508,9 +512,12 @@ class SavedPaletteService
         $palette = $full['palette'];
         $members = $full['members'] ?? [];
 
-        if (!$shareUrl) {
-            $shareUrl = sprintf('https://colorfix.terrymarr.com/palette/%s/share', $palette['palette_hash'] ?? $paletteId);
-        }
+        $shareUrl = $this->shareService->resolveShareUrl(
+            'saved_palette',
+            $paletteId,
+            $shareUrl,
+            ['palette_hash' => $palette['palette_hash'] ?? '']
+        );
 
         [$subject, $html, $text] = $this->emailTemplates->renderPaletteEmail(
             $palette,

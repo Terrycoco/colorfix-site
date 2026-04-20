@@ -23,8 +23,9 @@ try {
     }
 
     $apply = !empty($_GET['apply']) && $_GET['apply'] !== '0';
+    $relPath = trim((string)($_GET['rel_path'] ?? ''));
     $service = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
-    $result = $service->reconcileFilesystemRows($apply);
+    $result = $service->reconcileFilesystemRows($apply, $relPath !== '' ? $relPath : null);
 
     respond([
         'ok' => true,

@@ -10,6 +10,7 @@ const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 const UPDATE_URL = `${API_FOLDER}/v2/admin/photo-library/update.php`;
 const DELETE_INACTIVE_URL = `${API_FOLDER}/v2/admin/photo-library/delete-inactive.php`;
 const BACKFILL_EXTERIORS_URL = `${API_FOLDER}/v2/admin/photo-library/backfill-exteriors.php`;
+const RETIRE_MISSING_URL = `${API_FOLDER}/v2/admin/photo-library/retire-missing.php`;
 const DUPLICATES_URL = `${API_FOLDER}/v2/admin/photo-library/duplicate-candidates.php`;
 const MERGE_URL = `${API_FOLDER}/v2/admin/photo-library/merge.php`;
 const USAGE_URL = `${API_FOLDER}/v2/admin/photo-library/usage.php`;
@@ -56,6 +57,8 @@ export default function AdminPhotoLibraryToolsPage() {
   const [mergeMessage, setMergeMessage] = useState({ type: "", text: "" });
   const [usageModal, setUsageModal] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [retiringKey, setRetiringKey] = useState("");
+  const [selectedMissingRows, setSelectedMissingRows] = useState({});
 
   async function loadBroken() {
     const res = await fetch(AUDIT_URL, { credentials: "include" });
@@ -128,6 +131,7 @@ export default function AdminPhotoLibraryToolsPage() {
       flagged: `Missing library row (${item.source_type || "photo_base"})`,
       photo_library_id: null,
       rel_path: item.rel_path || "",
+      source_type: item.source_type || "photo_base",
     }));
   }
 
@@ -188,6 +192,15 @@ export default function AdminPhotoLibraryToolsPage() {
               ? await loadDuplicates()
               : await loadBroken();
       setRows(nextRows);
+      if (nextMode === "missing") {
+        setSelectedMissingRows((prev) => {
+          const next = {};
+          nextRows.forEach((row) => {
+            if (prev[row.key]) next[row.key] = true;
+          });
+          return next;
+        });
+      }
     } catch (err) {
       setError(err?.message || "Failed to load tools");
       setRows([]);
@@ -201,17 +214,31 @@ export default function AdminPhotoLibraryToolsPage() {
   }, [mode, loadMode]);
 
   async function handleCreateMissingRows() {
-    if (!window.confirm("Create missing Photo Library rows for files found on disk?")) return;
+    const selectedRows = rows.filter((row) => selectedMissingRows[row.key]);
+    if (!selectedRows.length) return;
+    if (!window.confirm(`Create Photo Library rows for ${selectedRows.length} selected file(s)?`)) return;
     setError("");
     setNotice("");
+    setRetiringKey("__bulk_create__");
+    let createdCount = 0;
     try {
-      const res = await fetch(`${RECONCILE_URL}?apply=1`, { credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Create missing rows failed");
-      setNotice(`Created ${Number(data?.result?.created || 0)} missing library row(s).`);
+      for (const row of selectedRows) {
+        setRetiringKey(row.key);
+        const params = new URLSearchParams();
+        params.set("apply", "1");
+        params.set("rel_path", row.rel_path);
+        const res = await fetch(`${RECONCILE_URL}?${params.toString()}`, { credentials: "include" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || `Create failed for ${row.rel_path}`);
+        createdCount += Number(data?.result?.created || 0);
+      }
+      setSelectedMissingRows({});
+      setNotice(`Created ${createdCount} missing library row(s).`);
       await loadMode("missing");
     } catch (err) {
       setError(err?.message || "Create missing rows failed");
+    } finally {
+      setRetiringKey("");
     }
   }
 
@@ -265,6 +292,41 @@ export default function AdminPhotoLibraryToolsPage() {
       await loadMode(mode);
     } catch (err) {
       setError(err?.message || "Sync base photos failed");
+    }
+  }
+
+  async function handleSaveMissingRetires() {
+    const selectedRows = rows.filter((row) => selectedMissingRows[row.key]);
+    if (!selectedRows.length) return;
+    if (!window.confirm(`Retire ${selectedRows.length} selected missing file(s)?`)) return;
+    setError("");
+    setNotice("");
+    setRetiringKey("__bulk__");
+    let retiredCount = 0;
+    try {
+      for (const row of selectedRows) {
+        setRetiringKey(row.key);
+        const res = await fetch(RETIRE_MISSING_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rel_path: row.rel_path,
+            source_type: row.source_type || null,
+            title: row.name || null,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data?.ok) throw new Error(data?.error || `Retire failed for ${row.rel_path}`);
+        retiredCount += 1;
+      }
+      setSelectedMissingRows({});
+      setNotice(`Retired ${retiredCount} missing row(s).`);
+      await loadMode("missing");
+    } catch (err) {
+      setError(err?.message || "Retire missing rows failed");
+    } finally {
+      setRetiringKey("");
     }
   }
 
@@ -364,6 +426,10 @@ export default function AdminPhotoLibraryToolsPage() {
     () => (mode === "duplicates" ? rows.filter((group) => Array.isArray(group?.items) && group.items.length > 0) : []),
     [mode, rows]
   );
+  const pendingMissingRetireCount = useMemo(
+    () => Object.values(selectedMissingRows).filter(Boolean).length,
+    [selectedMissingRows]
+  );
 
   const hasMergeIds = Boolean(mergeForm.fromId && mergeForm.toId);
   const canApplyMerge = Boolean(
@@ -415,9 +481,24 @@ export default function AdminPhotoLibraryToolsPage() {
             Refresh
           </button>
           {mode === "missing" ? (
-            <button type="button" className="admin-photo-library-tools__btn admin-photo-library-tools__btn--primary" onClick={handleCreateMissingRows}>
-              Create Missing Rows
-            </button>
+            <>
+              <button
+                type="button"
+                className="admin-photo-library-tools__btn admin-photo-library-tools__btn--primary"
+                onClick={handleCreateMissingRows}
+                disabled={!pendingMissingRetireCount || !!retiringKey}
+              >
+                {retiringKey === "__bulk_create__" ? "Creating Rows..." : `Create Rows${pendingMissingRetireCount ? ` (${pendingMissingRetireCount})` : ""}`}
+              </button>
+              <button
+                type="button"
+                className="admin-photo-library-tools__btn"
+                onClick={handleSaveMissingRetires}
+                disabled={!pendingMissingRetireCount || !!retiringKey}
+              >
+                {retiringKey === "__bulk__" ? "Saving Retires..." : `Save Retires${pendingMissingRetireCount ? ` (${pendingMissingRetireCount})` : ""}`}
+              </button>
+            </>
           ) : null}
           {mode === "retired" ? (
             <button type="button" className="admin-photo-library-tools__btn admin-photo-library-tools__btn--danger" onClick={handleDeleteRetired}>
@@ -508,6 +589,7 @@ export default function AdminPhotoLibraryToolsPage() {
         <table className="admin-photo-library-tools__table">
           <thead>
             <tr>
+              <th>{mode === "missing" ? "Select" : ""}</th>
               <th>Thumb</th>
               <th>Name</th>
               <th>Flagged</th>
@@ -518,22 +600,23 @@ export default function AdminPhotoLibraryToolsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="admin-photo-library-tools__empty">Loading…</td>
+                <td colSpan={6} className="admin-photo-library-tools__empty">Loading…</td>
               </tr>
             ) : null}
             {!loading && ((mode === "duplicates" ? duplicateRows.length : rows.length) === 0) ? (
               <tr>
-                <td colSpan={5} className="admin-photo-library-tools__empty">No rows.</td>
+                <td colSpan={6} className="admin-photo-library-tools__empty">No rows.</td>
               </tr>
             ) : null}
             {!loading && mode === "duplicates" && duplicateRows.map((group) => ([
               <tr key={`group:${group.group_key || group.rel_path || group.reason}`} className="admin-photo-library-tools__group-row">
-                <td colSpan={5} className="admin-photo-library-tools__group-cell">
+                <td colSpan={6} className="admin-photo-library-tools__group-cell">
                   {group.reason || "Duplicate candidate"} ({group.duplicate_count} rows)
                 </td>
               </tr>,
               ...group.items.map((row) => (
                 <tr key={`${group.rel_path}:${row.photo_library_id}`}>
+                  <td />
                   <td className="admin-photo-library-tools__thumb-cell">
                     {row.rel_path ? (
                       <img
@@ -600,6 +683,26 @@ export default function AdminPhotoLibraryToolsPage() {
             {!loading && rows.map((row) => (
               mode === "duplicates" ? null : (
               <tr key={row.key}>
+                <td className="admin-photo-library-tools__select-cell">
+                  {mode === "missing" ? (
+                    <input
+                      type="checkbox"
+                      checked={!!selectedMissingRows[row.key]}
+                      disabled={!!retiringKey}
+                      onChange={(e) => {
+                        setSelectedMissingRows((prev) => {
+                          const next = { ...prev };
+                          if (e.target.checked) {
+                            next[row.key] = true;
+                          } else {
+                            delete next[row.key];
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                  ) : null}
+                </td>
                 <td className="admin-photo-library-tools__thumb-cell">
                   {row.thumb ? (
                     <img

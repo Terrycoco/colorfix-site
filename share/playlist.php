@@ -36,7 +36,7 @@ try {
     // Non-fatal: keep fallback title.
 }
 
-$title = $instance->shareTitle ?: $playlistTitle;
+$title = $instance->shareTitle ?: ($instance->displayTitle ?: $playlistTitle);
 $description = $instance->shareDescription ?? '';
 $image = $instance->shareImageUrl ?? '';
 

@@ -13,6 +13,7 @@ use App\Repos\PdoClientRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Services\EmailTemplateService;
 use App\Services\PhotoRenderingService;
+use App\Services\ShareService;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -46,9 +47,12 @@ try {
         throw new RuntimeException('Palette not found');
     }
 
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'colorfix.terrymarr.com';
-    $link = $scheme . '://' . $host . '/view/' . $palette->id;
+    $shareService = new ShareService();
+    $link = $shareService->resolveShareUrl(
+        'applied_palette',
+        $palette->id,
+        (string)($payload['share_url'] ?? '')
+    );
 
     $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4), '/');
     $renderRel = "/photos/rendered/ap_{$palette->id}.jpg";
@@ -59,7 +63,7 @@ try {
         $cacheInfo = $renderService->cacheAppliedPalette($palette);
         $renderRel = $cacheInfo['render_rel_path'] ?? $renderRel;
     }
-    $renderUrl = $scheme . '://' . $host . $renderRel;
+    $renderUrl = $shareService->toAbsoluteUrl($renderRel);
 
     $uniqueEntries = [];
     foreach ($palette->entries as $entry) {

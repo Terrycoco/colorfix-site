@@ -12,6 +12,7 @@ const ITEM_TYPE_OPTIONS = [
   'quote',
   'search',
   'swatch',
+  'text',
   'wheel',
   'wheel-ticked',
 ];
@@ -41,10 +42,12 @@ return (
      <div>
       <label className="block font-medium">Insert Position</label>
       <input
-        type="text"
+        type="number"
+        step="0.01"
         value={formData.insert_position}
         onChange={(e) => updateField('insert_position', e.target.value)}
         className="w-full border px-2 py-1"
+        placeholder="e.g. 12.5"
       />
     </div>
 

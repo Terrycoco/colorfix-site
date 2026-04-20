@@ -216,6 +216,14 @@ export default function PlayerPage() {
         cta_id: Number(cta?.cta_id || 0) || null,
       });
     }
+    if (key === "watch_next") {
+      trackUserEvent({
+        event_type: "watch_next_click",
+        playlist_instance_id: Number(data?.playlist_instance_id || 0),
+        playlist_id: Number(data?.playlist_id || 0) || null,
+        cta_id: Number(cta?.cta_id || 0) || null,
+      });
+    }
     ctaHandlers[key]?.(cta);
   }
 
@@ -405,15 +413,6 @@ const visibleCTAs = useMemo(
         const currentPlaylistId = Number(data?.playlist_id);
         const seen = readWatchNextSeen(setId);
         const seenPlaylistIds = readWatchNextSeenPlaylists(setId);
-        const currentIndex = playlistItems.findIndex(
-          (item) => Number(item?.playlist_instance_id) === currentId
-        );
-        const orderedCandidates = currentIndex >= 0
-          ? [
-              ...playlistItems.slice(currentIndex + 1),
-              ...playlistItems.slice(0, currentIndex),
-            ]
-          : playlistItems;
 
         const isEligibleNextItem = (item, { ignoreSeen = false } = {}) => {
           const pid = Number(item?.playlist_instance_id);
@@ -425,7 +424,7 @@ const visibleCTAs = useMemo(
           return !seen.includes(pid);
         };
 
-        const nextItem = orderedCandidates.find((item) => isEligibleNextItem(item));
+        const nextItem = playlistItems.find((item) => isEligibleNextItem(item));
 
         if (!nextItem) {
           setWatchNextCta(null);

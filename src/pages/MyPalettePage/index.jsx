@@ -492,6 +492,11 @@ const activeBrandCodes = useMemo(() => {
   const handleNeutrals = () => runAndRemember("/v2/get-friends.php", null, "neutrals");
   const handleSimilar = () => runAndRemember("get-similar-hue.php", tolSame);
   const handleOpposites = () => runAndRemember("get-opposite-hue.php", tolOpp);
+  const normalizeTolerance = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.min(30, parsed));
+  };
 
   const handleBrowse = () => {
     const arr = Array.isArray(palette) ? palette : [];
@@ -560,75 +565,85 @@ const activeBrandCodes = useMemo(() => {
 
   const ControlsContent = () => (
     <div className="controls-grid controls-vertical">
-      <div className="cell">
+      <div className="cell cell--fuzzy">
         <FuzzySearchColorSelect
           onSelect={onFuzzyPick}
           className="myp-fuzzy"
-          placeholder="Enter a color"
+          placeholder="Start with a color name or code"
           autoFocus={false}
           mobileBreakpoint={0}
         />
       </div>
 
-      <div className="cell">
-        <button onClick={handleFriends}>What Colors Go?</button>
+      <div className="cell cell--primary-action">
+        <button className="myp-main-action" onClick={handleFriends}>What Colors Go?</button>
       </div>
 
-      <div className="cell">
-        <button onClick={handleNeutrals}>What Neutrals Go?</button>
+      <div className="cell cell--neutrals">
+        <button className="myp-secondary-action" onClick={handleNeutrals}>What Neutrals Go?</button>
       </div>
 
-      <div className="cell">
+      <div className="cell cell--similar">
         <div className="hue-stack">
-          <button className="hue-btn" onClick={handleSimilar}>Same Hue</button>
-          <input
-            type="number"
-            min="0"
-            max="30"
-            value={tolSame}
-            onChange={(e) => setTolSame(Number(e.target.value))}
-            className="hue-tolerance"
-            placeholder="0"
-            title="degree tolerance"
-            onFocus={selectAll}
-            onMouseUp={keepSelection}
-            onPointerUp={keepSelection}
-          />
+          <button className="hue-btn myp-secondary-action" onClick={handleSimilar}>See Similar Colors</button>
+          <div className="hue-tolerance-wrap">
+            <span className="hue-tolerance-prefix">±</span>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              value={tolSame}
+              onChange={(e) => setTolSame(normalizeTolerance(e.target.value))}
+              onBlur={(e) => setTolSame(normalizeTolerance(e.target.value))}
+              className="hue-tolerance"
+              placeholder="0"
+              title="degree tolerance"
+              onFocus={selectAll}
+              onMouseUp={keepSelection}
+              onPointerUp={keepSelection}
+            />
+            <span className="hue-tolerance-suffix">°</span>
+          </div>
         </div>
       </div>
 
-      <div className="cell">
+      <div className="cell cell--opposites">
         <div className="hue-stack">
-          <button className="hue-btn" onClick={handleOpposites}>Opposite Hue</button>
-          <input
-            type="number"
-            min="0"
-            max="30"
-            value={tolOpp}
-            onChange={(e) => setTolOpp(Number(e.target.value))}
-            className="hue-tolerance"
-            placeholder="0"
-            title="degree tolerance"
-            onFocus={selectAll}
-            onMouseUp={keepSelection}
-            onPointerUp={keepSelection}
-          />
+          <button className="hue-btn myp-secondary-action" onClick={handleOpposites}>See Opposite Colors</button>
+          <div className="hue-tolerance-wrap">
+            <span className="hue-tolerance-prefix">±</span>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              value={tolOpp}
+              onChange={(e) => setTolOpp(normalizeTolerance(e.target.value))}
+              onBlur={(e) => setTolOpp(normalizeTolerance(e.target.value))}
+              className="hue-tolerance"
+              placeholder="0"
+              title="degree tolerance"
+              onFocus={selectAll}
+              onMouseUp={keepSelection}
+              onPointerUp={keepSelection}
+            />
+            <span className="hue-tolerance-suffix">°</span>
+          </div>
         </div>
       </div>
 
-      <div className="cell">
-        <button type="button" onClick={handleBrowse}>
+      <div className="cell cell--browse">
+        <button className="myp-secondary-action" type="button" onClick={handleBrowse}>
           See Designer Palettes
         </button>
       </div>
 
-      <div className="cell">
-        <button type="button" onClick={handleTranslate}>
+      <div className="cell cell--translate">
+        <button className="myp-secondary-action" type="button" onClick={handleTranslate}>
           See In All Brands
         </button>
       </div>
 
-      <div className="cell">
+      <div className="cell cell--include">
         <label className="include-close">
           <input
             type="checkbox"
@@ -955,7 +970,7 @@ const activeBrandCodes = useMemo(() => {
         <section className="myp-top">
           {isPaletteEmpty ? (
             <div className="myp-empty">
-              <p>You have no colors saved yet. Enter a color name to start your palette.</p>
+              <p>Start with a color you love {"\u2014"} we'll show you what works with it.</p>
             </div>
           ) : (
             <div className="myp-row">

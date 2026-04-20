@@ -94,7 +94,6 @@ export default function PhotoSearchPicker({
   pageSize = DEFAULT_LIMIT,
   emptyText = "No photos matched.",
   autoSearch = true,
-  fallbackToTextOnEmpty = true,
   onPick,
   onQueryChange,
 }) {
@@ -117,11 +116,24 @@ export default function PhotoSearchPicker({
   }, [initialQ, initialTags, initialPage, autoSearch]);
 
   function doSearch({ q: nextQ, tagsText: nextTags }, nextPage = 1) {
+    const cleanTags = (nextTags || "").trim();
+    const cleanQ = (nextQ || "").trim();
+    if (!cleanTags && !cleanQ) {
+      setLoading(false);
+      setError("Enter at least one tag before searching.");
+      setItems([]);
+      setTotal(0);
+      setPage(1);
+      setQ("");
+      setTagsText("");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     const params = new URLSearchParams();
-    const mergedQ = nextQ || nextTags;
+    const mergedQ = cleanTags || cleanQ;
     if (mergedQ) params.set("q", mergedQ);
     params.set("page", String(nextPage));
     params.set("limit", String(pageSize));
@@ -149,11 +161,11 @@ export default function PhotoSearchPicker({
         setItems(nextItems);
         setTotal(data.total || 0);
         setPage(nextPageNum);
-        setQ(nextQ || "");
-        setTagsText(nextTags || "");
+        setQ(cleanQ);
+        setTagsText(cleanTags);
         onQueryChange && onQueryChange({
-          q: nextQ || "",
-          tagsText: nextTags || "",
+          q: cleanQ,
+          tagsText: cleanTags,
           page: nextPageNum,
           total: data.total || 0,
         });
@@ -169,6 +181,9 @@ export default function PhotoSearchPicker({
       <SearchBar initialQ={q} initialTags={tagsText} onSearch={(payload) => doSearch(payload, 1)} />
       {loading && <div className="psp-status">Loading…</div>}
       {error && <div className="psp-status error">{error}</div>}
+      {!loading && !error && !tagsText.trim() && !q.trim() && (
+        <div className="psp-status">Enter a tag first. Blank searches are disabled.</div>
+      )}
       <PhotoGrid
         items={items}
         onPick={(item) => onPick && onPick(item, { q, tagsText, page })}

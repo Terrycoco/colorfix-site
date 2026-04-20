@@ -271,6 +271,22 @@
   flex-wrap: wrap;
 }
 
+.admin-photo-library-tools__checklabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.admin-photo-library-tools__checklabel input {
+  margin: 0;
+}
+
+.admin-photo-library-tools__checklabel span {
+  white-space: nowrap;
+}
+
 .admin-photo-library-tools__empty {
   color: #6b7280;
 }

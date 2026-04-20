@@ -17,6 +17,18 @@ $logFile = dirname(__DIR__, 1) . '/run-query-error.log';
 $log = static function(string $msg) use ($logFile): void {
   @file_put_contents($logFile, '['.date('Y-m-d H:i:s')."] $msg\n", FILE_APPEND);
 };
+register_shutdown_function(static function () use ($log): void {
+  $error = error_get_last();
+  if (!$error) return;
+  $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+  if (!in_array($error['type'] ?? 0, $fatalTypes, true)) return;
+  $log(
+    'Fatal shutdown: '
+    . ($error['message'] ?? 'unknown')
+    . ' in ' . ($error['file'] ?? 'unknown')
+    . ':' . ($error['line'] ?? 0)
+  );
+});
 $extractNamedParamsFromQuery = static function(string $sql): array {
   preg_match_all('/:([a-zA-Z_][a-zA-Z0-9_]*)/', $sql, $m);
   return array_values(array_unique($m[1] ?? []));

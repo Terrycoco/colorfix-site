@@ -9,6 +9,8 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
+use App\Repos\PdoAudienceTypeRepository;
+
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -20,9 +22,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 $audienceRaw = trim((string)($_GET['audience'] ?? ''));
-$allowed = ['any', 'hoa', 'homeowner', 'contractor', 'admin'];
 $audienceLower = strtolower($audienceRaw);
-$audience = in_array($audienceLower, $allowed, true) ? $audienceLower : '';
+$audienceRepo = new PdoAudienceTypeRepository($pdo);
+$audience = $audienceRepo->isAllowedKey($audienceLower) ? $audienceLower : '';
 
 if ($audience === '') {
     respond(['ok' => false, 'error' => 'audience required'], 400);

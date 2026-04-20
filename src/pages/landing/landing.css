@@ -8,8 +8,15 @@
 }
 
 .brand {
-  color: var(--brand-color);
   font-weight: bold;
+}
+
+.brand__color {
+  color: #111;
+}
+
+.brand__fix {
+  color: var(--brand-color);
 }
 
 .tagline {

@@ -118,7 +118,7 @@ export default function AdminPlaylistInstanceSetsPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load instances");
       setInstances(Array.isArray(data.items) ? data.items : []);
-    } catch (err) {
+    } catch {
       // optional list
     }
   }
@@ -380,7 +380,17 @@ export default function AdminPlaylistInstanceSetsPage() {
     }
   }
 
-  const safeSets = Array.isArray(sets) ? sets : [];
+  const safeSets = useMemo(() => {
+    const list = Array.isArray(sets) ? [...sets] : [];
+    return list.sort((a, b) => {
+      const aLabel = (a.title || a.handle || `Set ${a.id || ""}`).trim();
+      const bLabel = (b.title || b.handle || `Set ${b.id || ""}`).trim();
+      return aLabel.localeCompare(bLabel, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+  }, [sets]);
   const safeSetItems = Array.isArray(setItems) ? setItems : [];
 
   const instanceOptions = useMemo(() => {
@@ -388,9 +398,12 @@ export default function AdminPlaylistInstanceSetsPage() {
     return safeInstances
       .map((item) => ({
         id: item.playlist_instance_id,
-        label: `#${item.playlist_instance_id} — ${item.display_title || item.instance_name || "Untitled"}`,
+        label: `${item.display_title || item.instance_name || "Untitled"} (#${item.playlist_instance_id})`,
       }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }));
   }, [instances]);
 
   const setOptions = useMemo(() => {
