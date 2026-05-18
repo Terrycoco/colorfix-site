@@ -31,6 +31,7 @@ final class PlaylistInstance
         public bool $hideStars,
         public bool $isActive,
         public ?int $createdFromInstance,
-        public ?int $kickerId
+        public ?int $kickerId,
+        public ?string $slug = null
     ) {}
 }

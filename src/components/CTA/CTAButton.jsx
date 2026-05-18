@@ -1,4 +1,5 @@
 import CTAIcon from '@components/Icons/CTAIcons';
+import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
 import "./cta.css";
 
 export default function CTAButton({ cta, onClick, disabled = false }) {
@@ -10,6 +11,13 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
   const hasIcon = Boolean(cta.icon);
   const isLink = variant === "link";
   const href = cta?.params?.url || cta?.href || cta?.url || "#";
+  const isColorFixBrandCta = cta?.params?.brand === "colorfix";
+  const className = [
+    "cta-button",
+    `cta-button--${variant}`,
+    `cta-button--${displayMode}`,
+    isColorFixBrandCta ? "cta-button--brand-colorfix" : "",
+  ].filter(Boolean).join(" ");
 
   const content = (
     <>
@@ -18,7 +26,9 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
       )}
 
       {displayMode !== "icon" && (
-        <span className="cta-button__label">{cta.label}</span>
+        <span className="cta-button__label">
+          {isColorFixBrandCta ? renderColorFixLabel(cta.label) : cta.label}
+        </span>
       )}
     </>
   );
@@ -27,7 +37,7 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
     return (
       <a
         href={href}
-        className={`cta-button cta-button--${variant} cta-button--${displayMode}`}
+        className={className}
         onClick={(event) => {
           if (onClick) {
             event.preventDefault();
@@ -44,11 +54,27 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
   return (
     <button
       type="button"
-      className={`cta-button cta-button--${variant} cta-button--${displayMode}`}
+      className={className}
       onClick={() => !disabled && onClick && onClick(cta)}
       disabled={disabled}
     >
       {content}
     </button>
   );
+}
+
+function renderColorFixLabel(label) {
+  const text = String(label || "");
+  const parts = text.split(/(ColorFix)/g);
+  return parts.map((part, index) => {
+    if (part !== "ColorFix") return part;
+    return (
+      <img
+        key={`brand-${index}`}
+        src={colorfixLightBgUrl}
+        alt="ColorFix"
+        className="cta-button__brand-logo"
+      />
+    );
+  });
 }

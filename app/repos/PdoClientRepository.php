@@ -12,11 +12,8 @@ class PdoClientRepository
     public function listAll(int $limit = 500): array
     {
         $limit = max(1, min(1000, $limit));
-        $stmt = $this->pdo->prepare($this->baseListSql() . "
-              ORDER BY
-                CASE WHEN COALESCE(clients.name, '') = '' THEN 1 ELSE 0 END,
-                LOWER(COALESCE(clients.name, '')) ASC,
-                LOWER(COALESCE(clients.email, '')) ASC
+        $stmt = $this->pdo->prepare($this->listSql() . "
+              ORDER BY clients.last_name ASC, clients.first_name ASC, clients.id ASC
               LIMIT {$limit}");
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -32,14 +29,11 @@ class PdoClientRepository
         }
 
         $like = '%' . $query . '%';
-        $stmt = $this->pdo->prepare($this->baseListSql() . "
+        $stmt = $this->pdo->prepare($this->listSql() . "
               WHERE clients.name LIKE :query_name
                  OR clients.email LIKE :query_email
                  OR clients.phone LIKE :query_phone
-              ORDER BY
-                CASE WHEN COALESCE(clients.name, '') = '' THEN 1 ELSE 0 END,
-                LOWER(COALESCE(clients.name, '')) ASC,
-                LOWER(COALESCE(clients.email, '')) ASC
+              ORDER BY clients.last_name ASC, clients.first_name ASC, clients.id ASC
               LIMIT {$limit}");
         $stmt->execute([
             ':query_name' => $like,
@@ -70,14 +64,44 @@ class PdoClientRepository
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare("
-            INSERT INTO clients (name, email, phone, notes, created_at)
-            VALUES (:name, :email, :phone, :notes, NOW())
+            INSERT INTO clients (
+                name,
+                first_name,
+                last_name,
+                email,
+                phone,
+                notes,
+                client_type_key,
+                photo_permission_status,
+                photo_permission_requested_at,
+                photo_permission_granted_at,
+                created_at
+            )
+            VALUES (
+                :name,
+                :first_name,
+                :last_name,
+                :email,
+                :phone,
+                :notes,
+                :client_type_key,
+                :photo_permission_status,
+                :photo_permission_requested_at,
+                :photo_permission_granted_at,
+                NOW()
+            )
         ");
         $stmt->execute([
             ':name'  => $data['name'] ?? 'Client',
+            ':first_name' => $data['first_name'] ?? null,
+            ':last_name' => $data['last_name'] ?? null,
             ':email' => $data['email'] ?? sprintf('unknown-%s@invalid.local', uniqid()),
             ':phone' => $data['phone'] ?? null,
             ':notes' => $data['notes'] ?? null,
+            ':client_type_key' => $data['client_type_key'] ?? $data['client_type'] ?? 'homeowner',
+            ':photo_permission_status' => $data['photo_permission_status'] ?? 'unknown',
+            ':photo_permission_requested_at' => $data['photo_permission_requested_at'] ?? null,
+            ':photo_permission_granted_at' => $data['photo_permission_granted_at'] ?? null,
         ]);
         return (int)$this->pdo->lastInsertId();
     }
@@ -85,7 +109,18 @@ class PdoClientRepository
     public function update(int $id, array $fields): void
     {
         if (!$fields) return;
-        $allowed = ['name','email','phone','notes'];
+        $allowed = [
+            'name',
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'notes',
+            'client_type_key',
+            'photo_permission_status',
+            'photo_permission_requested_at',
+            'photo_permission_granted_at',
+        ];
         $set = [];
         $params = [':id' => $id];
         foreach ($fields as $key => $value) {
@@ -149,12 +184,30 @@ class PdoClientRepository
         return "SELECT
                     clients.id,
                     clients.name,
+                    clients.first_name,
+                    clients.last_name,
                     clients.email,
                     clients.phone,
                     clients.notes,
+                    clients.client_type_key AS client_type,
+                    clients.photo_permission_status,
+                    clients.photo_permission_requested_at,
+                    clients.photo_permission_granted_at,
                     (SELECT COUNT(*) FROM photo_library WHERE client_id = clients.id) AS photo_count,
                     (SELECT COUNT(*) FROM client_applied_palettes WHERE client_id = clients.id) AS applied_palette_count,
                     (SELECT COUNT(*) FROM applied_palette_shares WHERE client_id = clients.id) AS share_count
+                FROM clients";
+    }
+
+    private function listSql(): string
+    {
+        return "SELECT
+                    clients.id,
+                    clients.name,
+                    clients.first_name,
+                    clients.last_name,
+                    clients.email,
+                    clients.phone
                 FROM clients";
     }
 }

@@ -10,8 +10,8 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoSavedPaletteRepository;
-use App\Services\PhotoLibraryService;
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Services\PhotoLibraryService;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -53,7 +53,6 @@ try {
     $photoType = isset($payload['photo_type']) ? trim((string)$payload['photo_type']) : 'full';
     $triggerMode = isset($payload['trigger_mode']) ? strtolower(trim((string)$payload['trigger_mode'])) : 'any';
     $triggerId = isset($payload['trigger_color_id']) ? (int)$payload['trigger_color_id'] : null;
-    $showInGallery = !empty($payload['show_in_gallery']);
     $replaceExistingFull = !empty($payload['replace_existing_full']);
     $caption = isset($payload['caption']) ? trim((string)$payload['caption']) : null;
     $altText = isset($payload['alt_text']) ? trim((string)$payload['alt_text']) : null;
@@ -108,7 +107,6 @@ try {
             'photo_type' => 'full',
             'trigger_mode' => $triggerMode,
             'trigger_color_id' => $triggerId,
-            'show_in_gallery' => $showInGallery ? 1 : 0,
             'caption' => $caption ?: null,
             'alt_text' => $altText ?: null,
         ];
@@ -119,13 +117,11 @@ try {
             'photo_library_id' => $photoLibraryId > 0 ? $photoLibraryId : ($existingExact['photo_library_id'] ?? null),
             'caption' => $caption ?: null,
             'alt_text' => $altText ?: null,
-            'show_in_gallery' => $showInGallery ? 1 : 0,
         ];
         if ($photoType === 'before') {
             $update['trigger_mode'] = 'none';
             $update['trigger_color_id'] = null;
             $update['caption'] = 'Before';
-            $update['show_in_gallery'] = 0;
         } else {
             $update['trigger_mode'] = $triggerMode;
             $update['trigger_color_id'] = $triggerId;
@@ -143,7 +139,6 @@ try {
             'photo_type' => $photoType,
             'trigger_mode' => $triggerMode,
             'trigger_color_id' => $triggerId,
-            'show_in_gallery' => $showInGallery ? 1 : 0,
             'caption' => $caption ?: null,
             'alt_text' => $altText ?: null,
         ];
@@ -151,17 +146,26 @@ try {
             $update['trigger_mode'] = 'none';
             $update['trigger_color_id'] = null;
             $update['caption'] = 'Before';
-            $update['show_in_gallery'] = 0;
         }
         $repo->updatePhoto($photoId, $paletteId, $update);
     }
 
     $row = $repo->getPhotoById($photoId);
     if ($row) {
-        // If the user explicitly picked an existing library asset, don't clone it into
-        // photo_library again under a saved-palette-specific source row.
-        if ($photoLibraryId <= 0) {
-            $photoLibrary = new PhotoLibraryService(new PdoPhotoLibraryRepository($pdo));
+        $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
+        // If the user explicitly picked an existing library asset, keep that row canonical
+        // and mark it as palette-linked there.
+        if ($photoLibraryId > 0) {
+            $libraryUpdate = [
+                'has_palette' => 1,
+            ];
+            if ($photoType !== 'before' && $triggerMode !== 'none') {
+                $libraryUpdate['show_in_gallery'] = 1;
+            }
+            $photoLibraryRepo->update($photoLibraryId, $libraryUpdate);
+            $row = $repo->getPhotoById($photoId) ?: $row;
+        } else {
+            $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
             $canonicalId = $photoLibrary->syncSavedPalettePhoto($row);
             if ($canonicalId > 0 && (int)($row['photo_library_id'] ?? 0) !== $canonicalId) {
                 $repo->updatePhoto($photoId, $paletteId, ['photo_library_id' => $canonicalId]);

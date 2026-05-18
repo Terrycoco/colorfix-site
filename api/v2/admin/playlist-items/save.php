@@ -58,6 +58,18 @@ try {
     $hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
     $hasPhotoLibraryId = columnExists($pdo, 'playlist_items', 'photo_library_id');
     $hasSavedPaletteSetId = columnExists($pdo, 'playlist_items', 'saved_palette_set_id');
+    $hasIsShareImage = columnExists($pdo, 'playlist_items', 'is_share_image');
+    $selectedShareIndex = null;
+    foreach ($items as $idx => $candidate) {
+        $candidateHasPhoto = (
+            (isset($candidate['photo_library_id']) && $candidate['photo_library_id'] !== '')
+            || trim((string)($candidate['image_url'] ?? '')) !== ''
+        );
+        if ($candidateHasPhoto && !empty($candidate['is_share_image'])) {
+            $selectedShareIndex = $idx;
+            break;
+        }
+    }
     $playlistPhotoSync = new PlaylistPhotoLibrarySyncService($pdo);
     $stmt = $pdo->prepare('UPDATE playlist_items SET order_index = order_index + 10000 WHERE playlist_id = :playlist_id');
     $stmt->execute(['playlist_id' => $playlistId]);
@@ -66,6 +78,10 @@ try {
     $keepIds = [];
     foreach ($items as $item) {
         $itemId = isset($item['playlist_item_id']) ? (int)$item['playlist_item_id'] : 0;
+        $hasPhoto = (
+            (isset($item['photo_library_id']) && $item['photo_library_id'] !== '')
+            || trim((string)($item['image_url'] ?? '')) !== ''
+        );
         $data = [
             'playlist_id' => $playlistId,
             'order_index' => $orderIndex,
@@ -89,12 +105,18 @@ try {
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
         }
+        if ($hasIsShareImage) {
+            $data['is_share_image'] = ($hasPhoto && $selectedShareIndex === $orderIndex) ? 1 : 0;
+        }
         $data = $playlistPhotoSync->normalizeItemForSave($data);
         if (!$hasPhotoLibraryId) {
             unset($data['photo_library_id']);
         }
         if (!$hasSavedPaletteSetId) {
             unset($data['saved_palette_set_id']);
+        }
+        if (!$hasIsShareImage) {
+            unset($data['is_share_image']);
         }
 
         $columns = [
@@ -116,12 +138,16 @@ try {
             'transition',
             'duration_ms',
             'is_active',
+            'is_share_image',
         ];
         if (!$hasPhotoLibraryId) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
         }
         if (!$hasSavedPaletteSetId) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'saved_palette_set_id'));
+        }
+        if (!$hasIsShareImage) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'is_share_image'));
         }
         if ($hasExcludeFromThumbs) {
             $columns[] = 'exclude_from_thumbs';

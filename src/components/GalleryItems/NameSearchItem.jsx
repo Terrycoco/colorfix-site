@@ -1,3 +1,4 @@
+import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
@@ -16,8 +17,9 @@ export default function NameSearchItem({ item }) {
   const [placeholderHeight, setPlaceholderHeight] = useState(0);
   const [openingFromRect, setOpeningFromRect] = useState(null);
   const [didSubmit, setDidSubmit] = useState(false);
+  const isColorFixBrand = String(item?.display || '').trim().toLowerCase() === 'colorfix';
 
-  const { clearSearchFilters, noResults, setNoResults } = useAppState();
+  const { noResults, setNoResults } = useAppState();
   const submittingRef = useRef(false);
 
   // Focus when active
@@ -65,7 +67,6 @@ export default function NameSearchItem({ item }) {
       return;
     }
     submittingRef.current = true;
-    clearSearchFilters();
     setNoResults(false);
     setDidSubmit(true);
     navigate(
@@ -136,7 +137,13 @@ export default function NameSearchItem({ item }) {
       {!active ? (
   <div className="search-item item name-search" ref={itemRef} onClick={handleClick}>
 
-          <div className="search-display">{item.display}</div>
+          <div className="search-display">
+            {isColorFixBrand ? (
+              <img src={colorfixLightBgUrl} alt="ColorFix" className="search-display__brand-image" />
+            ) : (
+              item.display
+            )}
+          </div>
           <div className="search-descr">{item.description}</div>
         </div>
       ) : (
@@ -151,7 +158,13 @@ export default function NameSearchItem({ item }) {
           style={floatingStyle}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="search-display">{item.display}</div>
+          <div className="search-display">
+            {isColorFixBrand ? (
+              <img src={colorfixLightBgUrl} alt="ColorFix" className="search-display__brand-image" />
+            ) : (
+              item.display
+            )}
+          </div>
 
           {showInput ? (
             <form ref={formRef} onSubmit={handleSubmit} className="search-form">

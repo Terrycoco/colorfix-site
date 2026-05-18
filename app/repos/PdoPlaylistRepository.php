@@ -30,7 +30,12 @@ class PdoPlaylistRepository
             [
                 new PlaylistStep('all', false, $items),
             ],
-            []
+            [
+                'slug' => $meta['slug'] ?? null,
+                'headline' => $meta['headline'] ?? null,
+                'meta_description' => $meta['meta_description'] ?? null,
+                'dek' => $meta['dek'] ?? null,
+            ]
         );
     }
 
@@ -128,6 +133,32 @@ class PdoPlaylistRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['slug' => $slug]);
         return $this->hydratePublicSeoResult($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
+    }
+
+    public function findWatchPlaylistInstanceIdBySlug(string $slug): ?int
+    {
+        $slug = trim($slug);
+        if ($slug === '') {
+            return null;
+        }
+
+        $sql = <<<SQL
+            SELECT pi.playlist_instance_id
+            FROM playlist_instances pi
+            JOIN playlists p
+              ON p.playlist_id = pi.playlist_id
+            WHERE pi.slug = :slug
+              AND pi.is_active = 1
+              AND pi.share_enabled = 1
+              AND p.is_active = 1
+            ORDER BY pi.playlist_instance_id ASC
+            LIMIT 1
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['slug' => $slug]);
+        $id = $stmt->fetchColumn();
+        return $id ? (int)$id : null;
     }
 
     public function findSeoLandingByPlaylistId(int $playlistId): ?array
@@ -246,6 +277,40 @@ class PdoPlaylistRepository
         $stmt = $this->pdo->query($sql);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(fn(array $row): array => $this->hydrateSeoRow($row), $rows);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPublicPlayerPages(): array
+    {
+        $sql = <<<SQL
+            SELECT
+                pi.playlist_instance_id,
+                pi.playlist_id,
+                COALESCE(NULLIF(pi.display_title, ''), p.title) AS title,
+                pi.slug,
+                p.headline,
+                p.meta_description,
+                p.dek,
+                p.updated_at,
+                p.published_at
+            FROM playlists p
+            JOIN playlist_instances pi
+              ON pi.playlist_id = p.playlist_id
+            WHERE p.is_active = 1
+              AND p.indexable = 1
+              AND pi.is_active = 1
+              AND pi.share_enabled = 1
+              AND pi.slug IS NOT NULL
+              AND TRIM(pi.slug) <> ''
+            ORDER BY
+                COALESCE(p.published_at, p.updated_at) DESC,
+                pi.playlist_instance_id DESC
+            SQL;
+
+        $stmt = $this->pdo->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function slugExists(string $slug, ?int $excludePlaylistId = null): bool
@@ -367,6 +432,7 @@ class PdoPlaylistRepository
         $excludeSelect = $this->getExcludeFromThumbsSelect();
         $photoSelect = $this->getPhotoLibraryIdSelect();
         $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
+        $shareImageSelect = $this->getIsShareImageSelect();
         $sql = <<<SQL
             SELECT
                 playlist_item_id,
@@ -385,7 +451,8 @@ class PdoPlaylistRepository
                 star,
                 transition,
                 duration_ms,
-                {$excludeSelect}
+                {$excludeSelect},
+                {$shareImageSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
@@ -422,7 +489,8 @@ class PdoPlaylistRepository
                 $row['transition'] ?? null,
                 $row['duration_ms'] !== null ? (int)$row['duration_ms'] : null,
                 $row['title_mode'] ?? null,
-                isset($row['exclude_from_thumbs']) ? (bool)$row['exclude_from_thumbs'] : null
+                isset($row['exclude_from_thumbs']) ? (bool)$row['exclude_from_thumbs'] : null,
+                isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null
             );
         }
 
@@ -453,6 +521,24 @@ class PdoPlaylistRepository
         if ($cached !== null) return $cached;
         $hasColumn = $this->hasPhotoLibraryIdColumn();
         $cached = $hasColumn ? 'photo_library_id' : 'NULL AS photo_library_id';
+        return $cached;
+    }
+
+    private function getIsShareImageSelect(): string
+    {
+        static $cached = null;
+        if ($cached !== null) return $cached;
+        $sql = <<<SQL
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'playlist_items'
+              AND COLUMN_NAME = 'is_share_image'
+            SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $hasColumn = (int)$stmt->fetchColumn() > 0;
+        $cached = $hasColumn ? 'is_share_image' : '0 AS is_share_image';
         return $cached;
     }
 
@@ -493,7 +579,7 @@ class PdoPlaylistRepository
     private function getPlaylistMeta(string $playlistId): ?array
     {
         $sql = <<<SQL
-            SELECT playlist_id, title, type
+            SELECT playlist_id, title, type, slug, headline, meta_description, dek
             FROM playlists
             WHERE playlist_id = :playlist_id
             LIMIT 1
@@ -511,6 +597,10 @@ class PdoPlaylistRepository
             'playlist_id' => (string)$row['playlist_id'],
             'title' => (string)$row['title'],
             'type' => (string)$row['type'],
+            'slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
+            'headline' => $row['headline'] !== null ? (string)$row['headline'] : null,
+            'meta_description' => $row['meta_description'] !== null ? (string)$row['meta_description'] : null,
+            'dek' => $row['dek'] !== null ? (string)$row['dek'] : null,
         ];
     }
 

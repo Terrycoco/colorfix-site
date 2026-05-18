@@ -321,11 +321,16 @@ export default function PaletteViewer({
       {(footer || showShare) && (
         <div className="apv-footer">
           {footer}
-          {showShare && (
-            <button type="button" className="apv-btn apv-btn--share" onClick={handleShare}>
-              Share
-            </button>
-          )}
+          <div className="apv-footer-actions">
+            {showShare && (
+              <button type="button" className="apv-btn apv-btn--share" onClick={handleShare}>
+                Share
+              </button>
+            )}
+            <a href="/hire-terry" className="apv-hire-link">
+              Get Your Makeover by Terry
+            </a>
+          </div>
           <div className="apv-branding">
             <span>Brought to you by </span>
             <a href="/" className="apv-branding-link">ColorFix</a>

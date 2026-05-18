@@ -1,0 +1,163 @@
+.admin-file-locker {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  color: #211f1c;
+}
+
+.admin-file-locker__head,
+.admin-file-locker__card {
+  border: 1px solid #ddd2c3;
+  border-radius: 10px;
+  background: #fffdf9;
+  padding: 16px;
+}
+
+.admin-file-locker__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.admin-file-locker__head h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.admin-file-locker__head p {
+  margin: 6px 0 0;
+  color: #6f655b;
+}
+
+.admin-file-locker__head-actions,
+.admin-file-locker__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-file-locker__card {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-file-locker__card-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-file-locker__current,
+.admin-file-locker__form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-file-locker__file-name {
+  font-size: 18px;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.admin-file-locker__meta,
+.admin-file-locker__hint,
+.admin-file-locker__selected,
+.admin-file-locker__empty {
+  color: #6f655b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-file-locker__large-warning {
+  margin-top: 6px;
+  color: #8f2f21;
+  font-weight: 600;
+}
+
+.admin-file-locker__note {
+  border: 1px solid #ece3d6;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  white-space: pre-wrap;
+}
+
+.admin-file-locker__stack {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-file-locker__stack input,
+.admin-file-locker__stack textarea {
+  border: 1px solid #cfc3b4;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font: inherit;
+  color: #211f1c;
+  background: #fff;
+}
+
+.admin-file-locker__stack textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+.admin-file-locker__btn {
+  border: 1px solid #b7ac9d;
+  background: #fff;
+  color: #211f1c;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-file-locker__btn--primary {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.admin-file-locker__btn--danger {
+  border-color: #d5a19a;
+  background: #fff7f6;
+  color: #8f2f21;
+}
+
+.admin-file-locker__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.admin-file-locker__message {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.admin-file-locker__message--error {
+  background: #fff0ee;
+  color: #8f2f21;
+  border: 1px solid #e6b0aa;
+}
+
+.admin-file-locker__message--ok {
+  background: #eef9f5;
+  color: #16624f;
+  border: 1px solid #b8dfd1;
+}
+
+@media (max-width: 720px) {
+  .admin-file-locker {
+    padding: 14px;
+  }
+
+  .admin-file-locker__head {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}

@@ -19,6 +19,8 @@ import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
 import FeaturedArticleItem from '../GalleryItems/FeaturedArticleItem';
 import PlaylistItem from '../GalleryItems/PlaylistItem';
 import TextItem from '../GalleryItems/TextItem';
+import FrontBlurbItem from '../GalleryItems/FrontBlurbItem';
+import FrontPagePlaylistSetItem from '../GalleryItems/FrontPagePlaylistSetItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
@@ -35,7 +37,10 @@ const renderContent = (item) => {
     case 'brand':       return <BrandItem key={key} item={item} />;
     case 'button':      return <ButtonItem key={key} item={item} />;
     case 'playlist':    return <PlaylistItem key={key} item={item} />;
+    case 'front-page-playlist-set':
+      return <FrontPagePlaylistSetItem key={key} item={item} />;
     case 'name-search': return <NameSearchItem key={key} item={item} />;
+    case 'front-blurb': return <FrontBlurbItem key={key} item={item} />;
     case 'text':        return <TextItem key={key} item={item} />;
     case 'wheel':       return <WheelItem key={key} item={item} />;
     case 'colorwheel':  return <ColorWheelItem key={key} item={item} />;
@@ -57,7 +62,15 @@ function slugify(s) {
     .replace(/^-+|-+$/g, '') || 'top';
 }
 
-function Gallery({ items, meta, heroItems = [] }) {
+function getNumericLabelPrefix(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/^(-?\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const num = Number(match[1]);
+  return Number.isFinite(num) ? num : null;
+}
+
+function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }) {
   const location = useLocation();
   const { categories = [] } = useAppState();
   const hideDisclaimerRoutes = ['/results/4', '/results/3', '/results/2'];
@@ -169,7 +182,13 @@ function Gallery({ items, meta, heroItems = [] }) {
       const ra = a.groupOrder ?? 999;
       const rb = b.groupOrder ?? 999;
       if (ra !== rb) return ra - rb;
-      return String(a.groupName).localeCompare(String(b.groupName));
+      const na = getNumericLabelPrefix(a.groupName);
+      const nb = getNumericLabelPrefix(b.groupName);
+      if (na != null && nb != null && na !== nb) return na - nb;
+      return String(a.groupName).localeCompare(String(b.groupName), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
     });
   }
 
@@ -179,7 +198,7 @@ function Gallery({ items, meta, heroItems = [] }) {
     .filter(g => g !== 'TOP');
 
   return (
-    <div className="gallery w-full max-w-6xl mx-auto">
+    <div className={`gallery w-full max-w-6xl mx-auto ${className}`.trim()}>
       {meta?.has_header == 1 && <HeaderItem meta={meta} />}
 
       {heroItems.length > 0 && (
@@ -241,7 +260,10 @@ function Gallery({ items, meta, heroItems = [] }) {
                 {groupName}
               </div>
             )}
-            <GalleryGrid key={`grid-${slugify(groupName)}-${idx}`}>
+            <GalleryGrid
+              key={`grid-${slugify(groupName)}-${idx}`}
+              breakpointCols={breakpointCols}
+            >
               {sectionItems.map((item) => (
                 <GalleryItem key={item.id || item.query_id || `${Math.random()}-gi`}>
                   {renderContent(item)}

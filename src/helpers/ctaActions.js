@@ -4,7 +4,14 @@ export function getCtaKey(cta) {
 }
 
 function buildShareUrl(shareFolder, playlistInstanceId) {
-  return `${shareFolder}/playlist.php?id=${playlistInstanceId}`;
+  return appendParams(`${shareFolder}/playlist.php?id=${playlistInstanceId}`, {
+    src: "share",
+  });
+}
+
+function buildPlayerPath(data) {
+  const pathId = data?.slug || data?.playlist_instance_slug || data?.playlist_instance_id;
+  return pathId ? `/playlist/${pathId}` : "";
 }
 
 function runShare({ data, shareFolder }) {
@@ -63,7 +70,7 @@ function runArticleLink({ navigate, cta }) {
   if (!baseUrl) return;
   const playlistInstanceId = cta?.data?.playlist_instance_id;
   const playlistTitle = cta?.data?.display_title || cta?.data?.title || "";
-  const defaultReturnTo = playlistInstanceId ? `/playlist/${playlistInstanceId}` : "";
+  const defaultReturnTo = buildPlayerPath(cta?.data);
   const url = appendParams(baseUrl, {
     playlist_instance_id: playlistInstanceId || undefined,
     playlist_title: playlistTitle || undefined,
@@ -77,11 +84,19 @@ function runArticleLink({ navigate, cta }) {
   window.open(url, target, "noopener");
 }
 
-function runPlaylistLink({ navigate, cta }) {
+function runPlaylistLink({ navigate, cta, source }) {
   const params = cta?.params || {};
   const playlistInstanceId = params.playlist_instance_id || params.playlistInstanceId || cta?.data?.playlist_instance_id;
-  const url = params.url || (playlistInstanceId ? `/playlist/${playlistInstanceId}` : "");
-  if (!url) return;
+  const rawUrl = params.url || buildPlayerPath({
+    ...cta?.data,
+    playlist_instance_id: playlistInstanceId,
+  });
+  if (!rawUrl) return;
+  const audience = params.aud || params.audience || cta?.data?.audience;
+  const url = appendParams(rawUrl, {
+    src: source,
+    aud: audience,
+  });
   const target = params.target || "_self";
   if (navigate && url.startsWith("/")) {
     navigate(url);
@@ -241,10 +256,10 @@ export function buildCtaHandlers({
     share: () => runShare({ data, shareFolder }),
     copy_link: () => runCopyLink({ data, shareFolder }),
     share_playlist: () => runShare({ data, shareFolder }),
-    navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data }, psi, thumb, demo }),
+    navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } }, psi, thumb, demo }),
     article_link: (cta) => runArticleLink({ navigate, cta }),
-    playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
-    watch_next: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data } }),
+    playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } } }),
+    watch_next: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } }, source: "watch_next" }),
     see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
     to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
     to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef }),

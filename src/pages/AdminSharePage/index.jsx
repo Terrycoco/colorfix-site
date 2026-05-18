@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
-import ClientPickerModal from "@components/ClientPickerModal";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { API_FOLDER } from "@helpers/config";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-share.css";
 
@@ -9,6 +7,7 @@ const PLAYLIST_INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.p
 const PLAYLIST_INSTANCE_SETS_URL = `${API_FOLDER}/v2/admin/playlist-instance-sets/list.php`;
 const SAVED_PALETTES_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/share/send-email.php`;
+const CLIENTS_URL = `${API_FOLDER}/v2/admin/clients/list.php`;
 
 const ASSET_TYPE_OPTIONS = [
   { value: "playlist_instance", label: "Playlist Instance" },
@@ -35,6 +34,8 @@ function normalizeAssetItems(assetType, rows) {
         instance_name: row?.instance_name ?? row?.name ?? "",
         audience: row?.audience ?? "any",
         instance_notes: row?.instance_notes ?? row?.notes ?? "",
+        player_url: row?.player_url ?? "",
+        playlist_slug: row?.playlist_slug ?? row?.slug ?? "",
       }))
       .filter((row) => row.playlist_instance_id);
   }
@@ -124,12 +125,22 @@ function buildShareLink(assetType, item) {
   if (!item || typeof window === "undefined") return "";
 
   if (assetType === "playlist_instance") {
+    const slug = String(item.playlist_slug || item.slug || "").trim();
+    const relativeUrl = item.player_url || (slug ? `/playlist/${encodeURIComponent(slug)}` : "");
+    if (relativeUrl) {
+      const url = new URL(relativeUrl, window.location.origin);
+      if (item.audience && item.audience !== "any") {
+        url.searchParams.set("aud", item.audience);
+      }
+      return url.toString();
+    }
+
     const params = new URLSearchParams();
     params.set("id", String(item.playlist_instance_id));
     if (item.audience && item.audience !== "any") {
       params.set("aud", item.audience);
     }
-    return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
+    return `${window.location.origin}/share/playlist.php?${params.toString()}`;
   }
 
   if (assetType === "saved_palette") {
@@ -161,6 +172,12 @@ function buildEmailDefaults(assetType, item, shareLink) {
   };
 }
 
+function buildClientOptionLabel(client) {
+  const name = client?.name || "Unnamed client";
+  const parts = [client?.email, client?.phone].filter(Boolean);
+  return parts.length ? `${name} - ${parts.join(" / ")}` : name;
+}
+
 export default function AdminSharePage() {
   const [assetType, setAssetType] = useState("playlist_instance");
   const [query, setQuery] = useState("");
@@ -169,7 +186,8 @@ export default function AdminSharePage() {
   const [error, setError] = useState("");
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [recipient, setRecipient] = useState(emptyRecipient);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
   const [status, setStatus] = useState({ error: "", success: "" });
   const [emailModal, setEmailModal] = useState({
     open: false,
@@ -180,6 +198,38 @@ export default function AdminSharePage() {
     status: { loading: false, error: "", success: "" },
   });
   const [sendFormat, setSendFormat] = useState("text");
+  const phoneInputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    async function loadClients() {
+      setClientsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("limit", "300");
+        params.set("_", String(Date.now()));
+        const res = await fetch(`${CLIENTS_URL}?${params.toString()}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load clients");
+        if (!cancelled) setClients(Array.isArray(data.items) ? data.items : []);
+      } catch (err) {
+        if (err?.name !== "AbortError" && !cancelled) setClients([]);
+      } finally {
+        if (!cancelled) setClientsLoading(false);
+      }
+    }
+
+    void loadClients();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,7 +303,6 @@ export default function AdminSharePage() {
       })
     );
   }, [assetType, items]);
-
   const canText = isTextCapableDevice();
   const canSystemShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
   function handleRecipientField(field, value) {
@@ -261,14 +310,27 @@ export default function AdminSharePage() {
     setStatus({ error: "", success: "" });
   }
 
-  function handlePickClient(client) {
-    setRecipient({
+  function handleClientSelect(clientId) {
+    if (!clientId) {
+      setRecipient(emptyRecipient);
+      setStatus({ error: "", success: "" });
+      return;
+    }
+    const client = clients.find((item) => String(item.id) === String(clientId));
+    if (!client) return;
+    const nextRecipient = {
       id: client?.id ?? null,
       name: client?.name || "",
       email: client?.email || "",
       phone: client?.phone || "",
-    });
-    setPickerOpen(false);
+    };
+    setRecipient(nextRecipient);
+    setStatus({ error: "", success: "" });
+  }
+
+  function handleAssetSelect(assetKey) {
+    const nextAsset = sortedItems.find((item) => getAssetKey(assetType, item) === assetKey) || null;
+    setSelectedAsset(nextAsset);
     setStatus({ error: "", success: "" });
   }
 
@@ -299,10 +361,33 @@ export default function AdminSharePage() {
     }
   }
 
+  function sendTextLink(phone) {
+    if (!shareLink) return;
+    const recipientPhone = (phone || "").trim();
+    if (!recipientPhone) {
+      setStatus({ error: "Enter a phone number, then click Text Link again.", success: "" });
+      phoneInputRef.current?.focus();
+      return;
+    }
+    const body = `${buildAssetLabel(assetType, selectedAsset)} ${shareLink}`;
+    const smsUrl = buildSmsShareUrl(recipientPhone, body);
+    setRecipient(emptyRecipient);
+    window.setTimeout(() => {
+      window.location.href = smsUrl;
+    }, 0);
+  }
+
   function handleTextLink() {
     if (!shareLink) return;
-    const body = `${buildAssetLabel(assetType, selectedAsset)} ${shareLink}`;
-    window.location.href = buildSmsShareUrl(recipient.phone, body);
+    if (!recipient.phone.trim()) {
+      setStatus({
+        error: "Enter a phone number in Recipient, or choose a saved client from the dropdown.",
+        success: "",
+      });
+      phoneInputRef.current?.focus();
+      return;
+    }
+    sendTextLink(recipient.phone);
   }
 
   function openEmailModal() {
@@ -378,7 +463,7 @@ export default function AdminSharePage() {
           <p>Pick a client, choose an asset, and send it from one place.</p>
         </div>
 
-        <section className="admin-share__panel admin-share__panel--sidebar">
+        <section className="admin-share__panel admin-share__panel--sidebar admin-share__panel--send">
           <div className="admin-share__panel-head">
             <div>
               <h2>Send</h2>
@@ -424,22 +509,29 @@ export default function AdminSharePage() {
           {status.success && <div className="admin-share__status admin-share__status--success">{status.success}</div>}
         </section>
 
-        <div className="admin-share__panel admin-share__panel--sidebar">
+        <div className="admin-share__panel admin-share__panel--sidebar admin-share__panel--recipient">
           <div className="admin-share__panel-head admin-share__panel-head--recipient">
             <div>
               <h2>Recipient</h2>
-              <p>Leave blank if you want. Use search to fill from clients.</p>
+              <p>Type a one-off recipient, or choose a saved client.</p>
             </div>
-            <button
-              type="button"
-              className="admin-share__icon-btn"
-              onClick={() => setPickerOpen(true)}
-              title="Search client database"
-              aria-label="Search client database"
-            >
-              <Search size={16} strokeWidth={2.2} />
-            </button>
           </div>
+
+          <label className="admin-share__field">
+            <span>Saved client optional</span>
+            <select
+              value={recipient.id || ""}
+              onChange={(e) => handleClientSelect(e.target.value)}
+              disabled={clientsLoading}
+            >
+              <option value="">{clientsLoading ? "Loading clients..." : "No saved client"}</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {buildClientOptionLabel(client)}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="admin-share__field">
             <span>Name</span>
@@ -462,6 +554,7 @@ export default function AdminSharePage() {
           <label className="admin-share__field">
             <span>Phone</span>
             <input
+              ref={phoneInputRef}
               type="text"
               value={recipient.phone}
               onChange={(e) => handleRecipientField("phone", e.target.value)}
@@ -482,7 +575,7 @@ export default function AdminSharePage() {
           <div className="admin-share__panel-head">
             <div>
               <h2>Asset</h2>
-              <p>Search the thing you want to send.</p>
+              <p>Pick the type, then choose the exact thing.</p>
             </div>
           </div>
 
@@ -506,43 +599,33 @@ export default function AdminSharePage() {
                 placeholder="Title, name, handle, notes"
               />
             </label>
+            <label className="admin-share__field admin-share__field--full">
+              <span>Asset</span>
+              <select
+                value={getAssetKey(assetType, selectedAsset)}
+                onChange={(e) => handleAssetSelect(e.target.value)}
+                disabled={loading || sortedItems.length === 0}
+              >
+                <option value="">
+                  {loading ? "Loading..." : sortedItems.length === 0 ? "No assets matched" : "Choose asset"}
+                </option>
+                {sortedItems.map((item) => {
+                  const assetKey = getAssetKey(assetType, item);
+                  const meta = buildAssetMeta(assetType, item);
+                  return (
+                    <option key={assetKey} value={assetKey}>
+                      {meta ? `${buildAssetLabel(assetType, item)} - ${meta}` : buildAssetLabel(assetType, item)}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
           </div>
 
           {error && <div className="admin-share__status admin-share__status--error">{error}</div>}
           {loading && <div className="admin-share__status">Loading assets…</div>}
-
-          <div className="admin-share__asset-list">
-            {!loading && sortedItems.length === 0 ? (
-              <div className="admin-share__status">No assets matched.</div>
-            ) : null}
-            {sortedItems.map((item) => {
-              const assetKey = getAssetKey(assetType, item);
-              const isActive = assetKey === getAssetKey(assetType, selectedAsset);
-              return (
-                <button
-                  key={assetKey}
-                  type="button"
-                  className={`admin-share__asset-card${isActive ? " is-active" : ""}`}
-                  onClick={() => {
-                    setSelectedAsset(item);
-                    setStatus({ error: "", success: "" });
-                  }}
-                >
-                  <div className="admin-share__asset-title">{buildAssetLabel(assetType, item)}</div>
-                  <div className="admin-share__asset-meta">{buildAssetMeta(assetType, item)}</div>
-                </button>
-              );
-            })}
-          </div>
         </section>
       </main>
-
-      <ClientPickerModal
-        open={pickerOpen}
-        title="Pick Recipient"
-        onClose={() => setPickerOpen(false)}
-        onPick={handlePickClient}
-      />
 
       <EmailShareModal
         open={emailModal.open}

@@ -8,6 +8,8 @@ use PDO;
 
 final class PdoPlaylistInstanceSetRepository
 {
+    private ?bool $hasEndCtaColumns = null;
+
     public function __construct(
         private PDO $pdo
     ) {}
@@ -17,8 +19,11 @@ final class PdoPlaylistInstanceSetRepository
      */
     public function listAll(): array
     {
+        $endCtaSelect = $this->hasEndCtaColumns()
+            ? 'end_cta_label, end_cta_url, end_cta_enabled'
+            : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context
+            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
             FROM playlist_instance_sets
             ORDER BY id DESC
             SQL;
@@ -32,7 +37,10 @@ final class PdoPlaylistInstanceSetRepository
                 (string)$row['handle'],
                 (string)$row['title'],
                 $row['subtitle'] !== null ? (string)$row['subtitle'] : null,
-                $row['context'] !== null ? (string)$row['context'] : null
+                $row['context'] !== null ? (string)$row['context'] : null,
+                $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
+                $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
+                (bool)((int)($row['end_cta_enabled'] ?? 1))
             );
         }
         return $sets;
@@ -40,8 +48,11 @@ final class PdoPlaylistInstanceSetRepository
 
     public function getById(int $id): ?PlaylistInstanceSet
     {
+        $endCtaSelect = $this->hasEndCtaColumns()
+            ? 'end_cta_label, end_cta_url, end_cta_enabled'
+            : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context
+            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
             FROM playlist_instance_sets
             WHERE id = :id
             LIMIT 1
@@ -55,14 +66,20 @@ final class PdoPlaylistInstanceSetRepository
             (string)$row['handle'],
             (string)$row['title'],
             $row['subtitle'] !== null ? (string)$row['subtitle'] : null,
-            $row['context'] !== null ? (string)$row['context'] : null
+            $row['context'] !== null ? (string)$row['context'] : null,
+            $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
+            $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
+            (bool)((int)($row['end_cta_enabled'] ?? 1))
         );
     }
 
     public function getByHandle(string $handle): ?PlaylistInstanceSet
     {
+        $endCtaSelect = $this->hasEndCtaColumns()
+            ? 'end_cta_label, end_cta_url, end_cta_enabled'
+            : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context
+            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
             FROM playlist_instance_sets
             WHERE handle = :handle
             LIMIT 1
@@ -76,11 +93,80 @@ final class PdoPlaylistInstanceSetRepository
             (string)$row['handle'],
             (string)$row['title'],
             $row['subtitle'] !== null ? (string)$row['subtitle'] : null,
-            $row['context'] !== null ? (string)$row['context'] : null
+            $row['context'] !== null ? (string)$row['context'] : null,
+            $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
+            $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
+            (bool)((int)($row['end_cta_enabled'] ?? 1))
         );
     }
 
     public function save(PlaylistInstanceSet $set): PlaylistInstanceSet
+    {
+        if (!$this->hasEndCtaColumns()) {
+            return $this->saveLegacy($set);
+        }
+
+        if ($set->id === null) {
+            $sql = <<<SQL
+                INSERT INTO playlist_instance_sets (
+                    handle,
+                    title,
+                    subtitle,
+                    context,
+                    end_cta_label,
+                    end_cta_url,
+                    end_cta_enabled
+                )
+                VALUES (
+                    :handle,
+                    :title,
+                    :subtitle,
+                    :context,
+                    :end_cta_label,
+                    :end_cta_url,
+                    :end_cta_enabled
+                )
+                SQL;
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([
+                'handle' => $set->handle,
+                'title' => $set->title,
+                'subtitle' => $set->subtitle,
+                'context' => $set->context,
+                'end_cta_label' => $set->endCtaLabel,
+                'end_cta_url' => $set->endCtaUrl,
+                'end_cta_enabled' => $set->endCtaEnabled ? 1 : 0,
+            ]);
+            $set->id = (int)$this->pdo->lastInsertId();
+            return $set;
+        }
+
+        $sql = <<<SQL
+            UPDATE playlist_instance_sets
+            SET handle = :handle,
+                title = :title,
+                subtitle = :subtitle,
+                context = :context,
+                end_cta_label = :end_cta_label,
+                end_cta_url = :end_cta_url,
+                end_cta_enabled = :end_cta_enabled
+            WHERE id = :id
+            SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            'id' => $set->id,
+            'handle' => $set->handle,
+            'title' => $set->title,
+            'subtitle' => $set->subtitle,
+            'context' => $set->context,
+            'end_cta_label' => $set->endCtaLabel,
+            'end_cta_url' => $set->endCtaUrl,
+            'end_cta_enabled' => $set->endCtaEnabled ? 1 : 0,
+        ]);
+        return $set;
+    }
+
+    private function saveLegacy(PlaylistInstanceSet $set): PlaylistInstanceSet
     {
         if ($set->id === null) {
             $sql = <<<SQL
@@ -115,5 +201,15 @@ final class PdoPlaylistInstanceSetRepository
             'context' => $set->context,
         ]);
         return $set;
+    }
+
+    private function hasEndCtaColumns(): bool
+    {
+        if ($this->hasEndCtaColumns !== null) {
+            return $this->hasEndCtaColumns;
+        }
+        $stmt = $this->pdo->query("SHOW COLUMNS FROM playlist_instance_sets LIKE 'end_cta_label'");
+        $this->hasEndCtaColumns = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        return $this->hasEndCtaColumns;
     }
 }

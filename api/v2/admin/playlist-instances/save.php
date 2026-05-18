@@ -29,9 +29,12 @@ if (!is_array($payload)) {
     respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
 }
 
+$repo = new PdoPlaylistInstanceRepository($pdo);
 $id = isset($payload['playlist_instance_id']) ? (int)$payload['playlist_instance_id'] : null;
 $playlistId = isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : 0;
 $instanceName = trim((string)($payload['instance_name'] ?? ''));
+$slug = trim((string)($payload['slug'] ?? $payload['playlist_slug'] ?? ''));
+$allowSlugEdit = !empty($payload['allow_slug_edit']);
 $displayTitle = trim((string)($payload['display_title'] ?? ''));
 $displaySubtitle = trim((string)($payload['display_subtitle'] ?? ''));
 $introLayout = trim((string)($payload['intro_layout'] ?? 'default'));
@@ -64,6 +67,13 @@ if ($introLayout === '') {
 }
 
 try {
+    if ($id !== null && $id > 0 && !$allowSlugEdit) {
+        $existing = $repo->getById($id);
+        if ($existing) {
+            $slug = trim((string)($existing->slug ?? ''));
+        }
+    }
+
     $instance = new PlaylistInstance(
         $id,
         $playlistId,
@@ -90,15 +100,17 @@ try {
         !empty($payload['hide_stars']),
         isset($payload['is_active']) ? (bool)$payload['is_active'] : true,
         isset($payload['created_from_instance']) && $payload['created_from_instance'] !== '' ? (int)$payload['created_from_instance'] : null,
-        isset($payload['kicker_id']) && $payload['kicker_id'] !== '' ? (int)$payload['kicker_id'] : null
+        isset($payload['kicker_id']) && $payload['kicker_id'] !== '' ? (int)$payload['kicker_id'] : null,
+        $slug !== '' ? $slug : null
     );
 
-    $repo = new PdoPlaylistInstanceRepository($pdo);
     $instance = $repo->save($instance);
 
     respond([
         'ok' => true,
         'playlist_instance_id' => $instance->id,
+        'slug' => $instance->slug,
+        'player_url' => $instance->slug ? '/playlist/' . $instance->slug : '/playlist/' . $instance->id,
     ]);
 } catch (\Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 500);

@@ -12,7 +12,7 @@ export const adminMenuItems = [
       
     ],
   },
-    {
+  {
     label: "Site",
     items: [
           { label: "Photo Library", href: "/admin/photo-library" },
@@ -22,12 +22,19 @@ export const adminMenuItems = [
       { label: "Projects", href: "/admin/projects" },
       { label: "QR Sheets", href: "/admin/qr-sheets" },
       { label: "Search Presets", href: "/admin/search-presets" },
-      { label: "Clients", href: "/admin/clients" },
       { label: "Gallery Builder", href: "/admin/sql" },
       { label: "Gallery Items", href: "/admin/items" },
       { label: "Hire Terry", href: "/hire-terry"},
 
       
+    ],
+  },
+  {
+    label: "Outreach",
+    items: [
+      { label: "Clients", href: "/admin/clients" },
+      { label: "Email Templates", href: "/admin/email-templates" },
+      { label: "Share", href: "/admin/share" },
     ],
   },
   {
@@ -67,7 +74,7 @@ export const adminMenuItems = [
 
       { label: "View Counts", href: "/admin/user-events" },
       { label: "Ideas/ToDos", href: "/admin/ideas" },
-      { label: "Share", href: "/admin/share" },
+      { label: "File Locker", href: "/admin/file-locker" },
   
       { label: "Photo Library Tools", href: "/admin/photo-library-tools" },
 

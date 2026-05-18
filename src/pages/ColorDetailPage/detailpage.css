@@ -1,117 +1,180 @@
-
-
-    .page-content {
-        padding: 1rem;
-        font-size: .9rem;
-        line-height: 1;
-        flex-basis: 1;
-    }
-
-    .descr {
-        font-size: .8rem;
-        max-width: 300px;
-        line-height: 1.2;
-    }  
-
-
-   .color-info {
-        gap: .5rem !important;
-        max-width: 300px;
-        margin-left: .5rem;
-    }
-
-    p {
-        font-size: .8rem;
-        line-height: 1.4;
-        margin-top: .5rem;
-    }
-
-
-
-    .right-align-group {
-        margin-right: 14rem;
-        margin-left: auto;
-        width: auto;
-        display: flex;
-        flex-direction: row;
-        justify-content: flex-start;
-        align-items: center;
-    }
-
-    .right-align-group select {
-        width: 200px;
-    }
-
-    .right-align-group label {
-        font-size: .8rem;
-    }
-
-.swatch-gallery {
-    max-width: 30%;
-}
-
-.detail-wheel-column {
-  align-items: center;
-}
-
-.detail-wheel-column .wheel300-stack {
-  width: min(540px, 100%);
-}
-
-.detail-wheel-column .descr {
-  max-width: 540px;
-  width: 100%;
-}
-
-.gallery-scroll-container {
-  max-height: 70vh;       /* or a fixed px value */
-  overflow-y: auto;
-   /* optional scrollbar buffer */
-}
-.gallery-scroll-container h4 {
-    margin-top:  1rem;
+.palette-control-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-start;
 }
 
 
-.color-comparison-strip {
-  position: sticky;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+
+/* ADD TO PALETTE BUTTON */
+.btn-add {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: rgba(128,128,128,.2);
+  color: #111;
+  font: inherit;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
   padding: 0;
-  margin-top: 0;
-  border-top: 1px solid #ccc;
-  background: #f9f9f9;
-  border-radius: 6px;
-  justify-content: start;
-  align-items: center;
 }
 
-.color-comparison-strip .slot {
-  width: 60px;
-  height: 60px;
-  border: 2px dashed #bbb;
+/* hover/focus states (desktop) */
+@media (hover: hover) and (pointer: fine) {
+  .btn-add:hover { background-color: white; transform: translateY(-1px); }
+}
+.btn-add:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+/* small screens: ensure tappable target */
+@media (max-width: 700px) {
+  .btn-add { width: 20px; height: 20px; top: 8px; right: 8px; }
+}
+
+
+
+/* Detail swatch stain overlay (real “stain” look) */
+.detail-swatch { position: relative; overflow: hidden; }
+
+/* Make sure wood shows through for stains */
+.detail-swatch[data-is-stain="1"] {
+  background-color: transparent !important;
+}
+
+/* Layer 1: wood substrate */
+.detail-swatch[data-is-stain="1"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: var(--wood-size, 200px) var(--wood-size, 200px);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23e3caa1'/><g stroke='%236b4528' stroke-width='1.6' fill='none' opacity='.45'><path d='M0,26 C75,8 125,44 200,26'/><path d='M0,52 C65,38 135,64 200,52'/><path d='M0,78 C85,100 115,60 200,78'/><path d='M0,104 C70,126 130,86 200,104'/><path d='M0,130 C65,152 135,112 200,130'/><path d='M0,156 C70,178 130,138 200,156'/></g><g stroke='%236b4528' stroke-width='1.2' fill='none' opacity='.35'><ellipse cx='60' cy='90' rx='18' ry='10'/><ellipse cx='60' cy='90' rx='28' ry='16'/><ellipse cx='148' cy='140' rx='14' ry='8'/><ellipse cx='148' cy='140' rx='22' ry='12'/></g></svg>");
+  filter: contrast(1.08) saturate(1.05);
+}
+
+/* Layer 2: color tint (multiply) */
+.detail-swatch[data-is-stain="1"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), var(--stain-alpha, .9));
+  mix-blend-mode: multiply;
+}
+
+/* Dark stains: let the grain push through a bit more */
+.detail-swatch[data-is-stain="1"][data-stain-tone="dark"]::after {
+  background-color: rgba(var(--stain-rgb, 120, 80, 40), .78);
+}
+
+/* Keep the palette toggle above overlays (upper-left pin) */
+.detail-swatch .pals-btn{
+  all: unset;
+  position: absolute;
+  z-index: 3;
+  top: 6px; left: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.detail-swatch .pals-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 760px){
+  .detail-swatch .pals-btn{
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .detail-swatch .pals-icon {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.detail-wheel-wrap {
+  width: 100%;
   display: flex;
-  align-items: center;
   justify-content: center;
 }
 
+.detail-wheel-wrap .wheel300-stack {
+  width: 100%;
+  max-width: 820px;
+}
 
-/* small screens */
-@media (max-width: 768px) {
-    .page-content {
-        padding: .5rem;
-    }
+.detail-other-brands-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 0.875rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid #1f2937;
+  border-radius: 0.5rem;
+  background: #111827;
+  color: #fff;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
 
-    .color-info {
-        gap: .5rem !important;
-        font-size: .8rem;
-    }
+.detail-other-brands-button:focus-visible {
+  outline: 2px solid #111827;
+  outline-offset: 3px;
+}
 
-  .swatch-gallery {
-   width: 100vw;
-   margin-left: 0;
+@media (hover: hover) and (pointer: fine) {
+  .detail-other-brands-button:hover {
+    background: #374151;
   }
+}
 
- 
+@media (max-width: 700px) {
+  .detail-other-brands-button {
+    width: 100%;
+  }
+}
+
+.detail-trigger-gallery__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.detail-trigger-gallery__item {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.detail-trigger-gallery__img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0.5rem;
+  background: #f4f1ec;
 }

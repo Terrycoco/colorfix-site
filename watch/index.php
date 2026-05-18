@@ -61,7 +61,11 @@ unset($queryEntries['id']);
 
 $query = http_build_query($queryEntries);
 $baseUrl = 'https://colorfix.terrymarr.com';
-$target = $baseUrl . '/playlist/' . $playlistInstanceId . ($query !== '' ? ('?' . $query) : '');
+$pathId = trim((string)($instance->slug ?? ''));
+if ($pathId === '') {
+    $pathId = (string)$playlistInstanceId;
+}
+$target = $baseUrl . '/playlist/' . rawurlencode($pathId) . ($query !== '' ? ('?' . $query) : '');
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');

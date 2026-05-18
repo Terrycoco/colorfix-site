@@ -15,7 +15,7 @@ export default function HireTerryPage() {
 
           <div className="hire-terry-hero-image">
             <img
-              src="/photos/uploads/saved-palettes/24/sp_24_837dfef47c7e.jpg"
+              src="/photos/uploads/saved-palettes/24/sp_24_10a4e51ffe34.jpg"
               alt="Room after makeover"
             />
             <span className="hire-terry-hero-label">After</span>

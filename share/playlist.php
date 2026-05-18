@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoPlaylistRepository;
+use App\Services\PlayerExperienceService;
 
 require_once __DIR__ . '/../api/autoload.php';
 require_once __DIR__ . '/../api/db.php';
@@ -36,13 +37,47 @@ try {
     // Non-fatal: keep fallback title.
 }
 
-$title = $instance->shareTitle ?: ($instance->displayTitle ?: $playlistTitle);
-$description = $instance->shareDescription ?? '';
-$image = $instance->shareImageUrl ?? '';
-
 $host = $_SERVER['HTTP_HOST'];
+
+$resolvedTitle = '';
+$resolvedDescription = '';
+$resolvedImage = '';
+try {
+    $experience = new PlayerExperienceService($pdo);
+    $plan = $experience->buildPlaybackPlanFromInstance($instanceId);
+    $resolvedTitle = trim((string)($plan['share_title'] ?? $plan['display_title'] ?? $plan['title'] ?? ''));
+    $resolvedDescription = trim((string)($plan['project_summary'] ?? $plan['share_description'] ?? ''));
+    $resolvedImage = trim((string)($plan['share_image_url'] ?? ''));
+} catch (\Throwable $e) {
+    // Fall back to raw instance fields below.
+}
+
+$title = $resolvedTitle !== '' ? $resolvedTitle : ($instance->shareTitle ?: ($instance->displayTitle ?: $playlistTitle));
+$description = $resolvedDescription !== '' ? $resolvedDescription : (string)($instance->shareDescription ?? '');
+$image = $resolvedImage !== '' ? $resolvedImage : (string)($instance->shareImageUrl ?? '');
+$image = trim($image);
+if ($image !== '' && !preg_match('#^https?://#i', $image)) {
+    if (str_starts_with($image, '/')) {
+        $image = "https://{$host}{$image}";
+    } elseif (!str_starts_with($image, 'photo:')) {
+        $image = "https://{$host}/" . ltrim($image, '/');
+    }
+}
+
 $shareUrl = "https://{$host}/share/playlist.php?id={$instanceId}";
-$appPath = "/playlist/{$instanceId}";
+$pathId = trim((string)($instance->slug ?? ''));
+if ($pathId === '') {
+    $pathId = (string)$instanceId;
+}
+$appPath = "/playlist/" . rawurlencode($pathId);
+
+$forwardParams = $_GET;
+unset($forwardParams['id']);
+$forwardQuery = http_build_query($forwardParams, '', '&', PHP_QUERY_RFC3986);
+if ($forwardQuery !== '') {
+    $shareUrl .= '&' . $forwardQuery;
+    $appPath .= '?' . $forwardQuery;
+}
 
 $titleEsc = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
 $descEsc  = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
@@ -73,6 +108,3 @@ $appEsc   = htmlspecialchars($appPath, ENT_QUOTES, 'UTF-8');
 Redirecting…
 </body>
 </html>
-
-
-exit;

@@ -1,9 +1,11 @@
 // PictureSwatch.jsx
 import { useNavigate } from "react-router-dom";
+import { photoThumbUrl } from "@helpers/imageThumb";
 import "./swatches.css";
 
 export default function PictureSwatch({
   photoUrl,
+  photoLibraryId,
   name,
   meta,
   to,
@@ -11,6 +13,12 @@ export default function PictureSwatch({
   widthPercent = 20,
 }) {
   const navigate = useNavigate();
+  const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
+  const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
+  const imageUrl = smallImageUrl || photoUrl;
+  const imageSrcSet = smallImageUrl && largeImageUrl
+    ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
+    : undefined;
 
   const go = () => {
     if (onClick) {
@@ -38,12 +46,15 @@ export default function PictureSwatch({
       }}
     >
       <div className="pals-fill pals-photo-fill">
-        {photoUrl && (
+        {imageUrl && (
           <img
             className="pals-photo-img"
-            src={photoUrl}
+            src={imageUrl}
+            srcSet={imageSrcSet}
+            sizes="(min-width: 560px) 260px, 50vw"
             alt={name || "Palette example"}
             loading="lazy"
+            decoding="async"
           />
         )}
       </div>

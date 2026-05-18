@@ -68,7 +68,14 @@ function buildWhereClauseFromFilters($filters, $sql) {
 
     if (!empty($clauses)) {
         if (stripos($mainSql, 'WHERE') !== false) {
-            $mainSql .= ' AND ' . implode(' AND ', $clauses);
+            $parts = preg_split('/\bWHERE\b/i', $mainSql, 2, PREG_SPLIT_DELIM_CAPTURE);
+            if (count($parts) >= 2) {
+                $beforeWhere = rtrim($parts[0]);
+                $whereBody = trim($parts[count($parts) - 1]);
+                $mainSql = $beforeWhere . ' WHERE (' . $whereBody . ') AND ' . implode(' AND ', $clauses);
+            } else {
+                $mainSql .= ' AND ' . implode(' AND ', $clauses);
+            }
         } else {
             $mainSql .= ' WHERE ' . implode(' AND ', $clauses);
         }

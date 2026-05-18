@@ -13,6 +13,7 @@ const PictureSwatchItem = ({ item }) => {
   return (
     <PictureSwatch
       photoUrl={item?.photo_url}
+      photoLibraryId={item?.photo_library_id || item?.photo_id}
       name={name}
       meta={meta}
       to={to}

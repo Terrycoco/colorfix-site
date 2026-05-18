@@ -25,6 +25,7 @@ const APPLIED_PHOTO_UPDATE_URL = `${API_FOLDER}/v2/admin/applied-palette-photos/
 const emptySavedForm = {
   palette_id: null,
   nickname: "",
+  display_title: "",
   notes: "",
   private_notes: "",
   terry_fav: false,
@@ -182,6 +183,7 @@ export default function AdminPalettePhotosPage() {
           setEditForm({
             palette_id: Number(palette.id) || palette.id,
             nickname: palette.nickname || "",
+            display_title: palette.display_title || "",
             notes: palette.notes || "",
             private_notes: palette.private_notes || "",
             terry_fav: Number(palette.terry_fav) === 1,
@@ -496,7 +498,6 @@ export default function AdminPalettePhotosPage() {
         rel_path: item.image_url,
         photo_type: photoType,
         trigger_mode: photoType === "before" ? "none" : "any",
-        show_in_gallery: photoType === "before" ? 0 : 1,
         caption: photoType === "before" ? "Before" : null,
       };
       const res = await fetch(addUrl, {
@@ -975,14 +976,24 @@ export default function AdminPalettePhotosPage() {
                 </div>
 
                 {!isApplied && (
-                  <label>
-                    Nickname
-                    <input
-                      type="text"
-                      value={editForm.nickname}
-                      onChange={(e) => handleEditField("nickname", e.target.value)}
-                    />
-                  </label>
+                  <>
+                    <label>
+                      Nickname (for me)
+                      <input
+                        type="text"
+                        value={editForm.nickname}
+                        onChange={(e) => handleEditField("nickname", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Display Title (shown in viewer)
+                      <input
+                        type="text"
+                        value={editForm.display_title}
+                        onChange={(e) => handleEditField("display_title", e.target.value)}
+                      />
+                    </label>
+                  </>
                 )}
 
                 {isApplied && (

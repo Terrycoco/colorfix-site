@@ -155,6 +155,11 @@
   position: relative;
   width: 100%;
   height: 100%;
+  background: #000;
+}
+
+.player-image-frame.is-text-only {
+  background: #000;
 }
 
 .player-image {
@@ -189,6 +194,19 @@
 
 .player-image.is-current:not(.is-ready) {
   opacity: 0;
+}
+
+.player-text-slide-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #000;
+  opacity: 0;
+  transition: opacity 1200ms ease-in-out;
+}
+
+.player-text-slide-backdrop.is-ready {
+  opacity: 1;
 }
 
 .player-loading {
@@ -324,6 +342,12 @@
   animation: none;
 }
 
+.player-title.is-text-intro {
+  opacity: 0;
+  transform: none;
+  animation: title-fade 1200ms ease-in-out forwards;
+}
+
 .player-title.is-static .player-title-text {
   transform: none;
 }
@@ -365,6 +389,15 @@
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes title-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

@@ -14,7 +14,7 @@ export default function MiniBrandIcon({ onClick }) {
 
   const BOX  = 26;   // hitbox
 const ICON = 20;   // svg size
-const color = hasActive ? '#ff8c00' : '#fff';
+const color = hasActive ? 'var(--brand-color)' : '#fff';
 
 return (
   <div

@@ -32,9 +32,15 @@ try {
     $service = new ClientService(new PdoClientRepository($pdo), $pdo);
     $client = $service->saveClient($id, [
         'name' => $payload['name'] ?? '',
+        'first_name' => $payload['first_name'] ?? '',
+        'last_name' => $payload['last_name'] ?? '',
         'email' => $payload['email'] ?? '',
         'phone' => $payload['phone'] ?? '',
         'notes' => $payload['notes'] ?? '',
+        'client_type' => $payload['client_type'] ?? null,
+        'photo_permission_status' => $payload['photo_permission_status'] ?? 'unknown',
+        'photo_permission_requested_at' => $payload['photo_permission_requested_at'] ?? null,
+        'photo_permission_granted_at' => $payload['photo_permission_granted_at'] ?? null,
     ]);
 
     respond([

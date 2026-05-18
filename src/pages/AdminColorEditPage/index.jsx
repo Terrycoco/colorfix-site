@@ -1,35 +1,26 @@
-import {useAppState} from '@context/AppStateContext';
-import {useEffect, useRef} from 'react';
-import useMediaQuery from '@hooks/useMediaQuery.js';
+import { useRef } from 'react';
+import { useAppState } from '@context/AppStateContext';
 import StickyToolbar from '@layout/StickyToolbar';
-// ✅ swap to the smarter search
 import FuzzySearchColorSelect from '@components/FuzzySearchColorSelect';
-
 import ColorForm from '@components/ColorForm';
 import SwatchCard from '@components/SwatchCard';
-import ColorWheel400 from '@components/ColorWheel/ColorWheel400';
 import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
 import ResponsiveRow from '@layout/ResponsiveRow';
 import Column from '@layout/Column';
-
 import fetchColorDetail from '@data/fetchColorDetail';
+import './editpage.css';
 
-export default function ColorEditPage() {
+export default function AdminColorEditPage() {
   const { colors, currentColorDetail, setCurrentColorDetail } = useAppState();
   const formRef = useRef();
-  const isMobile = useMediaQuery('(max-width: 768px)');
 
-  // Accepts either an id or an object from the fuzzy select and loads details
-    async function handleSelect(selection) {
-      const id = selection?.id;
-      if (!id) return;
+  async function handleSelect(selection) {
+    const id = selection?.id;
+    if (!id) return;
 
-      // instant UI: use what FuzzySearchColorSelect already returned
-      setCurrentColorDetail(selection);
-
-      // then hydrate from the server to keep it authoritative
-      await fetchColorDetail(id, setCurrentColorDetail);
-    }
+    setCurrentColorDetail(selection);
+    await fetchColorDetail(id, setCurrentColorDetail);
+  }
 
   return (
     <div>
@@ -64,3 +55,4 @@ export default function ColorEditPage() {
     </div>
   );
 }
+

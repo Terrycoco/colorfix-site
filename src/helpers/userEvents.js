@@ -3,6 +3,7 @@ import { isAdmin } from "@helpers/authHelper";
 
 const TRACK_URL = `${API_FOLDER}/v2/user-events/track.php`;
 const SESSION_KEY = "cf_user_event_session_id";
+const SOURCE_PARAM_KEY = "src";
 
 function generateSessionId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -46,8 +47,23 @@ export function trackUserEvent(payload) {
   if (typeof window === "undefined") return;
   if (isAdmin() && !payload?.allow_internal_tracking) return;
 
+  let source = payload?.source || "";
+  if (!source) {
+    try {
+      source = new URLSearchParams(window.location.search).get(SOURCE_PARAM_KEY) || "";
+    } catch {
+      source = "";
+    }
+  }
+  source = String(source || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "")
+    .slice(0, 100);
+
   const body = {
     ...payload,
+    source: source || null,
     session_id: payload?.session_id || getUserEventSessionId(),
     referrer: payload?.referrer || document.referrer || "",
     user_agent: payload?.user_agent || navigator.userAgent || "",

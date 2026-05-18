@@ -19,8 +19,10 @@ const Player = forwardRef(function Player({
   onPlaybackEnd,
   hideStars = false,
   embedded = false,
+  galleryName = "",
+  galleryDescription = "",
 }, ref) {
-  const allItems = Array.isArray(slides) ? slides : [];
+  const allItems = useMemo(() => (Array.isArray(slides) ? slides : []), [slides]);
 
 
   const safeStart = Math.min(
@@ -135,6 +137,7 @@ function queueFadeReady(img, stageEl) {
   };
 
   useEffect(() => {
+    if (!imageLoaded) return () => {};
     let cancelled = false;
     const seen = new Set();
 
@@ -146,7 +149,8 @@ function queueFadeReady(img, stageEl) {
       img.src = withCacheBust(url);
     }
 
-    (slides || []).forEach((item) => {
+    (slides || []).forEach((item, index) => {
+      if (index === activeIndex) return;
       const value = item?.image_url || "";
       if (isPaletteItem(item)) return;
       if (!value) return;
@@ -168,7 +172,7 @@ function queueFadeReady(img, stageEl) {
     return () => {
       cancelled = true;
     };
-  }, [slides, cacheBustEnabled]);
+  }, [slides, cacheBustEnabled, activeIndex, imageLoaded]);
 
 
   useEffect(() => {
@@ -276,6 +280,8 @@ function startPlayback(nextMode, nextIndex = 0) {
   const currentType = (currentItem?.type || "normal").toLowerCase();
   const isIntro = currentType === "intro" || currentType === "text";
   const introNoImage = isIntro && !currentImageUrl;
+  const hasCurrentImageRef = Boolean(currentItem?.image_url);
+  const showImageLoading = playbackState === "playing" && !imageLoaded && !introNoImage && (hasCurrentImageRef || currentImageUrl);
   const introLayoutKey = isIntro
     ? ((currentItem?.layout || "").toString().toLowerCase().trim() || (currentType === "text" ? "text" : "default"))
     : null;
@@ -283,6 +289,10 @@ function startPlayback(nextMode, nextIndex = 0) {
   const isStarrable = isItemStarrable(currentItem);
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
+  const galleryJsonLd = useMemo(
+    () => buildImageGallerySchema(allItems, galleryName, galleryDescription),
+    [allItems, galleryName, galleryDescription]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -507,17 +517,18 @@ function startPlayback(nextMode, nextIndex = 0) {
     if (!img || imageLoaded) return;
     if (img.complete && img.naturalWidth) {
       setImageLoaded(true);
-      const maybeDecode = typeof img.decode === "function" ? img.decode() : Promise.resolve();
-      Promise.resolve(maybeDecode)
-        .catch(() => {})
-        .finally(() => {
-          queueFadeReady(img, stageRef.current);
-        });
+      queueFadeReady(img, stageRef.current);
     }
   }, [currentIndex, currentImageUrl, playItems, imageLoaded]);
 
   return (
     <div className={`player-root${embedded ? " player-embedded" : ""}`}>
+      {galleryJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonForScript(galleryJsonLd) }}
+        />
+      )}
       <button
         className="player-exit"
         type="button"
@@ -550,7 +561,7 @@ function startPlayback(nextMode, nextIndex = 0) {
           }
         }}
       >
-        <div className="player-image-frame">
+        <div className={`player-image-frame${introNoImage ? " is-text-only" : ""}`}>
           {prevImageUrl && (
             <img
               key={`prev-${prevIndex}-${prevImageUrl}`}
@@ -559,22 +570,30 @@ function startPlayback(nextMode, nextIndex = 0) {
               className={`player-image is-prev${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
             />
           )}
+          {introNoImage && (
+            <div
+              className={`player-text-slide-backdrop${fadeReady ? " is-ready" : ""}${transitionMode === "cut" ? " fade-cut" : ""}`}
+              aria-hidden="true"
+            />
+          )}
           {currentImageUrl && (
             <img
               key={`cur-${currentIndex}-${currentImageUrl}`}
               src={withCacheBust(currentImageUrl)}
-              alt={currentItem.title || ""}
+              alt={currentItem.alt_tag || currentItem.title || currentItem.subtitle || ""}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
               className={`player-image is-current${isFading ? " fade-in" : ""}${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " is-ready" : " is-loading"}`}
               ref={currentImgRef}
               onLoad={(e) => {
                 const img = e.currentTarget;
                 setImageLoaded(true);
-                const maybeDecode = typeof img.decode === "function" ? img.decode() : Promise.resolve();
-                Promise.resolve(maybeDecode)
-                  .catch(() => {})
-                  .finally(() => {
-                    queueFadeReady(img, stageRef.current);
-                  });
+                queueFadeReady(img, stageRef.current);
+              }}
+              onError={() => {
+                setImageLoaded(true);
+                setFadeReady(true);
               }}
             />
           )}
@@ -619,7 +638,7 @@ function startPlayback(nextMode, nextIndex = 0) {
 
           {imageLoaded && fadeReady && titleVisible && titleReady && isIntro && IntroRenderer && (
             <div
-              className={`player-title is-static${introNoImage ? " is-intro-full" : ""}`}
+              className={`player-title${introNoImage ? " is-intro-full is-text-intro" : " is-static"}`}
               style={
                 introNoImage
                   ? undefined
@@ -647,7 +666,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               {subtitle && <span className="player-subtitle-text">{subtitle}</span>}
             </div>
           )}
-          {!imageLoaded && currentImageUrl && (
+          {showImageLoading && (
             <div className="player-loading" aria-label="Loading image">
               <div className="player-loading-spinner" />
             </div>
@@ -655,6 +674,7 @@ function startPlayback(nextMode, nextIndex = 0) {
         </div>
         {showAdvanceHint &&
           playbackState === "playing" &&
+          activeIndex === 0 &&
           !isIntro &&
           (imageLoaded || introNoImage) && (
             <div className="player-advance-hint">Tap screen to advance</div>
@@ -697,3 +717,78 @@ function writeLikedSet(playlistInstanceId, likedSet) {
 }
 
 export default Player;
+
+function buildImageGallerySchema(items, galleryName, galleryDescription) {
+  const projectName = cleanText(galleryName) || "ColorFix Gallery";
+  const hasPart = (items || [])
+    .map((item, index) => buildImageObject(item, index, projectName))
+    .filter(Boolean);
+
+  if (!hasPart.length) return null;
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ImageGallery",
+    name: projectName,
+    hasPart,
+  };
+
+  const description = cleanText(galleryDescription);
+  if (description) {
+    schema.description = description;
+  }
+
+  return schema;
+}
+
+function buildImageObject(item, index, projectName) {
+  const contentUrl = resolveSchemaImageUrl(item?.image_url);
+  if (!contentUrl) return null;
+
+  const title = cleanText(item?.title);
+  const subtitle = cleanText(item?.subtitle);
+  const altTag = cleanText(item?.alt_tag || item?.ai_alt_text || item?.alt_text);
+
+  const imageObject = {
+    "@type": "ImageObject",
+    position: index + 1,
+    name: title || subtitle || `${projectName} - Gallery Image ${index + 1}`,
+    contentUrl,
+    width: 1600,
+    height: 1200,
+  };
+
+  if (subtitle) {
+    imageObject.caption = subtitle;
+  }
+  if (altTag) {
+    imageObject.description = altTag;
+  }
+
+  return imageObject;
+}
+
+function resolveSchemaImageUrl(value) {
+  const raw = cleanText(value);
+  if (!raw) return "";
+
+  const parsed = parsePhotoRef(raw);
+  const resolved = parsed.url || raw;
+  if (isAssetRef(resolved)) return "";
+  if (/^https?:\/\//i.test(resolved)) return resolved;
+  if (typeof window === "undefined") return resolved;
+
+  try {
+    return new URL(resolved, window.location.origin).toString();
+  } catch {
+    return resolved;
+  }
+}
+
+function cleanText(value) {
+  return String(value || "").trim();
+}
+
+function safeJsonForScript(value) {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}

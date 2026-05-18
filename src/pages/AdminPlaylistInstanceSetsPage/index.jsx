@@ -9,6 +9,7 @@ const SETS_SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instance-sets/save.php`;
 const SET_ITEMS_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instance-set-items/list.php`;
 const SET_ITEMS_SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instance-set-items/save.php`;
 const INSTANCES_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
+const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 
 const emptySet = {
   id: null,
@@ -16,11 +17,15 @@ const emptySet = {
   title: "",
   subtitle: "",
   context: "",
+  end_cta_label: "Explore ColorFix",
+  end_cta_url: "/",
+  end_cta_enabled: true,
 };
 
 const emptyItem = {
+  playlist_id: "",
   playlist_instance_id: "",
-  item_type: "instance",
+  item_type: "playlist",
   target_set_id: "",
   title: "",
   subtitle: "",
@@ -28,8 +33,14 @@ const emptyItem = {
   photo_library_id: "",
 };
 
+function buildSetPlayUrl(setId) {
+  const id = Number(setId || 0);
+  return id > 0 ? `/picker?psi=${encodeURIComponent(String(id))}` : "";
+}
+
 export default function AdminPlaylistInstanceSetsPage() {
   const [sets, setSets] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
   const [instances, setInstances] = useState([]);
   const [activeSetId, setActiveSetId] = useState(null);
   const [setForm, setSetForm] = useState(emptySet);
@@ -40,9 +51,11 @@ export default function AdminPlaylistInstanceSetsPage() {
   const [error, setError] = useState("");
   const [expectedSaveCount, setExpectedSaveCount] = useState(0);
   const [photoPicker, setPhotoPicker] = useState({ open: false, mode: "", index: null });
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
 
   useEffect(() => {
     fetchSets();
+    fetchPlaylists();
     fetchInstances();
   }, []);
 
@@ -80,6 +93,9 @@ export default function AdminPlaylistInstanceSetsPage() {
         title: data.item?.title ?? "",
         subtitle: data.item?.subtitle ?? "",
         context: data.item?.context ?? "",
+        end_cta_label: data.item?.end_cta_label || "Explore ColorFix",
+        end_cta_url: data.item?.end_cta_url || "/",
+        end_cta_enabled: data.item?.end_cta_enabled !== false,
       });
     } catch (err) {
       setError(err?.message || "Failed to load set");
@@ -96,6 +112,7 @@ export default function AdminPlaylistInstanceSetsPage() {
       const normalized = items.map((item) => ({
         ...item,
         item_type: item?.item_type || "instance",
+        playlist_id: item?.playlist_id ?? "",
         target_set_id: item?.target_set_id ?? "",
         subtitle: item?.subtitle ?? "",
         photo_library_id: item?.photo_library_id ?? "",
@@ -123,6 +140,17 @@ export default function AdminPlaylistInstanceSetsPage() {
     }
   }
 
+  async function fetchPlaylists() {
+    try {
+      const res = await fetch(`${PLAYLISTS_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlists");
+      setPlaylists(Array.isArray(data.items) ? data.items : []);
+    } catch {
+      // optional list
+    }
+  }
+
   function updateSet(field, value) {
     setSetForm((prev) => ({ ...prev, [field]: value }));
     setStatus("");
@@ -134,11 +162,21 @@ export default function AdminPlaylistInstanceSetsPage() {
       const next = { ...prev, [field]: value };
       if (field === "item_type") {
         if (value === "set") {
+          next.playlist_id = "";
           next.playlist_instance_id = "";
+        } else if (value === "playlist") {
+          next.playlist_instance_id = "";
+          next.target_set_id = "";
         } else {
+          next.playlist_id = "";
           next.target_set_id = "";
         }
         next.title = "";
+        next.subtitle = "";
+      }
+      if (field === "playlist_id") {
+        const selected = playlists.find((item) => String(item.playlist_id) === String(value));
+        next.title = selected?.title || "";
         next.subtitle = "";
       }
       if (field === "playlist_instance_id") {
@@ -162,6 +200,7 @@ export default function AdminPlaylistInstanceSetsPage() {
     setSetForm(emptySet);
     setSetItems([]);
     setNewItem(emptyItem);
+    setMobileEditorOpen(true);
     setStatus("");
     setError("");
   }
@@ -173,6 +212,9 @@ export default function AdminPlaylistInstanceSetsPage() {
       title: setForm.title.trim(),
       subtitle: setForm.subtitle.trim(),
       context: setForm.context.trim(),
+      end_cta_label: (setForm.end_cta_label || "Explore ColorFix").trim(),
+      end_cta_url: (setForm.end_cta_url || "/").trim(),
+      end_cta_enabled: setForm.end_cta_enabled !== false,
     };
     if (!payload.handle) throw new Error("Handle required");
     if (!payload.title) throw new Error("Title required");
@@ -193,13 +235,15 @@ export default function AdminPlaylistInstanceSetsPage() {
 
   function buildItemsPayload(itemsList) {
     return itemsList.map((item, index) => ({
-      item_type: item.item_type || "instance",
+      item_type: item.item_type || "playlist",
+      playlist_id:
+        (item.item_type || "playlist") === "playlist" ? Number(item.playlist_id) || null : null,
       playlist_instance_id:
-        (item.item_type || "instance") === "set" ? null : Number(item.playlist_instance_id) || null,
+        (item.item_type || "playlist") === "instance" ? Number(item.playlist_instance_id) || null : null,
       target_set_id:
-        (item.item_type || "instance") === "set" ? Number(item.target_set_id) || null : null,
+        (item.item_type || "playlist") === "set" ? Number(item.target_set_id) || null : null,
       title: item.title || "",
-      subtitle: (item.item_type || "instance") === "set" ? (item.subtitle || "") : "",
+      subtitle: item.subtitle || "",
       photo_url: item.photo_url || "",
       photo_library_id: item.photo_library_id ? Number(item.photo_library_id) : null,
       sort_order: index + 1,
@@ -222,16 +266,22 @@ export default function AdminPlaylistInstanceSetsPage() {
   }
 
   async function handleAddItem() {
-    const itemType = newItem.item_type || "instance";
-    const playlistId = Number(newItem.playlist_instance_id);
+    const itemType = newItem.item_type || "playlist";
+    const playlistId = Number(newItem.playlist_id);
+    const playlistInstanceId = Number(newItem.playlist_instance_id);
     const targetSetId = Number(newItem.target_set_id);
     if (itemType === "set") {
       if (!targetSetId) {
         setError("target set required");
         return;
       }
-    } else if (!playlistId) {
-      setError("playlist_instance_id required");
+    } else if (itemType === "playlist") {
+      if (!playlistId) {
+        setError("playlist required");
+        return;
+      }
+    } else if (!playlistInstanceId) {
+      setError("playlist instance required");
       return;
     }
     if (!newItem.title.trim()) {
@@ -264,7 +314,8 @@ export default function AdminPlaylistInstanceSetsPage() {
       ...setItems,
       {
         id: null,
-        playlist_instance_id: itemType === "set" ? null : playlistId,
+        playlist_id: itemType === "playlist" ? playlistId : null,
+        playlist_instance_id: itemType === "instance" ? playlistInstanceId : null,
         item_type: itemType,
         target_set_id: itemType === "set" ? targetSetId : null,
         title: newItem.title.trim(),
@@ -312,11 +363,21 @@ export default function AdminPlaylistInstanceSetsPage() {
       const updated = { ...next[index], [field]: value };
       if (field === "item_type") {
         if (value === "set") {
+          updated.playlist_id = "";
           updated.playlist_instance_id = "";
+        } else if (value === "playlist") {
+          updated.playlist_instance_id = "";
+          updated.target_set_id = "";
         } else {
+          updated.playlist_id = "";
           updated.target_set_id = "";
         }
         updated.title = "";
+        updated.subtitle = "";
+      }
+      if (field === "playlist_id") {
+        const selected = playlists.find((row) => String(row.playlist_id) === String(value));
+        updated.title = selected?.title || "";
         updated.subtitle = "";
       }
       if (field === "playlist_instance_id") {
@@ -343,10 +404,11 @@ export default function AdminPlaylistInstanceSetsPage() {
         return;
       }
       const invalid = itemsList.find((item) => {
-        const itemType = item?.item_type || "instance";
+        const itemType = item?.item_type || "playlist";
         if (!String(item.title || "").trim()) return true;
         if (!String(item.photo_url || "").trim() && !Number(item.photo_library_id)) return true;
         if (itemType === "set") return !Number(item.target_set_id);
+        if (itemType === "playlist") return !Number(item.playlist_id);
         return !Number(item.playlist_instance_id);
       });
       if (invalid) {
@@ -406,6 +468,20 @@ export default function AdminPlaylistInstanceSetsPage() {
       }));
   }, [instances]);
 
+  const playlistOptions = useMemo(() => {
+    const safePlaylists = Array.isArray(playlists) ? playlists : [];
+    return safePlaylists
+      .filter((item) => Number(item.is_active) !== 0)
+      .map((item) => ({
+        id: item.playlist_id,
+        label: `${item.title || "Untitled"} (#${item.playlist_id})`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }));
+  }, [playlists]);
+
   const setOptions = useMemo(() => {
     return safeSets
       .filter((set) => Number(set.id) !== Number(activeSetId))
@@ -416,14 +492,47 @@ export default function AdminPlaylistInstanceSetsPage() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [safeSets, activeSetId]);
 
+  const activeSetSummary = useMemo(() => {
+    if (!activeSetId) return null;
+    return safeSets.find((set) => Number(set.id) === Number(activeSetId)) || null;
+  }, [activeSetId, safeSets]);
+
+  const activeSetLabel = activeSetSummary?.title || activeSetSummary?.handle || setForm.title || setForm.handle || "Untitled set";
+  const playUrl = buildSetPlayUrl(activeSetId || setForm.id);
+
+  function handlePlaySet() {
+    if (!playUrl) return;
+    window.open(playUrl, "_blank", "noopener");
+  }
+
   return (
     <div className="admin-pi-sets">
       <div className="pi-panel">
         <div className="panel-header">
           <div className="panel-title">Playlist Instance Sets</div>
-          <button type="button" className="primary-btn" onClick={handleNewSet}>
-            New Set
-          </button>
+          <div className="panel-actions">
+            <button
+              type="button"
+              className="primary-btn primary-btn--play"
+              onClick={handlePlaySet}
+              disabled={!playUrl}
+            >
+              Play
+            </button>
+            <button type="button" className="primary-btn" onClick={handleNewSet}>
+              New Set
+            </button>
+          </div>
+        </div>
+        <div className="pi-play-summary">
+          {activeSetId ? (
+            <>
+              <div className="pi-play-summary__label">Selected</div>
+              <div className="pi-play-summary__title">{activeSetLabel}</div>
+            </>
+          ) : (
+            <div className="pi-play-summary__empty">Select a set to play it.</div>
+          )}
         </div>
         <div className="panel-list">
           {safeSets.map((set) => (
@@ -431,7 +540,10 @@ export default function AdminPlaylistInstanceSetsPage() {
               key={set.id}
               type="button"
               className={`list-row${Number(activeSetId) === Number(set.id) ? " active" : ""}`}
-              onClick={() => setActiveSetId(set.id)}
+              onClick={() => {
+                setActiveSetId(set.id);
+                setMobileEditorOpen(false);
+              }}
             >
               <div className="row-title">{set.handle} (#{set.id})</div>
             </button>
@@ -478,7 +590,33 @@ export default function AdminPlaylistInstanceSetsPage() {
         }}
       />
 
-      <div className="pi-panel">
+      <div className="pi-mobile-priority">
+        <div className="pi-mobile-priority__copy">
+          <div className="pi-mobile-priority__label">Mobile priority</div>
+          <div className="pi-mobile-priority__title">
+            {activeSetId ? activeSetLabel : "Pick a set, then play it"}
+          </div>
+        </div>
+        <div className="pi-mobile-priority__actions">
+          <button
+            type="button"
+            className="primary-btn primary-btn--play"
+            onClick={handlePlaySet}
+            disabled={!playUrl}
+          >
+            Play Set
+          </button>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setMobileEditorOpen((prev) => !prev)}
+          >
+            {mobileEditorOpen ? "Hide Editor" : "Show Editor Anyway"}
+          </button>
+        </div>
+      </div>
+
+      <div className={`pi-panel pi-panel--editor${mobileEditorOpen ? " is-mobile-open" : ""}`}>
         <div className="panel-header">
           <div className="panel-title">Set Details</div>
           <div className="panel-actions">
@@ -486,6 +624,9 @@ export default function AdminPlaylistInstanceSetsPage() {
               {loading ? "Saving..." : "Save All"}
             </button>
           </div>
+        </div>
+        <div className="pi-mobile-editor-note">
+          Mobile is now optimized for playing a set. Editing stays available here if you really need it, but this page is meant for desktop editing.
         </div>
         <div className="form-grid">
           <label>
@@ -528,6 +669,32 @@ export default function AdminPlaylistInstanceSetsPage() {
               placeholder="hoa"
             />
           </label>
+          <label>
+            End Set CTA Label
+            <input
+              type="text"
+              value={setForm.end_cta_label || ""}
+              onChange={(e) => updateSet("end_cta_label", e.target.value)}
+              placeholder="Explore ColorFix"
+            />
+          </label>
+          <label>
+            End Set CTA URL
+            <input
+              type="text"
+              value={setForm.end_cta_url || ""}
+              onChange={(e) => updateSet("end_cta_url", e.target.value)}
+              placeholder="/"
+            />
+          </label>
+          <label className="pi-checkbox-label">
+            <input
+              type="checkbox"
+              checked={setForm.end_cta_enabled !== false}
+              onChange={(e) => updateSet("end_cta_enabled", e.target.checked)}
+            />
+            Show end set CTA
+          </label>
         </div>
 
         <div className="pi-items">
@@ -538,19 +705,24 @@ export default function AdminPlaylistInstanceSetsPage() {
               <div className="pi-item-main">
                 <div className="pi-item-field">
                   <div className="pi-item-label">
-                    {item.item_type === "set" ? "Set" : "Playlist"}
+                    {item.item_type === "set" ? "Set" : item.item_type === "instance" ? "Instance" : "Playlist"}
                   </div>
                   <div className="pi-item-value">
-                    {item.item_type === "set" ? `#${item.target_set_id}` : `#${item.playlist_instance_id}`}
+                    {item.item_type === "set"
+                      ? `#${item.target_set_id}`
+                      : item.item_type === "instance"
+                        ? `#${item.playlist_instance_id}`
+                        : `#${item.playlist_id}`}
                   </div>
                 </div>
                 <label className="pi-item-field">
                   Type
                   <select
-                    value={item.item_type || "instance"}
+                    value={item.item_type || "playlist"}
                     onChange={(e) => handleEditItem(index, "item_type", e.target.value)}
                   >
-                    <option value="instance">Playlist</option>
+                    <option value="playlist">Playlist</option>
+                    <option value="instance">Playlist Instance</option>
                     <option value="set">Set</option>
                   </select>
                 </label>
@@ -569,7 +741,7 @@ export default function AdminPlaylistInstanceSetsPage() {
                       ))}
                     </select>
                   </label>
-                ) : (
+                ) : item.item_type === "instance" ? (
                   <label className="pi-item-field">
                     Playlist instance
                     <select
@@ -584,13 +756,28 @@ export default function AdminPlaylistInstanceSetsPage() {
                       ))}
                     </select>
                   </label>
+                ) : (
+                  <label className="pi-item-field">
+                    Playlist
+                    <select
+                      value={item.playlist_id || ""}
+                      onChange={(e) => handleEditItem(index, "playlist_id", e.target.value)}
+                    >
+                      <option value="">Select playlist</option>
+                      {playlistOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 )}
                 <label className="pi-item-field">
                   Title
                   <input
                     type="text"
                     value={item.title || ""}
-                    readOnly
+                    onChange={(e) => handleEditItem(index, "title", e.target.value)}
                   />
                 </label>
                 <label className="pi-item-field">
@@ -598,7 +785,7 @@ export default function AdminPlaylistInstanceSetsPage() {
                   <input
                     type="text"
                     value={item.subtitle || ""}
-                    readOnly
+                    onChange={(e) => handleEditItem(index, "subtitle", e.target.value)}
                   />
                 </label>
                 <label className="pi-item-field">
@@ -645,7 +832,8 @@ export default function AdminPlaylistInstanceSetsPage() {
               value={newItem.item_type}
               onChange={(e) => updateNewItem("item_type", e.target.value)}
             >
-              <option value="instance">Playlist</option>
+              <option value="playlist">Playlist</option>
+              <option value="instance">Playlist Instance</option>
               <option value="set">Set</option>
             </select>
           </label>
@@ -664,7 +852,7 @@ export default function AdminPlaylistInstanceSetsPage() {
                 ))}
               </select>
             </label>
-          ) : (
+          ) : newItem.item_type === "instance" ? (
             <label>
               Playlist instance
               <select
@@ -679,13 +867,28 @@ export default function AdminPlaylistInstanceSetsPage() {
                 ))}
               </select>
             </label>
+          ) : (
+            <label>
+              Playlist
+              <select
+                value={newItem.playlist_id}
+                onChange={(e) => updateNewItem("playlist_id", e.target.value)}
+              >
+                <option value="">Select playlist</option>
+                {playlistOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
           <label>
             Title
             <input
               type="text"
               value={newItem.title}
-              readOnly
+              onChange={(e) => updateNewItem("title", e.target.value)}
               placeholder="Auto-filled from selection"
             />
           </label>
@@ -694,7 +897,7 @@ export default function AdminPlaylistInstanceSetsPage() {
             <input
               type="text"
               value={newItem.subtitle}
-              readOnly
+              onChange={(e) => updateNewItem("subtitle", e.target.value)}
               placeholder="Auto-filled from selection"
             />
           </label>

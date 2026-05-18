@@ -5,6 +5,7 @@ const ITEM_TYPE_OPTIONS = [
   'colorwheel',
   'colorwheel-ticked',
   'featured-article',
+  'front-blurb',
   'image',
   'name-search',
   'picture-swatch',

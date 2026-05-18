@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
+import { photoThumbUrl } from "@helpers/imageThumb";
 
 const PlaylistItem = ({ item }) => {
   const navigate = useNavigate();
@@ -26,12 +27,17 @@ const PlaylistItem = ({ item }) => {
 
       const parsedPhoto = parsePhotoRef(value);
       if (parsedPhoto.url) {
-        if (!cancelled) setImageSrc(parsedPhoto.url);
+        if (!cancelled) setImageSrc(photoThumbUrl(parsedPhoto.photoId, 420, 72) || parsedPhoto.url);
         return;
       }
 
       if (parsedPhoto.photoId) {
         try {
+          const thumbUrl = photoThumbUrl(parsedPhoto.photoId, 420, 72);
+          if (thumbUrl) {
+            if (!cancelled) setImageSrc(thumbUrl);
+            return;
+          }
           const params = new URLSearchParams();
           params.set("photo_library_ids", parsedPhoto.photoId);
           params.set("limit", "1");
@@ -77,7 +83,7 @@ const PlaylistItem = ({ item }) => {
             <div className="playlist-item__play" aria-hidden="true">
               <Play className="playlist-item__play-icon" />
             </div>
-            <img src={imageSrc} alt={item.display || item.title || "Playlist preview"} loading="lazy" />
+            <img src={imageSrc} alt={item.display || item.title || "Playlist preview"} loading="lazy" decoding="async" />
           </div>
         ) : null}
         <div className="playlist-display">

@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS client_emails (
+  client_email_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  client_id BIGINT UNSIGNED NOT NULL,
+  direction VARCHAR(20) NOT NULL DEFAULT 'outbound',
+  status VARCHAR(40) NOT NULL DEFAULT 'sent',
+  purpose VARCHAR(80) NULL DEFAULT NULL,
+  template_key VARCHAR(120) NULL DEFAULT NULL,
+  from_email VARCHAR(190) NOT NULL,
+  to_email VARCHAR(190) NOT NULL,
+  cc_emails TEXT NULL,
+  bcc_emails TEXT NULL,
+  subject TEXT NULL,
+  text_body MEDIUMTEXT NULL,
+  html_body MEDIUMTEXT NULL,
+  provider_message_id VARCHAR(255) NULL DEFAULT NULL,
+  in_reply_to_message_id VARCHAR(255) NULL DEFAULT NULL,
+  sent_at DATETIME NULL DEFAULT NULL,
+  received_at DATETIME NULL DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (client_email_id),
+  KEY idx_client_emails_client (client_id),
+  KEY idx_client_emails_direction (direction),
+  KEY idx_client_emails_sent_at (sent_at),
+  KEY idx_client_emails_received_at (received_at),
+  KEY idx_client_emails_message_id (provider_message_id),
+  CONSTRAINT fk_client_emails_client
+    FOREIGN KEY (client_id) REFERENCES clients(id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

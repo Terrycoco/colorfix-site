@@ -69,9 +69,11 @@ if (!$playlist) {
 $hasExcludeFromThumbs = columnExists($pdo, 'playlist_items', 'exclude_from_thumbs');
 $hasPhotoLibraryId = columnExists($pdo, 'playlist_items', 'photo_library_id');
 $hasSavedPaletteSetId = columnExists($pdo, 'playlist_items', 'saved_palette_set_id');
+$hasIsShareImage = columnExists($pdo, 'playlist_items', 'is_share_image');
 $excludeSelect = $hasExcludeFromThumbs ? 'exclude_from_thumbs' : '0 AS exclude_from_thumbs';
 $photoSelect = $hasPhotoLibraryId ? 'photo_library_id' : 'NULL AS photo_library_id';
 $savedPaletteSetSelect = $hasSavedPaletteSetId ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
+$shareImageSelect = $hasIsShareImage ? 'is_share_image' : '0 AS is_share_image';
 $itemSql = <<<SQL
     SELECT
       playlist_item_id,
@@ -93,6 +95,7 @@ $itemSql = <<<SQL
       transition,
       duration_ms,
       {$excludeSelect},
+      {$shareImageSelect},
       is_active
     FROM playlist_items
     WHERE playlist_id = :playlist_id

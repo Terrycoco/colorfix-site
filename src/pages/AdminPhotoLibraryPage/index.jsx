@@ -19,6 +19,7 @@ const REPLACE_URL = `${API_FOLDER}/v2/admin/photo-library/replace.php`;
 const SAVED_UPLOAD_URL = `${API_FOLDER}/v2/admin/saved-palette-photos/upload.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const CLIENTS_LIST_URL = `${API_FOLDER}/v2/admin/clients/list.php`;
+const SERIES_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/series.php`;
 const GROUPS_LIST_URL = `${API_FOLDER}/v2/admin/photo-groups/list.php`;
 const GROUPS_CREATE_URL = `${API_FOLDER}/v2/admin/photo-groups/create.php`;
 const GROUPS_DELETE_URL = `${API_FOLDER}/v2/admin/photo-groups/delete.php`;
@@ -73,6 +74,27 @@ function parseClientGroupId(value) {
   return Number.isFinite(id) ? id : 0;
 }
 
+function shouldUseExpandedPhotoSearch(filters, photoLibraryIdsFilter) {
+  return Boolean(
+    String(filters.q || "").trim()
+      || String(photoLibraryIdsFilter || "").trim()
+      || String(filters.source_type || "").trim()
+      || String(filters.palette_id || "").trim()
+      || filters.include_inactive
+      || filters.missing_tags
+  );
+}
+
+async function parseJsonResponse(res, label) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const preview = text.replace(/\s+/g, " ").slice(0, 160);
+    throw new Error(`${label} returned non-JSON (${res.status} ${res.statusText}): ${preview}`);
+  }
+}
+
 function openSavedPaletteViewerSetup(paletteId, setId = null, photoLibraryId = null) {
   const id = Number(paletteId || 0);
   if (!id) return;
@@ -118,6 +140,26 @@ function formatAiAltStatus(item) {
   if (status === "pending") return "AI alt queued";
   if (status === "failed") return item?.ai_alt_error ? `AI alt failed: ${item.ai_alt_error}` : "AI alt failed";
   return `AI alt ${status}`;
+}
+
+function displayClientListName(client) {
+  const firstName = String(client?.first_name || "").trim();
+  const lastName = String(client?.last_name || "").trim();
+  if (lastName && firstName) return `${lastName}, ${firstName}`;
+  if (lastName) return lastName;
+  if (firstName) return firstName;
+  return String(client?.name || "").trim();
+}
+
+function hasActiveLibrarySearch(filters, photoLibraryIdsFilter) {
+  return Boolean(
+    String(filters?.q || "").trim()
+      || String(photoLibraryIdsFilter || "").trim()
+      || String(filters?.source_type || "").trim()
+      || String(filters?.palette_id || "").trim()
+      || filters?.include_inactive
+      || filters?.missing_tags
+  );
 }
 
 export default function AdminPhotoLibraryPage() {
@@ -175,6 +217,7 @@ export default function AdminPhotoLibraryPage() {
 
   const [savedPalettes, setSavedPalettes] = useState([]);
   const [clients, setClients] = useState([]);
+  const [seriesOptions, setSeriesOptions] = useState([]);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientTargetPhotoId, setClientTargetPhotoId] = useState(null);
   const [paletteModalOpen, setPaletteModalOpen] = useState(false);
@@ -187,6 +230,14 @@ export default function AdminPhotoLibraryPage() {
   const [groupStatus, setGroupStatus] = useState("");
   const [groupFilterMode, setGroupFilterMode] = useState("group");
   const [imageRefreshEnabled, setImageRefreshEnabledState] = useState(() => getImageRefreshEnabled());
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState(() => ({
+    upload: false,
+  }));
+
+  function toggleSection(sectionKey) {
+    setExpandedSections((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }));
+  }
 
   function toggleImageRefresh() {
     const next = setImageRefreshEnabled(!imageRefreshEnabled);
@@ -212,7 +263,7 @@ export default function AdminPhotoLibraryPage() {
     async function loadSavedPalettes() {
       try {
         const params = new URLSearchParams();
-        params.set("limit", "200");
+        params.set("limit", shouldUseExpandedPhotoSearch(filters, photoLibraryIdsFilter) ? "50" : "5");
         params.set("with_photos", "1");
         params.set("_", Date.now().toString());
         const res = await fetch(`${SAVED_LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -353,25 +404,36 @@ export default function AdminPhotoLibraryPage() {
     return "Ranch progression";
   }, [uploadForm.source_type]);
 
-  const seriesOptions = useMemo(() => {
-    const labels = new Set();
-    const extractSeries = (item) => {
-      const direct = String(item?.series || "").trim();
-      if (direct) return direct;
-      const path = String(item?.raw_rel_path || item?.rel_path || item?.image_url || "").trim();
-      const match = path.match(/\/photos\/[^/]+\/([^/]+)\//i);
-      return match?.[1] ? String(match[1]).trim() : "";
+  useEffect(() => {
+    let active = true;
+    async function loadSeriesOptions() {
+      if (uploadForm.source_type === "saved_palette" || uploadForm.source_type === "client") {
+        setSeriesOptions([]);
+        return;
+      }
+      try {
+        const params = new URLSearchParams();
+        params.set("source_type", uploadForm.source_type || "progression");
+        params.set("limit", "300");
+        params.set("_", Date.now().toString());
+        const url = `${SERIES_LIST_URL}?${params.toString()}`;
+        const res = await fetch(url, { credentials: "include" });
+        const data = await parseJsonResponse(res, url);
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || "Failed to load folder labels");
+        }
+        if (!active) return;
+        setSeriesOptions(Array.isArray(data.items) ? data.items : []);
+      } catch {
+        if (!active) return;
+        setSeriesOptions([]);
+      }
+    }
+    loadSeriesOptions();
+    return () => {
+      active = false;
     };
-
-    (items || []).forEach((item) => {
-      const label = extractSeries(item);
-      if (label) labels.add(label);
-    });
-
-    return Array.from(labels).sort((a, b) =>
-      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
-    );
-  }, [items]);
+  }, [uploadForm.source_type, refreshKey]);
 
   const groupOptions = useMemo(() => {
     const clientOptions = clients
@@ -394,6 +456,13 @@ export default function AdminPhotoLibraryPage() {
   useEffect(() => {
     let active = true;
     async function loadLibrary() {
+      if (!hasActiveLibrarySearch(filters, photoLibraryIdsFilter)) {
+        if (!active) return;
+        setLoading(false);
+        setItems([]);
+        setError("");
+        return;
+      }
       setLoading(true);
       setError("");
       setThumbNonce(String(Date.now()));
@@ -409,8 +478,9 @@ export default function AdminPhotoLibraryPage() {
         if (filters.missing_tags) params.set("missing_tags", "1");
         params.set("limit", "200");
         params.set("_", Date.now().toString());
-        const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
-        const data = await res.json();
+        const url = `${LIST_URL}?${params.toString()}`;
+        const res = await fetch(url, { credentials: "include" });
+        const data = await parseJsonResponse(res, url);
         if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load photo library");
         if (!active) return;
         setItems(Array.isArray(data.items) ? data.items : []);
@@ -428,6 +498,8 @@ export default function AdminPhotoLibraryPage() {
     };
   }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey]);
 
+  const hasLibrarySearch = hasActiveLibrarySearch(filters, photoLibraryIdsFilter);
+
   const buildAdminImageUrl = (url, updatedAt = null) => {
     const base = buildImageUrl(url, updatedAt, imageRefreshEnabled);
     if (!base) return "";
@@ -437,35 +509,6 @@ export default function AdminPhotoLibraryPage() {
 
   const handleUploadField = (key, value) => {
     setUploadForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleClientSelect = (value) => {
-    if (!value) {
-      setUploadForm((prev) => ({
-        ...prev,
-        client_id: "",
-        client_name: "",
-        client_email: "",
-      }));
-      return;
-    }
-    if (value === "__new__") {
-      setUploadForm((prev) => ({
-        ...prev,
-        client_id: "__new__",
-        client_name: "",
-        client_email: "",
-      }));
-      return;
-    }
-    const selected = clients.find((client) => String(client.id) === String(value));
-    if (!selected) return;
-    setUploadForm((prev) => ({
-      ...prev,
-      client_id: String(selected.id),
-      client_name: selected.name || "",
-      client_email: selected.email || "",
-    }));
   };
 
   const handleLibraryField = (id, key, value) => {
@@ -954,6 +997,21 @@ export default function AdminPhotoLibraryPage() {
     }
   }, [uploadForm.source_type, uploadForm.palette_id]);
 
+  useEffect(() => {
+    if (!hasActiveLibrarySearch(filters, photoLibraryIdsFilter)) return;
+    setExpandedSections((prev) => ({
+      ...prev,
+      upload: false,
+    }));
+  }, [
+    filters.q,
+    filters.source_type,
+    filters.palette_id,
+    filters.include_inactive,
+    filters.missing_tags,
+    photoLibraryIdsFilter,
+  ]);
+
   return (
     <div className="admin-photo-library">
       <header className="admin-photo-library__header">
@@ -961,12 +1019,24 @@ export default function AdminPhotoLibraryPage() {
         <p>Upload and tag photos for playlists, progressions, or saved palettes.</p>
       </header>
 
-      <section className="admin-photo-library__section">
-        <h2>Upload Photos</h2>
-        {uploadStatus.error && <div className="admin-photo-library__error">{uploadStatus.error}</div>}
-        {uploadStatus.success && <div className="admin-photo-library__status">{uploadStatus.success}</div>}
-        {replaceStatus && <div className="admin-photo-library__status">{replaceStatus}</div>}
-        <form className="admin-photo-library__upload" onSubmit={handleUploadSubmit}>
+      <section className="admin-photo-library__section admin-photo-library__accordion">
+        <button
+          type="button"
+          className="admin-photo-library__accordion-toggle"
+          onClick={() => toggleSection("upload")}
+          aria-expanded={expandedSections.upload}
+        >
+          <span>Upload Photos</span>
+          <span className="admin-photo-library__accordion-icon" aria-hidden="true">
+            {expandedSections.upload ? "−" : "+"}
+          </span>
+        </button>
+        {expandedSections.upload && (
+          <div className="admin-photo-library__accordion-panel">
+            {uploadStatus.error && <div className="admin-photo-library__error">{uploadStatus.error}</div>}
+            {uploadStatus.success && <div className="admin-photo-library__status">{uploadStatus.success}</div>}
+            {replaceStatus && <div className="admin-photo-library__status">{replaceStatus}</div>}
+            <form className="admin-photo-library__upload" onSubmit={handleUploadSubmit}>
           <label>
             Type
             <select
@@ -1037,17 +1107,17 @@ export default function AdminPhotoLibraryPage() {
             <label>
               Existing client
               <div className="admin-photo-library__client-picker">
-                <select
-                  value={uploadForm.client_id}
-                  onChange={(e) => handleClientSelect(e.target.value)}
-                >
-                  <option value="">Pick client</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name ? `${client.name} (${client.email})` : client.email}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={(() => {
+                    const selected = clients.find((client) => String(client.id) === String(uploadForm.client_id));
+                    if (!selected) return "";
+                    const label = displayClientListName(selected) || selected.email || "";
+                    return selected.email ? `${label} (${selected.email})` : label;
+                  })()}
+                  readOnly
+                  placeholder="Pick client"
+                />
                 <button
                   type="button"
                   className="ghost"
@@ -1055,6 +1125,22 @@ export default function AdminPhotoLibraryPage() {
                 >
                   Client…
                 </button>
+                {uploadForm.client_id ? (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      setUploadForm((prev) => ({
+                        ...prev,
+                        client_id: "",
+                        client_name: "",
+                        client_email: "",
+                      }));
+                    }}
+                  >
+                    Clear
+                  </button>
+                ) : null}
               </div>
             </label>
           )}
@@ -1086,18 +1172,25 @@ export default function AdminPhotoLibraryPage() {
           {showSeriesField && (
             <label>
               {uploadSeriesLabel}
-              <input
-                type="text"
-                list="admin-photo-library-series-options"
-                value={uploadForm.series}
-                onChange={(e) => handleUploadField("series", e.target.value)}
-                placeholder={uploadSeriesPlaceholder}
-              />
-              <datalist id="admin-photo-library-series-options">
-                {seriesOptions.map((series) => (
-                  <option key={series} value={series} />
-                ))}
-              </datalist>
+              <div className="admin-photo-library__series-picker">
+                <select
+                  value={seriesOptions.includes(uploadForm.series) ? uploadForm.series : ""}
+                  onChange={(e) => handleUploadField("series", e.target.value)}
+                >
+                  <option value="">Choose existing folder label</option>
+                  {seriesOptions.map((series) => (
+                    <option key={series} value={series}>
+                      {series}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={uploadForm.series}
+                  onChange={(e) => handleUploadField("series", e.target.value)}
+                  placeholder={uploadSeriesPlaceholder}
+                />
+              </div>
             </label>
           )}
 
@@ -1170,39 +1263,54 @@ export default function AdminPhotoLibraryPage() {
             />
           </label>
 
-          <div className="admin-photo-library__upload-actions">
-            <button type="submit" disabled={uploading}>
-              {uploading ? "Uploading…" : "Upload"}
-            </button>
-            <button type="button" className="ghost" onClick={resetUpload} disabled={uploading}>
-              Clear
-            </button>
+              <div className="admin-photo-library__upload-actions">
+                <button type="submit" disabled={uploading}>
+                  {uploading ? "Uploading…" : "Upload"}
+                </button>
+                <button type="button" className="ghost" onClick={resetUpload} disabled={uploading}>
+                  Clear
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        )}
       </section>
 
-      <section className="admin-photo-library__section">
-        <h2>Library</h2>
+      <section className="admin-photo-library__section admin-photo-library__search-strip">
         {error && <div className="admin-photo-library__error">{error}</div>}
         <div className="admin-photo-library__filters">
-          <form
-            className="admin-photo-library__tag-filter"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setFilters((prev) => ({ ...prev, q: searchInput.trim() }));
-            }}
-          >
-            <label>
-              Search
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="title, tags, path, or photo id"
-              />
-            </label>
-            <div className="admin-photo-library__tag-input">
-              <button type="submit">Search</button>
+          <div className="admin-photo-library__filters-main">
+            <form
+              className="admin-photo-library__search-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                setFilters((prev) => ({ ...prev, q: searchInput.trim() }));
+              }}
+            >
+              <label className="admin-photo-library__search-label" aria-label="Search photo library">
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="title, tags, path, or photo id"
+                />
+              </label>
+              <div className="admin-photo-library__search-actions">
+                <button type="submit">Search</button>
+                <button
+                  type="button"
+                  className="ghost admin-photo-library__filters-inline-toggle"
+                  onClick={() => setMobileFiltersOpen((prev) => !prev)}
+                  aria-expanded={mobileFiltersOpen}
+                >
+                  {mobileFiltersOpen ? "Filters −" : "Filters +"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div className={`admin-photo-library__filters-advanced${mobileFiltersOpen ? " is-open" : ""}`}>
+            <div className="admin-photo-library__filters-advanced-actions">
               <button
                 type="button"
                 className="ghost"
@@ -1212,129 +1320,135 @@ export default function AdminPhotoLibraryPage() {
                   setFilters((prev) => ({ ...prev, q: "" }));
                 }}
               >
-                Clear
-              </button>
-              <button type="button" className="ghost" onClick={toggleImageRefresh}>
-                {imageRefreshEnabled ? "Image Refresh: On" : "Image Refresh: Off"}
+                Clear Search
               </button>
             </div>
-          </form>
-          <label>
-            Group
-            <select
-              value={groupId}
-              onChange={(e) => {
-                setGroupId(e.target.value);
-                setGroupFilterMode("group");
-              }}
-            >
-              <option value="">All photos</option>
-              {groupOptions.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="admin-photo-library__group-actions">
-            <div className="admin-photo-library__group-create">
-              <input
-                type="text"
-                value={newGroupTitle}
-                onChange={(e) => setNewGroupTitle(e.target.value)}
-                placeholder="New group title"
-              />
-              <button type="button" onClick={handleCreateGroup} disabled={!newGroupTitle.trim()}>
-                Add Group
-              </button>
-            </div>
-            {groupId && !isClientGroupId(groupId) && (
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => setGroupFilterMode((prev) => (prev === "group" ? "all" : "group"))}
-              >
-                {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
-              </button>
-            )}
-            <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId || isClientGroupId(groupId)}>
-              Delete Group
-            </button>
-            {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
-          </div>
-          <label>
-            Type
-            <select
-              value={filters.source_type}
-              onChange={(e) => setFilters((prev) => ({ ...prev, source_type: e.target.value }))}
-            >
-              <option value="">All</option>
-              <option value="saved_palette_photo">Saved palette</option>
-              <option value="applied_palette">Applied palette</option>
-              <option value="progression">Progression</option>
-              <option value="client">Client</option>
-              <option value="article">Article</option>
-              <option value="pin">Pin</option>
-              <option value="extra_photo">Extras</option>
-            </select>
-          </label>
-          <label>
-            Sort
-            <select
-              value={filters.sort}
-              onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
-            >
-              <option value="newest">Newest uploads</option>
-              <option value="oldest">Oldest uploads</option>
-              <option value="id_desc">ID desc</option>
-              <option value="id_asc">ID asc</option>
-              <option value="title">Title</option>
-            </select>
-          </label>
-          <label className="admin-photo-library__inline-check">
-            <input
-              type="checkbox"
-              checked={!!filters.include_inactive}
-              onChange={(e) => setFilters((prev) => ({ ...prev, include_inactive: e.target.checked }))}
-            />
-            Show retired
-          </label>
-          <label className="admin-photo-library__inline-check">
-            <input
-              type="checkbox"
-              checked={!!filters.missing_tags}
-              onChange={(e) => setFilters((prev) => ({ ...prev, missing_tags: e.target.checked }))}
-            />
-            Missing tags
-          </label>
-          {filters.source_type === "saved_palette_photo" && (
             <label>
-              Palette
+              Group
               <select
-                value={filters.palette_id}
-                onChange={(e) => setFilters((prev) => ({ ...prev, palette_id: e.target.value }))}
+                value={groupId}
+                onChange={(e) => {
+                  setGroupId(e.target.value);
+                  setGroupFilterMode("group");
+                }}
               >
-                <option value="">All palettes</option>
-                {paletteOptions.map((palette) => (
-                  <option key={palette.id} value={palette.id}>
-                    {palette.label}
+                <option value="">All photos</option>
+                {groupOptions.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.label}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          <div className="admin-photo-library__save-all">
-            <a className="admin-photo-library__tools-link" href="/admin/photo-library-tools">
-              Library Tools
-            </a>
-            <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
-              Save All
-            </button>
-            {dirtyIds.size > 0 && <div className="admin-photo-library__dirty-count">{dirtyIds.size} unsaved</div>}
+            <div className="admin-photo-library__group-actions">
+              <div className="admin-photo-library__group-create">
+                <input
+                  type="text"
+                  value={newGroupTitle}
+                  onChange={(e) => setNewGroupTitle(e.target.value)}
+                  placeholder="New group title"
+                />
+                <button type="button" onClick={handleCreateGroup} disabled={!newGroupTitle.trim()}>
+                  Add Group
+                </button>
+              </div>
+              {groupId && !isClientGroupId(groupId) && (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => setGroupFilterMode((prev) => (prev === "group" ? "all" : "group"))}
+                >
+                  {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
+                </button>
+              )}
+              <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId || isClientGroupId(groupId)}>
+                Delete Group
+              </button>
+              {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
+            </div>
+            <label>
+              Type
+              <select
+                value={filters.source_type}
+                onChange={(e) => setFilters((prev) => ({ ...prev, source_type: e.target.value }))}
+              >
+                <option value="">All</option>
+                <option value="saved_palette_photo">Saved palette</option>
+                <option value="applied_palette">Applied palette</option>
+                <option value="progression">Progression</option>
+                <option value="client">Client</option>
+                <option value="article">Article</option>
+                <option value="pin">Pin</option>
+                <option value="extra_photo">Extras</option>
+              </select>
+            </label>
+            <label>
+              Sort
+              <select
+                value={filters.sort}
+                onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
+              >
+                <option value="newest">Newest uploads</option>
+                <option value="oldest">Oldest uploads</option>
+                <option value="id_desc">ID desc</option>
+                <option value="id_asc">ID asc</option>
+                <option value="title">Title</option>
+              </select>
+            </label>
+            <label className="admin-photo-library__inline-check">
+              <input
+                type="checkbox"
+                checked={!!filters.include_inactive}
+                onChange={(e) => setFilters((prev) => ({ ...prev, include_inactive: e.target.checked }))}
+              />
+              Show retired
+            </label>
+            <label className="admin-photo-library__inline-check">
+              <input
+                type="checkbox"
+                checked={!!filters.missing_tags}
+                onChange={(e) => setFilters((prev) => ({ ...prev, missing_tags: e.target.checked }))}
+              />
+              Missing tags
+            </label>
+            {filters.source_type === "saved_palette_photo" && (
+              <label>
+                Palette
+                <select
+                  value={filters.palette_id}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, palette_id: e.target.value }))}
+                >
+                  <option value="">All palettes</option>
+                  {paletteOptions.map((palette) => (
+                    <option key={palette.id} value={palette.id}>
+                      {palette.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="admin-photo-library__filters-extra-actions">
+              <button type="button" className="ghost" onClick={toggleImageRefresh}>
+                {imageRefreshEnabled ? "Image Refresh: On" : "Image Refresh: Off"}
+              </button>
+              <div className="admin-photo-library__save-all">
+                <a className="admin-photo-library__tools-link" href="/admin/photo-library-tools">
+                  Library Tools
+                </a>
+                <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
+                  Save All
+                </button>
+                {dirtyIds.size > 0 && <div className="admin-photo-library__dirty-count">{dirtyIds.size} unsaved</div>}
+              </div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {loading ? (
+      <section className="admin-photo-library__section admin-photo-library__results-panel">
+        {!hasLibrarySearch ? (
+          <div className="admin-photo-library__empty">Search to load photo library results.</div>
+        ) : loading ? (
           <div className="admin-photo-library__loading">Loading…</div>
         ) : (
           <div className="admin-photo-library__table-wrap">
@@ -1713,6 +1827,9 @@ export default function AdminPhotoLibraryPage() {
         open={paletteModalOpen}
         paletteId={paletteTarget?.paletteId || null}
         attachment={paletteTarget?.attachment || null}
+        onChanged={() => {
+          setRefreshKey((prev) => prev + 1);
+        }}
         onClose={() => {
           setPaletteModalOpen(false);
           setPaletteTarget(null);

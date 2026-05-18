@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import colorfixByTerryLightBgUrl from "../../assets/brand/colorfix_byterry_lightbg.png";
 import "./admin-qr-sheets.css";
 
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
@@ -108,25 +109,14 @@ function handlePrintSheet() {
           }
 
           .admin-qr-sheets__sticker-brand {
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 8pt;
-            font-weight: 800;
-            line-height: 1;
-            letter-spacing: -0.01em;
-            white-space: nowrap;
             margin: -1pt 0 0 0;
           }
 
-          .admin-qr-sheets__sticker-brand-color {
-            color: #111827;
-          }
-
-          .admin-qr-sheets__sticker-brand-fix {
-            color: #ff6600;
-          }
-
-          .admin-qr-sheets__sticker-brand-by {
-            color: #111827;
+          .admin-qr-sheets__sticker-brand-image {
+            width: 100%;
+            max-width: 90pt;
+            height: auto;
+            display: block;
           }
         </style>
       </head>
@@ -201,46 +191,43 @@ function buildQrUrl(value, size = 600) {
 }
 
 
-function Avery15660SheetPreview() {
-  const labels = Array.from({ length: 30 }, (_, index) => index);
-  const qrSrc = buildQrUrl("https://colorfix.terrymarr.com/watch", 420);
+function Avery15660SheetPreview({ url }) {
+  const qrSrc = buildQrUrl(url || "https://colorfix.terrymarr.com/watch", 420);
 
   return (
     <div className="admin-qr-sheets__sheet-block">
-      <div className="admin-qr-sheets__sheet-title">Avery 15660 Exact Sheet Preview</div>
+      <div className="admin-qr-sheets__sheet-title">Sticker Preview</div>
       <div className="admin-qr-sheets__sheet-note">
-        1&quot; x 2.625&quot; labels, 3 columns x 10 rows, letter sheet proportions.
+        Single 1&quot; x 2.625&quot; label preview. Download PNG for the full print sheet.
       </div>
 
-      <div className="admin-qr-sheets__sheet">
-        {labels.map((labelIndex) => (
-          <div key={labelIndex} className="admin-qr-sheets__sheet-label">
-            <div className="admin-qr-sheets__sticker admin-qr-sheets__sticker--compact">
-              
-              <div className="admin-qr-sheets__sticker-qr-wrap">
+      <div className="admin-qr-sheets__single-preview">
+        <div className="admin-qr-sheets__single-preview-label">
+          <div className="admin-qr-sheets__sticker admin-qr-sheets__sticker--compact">
+            <div className="admin-qr-sheets__sticker-qr-wrap">
+              <img
+                className="admin-qr-sheets__sticker-qr"
+                src={qrSrc}
+                alt=""
+              />
+            </div>
+
+            <div className="admin-qr-sheets__sticker-copy">
+              <div className="admin-qr-sheets__sticker-eyebrow">
+                Watch Color<br />
+                Before &amp; Afters
+              </div>
+
+              <div className="admin-qr-sheets__sticker-brand">
                 <img
-                  className="admin-qr-sheets__sticker-qr"
-                  src={qrSrc}
-                  alt=""
+                  src={colorfixByTerryLightBgUrl}
+                  alt="ColorFix by Terry"
+                  className="admin-qr-sheets__sticker-brand-image"
                 />
               </div>
-
-              <div className="admin-qr-sheets__sticker-copy">
-                <div className="admin-qr-sheets__sticker-eyebrow">
-                  Watch Color<br />
-                  Transformations
-                </div>
-
-                <div className="admin-qr-sheets__sticker-brand">
-                  <span className="admin-qr-sheets__sticker-brand-color">Color</span>
-                  <span className="admin-qr-sheets__sticker-brand-fix">Fix</span>
-                  <span className="admin-qr-sheets__sticker-brand-by"> by Terry</span>
-                </div>
-              </div>
-
             </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
@@ -260,6 +247,19 @@ export default function AdminQrSheetsPage() {
     () => qrOptions.find((option) => option.id === selectedId) || qrOptions[0],
     [selectedId]
   );
+  const selectedWatchTarget = useMemo(
+    () => instances.find((item) => String(item.playlist_instance_id) === String(watchForm.playlist_instance_id)) || null,
+    [instances, watchForm.playlist_instance_id]
+  );
+  const watchSlugUrl = useMemo(() => {
+    const playerUrl = selectedWatchTarget?.player_url || "";
+    if (!playerUrl) return "https://colorfix.terrymarr.com/watch";
+    if (/^https?:\/\//i.test(playerUrl)) return playerUrl;
+    return `https://colorfix.terrymarr.com${playerUrl.startsWith("/") ? "" : "/"}${playerUrl}`;
+  }, [selectedWatchTarget]);
+  const selectedUrl = selected?.id === "watch" || selected?.id === "watch-sticker"
+    ? watchSlugUrl
+    : selected?.url;
 
   const wheelSrc =
     selected?.type === "wheel" ? `${selected.asset}?v=${wheelVersion}` : "";
@@ -420,13 +420,19 @@ async function handleDownloadPng() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, pageWidth, pageHeight);
 
-    const qrUrl = buildQrUrl(selected.url, 900);
+    const qrUrl = buildQrUrl(selectedUrl, 900);
     const qrImg = new Image();
     qrImg.crossOrigin = "anonymous";
     qrImg.src = qrUrl;
+    const brandImg = new Image();
+    brandImg.src = colorfixByTerryLightBgUrl;
     await new Promise((resolve, reject) => {
       qrImg.onload = resolve;
       qrImg.onerror = reject;
+    });
+    await new Promise((resolve, reject) => {
+      brandImg.onload = resolve;
+      brandImg.onerror = reject;
     });
 
     const innerPadX = Math.round(labelWidth * 0.065);
@@ -447,10 +453,9 @@ async function handleDownloadPng() {
     const textWidth = labelWidth - textXOffset - innerPadX;
 
     const headlineFontPx = 40;
-    const logoFontPx = 32;
     const headlineLineGap = 42;
     const headlineTopOffset = 104;
-    const brandYOffset = 72;
+    const brandBottomInset = 52;
 
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
@@ -465,13 +470,12 @@ async function handleDownloadPng() {
         const textX = labelX + textXOffset;
         const line1Y = labelY + headlineTopOffset;
         const line2Y = line1Y + headlineLineGap;
-        const brandY = labelY + labelHeight - brandYOffset;
 
         ctx.fillStyle = "#111827";
         ctx.font = `800 ${headlineFontPx}px Inter, Arial, sans-serif`;
 
         const line1Text = "Watch Color";
-        const line2Text = "Transformations";
+        const line2Text = "Before & Afters";
         const line1Scale = Math.min(1, textWidth / Math.max(ctx.measureText(line1Text).width, 1));
         const line2Scale = Math.min(1, textWidth / Math.max(ctx.measureText(line2Text).width, 1));
 
@@ -495,34 +499,19 @@ async function handleDownloadPng() {
           ctx.fillText(line2Text, textX, line2Y);
         }
 
-        ctx.font = `800 ${logoFontPx}px Lato, Arial, sans-serif`;
-        const colorText = "Color";
-        const fixText = "Fix";
-        const byText = " by Terry";
-        const colorWidth = ctx.measureText(colorText).width;
-        const fixWidth = ctx.measureText(fixText).width;
-        const byWidth = ctx.measureText(byText).width;
-        const brandScale = Math.min(1, textWidth / Math.max(colorWidth + fixWidth + byWidth, 1));
-
-        if (brandScale < 1) {
-          ctx.save();
-          ctx.translate(textX, brandY);
-          ctx.scale(brandScale, 1);
-          ctx.fillStyle = "#111827";
-          ctx.fillText(colorText, 0, 0);
-          ctx.fillStyle = "#ff6600";
-          ctx.fillText(fixText, colorWidth, 0);
-          ctx.fillStyle = "#111827";
-          ctx.fillText(byText, colorWidth + fixWidth, 0);
-          ctx.restore();
-        } else {
-          ctx.fillStyle = "#111827";
-          ctx.fillText(colorText, textX, brandY);
-          ctx.fillStyle = "#ff6600";
-          ctx.fillText(fixText, textX + colorWidth, brandY);
-          ctx.fillStyle = "#111827";
-          ctx.fillText(byText, textX + colorWidth + fixWidth, brandY);
-        }
+        const brandNaturalWidth = brandImg.naturalWidth || 1;
+        const brandNaturalHeight = brandImg.naturalHeight || 1;
+        const brandMaxWidth = Math.min(textWidth, Math.round(labelWidth * 0.24));
+        const brandScale = brandMaxWidth / brandNaturalWidth;
+        const brandDrawWidth = Math.round(brandNaturalWidth * brandScale);
+        const brandDrawHeight = Math.round(brandNaturalHeight * brandScale);
+        ctx.drawImage(
+          brandImg,
+          textX,
+          labelY + labelHeight - brandBottomInset - brandDrawHeight,
+          brandDrawWidth,
+          brandDrawHeight
+        );
       }
     }
 
@@ -581,13 +570,13 @@ async function handleDownloadPng() {
     return;
   }
 
-  if (!selected?.url) return;
+  if (!selectedUrl) return;
 
   const width = 1200;
   const height = 1600;
   const headline = selected.headline || "Reserve Time";
   const subline = selected.subline || "";
-  const qrUrl = buildQrUrl(selected.url, 600);
+  const qrUrl = buildQrUrl(selectedUrl, 600);
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -657,7 +646,7 @@ async function handleDownloadPng() {
           URL
           <input
             type="text"
-            value={selected?.type === "wheel" ? wheelSrc : selected.url}
+            value={selected?.type === "wheel" ? wheelSrc : selectedUrl}
             readOnly
           />
         </label>
@@ -668,7 +657,7 @@ async function handleDownloadPng() {
           <div>
             <div className="admin-qr-sheets__watch-config-title">Watch Link Target</div>
             <div className="admin-qr-sheets__watch-config-note">
-              Choose which playlist instance opens from the printed `/watch` QR code.
+              Choose which playlist slug the printed Watch QR code opens.
             </div>
           </div>
           <button type="button" onClick={handleSaveWatchConfig} disabled={watchSaving || watchLoading}>
@@ -691,7 +680,8 @@ async function handleDownloadPng() {
               <option value="">{watchLoading ? "Loading instances..." : "Select playlist instance"}</option>
               {instances.map((item) => (
                 <option key={item.playlist_instance_id} value={item.playlist_instance_id}>
-                  {(item.instance_name || item.display_title || "Untitled")} (#{item.playlist_instance_id})
+                  {(item.instance_name || item.display_title || "Untitled")} (#{item.playlist_instance_id}
+                  {item.playlist_slug ? ` / ${item.playlist_slug}` : ""})
                 </option>
               ))}
             </select>
@@ -716,10 +706,10 @@ async function handleDownloadPng() {
             ) : selected?.type === "sticker" ? (
               <>
              
-               <Avery15660SheetPreview />
+               <Avery15660SheetPreview url={selectedUrl} />
               </>
             ) : (
-              <img src={buildQrUrl(selected.url, 420)} alt={selected.headline} />
+              <img src={buildQrUrl(selectedUrl, 420)} alt={selected.headline} />
             )}
             {selected.subline && selected?.type !== "wheel" && selected?.type !== "sticker" && (
               <div className="admin-qr-sheets__subline">{selected.subline}</div>

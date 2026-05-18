@@ -30,6 +30,7 @@ const emptyEditForm = {
   palette_id: null,
   brand: "",
   nickname: "",
+  display_title: "",
   notes: "",
   private_notes: "",
   terry_fav: false,
@@ -121,6 +122,7 @@ function normalizePalette(palette) {
       palette_id: Number(palette.id) || palette.id,
       brand: palette.brand || "",
       nickname: palette.nickname || "",
+      display_title: palette.display_title || "",
       notes: palette.notes || "",
       private_notes: palette.private_notes || "",
       terry_fav: Number(palette.terry_fav) === 1,
@@ -185,6 +187,7 @@ export default function SavedPaletteEditorModal({
   attachment = null,
   showPhotoSection = !!attachment,
   onClose,
+  onChanged,
   onSaved,
 }) {
   const attachmentPreview = attachment?.rel_path || attachment?.image_url || "";
@@ -200,12 +203,11 @@ export default function SavedPaletteEditorModal({
   const [editPhotos, setEditPhotos] = useState([]);
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
   const [beforePickerOpen, setBeforePickerOpen] = useState(false);
-  const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
+  const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "", success: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
   const [existingLinks, setExistingLinks] = useState([]);
   const [attachEnabled, setAttachEnabled] = useState(true);
   const [attachPhotoType, setAttachPhotoType] = useState("full");
-  const [attachShowInGallery, setAttachShowInGallery] = useState(false);
   const [attachTriggerMode, setAttachTriggerMode] = useState("any");
   const [attachTriggerColorId, setAttachTriggerColorId] = useState(null);
   const [selectedBeforePhoto, setSelectedBeforePhoto] = useState(null);
@@ -244,11 +246,25 @@ export default function SavedPaletteEditorModal({
     };
   }, [open]);
 
+  async function refreshExistingLinks() {
+    if (!attachment?.photo_library_id) return [];
+    const params = new URLSearchParams();
+    params.set("photo_library_id", String(attachment.photo_library_id));
+    params.set("_", Date.now().toString());
+    const linksRes = await fetch(`${PHOTO_LIBRARY_LINKS_URL}?${params.toString()}`, { credentials: "include" });
+    const linksData = await linksRes.json().catch(() => ({}));
+    if (!linksRes.ok || !linksData?.ok) {
+      throw new Error(linksData?.error || "Failed to refresh linked viewers");
+    }
+    const nextLinks = Array.isArray(linksData.items) ? linksData.items : [];
+    setExistingLinks(nextLinks);
+    return nextLinks;
+  }
+
   useEffect(() => {
     if (!open) return;
     setAttachEnabled(!!attachment);
     setAttachPhotoType(attachment?.photo_type || "full");
-    setAttachShowInGallery(!!attachment?.show_in_gallery && (attachment?.photo_type || "full") !== "before");
     setAttachTriggerMode(
       (attachment?.photo_type || "full") === "before"
         ? "none"
@@ -276,7 +292,6 @@ export default function SavedPaletteEditorModal({
 
   useEffect(() => {
     if (attachPhotoType === "before") {
-      setAttachShowInGallery(false);
       setAttachTriggerMode("none");
       setAttachTriggerColorId(null);
       return;
@@ -471,16 +486,7 @@ export default function SavedPaletteEditorModal({
         setActiveSetId(String(photo.saved_palette_set_id));
         setCreateNewGroup(false);
       }
-      if (attachment?.photo_library_id) {
-        const params = new URLSearchParams();
-        params.set("photo_library_id", String(attachment.photo_library_id));
-        params.set("_", Date.now().toString());
-        const linksRes = await fetch(`${PHOTO_LIBRARY_LINKS_URL}?${params.toString()}`, { credentials: "include" });
-        const linksData = await linksRes.json().catch(() => ({}));
-        if (linksRes.ok && linksData?.ok) {
-          setExistingLinks(Array.isArray(linksData.items) ? linksData.items : []);
-        }
-      }
+      await refreshExistingLinks();
       setEditPhotos((prev) => [
         ...prev,
         {
@@ -494,16 +500,17 @@ export default function SavedPaletteEditorModal({
           order_index: photo.order_index ?? prev.length,
         },
       ]);
-      setPhotoStatus({ loading: false, error: "" });
+      setPhotoStatus({ loading: false, error: "", success: "Photo attached." });
       setPhotoPickerOpen(false);
+      onChanged?.();
     } catch (err) {
-      setPhotoStatus({ loading: false, error: err?.message || "Failed to attach photo" });
+      setPhotoStatus({ loading: false, error: err?.message || "Failed to attach photo", success: "" });
     }
   }
 
   async function handleDeletePhoto(photoId, unlinkOnly = false) {
     if (!photoId) return;
-    setPhotoStatus({ loading: true, error: "" });
+    setPhotoStatus({ loading: true, error: "", success: "" });
     try {
       const res = await fetch(PHOTO_DELETE_URL, {
         method: "POST",
@@ -515,13 +522,16 @@ export default function SavedPaletteEditorModal({
       if (!res.ok || !json.ok) {
         throw new Error(json.error || `HTTP ${res.status}`);
       }
-      if (attachment?.photo_library_id) {
-        setExistingLinks((prev) => prev.filter((link) => Number(link.id) !== Number(photoId)));
-      }
+      await refreshExistingLinks();
       setEditPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
-      setPhotoStatus({ loading: false, error: "" });
+      setPhotoStatus({
+        loading: false,
+        error: "",
+        success: unlinkOnly ? "Photo unlinked." : "Photo removed.",
+      });
+      onChanged?.();
     } catch (err) {
-      setPhotoStatus({ loading: false, error: err?.message || "Failed to delete photo" });
+      setPhotoStatus({ loading: false, error: err?.message || "Failed to delete photo", success: "" });
     }
   }
 
@@ -548,7 +558,6 @@ export default function SavedPaletteEditorModal({
       raw_rel_path: rel,
       rel_path: rel,
       photo_type: effectivePhotoType,
-      show_in_gallery: effectivePhotoType === "before" ? 0 : (attachShowInGallery ? 1 : 0),
       trigger_mode: effectivePhotoType === "before" ? "none" : attachTriggerMode,
       trigger_color_id: effectivePhotoType === "before" ? null : attachTriggerColorId,
       caption: effectivePhotoType === "before" ? "Before" : null,
@@ -583,7 +592,6 @@ export default function SavedPaletteEditorModal({
           rel_path: rawRelPath(selectedBeforePhoto.raw_rel_path || selectedBeforePhoto.image_url || ""),
           photo_type: "before",
           trigger_mode: "none",
-          show_in_gallery: 0,
           caption: "Before",
           alt_text: selectedBeforePhoto.alt_text || "",
         }),
@@ -608,16 +616,7 @@ export default function SavedPaletteEditorModal({
     : null;
 
   async function finalizeAttach(nextPaletteId, attachedPhoto) {
-    if (attachment?.photo_library_id) {
-      const params = new URLSearchParams();
-      params.set("photo_library_id", String(attachment.photo_library_id));
-      params.set("_", Date.now().toString());
-      const linksRes = await fetch(`${PHOTO_LIBRARY_LINKS_URL}?${params.toString()}`, { credentials: "include" });
-      const linksData = await linksRes.json().catch(() => ({}));
-      if (linksRes.ok && linksData?.ok) {
-        setExistingLinks(Array.isArray(linksData.items) ? linksData.items : []);
-      }
-    }
+    await refreshExistingLinks();
     const nextItems = await refreshItems(nextPaletteId);
     const current = nextItems.find((row) => String(row.id) === String(nextPaletteId)) || null;
     setEditStatus({ loading: false, error: "", success: "Saved." });
@@ -731,6 +730,7 @@ export default function SavedPaletteEditorModal({
           brand: editForm.brand,
           color_ids: members,
           nickname: editForm.nickname,
+          display_title: editForm.display_title,
           notes: editForm.notes,
           private_notes: editForm.private_notes,
           terry_fav: editForm.terry_fav ? 1 : 0,
@@ -755,6 +755,7 @@ export default function SavedPaletteEditorModal({
         const updatePayload = {
           palette_id: editForm.palette_id,
           nickname: editForm.nickname,
+          display_title: editForm.display_title,
           notes: editForm.notes,
           private_notes: editForm.private_notes,
           terry_fav: editForm.terry_fav ? 1 : 0,
@@ -873,6 +874,8 @@ export default function SavedPaletteEditorModal({
               </div>
             </div>
 
+            {photoStatus.success && <div className="asp-success">{photoStatus.success}</div>}
+            {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
             {editStatus.error && <div className="asp-error">{editStatus.error}</div>}
 
             <div className="asp-modal-actions">
@@ -1188,14 +1191,6 @@ export default function SavedPaletteEditorModal({
 
                       {attachPhotoType !== "before" ? (
                         <div className="asp-attach-grid">
-                          <label className="asp-modal-checkbox asp-attach-inline-check">
-                            <input
-                              type="checkbox"
-                              checked={attachShowInGallery}
-                              onChange={(e) => setAttachShowInGallery(e.target.checked)}
-                            />
-                            Show in gallery
-                          </label>
                           <label>
                             Gallery Trigger
                             <select
@@ -1276,6 +1271,7 @@ export default function SavedPaletteEditorModal({
                 </div>
               </div>
               {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
+              {photoStatus.success && <div className="asp-success">{photoStatus.success}</div>}
               {editPhotos.length > 0 ? (
                 <div className="asp-photo-grid">
                   {editPhotos.map((photo) => (
@@ -1440,8 +1436,13 @@ export default function SavedPaletteEditorModal({
           </div>
 
           <label>
-            Nickname
+            Nickname (for me)
             <input type="text" value={editForm.nickname} onChange={(e) => handleEditField("nickname", e.target.value)} />
+          </label>
+
+          <label>
+            Display Title (shown in viewer)
+            <input type="text" value={editForm.display_title} onChange={(e) => handleEditField("display_title", e.target.value)} />
           </label>
 
           <label>

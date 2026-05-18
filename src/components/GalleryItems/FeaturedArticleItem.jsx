@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { photoThumbUrl } from "@helpers/imageThumb";
 import "./FeaturedArticleItem.css";
 
 function parseJsonMaybe(text) {
@@ -36,9 +37,9 @@ const FeaturedArticleItem = ({ item = {} }) => {
         setError("");
         const params = new URLSearchParams();
         if (type) params.set("type", type);
-        params.set("_", String(Date.now()));
-        const url = `/api/v2/articles/featured.php?${params.toString()}`;
-        const res = await fetch(url, { signal: controller.signal });
+        const query = params.toString();
+        const url = `/api/v2/articles/featured.php${query ? `?${query}` : ""}`;
+        const res = await fetch(url, { signal: controller.signal, cache: "no-cache" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load featured article");
         if (!cancelled) setPayload(data.item || null);
@@ -60,6 +61,10 @@ const FeaturedArticleItem = ({ item = {} }) => {
   const hero = payload?.hero || null;
   const heroMobile = payload?.hero_mobile || null;
   const primaryHero = hero || heroMobile;
+  const primaryHeroId = Number(primaryHero?.photo_library_id || article?.hero_asset_id || article?.hero_mobile_asset_id || 0);
+  const mobileHeroId = Number(heroMobile?.photo_library_id || article?.hero_mobile_asset_id || 0);
+  const primaryHeroSrc = photoThumbUrl(primaryHeroId, 520, 72) || primaryHero?.rel_path;
+  const mobileHeroSrc = photoThumbUrl(mobileHeroId, 520, 72) || heroMobile?.rel_path;
 
   const withCacheBuster = (src, updatedAt) => {
     if (!src || !updatedAt) return src;
@@ -84,18 +89,22 @@ const FeaturedArticleItem = ({ item = {} }) => {
 
       {/* Full-bleed image */}
       <div className="featured-media">
-        {primaryHero?.rel_path ? (
+        {primaryHeroSrc ? (
           <picture>
-            {heroMobile?.rel_path ? (
+            {mobileHeroSrc ? (
               <source
                 media="(max-width: 640px)"
-                srcSet={withCacheBuster(heroMobile.rel_path, heroMobile.updated_at)}
+                srcSet={mobileHeroSrc}
               />
             ) : null}
             <img
-              src={withCacheBuster(primaryHero.rel_path, primaryHero.updated_at)}
-              alt={heroMobile?.alt_text || primaryHero.alt_text || article?.title || ""}
-              loading="lazy"
+              src={photoThumbUrl(primaryHeroId, 720, 72) || withCacheBuster(primaryHero?.rel_path, primaryHero?.updated_at)}
+              srcSet={`${primaryHeroSrc} 520w, ${photoThumbUrl(primaryHeroId, 720, 72) || primaryHeroSrc} 720w`}
+              sizes="(max-width: 640px) 90vw, 320px"
+              alt={heroMobile?.alt_text || primaryHero?.alt_text || article?.title || ""}
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
             />
           </picture>
         ) : (

@@ -20,7 +20,10 @@ class PlaylistItem
         public ?string $transition = null,
         public ?int $duration_ms = null,
         public ?string $title_mode = null,
-        public ?bool $exclude_from_thumbs = null
+        public ?bool $exclude_from_thumbs = null,
+        public ?bool $is_share_image = null,
+        public ?string $alt_tag = null,
+        public ?string $palette_title = null
     ) {
     }
 }

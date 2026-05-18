@@ -45,7 +45,54 @@ final class PlaylistPhotoLibrarySyncService
 
         $item['photo_library_id'] = $normalized['photo_library_id'] ?? null;
         $item['image_url'] = $normalized['image_url'] ?? ($item['image_url'] ?? '');
+
+        $attached = $this->resolveAttachedSavedPaletteForPhoto((int)($item['photo_library_id'] ?? 0));
+        if ($attached !== null) {
+            $item['palette_hash'] = $attached['palette_hash'];
+            $item['saved_palette_set_id'] = $attached['saved_palette_set_id'];
+        }
+
         return $item;
+    }
+
+    /**
+     * @return array{palette_hash:string,saved_palette_set_id:int}|null
+     */
+    private function resolveAttachedSavedPaletteForPhoto(int $photoLibraryId): ?array
+    {
+        if ($photoLibraryId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                spalette.palette_hash,
+                sps.id AS saved_palette_set_id
+             FROM saved_palette_set_photos spsp
+             JOIN saved_palette_sets sps
+               ON sps.id = spsp.saved_palette_set_id
+             JOIN saved_palettes spalette
+               ON spalette.id = sps.saved_palette_id
+             WHERE spsp.photo_library_id = :photo_library_id
+             ORDER BY sps.is_default DESC, spsp.id ASC
+             LIMIT 1"
+        );
+        $stmt->execute(['photo_library_id' => $photoLibraryId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+
+        $paletteHash = trim((string)($row['palette_hash'] ?? ''));
+        $setId = (int)($row['saved_palette_set_id'] ?? 0);
+        if ($paletteHash === '' || $setId <= 0) {
+            return null;
+        }
+
+        return [
+            'palette_hash' => $paletteHash,
+            'saved_palette_set_id' => $setId,
+        ];
     }
 
     public function backfill(?int $playlistId = null, bool $apply = false): array

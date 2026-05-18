@@ -117,6 +117,17 @@ export default function AdminPlaylistsPage() {
     return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
   }
 
+  function buildPlayerUrl(instance) {
+    if (!instance?.playlist_instance_id) return "";
+    const path = instance.player_url || `/playlist/${instance.playlist_instance_id}`;
+    const params = new URLSearchParams();
+    if (instance.audience && instance.audience !== "any") {
+      params.set("aud", instance.audience);
+    }
+    const qs = params.toString();
+    return `${window.location.origin}${path}${qs ? `?${qs}` : ""}`;
+  }
+
   function handleShareInstance(instance) {
     const url = buildShareUrl(instance);
     if (!url) return;
@@ -169,6 +180,17 @@ export default function AdminPlaylistsPage() {
         return aLabel.localeCompare(bLabel);
       });
   }, [activeId, instances]);
+
+  const viewInstance = useMemo(() => (
+    linkedInstances.find((instance) => Number(instance?.is_active || 0) === 1)
+    || linkedInstances[0]
+    || null
+  ), [linkedInstances]);
+
+  function handleViewPlaylist() {
+    if (!viewInstance) return;
+    window.open(buildPlayerUrl(viewInstance), "_blank", "noopener");
+  }
 
   return (
     <div className="admin-playlists">
@@ -241,7 +263,7 @@ export default function AdminPlaylistsPage() {
               </div>
 
               <div className="playlist-mobile-card__actions">
-                <button type="button" className="primary-btn" onClick={() => navigate(`/admin/playlists/${selectedPlaylist.playlist_id}`)}>
+                <button type="button" className="primary-btn" onClick={handleViewPlaylist} disabled={!viewInstance}>
                   View
                 </button>
                 <button type="button" onClick={() => navigate(`/admin/playlists/${selectedPlaylist.playlist_id}`)}>
@@ -269,7 +291,7 @@ export default function AdminPlaylistsPage() {
                           <button
                             type="button"
                             className="primary-btn"
-                            onClick={() => window.open(`${window.location.origin}/playlist/${instance.playlist_instance_id}${instance.audience && instance.audience !== "any" ? `?aud=${encodeURIComponent(instance.audience)}` : ""}`, "_blank", "noopener")}
+                            onClick={() => window.open(buildPlayerUrl(instance), "_blank", "noopener")}
                           >
                             Play
                           </button>
@@ -314,7 +336,7 @@ export default function AdminPlaylistsPage() {
               </div>
 
               <div className="playlist-mobile-card__actions">
-                <button type="button" className="primary-btn" onClick={() => navigate(`/admin/playlists/${selectedPlaylist.playlist_id}`)}>
+                <button type="button" className="primary-btn" onClick={handleViewPlaylist} disabled={!viewInstance}>
                   View
                 </button>
                 <button type="button" onClick={() => navigate(`/admin/playlists/${selectedPlaylist.playlist_id}`)}>
@@ -342,7 +364,7 @@ export default function AdminPlaylistsPage() {
                           <button
                             type="button"
                             className="primary-btn"
-                            onClick={() => window.open(`${window.location.origin}/playlist/${instance.playlist_instance_id}${instance.audience && instance.audience !== "any" ? `?aud=${encodeURIComponent(instance.audience)}` : ""}`, "_blank", "noopener")}
+                            onClick={() => window.open(buildPlayerUrl(instance), "_blank", "noopener")}
                           >
                             Play
                           </button>

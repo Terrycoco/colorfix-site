@@ -183,32 +183,77 @@ try {
       $placeholders = implode(',', array_fill(0, count($colorIds), '?'));
 
       $sqlSaved = "
-        SELECT m.color_id,
-               pl.photo_library_id,
-               pl.rel_path,
-               p.photo_type,
-               p.trigger_color_id,
-               p.order_index,
-               sp.id AS saved_palette_id,
-               sp.palette_hash,
-               sp.nickname,
-               sp.brand
-          FROM saved_palette_members m
-          JOIN saved_palette_photos p
-            ON p.saved_palette_id = m.saved_palette_id
-          JOIN saved_palettes sp
-            ON sp.id = m.saved_palette_id
-          JOIN photo_library pl
-            ON pl.source_type = 'saved_palette_photo'
-           AND pl.source_id = p.id
-         WHERE m.color_id IN ($placeholders)
-           AND pl.show_in_gallery = 1
-           AND pl.has_palette = 1
-         ORDER BY m.color_id ASC, p.order_index ASC, p.id ASC
+        SELECT merged.color_id,
+               merged.photo_library_id,
+               merged.rel_path,
+               merged.photo_type,
+               merged.trigger_color_id,
+               merged.order_index,
+               merged.saved_palette_id,
+               merged.palette_hash,
+               merged.nickname,
+               merged.brand
+          FROM (
+            SELECT m.color_id,
+                   COALESCE(p.photo_library_id, pl.photo_library_id) AS photo_library_id,
+                   COALESCE(NULLIF(pl.rel_path, ''), NULLIF(p.rel_path, '')) AS rel_path,
+                   p.photo_type,
+                   p.trigger_color_id,
+                   p.order_index,
+                   sp.id AS saved_palette_id,
+                   sp.palette_hash,
+                   sp.nickname,
+                   sp.brand
+              FROM saved_palette_members m
+              JOIN saved_palette_sets sps
+                ON sps.saved_palette_id = m.saved_palette_id
+              JOIN saved_palette_set_photos p
+                ON p.saved_palette_set_id = sps.id
+              JOIN saved_palettes sp
+                ON sp.id = m.saved_palette_id
+         LEFT JOIN photo_library pl
+                ON pl.photo_library_id = p.photo_library_id
+             WHERE m.color_id IN ($placeholders)
+               AND (
+                 (p.photo_library_id IS NOT NULL AND COALESCE(pl.show_in_gallery, 0) = 1 AND COALESCE(pl.has_palette, 0) = 1)
+                 OR (p.photo_library_id IS NULL AND p.show_in_gallery = 1)
+               )
+               AND p.trigger_mode <> 'none'
+
+            UNION ALL
+
+            SELECT m.color_id,
+                   pl.photo_library_id,
+                   pl.rel_path,
+                   p.photo_type,
+                   p.trigger_color_id,
+                   p.order_index,
+                   sp.id AS saved_palette_id,
+                   sp.palette_hash,
+                   sp.nickname,
+                   sp.brand
+              FROM saved_palette_members m
+              JOIN saved_palette_photos p
+                ON p.saved_palette_id = m.saved_palette_id
+              JOIN saved_palettes sp
+                ON sp.id = m.saved_palette_id
+              JOIN photo_library pl
+                ON pl.source_type = 'saved_palette_photo'
+               AND pl.source_id = p.id
+             WHERE m.color_id IN ($placeholders)
+               AND pl.show_in_gallery = 1
+               AND pl.has_palette = 1
+          ) AS merged
+         WHERE merged.rel_path IS NOT NULL
+           AND merged.rel_path <> ''
+         ORDER BY merged.color_id ASC, merged.order_index ASC
       ";
 
       $stmtSaved = $pdo->prepare($sqlSaved);
-      $stmtSaved->execute(array_keys($colorIds));
+      $stmtSaved->execute([
+        ...array_keys($colorIds),
+        ...array_keys($colorIds),
+      ]);
       $savedRows = $stmtSaved->fetchAll(PDO::FETCH_ASSOC);
 
       $sqlApplied = "
@@ -370,6 +415,7 @@ try {
               $withPictures[] = [
                 'id' => 'ps_' . $cid . '_' . ($photo['photo_id'] ?? uniqid()),
                 'item_type' => 'picture-swatch',
+                'photo_library_id' => (int)($photo['photo_id'] ?? 0),
                 'photo_url' => $photo['rel_path'],
                 'photo_type' => $photo['photo_type'] ?? null,
                 'palette_id' => $palette['id'] ?? null,
@@ -399,6 +445,7 @@ try {
               $withPictures[] = [
                 'id' => 'psz_' . $cid . '_' . ($zphoto['photo_id'] ?? uniqid()),
                 'item_type' => 'picture-swatch',
+                'photo_library_id' => (int)($zphoto['photo_id'] ?? 0),
                 'photo_url' => $zphoto['rel_path'],
                 'photo_type' => $zphoto['photo_type'] ?? null,
                 'palette_id' => $zpalette['id'] ?? null,

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\Repos;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 
 final class PdoUserEventRepository
@@ -22,21 +24,28 @@ final class PdoUserEventRepository
                 playlist_id,
                 playlist_instance_id,
                 cta_id,
+                source,
                 session_id,
                 referrer,
                 user_agent,
-                is_internal
+                is_internal,
+                created_at
             ) VALUES (
                 :event_type,
                 :playlist_id,
                 :playlist_instance_id,
                 :cta_id,
+                :source,
                 :session_id,
                 :referrer,
                 :user_agent,
-                :is_internal
+                :is_internal,
+                :created_at
             )
             SQL;
+
+        $createdAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))
+            ->format('Y-m-d H:i:s');
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
@@ -44,10 +53,12 @@ final class PdoUserEventRepository
             'playlist_id' => isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : null,
             'playlist_instance_id' => isset($payload['playlist_instance_id']) ? (int)$payload['playlist_instance_id'] : null,
             'cta_id' => isset($payload['cta_id']) ? (int)$payload['cta_id'] : null,
+            'source' => $this->normalizeNullableString($payload['source'] ?? null, 100),
             'session_id' => $this->normalizeNullableString($payload['session_id'] ?? null, 100),
             'referrer' => $this->normalizeNullableString($payload['referrer'] ?? null, 1000),
             'user_agent' => $this->normalizeNullableString($payload['user_agent'] ?? null, 1000),
             'is_internal' => !empty($payload['is_internal']) ? 1 : 0,
+            'created_at' => $createdAt,
         ]);
 
         return (int)$this->pdo->lastInsertId();
@@ -123,6 +134,22 @@ final class PdoUserEventRepository
             $where[] = 'COALESCE(ue.is_internal, 0) = 0';
         }
 
+        $createdFrom = trim((string)($filters['created_from'] ?? ''));
+        if ($createdFrom !== '') {
+            $where[] = 'ue.created_at >= :created_from';
+            $params['created_from'] = $createdFrom;
+        }
+
+        $source = trim((string)($filters['source'] ?? ''));
+        if ($source !== '' && $source !== 'all') {
+            if ($source === 'direct') {
+                $where[] = '(ue.source IS NULL OR ue.source = \'\')';
+            } else {
+                $where[] = 'ue.source = :source';
+                $params['source'] = $source;
+            }
+        }
+
         $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
         $sql = <<<SQL
@@ -133,6 +160,7 @@ final class PdoUserEventRepository
                 pi.display_title,
                 COALESCE(pi.audience, 'any') AS audience,
                 p.title AS playlist_title,
+                COALESCE(NULLIF(ue.source, ''), 'direct') AS source,
                 SUM(CASE WHEN ue.event_type = 'playlist_open' THEN 1 ELSE 0 END) AS playlist_open_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_visible' THEN 1 ELSE 0 END) AS hire_terry_cta_visible_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_click' THEN 1 ELSE 0 END) AS hire_terry_cta_click_count,
@@ -150,13 +178,14 @@ final class PdoUserEventRepository
                 pi.instance_name,
                 pi.display_title,
                 pi.audience,
-                p.title
+                p.title,
+                COALESCE(NULLIF(ue.source, ''), 'direct')
             HAVING
                 playlist_open_count > 0
                 OR hire_terry_cta_visible_count > 0
                 OR hire_terry_cta_click_count > 0
                 OR watch_next_click_count > 0
-            ORDER BY last_event_at DESC, pi.playlist_instance_id DESC
+            ORDER BY last_event_at DESC, pi.playlist_instance_id DESC, source ASC
             SQL;
 
         $stmt = $this->pdo->prepare($sql);
@@ -189,6 +218,22 @@ final class PdoUserEventRepository
         $includeInternal = !empty($filters['include_internal']);
         if (!$includeInternal) {
             $where[] = 'COALESCE(ue.is_internal, 0) = 0';
+        }
+
+        $createdFrom = trim((string)($filters['created_from'] ?? ''));
+        if ($createdFrom !== '') {
+            $where[] = 'ue.created_at >= :created_from';
+            $params['created_from'] = $createdFrom;
+        }
+
+        $source = trim((string)($filters['source'] ?? ''));
+        if ($source !== '' && $source !== 'all') {
+            if ($source === 'direct') {
+                $where[] = '(ue.source IS NULL OR ue.source = \'\')';
+            } else {
+                $where[] = 'ue.source = :source';
+                $params['source'] = $source;
+            }
         }
 
         $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';

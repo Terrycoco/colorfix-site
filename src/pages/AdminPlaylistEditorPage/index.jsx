@@ -33,6 +33,7 @@ const emptyPlaylist = {
 };
 
 const emptyItem = {
+  _clientKey: "",
   playlist_item_id: null,
   ap_id: "",
   palette_hash: "",
@@ -50,6 +51,7 @@ const emptyItem = {
   transition: "",
   duration_ms: "",
   exclude_from_thumbs: false,
+  is_share_image: false,
   is_active: true,
 };
 
@@ -91,6 +93,11 @@ export default function AdminPlaylistEditorPage() {
   const [photoThumbs, setPhotoThumbs] = useState({});
   const [photoInfo, setPhotoInfo] = useState({});
   const [previewPhoto, setPreviewPhoto] = useState(null);
+
+  const makeClientItemKey = useCallback(
+    () => `pli-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    []
+  );
 
   useEffect(() => {
     fetchPlaylistTypes();
@@ -197,6 +204,7 @@ export default function AdminPlaylistEditorPage() {
         (data.items || []).map((item) => ({
           ...emptyItem,
           ...item,
+          _clientKey: item.playlist_item_id ? `existing-${item.playlist_item_id}` : makeClientItemKey(),
           playlist_item_id: item.playlist_item_id ?? null,
           ap_id: item.ap_id ?? "",
           palette_hash: item.palette_hash ?? "",
@@ -215,6 +223,7 @@ export default function AdminPlaylistEditorPage() {
           transition: item.transition ?? "",
           duration_ms: item.duration_ms ?? "",
           exclude_from_thumbs: Boolean(item.exclude_from_thumbs),
+          is_share_image: Boolean(item.is_share_image),
           is_active: item.is_active === null ? true : Boolean(item.is_active),
         }))
       );
@@ -223,7 +232,7 @@ export default function AdminPlaylistEditorPage() {
     } finally {
       setLoading(false);
     }
-  }, [playlistTypes]);
+  }, [playlistTypes, makeClientItemKey]);
 
   useEffect(() => {
     if (!playlistId) {
@@ -306,8 +315,9 @@ export default function AdminPlaylistEditorPage() {
   }, [playlist.type, playlistTypes]);
 
   const handleTypeSelect = (value) => {
-    if (value === "__custom__") {
-      updatePlaylist("type", customType);
+    if (value === "") {
+      setCustomType("");
+      updatePlaylist("type", "");
       return;
     }
     setCustomType("");
@@ -332,20 +342,20 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
-  function applyAttachedPaletteFromPhoto(index, photoLibraryId) {
-    const info = photoInfo[String(photoLibraryId || "").trim()];
+  function applyAttachedPaletteFromPhoto(index, photoLibraryId, attachedInfo = null) {
+    const info = attachedInfo || photoInfo[String(photoLibraryId || "").trim()];
     const attachedPaletteId = Number(info?.attachedSavedPaletteId || 0);
-    if (!attachedPaletteId) return;
-    const match = savedOptions.find((option) => Number(option.id || 0) === attachedPaletteId);
-    if (!match) return;
+    const match = attachedPaletteId
+      ? savedOptions.find((option) => Number(option.id || 0) === attachedPaletteId)
+      : null;
     setItems((prev) =>
       prev.map((item, idx) => (
         idx === index
           ? {
               ...item,
               ap_id: "",
-              palette_hash: match.palette_hash || "",
-              saved_palette_set_id: info?.attachedSavedPaletteSetId ? String(info.attachedSavedPaletteSetId) : "",
+              palette_hash: match?.palette_hash || "",
+              saved_palette_set_id: match && info?.attachedSavedPaletteSetId ? String(info.attachedSavedPaletteSetId) : "",
             }
           : item
       ))
@@ -368,7 +378,7 @@ export default function AdminPlaylistEditorPage() {
 
   function addItem(type = "non-palette") {
     setItems((prev) => {
-      const nextItem = { ...emptyItem, item_type: type };
+      const nextItem = { ...emptyItem, _clientKey: makeClientItemKey(), item_type: type };
       if (type === "intro") {
         return [nextItem, ...prev];
       }
@@ -397,6 +407,16 @@ export default function AdminPlaylistEditorPage() {
     return parsePhotoRef(item?.image_url || "").photoId || "";
   };
 
+  const hasItemPhoto = (item) => {
+    return Boolean(String(getPhotoLibraryId(item) || "").trim() || String(item?.image_url || "").trim());
+  };
+
+  const resolvedShareItemIndex = useMemo(() => {
+    const explicitIndex = items.findIndex((item) => Boolean(item?.is_share_image) && hasItemPhoto(item));
+    if (explicitIndex >= 0) return explicitIndex;
+    return items.findIndex((item) => hasItemPhoto(item));
+  }, [items]);
+
   const getItemPhotoThumb = (item) => {
     const photoId = String(getPhotoLibraryId(item) || "").trim();
     if (photoId && photoThumbs[photoId]) return photoThumbs[photoId];
@@ -414,9 +434,21 @@ export default function AdminPlaylistEditorPage() {
               ...item,
               photo_library_id: "",
               image_url: "",
+              is_share_image: false,
             }
           : item
       ))
+    );
+    setSaveStatus("");
+    setSaveError("");
+  }
+
+  function setShareImageIndex(index) {
+    setItems((prev) =>
+      prev.map((item, idx) => ({
+        ...item,
+        is_share_image: idx === index && hasItemPhoto(item),
+      }))
     );
     setSaveStatus("");
     setSaveError("");
@@ -465,6 +497,7 @@ export default function AdminPlaylistEditorPage() {
           palette_hash: item.palette_hash === "" ? null : item.palette_hash,
           saved_palette_set_id: item.saved_palette_set_id === "" ? null : item.saved_palette_set_id,
           duration_ms: item.duration_ms === "" ? null : item.duration_ms,
+          is_share_image: Boolean(item.is_share_image),
         })),
       };
       const itemsRes = await fetch(SAVE_ITEMS_URL, {
@@ -565,10 +598,10 @@ export default function AdminPlaylistEditorPage() {
         <label>
           Type
           <select
-            value={isCustomType || !playlist.type ? "__custom__" : playlist.type}
+            value={isCustomType || !playlist.type ? "" : playlist.type}
             onChange={(e) => handleTypeSelect(e.target.value)}
           >
-            <option value="__custom__">Custom…</option>
+            <option value="">Select a type</option>
             {playlistTypes.map((type) => (
               <option key={type} value={type}>
                 {type}
@@ -626,7 +659,7 @@ export default function AdminPlaylistEditorPage() {
 
       <div className="items-list">
         {items.map((item, index) => (
-          <div className="item-card" key={`${item.playlist_item_id || "new"}-${index}`}>
+          <div className="item-card" key={item._clientKey || `fallback-${item.playlist_item_id || index}`}>
             <div className="item-row">
               <div className="item-cell item-order">#{index + 1}</div>
               <label className="item-cell">
@@ -726,6 +759,21 @@ export default function AdminPlaylistEditorPage() {
                   >
                     Remove Photo
                   </button>
+                </div>
+                <div className={`item-share-toggle ${resolvedShareItemIndex === index ? "is-active" : ""}${!hasItemPhoto(item) ? " is-disabled" : ""}`}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="playlist-share-image"
+                      checked={resolvedShareItemIndex === index}
+                      disabled={!hasItemPhoto(item)}
+                      onChange={() => setShareImageIndex(index)}
+                    />
+                    <span className="item-share-toggle__icon" aria-hidden="true">👓</span>
+                    <span className="item-share-toggle__label">
+                      {item.is_share_image ? "Manual peek photo" : resolvedShareItemIndex === index ? "Default peek photo" : "Use as peek photo"}
+                    </span>
+                  </label>
                 </div>
               </div>
               <label className="item-cell item-transition">
@@ -855,7 +903,14 @@ export default function AdminPlaylistEditorPage() {
           const pid = String(picked.photo_library_id);
           updateItem(photoPickerIndex, "photo_library_id", pid);
           updateItem(photoPickerIndex, "image_url", makePhotoRef(pid, picked.image_url || ""));
-          applyAttachedPaletteFromPhoto(photoPickerIndex, pid);
+          const attachedInfo = {
+            attachedSavedPaletteId: picked.attached_saved_palette_id ?? null,
+            attachedSavedPaletteLabel: picked.attached_saved_palette_label || "",
+            attachedSavedPaletteSetId: picked.attached_saved_palette_set_id ?? null,
+            attachedSavedPaletteSetLabel: picked.attached_saved_palette_set_label || "",
+            attachedSavedPalettePhotoType: picked.attached_saved_palette_photo_type || "",
+          };
+          applyAttachedPaletteFromPhoto(photoPickerIndex, pid, attachedInfo);
           setPhotoPickerIndex(null);
         }}
       />

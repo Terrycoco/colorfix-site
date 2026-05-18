@@ -1,0 +1,87 @@
+.lookup-type-manager {
+  display: grid;
+  gap: 16px;
+}
+
+.lookup-type-manager__section {
+  display: grid;
+  gap: 10px;
+}
+
+.lookup-type-manager__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #211f1c;
+}
+
+.lookup-type-manager__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lookup-type-manager__chip {
+  display: grid;
+  gap: 2px;
+  min-width: 120px;
+  border: 1px solid #e2d8cb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #faf6ef;
+}
+
+.lookup-type-manager__chip strong {
+  font-size: 13px;
+  color: #211f1c;
+}
+
+.lookup-type-manager__chip span,
+.lookup-type-manager__status,
+.lookup-type-manager__help {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #716c64;
+}
+
+.lookup-type-manager__form label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2a2723;
+}
+
+.lookup-type-manager__form input {
+  width: 100%;
+  border: 1px solid #d9d5ce;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.lookup-type-manager__error {
+  border: 1px solid #f1b4b4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff5f5;
+  color: #aa2b2b;
+  font-size: 13px;
+}
+
+.lookup-type-manager__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lookup-type-manager__primary {
+  border: 1px solid #ff8c00;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #ff8c00;
+  color: #fff;
+}
+

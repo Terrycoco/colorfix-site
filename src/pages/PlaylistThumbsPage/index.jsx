@@ -98,11 +98,17 @@ export default function PlaylistThumbsPage() {
         : `applied:${apId}`;
       if (seen.has(key)) continue;
       seen.add(key);
+      const paletteTitle =
+        item?.palette_title ||
+        item?.saved_palette_title ||
+        item?.palette_name ||
+        item?.title ||
+        (paletteHash ? "Saved Palette" : `Palette ${apId}`);
       list.push({
         ap_id: apId,
         palette_hash: paletteHash,
         saved_palette_set_id: savedPaletteSetId,
-        title: formatTitle(item?.title || (paletteHash ? "Saved Palette" : `Palette ${apId}`)),
+        title: formatTitle(paletteTitle),
         image_url: item?.image_url || "",
         is_liked: apId ? likedSet.has(String(apId)) : false,
       });

@@ -25,12 +25,10 @@ try {
         return [
             'id' => (int)$row['id'],
             'name' => (string)($row['name'] ?? ''),
+            'first_name' => isset($row['first_name']) ? (string)$row['first_name'] : '',
+            'last_name' => isset($row['last_name']) ? (string)$row['last_name'] : '',
             'email' => (string)($row['email'] ?? ''),
             'phone' => isset($row['phone']) ? (string)$row['phone'] : '',
-            'notes' => isset($row['notes']) ? (string)$row['notes'] : '',
-            'photo_count' => (int)($row['photo_count'] ?? 0),
-            'applied_palette_count' => (int)($row['applied_palette_count'] ?? 0),
-            'share_count' => (int)($row['share_count'] ?? 0),
         ];
     }, $rows);
 

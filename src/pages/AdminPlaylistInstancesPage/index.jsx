@@ -17,6 +17,7 @@ const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/playlist-instances/send-email.php
 const emptyInstance = {
   playlist_instance_id: null,
   playlist_id: "",
+  slug: "",
   instance_name: "",
   display_title: "",
   display_subtitle: "",
@@ -47,6 +48,33 @@ function coerceBoolean(value) {
   return Boolean(value);
 }
 
+function slugify(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 191);
+}
+
+function buildUniqueSlug(base, items, currentId) {
+  const fallback = currentId ? `playlist-instance-${currentId}` : "playlist-instance";
+  const root = slugify(base) || fallback;
+  const used = new Set(
+    (items || [])
+      .filter((item) => Number(item.playlist_instance_id || 0) !== Number(currentId || 0))
+      .map((item) => slugify(item.slug || item.playlist_slug || ""))
+      .filter(Boolean)
+  );
+  let candidate = root;
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${root}-${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
 export default function AdminPlaylistInstancesPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -59,6 +87,7 @@ export default function AdminPlaylistInstancesPage() {
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState(null);
   const [form, setForm] = useState(emptyInstance);
+  const [slugLocked, setSlugLocked] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
@@ -138,7 +167,7 @@ export default function AdminPlaylistInstancesPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlists");
       setPlaylists(data.items || []);
-    } catch (err) {
+    } catch {
       // playlist list is optional for now
     }
   }
@@ -201,7 +230,7 @@ export default function AdminPlaylistInstancesPage() {
       let data;
       try {
         data = JSON.parse(text);
-      } catch (parseError) {
+      } catch {
         throw new Error(`Unexpected response: ${text.slice(0, 200)}`);
       }
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load instances");
@@ -253,6 +282,7 @@ export default function AdminPlaylistInstancesPage() {
         ...next,
         cta_overrides: parseOverrides(data.item?.cta_overrides),
       });
+      setSlugLocked(true);
       setSaveStatus("");
       setSaveError("");
     } catch (err) {
@@ -305,6 +335,7 @@ export default function AdminPlaylistInstancesPage() {
     } catch {
       setForm(emptyInstance);
     }
+    setSlugLocked(false);
     setSaveStatus("");
     setSaveError("");
   }
@@ -325,6 +356,7 @@ export default function AdminPlaylistInstancesPage() {
       created_from_instance: sourceId,
       cta_overrides: JSON.parse(JSON.stringify(form.cta_overrides || {})),
     });
+    setSlugLocked(false);
     setSaveStatus(`Unsaved duplicate from Instance #${sourceId}`);
     setSaveError("");
   }
@@ -337,16 +369,23 @@ export default function AdminPlaylistInstancesPage() {
     return `${SHARE_FOLDER}/playlist.php?${params.toString()}`;
   }
 
-  function openLiveUrl(instance) {
+  function buildPlayerUrl(instance = null) {
     const id = instance?.playlist_instance_id || form.playlist_instance_id;
-    if (!id) return;
+    if (!id) return "";
+    const slug = String(instance?.slug || instance?.playlist_slug || form.slug || "").trim();
+    const pathId = slug || id;
     const audience = instance?.audience || form.audience || "";
     const demoEnabled = Boolean(instance?.demo_enabled ?? form.demo_enabled);
     const params = new URLSearchParams();
     if (audience && audience !== "any") params.set("aud", audience);
     if (demoEnabled) params.set("demo", "1");
     const qs = params.toString();
-    const url = `${window.location.origin}/playlist/${id}${qs ? `?${qs}` : ""}`;
+    return `${window.location.origin}/playlist/${pathId}${qs ? `?${qs}` : ""}`;
+  }
+
+  function openLiveUrl(instance) {
+    const url = buildPlayerUrl(instance);
+    if (!url) return;
     window.open(url, "_blank", "noopener");
   }
 
@@ -384,7 +423,7 @@ export default function AdminPlaylistInstancesPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load templates");
       setEmailTemplates(data.templates || []);
-    } catch (err) {
+    } catch {
       setEmailTemplates([]);
     }
   }
@@ -445,6 +484,26 @@ export default function AdminPlaylistInstancesPage() {
     });
     setSendFormat(htmlBody ? "html" : "text");
   }
+
+  function generateSlug() {
+    const base = form.display_title || form.instance_name || form.intro_title || form.playlist_instance_id || form.playlist_id;
+    updateForm("slug", buildUniqueSlug(base, items, form.playlist_instance_id));
+  }
+
+  const slugConflict = useMemo(() => {
+    const currentSlug = slugify(form.slug || "");
+    if (!currentSlug) return null;
+    return items.find((item) =>
+      Number(item.playlist_instance_id || 0) !== Number(form.playlist_instance_id || 0)
+        && slugify(item.slug || item.playlist_slug || "") === currentSlug
+    ) || null;
+  }, [form.playlist_instance_id, form.slug, items]);
+
+  const slugPreview = useMemo(() => {
+    if (form.slug) return "";
+    const base = form.display_title || form.instance_name || form.intro_title || form.playlist_instance_id || form.playlist_id;
+    return buildUniqueSlug(base, items, form.playlist_instance_id);
+  }, [form.display_title, form.instance_name, form.intro_title, form.playlist_id, form.playlist_instance_id, form.slug, items]);
 
   function closeEmailModal() {
     setEmailModal((prev) => ({ ...prev, open: false }));
@@ -523,6 +582,7 @@ export default function AdminPlaylistInstancesPage() {
       const payload = {
         ...form,
         playlist_id: Number(form.playlist_id) || 0,
+        allow_slug_edit: !slugLocked,
         demo_enabled: Boolean(form.demo_enabled),
         cta_overrides: form.cta_overrides || {},
         created_from_instance: form.created_from_instance === "" ? null : Number(form.created_from_instance),
@@ -550,7 +610,8 @@ export default function AdminPlaylistInstancesPage() {
 
       if (!hasSwitchedInstances) {
         setActiveId(newId);
-        setForm((prev) => ({ ...prev, playlist_instance_id: newId }));
+        setForm((prev) => ({ ...prev, playlist_instance_id: newId, slug: data.slug || prev.slug || "" }));
+        setSlugLocked(true);
       }
       await fetchInstances();
       if (newId && !hasSwitchedInstances) {
@@ -746,6 +807,7 @@ export default function AdminPlaylistInstancesPage() {
               <div className="row-title">
                 #{item.playlist_instance_id} {item.instance_name || "Untitled"}
               </div>
+              {item.slug ? <div className="row-audience">/{item.slug}</div> : null}
               <div className="row-audience">
                 {audienceLabelMap[item.audience] || item.audience || "Any"}
               </div>
@@ -932,6 +994,42 @@ export default function AdminPlaylistInstancesPage() {
                 value={form.instance_name}
                 onChange={(e) => updateForm("instance_name", e.target.value)}
               />
+            </label>
+
+            <label>
+              <span className="slug-label-row">
+                <span>Public slug</span>
+                {form.playlist_instance_id ? (
+                  <button
+                    type="button"
+                    className={`slug-lock-btn${slugLocked ? " is-locked" : ""}`}
+                    onClick={() => setSlugLocked((prev) => !prev)}
+                  >
+                    {slugLocked ? "Unlock" : "Lock"}
+                  </button>
+                ) : null}
+              </span>
+              <div className="slug-field">
+                <input
+                  type="text"
+                  value={form.slug || ""}
+                  disabled={Boolean(form.playlist_instance_id) && slugLocked}
+                  onChange={(e) => updateForm("slug", e.target.value)}
+                  placeholder={slugPreview || "where-does-the-eye-go"}
+                />
+                <button type="button" onClick={generateSlug} disabled={Boolean(form.playlist_instance_id) && slugLocked}>
+                  Generate
+                </button>
+              </div>
+              {form.playlist_instance_id && slugLocked ? (
+                <span className="field-hint">Locked so you do not kill a sent link. Unlock only if you mean to change it.</span>
+              ) : slugConflict ? (
+                <span className="field-hint error">
+                  Already used by instance #{slugConflict.playlist_instance_id}; save will use the next available suffix.
+                </span>
+              ) : slugPreview ? (
+                <span className="field-hint">Blank saves as /playlist/{slugPreview}</span>
+              ) : null}
             </label>
 
             <label>

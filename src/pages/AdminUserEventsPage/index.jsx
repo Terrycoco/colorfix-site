@@ -4,6 +4,7 @@ import {
   DEFAULT_AUDIENCE_FILTER_OPTIONS,
   fetchAudienceOptions,
 } from "@helpers/audienceOptions";
+import ModalDialog from "@components/ModalDialog";
 import "./admin-user-events.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/user-events/list.php`;
@@ -19,7 +20,7 @@ function formatEventTime(value, isoValue) {
   const raw = String(value || "").trim();
   if (!iso && !raw) return "—";
 
-  const parsed = iso ? new Date(iso) : new Date(raw);
+  const parsed = iso ? new Date(iso) : new Date(raw.replace(" ", "T"));
   if (Number.isNaN(parsed.getTime())) {
     return raw || iso;
   }
@@ -30,14 +31,24 @@ function formatEventTime(value, isoValue) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
+}
+
+function formatDateTimeLocalValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 export default function AdminUserEventsPage() {
   const [query, setQuery] = useState("");
   const [audience, setAudience] = useState("all");
+  const [source, setSource] = useState("all");
   const [audienceOptions, setAudienceOptions] = useState(DEFAULT_AUDIENCE_FILTER_OPTIONS);
-  const [includeInternal, setIncludeInternal] = useState(false);
   const [items, setItems] = useState([]);
   const [totals, setTotals] = useState({
     playlist_open_count: 0,
@@ -45,6 +56,13 @@ export default function AdminUserEventsPage() {
     hire_terry_cta_click_count: 0,
     watch_next_click_count: 0,
   });
+  const [baseline, setBaseline] = useState({
+    cutoff_at: "",
+    cutoff_at_iso: "",
+  });
+  const [baselineModalOpen, setBaselineModalOpen] = useState(false);
+  const [baselineInput, setBaselineInput] = useState(formatDateTimeLocalValue());
+  const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [clearing, setClearing] = useState(false);
@@ -79,7 +97,7 @@ export default function AdminUserEventsPage() {
         const params = new URLSearchParams();
         if (query.trim()) params.set("q", query.trim());
         if (audience) params.set("audience", audience);
-        if (includeInternal) params.set("include_internal", "1");
+        if (source && source !== "all") params.set("source", source);
         params.set("_", String(Date.now()));
 
         const res = await fetch(`${LIST_URL}?${params.toString()}`, {
@@ -96,6 +114,10 @@ export default function AdminUserEventsPage() {
           hire_terry_cta_click_count: Number(data?.totals?.hire_terry_cta_click_count || 0),
           watch_next_click_count: Number(data?.totals?.watch_next_click_count || 0),
         });
+        setBaseline({
+          cutoff_at: String(data?.baseline?.cutoff_at || ""),
+          cutoff_at_iso: String(data?.baseline?.cutoff_at_iso || ""),
+        });
       } catch (err) {
         if (ignore || err?.name === "AbortError") return;
         setError(err?.message || "Failed to load event summary");
@@ -110,7 +132,7 @@ export default function AdminUserEventsPage() {
       ignore = true;
       controller.abort();
     };
-  }, [query, audience, includeInternal]);
+  }, [query, audience, source, reloadKey]);
 
   const totalVisibleRate = useMemo(() => {
     if (!totals.playlist_open_count) return 0;
@@ -127,12 +149,7 @@ export default function AdminUserEventsPage() {
     return (totals.watch_next_click_count / totals.playlist_open_count) * 100;
   }, [totals]);
 
-  async function handleClearEvents() {
-    const ok = window.confirm(
-      "Clear all tracked view-count data? This deletes playlist opens, CTA events, and Watch Next clicks."
-    );
-    if (!ok) return;
-
+  async function handleSetBaseline() {
     setClearing(true);
     setError("");
     try {
@@ -140,17 +157,19 @@ export default function AdminUserEventsPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: "CLEAR_USER_EVENTS" }),
+        body: JSON.stringify({
+          confirm: "CLEAR_USER_EVENTS",
+          cutoff_at: baselineInput ? baselineInput.replace("T", " ") + ":00" : "",
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to clear events");
-      setItems([]);
-      setTotals({
-        playlist_open_count: 0,
-        hire_terry_cta_visible_count: 0,
-        hire_terry_cta_click_count: 0,
-        watch_next_click_count: 0,
+      setBaseline({
+        cutoff_at: String(data?.baseline?.cutoff_at || ""),
+        cutoff_at_iso: String(data?.baseline?.cutoff_at_iso || ""),
       });
+      setBaselineModalOpen(false);
+      setReloadKey((prev) => prev + 1);
     } catch (err) {
       setError(err?.message || "Failed to clear events");
     } finally {
@@ -163,14 +182,24 @@ export default function AdminUserEventsPage() {
       <aside className="admin-user-events__sidebar">
         <div className="admin-user-events__sidebar-header">
           <h1>View Counts</h1>
-          <p>Playlist opens and Hire Terry funnel events.</p>
+          <div className="admin-user-events__baseline-summary">
+            <span className="admin-user-events__baseline-summary-label">Baseline</span>
+            <span className="admin-user-events__baseline-summary-value">
+              {baseline.cutoff_at || baseline.cutoff_at_iso
+                ? formatEventTime(baseline.cutoff_at, baseline.cutoff_at_iso)
+                : "All time"}
+            </span>
+          </div>
           <button
             type="button"
-            className="admin-user-events__danger"
-            onClick={handleClearEvents}
+            className="admin-user-events__danger admin-user-events__danger--compact"
+            onClick={() => {
+              setBaselineInput(formatDateTimeLocalValue());
+              setBaselineModalOpen(true);
+            }}
             disabled={clearing}
           >
-            {clearing ? "Clearing..." : "Clear Tracking Data"}
+            {clearing ? "Setting Baseline..." : "Set New Baseline"}
           </button>
         </div>
 
@@ -188,14 +217,14 @@ export default function AdminUserEventsPage() {
               </option>
             ))}
           </select>
-          <label className="admin-user-events__checkbox">
-            <input
-              type="checkbox"
-              checked={includeInternal}
-              onChange={(e) => setIncludeInternal(e.target.checked)}
-            />
-            Include my admin views
-          </label>
+          <select value={source} onChange={(e) => setSource(e.target.value)}>
+            <option value="all">All sources</option>
+            <option value="email">Email</option>
+            <option value="share">Share</option>
+            <option value="qr">QR</option>
+            <option value="watch_next">Watch Next</option>
+            <option value="direct">Direct / none</option>
+          </select>
         </div>
 
         <div className="admin-user-events__totals">
@@ -228,9 +257,15 @@ export default function AdminUserEventsPage() {
           <div className="admin-user-events__panel-header">
             <h2>Playlist Funnel</h2>
             <div className="admin-user-events__panel-subtitle">
-              {loading ? "Loading..." : `${items.length} tracked playlist instance${items.length === 1 ? "" : "s"}`}
+              {loading ? "Loading..." : `${items.length} tracked source row${items.length === 1 ? "" : "s"}`}
             </div>
           </div>
+
+          {baseline.cutoff_at || baseline.cutoff_at_iso ? (
+            <div className="admin-user-events__panel-subtitle">
+              Tracking since {formatEventTime(baseline.cutoff_at, baseline.cutoff_at_iso)}
+            </div>
+          ) : null}
 
           {loading ? (
             <div className="admin-user-events__empty">Loading view counts…</div>
@@ -244,6 +279,7 @@ export default function AdminUserEventsPage() {
                     <th>Instance</th>
                     <th>Playlist</th>
                     <th>Audience</th>
+                    <th>Source</th>
                     <th>Opens</th>
                     <th>Hire Seen</th>
                     <th>Hire Clicks</th>
@@ -256,7 +292,7 @@ export default function AdminUserEventsPage() {
                 </thead>
                 <tbody>
                   {items.map((item) => (
-                    <tr key={item.playlist_instance_id}>
+                    <tr key={`${item.playlist_instance_id}:${item.source || "direct"}`}>
                       <td>
                         <span className="admin-user-events__instance-link">
                           #{item.playlist_instance_id} {item.instance_name || item.display_title || "Untitled instance"}
@@ -269,6 +305,7 @@ export default function AdminUserEventsPage() {
                         <div>#{item.playlist_id} {item.playlist_title || "Untitled playlist"}</div>
                       </td>
                       <td>{item.audience || "any"}</td>
+                      <td>{item.source || "direct"}</td>
                       <td>{item.playlist_open_count}</td>
                       <td>{item.hire_terry_cta_visible_count}</td>
                       <td>{item.hire_terry_cta_click_count}</td>
@@ -285,6 +322,52 @@ export default function AdminUserEventsPage() {
           )}
         </section>
       </main>
+
+      <ModalDialog
+        open={baselineModalOpen}
+        onClose={() => setBaselineModalOpen(false)}
+        title="Set New Baseline"
+        subtitle="Choose when tracking should start. Existing events will be preserved."
+        width="520px"
+      >
+        <div className="admin-user-events__baseline-modal">
+          <label className="admin-user-events__baseline-label">
+            Start counting from
+            <input
+              type="datetime-local"
+              value={baselineInput}
+              onChange={(e) => setBaselineInput(e.target.value)}
+            />
+          </label>
+          <div className="admin-user-events__baseline-help">
+            Leave this blank to show all-time view counts.
+          </div>
+          <div className="admin-user-events__baseline-actions">
+            <button
+              type="button"
+              className="admin-user-events__secondary"
+              onClick={() => setBaselineInput("")}
+            >
+              Clear Date
+            </button>
+            <button
+              type="button"
+              className="admin-user-events__secondary"
+              onClick={() => setBaselineInput(formatDateTimeLocalValue())}
+            >
+              Use Now
+            </button>
+            <button
+              type="button"
+              className="admin-user-events__danger"
+              onClick={handleSetBaseline}
+              disabled={clearing}
+            >
+              {clearing ? "Saving..." : "OK"}
+            </button>
+          </div>
+        </div>
+      </ModalDialog>
     </div>
   );
 }

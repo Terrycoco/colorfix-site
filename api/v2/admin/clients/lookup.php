@@ -32,6 +32,8 @@ try {
         'client' => [
             'id' => (int)$client['id'],
             'name' => $client['name'] ?? '',
+            'first_name' => $client['first_name'] ?? '',
+            'last_name' => $client['last_name'] ?? '',
             'email' => $client['email'] ?? '',
             'phone' => $client['phone'] ?? '',
         ],

@@ -1,221 +1,482 @@
-import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import MobileLayout from '@layout/MobileLayout';
+import {API_FOLDER} from '@helpers/config';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {useParams} from 'react-router-dom';
+import {useEffect, useState} from 'react';
 import { useAppState } from '@context/AppStateContext';
-import SwatchCardMini from '@components/SwatchCard/SwatchCardMini';
-import SwatchCardTiny from '@components/SwatchCard/SwatchCardTiny';
-import SwatchCard from '@components/SwatchCard';
-import SwatchGallery from '@components/SwatchGallery';
-import StickyToolbar from '@layout/StickyToolbar';
-import Column from '@layout/Column';
-import ResponsiveRow from '@layout/ResponsiveRow';
-import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
 import fetchColorDetail from '@data/fetchColorDetail';
-import fetchSearchResults from '@data/fetchSearchResults';
+import fetchColorTriggerPhotos from '@data/fetchColorTriggerPhotos';
+import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
+import {getColorUrl} from '@helpers/colorUrlHelper';
+import {photoThumbUrl} from '@helpers/imageThumb';
+import './detailpage.css';
+import {PaletteToggleIcon} from '@components/Icons/PaletteIcons';
+import TopSpacer from '@layout/TopSpacer';
 
+function formatChip(chipNum) {
+  if (!chipNum) return '';
+  // if it contains anything besides digits
+  if (!/^\d+$/.test(chipNum)) {
+    return chipNum + ' Brochure';
+  }
+  return chipNum;
+}
 
 
 
 export default function ColorDetailPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [comparisonColor, setComparisonColor] = useState();
- const [schemeSearchInProgress, setSchemeSearchInProgress] = useState(false);
-  const { colors,  currentColorDetail, setCurrentColorDetail, colorSchemes } = useAppState();
-  const [selectedScheme, setSelectedScheme] = useState(colorSchemes?.[0] || null);
-  const [schemeMatches, setSchemeMatches] = useState({});
-  const [comparisonColors, setComparisonColors] = useState([]);
+   const {id} = useParams();
+   const [ogImage, setOgImage] = useState(null);
+   const [triggerPhotos, setTriggerPhotos] = useState([]);
+   const [triggerPhotosLoading, setTriggerPhotosLoading] = useState(false);
+   const navigate = useNavigate();
+   const location = useLocation();
+   const {palette, currentColorDetail, setCurrentColorDetail, setShowBack, recentSwatches, setRecentSwatches, addToPalette, removeFromPalette} = useAppState();
+  const inPalette = palette?.some((c) => c.id === currentColorDetail.id);
+  const text = currentColorDetail?.hcl_l > 70 ? '#111' : '#fff';
+ 
+    const previous = recentSwatches.length > 1
+      ? recentSwatches[recentSwatches.length - 2]
+      : null;
+
+  // helpers near top of component (add these lines once)
+  const isStain = Number(currentColorDetail?.is_stain) === 1;
+  const nameHasStain = typeof currentColorDetail?.name === 'string' && /\bstain\b/i.test(currentColorDetail.name);
+  const displayName = isStain && !nameHasStain ? `${currentColorDetail.name} (Stain)` : currentColorDetail.name;
 
 
 
 
 
+   //USE EFFECTS
 
-
-//USE EFFECTS
+   //scroll to top of main layout
   useEffect(() => {
+    const mainEl = document.querySelector("main");
+    const isMainScrollable =
+      mainEl && mainEl.scrollHeight > mainEl.clientHeight;
+
+    const jumpTop = () => {
+      if (isMainScrollable) {
+        const prev = mainEl.style.scrollBehavior; // defeat any global smooth
+        mainEl.style.scrollBehavior = "auto";
+        mainEl.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        mainEl.style.scrollBehavior = prev;
+      } else {
+        // cover all browsers
+        window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    };
+
+    // wait a tick so the new page paints (mobile Safari quirk)
+    requestAnimationFrame(() => requestAnimationFrame(jumpTop));
+    const t = setTimeout(jumpTop, 300); // nudge in case images/layout shift
+    return () => clearTimeout(t);
+  }, [location.key]); // runs on each navigation to this page
+
+    useEffect(() => {
+      setShowBack(true);
+
+      return () => {
+        setShowBack(false); //on unload
+      };
+    }, []);  //on load and unload
+
+
+  //get the full info on this color
+    useEffect(() => {
       if (id) {
-        console.log("Fetching detail for ID:", id); 
         fetchColorDetail(id, setCurrentColorDetail);
       }
     }, [id, setCurrentColorDetail]);
 
+    useEffect(() => {
+      let active = true;
+
+      async function loadTriggerPhotos() {
+        const colorId = currentColorDetail?.id;
+        if (!colorId) {
+          setTriggerPhotos([]);
+          return;
+        }
+
+        setTriggerPhotosLoading(true);
+        try {
+          const items = await fetchColorTriggerPhotos(colorId);
+          if (!active) return;
+          setTriggerPhotos(items);
+        } catch (err) {
+          if (!active) return;
+          console.error('Failed to load trigger photos:', err);
+          setTriggerPhotos([]);
+        } finally {
+          if (active) setTriggerPhotosLoading(false);
+        }
+      }
+
+      void loadTriggerPhotos();
+      return () => {
+        active = false;
+      };
+    }, [currentColorDetail?.id]);
+
+    //fetch pic if available
+    useEffect(() => {
+      if (triggerPhotos.length > 0) {
+        setOgImage(null);
+        return;
+      }
+
+      const fullUrl = getColorUrl(
+        currentColorDetail.color_url,
+        currentColorDetail.base_url
+      );
+      if (!fullUrl) return;
+
+        const fetchOgImage = async () => {
+          try {
+            console.log('fetching:', fullUrl);
+            const res = await fetch(`${API_FOLDER}/fetch-og-image.php?url=${encodeURIComponent(fullUrl)}`);
+            const raw = await res.text();
+            let data;
+            try {
+              data = JSON.parse(raw);
+            } catch {
+              throw new Error(`og:image fetch failed (${res.status}): ${raw.slice(0, 120)}`);
+            }
+            setOgImage(data.image || null);
+          } catch (err) {
+            console.error('Failed to fetch og:image:', err);
+          }
+        };
+
+        fetchOgImage();
+    }, [currentColorDetail, triggerPhotos.length]);
+
+
+    //add this to recently viewed list
+    useEffect(() => {
+      if (!currentColorDetail) return;
+
+      // extract just the base swatch info
+          const swatch = {
+            id: currentColorDetail.id,
+            name: currentColorDetail.name,
+            brand_name: currentColorDetail.brand_name,
+            code: currentColorDetail.code,
+            r: currentColorDetail.r,
+            g: currentColorDetail.g,
+            b: currentColorDetail.b,
+            hcl_l: currentColorDetail.hcl_l,
+            hcl_c: currentColorDetail.hcl_c,
+            hcl_h: currentColorDetail.hcl_h,
+            cluster_id: currentColorDetail.cluster_id
+          };
+
+          setRecentSwatches(prev => {
+            if (
+              swatch &&
+              swatch.id != null &&
+              typeof swatch.r === 'number' &&
+              typeof swatch.g === 'number' &&
+              typeof swatch.b === 'number' &&
+              swatch.name &&
+              swatch.code &&
+              swatch.brand_name
+            ) {
+              if (prev.find(c => c.id === swatch.id)) return prev;
+              return [...prev.slice(-4), swatch]; // max 5
+            }
+            return prev;
+          });
+
+    }, [currentColorDetail]);
 
     useEffect(() => {
-      if (selectedScheme && currentColorDetail?.hcl_h != null) {
-        handleFindSchemeMatches(selectedScheme);
+        console.log('recent: ', recentSwatches);
+    }, [recentSwatches]);
+
+
+
+    //HANDLERS
+
+    const handleAddToPalette = () => {
+      addToPalette(currentColorDetail);
+    }
+
+    const handleBack = () => {
+      navigate(-1);
+    }
+
+    const handleClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('palettebefore', palette);
+        inPalette ? removeFromPalette(currentColorDetail.id) : addToPalette(currentColorDetail);
+    }
+
+    const handleCompare = () => {
+       navigate('/sbs')
+    };
+
+    const handleSeeOtherBrands = () => {
+      if (!currentColorDetail?.id) return;
+      navigate(`/matches?source_id=${encodeURIComponent(currentColorDetail.id)}`);
+    };
+
+    function formatCategoryList(catString) {
+      if (!catString) return '';
+
+      const cats = catString.split(',').map(s => s.trim());
+
+      if (cats.length === 1) {
+        return `<strong>${cats[0]}</strong> category`;
+      } else if (cats.length === 2) {
+        return `<strong>${cats[0]}</strong> and <strong>${cats[1]}</strong> categories`;
+      } else {
+        const wrapped = cats.map(cat => `<strong>${cat}</strong>`);
+        const allButLast = wrapped.slice(0, -1).join(', ');
+        const last = wrapped[wrapped.length - 1];
+        return `${allButLast}, and ${last} categories`;
       }
-    }, [selectedScheme, currentColorDetail]);
-
-
-  useEffect(() => {
-    setSchemeSearchInProgress(false);
-    setSchemeMatches([]); // also clear previous results
-  }, [currentColorDetail?.id]); 
+    }
 
 
 
 
+    if (!currentColorDetail) return <MobileLayout>Loading…</MobileLayout>;
+
+    return (
+    <MobileLayout>
+      <TopSpacer />
+      <div className="p-1">
 
 
-  function getOpposite(hue) {
-    return Math.round((hue + 180) % 360);
-  }
+            
 
-//EVENT HANDLERS
-const handleSelectComparison = (slotIndex, color) => {
-  setComparisonColors(prev => {
-    const updated = [...prev];
-    updated[slotIndex - 1] = color; // slotNumber is 1-based
-    return updated;
-  });
-};
+      {/* SWATCH */}
+        <div
+          className="mt-4 relative w-full h-32 rounded-xl border border-gray-300 shadow-inner detail-swatch"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            // for stains we’ll tint over a wood substrate, so keep the base transparent
+            backgroundColor: isStain
+              ? 'transparent'
+              : `rgb(${currentColorDetail.r}, ${currentColorDetail.g}, ${currentColorDetail.b})`,
+            color: text,
+            // pass RGB to CSS for the tint layer
+            '--stain-rgb': `${currentColorDetail.r}, ${currentColorDetail.g}, ${currentColorDetail.b}`,
+            // sensible defaults, tweak anytime
+            '--wood-size': 'clamp(140px, 55vw, 320px)',
+            '--stain-alpha': isStain ? 0.90 : 1
+          }}
+          data-is-stain={isStain ? 1 : 0}
+          data-stain-tone={typeof currentColorDetail.hcl_l === 'number' && currentColorDetail.hcl_l <= 55 ? 'dark' : 'light'}
+        >
+              <button
+                  type="button"
+                  className="pals-btn"
+                  aria-label={inPalette ? 'Remove from palette' : 'Add to palette'}
+                  onClick={handleClick}
+                >
+                  <PaletteToggleIcon
+                    active={inPalette}
+                    color={text}        // pass your contrast-aware text color here
+                    className="pals-icon"
+                  />
+        </button>
 
-
-const handleSchemeChange = (e) => {
-  const newScheme = colorSchemes.find(s => s.id === Number(e.target.value));
-  setSelectedScheme(newScheme);
-  //empty out comparison colors
-  setComparisonColors([]);
-  if (currentColorDetail?.hcl_h != null) {
-    handleFindSchemeMatches(newScheme); // pass explicitly!
-  }
-};
-
-const handleFindSchemeMatches = async (scheme = selectedScheme) => {
-  setSchemeSearchInProgress(true);
-  setSchemeMatches({}); // clear previous results
-
-  const baseHue = currentColorDetail?.hcl_h;
-  if (baseHue == null || !scheme) return;
-
-  const tolerance = 2;
-
-  const fetchPromises = scheme.angles.map((angleObj, index) => {
-    const angle = angleObj.angle_offset;
-    const targetHue = (baseHue + angle + 360) % 360;
-    const minHue = (targetHue - tolerance + 360) % 360;
-    const maxHue = (targetHue + tolerance) % 360;
-
-    return fetchSearchResults({ hueMin: minHue, hueMax: maxHue })
-      .then((res) => [`color${index + 1}`, res || []]);
-  });
-
-  const results = await Promise.all(fetchPromises);
-
-  const matchesObj = Object.fromEntries(results);
-  setSchemeMatches(matchesObj);
-};
-
-
-  if (!currentColorDetail) return <div>Loading...</div>;
-
-
-
-
-  return (
-    <div className="color-detail-page">
-      <StickyToolbar>
-
-
-    
-      </StickyToolbar>
-
-    
-
-
-     <ResponsiveRow className="page-content">
-
-
-      {/* COLUMN 1: SWATCH & INFO */}
-        <Column align="left" className="swatch">
-          <ResponsiveRow>
-              <SwatchCard color={currentColorDetail} large />
-              {comparisonColor && (
-                <SwatchCard color={comparisonColor}  />
-              )}
-             
-          </ResponsiveRow>
-          <ResponsiveRow>
-            <Column align="left">
-                
-                <div className="color-info">
-                  <h3 disabled>{currentColorDetail.name}</h3>
-                    <p><strong>Brand:</strong> {currentColorDetail.brand.toUpperCase()}</p>
-                    <p><strong>Code:</strong> {currentColorDetail.code}</p>
-                    <p><strong>RGB:</strong> {currentColorDetail.r}, {currentColorDetail.g}, {currentColorDetail.b}</p>
-                    <p><strong>HCL:</strong> {currentColorDetail.hcl_h}, {currentColorDetail.hcl_c}, {currentColorDetail.hcl_l}</p>
-                    <p><strong>LRV:</strong> {currentColorDetail.lrv}</p>
-                    <p className="descr" disabled>{currentColorDetail.brand_descr}</p>
-                    <p> <a 
-                        href={currentColorDetail.color_url}
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="underline"
-                      >
-                        Official Color Page
-                      </a>
-                      </p>
-                  </div>
-                 
-              </Column>
-          </ResponsiveRow>
-    
-
-   </Column>
+          {currentColorDetail?.chip_num?.length > 0 && (
+            <span
+              className="chip-badge absolute top-2 right-2 z-10 px-2 py-0.5 rounded-md text-xs 
+                          pointer-events-none select-none"
+              aria-label={`Chip #${currentColorDetail.chip_num}`}
+              title="Chip #"
+            >
+              {currentColorDetail.chip_num}
+            </span>
+          )}
 
 
 
 
-        <Column width="1/2" className="detail-wheel-column">
-            <ColorWheel300 currentColor={currentColorDetail} base="labels-420" size={540} />
+       </div>
+
+
+       <div className="w-full text-right text-xs">{currentColorDetail.id}/{currentColorDetail.cluster_id}</div>
+
+
+
+
+
+    {/* INFO & WHEEL */}
+
+  <div id="color-info" className="px-2 pb-16 mt-4">
+        <h3 className="mt-4 text-xl font-bold">{displayName}</h3>
+           <p className="text-sm text-gray-600">
+          {currentColorDetail.brand_name} · {currentColorDetail.code}
+        </p>
        
-            <p className="descr text-sm mt-4">
-             {currentColorDetail.hue_cats}
-            </p>
-             <p className="descr text-sm mt-4">
-             {currentColorDetail.neutral_cats}
-            </p>
-          
 
-    
-
-          
        
-                    
-              <p className="descr">{`Its opposite hue is ${getOpposite(currentColorDetail.hcl_h)}° `}</p>
-
-
-
-      </Column>
-
-
-
-      <Column align="center">
-        <div className="color-comparison-strip">
-          <div >{currentColorDetail && <SwatchCardMini color={currentColorDetail} />}</div>
-            {comparisonColors.map((color, i) =>
-                  color ? <SwatchCardMini key={i} color={color} /> : <div key={i} className="slot" />
-                )}
-          </div>
-      </Column>
-
-    <Column align="center" className="swatch-gallery">
-      <div className="gallery-scroll-container">
-          {Object.entries(schemeMatches).map(([label, swatches], index) => (
-            <div key={label} className="scheme-group">
-            <h4>Color {index + 1} Matches</h4>
-              <SwatchGallery
-                swatchComponent={SwatchCardTiny}
-                swatches={swatches}
-                onSelect={(color) => handleSelectComparison(index + 1, color)}
-              />
+     
+       
+            <div className="text-sm mt-4 flex justify-start gap-4 w-full ">
+              <span><strong>Hue:</strong> {Number(currentColorDetail.hcl_h).toFixed(4)}</span>
+              <span><strong>Chroma:</strong> {Number(currentColorDetail.hcl_c).toFixed(4)}</span>
+              <span><strong>Lightness:</strong> {Number(currentColorDetail.hcl_l).toFixed(4)}</span>
             </div>
-          ))}
-      </div>
-   </ Column>
+            <p className="text-sm mt-2"><strong>Hue:  </strong>The hue is {Number(currentColorDetail.hcl_h).toFixed(4)} which puts it in  <strong>{currentColorDetail.hue_cats}</strong> on the HCL Color Wheel.</p>
 
-      </ResponsiveRow>
+
+
+            <div className="py-4 detail-wheel-wrap">
+            <ColorWheel300 currentColor={currentColorDetail} base="labels-420" size={900} />
+            </div>
+
+
+            {currentColorDetail.neutral_cats ? (
+              <>  <p
+                  className="text-sm mt-2"
+                  dangerouslySetInnerHTML={{
+                    __html: `Because of the low chroma values, this color is also considered a neutral, in the ${formatCategoryList(currentColorDetail.neutral_cats)}.`
+                  }}
+                ></p>
+                <p className="text-sm mt-2">
+                  <strong>Chroma:  {currentColorDetail.chroma_cat}</strong> &mdash; {currentColorDetail.name} has a chroma of {Number(currentColorDetail.hcl_c).toFixed(4)}, which puts it in the {currentColorDetail.chroma_cat} range, {currentColorDetail.chroma_cat_descr}
+                </p>
+                </>
+              ) : (
+                 <p className="text-sm mt-2"><strong>Chroma:  {currentColorDetail.chroma_cat}</strong> &mdash; {currentColorDetail.name} has a chroma of {Number(currentColorDetail.hcl_c).toFixed(4)}, which puts it in the {currentColorDetail.chroma_cat} range, {currentColorDetail.chroma_cat_descr}</p>
+              )
+              
+              }
+         
+
+
+            <p className="text-sm mt-2"><strong>Lightness:  {currentColorDetail.light_cat}</strong> &mdash; {currentColorDetail.name} has a lightness value of {Number(currentColorDetail.hcl_l).toFixed(4)} out of 100, which puts it in the {currentColorDetail.light_cat} range, {currentColorDetail.light_cat_descr}</p>
     
+           <p className="text-sm mt-2"><strong>Hex:</strong> #{currentColorDetail.hex6}</p>
+            <p className="text-sm mt-2"><strong>LRV:</strong> {currentColorDetail.lrv}</p>
+              
+            <div className="flex gap-8 mt-2 text-sm" >
+                   <ul className="text-sm mt-2"><strong>RGB</strong>
+              <li><strong>{`R:  `}</strong>{currentColorDetail?.r}</li>
+              <li><strong>{`G:  `}</strong>{currentColorDetail?.g}</li>
+              <li><strong>{`B:  `}</strong>{currentColorDetail?.b}</li>
+              </ul>
+              <ul className="text-sm mt-2"><strong>HSL</strong>
+              <li><strong>{`H:  `}</strong>{Number(currentColorDetail?.hsl_h?.toFixed(3))}</li>
+              <li><strong>{`S:  `}</strong>{Number(currentColorDetail?.hsl_s?.toFixed(3))}</li>
+              <li><strong>{`L:  `}</strong>{Number(currentColorDetail?.hsl_l?.toFixed(3))}</li>
+              </ul>
+              <ul className="text-sm mt-2"><strong>CIELAB</strong>
+              <li><strong>{`L:  `}</strong>{Number(currentColorDetail?.lab_l?.toFixed(3))}</li>
+              <li><strong>{`a:  `}</strong>{Number(currentColorDetail?.lab_a?.toFixed(3))}</li>
+              <li><strong>{`b:  `}</strong>{Number(currentColorDetail?.lab_b?.toFixed(3))}</li>
+              </ul>
+              </div>
+            {currentColorDetail.chip_num && (<p className="text-sm mt-2"><strong>Chip Locator #:</strong> {formatChip(currentColorDetail.chip_num)}</p>)}
+            <button
+              type="button"
+              className="detail-other-brands-button"
+              onClick={handleSeeOtherBrands}
+            >
+              See in Other Brands
+            </button>
+             <p className="text-sm mt-2"> {currentColorDetail.exterior == 0 ? "Not recommended for Exterior use" : ''}</p>
     </div>
+
+
+          
+  <div className="detail-trigger-gallery mt-4">
+    {triggerPhotosLoading ? <p className="text-xs text-gray-500 italic">Loading photos…</p> : null}
+
+    {!triggerPhotosLoading && triggerPhotos.length > 0 ? (
+      <div className="detail-trigger-gallery__grid">
+        {triggerPhotos.map((item) => {
+          const key = `${item.palette_hash || item.palette_id}-${item.saved_palette_set_id || 'default'}-${item.photo_type}-${item.photo_url}`;
+          const href = item.palette_hash
+            ? `/palette/${item.palette_hash}/share`
+            : item.palette_id
+              ? `/view/${item.palette_id}`
+              : undefined;
+          const imageUrl = photoThumbUrl(item.photo_library_id, 520, 72) || item.photo_url;
+
+          const content = (
+            <img
+              src={imageUrl}
+              alt={item.palette_name || `Trigger photo for ${currentColorDetail.name}`}
+              className="detail-trigger-gallery__img"
+              loading="lazy"
+              decoding="async"
+            />
+          );
+
+          return href ? (
+            <a key={key} href={href} className="detail-trigger-gallery__item">
+              {content}
+            </a>
+          ) : (
+            <div key={key} className="detail-trigger-gallery__item">
+              {content}
+            </div>
+          );
+        })}
+      </div>
+    ) : null}
+
+    {!triggerPhotosLoading && triggerPhotos.length === 0 && ogImage ? (
+      <a
+        href={getColorUrl(currentColorDetail.color_url, currentColorDetail.base_url)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block mt-4"
+      >
+        <img
+          src={ogImage.replace(/&amp;/g, '&')}
+          alt={`Preview of ${currentColorDetail.name}`}
+          className="w-full rounded-md border"
+        />
+        <p className="text-xs text-gray-500 italic mt-1">
+          Official preview from {currentColorDetail.brand_name}
+        </p>
+      </a>
+    ) : null}
+  </div>
+
+
+      {/* COMPARE */}
+         {recentSwatches.length > 1 && recentSwatches[recentSwatches.length - 2].id !== currentColorDetail.id && (
+       <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <span className="mr-1">Colors Viewed:</span>
+            {recentSwatches.map(swatch => (
+              <div
+                key={swatch.id}
+                className="w-5 h-5 rounded-sm border"
+                style={{
+                  backgroundColor: `rgb(${swatch.r}, ${swatch.g}, ${swatch.b})`,
+                }}
+              />
+            ))}
+        </div>
+
+        <button onClick={handleCompare} className="compare-button">
+          See side by side
+        </button>
+      </div>
+
+
+
+         )}
+
+
+
+
+      </div>
+    </MobileLayout>
   );
 }

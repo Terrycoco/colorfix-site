@@ -196,7 +196,12 @@ class PaletteViewerService
             'source' => 'saved',
             'id' => $palette['id'] ?? null,
             'hash' => $palette['palette_hash'] ?? $hash,
-            'title' => $palette['nickname'] ?? 'Saved Palette',
+            'title' => $this->firstNonEmpty([
+                $palette['nickname'] ?? null,
+                'ColorFix Palette',
+            ]),
+            'nickname' => $palette['nickname'] ?? null,
+            'display_title' => $palette['display_title'] ?? null,
             'notes' => $palette['notes'] ?? '',
             'photo_url' => $fullPhoto['rel_path'] ?? '',
             'photo_alt' => $fullPhoto['alt_text'] ?? null,
@@ -213,5 +218,19 @@ class PaletteViewerService
         ];
 
         return (new Palette($meta, $swatches))->toArray();
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     */
+    private function firstNonEmpty(array $values): string
+    {
+        foreach ($values as $value) {
+            $text = trim((string)($value ?? ''));
+            if ($text !== '') {
+                return $text;
+            }
+        }
+        return 'ColorFix Palette';
     }
 }

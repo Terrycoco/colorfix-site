@@ -46,6 +46,9 @@ $items = array_map(static function ($set) {
         'title' => $set->title,
         'subtitle' => $set->subtitle,
         'context' => $set->context,
+        'end_cta_label' => $set->endCtaLabel,
+        'end_cta_url' => $set->endCtaUrl,
+        'end_cta_enabled' => $set->endCtaEnabled,
     ];
 }, $sets);
 

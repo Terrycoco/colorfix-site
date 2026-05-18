@@ -1,64 +1,69 @@
 .admin-share {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  height: calc(100vh - 40px);
-  overflow: hidden;
-  background: #edf3f8;
+  grid-template-columns: minmax(0, 720px);
+  align-content: start;
+  gap: 8px;
+  min-height: calc(100vh - 40px);
+  overflow: auto;
+  background: #f4f6f8;
   color: #152033;
+  padding: 8px;
 }
 
 .admin-share__sidebar {
-  padding: 14px 14px 16px;
-  border-right: 1px solid #d7e2ee;
-  background: linear-gradient(180deg, #f7fbff 0%, #eef4fa 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
+  display: contents;
+}
+
+.admin-share__sidebar-header {
+  order: 1;
 }
 
 .admin-share__sidebar-header h1,
 .admin-share__panel-head h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1.1;
 }
 
 .admin-share__sidebar-header p,
 .admin-share__panel-head p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #61728c;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .admin-share__main {
-  padding: 14px 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-  overflow: hidden;
+  display: contents;
 }
 
 .admin-share__panel {
   background: #fff;
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: 0 12px 28px rgba(16, 31, 61, 0.08);
+  border: 1px solid #d7e2ee;
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .admin-share__panel--asset-browser {
-  flex: 1;
+  order: 2;
   min-height: 0;
+}
+
+.admin-share__panel--recipient {
+  order: 3;
+}
+
+.admin-share__panel--send {
+  order: 4;
 }
 
 .admin-share__panel--sidebar {
   box-shadow: none;
   border: 1px solid #d7e2ee;
-  background: rgba(255, 255, 255, 0.88);
+  background: #fff;
 }
 
 .admin-share__panel-title {
@@ -70,7 +75,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 8px;
 }
 
 .admin-share__panel-head--recipient {
@@ -79,8 +84,8 @@
 
 .admin-share__toolbar {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 8px;
 }
 
 .admin-share__field {
@@ -93,18 +98,23 @@
   min-width: 0;
 }
 
+.admin-share__field--full {
+  grid-column: 1 / -1;
+}
+
 .admin-share__field span {
-  font-size: 12px;
+  font-size: 11px;
   color: #61728c;
 }
 
 .admin-share__field input,
 .admin-share__field select {
   border: 1px solid #ced8e7;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 14px;
+  border-radius: 4px;
+  padding: 5px 7px;
+  font-size: 13px;
   background: #fff;
+  min-height: 30px;
 }
 
 .admin-share__asset-list {
@@ -112,7 +122,7 @@
   flex-direction: column;
   gap: 0;
   border: 1px solid #d7e2ee;
-  border-radius: 12px;
+  border-radius: 4px;
   overflow-y: auto;
   background: #fff;
   min-height: 0;
@@ -125,11 +135,11 @@
   border-bottom: 1px solid #e3ebf3;
   border-radius: 0;
   background: #fff;
-  padding: 10px 12px;
+  padding: 7px 9px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 2px;
   color: #152033;
   cursor: pointer;
   transition: background-color 140ms ease, color 140ms ease;
@@ -150,14 +160,14 @@
 
 .admin-share__asset-title,
 .admin-share__summary-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .admin-share__asset-meta,
 .admin-share__summary-meta {
   color: #64748b;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .admin-share__asset-card.is-active .admin-share__asset-meta {
@@ -166,36 +176,38 @@
 
 .admin-share__summary {
   border: 1px solid #dae5ef;
-  border-radius: 14px;
-  padding: 10px 12px;
+  border-radius: 4px;
+  padding: 7px 8px;
   background: #f8fbfd;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .admin-share__summary-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #72839d;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .admin-share__actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
 .admin-share__btn {
-  border-radius: 10px;
+  border-radius: 4px;
   border: 1px solid #cfd8e6;
   background: #fff;
   color: #152033;
-  padding: 8px 12px;
+  padding: 5px 8px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  min-height: 28px;
 }
 
 .admin-share__btn:disabled {
@@ -210,10 +222,10 @@
 }
 
 .admin-share__icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border: 1px solid #cfd8e6;
-  border-radius: 999px;
+  border-radius: 4px;
   background: #fff;
   color: #152033;
   display: inline-flex;
@@ -227,11 +239,11 @@
 }
 
 .admin-share__status {
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 4px;
+  padding: 6px 8px;
   background: #eef6ff;
   color: #1d4f91;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .admin-share__status--error {

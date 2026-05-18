@@ -10,6 +10,9 @@ final class PlaylistInstanceSet
         public string $handle,
         public string $title,
         public ?string $subtitle,
-        public ?string $context
+        public ?string $context,
+        public ?string $endCtaLabel = null,
+        public ?string $endCtaUrl = null,
+        public bool $endCtaEnabled = true
     ) {}
 }

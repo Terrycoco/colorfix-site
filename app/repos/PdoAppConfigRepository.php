@@ -45,4 +45,10 @@ final class PdoAppConfigRepository
             'config_json' => $json,
         ]);
     }
+
+    public function delete(string $key): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM app_configs WHERE config_key = :key');
+        $stmt->execute(['key' => $key]);
+    }
 }

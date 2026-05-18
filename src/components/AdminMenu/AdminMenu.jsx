@@ -17,12 +17,13 @@ function isPathMatch(currentPath, href) {
 
 export default function AdminMenu() {
   const admin = isAdmin();
+  const currentPath = normalizeHrefPath(window.location.pathname);
+  const isAdminEntry = currentPath === "/admin" || currentPath.startsWith("/admin/");
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
   const menuRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const touchHandledRef = useRef(false);
-  const currentPath = normalizeHrefPath(window.location.pathname);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -58,7 +59,7 @@ export default function AdminMenu() {
     }
   }
 
-  if (!admin) return null;
+  if (!admin || !isAdminEntry) return null;
 
   const activeGroupIndex = adminMenuItems.findIndex((group) =>
     group.items.some((item) => isPathMatch(currentPath, item.href))

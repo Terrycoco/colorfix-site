@@ -37,6 +37,23 @@
   white-space: normal;
 }
 
+.cta-button--brand-colorfix .cta-button__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.24em;
+  flex-wrap: wrap;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cta-button__brand-logo {
+  display: inline-block;
+  width: auto;
+  height: 1em;
+  vertical-align: middle;
+}
+
 @media (max-width: 600px) {
   .cta-layout {
     width: 100%;
@@ -59,6 +76,22 @@
 .cta-button--primary {
   background: #111;
   color: #fff;
+}
+
+.cta-button.cta-button--brand-colorfix {
+  gap: 0;
+  background: #fff;
+  color: #151515;
+  border: 1px solid rgba(1, 145, 150, 0.42);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.cta-button.cta-button--brand-colorfix:hover {
+  background: var(--button-hover, #e66400);
+  background-color: var(--button-hover, #e66400);
+  border-color: var(--button-hover, #e66400);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  transform: none;
 }
 
 .cta-button--secondary {

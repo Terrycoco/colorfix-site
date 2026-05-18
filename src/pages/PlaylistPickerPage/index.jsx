@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { photoThumbUrl } from "@helpers/imageThumb";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-picker.css";
 
@@ -13,7 +14,6 @@ export default function PlaylistPickerPage() {
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
-  const isHoaView = ctaAudience.toLowerCase() === "hoa";
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -49,15 +49,18 @@ export default function PlaylistPickerPage() {
     return (items || []).map((item) => ({
       id: item.id,
       playlist_instance_id: item.playlist_instance_id,
+      player_url: item.player_url || "",
       item_type: item.item_type || "instance",
       target_set_id: item.target_set_id,
       title: formatTitle(item.title || ""),
       subtitle: formatTitle(item.subtitle || ""),
       photo_url: item.photo_url || "",
+      photo_library_id: item.photo_library_id || null,
     }));
   }, [items]);
 
-  const buildPlaylistUrl = (playlistInstanceId) => {
+  const buildPlaylistUrl = (tile) => {
+    const playlistPath = tile?.player_url || `/playlist/${tile?.playlist_instance_id || ""}`;
     const params = new URLSearchParams();
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
@@ -66,7 +69,7 @@ export default function PlaylistPickerPage() {
     const returnTo = buildReturnTo(location, searchParams);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
-    return `/playlist/${playlistInstanceId}${qs ? `?${qs}` : ""}`;
+    return `${playlistPath}${qs ? `?${qs}` : ""}`;
   };
 
   const buildSetUrl = (targetSetId) => {
@@ -136,12 +139,17 @@ export default function PlaylistPickerPage() {
                 href={
                   tile.item_type === "set"
                     ? buildSetUrl(tile.target_set_id || "")
-                    : buildPlaylistUrl(tile.playlist_instance_id)
+                    : buildPlaylistUrl(tile)
                 }
               >
                 <div className="playlist-thumbs__image">
-                  {tile.photo_url ? (
-                    <img src={tile.photo_url} alt={tile.title} loading="lazy" />
+                  {(photoThumbUrl(tile.photo_library_id, 520, 72) || tile.photo_url) ? (
+                    <img
+                      src={photoThumbUrl(tile.photo_library_id, 520, 72) || tile.photo_url}
+                      alt={tile.title}
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <div className="playlist-thumbs__placeholder">No Image</div>
                   )}

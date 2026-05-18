@@ -20,24 +20,44 @@
   top: 20px;
 }
 
-.admin-user-events__sidebar-header h1,
 .admin-user-events__panel-header h2 {
   margin: 0;
   font-size: 28px;
   line-height: 1.05;
 }
 
-.admin-user-events__sidebar-header p,
+.admin-user-events__sidebar-header h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.05;
+}
+
 .admin-user-events__panel-subtitle,
 .admin-user-events__secondary,
 .admin-user-events__total-meta {
   color: #7e7b74;
 }
 
-.admin-user-events__sidebar-header p {
-  margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 1.45;
+.admin-user-events__baseline-summary {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-user-events__baseline-summary-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9a958c;
+  font-weight: 700;
+}
+
+.admin-user-events__baseline-summary-value {
+  color: #4d4942;
+  font-weight: 600;
 }
 
 .admin-user-events__danger {
@@ -52,7 +72,32 @@
   cursor: pointer;
 }
 
+.admin-user-events__danger--compact {
+  margin-top: 10px;
+  align-self: flex-start;
+  border-radius: 11px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
 .admin-user-events__danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-user-events__secondary {
+  border: 1px solid #d9d5ce;
+  background: #fff;
+  color: #2c2924;
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-user-events__secondary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -180,6 +225,40 @@
 
 .admin-user-events__instance-link:hover {
   text-decoration: underline;
+}
+
+.admin-user-events__baseline-modal {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-user-events__baseline-label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c2924;
+}
+
+.admin-user-events__baseline-label input {
+  width: 100%;
+  border: 1px solid #d9d5ce;
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 16px;
+  background: #fff;
+}
+
+.admin-user-events__baseline-help {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #7e7b74;
+}
+
+.admin-user-events__baseline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 @media (max-width: 1100px) {

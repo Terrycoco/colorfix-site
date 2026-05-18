@@ -1,4 +1,5 @@
 import "./cta.css";
+import { photoThumbUrl } from "@helpers/imageThumb";
 
 export default function WatchNextCta({ cta, onClick, disabled = false }) {
   if (!cta) return null;
@@ -8,7 +9,7 @@ export default function WatchNextCta({ cta, onClick, disabled = false }) {
   const strippedTitle = rawTitle.replace(/^watch next[:\s-]*/i, "").trim();
   const title = strippedTitle || rawTitle || "Suggested Playlists";
   const subtitle = params.subtitle || params.dek || "";
-  const thumbnailUrl = params.thumbnail_url || params.thumb_url || "";
+  const thumbnailUrl = photoThumbUrl(params.photo_library_id, 360, 70) || params.thumbnail_url || params.thumb_url || "";
 
   return (
     <button
@@ -22,7 +23,7 @@ export default function WatchNextCta({ cta, onClick, disabled = false }) {
       <div className="cta-watch-next__body">
         {thumbnailUrl && (
           <div className="cta-watch-next__thumb">
-            <img src={thumbnailUrl} alt="" loading="lazy" />
+            <img src={thumbnailUrl} alt="" loading="lazy" decoding="async" />
           </div>
         )}
         <div className="cta-watch-next__text">

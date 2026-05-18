@@ -104,11 +104,11 @@
 
 .playlist-seo-form {
   background: #fff;
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 8px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
 }
 
@@ -116,38 +116,39 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
 }
 
 .playlist-seo-form__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 10px 14px;
 }
 
 .playlist-seo-form label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
 }
 
 .playlist-seo-form input,
 .playlist-seo-form select,
 .playlist-seo-form textarea {
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   border: 1px solid #ddd;
   font: inherit;
 }
 
 .playlist-seo-form textarea {
   resize: vertical;
+  min-height: 42px;
 }
 
 .playlist-seo-form__inline {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -157,8 +158,8 @@
 }
 
 .playlist-seo-form__inline button {
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   border: 1px solid #ddd;
   background: #f3f3f3;
   cursor: pointer;
@@ -185,23 +186,24 @@
   inset: 0;
   background: rgba(10, 16, 28, 0.55);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px;
-  z-index: 1200;
+  padding: max(12px, env(safe-area-inset-top)) 12px 12px;
+  z-index: 50000;
+  overflow-y: auto;
 }
 
 .playlist-seo-modal {
-  width: min(980px, 100%);
-  max-height: calc(100vh - 40px);
+  width: min(780px, 100%);
+  max-height: calc(100vh - 24px);
   overflow: auto;
   background: #fff;
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 10px;
+  padding: 12px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .playlist-seo-modal .playlist-seo-form {
@@ -242,23 +244,34 @@
 .items-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
 }
 
 .item-card {
   background: #fff;
-  border-radius: 10px;
-  padding: 10px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid #dfd6c8;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  position: relative;
+}
+
+.item-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(180deg, #f28c00 0%, #d76c00 100%);
 }
 
 .item-row {
   display: grid;
   grid-template-columns: 40px 90px minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: end;
 }
 
@@ -304,6 +317,9 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid #ece2d5;
 }
 
 .item-photo {
@@ -331,23 +347,30 @@
 .item-move {
   display: flex;
   gap: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f7f1e8;
+  border: 1px solid #e7dac8;
 }
 
 .item-move button {
-  border-radius: 6px 0 0 6px;
-  min-width: 22px;
-  padding: 4px 6px;
+  border-radius: 999px 0 0 999px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-weight: 700;
 }
 
 .item-move button + button {
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 999px 999px 0;
   border-left: none;
-  min-width: 22px;
-  padding: 4px 6px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 4px 8px;
 }
 
 .item-more {
-  margin-left: 4px;
+  margin-left: 8px;
 }
 
 .item-wide textarea {
@@ -407,6 +430,45 @@
   cursor: pointer;
   font-size: 12px;
   white-space: nowrap;
+}
+
+.item-share-toggle {
+  margin-top: 8px;
+}
+
+.item-share-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  background: #f3f3f3;
+  color: #5c5c5c;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.item-share-toggle input {
+  margin: 0;
+}
+
+.item-share-toggle__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.item-share-toggle.is-active label {
+  border-color: #0f7f82;
+  background: #e7f7f7;
+  color: #0f3d3f;
+  box-shadow: 0 0 0 2px rgba(15, 127, 130, 0.12);
+}
+
+.item-share-toggle.is-disabled label {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .item-picker {

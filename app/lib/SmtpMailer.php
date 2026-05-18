@@ -11,6 +11,8 @@ class SmtpMailer
     private string $password;
     private string $fromEmail;
     private string $fromName;
+    /** @var array<string, mixed> */
+    private array $lastTransaction = [];
 
     public function __construct(array $config)
     {
@@ -26,21 +28,42 @@ class SmtpMailer
         }
     }
 
-    public function send(string $toEmail, string $subject, string $htmlBody, string $textBody = ''): bool
+    public function send(string $toEmail, string $subject, string $htmlBody, string $textBody = '', array $options = []): bool
     {
         $toEmail = trim($toEmail);
         if ($toEmail === '') {
             throw new \InvalidArgumentException('Recipient email required');
         }
 
+        $cc = $this->normalizeEmailList($options['cc'] ?? []);
+        $bcc = $this->normalizeEmailList($options['bcc'] ?? []);
+        $replyTo = trim((string)($options['reply_to'] ?? ''));
+        $messageId = trim((string)($options['message_id'] ?? ''));
+        $fromEmail = trim((string)($options['from_email'] ?? $this->fromEmail));
+        $fromName = trim((string)($options['from_name'] ?? $this->fromName));
+        $extraHeaders = is_array($options['headers'] ?? null) ? $options['headers'] : [];
+
         $boundary = '=_cf_' . bin2hex(random_bytes(8));
         $headers = [
-            'From: ' . $this->formatAddress($this->fromEmail, $this->fromName),
+            'From: ' . $this->formatAddress($fromEmail, $fromName),
             'To: ' . $toEmail,
             'Subject: ' . $subject,
             'MIME-Version: 1.0',
             'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
         ];
+        if ($cc) {
+            $headers[] = 'Cc: ' . implode(', ', $cc);
+        }
+        if ($replyTo !== '') {
+            $headers[] = 'Reply-To: ' . $replyTo;
+        }
+        if ($messageId !== '') {
+            $headers[] = 'Message-ID: <' . trim($messageId, '<>') . '>';
+        }
+        foreach ($extraHeaders as $header) {
+            $header = trim((string)$header);
+            if ($header !== '') $headers[] = $header;
+        }
 
         if ($textBody === '') {
             $textBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $htmlBody));
@@ -66,7 +89,7 @@ class SmtpMailer
             throw new \RuntimeException('SMTP connect failed: ' . $errstr);
         }
 
-        $this->expect($fp, 220);
+        $connectResponse = $this->expect($fp, 220);
         $this->write($fp, 'EHLO colorfix');
         $this->expect($fp, 250);
         $this->write($fp, 'AUTH LOGIN');
@@ -75,19 +98,47 @@ class SmtpMailer
         $this->expect($fp, 334);
         $this->write($fp, base64_encode($this->password));
         $this->expect($fp, 235);
-        $this->write($fp, 'MAIL FROM: <' . $this->fromEmail . '>');
+        $this->write($fp, 'MAIL FROM: <' . $fromEmail . '>');
         $this->expect($fp, 250);
         $this->write($fp, 'RCPT TO: <' . $toEmail . '>');
-        $this->expect($fp, [250, 251]);
+        $recipientResponses = [trim($this->expect($fp, [250, 251]))];
+        foreach (array_merge($cc, $bcc) as $email) {
+            $this->write($fp, 'RCPT TO: <' . $email . '>');
+            $recipientResponses[] = trim($this->expect($fp, [250, 251]));
+        }
         $this->write($fp, 'DATA');
         $this->expect($fp, 354);
         $message = implode("\r\n", $headers) . "\r\n\r\n" . $body . "\r\n.";
         $this->write($fp, $message);
-        $this->expect($fp, 250);
+        $acceptedResponse = $this->expect($fp, 250);
         $this->write($fp, 'QUIT');
         fclose($fp);
 
+        $this->lastTransaction = [
+            'transport' => 'smtp',
+            'host' => $this->host,
+            'port' => $this->port,
+            'to_email' => $toEmail,
+            'cc' => $cc,
+            'bcc' => $bcc,
+            'from_email' => $fromEmail,
+            'message_id' => $messageId,
+            'subject' => $subject,
+            'connected_response' => trim($connectResponse),
+            'recipient_responses' => $recipientResponses,
+            'accepted_response' => trim($acceptedResponse),
+            'accepted_at_utc' => gmdate('c'),
+        ];
+
         return true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getLastTransaction(): array
+    {
+        return $this->lastTransaction;
     }
 
     private function write($fp, string $line): void
@@ -95,7 +146,7 @@ class SmtpMailer
         fwrite($fp, $line . "\r\n");
     }
 
-    private function expect($fp, $expected): void
+    private function expect($fp, $expected): string
     {
         $response = '';
         while (($line = fgets($fp, 515)) !== false) {
@@ -114,6 +165,7 @@ class SmtpMailer
                 }
             }
         }
+        return $response;
     }
 
     private function formatAddress(string $email, string $name): string
@@ -123,5 +175,26 @@ class SmtpMailer
             return $email;
         }
         return sprintf('"%s" <%s>', addslashes($name), $email);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeEmailList(mixed $value): array
+    {
+        if (is_array($value)) {
+            $items = $value;
+        } else {
+            $items = preg_split('/\s*,\s*/', trim((string)$value)) ?: [];
+        }
+        $normalized = [];
+        foreach ($items as $item) {
+            $email = strtolower(trim((string)$item));
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $normalized[$email] = $email;
+        }
+        return array_values($normalized);
     }
 }

@@ -21,6 +21,7 @@ export default function WatchRedirectPage() {
         const watchData = await watchRes.json();
 
         let playlistInstanceId = Number(watchData?.item?.playlist_instance_id || 0);
+        let playlistUrl = watchData?.item?.player_url || "";
 
         if (!playlistInstanceId) {
           const setRes = await fetch(
@@ -33,6 +34,7 @@ export default function WatchRedirectPage() {
               (item) => Number(item?.playlist_instance_id || 0) > 0
             );
             playlistInstanceId = Number(firstInstanceItem?.playlist_instance_id || 0);
+            playlistUrl = firstInstanceItem?.player_url || "";
           }
         }
 
@@ -43,7 +45,8 @@ export default function WatchRedirectPage() {
         const next = new URLSearchParams(location.search);
         next.delete("id");
         const qs = next.toString();
-        const target = `/playlist/${playlistInstanceId}${qs ? `?${qs}` : ""}`;
+        const targetPath = playlistUrl || `/playlist/${playlistInstanceId}`;
+        const target = `${targetPath}${qs ? `?${qs}` : ""}`;
 
         if (!cancelled) {
           window.location.replace(target);

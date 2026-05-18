@@ -23,6 +23,7 @@ class PdoSavedPaletteRepository
      *  - palette_hash (string, optional but recommended)
      *  - brand        (string, e.g. 'de', 'behr')
      *  - nickname     (string|null)
+     *  - display_title (string|null)
      *  - notes         (string|null)
      *  - private_notes (string|null)
      *  - terry_fav    (bool|int|null)
@@ -33,9 +34,9 @@ class PdoSavedPaletteRepository
     {
         $sql = "
             INSERT INTO saved_palettes
-                (palette_hash, brand, nickname, notes, private_notes, terry_fav, kicker_id, palette_type, created_at)
+                (palette_hash, brand, nickname, display_title, notes, private_notes, terry_fav, kicker_id, palette_type, created_at)
             VALUES
-                (:palette_hash, :brand, :nickname, :notes, :private_notes, :terry_fav, :kicker_id, :palette_type, NOW())
+                (:palette_hash, :brand, :nickname, :display_title, :notes, :private_notes, :terry_fav, :kicker_id, :palette_type, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -44,6 +45,7 @@ class PdoSavedPaletteRepository
             ':palette_hash'  => $data['palette_hash'] ?? null,
             ':brand'         => $data['brand'],
             ':nickname'      => $data['nickname'] ?? null,
+            ':display_title' => $data['display_title'] ?? null,
             ':notes'         => $data['notes'] ?? null,
             ':private_notes' => $data['private_notes'] ?? null,
             ':terry_fav'     => isset($data['terry_fav']) ? (int) (bool) $data['terry_fav'] : 0,
@@ -70,6 +72,7 @@ class PdoSavedPaletteRepository
             'palette_hash',
             'brand',
             'nickname',
+            'display_title',
             'notes',
             'private_notes',
             'terry_fav',
@@ -261,7 +264,10 @@ class PdoSavedPaletteRepository
                        sp.photo_type,
                        sp.trigger_mode,
                        sp.trigger_color_id,
-                       sp.show_in_gallery,
+                       CASE
+                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
+                           ELSE sp.show_in_gallery
+                       END AS show_in_gallery,
                        sp.use_palette_default_roles,
                        sp.caption,
                        sp.alt_text,
@@ -353,7 +359,10 @@ class PdoSavedPaletteRepository
                        sp.photo_type,
                        sp.trigger_mode,
                        sp.trigger_color_id,
-                       sp.show_in_gallery,
+                       CASE
+                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
+                           ELSE sp.show_in_gallery
+                       END AS show_in_gallery,
                        sp.use_palette_default_roles,
                        sp.caption,
                        sp.alt_text,
@@ -404,7 +413,10 @@ class PdoSavedPaletteRepository
                     sp.photo_type,
                     sp.trigger_mode,
                     sp.trigger_color_id,
-                    sp.show_in_gallery,
+                    CASE
+                        WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
+                        ELSE sp.show_in_gallery
+                    END AS show_in_gallery,
                     sp.caption,
                     sp.alt_text,
                     s.id AS saved_palette_set_id,
@@ -863,12 +875,14 @@ class PdoSavedPaletteRepository
         if (!empty($filters['q'])) {
             $where[] = '('
                 . 'p.nickname LIKE :q_nickname '
+                . 'OR p.display_title LIKE :q_display_title '
                 . 'OR p.notes LIKE :q_notes '
                 . 'OR p.private_notes LIKE :q_private_notes '
                 . 'OR p.palette_type LIKE :q_type'
                 . ')';
             $likeValue = '%' . $filters['q'] . '%';
             $params[':q_nickname']    = $likeValue;
+            $params[':q_display_title'] = $likeValue;
             $params[':q_notes']       = $likeValue;
             $params[':q_private_notes'] = $likeValue;
             $params[':q_type']        = $likeValue;

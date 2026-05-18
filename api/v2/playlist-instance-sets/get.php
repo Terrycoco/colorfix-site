@@ -24,6 +24,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 
 $handle = trim((string)($_GET['handle'] ?? ''));
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$audience = trim((string)($_GET['audience'] ?? $_GET['aud'] ?? ''));
 
 $setRepo = new PdoPlaylistInstanceSetRepository($pdo);
 $set = null;
@@ -42,12 +43,20 @@ $items = $itemRepo->listBySetId((int)$set->id);
 
 $photoIds = [];
 $targetSetIds = [];
+$playlistInstanceIds = [];
+$playlistIds = [];
 foreach ($items as $item) {
     if (($item->photoLibraryId ?? null) !== null) {
         $photoIds[(int)$item->photoLibraryId] = true;
     }
     if (($item->itemType ?? 'instance') === 'set' && ($item->targetSetId ?? null) !== null) {
         $targetSetIds[(int)$item->targetSetId] = true;
+    }
+    if (($item->playlistInstanceId ?? null) !== null) {
+        $playlistInstanceIds[(int)$item->playlistInstanceId] = true;
+    }
+    if (($item->playlistId ?? null) !== null) {
+        $playlistIds[(int)$item->playlistId] = true;
     }
 }
 
@@ -85,25 +94,126 @@ if ($targetSetIds) {
     }
 }
 
-$rows = array_map(static function ($item) use ($photoUrlById, $targetSetMetaById) {
+$slugByPlaylistInstanceId = [];
+$displaySubtitleByPlaylistInstanceId = [];
+$isPublicByPlaylistInstanceId = [];
+if ($playlistInstanceIds) {
+    $ids = array_keys($playlistInstanceIds);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT
+            pi.playlist_instance_id,
+            pi.slug,
+            pi.display_subtitle,
+            pi.is_active,
+            pi.share_enabled,
+            p.is_active AS playlist_is_active
+         FROM playlist_instances pi
+         LEFT JOIN playlists p
+           ON p.playlist_id = pi.playlist_id
+         WHERE pi.playlist_instance_id IN ({$placeholders})"
+    );
+    $stmt->execute($ids);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $playlistInstanceId = (int)$row['playlist_instance_id'];
+        $slugByPlaylistInstanceId[$playlistInstanceId] = $row['slug'] !== null ? (string)$row['slug'] : null;
+        $displaySubtitleByPlaylistInstanceId[$playlistInstanceId] = $row['display_subtitle'] !== null ? (string)$row['display_subtitle'] : '';
+        $isPublicByPlaylistInstanceId[$playlistInstanceId] =
+            (int)($row['is_active'] ?? 0) === 1
+            && (int)($row['share_enabled'] ?? 0) === 1
+            && (int)($row['playlist_is_active'] ?? 0) === 1;
+    }
+}
+
+$instanceByPlaylistId = [];
+if ($playlistIds) {
+    $ids = array_keys($playlistIds);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $sql = <<<SQL
+        SELECT
+            pi.playlist_instance_id,
+            pi.playlist_id,
+            pi.slug,
+            pi.display_subtitle,
+            pi.audience,
+            pi.is_active,
+            pi.share_enabled
+        FROM playlist_instances pi
+        JOIN playlists p
+          ON p.playlist_id = pi.playlist_id
+        WHERE pi.playlist_id IN ({$placeholders})
+          AND pi.is_active = 1
+          AND pi.share_enabled = 1
+          AND p.is_active = 1
+        ORDER BY
+          CASE
+            WHEN ? <> '' AND pi.audience = ? THEN 0
+            WHEN pi.audience = 'any' OR pi.audience IS NULL OR pi.audience = '' THEN 1
+            ELSE 2
+          END,
+          pi.playlist_instance_id ASC
+        SQL;
+    $params = array_merge($ids, [$audience, $audience]);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $playlistId = (int)$row['playlist_id'];
+        if (isset($instanceByPlaylistId[$playlistId])) {
+            continue;
+        }
+        $instanceByPlaylistId[$playlistId] = [
+            'playlist_instance_id' => (int)$row['playlist_instance_id'],
+            'playlist_slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
+            'display_subtitle' => $row['display_subtitle'] !== null ? (string)$row['display_subtitle'] : '',
+            'audience' => $row['audience'] !== null ? (string)$row['audience'] : null,
+        ];
+    }
+}
+
+$rows = array_values(array_filter(array_map(static function ($item) use ($photoUrlById, $targetSetMetaById, $slugByPlaylistInstanceId, $displaySubtitleByPlaylistInstanceId, $isPublicByPlaylistInstanceId, $instanceByPlaylistId) {
     $targetSetMeta = ($item->itemType === 'set' && $item->targetSetId)
         ? ($targetSetMetaById[(int)$item->targetSetId] ?? null)
         : null;
+    $playlistId = $item->playlistId !== null ? (int)$item->playlistId : null;
+    $resolvedInstance = ($item->itemType === 'playlist' && $playlistId !== null)
+        ? ($instanceByPlaylistId[$playlistId] ?? null)
+        : null;
+    if ($item->itemType === 'playlist' && $resolvedInstance === null) {
+        return null;
+    }
+    $playlistInstanceId = $resolvedInstance
+        ? (int)$resolvedInstance['playlist_instance_id']
+        : ($item->playlistInstanceId !== null ? (int)$item->playlistInstanceId : null);
+    if ($item->itemType !== 'playlist' && $playlistInstanceId !== null && empty($isPublicByPlaylistInstanceId[$playlistInstanceId])) {
+        return null;
+    }
+    $slug = $playlistInstanceId !== null ? trim((string)($slugByPlaylistInstanceId[$playlistInstanceId] ?? '')) : '';
+    if ($slug === '' && $resolvedInstance) {
+        $slug = trim((string)($resolvedInstance['playlist_slug'] ?? ''));
+    }
+    $displaySubtitle = $playlistInstanceId !== null ? (string)($displaySubtitleByPlaylistInstanceId[$playlistInstanceId] ?? '') : '';
+    if ($displaySubtitle === '' && $resolvedInstance) {
+        $displaySubtitle = (string)($resolvedInstance['display_subtitle'] ?? '');
+    }
     return [
         'id' => $item->id,
-        'playlist_instance_id' => $item->playlistInstanceId,
-        'playlist_id' => $item->playlistId,
+        'playlist_instance_id' => $playlistInstanceId,
+        'playlist_slug' => $slug !== '' ? $slug : null,
+        'player_url' => $playlistInstanceId !== null
+            ? '/playlist/' . ($slug !== '' ? $slug : (string)$playlistInstanceId)
+            : null,
+        'playlist_id' => $playlistId,
         'item_type' => $item->itemType,
         'target_set_id' => $item->targetSetId,
         'title' => $item->title !== '' ? $item->title : (string)($targetSetMeta['title'] ?? ''),
-        'subtitle' => $item->itemType === 'set'
-            ? (string)($targetSetMeta['subtitle'] ?? '')
-            : $item->subtitle,
+        'subtitle' => $item->subtitle !== ''
+            ? $item->subtitle
+            : ($item->itemType === 'set' ? (string)($targetSetMeta['subtitle'] ?? '') : $displaySubtitle),
         'photo_url' => $item->photoLibraryId ? ($photoUrlById[(int)$item->photoLibraryId] ?? $item->photoUrl) : $item->photoUrl,
         'photo_library_id' => $item->photoLibraryId,
         'sort_order' => $item->sortOrder,
     ];
-}, $items);
+}, $items)));
 
 respond([
     'ok' => true,
@@ -113,6 +223,11 @@ respond([
         'title' => $set->title,
         'subtitle' => $set->subtitle,
         'context' => $set->context,
+        'end_cta' => [
+            'label' => $set->endCtaLabel ?: 'Explore ColorFix',
+            'url' => $set->endCtaUrl ?: '/',
+            'enabled' => $set->endCtaEnabled,
+        ],
         'items' => $rows,
     ],
 ]);

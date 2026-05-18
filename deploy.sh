@@ -23,7 +23,7 @@ ls -l "$LOCAL_DIR"
 echo "🧹 Cleaning old hashed files in assets/ on remote..."
 deploy_ssh "
   cd "$REMOTE_PATH/assets" || exit
-  rm -f index-*.js index-*.css
+  rm -f *.js *.css
 "
 
 # 🚀 Upload everything from dist/ but DO NOT delete remote files outside of dist/assets
@@ -31,5 +31,10 @@ echo "🚀 Uploading files via rsync..."
 deploy_rsync -avz \
   -e "$RSYNC_SSH" \
   "$LOCAL_DIR" "$REMOTE_TARGET:$REMOTE_PATH"
+
+echo "🚀 Uploading rewrite rules..."
+deploy_rsync -avz \
+  -e "$RSYNC_SSH" \
+  "$SCRIPT_DIR/.htaccess" "$REMOTE_TARGET:$REMOTE_PATH/.htaccess"
 
 echo "✅ Site deployment complete."

@@ -67,6 +67,26 @@ class PhotoLibraryService
 
         $canonicalId = $this->repo->findCanonicalIdByRelPath($relPath);
         if ($canonicalId) {
+            $update = [
+                'source_type' => $sourceType,
+                'rel_path' => $relPath,
+            ];
+            if (array_key_exists('title', $overrides) || array_key_exists('caption', $photo)) {
+                $update['title'] = $data['title'];
+            }
+            if (array_key_exists('tags', $overrides)) {
+                $update['tags'] = $data['tags'];
+            }
+            if (array_key_exists('alt_text', $overrides) || array_key_exists('alt_text', $photo)) {
+                $update['alt_text'] = $data['alt_text'];
+            }
+            if (!empty($data['has_palette'])) {
+                $update['has_palette'] = 1;
+            }
+            if (!empty($data['show_in_gallery'])) {
+                $update['show_in_gallery'] = 1;
+            }
+            $this->repo->update($canonicalId, $update);
             return $canonicalId;
         }
 

@@ -21,11 +21,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 $config = loadWatchConfig($pdo ?? null);
+$playlistInstanceId = (int)($config['playlist_instance_id'] ?? 0);
+$slug = null;
+$url = $playlistInstanceId > 0 ? "/playlist/{$playlistInstanceId}" : '';
+
+if ($playlistInstanceId > 0) {
+    $stmt = $pdo->prepare(
+        "SELECT slug
+         FROM playlist_instances pi
+         WHERE pi.playlist_instance_id = :id
+         LIMIT 1"
+    );
+    $stmt->execute(['id' => $playlistInstanceId]);
+    $foundSlug = $stmt->fetchColumn();
+    if (is_string($foundSlug) && trim($foundSlug) !== '') {
+        $slug = trim($foundSlug);
+        $url = "/playlist/{$slug}";
+    }
+}
 
 respond([
     'ok' => true,
     'item' => [
-        'playlist_instance_id' => (int)($config['playlist_instance_id'] ?? 0),
+        'playlist_instance_id' => $playlistInstanceId,
+        'playlist_slug' => $slug,
+        'player_url' => $url,
         'query' => is_array($config['query'] ?? null) ? $config['query'] : [],
     ],
 ]);

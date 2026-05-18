@@ -116,7 +116,7 @@
 }
 
 .search-item:hover {
-  background-color: #b8c6d1;
+  background-color: var(--search-item-background-hover);
   transform: translateY(-1px);
 }
 
@@ -124,6 +124,12 @@
   font-size: 1.2rem;
   font-weight: 600;
   margin-bottom: 0.25rem;
+}
+
+.search-display__brand-image {
+  width: 9rem;
+  height: auto;
+  display: block;
 }
 
 .playlist-display {
@@ -253,7 +259,7 @@
 }
 
 .button-item:hover {
-   background-color: #b8c6d1;
+   background-color: var(--search-item-background-hover);
 }
 
 .button-display {

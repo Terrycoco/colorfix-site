@@ -40,6 +40,7 @@ class SavedPaletteService
      *  - brand         (string, required) e.g. 'de', 'behr'
      *  - color_ids     (int[] OR [['color_id' => int, 'order_index' => int], ...], required)
      *  - nickname      (string|null)
+     *  - display_title (string|null)
      *  - notes         (string|null)
      *  - terry_fav     (bool|int|null)
      *
@@ -66,6 +67,21 @@ class SavedPaletteService
         // Optional: re-use an existing palette with the same hash+brand
         $existing = $this->repo->getSavedPaletteByHashAndBrand($paletteHash, $brand);
         if ($existing) {
+            $metadata = [];
+            foreach (['nickname', 'display_title', 'notes', 'private_notes', 'kicker_id'] as $key) {
+                if (array_key_exists($key, $data)) {
+                    $metadata[$key] = $data[$key];
+                }
+            }
+            if (array_key_exists('terry_fav', $data)) {
+                $metadata['terry_fav'] = $data['terry_fav'];
+            }
+            if (array_key_exists('palette_type', $data)) {
+                $metadata['palette_type'] = $this->normalizePaletteType($data['palette_type']);
+            }
+            if ($metadata) {
+                $this->repo->updateSavedPalette((int)$existing['id'], $metadata);
+            }
             $full = $this->repo->getFullPalette((int)$existing['id']);
             if ($full !== null) {
                 return $full;
@@ -77,6 +93,7 @@ class SavedPaletteService
             'palette_hash'  => $paletteHash,
             'brand'         => $brand,
             'nickname'      => $data['nickname']      ?? null,
+            'display_title' => $data['display_title'] ?? null,
             'notes'         => $data['notes']         ?? null,
             'private_notes' => $data['private_notes'] ?? null,
             'terry_fav'     => $data['terry_fav']     ?? 0,
@@ -128,6 +145,7 @@ class SavedPaletteService
             'palette_hash'  => $paletteHash,
             'brand'         => $brand,
             'nickname'      => $data['nickname']      ?? null,
+            'display_title' => $data['display_title'] ?? null,
             'notes'         => $data['notes']         ?? null,
             'private_notes' => $data['private_notes'] ?? null,
             'terry_fav'     => $data['terry_fav']     ?? 0,
@@ -577,6 +595,11 @@ class SavedPaletteService
         if (array_key_exists('nickname', $data)) {
             $nickname = trim((string)$data['nickname']);
             $fields['nickname'] = $nickname === '' ? null : $nickname;
+        }
+
+        if (array_key_exists('display_title', $data)) {
+            $displayTitle = trim((string)$data['display_title']);
+            $fields['display_title'] = $displayTitle === '' ? null : $displayTitle;
         }
 
         if (array_key_exists('notes', $data)) {

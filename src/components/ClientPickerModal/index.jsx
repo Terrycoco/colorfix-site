@@ -5,6 +5,15 @@ import "./client-picker-modal.css";
 const LIST_URL = `${API_FOLDER}/v2/admin/clients/list.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/clients/save.php`;
 
+function displayClientListName(client) {
+  const firstName = String(client?.first_name || "").trim();
+  const lastName = String(client?.last_name || "").trim();
+  if (lastName && firstName) return `${lastName}, ${firstName}`;
+  if (lastName) return lastName;
+  if (firstName) return firstName;
+  return String(client?.name || "").trim();
+}
+
 export default function ClientPickerModal({
   open = false,
   title = "Pick Client",
@@ -127,10 +136,10 @@ export default function ClientPickerModal({
               className="cpm-card"
               onClick={() => onPick && onPick(item)}
             >
-              <div className="cpm-card-name">{item.name || "Unnamed client"}</div>
-              <div className="cpm-card-meta">#{item.id}</div>
-              <div className="cpm-card-meta">{item.email}</div>
-              {item.phone ? <div className="cpm-card-meta">{item.phone}</div> : null}
+              <div className="cpm-card-name">{displayClientListName(item) || "Unnamed client"}</div>
+              <div className="cpm-card-meta">
+                {[`#${item.id}`, item.email, item.phone].filter(Boolean).join(" · ")}
+              </div>
             </button>
           ))}
           {!loading && !error && items.length === 0 ? (

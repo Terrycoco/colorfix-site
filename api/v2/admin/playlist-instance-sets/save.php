@@ -33,6 +33,9 @@ $handle = trim((string)($payload['handle'] ?? ''));
 $title = trim((string)($payload['title'] ?? ''));
 $subtitle = trim((string)($payload['subtitle'] ?? ''));
 $context = trim((string)($payload['context'] ?? ''));
+$endCtaLabel = trim((string)($payload['end_cta_label'] ?? 'Explore ColorFix'));
+$endCtaUrl = trim((string)($payload['end_cta_url'] ?? '/'));
+$endCtaEnabled = array_key_exists('end_cta_enabled', $payload) ? (bool)$payload['end_cta_enabled'] : true;
 
 if ($handle === '') {
     respond(['ok' => false, 'error' => 'handle required'], 400);
@@ -47,7 +50,10 @@ try {
         $handle,
         $title,
         $subtitle !== '' ? $subtitle : null,
-        $context !== '' ? $context : null
+        $context !== '' ? $context : null,
+        $endCtaLabel !== '' ? $endCtaLabel : 'Explore ColorFix',
+        $endCtaUrl !== '' ? $endCtaUrl : '/',
+        $endCtaEnabled
     );
     $repo = new PdoPlaylistInstanceSetRepository($pdo);
     $set = $repo->save($set);

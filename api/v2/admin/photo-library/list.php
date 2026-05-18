@@ -31,6 +31,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 try {
     $q = trim((string)($_GET['q'] ?? ''));
     $sourceType = trim((string)($_GET['source_type'] ?? ''));
+    $clientId = isset($_GET['client_id']) ? (int)$_GET['client_id'] : 0;
     $paletteId = isset($_GET['palette_id']) ? (int)$_GET['palette_id'] : 0;
     $includeInactive = !empty($_GET['include_inactive']) && $_GET['include_inactive'] !== '0';
     $inactiveOnly = !empty($_GET['inactive_only']) && $_GET['inactive_only'] !== '0';
@@ -100,6 +101,10 @@ try {
         }
         $where[] = 'photo_library.photo_library_id IN (' . implode(', ', $placeholders) . ')';
     }
+    if ($clientId > 0) {
+        $where[] = 'photo_library.client_id = :client_id';
+        $params[':client_id'] = $clientId;
+    }
     if ($missingTags) {
         $where[] = "(photo_library.tags IS NULL OR TRIM(photo_library.tags) = '')";
     }
@@ -108,6 +113,16 @@ try {
     } elseif (!$includeInactive) {
         $where[] = 'photo_library.is_inactive = 0';
     }
+
+    $hasNarrowingFilter = $q !== ''
+        || $photoLibraryIds
+        || $clientId > 0
+        || $sourceType !== ''
+        || $paletteId > 0
+        || $inactiveOnly
+        || $includeInactive
+        || $missingTags;
+    $limit = min($limit, $hasNarrowingFilter ? 50 : 5);
 
     $joins = "";
     if ($needsPaletteJoin) {

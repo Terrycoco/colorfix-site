@@ -1,0 +1,101 @@
+.front-blurb-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.85rem;
+  width: 100%;
+  height: 100%;
+  padding: 1.7rem 1.55rem 1.7rem 1rem;
+  border-radius: 1.7rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #1f2937;
+  text-align: left;
+  overflow: hidden;
+}
+
+.front-blurb-item__subtitle {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-muted);
+  margin: 0;
+}
+
+.front-blurb-item__title {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+  margin: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.front-blurb-item__title-brand-image {
+  width: 9.5rem;
+  height: auto;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+.front-blurb-item__body {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 0.98rem;
+  line-height: 1.48;
+  font-weight: 500;
+  color: #334155;
+  white-space: pre-wrap;
+  margin: 0;
+  max-width: 38ch;
+}
+
+.front-blurb-item__brand {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+}
+
+.front-blurb-item__brand-image {
+  width: 7.8rem;
+  height: auto;
+  display: block;
+  transform: translateY(-0.05em);
+}
+
+@media (max-width: 700px) {
+  .front-blurb-item {
+    gap: 0.65rem;
+    padding: 1.25rem 1.1rem;
+  }
+
+  .front-blurb-item__title {
+    font-size: 1.1rem;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  .front-blurb-item__title-brand-image {
+    width: 6.4rem;
+  }
+
+  .front-blurb-item__subtitle {
+    font-size: 0.62rem;
+    line-height: 1.15;
+    letter-spacing: 0.06em;
+    word-break: normal;
+  }
+
+  .front-blurb-item__body {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    max-width: none;
+  }
+
+  .front-blurb-item__brand-image {
+    width: 6.2rem;
+  }
+}

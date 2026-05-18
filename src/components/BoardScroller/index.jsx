@@ -9,6 +9,7 @@ import useCanGoBack from "@hooks/useCanGoBack.js";
 import MiniBrandIcon from '@components/BrandFilter/MiniBrandIcon';
 import BrandFilterModal from "@components/BrandFilter";
 import AdminMenu from "@components/AdminMenu/AdminMenu";
+import colorfixDarkBgUrl from "../../assets/brand/colorfix_darkbg.png";
 
 
 const BoardScroller = () => {
@@ -29,6 +30,13 @@ const BoardScroller = () => {
     return window.matchMedia("(max-width: 768px)").matches;
   });
 
+
+  const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
+  const isFrontPageRoute =
+    location.pathname === "/" ||
+    location.pathname === "/results/4" ||
+    location.pathname === "/admin/";
+  const showPublicBackButton = !isAdminRoute && !isFrontPageRoute;
 
     //USE EFFECTS
 useEffect(() => {
@@ -173,14 +181,40 @@ const goToPalette = (e) => {
     }
   };
 
+const goBack = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    if (canGoBack) {
+      navigate(-1);
+      return;
+    }
+    navigate('/results/4');
+  };
+
+const goToHome = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    navigate(isAdminRoute ? '/admin/' : '/results/4');
+  };
+
  return (
   <>
-   <div className="board-scroller" style={{ '--center-gap': '80px' }}>
+   <div className="board-scroller">
       <div className="board-scroller__inner">
 
         {/* LEFT */}
         <div className="scroller-left">
           <AdminMenu />
+          {showPublicBackButton && (
+            <button
+              type="button"
+              className="public-back-button"
+              onClick={goBack}
+              aria-label="Go back"
+            >
+              ← Back
+            </button>
+          )}
         </div>
 
         {/* CENTER (always centered) */}
@@ -230,9 +264,11 @@ const goToPalette = (e) => {
 
 
 
-          <button className="board-tab logo-btn" onClick={() => navigate('/results/4')}>
-            <span className="logo-text">ColorFix</span>
-          </button>
+          <span className="board-tab " onClick={goToHome}>
+               
+                  <img src={colorfixDarkBgUrl} alt="ColorFix" className="logo-img" />
+               
+          </span>
         </div>
 
       </div>

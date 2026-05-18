@@ -14,6 +14,7 @@ run() {
 }
 
 run "deployapp.sh"
+run "deployconfig.sh"
 run "deployscripts.sh"
 run "deployapi.sh"
 run "deployshare.sh"

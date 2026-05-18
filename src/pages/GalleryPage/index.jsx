@@ -4,15 +4,21 @@ import { useAppState } from '@context/AppStateContext';
 import { API_FOLDER } from '@helpers/config';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Gallery from '@components/Gallery/Gallery';
+import FrontPagePlaylistSetItem from '@components/GalleryItems/FrontPagePlaylistSetItem';
 import { mergeWithInserts } from '@helpers/mergeHelper';
 import TopSpacer from '@layout/TopSpacer';
 import useHashJumpAfterLayout from "@hooks/useHashJumpAfterLayout.js";
 
-const GalleryPage = () => {
+const FRONT_PAGE_QUERY_ID = 4;
+const FRONT_PAGE_SET_ID = 9;
+const FRONT_PAGE_INSERT_POSITION = 3;
+
+const GalleryPage = ({ defaultQueryId = null }) => {
   const activeReqRef = useRef(0);
   const abortRef = useRef(null);
 
   const { queryId } = useParams();
+  const effectiveQueryId = queryId || defaultQueryId;
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,6 +27,7 @@ const GalleryPage = () => {
 
   const [searchItems, setSearchItems] = useState([]);
   const [insertItems, setInsertItems] = useState([]);
+  const [frontPageRailItem, setFrontPageRailItem] = useState(null);
   const [meta, setMeta] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showSortPeek, setShowSortPeek] = useState(true);
@@ -82,6 +89,7 @@ const GalleryPage = () => {
       setNoResults(false);
       setSearchItems([]);
       setInsertItems([]);
+      setFrontPageRailItem(null);
       setMeta(null);
 
       const serverFilters = makeServerFilters(searchFilters);
@@ -112,6 +120,7 @@ const GalleryPage = () => {
         setNoResults(true);
         setSearchItems([]);
         setInsertItems([]);
+        setFrontPageRailItem(null);
         setMeta(data.meta || null);
         return;
       }
@@ -127,9 +136,18 @@ const GalleryPage = () => {
           })
         : (data.results || []);
 
+      const nextInserts = Array.isArray(data.inserts) ? [...data.inserts] : [];
+      if (Number(query_id) === FRONT_PAGE_QUERY_ID) {
+        const frontPageInsert = await fetchFrontPagePlaylistInsert(controller.signal);
+        if (activeReqRef.current !== reqId) return;
+        setFrontPageRailItem(frontPageInsert);
+      } else {
+        setFrontPageRailItem(null);
+      }
+
       setNoResults(filteredResults.length === 0);
       setSearchItems(filteredResults);
-      setInsertItems(data.inserts || []);
+      setInsertItems(nextInserts);
       setMeta(data.meta);
 
       const onResultsRoute = location.pathname.startsWith('/results/');
@@ -166,24 +184,24 @@ const GalleryPage = () => {
 
   // Initial / route-change
   useEffect(() => {
-    if (!queryId) return;
-    const id = parseInt(queryId, 10);
+    if (!effectiveQueryId) return;
+    const id = parseInt(effectiveQueryId, 10);
     runQueryById(id, paramObj, { allowNavigate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryId, location.search]);
+  }, [effectiveQueryId, location.search]);
 
   // Re-run on Apply signal
   useEffect(() => {
-    if (!queryId) return;
-    const id = parseInt(queryId, 10);
+    if (!effectiveQueryId) return;
+    const id = parseInt(effectiveQueryId, 10);
     runQueryById(id, paramObj, { allowNavigate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandFiltersAppliedSeq]);
 
   // Re-run when brand selection changes
   useEffect(() => {
-    if (!queryId) return;
-    const id = parseInt(queryId, 10);
+    if (!effectiveQueryId) return;
+    const id = parseInt(effectiveQueryId, 10);
     runQueryById(id, paramObj, { allowNavigate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(searchFilters?.brands || [])]);
@@ -242,8 +260,19 @@ const GalleryPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.item_type, isSwatch]);
 
+  const isFrontPageDesktop = Number(effectiveQueryId) === FRONT_PAGE_QUERY_ID && !isMobile;
+  const galleryBreakpointCols = isFrontPageDesktop
+    ? { default: 3, 1200: 3, 800: 2, 500: 2 }
+    : undefined;
+  const mergedItems = mergeWithInserts(
+    searchItems,
+    !isFrontPageDesktop && frontPageRailItem
+      ? [...insertItems, frontPageRailItem]
+      : insertItems
+  );
+
   return (
-    <div className="gallery-wrapper">
+    <div className={`gallery-wrapper${isFrontPageDesktop ? ' gallery-wrapper--front-page-desktop' : ''}`}>
       <TopSpacer disabled={isMobile} />
 
       {isSwatch && (
@@ -282,7 +311,6 @@ const GalleryPage = () => {
       )}
 
       {(() => {
-        const mergedItems = mergeWithInserts(searchItems, insertItems);
         const isHue = groupMode === 'hue';
         const isWheelItem = (item) => {
           const t = String(item?.item_type || '').toLowerCase();
@@ -290,13 +318,30 @@ const GalleryPage = () => {
         };
         const heroItems = isHue ? mergedItems.filter(isWheelItem) : [];
         const galleryItems = isHue ? mergedItems.filter((item) => !isWheelItem(item)) : mergedItems;
-        return (
+        const galleryNode = (
           <Gallery
             items={galleryItems}
             heroItems={heroItems}
             runQueryById={runQueryById}
             meta={meta}
+            breakpointCols={galleryBreakpointCols}
+            className={isFrontPageDesktop ? 'gallery--front-page-main' : ''}
           />
+        );
+
+        if (!isFrontPageDesktop || !frontPageRailItem) {
+          return galleryNode;
+        }
+
+        return (
+          <div className="front-page-layout">
+            <div className="front-page-layout__main">
+              {galleryNode}
+            </div>
+            <aside className="front-page-layout__rail">
+              <FrontPagePlaylistSetItem item={frontPageRailItem} />
+            </aside>
+          </div>
         );
       })()}
       {showBackToTop && (
@@ -311,5 +356,50 @@ const GalleryPage = () => {
     </div>
   );
 };
+
+async function fetchFrontPagePlaylistInsert(signal) {
+  try {
+    const response = await fetch(
+      `${API_FOLDER}/v2/playlist-instance-sets/get.php?id=${FRONT_PAGE_SET_ID}&_=${Date.now()}`,
+      {
+        headers: { Accept: 'application/json' },
+        signal,
+      }
+    );
+    const payload = await response.json();
+    const rawItems = Array.isArray(payload?.set?.items) ? payload.set.items : [];
+    const items = rawItems
+      .filter((item) => String(item?.item_type || 'instance').toLowerCase() !== 'set')
+      .map((item, index) => ({
+        id: item.id || `front-page-playlist-${index}`,
+        title: formatFrontPageText(item.title || ''),
+        subtitle: formatFrontPageText(item.subtitle || ''),
+        photo_url: item.photo_url || '',
+        photo_library_id: item.photo_library_id || null,
+        player_url: item.player_url || (item.playlist_instance_id ? `/playlist/${item.playlist_instance_id}` : ''),
+      }))
+      .filter((item) => item.player_url);
+
+    if (!items.length) return null;
+
+    return {
+      id: `front-page-playlist-set-${FRONT_PAGE_SET_ID}`,
+      item_type: 'front-page-playlist-set',
+      insert_position: FRONT_PAGE_INSERT_POSITION,
+      title: formatFrontPageText(payload?.set?.title || ''),
+      subtitle: formatFrontPageText(payload?.set?.subtitle || ''),
+      items,
+    };
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.error('Failed to load front page playlist set:', error);
+    }
+    return null;
+  }
+}
+
+function formatFrontPageText(value) {
+  return String(value || '').replace(/\s*--\s*/g, ' — ').trim();
+}
 
 export default GalleryPage;

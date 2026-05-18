@@ -12,6 +12,7 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 
 use App\Services\PlayerExperienceService;
+use App\Repos\PdoPlaylistInstanceRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -24,16 +25,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 }
 
 $playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
+$playlistSlug = trim((string)($_GET['playlist_slug'] ?? $_GET['slug'] ?? ''));
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
 $mode = trim((string)($_GET['mode'] ?? ''));
 $addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null;
 $debugTiming = isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0';
 
-if ($playlistInstanceId <= 0) {
-    respond(['ok' => false, 'error' => 'playlist_instance_id required'], 400);
+if ($playlistInstanceId <= 0 && $playlistSlug === '') {
+    respond(['ok' => false, 'error' => 'playlist_instance_id or playlist_slug required'], 400);
 }
 
 try {
+    if ($playlistInstanceId <= 0 && $playlistSlug !== '') {
+        $repo = new PdoPlaylistInstanceRepository($pdo);
+        $playlistInstanceId = $repo->findIdBySlug($playlistSlug) ?? 0;
+        if ($playlistInstanceId <= 0) {
+            throw new RuntimeException("Playlist instance slug not found: {$playlistSlug}");
+        }
+    }
+
     $service = new PlayerExperienceService($pdo);
     $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start, $mode, $addGroupId);
 

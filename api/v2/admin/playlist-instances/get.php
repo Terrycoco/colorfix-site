@@ -37,6 +37,9 @@ respond([
     'item' => [
         'playlist_instance_id' => $instance->id,
         'playlist_id' => $instance->playlistId,
+        'slug' => $instance->slug,
+        'playlist_slug' => $instance->slug,
+        'player_url' => $instance->slug ? "/playlist/{$instance->slug}" : "/playlist/{$instance->id}",
         'instance_name' => $instance->instanceName,
         'display_title' => $instance->displayTitle,
         'display_subtitle' => $instance->displaySubtitle,

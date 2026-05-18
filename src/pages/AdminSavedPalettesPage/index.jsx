@@ -28,6 +28,7 @@ const defaultForm = {
 const emptyEditForm = {
   palette_id: null,
   nickname: "",
+  display_title: "",
   notes: "",
   private_notes: "",
   terry_fav: false,
@@ -255,6 +256,7 @@ export default function AdminSavedPalettesPage() {
     setEditForm({
       palette_id: Number(palette.id) || palette.id,
       nickname: "",
+      display_title: "",
       notes: "",
       private_notes: "",
       terry_fav: false,
@@ -441,6 +443,7 @@ export default function AdminSavedPalettesPage() {
                 {item.kicker_text && <div className="asp-card-kicker">{item.kicker_text}</div>}
                 <div className="asp-card-title">
                   <strong>{item.nickname || "(untitled palette)"}</strong>
+                  {item.display_title && <span className="asp-pill neutral">Viewer: {item.display_title}</span>}
                   <span className="asp-pill neutral">#{item.id}</span>
                   {Number(item.terry_fav) === 1 && <span className="asp-pill">Fav</span>}
                   <span className="asp-pill neutral">{(item.brand || "").toUpperCase() || "?"}</span>
@@ -457,7 +460,7 @@ export default function AdminSavedPalettesPage() {
               <div className="asp-photo-strip">
                 {item.photos.slice(0, 4).map((photo) => (
                   <div key={photo.id} className="asp-photo-thumb">
-                    <img src={photo.rel_path} alt={item.nickname || "Saved palette photo"} loading="lazy" />
+                    <img src={photo.rel_path} alt={item.display_title || "Saved palette photo"} loading="lazy" />
                   </div>
                 ))}
               </div>

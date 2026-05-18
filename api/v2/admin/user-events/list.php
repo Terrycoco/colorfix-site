@@ -10,6 +10,7 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoUserEventRepository;
+use App\Repos\PdoAppConfigRepository;
 use App\Services\UserEventService;
 
 function respond(array $payload, int $status = 200): void
@@ -26,11 +27,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 $filters = [
     'q' => isset($_GET['q']) ? trim((string)$_GET['q']) : '',
     'audience' => isset($_GET['audience']) ? trim((string)$_GET['audience']) : 'all',
+    'source' => isset($_GET['source']) ? trim((string)$_GET['source']) : 'all',
     'include_internal' => isset($_GET['include_internal']) && (string)$_GET['include_internal'] === '1',
 ];
 
 try {
-    $service = new UserEventService(new PdoUserEventRepository($pdo));
+    $service = new UserEventService(new PdoUserEventRepository($pdo), new PdoAppConfigRepository($pdo));
     $dashboard = $service->getPlaylistFunnelDashboard($filters);
 
     respond([
@@ -38,6 +40,7 @@ try {
         'filters' => $filters,
         'totals' => $dashboard['totals'],
         'items' => $dashboard['items'],
+        'baseline' => $dashboard['baseline'] ?? ['cutoff_at' => '', 'cutoff_at_iso' => null],
     ]);
 } catch (Throwable $e) {
     respond([

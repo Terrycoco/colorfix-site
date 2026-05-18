@@ -56,6 +56,7 @@ final class PlayerExperienceService
         $items = $this->flattenItems($playlist);
         $this->hydrateItemImages($items);
         $this->markTiming('hydrate_items', $itemsStartedAt);
+        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
         $startIndex = $this->normalizeStartIndex($start, count($items));
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
@@ -112,11 +113,24 @@ final class PlayerExperienceService
 
         // 5. Return full playback plan
         $displayTitle = $instance->displayTitle ?? $instance->instanceName ?? $playlist->title;
+        $pageH1 = $this->firstNonEmpty([
+            $playlist->meta['headline'] ?? null,
+            $displayTitle,
+            $playlist->title,
+        ]);
+        $projectSummary = $this->firstNonEmpty([
+            $playlist->meta['dek'] ?? null,
+            $playlist->meta['meta_description'] ?? null,
+            $instance->shareDescription,
+        ]);
         return [
             'playlist_instance_id' => $instance->id,
             'playlist_id'          => $playlist->playlist_id,
             'title'                => $playlist->title,
             'display_title'        => $displayTitle,
+            'slug'                 => $instance->slug,
+            'page_h1'              => $pageH1,
+            'project_summary'      => $projectSummary,
             'type'                 => $playlist->type,
             'total_items'          => count($items),
             'start_index'          => $startIndex,
@@ -130,7 +144,7 @@ final class PlayerExperienceService
             'share_enabled'        => $instance->shareEnabled,
             'share_title'          => $instance->shareTitle,
             'share_description'    => $instance->shareDescription,
-            'share_image_url'      => $instance->shareImageUrl,
+            'share_image_url'      => $instance->shareImageUrl ?: $resolvedShareImageUrl,
             'skip_intro_on_replay' => $instance->skipIntroOnReplay,
             'hide_stars'           => $instance->hideStars,
             'playlist_instance_set_ids' => $setIds,
@@ -170,14 +184,66 @@ final class PlayerExperienceService
     /**
      * @param PlaylistItem[] $items
      */
+    private function resolvePlaylistShareImageUrl(array $items): ?string
+    {
+        $chosen = null;
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            if (!$this->playlistItemHasImage($item)) continue;
+            if ($item->is_share_image) {
+                $chosen = $item;
+                break;
+            }
+            if ($chosen === null) {
+                $chosen = $item;
+            }
+        }
+
+        if (!$chosen instanceof PlaylistItem) {
+            return null;
+        }
+
+        return $this->normalizeShareImageUrl((string)($chosen->image_url ?? ''));
+    }
+
+    private function playlistItemHasImage(PlaylistItem $item): bool
+    {
+        return (int)($item->photo_library_id ?? 0) > 0 || trim((string)($item->image_url ?? '')) !== '';
+    }
+
+    private function normalizeShareImageUrl(string $imageUrl): ?string
+    {
+        $raw = trim($imageUrl);
+        if ($raw === '') return null;
+        if (str_starts_with($raw, 'photo:')) {
+            $parts = explode('|', $raw, 2);
+            $resolved = trim((string)($parts[1] ?? ''));
+            return $resolved !== '' ? $resolved : null;
+        }
+        return $raw;
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
     private function hydrateItemImages(array $items): void
     {
         $photoIds = [];
         $assetIds = [];
+        $appliedPaletteIds = [];
+        $savedPaletteHashes = [];
         foreach ($items as $item) {
             if (!$item instanceof PlaylistItem) continue;
             $photoId = $item->photo_library_id ?? null;
             $imageUrl = (string)($item->image_url ?? '');
+            $apId = (int)($item->ap_id ?? 0);
+            if ($apId > 0) {
+                $appliedPaletteIds[$apId] = true;
+            }
+            $paletteHash = trim((string)($item->palette_hash ?? ''));
+            if ($paletteHash !== '') {
+                $savedPaletteHashes[$paletteHash] = true;
+            }
             if ($photoId) {
                 $photoIds[$photoId] = true;
                 continue;
@@ -190,16 +256,29 @@ final class PlayerExperienceService
 
         $photoMetaMap = $this->loadPhotoLibraryMeta(array_keys($photoIds));
         $assetUrlMap = $this->loadAssetVariantUrls(array_keys($assetIds));
+        $appliedPaletteTitleMap = $this->loadAppliedPaletteTitles(array_keys($appliedPaletteIds));
+        $savedPaletteTitleMap = $this->loadSavedPaletteTitles(array_keys($savedPaletteHashes));
 
         foreach ($items as $item) {
             if (!$item instanceof PlaylistItem) continue;
             $imageUrl = (string)($item->image_url ?? '');
             $photoId = $item->photo_library_id ?? null;
+            $apId = (int)($item->ap_id ?? 0);
+            if (empty($item->palette_title) && $apId > 0 && !empty($appliedPaletteTitleMap[$apId])) {
+                $item->palette_title = $appliedPaletteTitleMap[$apId];
+            }
+            $paletteHash = trim((string)($item->palette_hash ?? ''));
+            if (empty($item->palette_title) && $paletteHash !== '' && !empty($savedPaletteTitleMap[$paletteHash])) {
+                $item->palette_title = $savedPaletteTitleMap[$paletteHash];
+            }
             if ($photoId) {
                 $meta = $photoMetaMap[(int)$photoId] ?? null;
                 $resolved = (string)($meta['url'] ?? '');
                 if ($resolved !== '') {
                     $item->image_url = "photo:{$photoId}|{$resolved}";
+                }
+                if (empty($item->alt_tag) && !empty($meta['alt_tag'])) {
+                    $item->alt_tag = (string)$meta['alt_tag'];
                 }
                 $resolvedSetMeta = null;
                 if (empty($item->saved_palette_set_id) && !empty($item->palette_hash)) {
@@ -208,18 +287,26 @@ final class PlayerExperienceService
                         (string)$item->palette_hash
                     );
                 }
-                if (empty($item->palette_hash) && !empty($meta['palette_hash'])) {
+
+                // The photo library attachment is the source of truth for player palette data.
+                // A playlist item can keep stale palette_hash values after its photo is replaced.
+                if (!empty($meta['palette_hash'])) {
                     $item->palette_hash = (string)$meta['palette_hash'];
                 }
-                if (empty($item->saved_palette_set_id) && !empty($resolvedSetMeta['saved_palette_set_id'])) {
-                    $item->saved_palette_set_id = (int)$resolvedSetMeta['saved_palette_set_id'];
-                } elseif (empty($item->saved_palette_set_id) && !empty($meta['saved_palette_set_id'])) {
+                if (!empty($meta['saved_palette_set_id'])) {
                     $item->saved_palette_set_id = (int)$meta['saved_palette_set_id'];
+                } elseif (empty($item->saved_palette_set_id) && !empty($resolvedSetMeta['saved_palette_set_id'])) {
+                    $item->saved_palette_set_id = (int)$resolvedSetMeta['saved_palette_set_id'];
                 }
-                if (empty($item->saved_palette_photo_type) && !empty($resolvedSetMeta['saved_palette_photo_type'])) {
-                    $item->saved_palette_photo_type = (string)$resolvedSetMeta['saved_palette_photo_type'];
-                } elseif (empty($item->saved_palette_photo_type) && !empty($meta['saved_palette_photo_type'])) {
+                if (!empty($meta['saved_palette_photo_type'])) {
                     $item->saved_palette_photo_type = (string)$meta['saved_palette_photo_type'];
+                } elseif (empty($item->saved_palette_photo_type) && !empty($resolvedSetMeta['saved_palette_photo_type'])) {
+                    $item->saved_palette_photo_type = (string)$resolvedSetMeta['saved_palette_photo_type'];
+                }
+                if (!empty($meta['palette_title'])) {
+                    $item->palette_title = (string)$meta['palette_title'];
+                } elseif (empty($item->palette_title) && !empty($resolvedSetMeta['palette_title'])) {
+                    $item->palette_title = (string)$resolvedSetMeta['palette_title'];
                 }
                 continue;
             }
@@ -234,8 +321,74 @@ final class PlayerExperienceService
     }
 
     /**
+     * @param int[] $paletteIds
+     * @return array<int, string>
+     */
+    private function loadAppliedPaletteTitles(array $paletteIds): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $paletteIds)));
+        if (!$ids) return [];
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                id,
+                COALESCE(
+                    NULLIF(TRIM(display_title), ''),
+                    NULLIF(TRIM(title), ''),
+                    CONCAT('Palette ', id)
+                ) AS palette_title
+             FROM applied_palettes
+             WHERE id IN ({$placeholders})"
+        );
+        $stmt->execute($ids);
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $title = trim((string)($row['palette_title'] ?? ''));
+            if ($title !== '') {
+                $map[(int)$row['id']] = $title;
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * @param string[] $paletteHashes
+     * @return array<string, string>
+     */
+    private function loadSavedPaletteTitles(array $paletteHashes): array
+    {
+        $hashes = array_values(array_unique(array_filter(array_map(
+            static fn($hash) => trim((string)$hash),
+            $paletteHashes
+        ))));
+        if (!$hashes) return [];
+        $placeholders = implode(',', array_fill(0, count($hashes), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                palette_hash,
+                COALESCE(
+                    NULLIF(TRIM(display_title), ''),
+                    NULLIF(TRIM(nickname), ''),
+                    palette_hash
+                ) AS palette_title
+             FROM saved_palettes
+             WHERE palette_hash IN ({$placeholders})"
+        );
+        $stmt->execute($hashes);
+        $map = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $hash = trim((string)($row['palette_hash'] ?? ''));
+            $title = trim((string)($row['palette_title'] ?? ''));
+            if ($hash !== '' && $title !== '') {
+                $map[$hash] = $title;
+            }
+        }
+        return $map;
+    }
+
+    /**
      * @param int[] $photoIds
-     * @return array<int, array{url:string,palette_hash:?string,saved_palette_set_id:?int,saved_palette_photo_type:?string}>
+     * @return array<int, array{url:string,palette_hash:?string,palette_title:?string,saved_palette_set_id:?int,saved_palette_photo_type:?string,alt_tag:?string}>
      */
     private function loadPhotoLibraryMeta(array $photoIds): array
     {
@@ -247,6 +400,8 @@ final class PlayerExperienceService
                 pl.photo_library_id,
                 pl.rel_path,
                 pl.updated_at,
+                pl.ai_alt_text,
+                pl.alt_text,
                 (
                   SELECT spalette.palette_hash
                     FROM saved_palette_set_photos spsp
@@ -258,6 +413,22 @@ final class PlayerExperienceService
                    ORDER BY sps.is_default DESC, spsp.id ASC
                    LIMIT 1
                 ) AS palette_hash,
+                (
+                  SELECT COALESCE(
+                      NULLIF(TRIM(spalette.display_title), ''),
+                      NULLIF(TRIM(spalette.nickname), ''),
+                      NULLIF(TRIM(sps.title), ''),
+                      spalette.palette_hash
+                    )
+                    FROM saved_palette_set_photos spsp
+                    JOIN saved_palette_sets sps
+                      ON sps.id = spsp.saved_palette_set_id
+                    JOIN saved_palettes spalette
+                      ON spalette.id = sps.saved_palette_id
+                   WHERE spsp.photo_library_id = pl.photo_library_id
+                   ORDER BY sps.is_default DESC, spsp.id ASC
+                   LIMIT 1
+                ) AS palette_title,
                 (
                   SELECT sps.id
                     FROM saved_palette_set_photos spsp
@@ -287,15 +458,20 @@ final class PlayerExperienceService
             $map[(int)$row['photo_library_id']] = [
                 'url' => $this->appendCacheBuster($relPath, $updatedAt),
                 'palette_hash' => isset($row['palette_hash']) && $row['palette_hash'] !== '' ? (string)$row['palette_hash'] : null,
+                'palette_title' => isset($row['palette_title']) && trim((string)$row['palette_title']) !== '' ? trim((string)$row['palette_title']) : null,
                 'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0 ? (int)$row['saved_palette_set_id'] : null,
                 'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== '' ? strtolower((string)$row['saved_palette_photo_type']) : null,
+                'alt_tag' => $this->firstNonEmpty([
+                    $row['ai_alt_text'] ?? null,
+                    $row['alt_text'] ?? null,
+                ]) ?: null,
             ];
         }
         return $map;
     }
 
     /**
-     * @return array{saved_palette_set_id:?int,saved_palette_photo_type:?string}|null
+     * @return array{saved_palette_set_id:?int,saved_palette_photo_type:?string,palette_title:?string}|null
      */
     private function resolveSavedPaletteSetForPhoto(int $photoLibraryId, string $paletteHash): ?array
     {
@@ -308,7 +484,13 @@ final class PlayerExperienceService
         $stmt = $this->pdo->prepare(
             "SELECT
                 sps.id AS saved_palette_set_id,
-                spsp.photo_type AS saved_palette_photo_type
+                spsp.photo_type AS saved_palette_photo_type,
+                COALESCE(
+                    NULLIF(TRIM(sp.display_title), ''),
+                    NULLIF(TRIM(sp.nickname), ''),
+                    NULLIF(TRIM(sps.title), ''),
+                    sp.palette_hash
+                ) AS palette_title
              FROM saved_palette_set_photos spsp
              JOIN saved_palette_sets sps
                ON sps.id = spsp.saved_palette_set_id
@@ -342,6 +524,9 @@ final class PlayerExperienceService
                 : null,
             'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== ''
                 ? strtolower((string)$row['saved_palette_photo_type'])
+                : null,
+            'palette_title' => isset($row['palette_title']) && trim((string)$row['palette_title']) !== ''
+                ? trim((string)$row['palette_title'])
                 : null,
         ];
     }
@@ -593,6 +778,17 @@ final class PlayerExperienceService
         if (!is_string($value) || trim($value) === '') return [];
         $decoded = json_decode($value, true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function firstNonEmpty(array $values): string
+    {
+        foreach ($values as $value) {
+            $text = trim((string)$value);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+        return '';
     }
 
     private function markTiming(string $key, float $startedAt): void

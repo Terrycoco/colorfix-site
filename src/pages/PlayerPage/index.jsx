@@ -19,10 +19,12 @@ export default function PlayerPage() {
   const psiParam = searchParams.get("psi") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
+  const sourceParam = searchParams.get("src") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
   const returnToParam = searchParams.get("return_to") ?? "";
   const debugTimingParam = searchParams.get("debug_timing") ?? "";
   const returnTo = resolveReturnTo(returnToParam);
+  const startParamValue = start ?? searchParams.get("start") ?? "";
 
 
   const [data, setData] = useState(null);
@@ -34,6 +36,7 @@ export default function PlayerPage() {
   const playerRef = useRef(null);
   const trackedOpenRef = useRef("");
   const trackedVisibleRef = useRef("");
+  const initializedWatchNextJourneyRef = useRef("");
   const thumbsEnabled =
     thumbParam === "1" || thumbParam.toLowerCase() === "true" || Boolean(data?.thumbs_enabled);
   const demoEnabled =
@@ -62,26 +65,27 @@ export default function PlayerPage() {
 
   useEffect(() => {
     if (!playlistId) {
-      setError("Missing playlist instance id");
+      setError("Missing playlist");
       setLoading(false);
       return;
     }
-    const startParam = start ?? searchParams.get("start") ?? "";
     const params = new URLSearchParams();
-    params.set("playlist_instance_id", playlistId);
-    if (startParam !== "") params.set("start", startParam);
+    if (isNumericId(playlistId)) {
+      params.set("playlist_instance_id", playlistId);
+    } else {
+      params.set("playlist_slug", playlistId);
+    }
+    if (startParamValue !== "") params.set("start", startParamValue);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
     params.set("_", String(Date.now()));
+    let cancelled = false;
     setLoading(true);
     setError("");
-    fetch(`/api/v2/player-playlist.php?${params.toString()}`, {
-      credentials: "include",
-      headers: { Accept: "application/json" },
-    })
-      .then((r) => r.json())
+    fetchPlayerPlaylist(`/api/v2/player-playlist.php?${params.toString()}`)
       .then((payload) => {
+        if (cancelled) return;
         if (!payload?.ok || !payload?.data) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
@@ -91,15 +95,46 @@ export default function PlayerPage() {
         setData(payload.data);
       })
       .catch((err) => {
+        if (cancelled) return;
         setError(err?.message || "Failed to load playlist");
       })
-      .finally(() => setLoading(false));
-  }, [playlistId, start, searchParams, addCtaGroup, ctaAudience, debugTimingParam]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playlistId, startParamValue, addCtaGroup, ctaAudience, debugTimingParam]);
 
   useEffect(() => {
     if (!data?.playlist_instance_id) return;
     recordLastPlaylistInstanceId(data.playlist_instance_id);
   }, [data?.playlist_instance_id]);
+
+  useEffect(() => {
+    if (!data) return;
+    const title = data?.page_h1 || data?.display_title || data?.title || "ColorFix Playlist";
+    const description = data?.project_summary || data?.share_description || "";
+    const image = String(data?.share_image_url || "").trim();
+    const slugOrId = data?.slug || data?.playlist_instance_id || playlistId;
+    const canonicalPath = slugOrId ? `/playlist/${slugOrId}` : location.pathname;
+    const canonicalUrl = `${window.location.origin}${canonicalPath}`;
+    const absoluteImage = image.startsWith("http://") || image.startsWith("https://")
+      ? image
+      : image.startsWith("/")
+        ? `${window.location.origin}${image}`
+        : "";
+
+    document.title = title;
+    setMetaContent("description", description);
+    setMetaProperty("og:title", title);
+    setMetaProperty("og:url", canonicalUrl);
+    if (description) {
+      setMetaProperty("og:description", description);
+    }
+    setMetaProperty("og:image", absoluteImage);
+    setCanonicalHref(canonicalUrl);
+  }, [data, location.pathname, playlistId]);
 
   useEffect(() => {
     const playlistInstanceId = Number(data?.playlist_instance_id || 0);
@@ -120,6 +155,7 @@ export default function PlayerPage() {
   useEffect(() => {
     setPlaybackEnded(endParam);
     setLikedCount(0);
+    setWatchNextCta(null);
   }, [data?.playlist_instance_id, endParam]);
 
   function handleExit() {
@@ -312,6 +348,51 @@ function resolveReturnTo(value) {
   return trimmed;
 }
 
+function isNumericId(value) {
+  return /^[0-9]+$/.test(String(value || "").trim());
+}
+
+function setMetaContent(name, content) {
+  if (typeof document === "undefined") return;
+  let el = document.querySelector(`meta[name="${name}"]`);
+  if (!content) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("name", name);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
+function setMetaProperty(property, content) {
+  if (typeof document === "undefined") return;
+  let el = document.querySelector(`meta[property="${property}"]`);
+  if (!content) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
+function setCanonicalHref(href) {
+  if (typeof document === "undefined") return;
+  let el = document.querySelector('link[rel="canonical"]');
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", "canonical");
+    document.head.appendChild(el);
+  }
+  el.setAttribute("href", href);
+}
+
 function isTruthyFlag(value) {
   if (value === true) return true;
   if (value === false || value === null || value === undefined) return false;
@@ -372,29 +453,48 @@ const visibleCTAs = useMemo(
   }, [data?.playlist_id, data?.playlist_instance_id, orderedCTAs, playbackEnded]);
 
   useEffect(() => {
-    if (!data || !visibleCTAs.length) {
+    if (!data) {
       setWatchNextCta(null);
       return;
     }
     const baseCta = visibleCTAs.find((cta) => (cta?.key || "") === "watch_next");
-    if (!baseCta) {
-      setWatchNextCta(null);
-      return;
-    }
+    const explicitSetId =
+      Number(psiParam || 0) ||
+      Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id || 0);
+    const storedJourneySetId = readActiveWatchNextSetId();
+    const isWatchNextNavigation = sourceParam === "watch_next";
 
     const setId =
-      Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id) ||
-      Number((data?.playlist_instance_set_ids || [])[0]) ||
-      3;
+      (isWatchNextNavigation && storedJourneySetId ? storedJourneySetId : 0) ||
+      explicitSetId ||
+      (isWatchNextNavigation ? storedJourneySetId : 0) ||
+      (baseCta ? 3 : 0);
     if (!setId) {
       setWatchNextCta(null);
       return;
     }
 
+    const playlistInstanceId = Number(data?.playlist_instance_id || 0);
+    const journeyKey = `${playlistInstanceId}:${setId}:${isWatchNextNavigation ? "watch_next" : "entry"}`;
+    if (initializedWatchNextJourneyRef.current !== journeyKey) {
+      initializedWatchNextJourneyRef.current = journeyKey;
+      writeActiveWatchNextSetId(setId);
+      if (!isWatchNextNavigation) {
+        clearWatchNextSeen(setId);
+      }
+    }
+
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(`/api/v2/playlist-instance-sets/get.php?id=${setId}&_=${Date.now()}`, {
+        const setParams = new URLSearchParams({
+          id: String(setId),
+          _: String(Date.now()),
+        });
+        if (ctaAudience) {
+          setParams.set("aud", ctaAudience);
+        }
+        const res = await fetch(`/api/v2/playlist-instance-sets/get.php?${setParams.toString()}`, {
           credentials: "include",
           headers: { Accept: "application/json" },
         });
@@ -412,22 +512,35 @@ const visibleCTAs = useMemo(
         const currentId = Number(data?.playlist_instance_id);
         const currentPlaylistId = Number(data?.playlist_id);
         const seen = readWatchNextSeen(setId);
-        const seenPlaylistIds = readWatchNextSeenPlaylists(setId);
+        const globalSeen = readGlobalWatchNextSeen();
+        const globalSeenPlaylistIds = readGlobalWatchNextSeenPlaylists();
 
         const isEligibleNextItem = (item, { ignoreSeen = false } = {}) => {
           const pid = Number(item?.playlist_instance_id);
           const playlistItemId = Number(item?.playlist_id);
           if (!pid || pid === currentId) return false;
-          if (playlistItemId && currentPlaylistId && playlistItemId === currentPlaylistId) return false;
           if (ignoreSeen) return true;
-          if (playlistItemId && seenPlaylistIds.includes(playlistItemId)) return false;
+          if (playlistItemId && currentPlaylistId && playlistItemId === currentPlaylistId) return false;
+          if (playlistItemId && globalSeenPlaylistIds.includes(playlistItemId)) return false;
+          if (globalSeen.includes(pid)) return false;
           return !seen.includes(pid);
         };
 
         const nextItem = playlistItems.find((item) => isEligibleNextItem(item));
 
         if (!nextItem) {
-          setWatchNextCta(null);
+          if (playbackEnded && currentId) {
+            if (setItemIds.includes(currentId)) {
+              markWatchNextSeen(setId, currentId);
+            }
+            markGlobalWatchNextSeen(currentId);
+            if (currentPlaylistId) {
+              markGlobalWatchNextSeenPlaylist(currentPlaylistId);
+            }
+          }
+          const endSetCta = buildEndSetCta(payload?.set?.end_cta, setId);
+          clearActiveWatchNextSetId();
+          setWatchNextCta(endSetCta);
           return;
         }
 
@@ -440,22 +553,31 @@ const visibleCTAs = useMemo(
           params: {
             ...(baseCta?.params || {}),
             playlist_instance_id: Number(nextItem.playlist_instance_id),
+            url: nextItem.player_url ? appendUrlParams(nextItem.player_url, { psi: setId }) : undefined,
+            audience: ctaAudience || data?.audience || undefined,
             title: resolvedTitle,
             subtitle: resolvedSubtitle,
             thumbnail_url: resolvedThumb,
+            photo_library_id: nextItem.photo_library_id || undefined,
           },
           data: {
             ...(baseCta?.data || {}),
             playlist_instance_id: Number(nextItem.playlist_instance_id),
             playlist_id: Number(nextItem.playlist_id) || undefined,
+            playlist_instance_slug: nextItem.playlist_slug || undefined,
+            slug: nextItem.playlist_slug || undefined,
+            player_url: nextItem.player_url || undefined,
           },
         };
         setWatchNextCta(resolved);
 
-        if (playbackEnded && currentId && setItemIds.includes(currentId)) {
-          markWatchNextSeen(setId, currentId);
+        if (playbackEnded && currentId) {
+          if (setItemIds.includes(currentId)) {
+            markWatchNextSeen(setId, currentId);
+          }
+          markGlobalWatchNextSeen(currentId);
           if (currentPlaylistId) {
-            markWatchNextSeenPlaylist(setId, currentPlaylistId);
+            markGlobalWatchNextSeenPlaylist(currentPlaylistId);
           }
         }
       } catch {
@@ -468,9 +590,15 @@ const visibleCTAs = useMemo(
     return () => {
       cancelled = true;
     };
-  }, [data, visibleCTAs, playbackEnded]);
+  }, [ctaAudience, data, visibleCTAs, playbackEnded, psiParam, sourceParam]);
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="player-page">
+        <PlayerLoadingIndicator label="Loading playlist" />
+      </div>
+    );
+  }
   if (error) return <div className="player-error">{error}</div>;
 
   return (
@@ -480,8 +608,10 @@ const visibleCTAs = useMemo(
           ref={playerRef}
           slides={data?.items || []}
           startIndex={data?.start_index ?? 0}
-          playlistInstanceId={playlistId}
+          playlistInstanceId={data?.playlist_instance_id || playlistId}
           hideStars={Boolean(data?.hide_stars)}
+          galleryName={data?.page_h1 || data?.display_title || data?.title || ""}
+          galleryDescription={data?.project_summary || data?.share_description || ""}
           onAbort={handleExit}
           onLikeChange={({ likedCount: nextCount }) => setLikedCount(nextCount)}
           onPlaybackEnd={({ likedCount: nextCount }) => {
@@ -504,6 +634,54 @@ const visibleCTAs = useMemo(
 
     </div>
   );
+}
+
+function PlayerLoadingIndicator({ label = "Loading" }) {
+  return (
+    <div className="player-page-loading" role="status" aria-live="polite" aria-label={label}>
+      <span className="player-page-loading__dot" />
+      <span className="player-page-loading__dot" />
+      <span className="player-page-loading__dot" />
+    </div>
+  );
+}
+
+async function fetchPlayerPlaylist(url) {
+  const options = {
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  };
+  try {
+    return await fetchJsonWithTimeout(url, options, 8000);
+  } catch (err) {
+    if (!isTimeoutError(err)) throw err;
+    return fetchJsonWithTimeout(url, { ...options, cache: "reload" }, 8000);
+  }
+}
+
+async function fetchJsonWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      throw new Error("Playlist returned an invalid response");
+    }
+    if (!response.ok) {
+      throw new Error(payload?.error || `Playlist request failed (${response.status})`);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isTimeoutError(err) {
+  return err?.name === "AbortError";
 }
 
 function readWatchNextSeen(setId) {
@@ -529,6 +707,50 @@ function markWatchNextSeen(setId, playlistInstanceId) {
   }
 }
 
+function readGlobalWatchNextSeen() {
+  if (typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem("cf_watch_next_seen_global");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markGlobalWatchNextSeen(playlistInstanceId) {
+  if (typeof sessionStorage === "undefined" || !playlistInstanceId) return;
+  const current = readGlobalWatchNextSeen();
+  if (current.includes(playlistInstanceId)) return;
+  try {
+    sessionStorage.setItem("cf_watch_next_seen_global", JSON.stringify([...current, playlistInstanceId]));
+  } catch {
+    // ignore
+  }
+}
+
+function readGlobalWatchNextSeenPlaylists() {
+  if (typeof sessionStorage === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem("cf_watch_next_seen_playlist_global");
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function markGlobalWatchNextSeenPlaylist(playlistId) {
+  if (typeof sessionStorage === "undefined" || !playlistId) return;
+  const current = readGlobalWatchNextSeenPlaylists();
+  if (current.includes(playlistId)) return;
+  try {
+    sessionStorage.setItem("cf_watch_next_seen_playlist_global", JSON.stringify([...current, playlistId]));
+  } catch {
+    // ignore
+  }
+}
+
 function clearWatchNextSeen(setId) {
   if (typeof sessionStorage === "undefined" || !setId) return;
   try {
@@ -536,6 +758,70 @@ function clearWatchNextSeen(setId) {
   } catch {
     // ignore
   }
+}
+
+function readActiveWatchNextSetId() {
+  if (typeof sessionStorage === "undefined") return 0;
+  try {
+    return Number(sessionStorage.getItem("cf_watch_next_active_set_id") || 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeActiveWatchNextSetId(setId) {
+  if (typeof sessionStorage === "undefined" || !setId) return;
+  try {
+    sessionStorage.setItem("cf_watch_next_active_set_id", String(setId));
+  } catch {
+    // ignore
+  }
+}
+
+function clearActiveWatchNextSetId() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.removeItem("cf_watch_next_active_set_id");
+  } catch {
+    // ignore
+  }
+}
+
+function appendUrlParams(url, params) {
+  if (!url) return url;
+  const entries = Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (!entries.length) return url;
+  try {
+    const base = url.startsWith("http://") || url.startsWith("https://")
+      ? url
+      : `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    const parsed = new URL(base);
+    entries.forEach(([key, value]) => {
+      parsed.searchParams.set(key, String(value));
+    });
+    if (url.startsWith("http://") || url.startsWith("https://")) return parsed.toString();
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}${new URLSearchParams(entries).toString()}`;
+  }
+}
+
+function buildEndSetCta(rawEndCta, setId) {
+  const enabled = rawEndCta?.enabled !== false;
+  if (!enabled) return null;
+  return {
+    cta_id: `end-set-${setId}`,
+    label: rawEndCta?.label || "Explore ColorFix",
+    key: "navigate",
+    enabled: true,
+    variant: "primary",
+    params: {
+      url: rawEndCta?.url || "/",
+      target: "_self",
+      brand: "colorfix",
+    },
+  };
 }
 
 function readWatchNextSeenPlaylists(setId) {

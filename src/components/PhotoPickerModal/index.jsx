@@ -184,6 +184,11 @@ export default function PhotoPickerModal({
                 image_url: item.raw_rel_path || item.rel_path || item.image_url || "",
                 title: item.title || "",
                 tags: item.tags || "",
+                attached_saved_palette_id: item.attached_saved_palette_id ?? null,
+                attached_saved_palette_label: item.attached_saved_palette_label || "",
+                attached_saved_palette_set_id: item.attached_saved_palette_set_id ?? null,
+                attached_saved_palette_set_label: item.attached_saved_palette_set_label || "",
+                attached_saved_palette_photo_type: item.attached_saved_palette_photo_type || "",
               })}
             >
               <div className="ppm-thumb">

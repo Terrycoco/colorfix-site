@@ -1,11 +1,10 @@
 @import 'tailwindcss';
-@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;700&family=Poppins:wght@500;600;700;800&display=swap');
 
 @layer base {
 :root {
   --app-background: #f8f8f8;
-  --brand-color: #ff6600; /* Bright orange example */
-  --brand-muted:  #a66a3a;
+  --brand-color: #019196; /* splashy */
+  --brand-muted:  #456f70;
   --brand-accent: #ffaa33;
   --button-color:  #f57c00; /*orange */
   --button-background:  #f57c00; /*orange */
@@ -18,7 +17,7 @@
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 2rem;
-  --font-primary: 'Inter', sans-serif;
+  --font-primary: system-ui, -apple-system, "Segoe UI", sans-serif;
   --navbar-bg: #333;
   --palettebar-bg: #888;
   --menu-links: white;
@@ -29,8 +28,8 @@
   --dashboard-zindex: 2000;
   --palette-zindex: 4001;
   --board-scroller-height: 40px;
-  --search-item-background: #cdd8e0;
-  --search-item-background-hover: #B9C7D3;
+  --search-item-background: #DDE2E2; /* etched glass */
+  --search-item-background-hover: #BEDCDD; /* birds egg */
   --sticky-palette-bar-height: 70px;
   --board-scroller-z-index: 12000;
   --modals-z-index: 5000;

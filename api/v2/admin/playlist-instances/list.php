@@ -57,6 +57,7 @@ $items = array_map(static function ($instance) {
     return [
         'playlist_instance_id' => $instance->id,
         'playlist_id' => $instance->playlistId,
+        'slug' => $instance->slug,
         'instance_name' => $instance->instanceName,
         'display_title' => $instance->displayTitle,
         'display_subtitle' => $instance->displaySubtitle,
@@ -71,6 +72,13 @@ $items = array_map(static function ($instance) {
         'is_active' => $instance->isActive ? 1 : 0,
     ];
 }, $instances);
+
+$items = array_map(static function (array $item): array {
+    $slug = trim((string)($item['slug'] ?? ''));
+    $item['playlist_slug'] = $slug !== '' ? $slug : null;
+    $item['player_url'] = $slug ? "/playlist/{$slug}" : "/playlist/{$item['playlist_instance_id']}";
+    return $item;
+}, $items);
 
 respond([
     'ok' => true,

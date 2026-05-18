@@ -22,6 +22,7 @@ class SavedPaletteController
      *  - brand         (string, required)
      *  - color_ids     (array<int>|array<array{color_id:int,order_index?:int}>, required)
      *  - nickname      (string|null)
+     *  - display_title (string|null)
      *  - notes         (string|null)
      *  - terry_fav     (bool|int|null)
      *  - palette_id    (int|null) if provided, overwrites existing palette
@@ -50,6 +51,7 @@ class SavedPaletteController
             'brand'         => $brand,
             'color_ids'     => $payload['color_ids'],
             'nickname'      => isset($payload['nickname']) ? (string)$payload['nickname'] : null,
+            'display_title' => isset($payload['display_title']) ? (string)$payload['display_title'] : null,
             'notes'         => isset($payload['notes']) ? (string)$payload['notes'] : null,
             'private_notes' => isset($payload['private_notes']) ? (string)$payload['private_notes'] : null,
             'terry_fav'     => isset($payload['terry_fav']) ? (bool)$payload['terry_fav'] : false,
@@ -142,6 +144,7 @@ class SavedPaletteController
 
         $allowed = [
             'nickname',
+            'display_title',
             'notes',
             'private_notes',
             'terry_fav',
