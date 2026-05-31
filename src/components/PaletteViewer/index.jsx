@@ -40,6 +40,16 @@ export default function PaletteViewer({
   const seoDescription = kicker ? `Take a look at this palette: ${kicker}.` : shareText;
   const showExteriorNote = (paletteType === "exterior" || paletteType === "hoa")
     && colorGroups.some((group) => group.int_only);
+  const exteriorNoteBrandText = useMemo(() => {
+    const brands = colorGroups
+      .filter((group) => group.int_only)
+      .map((group) => group.brand_name || group.brand)
+      .filter(Boolean);
+    const uniqueBrands = Array.from(new Set(brands));
+    if (uniqueBrands.length === 1) return uniqueBrands[0];
+    if (uniqueBrands.length > 1) return "paint brand";
+    return "paint brand";
+  }, [colorGroups]);
 
   const handleBack = () => {
     if (onBack) {
@@ -301,7 +311,7 @@ export default function PaletteViewer({
           )}
           {showExteriorNote && (
             <div className="apv-footnote">
-              * Color is not recommended for exteriors. See manufacturer specifications.
+              * Depending on sun exposure, this color may not be suitable for exterior surfaces. But there are exceptions. Consult with your {exteriorNoteBrandText} representative.
             </div>
           )}
         </div>

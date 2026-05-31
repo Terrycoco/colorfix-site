@@ -23,11 +23,11 @@ function SearchBar({ initialQ = "", initialTags = "", onSearch }) {
   return (
     <div className="photo-searchbar">
       <div className="psb-field">
-        <label className="psb-label">Tags</label>
+        <label className="psb-label">Tags or Photo ID</label>
         <input
           className="psb-input"
           type="text"
-          placeholder="comma or | separated (e.g., adobe,white)"
+          placeholder="comma or | separated, or #621"
           value={tagsText}
           onChange={(e) => setTagsText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}

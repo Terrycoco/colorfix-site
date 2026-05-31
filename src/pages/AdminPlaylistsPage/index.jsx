@@ -19,26 +19,29 @@ export default function AdminPlaylistsPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [instances, setInstances] = useState([]);
+  const [instancesLoading, setInstancesLoading] = useState(false);
 
   useEffect(() => {
     fetchPlaylists();
-    fetchInstances();
   }, []);
 
   useEffect(() => {
     if (!activeId) {
       setDetail(null);
+      setInstances([]);
       return;
     }
     fetchPlaylistDetail(activeId);
+    fetchInstances(activeId);
   }, [activeId]);
 
-  async function fetchPlaylists() {
+  async function fetchPlaylists(forceReload = false) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${LIST_URL}?_=${Date.now()}`, {
+      const res = await fetch(LIST_URL, {
         credentials: "include",
+        cache: forceReload ? "reload" : "default",
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlists");
@@ -77,9 +80,18 @@ export default function AdminPlaylistsPage() {
     }
   }
 
-  async function fetchInstances() {
+  async function fetchInstances(playlistId) {
+    if (!playlistId) {
+      setInstances([]);
+      return;
+    }
+    setInstancesLoading(true);
     try {
-      const res = await fetch(`${INSTANCES_URL}?_=${Date.now()}`, {
+      const params = new URLSearchParams({
+        playlist_id: String(playlistId),
+        _: String(Date.now()),
+      });
+      const res = await fetch(`${INSTANCES_URL}?${params.toString()}`, {
         credentials: "include",
       });
       const data = await res.json();
@@ -87,6 +99,8 @@ export default function AdminPlaylistsPage() {
       setInstances(Array.isArray(data.items) ? data.items : []);
     } catch {
       setInstances([]);
+    } finally {
+      setInstancesLoading(false);
     }
   }
 
@@ -119,11 +133,15 @@ export default function AdminPlaylistsPage() {
 
   function buildPlayerUrl(instance) {
     if (!instance?.playlist_instance_id) return "";
-    const path = instance.player_url || `/playlist/${instance.playlist_instance_id}`;
+    const path = instance.player_url
+      ? instance.player_url.replace(/^\/playlist\//, "/p/")
+      : `/p/${instance.playlist_instance_id}`;
     const params = new URLSearchParams();
     if (instance.audience && instance.audience !== "any") {
       params.set("aud", instance.audience);
     }
+    params.set("close", "1");
+    params.set("return_to", "/admin/playlists");
     const qs = params.toString();
     return `${window.location.origin}${path}${qs ? `?${qs}` : ""}`;
   }
@@ -201,7 +219,7 @@ export default function AdminPlaylistsPage() {
             <button type="button" className="primary-btn" onClick={() => navigate("/admin/playlists/new")}>
               New Playlist
             </button>
-            <button type="button" onClick={fetchPlaylists}>
+            <button type="button" onClick={() => fetchPlaylists(true)}>
               Refresh
             </button>
           </div>
@@ -232,7 +250,7 @@ export default function AdminPlaylistsPage() {
               >
                 <div className="row-title">{row.title || "Untitled"}</div>
                 <div className="row-meta">
-                  #{row.playlist_id} • {row.type} • {row.is_active ? "Active" : "Inactive"}
+                  #{row.playlist_id} • {row.type} • {Number(row.is_active) !== 0 ? "Active" : "Inactive"} • {Number(row.is_public) === 1 ? "Public" : "Private"}
                 </div>
               </button>
               <button
@@ -258,7 +276,8 @@ export default function AdminPlaylistsPage() {
               <div className="playlist-mobile-card__meta">
                 <div>#{selectedPlaylist.playlist_id}</div>
                 <div>{selectedPlaylist.type || "Untyped"}</div>
-                <div>{selectedPlaylist.is_active ? "Active" : "Inactive"}</div>
+                <div>{Number(selectedPlaylist.is_active) !== 0 ? "Active" : "Inactive"}</div>
+                <div>{Number(selectedPlaylist.is_public) === 1 ? "Public" : "Private"}</div>
                 <div>{detail?.items?.length ?? 0} items</div>
               </div>
 
@@ -273,7 +292,7 @@ export default function AdminPlaylistsPage() {
 
               <div className="playlist-mobile-card__section">
                 <div className="playlist-mobile-card__label">Instances</div>
-                {detailLoading ? (
+                {detailLoading || instancesLoading ? (
                   <div className="panel-status">Loading details…</div>
                 ) : linkedInstances.length === 0 ? (
                   <div className="playlist-mobile-card__empty">No playlist instances are attached to this playlist yet.</div>
@@ -331,7 +350,8 @@ export default function AdminPlaylistsPage() {
               <div className="playlist-mobile-card__meta">
                 <div>#{selectedPlaylist.playlist_id}</div>
                 <div>{selectedPlaylist.type || "Untyped"}</div>
-                <div>{selectedPlaylist.is_active ? "Active" : "Inactive"}</div>
+                <div>{Number(selectedPlaylist.is_active) !== 0 ? "Active" : "Inactive"}</div>
+                <div>{Number(selectedPlaylist.is_public) === 1 ? "Public" : "Private"}</div>
                 <div>{detail?.items?.length ?? 0} items</div>
               </div>
 
@@ -346,7 +366,7 @@ export default function AdminPlaylistsPage() {
 
               <div className="playlist-mobile-card__section">
                 <div className="playlist-mobile-card__label">Instances</div>
-                {detailLoading ? (
+                {detailLoading || instancesLoading ? (
                   <div className="panel-status">Loading details…</div>
                 ) : linkedInstances.length === 0 ? (
                   <div className="playlist-mobile-card__empty">No playlist instances are attached to this playlist yet.</div>

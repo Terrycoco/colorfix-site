@@ -22,6 +22,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
+$playlistId = isset($_GET['playlist_id']) ? (int)$_GET['playlist_id'] : 0;
 $tagsRaw = isset($_GET['tags']) ? trim((string)$_GET['tags']) : '';
 $tags = [];
 if ($tagsRaw !== '') {
@@ -29,6 +30,52 @@ if ($tagsRaw !== '') {
     $tags = array_map('strtolower', $tags);
 }
 $onlyActive = isset($_GET['active']) ? (int)$_GET['active'] === 1 : false;
+
+if ($playlistId > 0) {
+    $sql = <<<SQL
+        SELECT
+          playlist_instance_id,
+          playlist_id,
+          slug,
+          instance_name,
+          display_title,
+          display_subtitle,
+          instance_notes,
+          cta_group_id,
+          palette_viewer_cta_group_id,
+          demo_enabled,
+          cta_context_key,
+          audience,
+          cta_overrides,
+          kicker_id,
+          is_active
+        FROM playlist_instances
+        WHERE playlist_id = :playlist_id
+        SQL;
+    if ($onlyActive) {
+        $sql .= "\n  AND is_active = 1";
+    }
+    $sql .= "\nORDER BY playlist_instance_id DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['playlist_id' => $playlistId]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $items = array_map(static function (array $item): array {
+        $slug = trim((string)($item['slug'] ?? ''));
+        $item['playlist_instance_id'] = (int)($item['playlist_instance_id'] ?? 0);
+        $item['playlist_id'] = (int)($item['playlist_id'] ?? 0);
+        $item['demo_enabled'] = (int)($item['demo_enabled'] ?? 0);
+        $item['kicker_id'] = $item['kicker_id'] !== null ? (int)$item['kicker_id'] : null;
+        $item['is_active'] = (int)($item['is_active'] ?? 0);
+        $item['playlist_slug'] = $slug !== '' ? $slug : null;
+        $item['player_url'] = $slug ? "/playlist/{$slug}" : "/playlist/{$item['playlist_instance_id']}";
+        return $item;
+    }, $items);
+
+    respond([
+        'ok' => true,
+        'items' => $items,
+    ]);
+}
 
 $repo = new PdoPlaylistInstanceRepository($pdo);
 $instances = $repo->listAll($onlyActive);

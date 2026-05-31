@@ -211,6 +211,112 @@
   box-shadow: none;
 }
 
+.hue-wheel-editor-modal {
+  width: min(1120px, 100%);
+}
+
+.hue-wheel-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hue-wheel-editor__settings {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(130px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fafafa;
+  border: 1px solid #e7e0d7;
+}
+
+.hue-wheel-editor__settings label,
+.hue-wheel-marker-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #293241;
+}
+
+.hue-wheel-editor__settings .checkbox-row,
+.hue-wheel-marker-row .checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  align-self: end;
+  min-height: 34px;
+}
+
+.hue-wheel-editor input,
+.hue-wheel-editor select {
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #d8d8d8;
+  font: inherit;
+}
+
+.hue-wheel-editor input[type="color"] {
+  width: 52px;
+  padding: 2px;
+}
+
+.hue-wheel-editor__markers-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.hue-wheel-editor__markers-head button,
+.hue-wheel-marker-row button {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #f3f3f3;
+  color: #111;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.hue-wheel-editor__markers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hue-wheel-marker-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) 80px minmax(130px, 1fr) 64px 94px 82px 92px 92px 92px auto;
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e7e0d7;
+}
+
+.hue-wheel-marker-row__pick {
+  min-width: 0;
+}
+
+.hue-wheel-marker-row__pick .fuzzy-wrap,
+.hue-wheel-marker-row__pick .fuzzy-search {
+  max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .hue-wheel-editor__settings {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+
+  .hue-wheel-marker-row {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
+}
+
 .items-header {
   display: flex;
   justify-content: space-between;

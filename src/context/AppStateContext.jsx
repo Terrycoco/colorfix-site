@@ -10,6 +10,7 @@ import { API_FOLDER } from '@helpers/config';
 const AppStateContext = createContext();
 const PALETTE_STORAGE_KEY = "pals.palette.v1";
 const BRAND_FILTERS_STORAGE_KEY = "pals.brand_filters.v1";
+const ADMIN_EXIT_PATH_STORAGE_KEY = "cf.admin_exit_path.v1";
 //import mockBoards from '@test/mockBoards';
 
 
@@ -214,6 +215,14 @@ export function AppStateProvider({ children }) {
   const [message, setMessage] = useState('');
   const [categories, setCategories] = useState([]);
   const [showBack, setShowBack] = useState(false);
+  const [adminExitPath, setAdminExitPathState] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return sessionStorage.getItem(ADMIN_EXIT_PATH_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
 
  
   const [recentSwatches, setRecentSwatches] = useState([]); //used for detail screen
@@ -615,6 +624,23 @@ function applyBrandFilters(brands) {
   setBrandFiltersAppliedSeq(s => s + 1); // bump a counter each Apply
 }
 
+function setAdminExitPath(path = '') {
+  const next = String(path || '').trim();
+  setAdminExitPathState(next);
+  if (typeof window === 'undefined') return;
+  try {
+    if (next) {
+      sessionStorage.setItem(ADMIN_EXIT_PATH_STORAGE_KEY, next);
+    } else {
+      sessionStorage.removeItem(ADMIN_EXIT_PATH_STORAGE_KEY);
+    }
+  } catch {}
+}
+
+function clearAdminExitPath() {
+  setAdminExitPath('');
+}
+
   //EXPORTS
   const state = {
     loggedIn, setLoggedIn,
@@ -629,6 +655,7 @@ function applyBrandFilters(brands) {
     categories, setCategories, refreshCategories,
     selectedCategory, setSelectedCategory,
     showBack, setShowBack,
+    adminExitPath, setAdminExitPath, clearAdminExitPath,
     recentSwatches, setRecentSwatches,
     searchFilters, setSearchFilters, clearSearchFilters,
        toggleFilter, clearFilter, setFilterValues, isFilterChecked,

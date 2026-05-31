@@ -35,7 +35,14 @@ const emptyItem = {
 
 function buildSetPlayUrl(setId) {
   const id = Number(setId || 0);
-  return id > 0 ? `/picker?psi=${encodeURIComponent(String(id))}` : "";
+  if (id <= 0) return "";
+  const params = new URLSearchParams({
+    psi: String(id),
+    include_private: "1",
+    close: "1",
+    return_to: "/admin/playlist-sets",
+  });
+  return `/picker?${params.toString()}`;
 }
 
 export default function AdminPlaylistInstanceSetsPage() {
@@ -474,7 +481,7 @@ export default function AdminPlaylistInstanceSetsPage() {
       .filter((item) => Number(item.is_active) !== 0)
       .map((item) => ({
         id: item.playlist_id,
-        label: `${item.title || "Untitled"} (#${item.playlist_id})`,
+        label: `${item.title || "Untitled"} (#${item.playlist_id}) ${Number(item.is_public) === 1 ? "Public" : "Private"}`,
       }))
       .sort((a, b) => a.label.localeCompare(b.label, undefined, {
         numeric: true,

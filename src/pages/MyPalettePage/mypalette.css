@@ -6,6 +6,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .myp-title{
@@ -27,6 +29,40 @@
 }
 .myp-save-btn:hover { background:#f67c00; }
 .myp-save-btn:disabled { opacity:0.6; cursor:not-allowed; }
+
+.myp-hue-toggle {
+  background: #ff9100;
+  color: #fff;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.myp-hue-toggle:hover {
+  background: #f67c00;
+}
+
+.myp-hue-toggle.is-on {
+  background: #121212;
+}
+
+.myp-hue-toggle.is-on:hover {
+  background: #000;
+}
+
+.myp-hue-wheel-tile {
+  align-self: stretch;
+  cursor: default;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.myp-hue-wheel-tile .animated-hue-wheel {
+  width: 100%;
+}
 
 section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 
@@ -759,7 +795,76 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   margin-left: 8px;
 }
 
+.myp-copy-export {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  pointer-events: none;
+  width: max-content;
+  padding: 0;
+  background: #fff;
+}
+
+.myp-copy-export__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 360px);
+  gap: 16px;
+  padding: 0;
+  background: #fff;
+}
+
+.myp-copy-export__card {
+  position: relative;
+  width: 360px;
+  height: 288px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-sizing: border-box;
+  box-shadow: none;
+}
+
+.myp-copy-export__chip {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  font: 700 22px/1.1 "Open Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+.myp-copy-export__label {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+}
+
+.myp-copy-export__name {
+  font-family: "Lato", Georgia, serif;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1.08;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.myp-copy-export__meta {
+  margin-top: 6px;
+  font: 700 17px/1.2 "Open Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
+  .myp-header-actions {
+    gap: 8px;
+  }
+
+  .myp-header-actions .myp-clear-btn,
+  .myp-header-actions .myp-hue-toggle {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+  }
+
   .myp-sort-btn {
     font-size: 0.75rem;
     padding: 5px 6px;

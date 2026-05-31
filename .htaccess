@@ -5,6 +5,7 @@
   RewriteRule ^index\.html$ - [L]
   RewriteRule ^colorfix/index\.html$ - [L]
   RewriteRule ^playlist/share/id=([0-9]+)/?$ /playlist-share.php?playlist_id=$1 [L,QSA]
+  RewriteRule ^playlist/(.+)$ /p/$1 [R=302,L,NE]
   RewriteRule ^playlists/?$ /playlists/index.php [L,QSA]
   RewriteRule ^sitemap\.xml$ /sitemap.php [L,QSA]
 
@@ -15,6 +16,10 @@
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^colorfix/.*$ /colorfix/index.html [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^p(/.*)?$ /player/index.html [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

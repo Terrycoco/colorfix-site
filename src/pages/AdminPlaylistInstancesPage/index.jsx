@@ -379,12 +379,36 @@ export default function AdminPlaylistInstancesPage() {
     const params = new URLSearchParams();
     if (audience && audience !== "any") params.set("aud", audience);
     if (demoEnabled) params.set("demo", "1");
+    params.set("close", "1");
+    params.set("return_to", "/admin/playlist-instances");
     const qs = params.toString();
     return `${window.location.origin}/playlist/${pathId}${qs ? `?${qs}` : ""}`;
   }
 
+  function buildFastPlayerUrl(instance = null) {
+    const id = instance?.playlist_instance_id || form.playlist_instance_id;
+    if (!id) return "";
+    const slug = String(instance?.slug || instance?.playlist_slug || form.slug || "").trim();
+    const pathId = slug || id;
+    const audience = instance?.audience || form.audience || "";
+    const demoEnabled = Boolean(instance?.demo_enabled ?? form.demo_enabled);
+    const params = new URLSearchParams();
+    if (audience && audience !== "any") params.set("aud", audience);
+    if (demoEnabled) params.set("demo", "1");
+    params.set("close", "1");
+    params.set("return_to", "/admin/playlist-instances");
+    const qs = params.toString();
+    return `${window.location.origin}/p/${pathId}${qs ? `?${qs}` : ""}`;
+  }
+
   function openLiveUrl(instance) {
     const url = buildPlayerUrl(instance);
+    if (!url) return;
+    window.open(url, "_blank", "noopener");
+  }
+
+  function openFastPlayerUrl(instance) {
+    const url = buildFastPlayerUrl(instance);
     if (!url) return;
     window.open(url, "_blank", "noopener");
   }
@@ -458,7 +482,13 @@ export default function AdminPlaylistInstancesPage() {
   function openEmailModal() {
     if (!activeId) return;
     const shareUrl = buildShareUrl(activeId);
-    const instanceLabel = form.instance_name || form.display_title || `Instance #${activeId}`;
+    const selectedItem = items.find((item) => item.playlist_instance_id === activeId);
+    const formMatchesActive = Number(form.playlist_instance_id || 0) === Number(activeId || 0);
+    const instanceLabel =
+      (formMatchesActive ? form.instance_name || form.display_title : "") ||
+      selectedItem?.instance_name ||
+      selectedItem?.display_title ||
+      `Instance #${activeId}`;
     const fallbackTemplate = emailTemplates[0] || null;
     const templateKey = fallbackTemplate?.key || "";
     const subject = hydrateTemplate(fallbackTemplate?.subject || "Your ColorFix playlist", {
@@ -653,6 +683,13 @@ export default function AdminPlaylistInstancesPage() {
     });
   }, [audienceFilter, items, query]);
 
+  function getInstanceOptionLabel(item) {
+    if (!item) return "";
+    const name = item.instance_name || item.display_title || item.slug || "Untitled";
+    const audience = audienceLabelMap[item.audience] || item.audience || "Any";
+    return `#${item.playlist_instance_id} ${name} - ${audience}`;
+  }
+
   const duplicateNotice =
     !form.playlist_instance_id && saveStatus.startsWith("Unsaved duplicate from Instance #")
       ? saveStatus
@@ -796,23 +833,20 @@ export default function AdminPlaylistInstancesPage() {
         {loading && <div className="panel-status">Loading…</div>}
         {error && <div className="panel-status error">{error}</div>}
 
-        <div className="panel-list">
-          {filteredItems.map((item) => (
-            <button
-              type="button"
-              key={item.playlist_instance_id}
-              className={`list-row ${activeId === item.playlist_instance_id ? "active" : ""}`}
-              onClick={() => setActiveId(item.playlist_instance_id)}
-            >
-              <div className="row-title">
-                #{item.playlist_instance_id} {item.instance_name || "Untitled"}
-              </div>
-              {item.slug ? <div className="row-audience">/{item.slug}</div> : null}
-              <div className="row-audience">
-                {audienceLabelMap[item.audience] || item.audience || "Any"}
-              </div>
-            </button>
-          ))}
+        <div className="mobile-instance-picker">
+          <label htmlFor="mobile-playlist-instance-select">Choose Playlist Instance</label>
+          <select
+            id="mobile-playlist-instance-select"
+            value={activeId || ""}
+            onChange={(e) => setActiveId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Pick an instance...</option>
+            {filteredItems.map((item) => (
+              <option key={item.playlist_instance_id} value={item.playlist_instance_id}>
+                {getInstanceOptionLabel(item)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mobile-instance-card">
@@ -848,14 +882,20 @@ export default function AdminPlaylistInstancesPage() {
                 <button type="button" className="primary-btn" onClick={() => openLiveUrl(activeItem)}>
                   Play
                 </button>
+                <button type="button" onClick={() => openFastPlayerUrl(activeItem)}>
+                  Fast Play
+                </button>
                 <button type="button" onClick={() => openPreview(activeItem)}>
                   Preview
                 </button>
                 <button type="button" onClick={handleCopyLink}>
                   Copy Link
                 </button>
+                <button type="button" onClick={handleCopyPinterestLink}>
+                  Copy Pinterest
+                </button>
                 <button type="button" onClick={handleShare}>
-                  Share
+                  Text
                 </button>
                 <button type="button" onClick={openEmailModal}>
                   Email
@@ -884,36 +924,28 @@ export default function AdminPlaylistInstancesPage() {
             </>
           ) : (
             <div className="mobile-instance-card__empty">
-              Tap an instance to view it, share it, or email it from your phone.
+              Choose an instance to view it, text it, copy it, or email it from your phone.
             </div>
           )}
         </div>
 
-        <div className="mobile-share">
-          <div className="mobile-share__title">Share Playlist Instance</div>
-          {activeId ? (
-            <div className="mobile-share__selected">
-              {items.find((item) => item.playlist_instance_id === activeId)?.instance_name || "Untitled"}
-            </div>
-          ) : (
-            <div className="mobile-share__selected">Select an instance to share</div>
-          )}
-          <div className="mobile-share__actions">
-            <button type="button" onClick={handleCopyLink} disabled={!activeId}>
-              Copy Link
+        <div className="panel-list">
+          {filteredItems.map((item) => (
+            <button
+              type="button"
+              key={item.playlist_instance_id}
+              className={`list-row ${activeId === item.playlist_instance_id ? "active" : ""}`}
+              onClick={() => setActiveId(item.playlist_instance_id)}
+            >
+              <div className="row-title">
+                #{item.playlist_instance_id} {item.instance_name || "Untitled"}
+              </div>
+              {item.slug ? <div className="row-audience">/{item.slug}</div> : null}
+              <div className="row-audience">
+                {audienceLabelMap[item.audience] || item.audience || "Any"}
+              </div>
             </button>
-            <button type="button" className="primary-btn" onClick={handleShare} disabled={!activeId}>
-              Share via Text
-            </button>
-            <button type="button" onClick={openEmailModal} disabled={!activeId}>
-              Email Link
-            </button>
-          </div>
-          {activeId && (
-            <div className="mobile-share__hint">
-              {buildShareUrl(activeId)}
-            </div>
-          )}
+          ))}
         </div>
       </div>
 
@@ -962,6 +994,15 @@ export default function AdminPlaylistInstancesPage() {
               disabled={!form.playlist_instance_id}
             >
               Open Live URL
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                openFastPlayerUrl();
+              }}
+              disabled={!form.playlist_instance_id}
+            >
+              Open Fast URL
             </button>
             <button
               type="button"

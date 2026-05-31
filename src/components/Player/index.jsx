@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
+import AnimatedHueWheel from "@components/AnimatedHueWheel";
 import {
   extractAssetId,
   fetchAssetUrl,
@@ -183,7 +184,7 @@ function queueFadeReady(img, stageEl) {
     if (hideStars) return false;
     if (!item) return false;
     const itemType = (item.type || "normal").toLowerCase();
-    if (itemType === "intro" || itemType === "text") return false;
+    if (itemType === "intro" || itemType === "text" || itemType === "hue-wheel") return false;
     return item.star === true || item.star === 1 || item.star === "1";
   }
 
@@ -277,11 +278,22 @@ function startPlayback(nextMode, nextIndex = 0) {
   const titleMode = playItems[titleIndex]?.title_mode || "animated";
   const transitionMode = (currentItem?.transition || "animation").toLowerCase();
   const subtitleOffset = subtitle ? 0 : 18;
-  const currentType = (currentItem?.type || "normal").toLowerCase();
+  const currentType = (currentItem?.type || "normal").toLowerCase().trim();
   const isIntro = currentType === "intro" || currentType === "text";
+  const isHueWheel = currentType === "hue-wheel";
+  const hueWheelConfig = useMemo(
+    () => parseHueWheelConfig(currentItem?.body),
+    [currentItem?.body]
+  );
   const introNoImage = isIntro && !currentImageUrl;
   const hasCurrentImageRef = Boolean(currentItem?.image_url);
   const showImageLoading = playbackState === "playing" && !imageLoaded && !introNoImage && (hasCurrentImageRef || currentImageUrl);
+  const shouldShowAdvanceHint =
+    showAdvanceHint &&
+    playbackState === "playing" &&
+    activeIndex === 0 &&
+    currentIndex === 0 &&
+    (imageLoaded || introNoImage);
   const introLayoutKey = isIntro
     ? ((currentItem?.layout || "").toString().toLowerCase().trim() || (currentType === "text" ? "text" : "default"))
     : null;
@@ -296,6 +308,10 @@ function startPlayback(nextMode, nextIndex = 0) {
 
   useEffect(() => {
     let cancelled = false;
+    if (isHueWheel) {
+      setCurrentImageUrl("");
+      return () => { cancelled = true; };
+    }
     const value = currentItem?.image_url || "";
     const parsed = parsePhotoRef(value);
     if (parsed.url) {
@@ -315,7 +331,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       if (!cancelled) setCurrentImageUrl(url || "");
     });
     return () => { cancelled = true; };
-  }, [currentItem?.image_url]);
+  }, [currentItem?.image_url, isHueWheel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -476,11 +492,11 @@ function startPlayback(nextMode, nextIndex = 0) {
   }, [imageLoaded, fadeReady, currentIndex]);
 
   useEffect(() => {
-    if (!isIntro) return;
+    if (!isIntro && !isHueWheel) return;
     if (currentImageUrl) return;
     setImageLoaded(true);
     setFadeReady(true);
-  }, [isIntro, currentIndex, currentImageUrl]);
+  }, [isIntro, isHueWheel, currentIndex, currentImageUrl]);
 
 
   useEffect(() => {
@@ -537,7 +553,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       >
         ×
       </button>
-      {playbackState === "playing" && activeIndex > 0 && !isIntro && (
+      {playbackState === "playing" && activeIndex > 0 && currentType !== "intro" && (
         <button
           className="player-back"
           type="button"
@@ -636,6 +652,32 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
+          {imageLoaded && fadeReady && titleVisible && titleReady && isHueWheel && (
+            <div className="player-hue-wheel-slide">
+              <div className="player-hue-wheel-copy">
+                {title ? <h1>{title}</h1> : null}
+                {subtitle ? <p>{subtitle}</p> : null}
+              </div>
+              <AnimatedHueWheel
+                key={`hue-wheel-${currentIndex}-${currentItem?.playlist_item_id || ""}`}
+                items={hueWheelConfig.items}
+                animated={hueWheelConfig.animated}
+                showLabels={hueWheelConfig.showLabels}
+                showDots={hueWheelConfig.showDots}
+                pulseOnComplete={hueWheelConfig.pulseOnComplete}
+                caption={hueWheelConfig.caption}
+                size={hueWheelConfig.size}
+                wheelFadeMs={hueWheelConfig.wheelFadeMs}
+                spokeStartRadius={hueWheelConfig.spokeStartRadius}
+                spokeEndRadius={hueWheelConfig.spokeEndRadius}
+                spokeDelayMs={hueWheelConfig.spokeDelayMs}
+                spokeStaggerMs={hueWheelConfig.spokeStaggerMs}
+                spokeDurationMs={hueWheelConfig.spokeDurationMs}
+                className="player-hue-wheel"
+              />
+            </div>
+          )}
+
           {imageLoaded && fadeReady && titleVisible && titleReady && isIntro && IntroRenderer && (
             <div
               className={`player-title${introNoImage ? " is-intro-full is-text-intro" : " is-static"}`}
@@ -650,10 +692,13 @@ function startPlayback(nextMode, nextIndex = 0) {
               ref={titleRef}
             >
               <IntroRenderer item={currentItem} />
+              {shouldShowAdvanceHint && introNoImage ? (
+                <div className="player-advance-hint player-advance-hint--inline">Tap to Advance</div>
+              ) : null}
             </div>
           )}
 
-          {imageLoaded && fadeReady && hasOverlayText && titleVisible && titleReady && !isIntro && (
+          {imageLoaded && fadeReady && hasOverlayText && titleVisible && titleReady && !isIntro && !isHueWheel && (
             <div
               className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}${title ? "" : " no-title"}`}
               style={{
@@ -672,13 +717,9 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
         </div>
-        {showAdvanceHint &&
-          playbackState === "playing" &&
-          activeIndex === 0 &&
-          !isIntro &&
-          (imageLoaded || introNoImage) && (
-            <div className="player-advance-hint">Tap screen to advance</div>
-          )}
+        {shouldShowAdvanceHint && !introNoImage && (
+          <div className="player-advance-hint">Tap to Advance</div>
+        )}
       </div>
     </div>
   );
@@ -717,6 +758,44 @@ function writeLikedSet(playlistInstanceId, likedSet) {
 }
 
 export default Player;
+
+function parseHueWheelConfig(rawBody) {
+  const fallback = {
+    items: [],
+    animated: true,
+    showLabels: false,
+    showDots: false,
+    pulseOnComplete: true,
+    caption: "",
+    size: 360,
+    wheelFadeMs: 420,
+    spokeStartRadius: 0,
+    spokeEndRadius: 136,
+    spokeDelayMs: 420,
+    spokeStaggerMs: 260,
+    spokeDurationMs: 800,
+  };
+  const raw = String(rawBody || "").trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    const config = Array.isArray(parsed) ? { items: parsed } : parsed;
+    if (!config || typeof config !== "object") return fallback;
+    const items = Array.isArray(config.items) ? config.items : [];
+    return {
+      ...fallback,
+      ...config,
+      items,
+      animated: config.animated !== false,
+      showLabels: config.showLabels === true,
+      showDots: config.showDots === true,
+      pulseOnComplete: config.pulseOnComplete !== false,
+      caption: typeof config.caption === "string" ? config.caption : fallback.caption,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 function buildImageGallerySchema(items, galleryName, galleryDescription) {
   const projectName = cleanText(galleryName) || "ColorFix Gallery";

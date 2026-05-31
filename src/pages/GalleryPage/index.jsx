@@ -16,6 +16,7 @@ const FRONT_PAGE_INSERT_POSITION = 3;
 const GalleryPage = ({ defaultQueryId = null }) => {
   const activeReqRef = useRef(0);
   const abortRef = useRef(null);
+  const frontPageGeneratedAtRef = useRef('');
 
   const { queryId } = useParams();
   const effectiveQueryId = queryId || defaultQueryId;
@@ -73,6 +74,80 @@ const GalleryPage = ({ defaultQueryId = null }) => {
     return codes.length ? { brand: codes } : {};
   }
 
+  const isPrebuiltFrontPageRequest = (query_id, params = paramObj) => {
+    const serverFilters = makeServerFilters(searchFilters);
+    return (
+      Number(query_id) === FRONT_PAGE_QUERY_ID &&
+      isDefaultFrontPageParams(params) &&
+      Object.keys(serverFilters).length === 0
+    );
+  };
+
+  const getFrontPageVariant = () => (
+    location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+      ? 'admin'
+      : 'public'
+  );
+
+  const applyPrebuiltFrontPage = (prebuilt, { scrollToTop = false } = {}) => {
+    frontPageGeneratedAtRef.current = String(prebuilt?.generated_at || '');
+    setNoResults((prebuilt.results || []).length === 0);
+    setSearchItems(prebuilt.results || []);
+    setInsertItems(prebuilt.inserts || []);
+    setFrontPageRailItem(prebuilt.frontPageRailItem || null);
+    setMeta(prebuilt.meta || null);
+    if (scrollToTop) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const loadPrebuiltFrontPage = async () => {
+    const reqId = ++activeReqRef.current;
+
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setNoResults(false);
+    setSearchItems([]);
+    setInsertItems([]);
+    setFrontPageRailItem(null);
+    setMeta(null);
+
+    try {
+      const variant = getFrontPageVariant();
+      const prebuilt = await fetchPrebuiltFrontPage(variant, controller.signal);
+      if (activeReqRef.current !== reqId) return;
+      if (!prebuilt?.success) {
+        throw new Error('Prebuilt front page payload was not successful');
+      }
+
+      applyPrebuiltFrontPage(prebuilt, { scrollToTop: true });
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      console.error('Prebuilt front page unavailable:', err);
+      setNoResults(true);
+    }
+  };
+
+  const refreshPrebuiltFrontPage = async () => {
+    if (!effectiveQueryId) return;
+    const id = parseInt(effectiveQueryId, 10);
+    if (!isPrebuiltFrontPageRequest(id, paramObj)) return;
+
+    try {
+      const prebuilt = await fetchPrebuiltFrontPage(getFrontPageVariant(), null, { cacheBust: true });
+      if (!prebuilt?.success) return;
+      const nextGeneratedAt = String(prebuilt.generated_at || '');
+      if (nextGeneratedAt && nextGeneratedAt === frontPageGeneratedAtRef.current) return;
+      applyPrebuiltFrontPage(prebuilt);
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.warn('Front page refresh skipped:', err);
+      }
+    }
+  };
+
   const runQueryById = async (query_id, params = [], opts = {}) => {
     const { allowNavigate = false } = opts;
     const reqId = ++activeReqRef.current;
@@ -86,6 +161,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
       const v2 = `${API_FOLDER}/v2/run-query.php?t=${Date.now()}`;
 
       // reset view while loading
+      frontPageGeneratedAtRef.current = '';
       setNoResults(false);
       setSearchItems([]);
       setInsertItems([]);
@@ -186,14 +262,40 @@ const GalleryPage = ({ defaultQueryId = null }) => {
   useEffect(() => {
     if (!effectiveQueryId) return;
     const id = parseInt(effectiveQueryId, 10);
+    if (isPrebuiltFrontPageRequest(id, paramObj)) {
+      loadPrebuiltFrontPage();
+      return;
+    }
     runQueryById(id, paramObj, { allowNavigate: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveQueryId, location.search]);
+
+  useEffect(() => {
+    if (!effectiveQueryId) return undefined;
+    const id = parseInt(effectiveQueryId, 10);
+    if (!isPrebuiltFrontPageRequest(id, paramObj)) return undefined;
+
+    const refreshIfVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') {
+        return;
+      }
+      refreshPrebuiltFrontPage();
+    };
+
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveQueryId, location.pathname, location.search]);
 
   // Re-run on Apply signal
   useEffect(() => {
     if (!effectiveQueryId) return;
     const id = parseInt(effectiveQueryId, 10);
+    if (isPrebuiltFrontPageRequest(id, paramObj)) return;
     runQueryById(id, paramObj, { allowNavigate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandFiltersAppliedSeq]);
@@ -202,6 +304,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
   useEffect(() => {
     if (!effectiveQueryId) return;
     const id = parseInt(effectiveQueryId, 10);
+    if (isPrebuiltFrontPageRequest(id, paramObj)) return;
     runQueryById(id, paramObj, { allowNavigate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(searchFilters?.brands || [])]);
@@ -396,6 +499,33 @@ async function fetchFrontPagePlaylistInsert(signal) {
     }
     return null;
   }
+}
+
+async function fetchPrebuiltFrontPage(variant, signal, options = {}) {
+  const params = new URLSearchParams({
+    variant: variant || 'public',
+  });
+  if (options.cacheBust !== false) {
+    params.set('t', String(Date.now()));
+  }
+  const response = await fetch(`${API_FOLDER}/v2/front-page.php?${params.toString()}`, {
+    headers: { Accept: 'application/json' },
+    cache: options.cacheBust === false ? 'default' : 'no-store',
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Prebuilt front page failed with ${response.status}`);
+  }
+  return response.json();
+}
+
+function isDefaultFrontPageParams(params) {
+  if (!params || typeof params !== 'object') return true;
+  return Object.entries(params).every(([key, value]) => {
+    if (value == null || value === '') return true;
+    if (key === 'group_mode') return value === 'hue';
+    return key === '_';
+  });
 }
 
 function formatFrontPageText(value) {

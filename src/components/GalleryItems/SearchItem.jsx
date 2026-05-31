@@ -12,10 +12,6 @@ const SearchItem = ({ item }) => {
     if (!target) return;
     const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
     const isPublicAbsolutePath = target.startsWith('/') && !target.startsWith('/admin');
-    if (isAdminRoute && isPublicAbsolutePath) {
-      window.location.assign(target);
-      return;
-    }
     navigate(target);
   };
 

@@ -32,6 +32,7 @@ $playlistId = isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : 0;
 $title = trim((string)($payload['title'] ?? ''));
 $type = trim((string)($payload['type'] ?? ''));
 $isActive = isset($payload['is_active']) ? (int)(bool)$payload['is_active'] : 1;
+$isPublic = isset($payload['is_public']) ? (int)(bool)$payload['is_public'] : 0;
 $headline = trim((string)($payload['headline'] ?? ''));
 $pageTitle = trim((string)($payload['page_title'] ?? ''));
 $metaDescription = trim((string)($payload['meta_description'] ?? ''));
@@ -81,6 +82,7 @@ if ($playlistId > 0) {
         SET title = :title,
             type = :type,
             is_active = :is_active,
+            is_public = :is_public,
             slug = :slug,
             headline = :headline,
             page_title = :page_title,
@@ -102,6 +104,7 @@ if ($playlistId > 0) {
         'title' => $title,
         'type' => $type,
         'is_active' => $isActive,
+        'is_public' => $isPublic,
         'slug' => $slug !== '' ? $slug : null,
         'headline' => $headline !== '' ? $headline : null,
         'page_title' => $pageTitle !== '' ? $pageTitle : null,
@@ -121,6 +124,7 @@ if ($playlistId > 0) {
             title,
             type,
             is_active,
+            is_public,
             slug,
             headline,
             page_title,
@@ -139,6 +143,7 @@ if ($playlistId > 0) {
             :title,
             :type,
             :is_active,
+            :is_public,
             :slug,
             :headline,
             :page_title,
@@ -159,6 +164,7 @@ if ($playlistId > 0) {
         'title' => $title,
         'type' => $type,
         'is_active' => $isActive,
+        'is_public' => $isPublic,
         'slug' => $slug !== '' ? $slug : null,
         'headline' => $headline !== '' ? $headline : null,
         'page_title' => $pageTitle !== '' ? $pageTitle : null,

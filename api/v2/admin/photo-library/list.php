@@ -72,12 +72,14 @@ try {
         $tokenClauses = [];
         foreach ($tokens as $idx => $token) {
             $suffix = '_' . $idx;
+            $numericToken = preg_replace('/^#/', '', $token);
             $tokenClauses[] = '(photo_library.title LIKE :q_title' . $suffix
                 . ' OR photo_library.tags LIKE :q_tags' . $suffix
                 . ' OR photo_library.rel_path LIKE :q_path' . $suffix
                 . ' OR clients.name LIKE :q_client_name' . $suffix
                 . ' OR clients.email LIKE :q_client_email' . $suffix
-                . (ctype_digit($token) ? ' OR CAST(photo_library.photo_library_id AS CHAR) LIKE :q_photo_id' . $suffix : '')
+                . (ctype_digit($numericToken) ? ' OR photo_library.photo_library_id = :q_photo_id_exact' . $suffix
+                    . ' OR CAST(photo_library.photo_library_id AS CHAR) LIKE :q_photo_id' . $suffix : '')
                 . ')';
 
             $params[':q_title' . $suffix] = '%' . $token . '%';
@@ -85,8 +87,9 @@ try {
             $params[':q_path' . $suffix] = '%' . $token . '%';
             $params[':q_client_name' . $suffix] = '%' . $token . '%';
             $params[':q_client_email' . $suffix] = '%' . $token . '%';
-            if (ctype_digit($token)) {
-                $params[':q_photo_id' . $suffix] = $token . '%';
+            if (ctype_digit($numericToken)) {
+                $params[':q_photo_id_exact' . $suffix] = (int)$numericToken;
+                $params[':q_photo_id' . $suffix] = $numericToken . '%';
             }
         }
 

@@ -3,28 +3,38 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import Player from "@components/Player";
 import CTALayout from "@components/cta/CTALayout";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
+import { useAppState } from "@context/AppStateContext";
 import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
 import { isHireTerryCta, trackUserEvent } from "@helpers/userEvents";
 import './playerpage.css';
 
+const PLAYER_CLOSE_ON_EXIT_KEY = "cf.player.close_on_exit.v1";
+
 export default function PlayerPage() {
   const { playlistId, start } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { adminExitPath, clearAdminExitPath } = useAppState();
+  const isFastPlayerShell = location.pathname === "/p" || location.pathname.startsWith("/p/");
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const ctaAudience = searchParams.get("aud") ?? "";
   const psiParam = searchParams.get("psi") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const sourceParam = searchParams.get("src") ?? "";
+  const includePrivateParam = searchParams.get("include_private") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
+  const closeOnExitParam = (searchParams.get("close") ?? "") === "1";
+  const freshParam = searchParams.get("fresh") ?? "";
+  const reloadParam = searchParams.get("_") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
   const debugTimingParam = searchParams.get("debug_timing") ?? "";
   const returnTo = resolveReturnTo(returnToParam);
   const startParamValue = start ?? searchParams.get("start") ?? "";
+  const shouldCloseOnExit = closeOnExitParam || readPlayerCloseOnExit();
 
 
   const [data, setData] = useState(null);
@@ -41,6 +51,10 @@ export default function PlayerPage() {
     thumbParam === "1" || thumbParam.toLowerCase() === "true" || Boolean(data?.thumbs_enabled);
   const demoEnabled =
     demoParam === "1" || demoParam.toLowerCase() === "true" || Boolean(data?.demo_enabled);
+
+  useEffect(() => {
+    if (closeOnExitParam) writePlayerCloseOnExit(true);
+  }, [closeOnExitParam]);
 
   useEffect(() => {
     if (!data) return;
@@ -79,7 +93,8 @@ export default function PlayerPage() {
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
-    params.set("_", String(Date.now()));
+    if (freshParam !== "") params.set("fresh", freshParam);
+    if (reloadParam !== "") params.set("_", reloadParam);
     let cancelled = false;
     setLoading(true);
     setError("");
@@ -104,7 +119,7 @@ export default function PlayerPage() {
     return () => {
       cancelled = true;
     };
-  }, [playlistId, startParamValue, addCtaGroup, ctaAudience, debugTimingParam]);
+  }, [playlistId, startParamValue, addCtaGroup, ctaAudience, debugTimingParam, freshParam, reloadParam]);
 
   useEffect(() => {
     if (!data?.playlist_instance_id) return;
@@ -159,7 +174,34 @@ export default function PlayerPage() {
   }, [data?.playlist_instance_id, endParam]);
 
   function handleExit() {
-    navigate("/");
+    if (shouldCloseOnExit) {
+      window.close();
+      window.setTimeout(() => {
+        writePlayerCloseOnExit(false);
+        exitToPath(returnTo || adminExitPath || "/admin/");
+      }, 150);
+      return;
+    }
+    if (returnTo) {
+      exitToPath(returnTo);
+      return;
+    }
+    if (adminExitPath) {
+      const target = adminExitPath;
+      clearAdminExitPath();
+      window.location.href = target;
+      return;
+    }
+    exitToPath("/");
+  }
+
+  function exitToPath(path) {
+    const target = resolveReturnTo(path) || "/";
+    if (isFastPlayerShell && !target.startsWith("/p/")) {
+      window.location.href = target;
+      return;
+    }
+    navigate(target);
   }
 
   const firstNonIntroIndex = useMemo(() => {
@@ -348,6 +390,26 @@ function resolveReturnTo(value) {
   return trimmed;
 }
 
+function readPlayerCloseOnExit() {
+  if (typeof sessionStorage === "undefined") return false;
+  try {
+    return sessionStorage.getItem(PLAYER_CLOSE_ON_EXIT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writePlayerCloseOnExit(enabled) {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    if (enabled) {
+      sessionStorage.setItem(PLAYER_CLOSE_ON_EXIT_KEY, "1");
+    } else {
+      sessionStorage.removeItem(PLAYER_CLOSE_ON_EXIT_KEY);
+    }
+  } catch {}
+}
+
 function isNumericId(value) {
   return /^[0-9]+$/.test(String(value || "").trim());
 }
@@ -489,10 +551,12 @@ const visibleCTAs = useMemo(
       try {
         const setParams = new URLSearchParams({
           id: String(setId),
-          _: String(Date.now()),
         });
         if (ctaAudience) {
           setParams.set("aud", ctaAudience);
+        }
+        if (adminExitPath || includePrivateParam === "1") {
+          setParams.set("include_private", "1");
         }
         const res = await fetch(`/api/v2/playlist-instance-sets/get.php?${setParams.toString()}`, {
           credentials: "include",
@@ -553,7 +617,12 @@ const visibleCTAs = useMemo(
           params: {
             ...(baseCta?.params || {}),
             playlist_instance_id: Number(nextItem.playlist_instance_id),
-            url: nextItem.player_url ? appendUrlParams(nextItem.player_url, { psi: setId }) : undefined,
+            url: nextItem.player_url ? appendUrlParams(normalizePlayerUrlForShell(nextItem.player_url, isFastPlayerShell), {
+              psi: setId,
+              include_private: includePrivateParam === "1" ? "1" : undefined,
+              close: shouldCloseOnExit ? "1" : undefined,
+              return_to: returnTo || undefined,
+            }) : undefined,
             audience: ctaAudience || data?.audience || undefined,
             title: resolvedTitle,
             subtitle: resolvedSubtitle,
@@ -590,7 +659,7 @@ const visibleCTAs = useMemo(
     return () => {
       cancelled = true;
     };
-  }, [ctaAudience, data, visibleCTAs, playbackEnded, psiParam, sourceParam]);
+  }, [adminExitPath, ctaAudience, data, includePrivateParam, shouldCloseOnExit, visibleCTAs, playbackEnded, psiParam, sourceParam]);
 
   if (loading) {
     return (
@@ -599,7 +668,19 @@ const visibleCTAs = useMemo(
       </div>
     );
   }
-  if (error) return <div className="player-error">{error}</div>;
+  if (error) {
+    return (
+      <div className="player-error" role="alert">
+        <div className="player-error__panel">
+          <div className="player-error__title">Playlist could not load</div>
+          <div className="player-error__message">{error}</div>
+          <button type="button" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="player-page">
@@ -654,7 +735,7 @@ async function fetchPlayerPlaylist(url) {
   try {
     return await fetchJsonWithTimeout(url, options, 8000);
   } catch (err) {
-    if (!isTimeoutError(err)) throw err;
+    if (!isRetryablePlaylistError(err)) throw err;
     return fetchJsonWithTimeout(url, { ...options, cache: "reload" }, 8000);
   }
 }
@@ -669,7 +750,7 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
     try {
       payload = text ? JSON.parse(text) : null;
     } catch {
-      throw new Error("Playlist returned an invalid response");
+      throw new Error("Playlist returned a server page instead of data. Please try again.");
     }
     if (!response.ok) {
       throw new Error(payload?.error || `Playlist request failed (${response.status})`);
@@ -682,6 +763,14 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
 
 function isTimeoutError(err) {
   return err?.name === "AbortError";
+}
+
+function isRetryablePlaylistError(err) {
+  if (isTimeoutError(err)) return true;
+  const message = String(err?.message || "").toLowerCase();
+  return message.includes("server page")
+    || message.includes("failed (5")
+    || message.includes("network");
 }
 
 function readWatchNextSeen(setId) {
@@ -804,6 +893,23 @@ function appendUrlParams(url, params) {
   } catch {
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}${new URLSearchParams(entries).toString()}`;
+  }
+}
+
+function normalizePlayerUrlForShell(url, useFastPlayerShell = false) {
+  if (!useFastPlayerShell || !url) return url;
+  try {
+    const base = url.startsWith("http://") || url.startsWith("https://")
+      ? url
+      : `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    const parsed = new URL(base);
+    if (parsed.pathname.startsWith("/playlist/")) {
+      parsed.pathname = parsed.pathname.replace(/^\/playlist\//, "/p/");
+    }
+    if (url.startsWith("http://") || url.startsWith("https://")) return parsed.toString();
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return String(url).replace(/^\/playlist\//, "/p/");
   }
 }
 

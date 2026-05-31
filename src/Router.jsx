@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import App from './App.jsx';
 import MainLayout from '@layout/MainLayout';
 import ScrollToTop from '@layout/ScrollToTop';
+import PlayerPage from '@pages/PlayerPage';
+import StandAloneLayout from '@layout/StandAloneLayout';
 
 const AboutPage = lazy(() => import('@pages/AboutPage'));
 const HireTerryPage = lazy(() => import('@pages/HireTerryPage'));
@@ -28,8 +30,6 @@ const HOA_PUBLIC_ENABLED = false;
 const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
 const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
-const PlayerPage = lazy(() => import('@pages/PlayerPage'));
-const StandAloneLayout = lazy(() => import('@layout/StandAloneLayout'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
@@ -70,6 +70,14 @@ function AppRouter() {
           element={renderWithSuspense(WatchRedirectPage, 'Loading watch link…')}
         />
         <Route element={renderWithSuspense(StandAloneLayout, 'Loading player…')}>
+          <Route
+            path="p/:playlistId"
+            element={renderWithSuspense(PlayerPage, 'Loading player…')}
+          />
+          <Route
+            path="p/:playlistId/:start"
+            element={renderWithSuspense(PlayerPage, 'Loading player…')}
+          />
           <Route
             path="playlist/:playlistId"
             element={renderWithSuspense(PlayerPage, 'Loading player…')}

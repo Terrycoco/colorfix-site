@@ -4,7 +4,12 @@ declare(strict_types=1);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+$startedAt = microtime(true);
+$timing = [];
+$markTiming = static function (string $label) use (&$timing, $startedAt): void {
+    $timing[$label] = round((microtime(true) - $startedAt) * 1000, 1);
+};
 
 require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
@@ -25,6 +30,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 $handle = trim((string)($_GET['handle'] ?? ''));
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $audience = trim((string)($_GET['audience'] ?? $_GET['aud'] ?? ''));
+$audienceLower = strtolower($audience);
+$isAdmin = (isset($_COOKIE['cf_admin']) && $_COOKIE['cf_admin'] === '1')
+    || (isset($_COOKIE['cf_admin_global']) && $_COOKIE['cf_admin_global'] === '1');
+$privateAudience = $audienceLower !== '' && $audienceLower !== 'any' && $audienceLower !== 'public';
+$includePrivate = $privateAudience
+    || ($isAdmin && isset($_GET['include_private']) && (string)$_GET['include_private'] !== '0');
+
+header(
+    $includePrivate
+        ? 'Cache-Control: private, max-age=120, stale-while-revalidate=300'
+        : 'Cache-Control: public, max-age=120, stale-while-revalidate=300'
+);
 
 $setRepo = new PdoPlaylistInstanceSetRepository($pdo);
 $set = null;
@@ -33,6 +50,7 @@ if ($id > 0) {
 } elseif ($handle !== '') {
     $set = $setRepo->getByHandle($handle);
 }
+$markTiming('load_set');
 
 if (!$set) {
     respond(['ok' => false, 'error' => 'Set not found'], 404);
@@ -40,6 +58,7 @@ if (!$set) {
 
 $itemRepo = new PdoPlaylistInstanceSetItemRepository($pdo);
 $items = $itemRepo->listBySetId((int)$set->id);
+$markTiming('load_items');
 
 $photoIds = [];
 $targetSetIds = [];
@@ -79,6 +98,51 @@ if ($photoIds) {
                 : $relPath;
     }
 }
+$markTiming('load_explicit_photos');
+
+$fallbackPhotoByPlaylistId = [];
+if ($playlistIds) {
+    $ids = array_keys($playlistIds);
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT pi.playlist_id,
+                pi.photo_library_id,
+                pl.rel_path,
+                pl.updated_at
+           FROM playlist_items pi
+           JOIN photo_library pl
+             ON pl.photo_library_id = pi.photo_library_id
+          WHERE pi.playlist_id IN ({$placeholders})
+            AND pi.is_active = 1
+            AND pi.photo_library_id IS NOT NULL
+            AND pi.photo_library_id > 0
+          ORDER BY
+            pi.playlist_id ASC,
+            CASE WHEN pi.item_type = 'intro' THEN 0 ELSE 1 END,
+            pi.order_index ASC,
+            pi.playlist_item_id ASC"
+    );
+    $stmt->execute($ids);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $playlistId = (int)$row['playlist_id'];
+        if (isset($fallbackPhotoByPlaylistId[$playlistId])) {
+            continue;
+        }
+        $relPath = trim((string)($row['rel_path'] ?? ''));
+        if ($relPath === '') {
+            continue;
+        }
+        $updatedAt = trim((string)($row['updated_at'] ?? ''));
+        $stamp = $updatedAt !== '' ? strtotime($updatedAt) : false;
+        $fallbackPhotoByPlaylistId[$playlistId] = [
+            'photo_library_id' => (int)$row['photo_library_id'],
+            'photo_url' => ($stamp && $stamp > 0)
+                ? ($relPath . (str_contains($relPath, '?') ? '&' : '?') . 'v=' . $stamp)
+                : $relPath,
+        ];
+    }
+}
+$markTiming('load_fallback_photos');
 
 $targetSetMetaById = [];
 if ($targetSetIds) {
@@ -93,6 +157,7 @@ if ($targetSetIds) {
         ];
     }
 }
+$markTiming('load_target_sets');
 
 $slugByPlaylistInstanceId = [];
 $displaySubtitleByPlaylistInstanceId = [];
@@ -107,7 +172,8 @@ if ($playlistInstanceIds) {
             pi.display_subtitle,
             pi.is_active,
             pi.share_enabled,
-            p.is_active AS playlist_is_active
+            p.is_active AS playlist_is_active,
+            p.is_public AS playlist_is_public
          FROM playlist_instances pi
          LEFT JOIN playlists p
            ON p.playlist_id = pi.playlist_id
@@ -121,9 +187,11 @@ if ($playlistInstanceIds) {
         $isPublicByPlaylistInstanceId[$playlistInstanceId] =
             (int)($row['is_active'] ?? 0) === 1
             && (int)($row['share_enabled'] ?? 0) === 1
-            && (int)($row['playlist_is_active'] ?? 0) === 1;
+            && (int)($row['playlist_is_active'] ?? 0) === 1
+            && ($includePrivate || (int)($row['playlist_is_public'] ?? 0) === 1);
     }
 }
+$markTiming('load_instances');
 
 $instanceByPlaylistId = [];
 if ($playlistIds) {
@@ -145,6 +213,7 @@ if ($playlistIds) {
           AND pi.is_active = 1
           AND pi.share_enabled = 1
           AND p.is_active = 1
+          AND (? = 1 OR p.is_public = 1)
         ORDER BY
           CASE
             WHEN ? <> '' AND pi.audience = ? THEN 0
@@ -153,7 +222,7 @@ if ($playlistIds) {
           END,
           pi.playlist_instance_id ASC
         SQL;
-    $params = array_merge($ids, [$audience, $audience]);
+    $params = array_merge($ids, [$includePrivate ? 1 : 0, $audience, $audience]);
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
@@ -169,8 +238,9 @@ if ($playlistIds) {
         ];
     }
 }
+$markTiming('load_instances_by_playlist');
 
-$rows = array_values(array_filter(array_map(static function ($item) use ($photoUrlById, $targetSetMetaById, $slugByPlaylistInstanceId, $displaySubtitleByPlaylistInstanceId, $isPublicByPlaylistInstanceId, $instanceByPlaylistId) {
+$rows = array_values(array_filter(array_map(static function ($item) use ($photoUrlById, $fallbackPhotoByPlaylistId, $targetSetMetaById, $slugByPlaylistInstanceId, $displaySubtitleByPlaylistInstanceId, $isPublicByPlaylistInstanceId, $instanceByPlaylistId) {
     $targetSetMeta = ($item->itemType === 'set' && $item->targetSetId)
         ? ($targetSetMetaById[(int)$item->targetSetId] ?? null)
         : null;
@@ -195,6 +265,12 @@ $rows = array_values(array_filter(array_map(static function ($item) use ($photoU
     if ($displaySubtitle === '' && $resolvedInstance) {
         $displaySubtitle = (string)($resolvedInstance['display_subtitle'] ?? '');
     }
+    $fallbackPhoto = $playlistId !== null ? ($fallbackPhotoByPlaylistId[$playlistId] ?? null) : null;
+    $photoLibraryId = $item->photoLibraryId ?: ($fallbackPhoto['photo_library_id'] ?? null);
+    $photoUrl = $item->photoLibraryId
+        ? ($photoUrlById[(int)$item->photoLibraryId] ?? $item->photoUrl)
+        : (($fallbackPhoto['photo_url'] ?? '') !== '' ? (string)$fallbackPhoto['photo_url'] : $item->photoUrl);
+
     return [
         'id' => $item->id,
         'playlist_instance_id' => $playlistInstanceId,
@@ -209,13 +285,14 @@ $rows = array_values(array_filter(array_map(static function ($item) use ($photoU
         'subtitle' => $item->subtitle !== ''
             ? $item->subtitle
             : ($item->itemType === 'set' ? (string)($targetSetMeta['subtitle'] ?? '') : $displaySubtitle),
-        'photo_url' => $item->photoLibraryId ? ($photoUrlById[(int)$item->photoLibraryId] ?? $item->photoUrl) : $item->photoUrl,
-        'photo_library_id' => $item->photoLibraryId,
+        'photo_url' => $photoUrl,
+        'photo_library_id' => $photoLibraryId,
         'sort_order' => $item->sortOrder,
     ];
 }, $items)));
+$markTiming('map_rows');
 
-respond([
+$payload = [
     'ok' => true,
     'set' => [
         'id' => $set->id,
@@ -230,4 +307,10 @@ respond([
         ],
         'items' => $rows,
     ],
-]);
+];
+if (isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0') {
+    $markTiming('total');
+    $payload['timing_ms'] = $timing;
+}
+
+respond($payload);

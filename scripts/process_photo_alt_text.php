@@ -17,6 +17,16 @@ foreach ($argv as $arg) {
     }
 }
 
+$enabled = strtolower((string)(getenv('PHOTO_ALT_TEXT_WORKER_ENABLED') ?: ''));
+if (!in_array($enabled, ['1', 'true', 'yes'], true)) {
+    echo json_encode([
+        'ok' => true,
+        'skipped' => true,
+        'reason' => 'PHOTO_ALT_TEXT_WORKER_ENABLED is not enabled',
+    ], JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . PHP_EOL;
+    exit;
+}
+
 $service = PhotoAltTextQueueService::fromPdo($pdo, dirname(__DIR__));
 $result = $service->processReady($limit);
 echo json_encode(['ok' => true] + $result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . PHP_EOL;

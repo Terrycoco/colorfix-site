@@ -349,6 +349,7 @@ export default function AdminClientsPage() {
   const [notice, setNotice] = useState("");
   const plainTextBodyRef = useRef(null);
   const textBodyRef = useRef(null);
+  const linkSelectionRef = useRef({ target: "email", start: null, end: null });
 
   const templateOptions = useMemo(() => {
     const activeTemplates = templates.filter((template) => template.isActive);
@@ -921,11 +922,18 @@ export default function AdminClientsPage() {
   function handleLinkInsert(payload) {
     const line = payload.text?.trim() ? `${payload.text.trim()}: ${payload.url}` : payload.url;
     const insertion = line ? `${line}\n` : "";
+    const savedSelection = linkSelectionRef.current?.target === linkModalTarget
+      ? linkSelectionRef.current
+      : { start: null, end: null };
 
     if (linkModalTarget === "text") {
       const textarea = textBodyRef.current;
-      const selectionStart = textarea && typeof textarea.selectionStart === "number" ? textarea.selectionStart : null;
-      const selectionEnd = textarea && typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : null;
+      const selectionStart = Number.isInteger(savedSelection.start)
+        ? savedSelection.start
+        : (textarea && typeof textarea.selectionStart === "number" ? textarea.selectionStart : null);
+      const selectionEnd = Number.isInteger(savedSelection.end)
+        ? savedSelection.end
+        : (textarea && typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : null);
 
       setTextDraft((prev) => {
         const nextMessage = selectionStart !== null && selectionEnd !== null
@@ -951,12 +959,12 @@ export default function AdminClientsPage() {
     }
 
     const textarea = plainTextBodyRef.current;
-    const selectionStart = emailView === "plain" && textarea && typeof textarea.selectionStart === "number"
-      ? textarea.selectionStart
-      : null;
-    const selectionEnd = emailView === "plain" && textarea && typeof textarea.selectionEnd === "number"
-      ? textarea.selectionEnd
-      : null;
+    const selectionStart = Number.isInteger(savedSelection.start)
+      ? savedSelection.start
+      : (emailView === "plain" && textarea && typeof textarea.selectionStart === "number" ? textarea.selectionStart : null);
+    const selectionEnd = Number.isInteger(savedSelection.end)
+      ? savedSelection.end
+      : (emailView === "plain" && textarea && typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : null);
 
     setEmailDraft((prev) => {
       const hasPlainSelection = emailView === "plain"
@@ -994,6 +1002,21 @@ export default function AdminClientsPage() {
         nextTextarea.setSelectionRange(caret, caret);
       });
     }
+  }
+
+  function rememberLinkSelection(target) {
+    const textarea = target === "text" ? textBodyRef.current : plainTextBodyRef.current;
+    linkSelectionRef.current = {
+      target,
+      start: textarea && typeof textarea.selectionStart === "number" ? textarea.selectionStart : null,
+      end: textarea && typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : null,
+    };
+  }
+
+  function openLinkModal(target) {
+    setLinkModalTarget(target);
+    rememberLinkSelection(target);
+    setLinkModalOpen(true);
   }
 
   function handleOpenTextMessage() {
@@ -1302,7 +1325,7 @@ export default function AdminClientsPage() {
               </label>
 
               <div className="admin-clients__email-actions">
-                <button type="button" className="admin-clients__secondary" onClick={() => setLinkModalOpen(true)}>
+                <button type="button" className="admin-clients__secondary" onClick={() => openLinkModal("email")}>
                   Insert Link
                 </button>
                 <button
@@ -1349,8 +1372,12 @@ export default function AdminClientsPage() {
                     ref={plainTextBodyRef}
                     rows={14}
                     value={emailDraft.message}
+                    onSelect={() => rememberLinkSelection("email")}
+                    onKeyUp={() => rememberLinkSelection("email")}
+                    onClick={() => rememberLinkSelection("email")}
                     onChange={(e) => {
                       const nextMessage = e.target.value;
+                      window.requestAnimationFrame(() => rememberLinkSelection("email"));
                       setEmailDraft((prev) => ({
                         ...prev,
                         message: nextMessage,
@@ -1445,10 +1472,7 @@ export default function AdminClientsPage() {
                 <button
                   type="button"
                   className="admin-clients__secondary"
-                  onClick={() => {
-                    setLinkModalTarget("text");
-                    setLinkModalOpen(true);
-                  }}
+                  onClick={() => openLinkModal("text")}
                 >
                   Insert Link
                 </button>
@@ -1468,7 +1492,14 @@ export default function AdminClientsPage() {
                   ref={textBodyRef}
                   rows={10}
                   value={textDraft.message}
-                  onChange={(e) => setTextDraft((prev) => ({ ...prev, message: e.target.value }))}
+                  onSelect={() => rememberLinkSelection("text")}
+                  onKeyUp={() => rememberLinkSelection("text")}
+                  onClick={() => rememberLinkSelection("text")}
+                  onChange={(e) => {
+                    const nextMessage = e.target.value;
+                    window.requestAnimationFrame(() => rememberLinkSelection("text"));
+                    setTextDraft((prev) => ({ ...prev, message: nextMessage }));
+                  }}
                   placeholder="Hi Lorena, I wanted to share this with you..."
                 />
               </label>

@@ -6,7 +6,7 @@ import {useEffect, useState} from 'react';
 import { useAppState } from '@context/AppStateContext';
 import fetchColorDetail from '@data/fetchColorDetail';
 import fetchColorTriggerPhotos from '@data/fetchColorTriggerPhotos';
-import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
+import AnimatedHueWheel from '@components/AnimatedHueWheel';
 import {getColorUrl} from '@helpers/colorUrlHelper';
 import {photoThumbUrl} from '@helpers/imageThumb';
 import './detailpage.css';
@@ -31,9 +31,18 @@ export default function ColorDetailPage() {
    const [triggerPhotosLoading, setTriggerPhotosLoading] = useState(false);
    const navigate = useNavigate();
    const location = useLocation();
-   const {palette, currentColorDetail, setCurrentColorDetail, setShowBack, recentSwatches, setRecentSwatches, addToPalette, removeFromPalette} = useAppState();
+  const {palette, currentColorDetail, setCurrentColorDetail, setShowBack, recentSwatches, setRecentSwatches, addToPalette, removeFromPalette} = useAppState();
   const inPalette = palette?.some((c) => c.id === currentColorDetail.id);
   const text = currentColorDetail?.hcl_l > 70 ? '#111' : '#fff';
+  const detailHueValue = currentColorDetail?.hcl_h;
+  const detailHue = detailHueValue == null || detailHueValue === '' ? NaN : Number(detailHueValue);
+  const detailWheelItems = Number.isFinite(detailHue)
+    ? [{
+        hue: detailHue,
+        color: `rgb(${currentColorDetail?.r || 0}, ${currentColorDetail?.g || 0}, ${currentColorDetail?.b || 0})`,
+        animate: true,
+      }]
+    : [];
  
     const previous = recentSwatches.length > 1
       ? recentSwatches[recentSwatches.length - 2]
@@ -333,7 +342,16 @@ export default function ColorDetailPage() {
 
 
             <div className="py-4 detail-wheel-wrap">
-            <ColorWheel300 currentColor={currentColorDetail} base="labels-420" size={900} />
+            <AnimatedHueWheel
+              items={detailWheelItems}
+              showLabels={false}
+              base="labels-420"
+              size={900}
+              spokeStartRadius={0}
+              spokeEndRadius={136}
+              spokeDelayMs={500}
+              spokeDurationMs={900}
+            />
             </div>
 
 

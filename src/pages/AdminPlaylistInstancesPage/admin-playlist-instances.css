@@ -227,6 +227,28 @@
   word-break: break-all;
 }
 
+.mobile-instance-picker {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-instance-picker label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #222;
+}
+
+.mobile-instance-picker select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #d8d8d8;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 16px;
+  color: #111;
+}
+
 .mobile-instance-card {
   display: none;
   margin-top: 4px;
@@ -330,9 +352,17 @@
     display: none;
   }
 
+  .mobile-instance-picker {
+    display: flex;
+  }
+
   .mobile-instance-card {
     display: flex;
     flex-direction: column;
+  }
+
+  .list-panel .panel-list {
+    display: none;
   }
 }
 

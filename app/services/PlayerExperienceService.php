@@ -623,7 +623,7 @@ final class PlayerExperienceService
         $count = 0;
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
-            if (in_array($type, ['intro', 'before', 'text', 'non-palette'], true)) {
+            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'non-palette'], true)) {
                 continue;
             }
             if (!empty($item->exclude_from_thumbs)) continue;

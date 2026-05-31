@@ -7,6 +7,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
 }
 
 header('Content-Type: application/json; charset=utf-8');
+$freshRequest = isset($_GET['fresh']) && (string)$_GET['fresh'] !== '0';
+if ($freshRequest) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+} else {
+    header('Cache-Control: public, max-age=60, stale-while-revalidate=180');
+}
 
 require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';

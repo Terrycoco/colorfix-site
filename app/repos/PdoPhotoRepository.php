@@ -413,8 +413,15 @@ class PdoPhotoRepository
         $having = '';
 
         if ($qtext !== '') {
-            $where[] = "(p.asset_id LIKE :qtext OR p.style_primary LIKE :qtext OR p.category_path LIKE :qtext)";
+            $numericQtext = preg_replace('/^#/', '', trim($qtext));
+            $where[] = "(p.asset_id LIKE :qtext OR p.style_primary LIKE :qtext OR p.category_path LIKE :qtext"
+                . (ctype_digit($numericQtext) ? " OR p.id = :q_photo_id_exact OR CAST(p.id AS CHAR) LIKE :q_photo_id" : "")
+                . ")";
             $params['qtext'] = '%' . $qtext . '%';
+            if (ctype_digit($numericQtext)) {
+                $params['q_photo_id_exact'] = (int)$numericQtext;
+                $params['q_photo_id'] = $numericQtext . '%';
+            }
         }
 
         if ($tags) {

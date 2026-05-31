@@ -14,6 +14,7 @@ class PlaylistItem
         public ?string $saved_palette_photo_type = null,
         public ?string $title = null,
         public ?string $subtitle = null,
+        public ?string $body = null,
         public ?string $type = null,
         public ?bool $star = null,
         public ?string $layout = null,

@@ -1,0 +1,372 @@
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+
+const root = process.cwd();
+const distIndex = path.join(root, "dist", "index.html");
+const payloadPath = path.join(root, "api", "cache", "front-page-public.json");
+const brandLogo = findAsset(/^colorfix_lightbg-.*\.png$/) || "/brand/full_lightbg.png";
+
+if (!fs.existsSync(distIndex)) {
+  fail("dist/index.html not found. Run npm run build first.");
+}
+if (!fs.existsSync(payloadPath)) {
+  fail("api/cache/front-page-public.json not found. Run npm run prebuild-front-page first.");
+}
+
+const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
+const html = fs.readFileSync(distIndex, "utf8");
+const staticHtml = `<!-- cf-static-home:start -->${renderStaticHome(payload)}<!-- cf-static-home:end -->`;
+const preloadLinks = renderPreloadLinks(payload);
+const styleBlock = `<style id="cf-static-home-style">${getStaticCss()}</style>`;
+
+let next = stripExistingStaticHome(html);
+next = replaceRoot(next, staticHtml);
+next = next.replace("</head>", `${preloadLinks}${styleBlock}\n  </head>`);
+
+fs.writeFileSync(distIndex, next);
+console.log(`Prebuilt static homepage HTML into ${distIndex}`);
+
+function renderStaticHome(payload) {
+  const items = mergeWithInserts(payload.results || [], [
+    ...(payload.inserts || []),
+    payload.frontPageRailItem,
+  ].filter(Boolean)).filter((item) => !isLoginButton(item));
+
+  const cards = items.map(renderItem).filter(Boolean).join("\n");
+  return `
+    <div class="cf-static-home" aria-hidden="true">
+      <main class="cf-static-home__grid">
+        ${cards}
+      </main>
+    </div>
+  `;
+}
+
+function renderItem(item) {
+  const type = String(item?.item_type || "").toLowerCase();
+  if (type === "front-blurb") return renderFrontBlurb(item);
+  if (type === "featured-article") return renderFeaturedArticle(item);
+  if (type === "front-page-playlist-set") return renderPlaylistSet(item);
+  if (type === "name-search") return renderTextCard(item.display || item.title, "", "cf-static-card--name", item.target_url || "");
+  if (type === "search" || type === "brand" || type === "button") {
+    return renderTextCard(item.display || item.title, item.description || "", "", item.target_url || "");
+  }
+  return "";
+}
+
+function renderFrontBlurb(item) {
+  return `
+    <section class="cf-static-card cf-static-blurb">
+      <img src="${escapeAttr(brandLogo)}" alt="ColorFix" class="cf-static-blurb__logo">
+      ${item.subtitle ? `<div class="cf-static-blurb__subtitle">${escapeHtml(item.subtitle)}</div>` : ""}
+      <p>${escapeHtml(item.body || "")}</p>
+    </section>
+  `;
+}
+
+function renderFeaturedArticle(item) {
+  const payload = item.featured_payload || {};
+  const article = payload.article || {};
+  const hero = payload.hero_mobile || payload.hero || {};
+  const heroId = Number(hero.photo_library_id || article.hero_mobile_asset_id || article.hero_asset_id || 0);
+  const image = heroId ? thumbUrl(heroId, 720, 72) : hero.rel_path || "";
+  const body = `
+    <article class="cf-static-card cf-static-featured">
+      <div class="cf-static-kicker">${escapeHtml(item.display || "Featured Article")}</div>
+      ${image ? `<img src="${escapeAttr(image)}" alt="${escapeAttr(hero.alt_text || article.title || "")}" class="cf-static-featured__image">` : `<div class="cf-static-placeholder">No image</div>`}
+      <div class="cf-static-featured__body">
+        <h2>${escapeHtml(article.title || item.title || "Featured article")}</h2>
+        <p>${escapeHtml(article.dek || "Tap to read")}</p>
+        <span>Read Full Article →</span>
+      </div>
+    </article>
+  `;
+  const url = article.slug ? `/articles/${encodeURIComponent(String(article.slug))}` : "";
+  return wrapStaticLink(body, url);
+}
+
+function renderPlaylistSet(item) {
+  const tiles = Array.isArray(item.items) ? item.items : [];
+  if (!tiles.length) return "";
+  return `
+    <section class="cf-static-playlist-set">
+      ${tiles.map((tile, index) => {
+        const image = tile.photo_library_id ? thumbUrl(tile.photo_library_id, 480, 72) : tile.photo_url || "";
+        const body = `
+          <article class="cf-static-playlist-tile">
+            ${image ? `<img src="${escapeAttr(image)}" alt="${escapeAttr(tile.title || "Playlist")}" loading="${index === 0 ? "eager" : "lazy"}">` : ""}
+            <h3>${escapeHtml(tile.title || "")}</h3>
+            ${tile.subtitle ? `<p>${escapeHtml(tile.subtitle)}</p>` : ""}
+          </article>
+        `;
+        return wrapStaticLink(body, toFastPlayerPath(tile.player_url || ""));
+      }).join("")}
+    </section>
+  `;
+}
+
+function renderTextCard(title, description, className, url = "") {
+  if (!title && !description) return "";
+  const body = `
+    <section class="cf-static-card cf-static-text ${className}">
+      <h2>${escapeHtml(title || "")}</h2>
+      ${description ? `<p>${escapeHtml(description)}</p>` : ""}
+    </section>
+  `;
+  return wrapStaticLink(body, url);
+}
+
+function wrapStaticLink(html, url) {
+  const target = String(url || "").trim();
+  if (!target) return html;
+  return `<a class="cf-static-link" href="${escapeAttr(target)}">${html}</a>`;
+}
+
+function renderPreloadLinks(payload) {
+  const urls = Array.isArray(payload.image_preloads) ? payload.image_preloads.slice(0, 5) : [];
+  return urls.map((url, index) => `\n    <link rel="preload" as="image" href="${escapeAttr(url)}"${index === 0 ? ' fetchpriority="high"' : ""}>`).join("");
+}
+
+function stripExistingStaticHome(html) {
+  return html
+    .replace(/\s*<link rel="preload" as="image" href="\/api\/v2\/image-thumb\.php\?id=[^"]*"(?: fetchpriority="high")?>/g, "")
+    .replace(/\s*<style id="cf-static-home-style">[\s\S]*?<\/style>/g, "");
+}
+
+function replaceRoot(html, staticHtml) {
+  if (html.includes("<!-- cf-static-home:start -->")) {
+    return html.replace(
+      /<!-- cf-static-home:start -->[\s\S]*?<!-- cf-static-home:end -->/,
+      staticHtml
+    );
+  }
+  if (html.includes('<div id="root"></div>')) {
+    return html.replace('<div id="root"></div>', `<div id="root">${staticHtml}</div>`);
+  }
+  return html.replace(
+    /<div id="root">[\s\S]*<\/div>\s*<\/body>/,
+    `<div id="root">${staticHtml}</div>\n  </body>`
+  );
+}
+
+function mergeWithInserts(results = [], inserts = []) {
+  const toPos = (value) => {
+    if (value === "" || value == null) return Infinity;
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : Infinity;
+  };
+  return [...results, ...inserts]
+    .map((item, index) => {
+      const resultSort = toPos(item?.sort_order);
+      const insertSort = toPos(item?.insert_position);
+      return {
+        item,
+        index,
+        sortValue: Number.isFinite(resultSort) ? resultSort : insertSort,
+      };
+    })
+    .sort((a, b) => a.sortValue === b.sortValue ? a.index - b.index : a.sortValue - b.sortValue)
+    .map((entry) => entry.item);
+}
+
+function isLoginButton(item) {
+  return String(item?.target_url || "").replace(/\/+$/, "") === "/login";
+}
+
+function thumbUrl(id, width, quality) {
+  return `/api/v2/image-thumb.php?id=${encodeURIComponent(String(id))}&w=${width}&q=${quality}`;
+}
+
+function toFastPlayerPath(url) {
+  const rawUrl = String(url || "").trim();
+  if (!rawUrl) return rawUrl;
+  try {
+    const parsed = new URL(rawUrl, "https://colorfix.terrymarr.com");
+    if (parsed.pathname.startsWith("/playlist/")) {
+      parsed.pathname = parsed.pathname.replace(/^\/playlist\//, "/p/");
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return rawUrl.replace(/^\/playlist\//, "/p/");
+  }
+}
+
+function findAsset(pattern) {
+  const assetDir = path.join(root, "dist", "assets");
+  if (!fs.existsSync(assetDir)) return "";
+  const found = fs.readdirSync(assetDir).find((file) => pattern.test(file));
+  return found ? `/assets/${found}` : "";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+function fail(message) {
+  console.error(message);
+  process.exit(1);
+}
+
+function getStaticCss() {
+  return `
+.cf-static-home {
+  background: #f5f5f5;
+  color: #1f2937;
+  font-family: Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+  padding: 16px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+}
+.cf-static-home__grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+.cf-static-card,
+.cf-static-playlist-set {
+  box-sizing: border-box;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cf-static-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+.cf-static-link:focus-visible {
+  outline: 3px solid #ff8c00;
+  outline-offset: 3px;
+}
+.cf-static-card {
+  background: #dfe5e5;
+  padding: 16px;
+}
+.cf-static-blurb {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+}
+.cf-static-blurb__logo {
+  display: block;
+  width: 132px;
+  height: auto;
+  margin: 0 0 14px;
+}
+.cf-static-blurb__subtitle,
+.cf-static-kicker {
+  color: #47706f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+.cf-static-blurb p,
+.cf-static-text p,
+.cf-static-featured p,
+.cf-static-playlist-tile p {
+  margin: 6px 0 0;
+  line-height: 1.35;
+}
+.cf-static-blurb p {
+  font-family: Quicksand, Lato, sans-serif;
+  font-weight: 600;
+}
+.cf-static-featured {
+  background: #fff;
+  border: 1px solid #e6e7eb;
+  padding: 0;
+}
+.cf-static-featured .cf-static-kicker {
+  padding: 12px 10px 8px;
+  border-bottom: 1px solid #eef0f4;
+}
+.cf-static-featured__image,
+.cf-static-placeholder {
+  display: block;
+  width: calc(100% - 20px);
+  height: 190px;
+  margin: 0 10px;
+  object-fit: cover;
+  background: #eef0f3;
+}
+.cf-static-featured__body {
+  padding: 12px 10px 14px;
+}
+.cf-static-featured h2,
+.cf-static-text h2,
+.cf-static-playlist-tile h3 {
+  font-family: Poppins, Lato, sans-serif;
+  font-size: 19px;
+  line-height: 1.14;
+  margin: 0;
+}
+.cf-static-featured span {
+  display: inline-block;
+  color: #4b6b8a;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+.cf-static-text {
+  min-height: 98px;
+}
+.cf-static-text h2 {
+  font-size: 20px;
+}
+.cf-static-playlist-set {
+  grid-column: span 2;
+  border: 3px solid #1e8a8a;
+  background: #f6f3ec;
+  padding: 10px;
+}
+.cf-static-playlist-tile {
+  background: #fff;
+  border-radius: 14px;
+  margin-bottom: 8px;
+  padding: 10px;
+}
+.cf-static-playlist-tile:last-child {
+  margin-bottom: 0;
+}
+.cf-static-playlist-tile img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.cf-static-playlist-tile h3 {
+  font-size: 16px;
+}
+@media (min-width: 760px) {
+  .cf-static-home {
+    padding: 24px 32px 64px;
+  }
+  .cf-static-home__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .cf-static-playlist-set {
+    grid-column: span 1;
+    grid-row: span 4;
+  }
+  .cf-static-featured__image {
+    height: 160px;
+  }
+}
+`;
+}

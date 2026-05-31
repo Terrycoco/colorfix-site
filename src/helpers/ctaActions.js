@@ -11,7 +11,7 @@ function buildShareUrl(shareFolder, playlistInstanceId) {
 
 function buildPlayerPath(data) {
   const pathId = data?.slug || data?.playlist_instance_slug || data?.playlist_instance_id;
-  return pathId ? `/playlist/${pathId}` : "";
+  return pathId ? `/p/${pathId}` : "";
 }
 
 function runShare({ data, shareFolder }) {
@@ -56,7 +56,7 @@ function runNavigate({ navigate, cta, psi, thumb, demo }) {
       .replaceAll("{demo}", demo ? "1" : "");
   }
   const target = cta?.params?.target || "_blank";
-  if (navigate && url.startsWith("/")) {
+  if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
@@ -77,7 +77,7 @@ function runArticleLink({ navigate, cta }) {
     return_to: params.return_to || defaultReturnTo || undefined,
   });
   const target = params.target || "_self";
-  if (navigate && url.startsWith("/")) {
+  if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
@@ -98,7 +98,7 @@ function runPlaylistLink({ navigate, cta, source }) {
     aud: audience,
   });
   const target = params.target || "_self";
-  if (navigate && url.startsWith("/")) {
+  if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
@@ -147,7 +147,7 @@ function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, retur
   if (returnTo) params.set("return_to", returnTo);
   const query = params.toString();
   const url = `/playlist-thumbs/${data.playlist_instance_id}${query ? `?${query}` : ""}`;
-  if (navigate) {
+  if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
@@ -160,7 +160,7 @@ function getPaletteItems(data) {
   return items.filter((item) => {
     const type = (item?.type || "normal").toLowerCase();
     const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
-    if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
+    if (type === "intro" || type === "before" || type === "text" || type === "hue-wheel" || type === "non-palette") return false;
     if (attachedType === "before") return false;
     if (item?.exclude_from_thumbs) return false;
     return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
@@ -171,7 +171,7 @@ function isPaletteEligibleItem(item) {
   if (!item) return false;
   const type = (item?.type || "normal").toLowerCase();
   const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
-  if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
+  if (type === "intro" || type === "before" || type === "text" || type === "hue-wheel" || type === "non-palette") return false;
   if (attachedType === "before") return false;
   if (item?.exclude_from_thumbs) return false;
   return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
@@ -208,12 +208,31 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const url = paletteHash
     ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
     : `/view/${apId}${qs ? `?${qs}` : ""}`;
-  if (navigate) {
+  if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
   const target = cta?.params?.target || "_self";
   window.open(url, target, "noopener");
+}
+
+function shouldNavigateInPlayerShell(url) {
+  if (!url || !url.startsWith("/")) return false;
+  if (isFastPlayerShell()) {
+    return url.startsWith("/p/") || url.startsWith("/playlist/");
+  }
+  return url.startsWith("/p/")
+    || url.startsWith("/playlist/")
+    || url.startsWith("/playlist-thumbs/")
+    || url.startsWith("/picker")
+    || url.startsWith("/palette/")
+    || url.startsWith("/view/");
+}
+
+function isFastPlayerShell() {
+  return typeof window !== "undefined" && (
+    window.location.pathname === "/p" || window.location.pathname.startsWith("/p/")
+  );
 }
 
 export function buildCtaHandlers({

@@ -9,6 +9,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "prebuild-front-page": "php api/tools/prebuild-front-page.php",
+    "prebuild-homepage-html": "node scripts/prebuild-homepage-html.mjs",
+    "build:prebuilt-home": "npm run prebuild-front-page && npm run build && npm run prebuild-homepage-html",
     "regen-wheel": "node scripts/regen-wheel.js"
   },
   "dependencies": {

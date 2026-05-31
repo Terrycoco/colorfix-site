@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { isAdmin } from "@helpers/authHelper";
+import { useAppState } from "@context/AppStateContext";
 import { adminMenuItems } from "./adminMenuItems";
 import "./adminmenu.css";
 
@@ -16,7 +17,8 @@ function isPathMatch(currentPath, href) {
 }
 
 export default function AdminMenu() {
-  const admin = isAdmin();
+  const { user, setAdminExitPath } = useAppState();
+  const admin = Boolean(user?.is_admin) || isAdmin();
   const currentPath = normalizeHrefPath(window.location.pathname);
   const isAdminEntry = currentPath === "/admin" || currentPath.startsWith("/admin/");
   const [open, setOpen] = useState(false);
@@ -158,6 +160,9 @@ export default function AdminMenu() {
                         href={item.href}
                         className={`admin-menu__item${isPathMatch(currentPath, item.href) ? " is-active" : ""}`}
                         onClick={() => {
+                          if (item.adminExitPath) {
+                            setAdminExitPath(item.adminExitPath);
+                          }
                           setOpen(false);
                           setHovered(null);
                         }}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useAppState } from "@context/AppStateContext";
 import { photoThumbUrl } from "@helpers/imageThumb";
+import { toFastPlayerPath } from "@helpers/playerUrls";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-picker.css";
 
@@ -10,10 +12,13 @@ export default function PlaylistPickerPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { adminExitPath, clearAdminExitPath } = useAppState();
   const setId = Number(searchParams.get("psi") || 0);
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
+  const includePrivateParam = searchParams.get("include_private") ?? "";
+  const closeParam = searchParams.get("close") ?? "";
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -29,8 +34,12 @@ export default function PlaylistPickerPage() {
     }
     setLoading(true);
     setError("");
-    fetch(`${SET_URL}?id=${setId}&_=${Date.now()}`, { headers: { Accept: "application/json" } })
-      .then((r) => r.json())
+    const params = new URLSearchParams({
+      id: String(setId),
+    });
+    if (ctaAudience) params.set("aud", ctaAudience);
+    if (adminExitPath || includePrivateParam === "1") params.set("include_private", "1");
+    fetchPlaylistSet(`${SET_URL}?${params.toString()}`)
       .then((payload) => {
         if (!payload?.ok || !payload?.set) {
           throw new Error(payload?.error || "Failed to load playlist set");
@@ -43,7 +52,7 @@ export default function PlaylistPickerPage() {
         setError(err?.message || "Failed to load playlist set");
       })
       .finally(() => setLoading(false));
-  }, [setId]);
+  }, [setId, ctaAudience, adminExitPath, includePrivateParam]);
 
   const tiles = useMemo(() => {
     return (items || []).map((item) => ({
@@ -65,11 +74,13 @@ export default function PlaylistPickerPage() {
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
+    if (includePrivateParam === "1") params.set("include_private", "1");
+    if (closeParam === "1") params.set("close", "1");
     if (setId) params.set("psi", String(setId));
     const returnTo = buildReturnTo(location, searchParams);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
-    return `${playlistPath}${qs ? `?${qs}` : ""}`;
+    return toFastPlayerPath(`${playlistPath}${qs ? `?${qs}` : ""}`);
   };
 
   const buildSetUrl = (targetSetId) => {
@@ -78,6 +89,7 @@ export default function PlaylistPickerPage() {
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
+    if (includePrivateParam === "1") params.set("include_private", "1");
     const returnTo = buildReturnTo(location, searchParams);
     if (returnTo) params.set("return_to", returnTo);
     params.set("psi", String(targetSetId));
@@ -99,6 +111,12 @@ export default function PlaylistPickerPage() {
   };
 
   const handleExit = () => {
+    if (adminExitPath) {
+      const target = adminExitPath;
+      clearAdminExitPath();
+      window.location.href = target;
+      return;
+    }
     navigate("/");
   };
 
@@ -133,19 +151,19 @@ export default function PlaylistPickerPage() {
         <div className="playlist-thumbs__grid-wrap">
           <div className="playlist-thumbs__grid">
             {tiles.map((tile) => (
-              <a
+              <Link
                 key={tile.id ?? `${tile.item_type}-${tile.playlist_instance_id || tile.target_set_id}`}
                 className="playlist-thumbs__card"
-                href={
+                to={
                   tile.item_type === "set"
                     ? buildSetUrl(tile.target_set_id || "")
                     : buildPlaylistUrl(tile)
                 }
               >
                 <div className="playlist-thumbs__image">
-                  {(photoThumbUrl(tile.photo_library_id, 520, 72) || tile.photo_url) ? (
+                  {(photoThumbUrl(tile.photo_library_id, 520, 72, tile.photo_url) || tile.photo_url) ? (
                     <img
-                      src={photoThumbUrl(tile.photo_library_id, 520, 72) || tile.photo_url}
+                      src={photoThumbUrl(tile.photo_library_id, 520, 72, tile.photo_url) || tile.photo_url}
                       alt={tile.title}
                       loading="lazy"
                       decoding="async"
@@ -158,7 +176,7 @@ export default function PlaylistPickerPage() {
                 {tile.subtitle && (
                   <div className="playlist-picker__card-subtitle">{tile.subtitle}</div>
                 )}
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -195,4 +213,52 @@ function resolveReturnTo(value) {
   if (!trimmed.startsWith("/")) return "";
   if (trimmed.startsWith("//")) return "";
   return trimmed;
+}
+
+async function fetchPlaylistSet(url) {
+  try {
+    return await fetchJsonWithRetry(url);
+  } catch (err) {
+    if (!isRetryableLoadError(err)) throw err;
+    return fetchJsonWithRetry(url, { cache: "reload" });
+  }
+}
+
+async function fetchJsonWithRetry(url, overrides = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(url, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      ...overrides,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      throw new Error("Playlist set returned a server page instead of data. Please try again.");
+    }
+    if (!response.ok) {
+      throw new Error(payload?.error || `Playlist set request failed (${response.status})`);
+    }
+    return payload;
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      throw new Error("Playlist set request timed out.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isRetryableLoadError(err) {
+  const message = String(err?.message || "").toLowerCase();
+  return message.includes("server page")
+    || message.includes("timed out")
+    || message.includes("failed (5")
+    || message.includes("network");
 }

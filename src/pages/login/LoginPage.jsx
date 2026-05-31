@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppState } from '@/context/AppStateContext'; // ✅ global context
 import './login.css';
 import {API_FOLDER} from '@helpers/config';
@@ -7,6 +7,7 @@ import {API_FOLDER} from '@helpers/config';
 function LoginPage() {
   const { setUser, setLoggedIn } = useAppState();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -95,11 +96,13 @@ const handleSubmit = async (e) => {
     if (deviceToken) {
       const params = new URLSearchParams(window.location.search || '');
       if (!params.get('device_token')) {
-        window.location.replace(`/?device_token=${encodeURIComponent(deviceToken)}`);
+        const adminLogin = location.pathname === '/admin/login' || location.pathname.startsWith('/admin/');
+        const targetPath = adminLogin ? '/admin/' : '/';
+        window.location.replace(`${targetPath}?device_token=${encodeURIComponent(deviceToken)}`);
         return;
       }
     }
-    navigate('/');
+    navigate(location.pathname === '/admin/login' || location.pathname.startsWith('/admin/') ? '/admin/' : '/');
   } catch (err) {
     console.error('Login error:', err);
     setError('Something went wrong');

@@ -40,6 +40,7 @@
   position: absolute;
   left: 50%;
   bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 70;
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: 999px;
@@ -51,6 +52,21 @@
   text-transform: none;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
   pointer-events: none;
+}
+
+.player-advance-hint--inline {
+  position: static;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  transform: none;
+  margin-top: 10px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* ===============================
@@ -209,6 +225,66 @@
   opacity: 1;
 }
 
+.player-hue-wheel-slide {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 4vh, 42px);
+  padding: clamp(32px, 8vw, 96px);
+  color: #fff;
+  text-align: center;
+  opacity: 0;
+  animation: title-fade 700ms ease-out forwards;
+}
+
+.player-hue-wheel-copy {
+  max-width: min(760px, 88vw);
+}
+
+.player-hue-wheel-copy h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(28px, 5vw, 58px);
+  line-height: 1.05;
+  font-weight: 800;
+}
+
+.player-hue-wheel-copy p {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(16px, 2.2vw, 28px);
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.player-hue-wheel {
+  width: min(56vh, 68vw, 440px);
+}
+
+.player-hue-wheel .animated-hue-wheel__caption {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .player-hue-wheel-slide {
+    flex-direction: row;
+    text-align: left;
+    gap: clamp(18px, 5vw, 48px);
+  }
+
+  .player-hue-wheel-copy {
+    max-width: min(420px, 42vw);
+  }
+
+  .player-hue-wheel {
+    width: min(64vh, 38vw, 360px);
+  }
+}
+
 .player-loading {
   position: absolute;
   inset: 0;
@@ -345,6 +421,7 @@
 .player-title.is-text-intro {
   opacity: 0;
   transform: none;
+  flex-direction: column;
   animation: title-fade 1200ms ease-in-out forwards;
 }
 

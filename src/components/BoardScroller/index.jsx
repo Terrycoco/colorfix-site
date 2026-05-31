@@ -12,7 +12,7 @@ import AdminMenu from "@components/AdminMenu/AdminMenu";
 import colorfixDarkBgUrl from "../../assets/brand/colorfix_darkbg.png";
 
 
-const BoardScroller = () => {
+const BoardScroller = ({ adminContext = false }) => {
   const navigate = useNavigate();
   const location= useLocation();
   const { palette, paletteCollapsed, setPaletteCollapsed, searchFilters } = useAppState();
@@ -31,7 +31,8 @@ const BoardScroller = () => {
   });
 
 
-  const isAdminRoute = location.pathname === "/admin" || location.pathname.startsWith("/admin/");
+  const isAdminRoute = adminContext || location.pathname === "/admin" || location.pathname.startsWith("/admin/");
+  const homePath = isAdminRoute ? "/admin/" : "/results/4";
   const isFrontPageRoute =
     location.pathname === "/" ||
     location.pathname === "/results/4" ||
@@ -188,13 +189,13 @@ const goBack = (e) => {
       navigate(-1);
       return;
     }
-    navigate('/results/4');
+    navigate(homePath);
   };
 
 const goToHome = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    navigate(isAdminRoute ? '/admin/' : '/results/4');
+    navigate(homePath);
   };
 
  return (

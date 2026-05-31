@@ -13,7 +13,7 @@ function parseJsonMaybe(text) {
 }
 
 const FeaturedArticleItem = ({ item = {} }) => {
-  const [payload, setPayload] = useState(null);
+  const [payload, setPayload] = useState(item?.featured_payload || null);
   const [error, setError] = useState("");
 
   const metadata = useMemo(() => {
@@ -29,6 +29,11 @@ const FeaturedArticleItem = ({ item = {} }) => {
   const kicker = item.display || item.title || metadata.kicker || "Featured Article";
 
   useEffect(() => {
+    if (item?.featured_payload) {
+      setPayload(item.featured_payload);
+      return undefined;
+    }
+
     let cancelled = false;
     const controller = new AbortController();
 
@@ -55,7 +60,7 @@ const FeaturedArticleItem = ({ item = {} }) => {
       cancelled = true;
       controller.abort();
     };
-  }, [type]);
+  }, [type, item?.featured_payload]);
 
   const article = payload?.article || null;
   const hero = payload?.hero || null;

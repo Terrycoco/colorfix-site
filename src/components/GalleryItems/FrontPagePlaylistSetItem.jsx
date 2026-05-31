@@ -1,5 +1,6 @@
 import './front-page-playlist-set-item.css';
 import { photoThumbUrl } from '@helpers/imageThumb';
+import { toFastPlayerPath } from '@helpers/playerUrls';
 
 const FrontPagePlaylistSetItem = ({ item }) => {
   const tiles = Array.isArray(item?.items) ? item.items : [];
@@ -9,12 +10,12 @@ const FrontPagePlaylistSetItem = ({ item }) => {
     <section className="front-page-playlist-set-item">
       <div className="front-page-playlist-set-item__tiles">
         {tiles.map((tile, index) => {
-          const imageSrc = photoThumbUrl(tile.photo_library_id, 480, 72) || tile.photo_url;
+          const imageSrc = photoThumbUrl(tile.photo_library_id, 480, 72, tile.photo_url) || tile.photo_url;
           return (
           <a
             key={tile.id || tile.player_url}
             className="front-page-playlist-set-item__tile"
-            href={appendSourceTag(tile.player_url, 'site')}
+            href={appendSourceTag(toFastPlayerPath(tile.player_url), 'site')}
           >
             <div className="front-page-playlist-set-item__image">
               {imageSrc ? (

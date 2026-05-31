@@ -1,0 +1,133 @@
+.animated-hue-wheel {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 0;
+  width: min(100%, var(--ahw-size, 300px));
+  max-width: 100%;
+}
+
+.animated-hue-wheel__stage {
+  width: min(100%, var(--ahw-size, 300px));
+  display: grid;
+  place-items: center;
+}
+
+.animated-hue-wheel.is-animated .wheel300-base,
+.animated-hue-wheel.is-animated .wheel300-fallback {
+  opacity: 0;
+  animation: ahw-wheel-fade var(--ahw-wheel-fade-ms, 420ms) ease-out forwards;
+}
+
+.animated-hue-wheel__spoke {
+  fill: none;
+  stroke-width: 2.75;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.animated-hue-wheel__dot {
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+}
+
+.animated-hue-wheel__label {
+  font-family: Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.86);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.animated-hue-wheel__marker.is-spoke-animated .animated-hue-wheel__spoke {
+  stroke-linecap: butt;
+}
+
+.animated-hue-wheel__marker.is-spoke-animated.has-finish-pulse .animated-hue-wheel__spoke {
+  animation: ahw-spoke-finish-pulse 520ms ease-out forwards;
+  animation-delay: calc(var(--ahw-delay-ms, 0ms) + var(--ahw-spoke-duration-ms, 700ms));
+}
+
+.animated-hue-wheel__marker.is-spoke-animated .animated-hue-wheel__dot,
+.animated-hue-wheel__marker.is-spoke-animated .animated-hue-wheel__label {
+  animation: ahw-fade-marker 260ms ease-out forwards;
+  animation-delay: calc(var(--ahw-delay-ms, 0ms) + var(--ahw-spoke-duration-ms, 700ms) - 90ms);
+}
+
+.animated-hue-wheel__marker.is-spoke-static .animated-hue-wheel__dot,
+.animated-hue-wheel__marker.is-spoke-static .animated-hue-wheel__label {
+  animation: ahw-fade-marker 180ms ease-out forwards;
+  animation-delay: var(--ahw-delay-ms, 0ms);
+}
+
+.animated-hue-wheel.is-static .animated-hue-wheel__dot,
+.animated-hue-wheel.is-static .animated-hue-wheel__label {
+  opacity: 1;
+}
+
+.animated-hue-wheel__caption {
+  max-width: 34ch;
+  color: #374151;
+  font-family: Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+@keyframes ahw-wheel-fade {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ahw-fade-marker {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ahw-spoke-finish-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+    stroke-width: 2.75;
+  }
+  45% {
+    filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.92)) drop-shadow(0 0 5px currentColor);
+    stroke-width: 4.4;
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+    stroke-width: 2.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-hue-wheel.is-animated .wheel300-base,
+  .animated-hue-wheel.is-animated .wheel300-fallback,
+  .animated-hue-wheel__marker.is-spoke-animated .animated-hue-wheel__dot,
+  .animated-hue-wheel__marker.is-spoke-animated .animated-hue-wheel__label,
+  .animated-hue-wheel__marker.is-spoke-static .animated-hue-wheel__dot,
+  .animated-hue-wheel__marker.is-spoke-static .animated-hue-wheel__label {
+    animation: none;
+  }
+
+  .animated-hue-wheel.is-animated .wheel300-base,
+  .animated-hue-wheel.is-animated .wheel300-fallback,
+  .animated-hue-wheel__dot,
+  .animated-hue-wheel__label {
+    opacity: 1;
+  }
+
+  .animated-hue-wheel__marker.is-spoke-animated.has-finish-pulse .animated-hue-wheel__spoke {
+    animation: none;
+  }
+}

@@ -145,7 +145,7 @@ export default function PlaylistThumbsPage() {
   const handleBackToPlaylist = () => {
     const targetId = lastPlaylistInstanceId || playlistId;
     if (!targetId) return;
-    navigate(`/playlist/${targetId}`);
+    navigate(`/p/${targetId}`);
   };
   const handleExit = () => {
     navigate("/");

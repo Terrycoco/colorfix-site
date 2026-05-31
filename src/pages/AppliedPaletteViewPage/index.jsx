@@ -75,7 +75,7 @@ export default function AppliedPaletteViewPage() {
 
   const handleBackToPlaylist = () => {
     if (!lastPlaylistInstanceId) return;
-    navigate(`/playlist/${lastPlaylistInstanceId}`);
+    navigate(`/p/${lastPlaylistInstanceId}`);
   };
 
   const shareUrl = useMemo(() => {

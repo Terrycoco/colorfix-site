@@ -124,12 +124,15 @@ export function buildLinkAssetUrl(assetType, item) {
   if (!item || typeof window === "undefined") return "";
 
   if (assetType === "playlist_instance") {
+    const slug = String(item.playlist_slug || item.slug || "").trim();
+    const pathId = slug || item.playlist_instance_id;
+    if (!pathId) return "";
     const params = new URLSearchParams();
-    params.set("id", String(item.playlist_instance_id));
     if (item.audience && item.audience !== "any") {
       params.set("aud", item.audience);
     }
-    return `${window.location.origin}/share/playlist.php?${params.toString()}`;
+    const qs = params.toString();
+    return `${window.location.origin}/p/${encodeURIComponent(String(pathId))}${qs ? `?${qs}` : ""}`;
   }
 
   if (assetType === "saved_palette") {

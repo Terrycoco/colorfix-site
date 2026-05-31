@@ -1,9 +1,23 @@
 import { Suspense, lazy } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { useAppState } from '@context/AppStateContext.jsx';
+import { isAdmin } from '@helpers/authHelper';
 import '@layout/MainLayout/mainlayout.css';
 
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
+const LoginPage = lazy(() => import('@pages/login/LoginPage'));
 const GalleryPage = lazy(() => import('@pages/GalleryPage'));
+const ColorDetailPage = lazy(() => import('@pages/ColorDetailPage'));
+const SearchPage = lazy(() => import('@pages/SearchPage'));
+const QuickFindPage = lazy(() => import('@pages/QuickFindPage'));
+const BrowsePalettesPage = lazy(() => import('@pages/BrowsePalettesPage'));
+const MatchResultsPage = lazy(() => import('@pages/MatchResultsPage'));
+const SideBySidePage = lazy(() => import('@pages/SideBySidePage'));
+const AdvancedSearchPage = lazy(() => import('@pages/AdvancedSearchPage'));
+const AdvancedResultsPage = lazy(() => import('@pages/AdvancedResultsPage'));
+const MyPalettePage = lazy(() => import('@pages/MyPalettePage'));
+const PaletteTranslationPage = lazy(() => import('@pages/PaletteTranslationPage'));
+const ArticlePage = lazy(() => import('@pages/ArticlePage'));
 const CategoryEditPage = lazy(() => import('@pages/CategoryEditPage'));
 const AdminColorEditPage = lazy(() => import('@pages/AdminColorEditPage'));
 const SearchPresetPage = lazy(() => import('@pages/SearchPresetPage'));
@@ -55,9 +69,35 @@ function renderWithSuspense(Component, label) {
 }
 
 export default function AdminRoutes() {
+  const { user } = useAppState();
+  const adminAllowed = Boolean(user?.is_admin) || isAdmin();
+
+  if (!adminAllowed) {
+    return (
+      <Routes>
+        <Route path="login" element={renderWithSuspense(LoginPage, 'Loading login...')} />
+        <Route path="*" element={<Navigate to="/admin/login" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
+      <Route path="login" element={<Navigate to="/admin/" replace />} />
       <Route index element={<AdminHomePage />} />
+      <Route path="results/:queryId" element={<AdminHomePage />} />
+      <Route path="color/:id" element={<AdminPublicPage><ColorDetailPage /></AdminPublicPage>} />
+      <Route path="search" element={<AdminPublicPage><SearchPage /></AdminPublicPage>} />
+      <Route path="quick-find" element={<AdminPublicPage><QuickFindPage /></AdminPublicPage>} />
+      <Route path="browse-palettes" element={<AdminPublicPage><BrowsePalettesPage /></AdminPublicPage>} />
+      <Route path="matches" element={<AdminPublicPage><MatchResultsPage /></AdminPublicPage>} />
+      <Route path="sbs" element={<AdminPublicPage><SideBySidePage /></AdminPublicPage>} />
+      <Route path="adv-search" element={<AdminPublicPage><AdvancedSearchPage /></AdminPublicPage>} />
+      <Route path="adv-results" element={<AdminPublicPage><AdvancedResultsPage /></AdminPublicPage>} />
+      <Route path="my-palette" element={<AdminPublicPage><MyPalettePage /></AdminPublicPage>} />
+      <Route path="palette/translate" element={<AdminPublicPage><PaletteTranslationPage /></AdminPublicPage>} />
+      <Route path="palette/:id/brands" element={<AdminPublicPage><PaletteTranslationPage /></AdminPublicPage>} />
+      <Route path="articles/:id" element={<AdminPublicPage><ArticlePage /></AdminPublicPage>} />
       <Route element={renderWithSuspense(AdminLayout, 'Loading admin shell...')}>
         <Route path="analysis" element={renderWithSuspense(AnalysisPage, 'Loading analysis...')} />
         <Route path="categories" element={renderWithSuspense(CategoryEditPage, 'Loading categories...')} />
@@ -89,6 +129,11 @@ export default function AdminRoutes() {
         <Route path="email-templates" element={renderWithSuspense(AdminEmailTemplatesPage, 'Loading email templates...')} />
         <Route path="applied-palettes" element={renderWithSuspense(AdminAppliedPalettesPage, 'Loading applied palettes...')} />
         <Route path="applied-palettes/:paletteId/edit" element={renderWithSuspense(AdminAppliedPaletteEditorPage, 'Loading palette editor...')} />
+        <Route path="picker" element={<PublicPathRedirect stripPrefix="/admin" />} />
+        <Route path="p/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
+        <Route path="p/:playlistId/:start" element={<PublicPathRedirect stripPrefix="/admin" />} />
+        <Route path="playlist/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
+        <Route path="playlist/:playlistId/:start" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="player/:playlistId" element={renderWithSuspense(PlayerPage, 'Loading player...')} />
         <Route path="player/:playlistId/:start" element={renderWithSuspense(PlayerPage, 'Loading player...')} />
         <Route path="player-preview/:playlistId" element={renderWithSuspense(AdminPlayerPage, 'Loading player preview...')} />
@@ -118,10 +163,30 @@ function AdminHomePage() {
   );
 }
 
+function AdminPublicPage({ children }) {
+  return (
+    <main className="main-layout">
+      <Suspense fallback={<RouteFallback label="Loading page..." />}>
+        {children}
+      </Suspense>
+    </main>
+  );
+}
+
 function RouteFallback({ label }) {
   return (
     <div className="route-loader" role="status" aria-live="polite">
       {label}
     </div>
   );
+}
+
+function PublicPathRedirect({ stripPrefix }) {
+  const location = useLocation();
+  const from = `${location.pathname}${location.search}${location.hash}`;
+  const target = from.startsWith(stripPrefix)
+    ? from.slice(stripPrefix.length) || "/"
+    : from;
+  window.location.replace(target);
+  return null;
 }

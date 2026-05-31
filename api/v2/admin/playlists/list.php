@@ -4,7 +4,7 @@ declare(strict_types=1);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Cache-Control: private, max-age=60, stale-while-revalidate=180');
 
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
@@ -38,6 +38,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 try {
     $slugSelect = columnExists($pdo, 'playlists', 'slug') ? 'slug' : 'NULL AS slug';
     $headlineSelect = columnExists($pdo, 'playlists', 'headline') ? 'headline' : 'NULL AS headline';
+    $publicSelect = columnExists($pdo, 'playlists', 'is_public') ? 'is_public' : '0 AS is_public';
+    $retiredWhere = columnExists($pdo, 'playlists', 'is_retired') ? 'WHERE COALESCE(is_retired, 0) = 0' : '';
     $indexableSelect = columnExists($pdo, 'playlists', 'indexable') ? 'indexable' : '1 AS indexable';
     $publishedAtSelect = columnExists($pdo, 'playlists', 'published_at') ? 'published_at' : 'NULL AS published_at';
     $updatedAtSelect = columnExists($pdo, 'playlists', 'updated_at') ? 'updated_at' : 'NULL AS updated_at';
@@ -48,12 +50,14 @@ try {
             title,
             type,
             is_active,
+            {$publicSelect},
             {$slugSelect},
             {$headlineSelect},
             {$indexableSelect},
             {$publishedAtSelect},
             {$updatedAtSelect}
         FROM playlists
+        {$retiredWhere}
         ORDER BY playlist_id ASC
         SQL;
 

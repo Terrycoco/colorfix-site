@@ -69,7 +69,7 @@ $pathId = trim((string)($instance->slug ?? ''));
 if ($pathId === '') {
     $pathId = (string)$instanceId;
 }
-$appPath = "/playlist/" . rawurlencode($pathId);
+$appPath = "/p/" . rawurlencode($pathId);
 
 $forwardParams = $_GET;
 unset($forwardParams['id']);

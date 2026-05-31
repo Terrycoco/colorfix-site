@@ -8,6 +8,7 @@ import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 import SwatchGallery from "@components/SwatchGallery";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import EditableSwatch from "@components/EditableSwatch";
+import AnimatedHueWheel from "@components/AnimatedHueWheel";
 import "./mypalette.css";
 
 /* ---------- Helpers ---------- */
@@ -32,6 +33,31 @@ function buildBrandsQS(searchFilters) {
     new Set(arr.map((s) => String(s || "").trim().toLowerCase()).filter(Boolean))
   );
   return codes.length ? `&brands=${encodeURIComponent(codes.join(","))}` : "";
+}
+
+function normalizeHexValue(hexLike) {
+  const raw = String(hexLike || "").trim();
+  if (!raw) return "#cccccc";
+  const value = raw.startsWith("#") ? raw : `#${raw}`;
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#cccccc";
+}
+
+function hexToRgbValue(hexLike) {
+  const hex = normalizeHexValue(hexLike);
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  };
+}
+
+function getExportTextColor(color, hexLike) {
+  if (typeof color?.hcl_l === "number") {
+    return color.hcl_l > 70 ? "#111111" : "#ffffff";
+  }
+  const { r, g, b } = hexToRgbValue(hexLike);
+  const luminance = 0.2126 * (r / 255) + 0.7152 * (g / 255) + 0.0722 * (b / 255);
+  return luminance > 0.62 ? "#111111" : "#ffffff";
 }
 
 /* ---------- Component ---------- */
@@ -154,6 +180,7 @@ const activeBrandCodes = useMemo(() => {
   const [dragOverId, setDragOverId] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showSortPeek, setShowSortPeek] = useState(true);
+  const [showHueWheel, setShowHueWheel] = useState(false);
   const lastScrollRef = useRef(0);
 
   const CLEAR_ON = ["/v2/get-friends.php"];
@@ -170,6 +197,24 @@ const activeBrandCodes = useMemo(() => {
       .filter((v) => Number.isFinite(v) && v > 0);
     return Array.from(new Set(ids));
   }, [palette]);
+
+  const paletteHueItems = useMemo(() => {
+    const arr = Array.isArray(paletteFallback) ? paletteFallback : [];
+    return arr
+      .map((swatch) => swatch?.color ?? swatch)
+      .filter((color) => color?.hcl_h != null && color.hcl_h !== "")
+      .map((color) => {
+        const hue = Number(color.hcl_h);
+        if (!Number.isFinite(hue)) return null;
+        return {
+          hue,
+          color: `rgb(${color?.r || 0}, ${color?.g || 0}, ${color?.b || 0})`,
+          label: color?.name || "",
+          animate: true,
+        };
+      })
+      .filter(Boolean);
+  }, [paletteFallback]);
 
   async function runQuery(endpoint, tol = null, mode = null) {
     setLoading(true);
@@ -892,14 +937,56 @@ const activeBrandCodes = useMemo(() => {
   };
 
   async function handleCopyPalette() {
-    const node = paletteGridRef.current;
-    if (!node) {
+    const colors = (Array.isArray(paletteFallback) ? paletteFallback : [])
+      .map((swatch) => swatch?.color ?? swatch)
+      .filter(Boolean);
+    if (colors.length === 0) {
       pushCopyStatus("No palette to copy yet.");
       return;
     }
+    const exportNode = document.createElement("div");
+    exportNode.className = "myp-copy-export";
+    const grid = document.createElement("div");
+    grid.className = "myp-copy-export__grid";
+    exportNode.appendChild(grid);
+
+    colors.forEach((color) => {
+      const hex = normalizeHexValue(getHex(color));
+      const textColor = getExportTextColor(color, hex);
+      const card = document.createElement("div");
+      card.className = "myp-copy-export__card";
+      card.style.backgroundColor = hex;
+      card.style.color = textColor;
+
+      const chip = document.createElement("div");
+      chip.className = "myp-copy-export__chip";
+      chip.textContent = color?.chip_num || "";
+      card.appendChild(chip);
+
+      const label = document.createElement("div");
+      label.className = "myp-copy-export__label";
+
+      const name = document.createElement("div");
+      name.className = "myp-copy-export__name";
+      name.textContent = color?.name || "Untitled";
+      label.appendChild(name);
+
+      const meta = document.createElement("div");
+      meta.className = "myp-copy-export__meta";
+      const hue = typeof color?.hcl_h === "number" ? Math.round(color.hcl_h) : "–";
+      const chroma = typeof color?.hcl_c === "number" ? Math.round(color.hcl_c) : "–";
+      const lightness = typeof color?.hcl_l === "number" ? Math.round(color.hcl_l) : "–";
+      meta.textContent = `${color?.brand || ""} • H:${hue} • C:${chroma} • L:${lightness}`;
+      label.appendChild(meta);
+
+      card.appendChild(label);
+      grid.appendChild(card);
+    });
+
+    document.body.appendChild(exportNode);
     try {
       const html2canvas = (await import("html2canvas")).default;
-      const canvas = await html2canvas(node, {
+      const canvas = await html2canvas(exportNode, {
         backgroundColor: "#ffffff",
         scale: window.devicePixelRatio || 2,
       });
@@ -912,6 +999,8 @@ const activeBrandCodes = useMemo(() => {
       pushCopyStatus("Copied.");
     } catch (err) {
       pushCopyStatus(err?.message || "Unable to copy palette.");
+    } finally {
+      exportNode.remove();
     }
   }
 
@@ -959,6 +1048,16 @@ const activeBrandCodes = useMemo(() => {
                 )}
               </>
             )}
+            {adminMode && (
+              <button
+                className={`myp-hue-toggle${showHueWheel ? " is-on" : ""}`}
+                type="button"
+                onClick={() => setShowHueWheel((value) => !value)}
+                aria-pressed={showHueWheel}
+              >
+                Hue Wheel
+              </button>
+            )}
           </div>
      
           <span className="myp-copy-status" aria-live="polite">
@@ -968,7 +1067,7 @@ const activeBrandCodes = useMemo(() => {
         </div>
 
         <section className="myp-top">
-          {isPaletteEmpty ? (
+          {isPaletteEmpty && !showHueWheel ? (
             <div className="myp-empty">
               <p>Start with a color you love {"\u2014"} we'll show you what works with it.</p>
             </div>
@@ -976,6 +1075,20 @@ const activeBrandCodes = useMemo(() => {
             <div className="myp-row">
               <div className="sg-root sg-palette myp-palette-grid" ref={paletteGridRef}>
                 <div className="sg-grid">
+                  {showHueWheel && (
+                    <div className="sg-item myp-hue-wheel-tile">
+                      <AnimatedHueWheel
+                        items={paletteHueItems}
+                        showLabels={false}
+                        size={280}
+                        spokeStartRadius={0}
+                        spokeEndRadius={136}
+                        spokeDelayMs={260}
+                        spokeStaggerMs={150}
+                        spokeDurationMs={650}
+                      />
+                    </div>
+                  )}
                   {paletteFallback.map((swatch, index) => {
                     const swatchId = getSwatchId(swatch);
                     const key = swatchId ?? swatch?.hex6 ?? swatch?.hex ?? index;

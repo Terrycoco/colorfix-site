@@ -47,6 +47,7 @@ class PdoPlaylistRepository
                 p.title,
                 p.type,
                 p.is_active,
+                p.is_public,
                 p.slug,
                 p.headline,
                 p.page_title,
@@ -88,6 +89,7 @@ class PdoPlaylistRepository
                 p.title,
                 p.type,
                 p.is_active,
+                p.is_public,
                 p.slug,
                 p.headline,
                 p.page_title,
@@ -118,6 +120,7 @@ class PdoPlaylistRepository
               ON shareable.playlist_id = p.playlist_id
             WHERE p.slug = :slug
               AND p.is_active = 1
+              AND p.is_public = 1
               AND p.indexable = 1
               AND p.headline IS NOT NULL
               AND TRIM(p.headline) <> ''
@@ -169,6 +172,7 @@ class PdoPlaylistRepository
                 p.title,
                 p.type,
                 p.is_active,
+                p.is_public,
                 p.slug,
                 p.headline,
                 p.page_title,
@@ -199,6 +203,7 @@ class PdoPlaylistRepository
               ON shareable.playlist_id = p.playlist_id
             WHERE p.playlist_id = :playlist_id
               AND p.is_active = 1
+              AND p.is_public = 1
               AND p.indexable = 1
               AND p.slug IS NOT NULL
               AND TRIM(p.slug) <> ''
@@ -229,6 +234,7 @@ class PdoPlaylistRepository
                 p.title,
                 p.type,
                 p.is_active,
+                p.is_public,
                 p.slug,
                 p.headline,
                 p.page_title,
@@ -258,6 +264,7 @@ class PdoPlaylistRepository
             ) shareable
               ON shareable.playlist_id = p.playlist_id
             WHERE p.is_active = 1
+              AND p.is_public = 1
               AND p.indexable = 1
               AND p.slug IS NOT NULL
               AND p.slug <> ''
@@ -299,6 +306,7 @@ class PdoPlaylistRepository
             JOIN playlist_instances pi
               ON pi.playlist_id = p.playlist_id
             WHERE p.is_active = 1
+              AND p.is_public = 1
               AND p.indexable = 1
               AND pi.is_active = 1
               AND pi.share_enabled = 1
@@ -445,6 +453,7 @@ class PdoPlaylistRepository
                 {$savedPaletteSetSelect},
                 title,
                 subtitle,
+                body,
                 item_type,
                 layout,
                 title_mode,
@@ -483,6 +492,7 @@ class PdoPlaylistRepository
                 null,
                 $row['title'] ?? null,
                 $row['subtitle'] ?? null,
+                $row['body'] ?? null,
                 $row['item_type'] ?? null,
                 $star,
                 $row['layout'] ?? null,
@@ -625,6 +635,7 @@ class PdoPlaylistRepository
             'title' => (string)($row['title'] ?? ''),
             'type' => (string)($row['type'] ?? ''),
             'is_active' => (int)($row['is_active'] ?? 0),
+            'is_public' => (int)($row['is_public'] ?? 0),
             'slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
             'headline' => $row['headline'] !== null ? (string)$row['headline'] : null,
             'page_title' => $row['page_title'] !== null ? (string)$row['page_title'] : null,

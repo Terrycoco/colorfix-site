@@ -42,7 +42,7 @@ export default function ArticlePage() {
   const playlistInstanceId = searchParams.get("playlist_instance_id") ?? "";
   const playlistTitle = searchParams.get("playlist_title") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
-  const playlistUrl = returnToParam || (playlistInstanceId ? `/playlist/${playlistInstanceId}` : "");
+  const playlistUrl = returnToParam || (playlistInstanceId ? `/p/${playlistInstanceId}` : "");
 
   useEffect(() => {
     let active = true;

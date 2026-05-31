@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
+import { toFastPlayerPath } from "@helpers/playerUrls";
 
 const WATCH_GET_URL = `${API_FOLDER}/v2/admin/watch-config/get.php`;
 const SET_ITEMS_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instance-set-items/list.php`;
@@ -45,7 +46,7 @@ export default function WatchRedirectPage() {
         const next = new URLSearchParams(location.search);
         next.delete("id");
         const qs = next.toString();
-        const targetPath = playlistUrl || `/playlist/${playlistInstanceId}`;
+        const targetPath = toFastPlayerPath(playlistUrl || `/playlist/${playlistInstanceId}`);
         const target = `${targetPath}${qs ? `?${qs}` : ""}`;
 
         if (!cancelled) {

@@ -143,13 +143,13 @@ export default function PhotoPickerModal({
             runSearch();
           }}
         >
-          <label className="ppm-label">Search (title or tags)</label>
+          <label className="ppm-label">Search (title, tags, or photo ID)</label>
           <div className="ppm-search-row">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g., door, cottage, adobe"
+              placeholder="e.g., door, cottage, adobe, or #621"
               ref={inputRef}
             />
             <button type="submit" className="ppm-search-btn" disabled={loading}>

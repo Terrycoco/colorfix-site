@@ -12,7 +12,7 @@ export default function AdminApp() {
 
   return (
     <AppLayout>
-      <BoardScroller />
+      <BoardScroller adminContext />
       <MessagePopup />
       <AdminRoutes />
     </AppLayout>

@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PhotoPickerModal from "@components/PhotoPickerModal";
+import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import { makePhotoRef, parsePhotoRef } from "@helpers/assetImage";
+import fetchColorDetail from "@data/fetchColorDetail";
 import "./admin-playlist-editor.css";
 
 const GET_URL = `${API_FOLDER}/v2/admin/playlists/get.php`;
@@ -10,6 +12,7 @@ const SAVE_URL = `${API_FOLDER}/v2/admin/playlists/save.php`;
 const SAVE_ITEMS_URL = `${API_FOLDER}/v2/admin/playlist-items/save.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/playlists/delete.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const PLAYLIST_INSTANCES_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const PHOTO_LIBRARY_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
@@ -18,6 +21,7 @@ const emptyPlaylist = {
   title: "",
   type: "",
   is_active: true,
+  is_public: false,
   slug: "",
   headline: "",
   page_title: "",
@@ -55,6 +59,27 @@ const emptyItem = {
   is_active: true,
 };
 
+const DEFAULT_HUE_WHEEL_CONFIG = {
+  items: [
+    { hue: 145, label: "Green", color: "#6F8F72", animate: false },
+    { hue: 355, label: "Red", color: "#A6403A", animate: true },
+  ],
+  animated: true,
+  showLabels: false,
+  showDots: false,
+  pulseOnComplete: true,
+  caption: "",
+  size: 360,
+  wheelFadeMs: 420,
+  spokeStartRadius: 0,
+  spokeEndRadius: 136,
+  spokeDelayMs: 420,
+  spokeStaggerMs: 260,
+  spokeDurationMs: 800,
+};
+
+const HUE_WHEEL_BODY_TEMPLATE = serializeHueWheelConfig(DEFAULT_HUE_WHEEL_CONFIG);
+
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
 
 function slugifyPlaylistValue(value) {
@@ -70,6 +95,76 @@ function toDatetimeLocal(value) {
   const text = String(value || "").trim();
   if (!text) return "";
   return text.replace(" ", "T").slice(0, 16);
+}
+
+function parseHueWheelBody(rawBody) {
+  const raw = String(rawBody || "").trim();
+  if (!raw) return { ...DEFAULT_HUE_WHEEL_CONFIG, items: [...DEFAULT_HUE_WHEEL_CONFIG.items] };
+  try {
+    const parsed = JSON.parse(raw);
+    const config = Array.isArray(parsed) ? { items: parsed } : parsed;
+    if (!config || typeof config !== "object") {
+      return { ...DEFAULT_HUE_WHEEL_CONFIG, items: [...DEFAULT_HUE_WHEEL_CONFIG.items] };
+    }
+    const items = Array.isArray(config.items) ? config.items : [];
+    return {
+      ...DEFAULT_HUE_WHEEL_CONFIG,
+      ...config,
+      items: items.map(normalizeHueWheelItem),
+      animated: config.animated !== false,
+      showLabels: config.showLabels === true,
+      showDots: config.showDots === true,
+      pulseOnComplete: config.pulseOnComplete !== false,
+    };
+  } catch {
+    return { ...DEFAULT_HUE_WHEEL_CONFIG, items: [...DEFAULT_HUE_WHEEL_CONFIG.items] };
+  }
+}
+
+function normalizeHueWheelItem(item = {}) {
+  return {
+    hue: item.hue ?? "",
+    label: item.label ?? "",
+    color: item.color || "#111111",
+    animate: item.animate !== false,
+    delayMs: item.delayMs ?? "",
+    durationMs: item.durationMs ?? "",
+    startRadius: item.startRadius ?? "",
+    endRadius: item.endRadius ?? "",
+  };
+}
+
+function serializeHueWheelConfig(config) {
+  const cleanedItems = (Array.isArray(config.items) ? config.items : [])
+    .map((item) => {
+      const next = {
+        hue: item.hue === "" ? "" : Number(item.hue),
+        label: String(item.label || ""),
+        color: String(item.color || ""),
+        animate: item.animate !== false,
+      };
+      ["delayMs", "durationMs", "startRadius", "endRadius"].forEach((key) => {
+        if (item[key] !== "" && item[key] != null) next[key] = Number(item[key]);
+      });
+      return next;
+    })
+    .filter((item) => item.hue !== "" && Number.isFinite(item.hue));
+
+  return JSON.stringify({
+    items: cleanedItems,
+    animated: config.animated !== false,
+    showLabels: config.showLabels === true,
+    showDots: config.showDots === true,
+    pulseOnComplete: config.pulseOnComplete !== false,
+    caption: String(config.caption || ""),
+    size: Number(config.size) || DEFAULT_HUE_WHEEL_CONFIG.size,
+    wheelFadeMs: Number(config.wheelFadeMs ?? DEFAULT_HUE_WHEEL_CONFIG.wheelFadeMs),
+    spokeStartRadius: Number(config.spokeStartRadius ?? DEFAULT_HUE_WHEEL_CONFIG.spokeStartRadius),
+    spokeEndRadius: Number(config.spokeEndRadius ?? DEFAULT_HUE_WHEEL_CONFIG.spokeEndRadius),
+    spokeDelayMs: Number(config.spokeDelayMs ?? DEFAULT_HUE_WHEEL_CONFIG.spokeDelayMs),
+    spokeStaggerMs: Number(config.spokeStaggerMs ?? DEFAULT_HUE_WHEEL_CONFIG.spokeStaggerMs),
+    spokeDurationMs: Number(config.spokeDurationMs ?? DEFAULT_HUE_WHEEL_CONFIG.spokeDurationMs),
+  }, null, 2);
 }
 
 export default function AdminPlaylistEditorPage() {
@@ -93,6 +188,9 @@ export default function AdminPlaylistEditorPage() {
   const [photoThumbs, setPhotoThumbs] = useState({});
   const [photoInfo, setPhotoInfo] = useState({});
   const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [linkedInstances, setLinkedInstances] = useState([]);
+  const [playing, setPlaying] = useState(false);
+  const [hueWheelEditorIndex, setHueWheelEditorIndex] = useState(null);
 
   const makeClientItemKey = useCallback(
     () => `pli-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -182,7 +280,8 @@ export default function AdminPlaylistEditorPage() {
         playlist_id: data.playlist.playlist_id,
         title: data.playlist.title,
         type: data.playlist.type,
-        is_active: Boolean(data.playlist.is_active),
+        is_active: Number(data.playlist.is_active) !== 0,
+        is_public: Number(data.playlist.is_public) === 1,
         slug: data.playlist.slug ?? "",
         headline: data.playlist.headline ?? "",
         page_title: data.playlist.page_title ?? "",
@@ -193,7 +292,7 @@ export default function AdminPlaylistEditorPage() {
         hero_image_id: data.playlist.hero_image_id ?? "",
         hero_image_url: data.playlist.hero_image_url ?? "",
         hero_alt: data.playlist.hero_alt ?? "",
-        indexable: data.playlist.indexable == null ? true : Boolean(data.playlist.indexable),
+        indexable: data.playlist.indexable == null ? true : Number(data.playlist.indexable) !== 0,
         published_at: toDatetimeLocal(data.playlist.published_at ?? ""),
       });
       const typeValue = String(data.playlist.type || "").trim();
@@ -234,15 +333,41 @@ export default function AdminPlaylistEditorPage() {
     }
   }, [playlistTypes, makeClientItemKey]);
 
+  const fetchLinkedInstances = useCallback(async (id) => {
+    if (!id) {
+      setLinkedInstances([]);
+      return [];
+    }
+    try {
+      const params = new URLSearchParams({
+        playlist_id: String(id),
+        _: String(Date.now()),
+      });
+      const res = await fetch(`${PLAYLIST_INSTANCES_LIST_URL}?${params.toString()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlist instances");
+      const rows = Array.isArray(data.items) ? data.items : [];
+      setLinkedInstances(rows);
+      return rows;
+    } catch {
+      setLinkedInstances([]);
+      return [];
+    }
+  }, []);
+
   useEffect(() => {
     if (!playlistId) {
       setPlaylist(emptyPlaylist);
       setItems([]);
       setExpandedItems({});
+      setLinkedInstances([]);
       return;
     }
     fetchPlaylist(playlistId);
-  }, [playlistId, fetchPlaylist]);
+    fetchLinkedInstances(playlistId);
+  }, [playlistId, fetchPlaylist, fetchLinkedInstances]);
 
   async function fetchSavedPalettes() {
     try {
@@ -336,10 +461,104 @@ export default function AdminPlaylistEditorPage() {
         .replace(/--/g, "—");
     }
     setItems((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, [field]: nextValue } : item))
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const nextItem = { ...item, [field]: nextValue };
+        if (field === "item_type" && nextValue === "hue-wheel") {
+          if (!String(item.body || "").trim()) {
+            nextItem.body = HUE_WHEEL_BODY_TEMPLATE;
+          }
+          nextItem.ap_id = "";
+          nextItem.palette_hash = "";
+          nextItem.image_url = "";
+          nextItem.photo_library_id = "";
+          nextItem.saved_palette_set_id = "";
+          nextItem.is_share_image = false;
+          nextItem.star = false;
+        }
+        return nextItem;
+      })
     );
     setSaveStatus("");
     setSaveError("");
+  }
+
+  function updateHueWheelConfig(index, updater) {
+    setItems((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+        const current = parseHueWheelBody(item.body);
+        const nextConfig = typeof updater === "function" ? updater(current) : updater;
+        return {
+          ...item,
+          item_type: "hue-wheel",
+          body: serializeHueWheelConfig(nextConfig),
+          star: false,
+        };
+      })
+    );
+    setSaveStatus("");
+    setSaveError("");
+  }
+
+  function updateHueWheelField(index, field, value) {
+    updateHueWheelConfig(index, (config) => ({ ...config, [field]: value }));
+  }
+
+  function updateHueWheelItem(index, markerIndex, field, value) {
+    updateHueWheelConfig(index, (config) => ({
+      ...config,
+      items: config.items.map((marker, idx) => (
+        idx === markerIndex ? { ...marker, [field]: value } : marker
+      )),
+    }));
+  }
+
+  function addHueWheelItem(index) {
+    updateHueWheelConfig(index, (config) => ({
+      ...config,
+      items: [
+        ...config.items,
+        normalizeHueWheelItem({ hue: 0, label: "", color: "#111111", animate: true }),
+      ],
+    }));
+  }
+
+  function removeHueWheelItem(index, markerIndex) {
+    updateHueWheelConfig(index, (config) => ({
+      ...config,
+      items: config.items.filter((_, idx) => idx !== markerIndex),
+    }));
+  }
+
+  async function applyHueWheelColor(index, markerIndex, pickedColor) {
+    const colorId = pickedColor?.id ?? pickedColor?.color_id;
+    let color = pickedColor || {};
+    if (colorId) {
+      try {
+        await fetchColorDetail(colorId, (detail) => {
+          color = detail || color;
+        });
+      } catch {
+        // Fuzzy search rows usually include enough data; fall back to the picked row.
+      }
+    }
+    const hexRaw = color.hex6 || color.hex || pickedColor?.hex6 || pickedColor?.hex || "";
+    const hex = String(hexRaw || "").trim().replace(/^#/, "");
+    const hue = Number(color.hcl_h ?? color.h ?? pickedColor?.hcl_h ?? pickedColor?.h);
+    updateHueWheelConfig(index, (config) => ({
+      ...config,
+      items: config.items.map((marker, idx) => (
+        idx === markerIndex
+          ? {
+              ...marker,
+              hue: Number.isFinite(hue) ? Number(hue.toFixed(2)) : marker.hue,
+              label: color.name || color.color_name || pickedColor?.name || marker.label,
+              color: hex ? `#${hex.toUpperCase()}` : marker.color,
+            }
+          : marker
+      )),
+    }));
   }
 
   function applyAttachedPaletteFromPhoto(index, photoLibraryId, attachedInfo = null) {
@@ -378,7 +597,13 @@ export default function AdminPlaylistEditorPage() {
 
   function addItem(type = "non-palette") {
     setItems((prev) => {
-      const nextItem = { ...emptyItem, _clientKey: makeClientItemKey(), item_type: type };
+      const nextItem = {
+        ...emptyItem,
+        _clientKey: makeClientItemKey(),
+        item_type: type,
+        body: type === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : emptyItem.body,
+        star: type === "hue-wheel" ? false : emptyItem.star,
+      };
       if (type === "intro") {
         return [nextItem, ...prev];
       }
@@ -454,7 +679,7 @@ export default function AdminPlaylistEditorPage() {
     setSaveError("");
   }
 
-  async function handleSave() {
+  async function savePlaylist() {
     setSaving(true);
     setSaveStatus("");
     setSaveError("");
@@ -464,6 +689,7 @@ export default function AdminPlaylistEditorPage() {
         title: playlist.title,
         type: playlist.type,
         is_active: playlist.is_active,
+        is_public: playlist.is_public,
         slug: playlist.slug,
         headline: playlist.headline,
         page_title: playlist.page_title,
@@ -513,13 +739,49 @@ export default function AdminPlaylistEditorPage() {
 
       setSaveStatus("Saved");
       await fetchPlaylist(playlistIdToSave);
+      await fetchLinkedInstances(playlistIdToSave);
       if (!playlistId) {
         navigate(`/admin/playlists/${playlistIdToSave}`, { replace: true });
       }
+      return playlistIdToSave;
     } catch (err) {
       setSaveError(err?.message || "Save failed");
+      return null;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSave() {
+    await savePlaylist();
+  }
+
+  async function handleSaveAndPlay() {
+    setPlaying(true);
+    setSaveError("");
+    try {
+      const savedPlaylistId = await savePlaylist();
+      if (!savedPlaylistId) return;
+      const instances = await fetchLinkedInstances(savedPlaylistId);
+      const instance = instances.find((item) => Number(item.is_active) !== 0) || instances[0];
+      if (!instance?.playlist_instance_id) {
+        setSaveError("Saved, but this playlist has no playlist instance to run yet.");
+        return;
+      }
+      const slug = String(instance.playlist_slug || instance.slug || "").trim();
+      const pathId = slug || instance.playlist_instance_id;
+      const params = new URLSearchParams({
+        fresh: "1",
+        close: "1",
+        _: String(Date.now()),
+        return_to: `/admin/playlists/${savedPlaylistId}`,
+      });
+      if (instance.audience && instance.audience !== "any") {
+        params.set("aud", instance.audience);
+      }
+      window.open(`${window.location.origin}/p/${encodeURIComponent(String(pathId))}?${params.toString()}`, "_blank", "noopener");
+    } finally {
+      setPlaying(false);
     }
   }
 
@@ -551,6 +813,8 @@ export default function AdminPlaylistEditorPage() {
   const hasIntro = useMemo(() => {
     return items.some((item) => (item.item_type || "normal") === "intro");
   }, [items]);
+  const hueWheelEditorItem = hueWheelEditorIndex != null ? items[hueWheelEditorIndex] : null;
+  const hueWheelEditorConfig = hueWheelEditorItem ? parseHueWheelBody(hueWheelEditorItem.body) : null;
 
   return (
     <div className="admin-playlist-editor">
@@ -566,6 +830,13 @@ export default function AdminPlaylistEditorPage() {
         <div className="editor-actions">
           <button type="button" onClick={() => navigate("/admin/playlist-instances")}>
             Back to Instances
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAndPlay}
+            disabled={saving || playing}
+          >
+            {playing ? "Opening..." : "Save & Play"}
           </button>
           {playlist.playlist_id && (
             <button
@@ -629,6 +900,14 @@ export default function AdminPlaylistEditorPage() {
           />
           Active
         </label>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={playlist.is_public}
+            onChange={(e) => updatePlaylist("is_public", e.target.checked)}
+          />
+          Public discovery / watch next
+        </label>
         <div className="playlist-form__tools">
           <button type="button" onClick={() => setSeoModalOpen(true)}>
             SEO
@@ -648,6 +927,7 @@ export default function AdminPlaylistEditorPage() {
         <div className="items-actions">
           <button type="button" onClick={() => addItem("intro")}>Add Intro</button>
           <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
+          <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
         </div>
       </div>
 
@@ -671,6 +951,7 @@ export default function AdminPlaylistEditorPage() {
                   <option value="palette">palette</option>
                   <option value="intro">intro</option>
                   <option value="text">text</option>
+                  <option value="hue-wheel">hue wheel</option>
                   <option value="non-palette">no palette</option>
                 </select>
               </label>
@@ -792,6 +1073,11 @@ export default function AdminPlaylistEditorPage() {
                   <button type="button" onClick={() => moveItem(index, -1)}>↑</button>
                   <button type="button" onClick={() => moveItem(index, 1)}>↓</button>
                 </div>
+                {item.item_type === "hue-wheel" && (
+                  <button type="button" className="item-more" onClick={() => setHueWheelEditorIndex(index)}>
+                    Edit Hue Wheel
+                  </button>
+                )}
                 <button type="button" className="item-more" onClick={() => toggleExpanded(index)}>
                   {expandedItems[index] ? "Less" : "More"}
                 </button>
@@ -817,14 +1103,30 @@ export default function AdminPlaylistEditorPage() {
                     onChange={(e) => updateItem(index, "subtitle_2", e.target.value)}
                   />
                 </label>
-                <label className="item-cell item-wide">
-                  Body
-                  <textarea
-                    rows={2}
-                    value={item.body}
-                    onChange={(e) => updateItem(index, "body", e.target.value)}
-                  />
-                </label>
+                {item.item_type === "hue-wheel" ? (
+                  <div className="item-cell item-wide">
+                    Hue Wheel
+                    <button
+                      type="button"
+                      className="item-inline-btn"
+                      onClick={() => setHueWheelEditorIndex(index)}
+                    >
+                      Edit Hue Wheel
+                    </button>
+                    <div className="muted">
+                      {parseHueWheelBody(item.body).items.length} marker{parseHueWheelBody(item.body).items.length === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                ) : (
+                  <label className="item-cell item-wide">
+                    Body
+                    <textarea
+                      rows={2}
+                      value={item.body}
+                      onChange={(e) => updateItem(index, "body", e.target.value)}
+                    />
+                  </label>
+                )}
                 <label className="item-cell">
                   Layout
                   <input
@@ -887,6 +1189,7 @@ export default function AdminPlaylistEditorPage() {
       <div className="items-actions items-actions--bottom">
         <button type="button" onClick={() => addItem("intro")}>Add Intro</button>
         <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
+        <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
         <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </button>
@@ -1103,6 +1406,230 @@ export default function AdminPlaylistEditorPage() {
                   Landing page: <code>/playlists/{playlist.slug}</code>
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hueWheelEditorItem && hueWheelEditorConfig && (
+        <div
+          className="playlist-seo-modal-backdrop"
+          onClick={() => setHueWheelEditorIndex(null)}
+        >
+          <div
+            className="playlist-seo-modal hue-wheel-editor-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="playlist-seo-form__header">
+              <div>
+                <div className="items-title">Hue Wheel Slide</div>
+                <div className="editor-subtitle">
+                  Set the exact spokes for slide #{hueWheelEditorIndex + 1}.
+                </div>
+              </div>
+              <button type="button" onClick={() => setHueWheelEditorIndex(null)}>
+                Close
+              </button>
+            </div>
+
+            <div className="hue-wheel-editor">
+              <div className="hue-wheel-editor__settings">
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={hueWheelEditorConfig.animated !== false}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "animated", e.target.checked)}
+                  />
+                  Animated
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={hueWheelEditorConfig.showLabels === true}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "showLabels", e.target.checked)}
+                  />
+                  Show labels
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={hueWheelEditorConfig.showDots === true}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "showDots", e.target.checked)}
+                  />
+                  Show dots
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={hueWheelEditorConfig.pulseOnComplete !== false}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "pulseOnComplete", e.target.checked)}
+                  />
+                  Finish pulse
+                </label>
+                <label>
+                  Caption
+                  <input
+                    type="text"
+                    value={hueWheelEditorConfig.caption || ""}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "caption", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Size
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.size ?? 360}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "size", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Start radius
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.spokeStartRadius ?? 0}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "spokeStartRadius", e.target.value)}
+                  />
+                </label>
+                <label>
+                  End radius
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.spokeEndRadius ?? 136}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "spokeEndRadius", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Wheel fade
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.wheelFadeMs ?? 420}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "wheelFadeMs", e.target.value)}
+                  />
+                </label>
+                <label>
+                  First spoke delay
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.spokeDelayMs ?? 420}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "spokeDelayMs", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Stagger
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.spokeStaggerMs ?? 260}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "spokeStaggerMs", e.target.value)}
+                  />
+                </label>
+                <label>
+                  Duration
+                  <input
+                    type="number"
+                    value={hueWheelEditorConfig.spokeDurationMs ?? 800}
+                    onChange={(e) => updateHueWheelField(hueWheelEditorIndex, "spokeDurationMs", e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="hue-wheel-editor__markers-head">
+                <div className="items-title">Markers</div>
+                <button type="button" onClick={() => addHueWheelItem(hueWheelEditorIndex)}>
+                  Add Marker
+                </button>
+              </div>
+
+              <div className="hue-wheel-editor__markers">
+                {hueWheelEditorConfig.items.map((marker, markerIndex) => (
+                  <div className="hue-wheel-marker-row" key={`marker-${markerIndex}`}>
+                    <div className="hue-wheel-marker-row__pick">
+                      <label>Pick color</label>
+                      <FuzzySearchColorSelect
+                        onSelect={(color) => applyHueWheelColor(hueWheelEditorIndex, markerIndex, color)}
+                        autoFocus={false}
+                        preventAutoFocus
+                        compact
+                        showLabel={false}
+                        mobileBreakpoint={0}
+                      />
+                    </div>
+                    <label>
+                      Hue
+                      <input
+                        type="number"
+                        min="0"
+                        max="360"
+                        step="0.1"
+                        value={marker.hue}
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "hue", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Label
+                      <input
+                        type="text"
+                        value={marker.label}
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "label", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Color
+                      <input
+                        type="color"
+                        value={/^#[0-9a-f]{6}$/i.test(marker.color || "") ? marker.color : "#111111"}
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "color", e.target.value)}
+                      />
+                    </label>
+                    <label className="checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={marker.animate !== false}
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "animate", e.target.checked)}
+                      />
+                      Animate
+                    </label>
+                    <label>
+                      Delay
+                      <input
+                        type="number"
+                        value={marker.delayMs ?? ""}
+                        placeholder="default"
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "delayMs", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Duration
+                      <input
+                        type="number"
+                        value={marker.durationMs ?? ""}
+                        placeholder="default"
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "durationMs", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Start radius
+                      <input
+                        type="number"
+                        value={marker.startRadius ?? ""}
+                        placeholder="default"
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "startRadius", e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      End radius
+                      <input
+                        type="number"
+                        value={marker.endRadius ?? ""}
+                        placeholder="default"
+                        onChange={(e) => updateHueWheelItem(hueWheelEditorIndex, markerIndex, "endRadius", e.target.value)}
+                      />
+                    </label>
+                    <button type="button" onClick={() => removeHueWheelItem(hueWheelEditorIndex, markerIndex)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

@@ -15,6 +15,9 @@ if [ ! -f "${LOCAL_DIR}index.html" ]; then
   exit 1
 fi
 
+echo "🧱 Injecting cached homepage HTML. Run ./deployfrontpage.sh when front-page content changes."
+npm run prebuild-homepage-html
+
 # Show what's being deployed
 echo "📂 Contents of ${LOCAL_DIR}"
 ls -l "$LOCAL_DIR"
