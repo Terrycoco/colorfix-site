@@ -14,14 +14,14 @@ class PdoPlaylistRepository
         private PDO $pdo
     ) {}
 
-    public function getById(string $playlistId): ?Playlist
+    public function getById(string $playlistId, string $venue = 'site'): ?Playlist
     {
         $meta = $this->getPlaylistMeta($playlistId);
         if ($meta === null) {
             return null;
         }
 
-        $items = $this->getItemsFromDb($playlistId) ?? [];
+        $items = $this->getItemsFromDb($playlistId, $venue) ?? [];
 
         return new Playlist(
             $playlistId,
@@ -435,12 +435,16 @@ class PdoPlaylistRepository
     /**
      * @return PlaylistItem[]|null
      */
-    private function getItemsFromDb(string $playlistId): ?array
+    private function getItemsFromDb(string $playlistId, string $venue = 'site'): ?array
     {
         $excludeSelect = $this->getExcludeFromThumbsSelect();
         $photoSelect = $this->getPhotoLibraryIdSelect();
         $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
         $shareImageSelect = $this->getIsShareImageSelect();
+        $siteSelect = $this->getPlaylistItemFlagSelect('site');
+        $ytSelect = $this->getPlaylistItemFlagSelect('yt');
+        $venueColumn = $venue === 'yt' ? 'yt' : 'site';
+        $venueWhere = $this->hasPlaylistItemColumn($venueColumn) ? "\n              AND {$venueColumn} = 1" : '';
         $sql = <<<SQL
             SELECT
                 playlist_item_id,
@@ -461,10 +465,13 @@ class PdoPlaylistRepository
                 transition,
                 duration_ms,
                 {$excludeSelect},
-                {$shareImageSelect}
+                {$shareImageSelect},
+                {$siteSelect},
+                {$ytSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
+              {$venueWhere}
             ORDER BY order_index ASC
             SQL;
 
@@ -500,7 +507,9 @@ class PdoPlaylistRepository
                 $row['duration_ms'] !== null ? (int)$row['duration_ms'] : null,
                 $row['title_mode'] ?? null,
                 isset($row['exclude_from_thumbs']) ? (bool)$row['exclude_from_thumbs'] : null,
-                isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null
+                isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null,
+                isset($row['site']) ? (bool)$row['site'] : true,
+                isset($row['yt']) ? (bool)$row['yt'] : true
             );
         }
 
@@ -567,6 +576,28 @@ class PdoPlaylistRepository
         $stmt->execute();
         $cached = (int)$stmt->fetchColumn() > 0 ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
         return $cached;
+    }
+
+    private function getPlaylistItemFlagSelect(string $column): string
+    {
+        return $this->hasPlaylistItemColumn($column) ? $column : "1 AS {$column}";
+    }
+
+    private function hasPlaylistItemColumn(string $column): bool
+    {
+        static $cached = [];
+        if (array_key_exists($column, $cached)) return $cached[$column];
+        $sql = <<<SQL
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'playlist_items'
+              AND COLUMN_NAME = :column
+        SQL;
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['column' => $column]);
+        $cached[$column] = (int)$stmt->fetchColumn() > 0;
+        return $cached[$column];
     }
 
     private function hasPhotoLibraryIdColumn(): bool

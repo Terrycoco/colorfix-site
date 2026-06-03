@@ -90,6 +90,27 @@
   color: #1b2433;
 }
 
+.admin-ideas__title-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.admin-ideas__priority {
+  width: 58px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #d5ddef;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #fff;
+}
+
+.admin-ideas__field--title {
+  min-width: 0;
+}
+
 .admin-ideas__editor {
   display: grid;
   gap: 16px;

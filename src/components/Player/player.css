@@ -195,6 +195,15 @@
   z-index: 1;
 }
 
+.player-image.is-prev.is-exiting-to-text {
+  z-index: 2;
+  transition: opacity 900ms ease-in-out;
+}
+
+.player-image.is-prev.is-exiting-to-text.fade-out.is-ready {
+  opacity: 0;
+}
+
 .player-image.is-current {
   position: absolute;
   inset: 0;
@@ -215,10 +224,10 @@
 .player-text-slide-backdrop {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 1;
   background: #000;
   opacity: 0;
-  transition: opacity 1200ms ease-in-out;
+  transition: opacity 900ms ease-in-out;
 }
 
 .player-text-slide-backdrop.is-ready {

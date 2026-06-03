@@ -56,6 +56,8 @@ const emptyItem = {
   duration_ms: "",
   exclude_from_thumbs: false,
   is_share_image: false,
+  site: true,
+  yt: true,
   is_active: true,
 };
 
@@ -323,6 +325,8 @@ export default function AdminPlaylistEditorPage() {
           duration_ms: item.duration_ms ?? "",
           exclude_from_thumbs: Boolean(item.exclude_from_thumbs),
           is_share_image: Boolean(item.is_share_image),
+          site: item.site === null || item.site == null ? true : Boolean(Number(item.site)),
+          yt: item.yt === null || item.yt == null ? true : Boolean(Number(item.yt)),
           is_active: item.is_active === null ? true : Boolean(item.is_active),
         }))
       );
@@ -724,6 +728,8 @@ export default function AdminPlaylistEditorPage() {
           saved_palette_set_id: item.saved_palette_set_id === "" ? null : item.saved_palette_set_id,
           duration_ms: item.duration_ms === "" ? null : item.duration_ms,
           is_share_image: Boolean(item.is_share_image),
+          site: Boolean(item.site),
+          yt: Boolean(item.yt),
         })),
       };
       const itemsRes = await fetch(SAVE_ITEMS_URL, {
@@ -785,6 +791,25 @@ export default function AdminPlaylistEditorPage() {
     }
   }
 
+  async function handleMakeYoutubeVideo() {
+    setSaving(true);
+    setSaveError("");
+    setSaveStatus("");
+    try {
+      const savedPlaylistId = await savePlaylist();
+      if (!savedPlaylistId) return;
+      const command = `npm run render-youtube-video -- ${savedPlaylistId}`;
+      try {
+        await navigator.clipboard.writeText(command);
+        setSaveStatus(`YT video command copied: ${command}`);
+      } catch {
+        setSaveStatus(`Run this to make the YT video: ${command}`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleDeletePlaylist() {
     if (!playlist.playlist_id) return;
     if (!window.confirm(`Delete playlist #${playlist.playlist_id}?`)) return;
@@ -828,6 +853,9 @@ export default function AdminPlaylistEditorPage() {
           </div>
         </div>
         <div className="editor-actions">
+          <button type="button" onClick={() => navigate("/admin/playlists")}>
+            Back to Playlists
+          </button>
           <button type="button" onClick={() => navigate("/admin/playlist-instances")}>
             Back to Instances
           </button>
@@ -837,6 +865,13 @@ export default function AdminPlaylistEditorPage() {
             disabled={saving || playing}
           >
             {playing ? "Opening..." : "Save & Play"}
+          </button>
+          <button
+            type="button"
+            onClick={handleMakeYoutubeVideo}
+            disabled={saving || playing || !playlist.playlist_id}
+          >
+            Make YT Video
           </button>
           {playlist.playlist_id && (
             <button
@@ -1068,6 +1103,27 @@ export default function AdminPlaylistEditorPage() {
                   <option value="cut">cut</option>
                 </select>
               </label>
+              <div className="item-cell item-venues">
+                Venue
+                <div className="item-venue-toggles">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={item.site !== false}
+                      onChange={(e) => updateItem(index, "site", e.target.checked)}
+                    />
+                    Site
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={item.yt !== false}
+                      onChange={(e) => updateItem(index, "yt", e.target.checked)}
+                    />
+                    YT
+                  </label>
+                </div>
+              </div>
               <div className="item-actions">
                 <div className="item-move">
                   <button type="button" onClick={() => moveItem(index, -1)}>↑</button>

@@ -23,6 +23,8 @@ class PlaylistItem
         public ?string $title_mode = null,
         public ?bool $exclude_from_thumbs = null,
         public ?bool $is_share_image = null,
+        public ?bool $site = null,
+        public ?bool $yt = null,
         public ?string $alt_tag = null,
         public ?string $palette_title = null
     ) {

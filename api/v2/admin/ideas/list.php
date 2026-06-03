@@ -21,13 +21,17 @@ try {
     $sql = <<<SQL
         SELECT
             idea_id,
+            priority,
             title,
             body,
             is_done,
             created_at,
             updated_at
         FROM ideas
-        ORDER BY is_done ASC, updated_at DESC, created_at DESC
+        ORDER BY is_done ASC,
+                 FIELD(priority, 'A', 'B', 'C'),
+                 updated_at DESC,
+                 created_at DESC
     SQL;
     $stmt = $pdo->query($sql);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -35,6 +39,9 @@ try {
     $items = array_map(static function (array $row): array {
         return [
             'idea_id' => (int)$row['idea_id'],
+            'priority' => in_array((string)($row['priority'] ?? ''), ['A', 'B', 'C'], true)
+                ? (string)$row['priority']
+                : 'B',
             'title' => (string)$row['title'],
             'body' => (string)$row['body'],
             'is_done' => (int)$row['is_done'] === 1,

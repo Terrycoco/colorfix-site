@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
-import LabelArcs from '@components/ColorWheel/LabelArcs';
+import ColorWheelIndicator from './ColorWheelIndicator';
+import LabelArcs from './LabelArcs';
 import './wheel.css';
 
 const BASES = {

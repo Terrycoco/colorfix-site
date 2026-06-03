@@ -433,11 +433,34 @@
 }
 
 .item-transition {
-  grid-column: 4 / span 2;
+  grid-column: 4 / span 1;
 }
 
 .item-transition select {
   max-width: 220px;
+}
+
+.item-venues {
+  grid-column: 5 / span 1;
+}
+
+.item-venue-toggles {
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-venue-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.item-venue-toggles input {
+  margin: 0;
 }
 
 .item-actions button {

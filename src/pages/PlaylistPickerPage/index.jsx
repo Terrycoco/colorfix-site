@@ -19,6 +19,7 @@ export default function PlaylistPickerPage() {
   const demoParam = searchParams.get("demo") ?? "";
   const includePrivateParam = searchParams.get("include_private") ?? "";
   const closeParam = searchParams.get("close") ?? "";
+  const setVersionParam = searchParams.get("set_v") ?? searchParams.get("v") ?? "";
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -37,6 +38,7 @@ export default function PlaylistPickerPage() {
     const params = new URLSearchParams({
       id: String(setId),
     });
+    if (setVersionParam) params.set("v", setVersionParam);
     if (ctaAudience) params.set("aud", ctaAudience);
     if (adminExitPath || includePrivateParam === "1") params.set("include_private", "1");
     fetchPlaylistSet(`${SET_URL}?${params.toString()}`)
@@ -52,7 +54,7 @@ export default function PlaylistPickerPage() {
         setError(err?.message || "Failed to load playlist set");
       })
       .finally(() => setLoading(false));
-  }, [setId, ctaAudience, adminExitPath, includePrivateParam]);
+  }, [setId, ctaAudience, adminExitPath, includePrivateParam, setVersionParam]);
 
   const tiles = useMemo(() => {
     return (items || []).map((item) => ({
@@ -61,6 +63,7 @@ export default function PlaylistPickerPage() {
       player_url: item.player_url || "",
       item_type: item.item_type || "instance",
       target_set_id: item.target_set_id,
+      target_set_version: item.target_set_version || "",
       title: formatTitle(item.title || ""),
       subtitle: formatTitle(item.subtitle || ""),
       photo_url: item.photo_url || "",
@@ -75,6 +78,7 @@ export default function PlaylistPickerPage() {
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
+    if (setVersionParam !== "") params.set("set_v", setVersionParam);
     if (closeParam === "1") params.set("close", "1");
     if (setId) params.set("psi", String(setId));
     const returnTo = buildReturnTo(location, searchParams);
@@ -83,13 +87,15 @@ export default function PlaylistPickerPage() {
     return toFastPlayerPath(`${playlistPath}${qs ? `?${qs}` : ""}`);
   };
 
-  const buildSetUrl = (targetSetId) => {
+  const buildSetUrl = (tile) => {
+    const targetSetId = tile?.target_set_id || "";
     if (!targetSetId) return "#";
     const params = new URLSearchParams();
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
+    if (tile?.target_set_version) params.set("set_v", tile.target_set_version);
     const returnTo = buildReturnTo(location, searchParams);
     if (returnTo) params.set("return_to", returnTo);
     params.set("psi", String(targetSetId));
@@ -156,7 +162,7 @@ export default function PlaylistPickerPage() {
                 className="playlist-thumbs__card"
                 to={
                   tile.item_type === "set"
-                    ? buildSetUrl(tile.target_set_id || "")
+                    ? buildSetUrl(tile)
                     : buildPlaylistUrl(tile)
                 }
               >

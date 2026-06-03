@@ -130,6 +130,9 @@ final class PdoPlaylistInstanceSetItemRepository
                 ]);
             }
 
+            $touch = $this->pdo->prepare('UPDATE playlist_instance_sets SET updated_at = NOW() WHERE id = :set_id');
+            $touch->execute(['set_id' => $setId]);
+
             $this->pdo->commit();
         } catch (\Throwable $e) {
             $this->pdo->rollBack();

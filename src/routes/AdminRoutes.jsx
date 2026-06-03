@@ -59,6 +59,7 @@ const AdminHoaMaskTesterPage = lazy(() => import('@pages/AdminHoaMaskTesterPage'
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
 const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
+const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
 
 function renderWithSuspense(Component, label) {
   return (
@@ -86,6 +87,7 @@ export default function AdminRoutes() {
       <Route path="login" element={<Navigate to="/admin/" replace />} />
       <Route index element={<AdminHomePage />} />
       <Route path="results/:queryId" element={<AdminHomePage />} />
+      <Route path="youtube-player/:playlistId" element={renderWithSuspense(YoutubePlayerPage, 'Loading YouTube player...')} />
       <Route path="color/:id" element={<AdminPublicPage><ColorDetailPage /></AdminPublicPage>} />
       <Route path="search" element={<AdminPublicPage><SearchPage /></AdminPublicPage>} />
       <Route path="quick-find" element={<AdminPublicPage><QuickFindPage /></AdminPublicPage>} />

@@ -148,12 +148,15 @@ $targetSetMetaById = [];
 if ($targetSetIds) {
     $ids = array_keys($targetSetIds);
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $stmt = $pdo->prepare("SELECT id, title, subtitle FROM playlist_instance_sets WHERE id IN ({$placeholders})");
+    $stmt = $pdo->prepare("SELECT id, title, subtitle, updated_at FROM playlist_instance_sets WHERE id IN ({$placeholders})");
     $stmt->execute($ids);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        $updatedAt = trim((string)($row['updated_at'] ?? ''));
+        $stamp = $updatedAt !== '' ? strtotime($updatedAt) : false;
         $targetSetMetaById[(int)$row['id']] = [
             'title' => (string)($row['title'] ?? ''),
             'subtitle' => (string)($row['subtitle'] ?? ''),
+            'version' => ($stamp && $stamp > 0) ? (string)$stamp : '',
         ];
     }
 }
@@ -281,6 +284,9 @@ $rows = array_values(array_filter(array_map(static function ($item) use ($photoU
         'playlist_id' => $playlistId,
         'item_type' => $item->itemType,
         'target_set_id' => $item->targetSetId,
+        'target_set_version' => $item->targetSetId !== null
+            ? (string)($targetSetMeta['version'] ?? '')
+            : '',
         'title' => $item->title !== '' ? $item->title : (string)($targetSetMeta['title'] ?? ''),
         'subtitle' => $item->subtitle !== ''
             ? $item->subtitle

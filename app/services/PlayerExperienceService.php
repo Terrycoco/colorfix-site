@@ -13,13 +13,13 @@ use App\Entities\PlaylistInstance;
 use PDO;
 use RuntimeException;
 
-final class PlayerExperienceService
+class PlayerExperienceService
 {
     /** @var array<string, float> */
     private array $lastTiming = [];
 
     public function __construct(
-        private PDO $pdo
+        protected PDO $pdo
     ) {}
 
     public function buildPlaybackPlanFromInstance(
@@ -162,7 +162,7 @@ final class PlayerExperienceService
     /**
      * @return PlaylistItem[]
      */
-    private function flattenItems(Playlist $playlist): array
+    protected function flattenItems(Playlist $playlist): array
     {
         $flat = [];
         foreach ($playlist->steps as $step) {
@@ -226,7 +226,7 @@ final class PlayerExperienceService
     /**
      * @param PlaylistItem[] $items
      */
-    private function hydrateItemImages(array $items): void
+    protected function hydrateItemImages(array $items): void
     {
         $photoIds = [];
         $assetIds = [];
@@ -780,7 +780,7 @@ final class PlayerExperienceService
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function firstNonEmpty(array $values): string
+    protected function firstNonEmpty(array $values): string
     {
         foreach ($values as $value) {
             $text = trim((string)$value);

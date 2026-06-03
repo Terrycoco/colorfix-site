@@ -1,4 +1,4 @@
-import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
+import ColorWheelIndicator from './ColorWheelIndicator';
 import Paths400 from './wheel-400-svg.js';
 
 

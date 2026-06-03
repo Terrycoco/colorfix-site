@@ -833,10 +833,10 @@ export default function AdminPlaylistInstancesPage() {
         {loading && <div className="panel-status">Loading…</div>}
         {error && <div className="panel-status error">{error}</div>}
 
-        <div className="mobile-instance-picker">
-          <label htmlFor="mobile-playlist-instance-select">Choose Playlist Instance</label>
+        <div className="instance-picker">
+          <label htmlFor="playlist-instance-select">Choose Playlist Instance</label>
           <select
-            id="mobile-playlist-instance-select"
+            id="playlist-instance-select"
             value={activeId || ""}
             onChange={(e) => setActiveId(e.target.value ? Number(e.target.value) : null)}
           >
@@ -849,103 +849,46 @@ export default function AdminPlaylistInstancesPage() {
           </select>
         </div>
 
-        <div className="mobile-instance-card">
-          <div className="mobile-instance-card__header">
-            <div className="mobile-instance-card__eyebrow">Selected Instance</div>
-            <div className="mobile-instance-card__title">
-              {activeItem?.instance_name || "Pick an instance"}
-            </div>
-            {activeItem?.display_title ? (
-              <div className="mobile-instance-card__subtitle">{activeItem.display_title}</div>
-            ) : null}
-            {activeItem?.display_subtitle ? (
-              <div className="mobile-instance-card__subtitle mobile-instance-card__subtitle--muted">
-                {activeItem.display_subtitle}
-              </div>
-            ) : null}
-          </div>
-
+        <div className="instance-action-strip">
+          <button type="button" className="primary-btn" onClick={() => openLiveUrl(activeItem)} disabled={!activeItem}>
+            Play
+          </button>
+          <button type="button" onClick={() => openFastPlayerUrl(activeItem)} disabled={!activeItem}>
+            Fast Play
+          </button>
+          <button type="button" onClick={() => openPreview(activeItem)} disabled={!activeItem}>
+            Preview
+          </button>
+          <button type="button" onClick={handleCopyLink} disabled={!activeItem}>
+            Copy Link
+          </button>
+          <button type="button" onClick={handleCopyPinterestLink} disabled={!activeItem}>
+            Copy Pinterest
+          </button>
+          <button type="button" onClick={handleShare} disabled={!activeItem}>
+            Text
+          </button>
+          <button type="button" onClick={openEmailModal} disabled={!activeItem}>
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/playlists/${activeItem.playlist_id}`)}
+            disabled={!activeItem?.playlist_id}
+          >
+            Playlist
+          </button>
           {activeItem ? (
-            <>
-              <div className="mobile-instance-card__meta">
-                <div>#{activeItem.playlist_instance_id}</div>
-                <div>{audienceLabelMap[activeItem.audience] || activeItem.audience || "Any"}</div>
-                <div>{activePlaylistLabel}</div>
-                <div>{activeItem.is_active ? "Active" : "Inactive"}</div>
-              </div>
-
-              {activeItem.instance_notes ? (
-                <div className="mobile-instance-card__notes">{activeItem.instance_notes}</div>
-              ) : null}
-
-              <div className="mobile-instance-card__actions">
-                <button type="button" className="primary-btn" onClick={() => openLiveUrl(activeItem)}>
-                  Play
-                </button>
-                <button type="button" onClick={() => openFastPlayerUrl(activeItem)}>
-                  Fast Play
-                </button>
-                <button type="button" onClick={() => openPreview(activeItem)}>
-                  Preview
-                </button>
-                <button type="button" onClick={handleCopyLink}>
-                  Copy Link
-                </button>
-                <button type="button" onClick={handleCopyPinterestLink}>
-                  Copy Pinterest
-                </button>
-                <button type="button" onClick={handleShare}>
-                  Text
-                </button>
-                <button type="button" onClick={openEmailModal}>
-                  Email
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/playlists/${activeItem.playlist_id}`)}
-                  disabled={!activeItem.playlist_id}
-                >
-                  Playlist
-                </button>
-              </div>
-
-              {selectedCtas.length > 0 ? (
-                <div className="mobile-instance-card__ctas">
-                  <div className="mobile-instance-card__label">CTAs</div>
-                  <div className="mobile-instance-card__chips">
-                    {selectedCtas.map((cta) => (
-                      <span key={cta.cta_id} className="mobile-instance-card__chip">
-                        {cta.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <div className="mobile-instance-card__empty">
-              Choose an instance to view it, text it, copy it, or email it from your phone.
+            <div className="instance-action-strip__meta">
+              #{activeItem.playlist_instance_id}
+              {activeItem.slug ? ` /${activeItem.slug}` : ""}
+              {" · "}
+              {audienceLabelMap[activeItem.audience] || activeItem.audience || "Any"}
+              {activePlaylistLabel ? ` · ${activePlaylistLabel}` : ""}
             </div>
+          ) : (
+            <div className="instance-action-strip__meta">Choose an instance to use the actions.</div>
           )}
-        </div>
-
-        <div className="panel-list">
-          {filteredItems.map((item) => (
-            <button
-              type="button"
-              key={item.playlist_instance_id}
-              className={`list-row ${activeId === item.playlist_instance_id ? "active" : ""}`}
-              onClick={() => setActiveId(item.playlist_instance_id)}
-            >
-              <div className="row-title">
-                #{item.playlist_instance_id} {item.instance_name || "Untitled"}
-              </div>
-              {item.slug ? <div className="row-audience">/{item.slug}</div> : null}
-              <div className="row-audience">
-                {audienceLabelMap[item.audience] || item.audience || "Any"}
-              </div>
-            </button>
-          ))}
         </div>
       </div>
 

@@ -8,10 +8,18 @@ const DELETE_URL = `${API_FOLDER}/v2/admin/ideas/delete.php`;
 
 const emptyForm = {
   idea_id: null,
+  priority: "B",
   title: "",
   body: "",
   is_done: false,
 };
+
+const PRIORITY_OPTIONS = ["A", "B", "C"];
+
+function normalizePriority(value) {
+  const priority = String(value || "B").trim().toUpperCase();
+  return PRIORITY_OPTIONS.includes(priority) ? priority : "B";
+}
 
 export default function AdminIdeasPage() {
   const [ideas, setIdeas] = useState([]);
@@ -26,9 +34,15 @@ export default function AdminIdeasPage() {
   const ideaOptions = useMemo(() => {
     return ideas.map((idea) => ({
       idea_id: idea.idea_id,
+      priority: normalizePriority(idea.priority),
       title: idea.title,
       is_done: idea.is_done,
-    }));
+    })).sort((a, b) => {
+      if (a.is_done !== b.is_done) return a.is_done ? 1 : -1;
+      const byPriority = PRIORITY_OPTIONS.indexOf(a.priority) - PRIORITY_OPTIONS.indexOf(b.priority);
+      if (byPriority !== 0) return byPriority;
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
+    });
   }, [ideas]);
 
   const visibleIdeaOptions = useMemo(() => {
@@ -63,6 +77,7 @@ export default function AdminIdeasPage() {
         if (found) {
           setForm({
             idea_id: found.idea_id,
+            priority: normalizePriority(found.priority),
             title: found.title || "",
             body: found.body || "",
             is_done: !!found.is_done,
@@ -92,6 +107,7 @@ export default function AdminIdeasPage() {
     }
     setForm({
       idea_id: idea.idea_id,
+      priority: normalizePriority(idea.priority),
       title: idea.title || "",
       body: idea.body || "",
       is_done: !!idea.is_done,
@@ -103,6 +119,7 @@ export default function AdminIdeasPage() {
     setError("");
     const payload = {
       idea_id: form.idea_id,
+      priority: normalizePriority(form.priority),
       title: form.title.trim(),
       body: form.body || "",
       is_done: !!form.is_done,
@@ -189,7 +206,7 @@ export default function AdminIdeasPage() {
               <option value="">New idea…</option>
               {visibleIdeaOptions.map((idea) => (
                 <option key={idea.idea_id} value={idea.idea_id}>
-                  {idea.title}{idea.is_done ? " (done)" : ""}
+                  {idea.priority} - {idea.title}{idea.is_done ? " (done)" : ""}
                 </option>
               ))}
             </select>
@@ -230,15 +247,29 @@ export default function AdminIdeasPage() {
           <div className="admin-ideas__loading">Loading…</div>
         ) : (
           <div className="admin-ideas__editor">
-            <label className="admin-ideas__field">
-              <span>Title</span>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Idea title"
-              />
-            </label>
+            <div className="admin-ideas__title-row">
+              <select
+                className="admin-ideas__priority"
+                value={normalizePriority(form.priority)}
+                onChange={(e) => setForm((prev) => ({ ...prev, priority: normalizePriority(e.target.value) }))}
+                aria-label="Priority"
+              >
+                {PRIORITY_OPTIONS.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {priority}
+                  </option>
+                ))}
+              </select>
+              <label className="admin-ideas__field admin-ideas__field--title">
+                <span>Title</span>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="Idea title"
+                />
+              </label>
+            </div>
             <label className="admin-ideas__field admin-ideas__field--inline">
               <input
                 type="checkbox"

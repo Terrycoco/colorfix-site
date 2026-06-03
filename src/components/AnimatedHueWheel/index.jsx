@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import ColorWheel300 from "@components/ColorWheel/ColorWheel300";
+import ColorWheel300 from "../ColorWheel/ColorWheel300";
 import "./animated-hue-wheel.css";
 
 const CENTER = 150;

@@ -11,6 +11,9 @@ import {
 } from "@helpers/assetImage";
 import "./player.css";
 
+const DEFAULT_TITLE_DELAY_MS = 120;
+const TEXT_AFTER_IMAGE_TITLE_DELAY_MS = 650;
+
 const Player = forwardRef(function Player({
   slides = [],
   startIndex = 0,
@@ -286,6 +289,7 @@ function startPlayback(nextMode, nextIndex = 0) {
     [currentItem?.body]
   );
   const introNoImage = isIntro && !currentImageUrl;
+  const textAfterImageTransition = introNoImage && Boolean(prevImageUrl) && isFading;
   const hasCurrentImageRef = Boolean(currentItem?.image_url);
   const showImageLoading = playbackState === "playing" && !imageLoaded && !introNoImage && (hasCurrentImageRef || currentImageUrl);
   const shouldShowAdvanceHint =
@@ -461,15 +465,18 @@ function startPlayback(nextMode, nextIndex = 0) {
       setTitleReady(true);
       return undefined;
     }
+    const titleDelay = textAfterImageTransition
+      ? TEXT_AFTER_IMAGE_TITLE_DELAY_MS
+      : DEFAULT_TITLE_DELAY_MS;
     const timer = setTimeout(() => {
       setTitleVisible(true);
       requestAnimationFrame(() => {
         updateOverlayPositions(currentImgRef.current, stageRef.current);
         setTitleReady(true);
       });
-    }, 120);
+    }, titleDelay);
     return () => clearTimeout(timer);
-  }, [imageLoaded, fadeReady, currentIndex, titleMode]);
+  }, [imageLoaded, fadeReady, currentIndex, titleMode, textAfterImageTransition]);
 
   useEffect(() => {
     if (!titleVisible || !titleReady) return;
@@ -495,7 +502,15 @@ function startPlayback(nextMode, nextIndex = 0) {
     if (!isIntro && !isHueWheel) return;
     if (currentImageUrl) return;
     setImageLoaded(true);
-    setFadeReady(true);
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setFadeReady(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [isIntro, isHueWheel, currentIndex, currentImageUrl]);
 
 
@@ -583,7 +598,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               key={`prev-${prevIndex}-${prevImageUrl}`}
               src={withCacheBust(prevImageUrl)}
               alt=""
-              className={`player-image is-prev${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
+              className={`player-image is-prev${textAfterImageTransition ? " is-exiting-to-text" : ""}${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
             />
           )}
           {introNoImage && (

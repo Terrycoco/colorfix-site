@@ -25,6 +25,10 @@ try {
     }
 
     $ideaId = isset($data['idea_id']) ? (int)$data['idea_id'] : 0;
+    $priority = strtoupper(trim((string)($data['priority'] ?? 'B')));
+    if (!in_array($priority, ['A', 'B', 'C'], true)) {
+        $priority = 'B';
+    }
     $title = isset($data['title']) ? trim((string)$data['title']) : '';
     $body = isset($data['body']) ? (string)$data['body'] : '';
     $isDone = !empty($data['is_done']) ? 1 : 0;
@@ -36,13 +40,15 @@ try {
     if ($ideaId > 0) {
         $sql = <<<SQL
             UPDATE ideas
-            SET title = :title,
+            SET priority = :priority,
+                title = :title,
                 body = :body,
                 is_done = :is_done
             WHERE idea_id = :idea_id
         SQL;
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
+            'priority' => $priority,
             'title' => $title,
             'body' => $body,
             'is_done' => $isDone,
@@ -52,11 +58,12 @@ try {
     }
 
     $sql = <<<SQL
-        INSERT INTO ideas (title, body, is_done)
-        VALUES (:title, :body, :is_done)
+        INSERT INTO ideas (priority, title, body, is_done)
+        VALUES (:priority, :title, :body, :is_done)
     SQL;
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
+        'priority' => $priority,
         'title' => $title,
         'body' => $body,
         'is_done' => $isDone,

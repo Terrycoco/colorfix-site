@@ -12,19 +12,26 @@
     "prebuild-front-page": "php api/tools/prebuild-front-page.php",
     "prebuild-homepage-html": "node scripts/prebuild-homepage-html.mjs",
     "build:prebuilt-home": "npm run prebuild-front-page && npm run build && npm run prebuild-homepage-html",
-    "regen-wheel": "node scripts/regen-wheel.js"
+    "regen-wheel": "node scripts/regen-wheel.js",
+    "export-youtube-draft": "node scripts/export-youtube-draft.mjs",
+    "export-youtube-draft:poc": "node scripts/export-youtube-draft.mjs 37",
+    "render-youtube-video": "node scripts/render-youtube-video.mjs",
+    "render-youtube-video:poc": "node scripts/render-youtube-video.mjs 37"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
+    "@remotion/cli": "^4.0.471",
     "@tailwindcss/vite": "^4.1.11",
     "d3": "^7.9.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.525.0",
+    "pptxgenjs": "^4.0.1",
     "prop-types": "^15.8.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-masonry-css": "^1.0.16",
     "react-router-dom": "^7.6.2",
+    "remotion": "^4.0.471",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

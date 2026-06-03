@@ -1,0 +1,92 @@
+{
+  "plan": {
+    "playlist_id": 37,
+    "title": "Poduska Makeover",
+    "type": "client_makeover",
+    "total_items": 2,
+    "items": [
+      {
+        "playlist_item_id": 295,
+        "playlist_id": 37,
+        "order_index": 0,
+        "ap_id": null,
+        "palette_hash": "3cb57ba625d74d640962dc07f9a3a10ce48c3c7a37e344dec4b9c246b10e3a25",
+        "image_url": "photo:641|https://colorfix.terrymarr.com/photos/clients/client-39-jennifer-art-poduska/client_client-39-jennifer-art-poduska_5e45b0793ccc.jpg",
+        "photo_library_id": 641,
+        "saved_palette_set_id": 150,
+        "title": "Before",
+        "subtitle": "Eye centers on upper story",
+        "subtitle_2": "",
+        "body": "",
+        "item_type": "non-palette",
+        "layout": "default",
+        "title_mode": "",
+        "star": 1,
+        "transition": "animation",
+        "duration_ms": null,
+        "exclude_from_thumbs": 0,
+        "is_share_image": 0,
+        "site": 1,
+        "yt": 1,
+        "is_active": 1,
+        "type": "non-palette"
+      },
+      {
+        "playlist_item_id": 296,
+        "playlist_id": 37,
+        "order_index": 1,
+        "ap_id": null,
+        "palette_hash": "3cb57ba625d74d640962dc07f9a3a10ce48c3c7a37e344dec4b9c246b10e3a25",
+        "image_url": "photo:642|https://colorfix.terrymarr.com/photos/clients/client-39-jennifer-art-poduska/client_client-39-jennifer-art-poduska_3d7d7ec425ef.jpg",
+        "photo_library_id": 642,
+        "saved_palette_set_id": 150,
+        "title": "After",
+        "subtitle": "A darker body and unified neutrals allow the warm front door to become the focal point",
+        "subtitle_2": "",
+        "body": "",
+        "item_type": "normal",
+        "layout": "default",
+        "title_mode": "",
+        "star": 1,
+        "transition": "animation",
+        "duration_ms": null,
+        "exclude_from_thumbs": 0,
+        "is_share_image": 0,
+        "site": 1,
+        "yt": 1,
+        "is_active": 1,
+        "type": "normal"
+      }
+    ],
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "default_slide_duration_ms": 8500,
+      "default_text_duration_ms": 3600,
+      "default_hue_wheel_duration_ms": 6200,
+      "dissolve_ms": 2000,
+      "cut_ms": 200,
+      "caption_delay_after_photo_ms": 120,
+      "caption_fade_ms": 2000,
+      "timeline": [
+        {
+          "index": 0,
+          "start_ms": 0,
+          "duration_ms": 8500,
+          "end_ms": 8500,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 1,
+          "start_ms": 8500,
+          "duration_ms": 8500,
+          "end_ms": 17000,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        }
+      ]
+    }
+  }
+}
