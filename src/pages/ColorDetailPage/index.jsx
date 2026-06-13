@@ -349,8 +349,9 @@ export default function ColorDetailPage() {
               size={900}
               spokeStartRadius={0}
               spokeEndRadius={136}
-              spokeDelayMs={500}
-              spokeDurationMs={900}
+              spokeDelayMs={180}
+              spokeDurationMs={650}
+              spokeWidth={5}
             />
             </div>
 

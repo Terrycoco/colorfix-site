@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('America/Los_Angeles');
 file_put_contents(__DIR__ . '/assign.log', "[" . date('Y-m-d H:i:s') . "] 👣 entered db.php\n", FILE_APPEND);
 
 ini_set('log_errors', 1);
@@ -24,6 +25,9 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
+    $appTimezone = new DateTimeZone('America/Los_Angeles');
+    $appOffset = (new DateTimeImmutable('now', $appTimezone))->format('P');
+    $pdo->exec("SET time_zone = " . $pdo->quote($appOffset));
 } catch (\PDOException $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);

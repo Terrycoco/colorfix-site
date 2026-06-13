@@ -1,6 +1,8 @@
 // Centralized CTA action handlers shared by player screens.
+import { getPaletteTargets, isPaletteEligibleItem } from "@helpers/playerPaletteItems";
+
 export function getCtaKey(cta) {
-  return cta?.key || "";
+  return (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
 }
 
 function buildShareUrl(shareFolder, playlistInstanceId) {
@@ -155,32 +157,10 @@ function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, retur
   window.open(url, target, "noopener");
 }
 
-function getPaletteItems(data) {
-  const items = data?.items || [];
-  return items.filter((item) => {
-    const type = (item?.type || "normal").toLowerCase();
-    const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
-    if (type === "intro" || type === "before" || type === "text" || type === "hue-wheel" || type === "non-palette") return false;
-    if (attachedType === "before") return false;
-    if (item?.exclude_from_thumbs) return false;
-    return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
-  });
-}
-
-function isPaletteEligibleItem(item) {
-  if (!item) return false;
-  const type = (item?.type || "normal").toLowerCase();
-  const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
-  if (type === "intro" || type === "before" || type === "text" || type === "hue-wheel" || type === "non-palette") return false;
-  if (attachedType === "before") return false;
-  if (item?.exclude_from_thumbs) return false;
-  return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
-}
-
 function getCurrentPaletteItem(data, playerRef) {
   const current = playerRef?.current?.getCurrentItem?.() || null;
   if (isPaletteEligibleItem(current)) return current;
-  const palettes = getPaletteItems(data);
+  const palettes = getPaletteTargets(data);
   return palettes.length === 1 ? palettes[0] : null;
 }
 
@@ -190,7 +170,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const apId = targetItem.ap_id;
   const paletteHash = targetItem.palette_hash;
   const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
-  if (!apId && !paletteHash) return;
+  if (!apId && !paletteHash && !savedPaletteSetId) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
     params.set("add_cta_group", String(cta.params.add_cta_group));
@@ -205,6 +185,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (returnTo) params.set("return_to", returnTo);
   if (savedPaletteSetId > 0) params.set("set_id", String(savedPaletteSetId));
   const qs = params.toString();
+  if (!apId && !paletteHash) return;
   const url = paletteHash
     ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
     : `/view/${apId}${qs ? `?${qs}` : ""}`;

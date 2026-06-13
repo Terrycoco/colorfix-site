@@ -38,6 +38,16 @@ export const adminMenuItems = [
     ],
   },
   {
+    label: "Assets",
+    items: [
+      { label: "Asset Library", href: "/admin/library" },
+      { label: "Creator", href: "/admin/asset-creators" },
+      { label: "Publisher", href: "/admin/publisher" },
+      { label: "Analytics", href: "/admin/asset-analytics" },
+      { label: "Pinterest Publisher", href: "/admin/pinterest-publisher" },
+    ],
+  },
+  {
     label: "Palettes",
     items: [
       { label: "Saved Palettes", href: "/admin/saved-palettes" },

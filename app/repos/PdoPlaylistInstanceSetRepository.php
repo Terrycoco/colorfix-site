@@ -149,7 +149,8 @@ final class PdoPlaylistInstanceSetRepository
                 context = :context,
                 end_cta_label = :end_cta_label,
                 end_cta_url = :end_cta_url,
-                end_cta_enabled = :end_cta_enabled
+                end_cta_enabled = :end_cta_enabled,
+                updated_at = NOW()
             WHERE id = :id
             SQL;
         $stmt = $this->pdo->prepare($sql);
@@ -189,7 +190,8 @@ final class PdoPlaylistInstanceSetRepository
             SET handle = :handle,
                 title = :title,
                 subtitle = :subtitle,
-                context = :context
+                context = :context,
+                updated_at = NOW()
             WHERE id = :id
             SQL;
         $stmt = $this->pdo->prepare($sql);

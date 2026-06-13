@@ -39,6 +39,7 @@ final class UserEventService
             $openCount = (int)($row['playlist_open_count'] ?? 0);
             $visibleCount = (int)($row['hire_terry_cta_visible_count'] ?? 0);
             $clickCount = (int)($row['hire_terry_cta_click_count'] ?? 0);
+            $replayCount = (int)($row['replay_click_count'] ?? 0);
             $watchNextCount = (int)($row['watch_next_click_count'] ?? 0);
 
             return [
@@ -52,9 +53,11 @@ final class UserEventService
                 'playlist_open_count' => $openCount,
                 'hire_terry_cta_visible_count' => $visibleCount,
                 'hire_terry_cta_click_count' => $clickCount,
+                'replay_click_count' => $replayCount,
                 'watch_next_click_count' => $watchNextCount,
                 'visible_rate' => $openCount > 0 ? round(($visibleCount / $openCount) * 100, 1) : 0.0,
                 'click_through_rate' => $visibleCount > 0 ? round(($clickCount / $visibleCount) * 100, 1) : 0.0,
+                'replay_rate' => $openCount > 0 ? round(($replayCount / $openCount) * 100, 1) : 0.0,
                 'watch_next_rate' => $openCount > 0 ? round(($watchNextCount / $openCount) * 100, 1) : 0.0,
                 'last_event_at' => $row['last_event_at'] !== null ? (string)$row['last_event_at'] : '',
                 'last_event_at_iso' => $this->normalizeStoredUtcTime($row['last_event_at'] ?? null),
@@ -81,6 +84,7 @@ final class UserEventService
             'playlist_open',
             'hire_terry_cta_visible',
             'hire_terry_cta_click',
+            'replay_click',
             'watch_next_click',
         ];
         if ($eventType === '' || !in_array($eventType, $allowed, true)) {

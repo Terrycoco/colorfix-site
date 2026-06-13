@@ -6,6 +6,7 @@ import PlayerEndScreen from "@components/Player/PlayerEndScreen";
 import { useAppState } from "@context/AppStateContext";
 import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
+import { getPaletteTargets } from "@helpers/playerPaletteItems";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
 import { isHireTerryCta, trackUserEvent } from "@helpers/userEvents";
 import './playerpage.css';
@@ -242,19 +243,9 @@ export default function PlayerPage() {
     returnTo,
   ]);
 
-  const paletteItems = useMemo(() => {
-    const items = data?.items || [];
-    return items.filter((item) => {
-      const type = (item?.type || "normal").toLowerCase();
-      const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
-      if (type === "intro" || type === "before" || type === "text" || type === "non-palette") return false;
-      if (attachedType === "before") return false;
-      if (item?.exclude_from_thumbs) return false;
-      return Boolean(item?.ap_id) || Boolean(item?.palette_hash);
-    });
-  }, [data?.items]);
+  const paletteTargets = useMemo(() => getPaletteTargets(data), [data]);
 
-  const paletteCount = paletteItems.length;
+  const paletteCount = paletteTargets.length;
 
   function isCtaVisible(cta) {
     if (!cta) return false;
@@ -300,6 +291,17 @@ export default function PlayerPage() {
         playlist_instance_id: Number(data?.playlist_instance_id || 0),
         playlist_id: Number(data?.playlist_id || 0) || null,
         cta_id: Number(cta?.cta_id || 0) || null,
+        source: "watch_next",
+        allow_internal_tracking: true,
+      });
+    }
+    if (key === "replay" || key === "replay_liked" || key === "replay_filtered") {
+      trackUserEvent({
+        event_type: "replay_click",
+        playlist_instance_id: Number(data?.playlist_instance_id || 0),
+        playlist_id: Number(data?.playlist_id || 0) || null,
+        cta_id: Number(cta?.cta_id || 0) || null,
+        allow_internal_tracking: true,
       });
     }
     ctaHandlers[key]?.(cta);
@@ -347,6 +349,7 @@ const ctas = useMemo(() => {
 useEffect(() => {
   const fromPicker = returnTo.startsWith("/picker");
   if (!fromPicker) return;
+  if (sourceParam === "watch_next") return;
 
   const setIds = new Set();
   const pickerSetId = Number(psiParam || 0);
@@ -371,7 +374,7 @@ useEffect(() => {
     clearWatchNextSeen(setId);
     clearWatchNextSeenPlaylists(setId);
   }
-}, [ctas, data?.playlist_instance_id, data?.playlist_instance_set_ids, psiParam, returnTo]);
+}, [ctas, data?.playlist_instance_id, data?.playlist_instance_set_ids, psiParam, returnTo, sourceParam]);
 
 function resolveVariant(raw, isBack = false) {
   if (!raw) return isBack ? "link" : undefined;
@@ -520,9 +523,10 @@ const visibleCTAs = useMemo(
       return;
     }
     const baseCta = visibleCTAs.find((cta) => (cta?.key || "") === "watch_next");
+    const ctaSetId = Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id || 0);
     const explicitSetId =
-      Number(psiParam || 0) ||
-      Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id || 0);
+      ctaSetId ||
+      Number(psiParam || 0);
     const storedJourneySetId = readActiveWatchNextSetId();
     const isWatchNextNavigation = sourceParam === "watch_next";
 
@@ -532,7 +536,7 @@ const visibleCTAs = useMemo(
       (isWatchNextNavigation ? storedJourneySetId : 0) ||
       (baseCta ? 3 : 0);
     if (!setId) {
-      setWatchNextCta(null);
+      setWatchNextCta(baseCta || null);
       return;
     }
 
@@ -590,7 +594,8 @@ const visibleCTAs = useMemo(
           return !seen.includes(pid);
         };
 
-        const nextItem = playlistItems.find((item) => isEligibleNextItem(item));
+        const nextItem = playlistItems.find((item) => isEligibleNextItem(item))
+          || playlistItems.find((item) => isEligibleNextItem(item, { ignoreSeen: true }));
 
         if (!nextItem) {
           if (playbackEnded && currentId) {
@@ -651,7 +656,7 @@ const visibleCTAs = useMemo(
         }
       } catch {
         if (!cancelled) {
-          setWatchNextCta(null);
+          setWatchNextCta(baseCta || null);
         }
       }
     };

@@ -38,6 +38,11 @@ const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
 const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
 const AdminSharePage = lazy(() => import('@pages/AdminSharePage'));
+const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'));
+const AdminAssetCreatorsPage = lazy(() => import('@pages/AdminAssetCreatorsPage'));
+const AdminAssetAnalyticsPage = lazy(() => import('@pages/AdminAssetAnalyticsPage'));
+const AdminPublishingPage = lazy(() => import('@pages/AdminPublishingPage'));
+const AdminPinterestPublisherPage = lazy(() => import('@pages/AdminPinterestPublisherPage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
@@ -122,6 +127,13 @@ export default function AdminRoutes() {
         <Route path="articles" element={renderWithSuspense(AdminArticlesPage, 'Loading articles...')} />
         <Route path="projects" element={renderWithSuspense(AdminProjectsPage, 'Loading projects...')} />
         <Route path="share" element={renderWithSuspense(AdminSharePage, 'Loading admin share...')} />
+        <Route path="library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
+        <Route path="asset-library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
+        <Route path="asset-creators" element={renderWithSuspense(AdminAssetCreatorsPage, 'Loading asset creator...')} />
+        <Route path="publishing" element={renderWithSuspense(AdminPublishingPage, 'Loading publishing...')} />
+        <Route path="publisher" element={renderWithSuspense(AdminPublishingPage, 'Loading publisher...')} />
+        <Route path="asset-analytics" element={renderWithSuspense(AdminAssetAnalyticsPage, 'Loading asset analytics...')} />
+        <Route path="pinterest-publisher" element={renderWithSuspense(AdminPinterestPublisherPage, 'Loading Pinterest publisher...')} />
         <Route path="user-events" element={renderWithSuspense(AdminUserEventsPage, 'Loading view counts...')} />
         <Route path="qr-sheets" element={renderWithSuspense(AdminQrSheetsPage, 'Loading QR sheets...')} />
         <Route path="photo-library" element={renderWithSuspense(AdminPhotoLibraryPage, 'Loading photo library...')} />

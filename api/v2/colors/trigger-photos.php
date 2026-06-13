@@ -79,28 +79,13 @@ try {
              WHERE m.color_id = :legacy_color_id
                AND pl.show_in_gallery = 1
                AND pl.has_palette = 1
-
-            UNION ALL
-
-            SELECT COALESCE(pl.photo_library_id, 0) AS photo_library_id,
-                   pl.rel_path AS photo_url,
-                   'full' AS photo_type,
-                   :applied_color_id AS trigger_color_id,
-                   0 AS order_index,
-                   ap.id AS palette_id,
-                   NULL AS palette_hash,
-                   COALESCE(ap.display_title, ap.title, CONCAT('Applied #', ap.id)) AS palette_name,
-                   NULL AS palette_brand,
-                   NULL AS saved_palette_set_id
-              FROM applied_palette_entries ape
-              JOIN applied_palettes ap
-                ON ap.id = ape.applied_palette_id
-              JOIN photo_library pl
-                ON pl.source_type = 'applied_palette'
-               AND pl.source_id = ap.id
-             WHERE ape.color_id = :applied_entry_color_id
-               AND pl.show_in_gallery = 1
-               AND pl.has_palette = 1
+               AND NOT EXISTS (
+                 SELECT 1
+                   FROM saved_palette_sets modern_set
+                   JOIN saved_palette_set_photos modern
+                     ON modern.saved_palette_set_id = modern_set.id
+                  WHERE modern_set.saved_palette_id = spp.saved_palette_id
+               )
           ) AS merged
          WHERE merged.photo_url IS NOT NULL
            AND merged.photo_url <> ''
@@ -111,8 +96,6 @@ try {
     $stmt->execute([
         ':color_id' => $colorId,
         ':legacy_color_id' => $colorId,
-        ':applied_color_id' => $colorId,
-        ':applied_entry_color_id' => $colorId,
     ]);
 
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];

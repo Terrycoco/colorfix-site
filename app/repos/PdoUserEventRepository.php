@@ -164,6 +164,7 @@ final class PdoUserEventRepository
                 SUM(CASE WHEN ue.event_type = 'playlist_open' THEN 1 ELSE 0 END) AS playlist_open_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_visible' THEN 1 ELSE 0 END) AS hire_terry_cta_visible_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_click' THEN 1 ELSE 0 END) AS hire_terry_cta_click_count,
+                SUM(CASE WHEN ue.event_type = 'replay_click' THEN 1 ELSE 0 END) AS replay_click_count,
                 SUM(CASE WHEN ue.event_type = 'watch_next_click' THEN 1 ELSE 0 END) AS watch_next_click_count,
                 MAX(ue.created_at) AS last_event_at
             FROM playlist_instances pi
@@ -184,6 +185,7 @@ final class PdoUserEventRepository
                 playlist_open_count > 0
                 OR hire_terry_cta_visible_count > 0
                 OR hire_terry_cta_click_count > 0
+                OR replay_click_count > 0
                 OR watch_next_click_count > 0
             ORDER BY last_event_at DESC, pi.playlist_instance_id DESC, source ASC
             SQL;
@@ -243,6 +245,7 @@ final class PdoUserEventRepository
                 SUM(CASE WHEN ue.event_type = 'playlist_open' THEN 1 ELSE 0 END) AS playlist_open_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_visible' THEN 1 ELSE 0 END) AS hire_terry_cta_visible_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_click' THEN 1 ELSE 0 END) AS hire_terry_cta_click_count,
+                SUM(CASE WHEN ue.event_type = 'replay_click' THEN 1 ELSE 0 END) AS replay_click_count,
                 SUM(CASE WHEN ue.event_type = 'watch_next_click' THEN 1 ELSE 0 END) AS watch_next_click_count
             FROM user_events ue
             LEFT JOIN playlist_instances pi
@@ -260,6 +263,7 @@ final class PdoUserEventRepository
             'playlist_open_count' => (int)($row['playlist_open_count'] ?? 0),
             'hire_terry_cta_visible_count' => (int)($row['hire_terry_cta_visible_count'] ?? 0),
             'hire_terry_cta_click_count' => (int)($row['hire_terry_cta_click_count'] ?? 0),
+            'replay_click_count' => (int)($row['replay_click_count'] ?? 0),
             'watch_next_click_count' => (int)($row['watch_next_click_count'] ?? 0),
         ];
     }

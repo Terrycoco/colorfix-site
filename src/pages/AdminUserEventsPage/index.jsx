@@ -48,12 +48,12 @@ export default function AdminUserEventsPage() {
   const [query, setQuery] = useState("");
   const [audience, setAudience] = useState("all");
   const [source, setSource] = useState("all");
+  const [includeInternal, setIncludeInternal] = useState(false);
   const [audienceOptions, setAudienceOptions] = useState(DEFAULT_AUDIENCE_FILTER_OPTIONS);
   const [items, setItems] = useState([]);
   const [totals, setTotals] = useState({
     playlist_open_count: 0,
-    hire_terry_cta_visible_count: 0,
-    hire_terry_cta_click_count: 0,
+    replay_click_count: 0,
     watch_next_click_count: 0,
   });
   const [baseline, setBaseline] = useState({
@@ -98,6 +98,7 @@ export default function AdminUserEventsPage() {
         if (query.trim()) params.set("q", query.trim());
         if (audience) params.set("audience", audience);
         if (source && source !== "all") params.set("source", source);
+        if (includeInternal) params.set("include_internal", "1");
         params.set("_", String(Date.now()));
 
         const res = await fetch(`${LIST_URL}?${params.toString()}`, {
@@ -110,8 +111,7 @@ export default function AdminUserEventsPage() {
         setItems(Array.isArray(data.items) ? data.items : []);
         setTotals({
           playlist_open_count: Number(data?.totals?.playlist_open_count || 0),
-          hire_terry_cta_visible_count: Number(data?.totals?.hire_terry_cta_visible_count || 0),
-          hire_terry_cta_click_count: Number(data?.totals?.hire_terry_cta_click_count || 0),
+          replay_click_count: Number(data?.totals?.replay_click_count || 0),
           watch_next_click_count: Number(data?.totals?.watch_next_click_count || 0),
         });
         setBaseline({
@@ -132,16 +132,11 @@ export default function AdminUserEventsPage() {
       ignore = true;
       controller.abort();
     };
-  }, [query, audience, source, reloadKey]);
+  }, [query, audience, source, includeInternal, reloadKey]);
 
-  const totalVisibleRate = useMemo(() => {
+  const totalReplayRate = useMemo(() => {
     if (!totals.playlist_open_count) return 0;
-    return (totals.hire_terry_cta_visible_count / totals.playlist_open_count) * 100;
-  }, [totals]);
-
-  const totalClickRate = useMemo(() => {
-    if (!totals.hire_terry_cta_visible_count) return 0;
-    return (totals.hire_terry_cta_click_count / totals.hire_terry_cta_visible_count) * 100;
+    return (totals.replay_click_count / totals.playlist_open_count) * 100;
   }, [totals]);
 
   const totalWatchNextRate = useMemo(() => {
@@ -225,6 +220,14 @@ export default function AdminUserEventsPage() {
             <option value="watch_next">Watch Next</option>
             <option value="direct">Direct / none</option>
           </select>
+          <label className="admin-user-events__checkbox">
+            <input
+              type="checkbox"
+              checked={includeInternal}
+              onChange={(e) => setIncludeInternal(e.target.checked)}
+            />
+            Include internal/admin tests
+          </label>
         </div>
 
         <div className="admin-user-events__totals">
@@ -233,14 +236,9 @@ export default function AdminUserEventsPage() {
             <div className="admin-user-events__total-value">{totals.playlist_open_count}</div>
           </div>
           <div className="admin-user-events__total-card">
-            <div className="admin-user-events__total-label">Hire Seen</div>
-            <div className="admin-user-events__total-value">{totals.hire_terry_cta_visible_count}</div>
-            <div className="admin-user-events__total-meta">{formatPercent(totalVisibleRate)} of opens</div>
-          </div>
-          <div className="admin-user-events__total-card">
-            <div className="admin-user-events__total-label">Hire Clicks</div>
-            <div className="admin-user-events__total-value">{totals.hire_terry_cta_click_count}</div>
-            <div className="admin-user-events__total-meta">{formatPercent(totalClickRate)} of Hire views</div>
+            <div className="admin-user-events__total-label">Replays</div>
+            <div className="admin-user-events__total-value">{totals.replay_click_count}</div>
+            <div className="admin-user-events__total-meta">{formatPercent(totalReplayRate)} of opens</div>
           </div>
           <div className="admin-user-events__total-card">
             <div className="admin-user-events__total-label">Watch Next</div>
@@ -281,11 +279,9 @@ export default function AdminUserEventsPage() {
                     <th>Audience</th>
                     <th>Source</th>
                     <th>Opens</th>
-                    <th>Hire Seen</th>
-                    <th>Hire Clicks</th>
+                    <th>Replays</th>
                     <th>Watch Next</th>
-                    <th>Seen %</th>
-                    <th>Click %</th>
+                    <th>Replay %</th>
                     <th>Next %</th>
                     <th>Last Event</th>
                   </tr>
@@ -307,11 +303,9 @@ export default function AdminUserEventsPage() {
                       <td>{item.audience || "any"}</td>
                       <td>{item.source || "direct"}</td>
                       <td>{item.playlist_open_count}</td>
-                      <td>{item.hire_terry_cta_visible_count}</td>
-                      <td>{item.hire_terry_cta_click_count}</td>
+                      <td>{item.replay_click_count}</td>
                       <td>{item.watch_next_click_count}</td>
-                      <td>{formatPercent(item.visible_rate)}</td>
-                      <td>{formatPercent(item.click_through_rate)}</td>
+                      <td>{formatPercent(item.replay_rate)}</td>
                       <td>{formatPercent(item.watch_next_rate)}</td>
                       <td>{formatEventTime(item.last_event_at, item.last_event_at_iso)}</td>
                     </tr>

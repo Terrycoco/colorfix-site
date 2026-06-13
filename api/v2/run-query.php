@@ -243,6 +243,13 @@ try {
              WHERE m.color_id IN ($placeholders)
                AND pl.show_in_gallery = 1
                AND pl.has_palette = 1
+               AND NOT EXISTS (
+                 SELECT 1
+                   FROM saved_palette_sets modern_set
+                   JOIN saved_palette_set_photos modern
+                     ON modern.saved_palette_set_id = modern_set.id
+                  WHERE modern_set.saved_palette_id = p.saved_palette_id
+               )
           ) AS merged
          WHERE merged.rel_path IS NOT NULL
            AND merged.rel_path <> ''
@@ -256,30 +263,7 @@ try {
       ]);
       $savedRows = $stmtSaved->fetchAll(PDO::FETCH_ASSOC);
 
-      $sqlApplied = "
-        SELECT ape.color_id,
-               pl.photo_library_id,
-               pl.rel_path,
-               ap.id AS applied_palette_id,
-               ap.title,
-               ap.display_title
-          FROM applied_palette_entries ape
-          JOIN applied_palettes ap
-            ON ap.id = ape.applied_palette_id
-          JOIN photo_library pl
-            ON pl.source_type = 'applied_palette'
-           AND pl.source_id = ap.id
-         WHERE ape.color_id IN ($placeholders)
-           AND pl.show_in_gallery = 1
-           AND pl.has_palette = 1
-         ORDER BY ape.color_id ASC, ap.id ASC
-      ";
-
-      $stmtApplied = $pdo->prepare($sqlApplied);
-      $stmtApplied->execute(array_keys($colorIds));
-      $appliedRows = $stmtApplied->fetchAll(PDO::FETCH_ASSOC);
-
-      $photoRows = array_merge($savedRows, $appliedRows);
+      $photoRows = $savedRows;
 
       $byColor = [];
       foreach ($photoRows as $row) {
@@ -311,28 +295,6 @@ try {
           continue;
         }
 
-        if (!empty($row['applied_palette_id'])) {
-          $pid = (int)$row['applied_palette_id'];
-          $paletteKey = "applied:{$pid}";
-          if (!isset($byColor[$cid][$paletteKey])) {
-            $title = $row['display_title'] ?? $row['title'] ?? null;
-            $byColor[$cid][$paletteKey] = [
-              'palette' => [
-                'kind' => 'applied',
-                'id' => $pid,
-                'nickname' => $title,
-                'brand' => null,
-              ],
-              'photos' => [],
-            ];
-          }
-          $byColor[$cid][$paletteKey]['photos'][] = [
-            'photo_id' => (int)$row['photo_library_id'],
-            'rel_path' => $row['rel_path'] ?? null,
-            'photo_type' => 'full',
-            'trigger_color_id' => $cid,
-          ];
-        }
       }
 
       foreach ($byColor as $cid => $palettes) {

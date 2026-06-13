@@ -1,0 +1,46 @@
+.admin-asset-analytics {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #111;
+  font-size: 14px;
+}
+
+.assetanalytics-header {
+  margin-bottom: 10px;
+}
+
+.assetanalytics-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.assetanalytics-header p {
+  margin: 4px 0 0;
+  color: #555;
+}
+
+.assetanalytics-panel {
+  border: 1px solid #777;
+  background: #fff;
+  overflow: auto;
+}
+
+.assetanalytics-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.assetanalytics-grid th,
+.assetanalytics-grid td {
+  border-right: 1px solid #cfcfcf;
+  border-bottom: 1px solid #d9d9d9;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.assetanalytics-grid th {
+  background: #dcdcdc;
+  color: #111;
+  font-weight: 800;
+}

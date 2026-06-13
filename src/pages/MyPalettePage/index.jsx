@@ -208,7 +208,7 @@ const activeBrandCodes = useMemo(() => {
         if (!Number.isFinite(hue)) return null;
         return {
           hue,
-          color: `rgb(${color?.r || 0}, ${color?.g || 0}, ${color?.b || 0})`,
+          color: normalizeHexValue(getHex(color)),
           label: color?.name || "",
           animate: true,
         };

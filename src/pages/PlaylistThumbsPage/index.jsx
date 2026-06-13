@@ -92,10 +92,12 @@ export default function PlaylistThumbsPage() {
       const apId = item?.ap_id ?? null;
       const paletteHash = item?.palette_hash ?? null;
       const savedPaletteSetId = Number(item?.saved_palette_set_id || 0) || null;
-      if (!apId && !paletteHash) continue;
+      if (!apId && !paletteHash && !savedPaletteSetId) continue;
       const key = paletteHash
         ? `saved:${paletteHash}:${savedPaletteSetId || "default"}`
-        : `applied:${apId}`;
+        : savedPaletteSetId
+          ? `saved-set:${savedPaletteSetId}`
+          : `applied:${apId}`;
       if (seen.has(key)) continue;
       seen.add(key);
       const paletteTitle =

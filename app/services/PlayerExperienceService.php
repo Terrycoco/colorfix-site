@@ -620,7 +620,7 @@ class PlayerExperienceService
      */
     private function shouldUseThumbs(array $items): bool
     {
-        $count = 0;
+        $seen = [];
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
             if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'non-palette'], true)) {
@@ -628,10 +628,20 @@ class PlayerExperienceService
             }
             if (!empty($item->exclude_from_thumbs)) continue;
             if (strtolower((string)($item->saved_palette_photo_type ?? '')) === 'before') continue;
-            $hasPalette = !empty($item->ap_id) || !empty($item->palette_hash);
-            if (!$hasPalette) continue;
-            $count++;
-            if ($count > 1) return true;
+            $paletteHash = trim((string)($item->palette_hash ?? ''));
+            $savedPaletteSetId = (int)($item->saved_palette_set_id ?? 0);
+            $apId = (int)($item->ap_id ?? 0);
+            if ($paletteHash !== '') {
+                $key = 'saved:' . $paletteHash . ':' . ($savedPaletteSetId > 0 ? (string)$savedPaletteSetId : 'default');
+            } elseif ($savedPaletteSetId > 0) {
+                $key = 'saved-set:' . $savedPaletteSetId;
+            } elseif ($apId > 0) {
+                $key = 'applied:' . $apId;
+            } else {
+                continue;
+            }
+            $seen[$key] = true;
+            if (count($seen) > 1) return true;
         }
         return false;
     }

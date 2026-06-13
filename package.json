@@ -16,7 +16,10 @@
     "export-youtube-draft": "node scripts/export-youtube-draft.mjs",
     "export-youtube-draft:poc": "node scripts/export-youtube-draft.mjs 37",
     "render-youtube-video": "node scripts/render-youtube-video.mjs",
-    "render-youtube-video:poc": "node scripts/render-youtube-video.mjs 37"
+    "render-youtube-video:poc": "node scripts/render-youtube-video.mjs 37",
+    "publishing:list": "node scripts/publishing/list.mjs",
+    "asset-creators:list": "node scripts/asset-creators/run.mjs --list",
+    "asset-creators:run": "node scripts/asset-creators/run.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

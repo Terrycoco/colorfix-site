@@ -27,6 +27,7 @@ export default function AnimatedHueWheel({
   spokeDelayMs = SPOKE_START_DELAY_MS,
   spokeStaggerMs = SPOKE_STAGGER_MS,
   spokeDurationMs = SPOKE_DURATION_MS,
+  spokeWidth = 2.75,
   className = "",
 }) {
   const normalizedItems = normalizeItems(items);
@@ -51,6 +52,7 @@ export default function AnimatedHueWheel({
       style={{
         "--ahw-size": `${size}px`,
         "--ahw-wheel-fade-ms": `${animated ? timing.wheelFadeMs : 0}ms`,
+        "--ahw-spoke-width": `${Number.isFinite(Number(spokeWidth)) ? Number(spokeWidth) : 2.75}`,
       }}
     >
       <div className="animated-hue-wheel__stage">

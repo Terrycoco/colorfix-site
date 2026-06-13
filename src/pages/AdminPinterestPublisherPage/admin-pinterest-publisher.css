@@ -1,0 +1,196 @@
+.admin-pinterest-publisher {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+  color: #111827;
+}
+
+.appub-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.appub-header h1,
+.appub-panel h2,
+.appub-job h3 {
+  margin: 0;
+}
+
+.appub-header p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.appub-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.appub-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.appub-form label {
+  display: grid;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.appub-form input,
+.appub-form select,
+.appub-form textarea,
+.appub-search input {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+.appub-form__wide {
+  grid-column: 1 / -1;
+}
+
+.appub-inline-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.appub-actions,
+.appub-list-header,
+.appub-search,
+.appub-job__meta,
+.appub-output,
+.appub-output div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.appub-actions {
+  justify-content: flex-end;
+}
+
+.appub-list-header {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.appub-search input {
+  min-width: 260px;
+}
+
+.appub-status {
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.appub-status--error {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.appub-status--ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.appub-jobs {
+  display: grid;
+  gap: 12px;
+}
+
+.appub-job {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.appub-job__eyebrow,
+.appub-job__meta,
+.appub-output,
+.appub-empty {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.appub-job h3 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.appub-outputs {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.appub-output {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 8px;
+}
+
+.appub-output code {
+  color: #111827;
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 3px 5px;
+}
+
+.appub-output a {
+  color: #111827;
+  font-weight: 700;
+}
+
+.appub-panel button,
+.appub-actions .primary-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: #f77a00;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.appub-panel button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .admin-pinterest-publisher {
+    padding: 14px;
+  }
+
+  .appub-form,
+  .appub-inline-field {
+    grid-template-columns: 1fr;
+  }
+
+  .appub-list-header,
+  .appub-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .appub-search input {
+    min-width: 0;
+  }
+}
