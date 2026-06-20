@@ -66,6 +66,34 @@ final class AssetLibraryService
         return $asset;
     }
 
+    public function upsertAssetForPhoto(int $photoLibraryId, string $relPath, array $payload = []): array
+    {
+        if ($photoLibraryId <= 0) {
+            return $this->upsertAssetByPath($relPath, $payload);
+        }
+
+        $payload['legacy_photo_library_id'] = $photoLibraryId;
+        $relPath = trim($relPath);
+        if ($relPath === '') {
+            throw new RuntimeException('rel_path required');
+        }
+        $payload['rel_path'] = $relPath;
+        $payload['asset_kind'] = $this->normalizeAssetKind($payload['asset_kind'] ?? null, $relPath);
+        $payload['mime_type'] = $payload['mime_type'] ?? $this->guessMimeType($relPath);
+
+        $existing = $this->repo->findByLegacyPhotoLibraryId($photoLibraryId);
+        if ($existing) {
+            $this->repo->update((int)$existing['asset_library_id'], $payload);
+            $asset = $this->getAsset((int)$existing['asset_library_id']);
+        } else {
+            $asset = $this->upsertAssetByPath($relPath, $payload);
+        }
+        if (!$asset) {
+            throw new RuntimeException('Failed to upsert photo asset library row');
+        }
+        return $asset;
+    }
+
     public function retireAsset(int $assetLibraryId): void
     {
         $this->repo->retire($assetLibraryId);

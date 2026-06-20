@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import {
   DEFAULT_AUDIENCE_FILTER_OPTIONS,
@@ -9,11 +9,7 @@ import "./admin-user-events.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/user-events/list.php`;
 const CLEAR_URL = `${API_FOLDER}/v2/admin/user-events/clear.php`;
-
-function formatPercent(value) {
-  const num = Number(value || 0);
-  return `${num.toFixed(1)}%`;
-}
+const DEFINITIONS_URL = `${API_FOLDER}/v2/admin/user-events/definitions.php`;
 
 function formatEventTime(value, isoValue) {
   const iso = String(isoValue || "").trim();
@@ -55,12 +51,22 @@ export default function AdminUserEventsPage() {
     playlist_open_count: 0,
     replay_click_count: 0,
     watch_next_click_count: 0,
+    share_click_count: 0,
+    browse_playlists_click_count: 0,
   });
   const [baseline, setBaseline] = useState({
     cutoff_at: "",
     cutoff_at_iso: "",
   });
   const [baselineModalOpen, setBaselineModalOpen] = useState(false);
+  const [definitionsModalOpen, setDefinitionsModalOpen] = useState(false);
+  const [definitions, setDefinitions] = useState({
+    audiences: [],
+    sources: [],
+    events: [],
+  });
+  const [definitionsLoading, setDefinitionsLoading] = useState(false);
+  const [definitionsError, setDefinitionsError] = useState("");
   const [baselineInput, setBaselineInput] = useState(formatDateTimeLocalValue());
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -113,6 +119,8 @@ export default function AdminUserEventsPage() {
           playlist_open_count: Number(data?.totals?.playlist_open_count || 0),
           replay_click_count: Number(data?.totals?.replay_click_count || 0),
           watch_next_click_count: Number(data?.totals?.watch_next_click_count || 0),
+          share_click_count: Number(data?.totals?.share_click_count || 0),
+          browse_playlists_click_count: Number(data?.totals?.browse_playlists_click_count || 0),
         });
         setBaseline({
           cutoff_at: String(data?.baseline?.cutoff_at || ""),
@@ -133,16 +141,6 @@ export default function AdminUserEventsPage() {
       controller.abort();
     };
   }, [query, audience, source, includeInternal, reloadKey]);
-
-  const totalReplayRate = useMemo(() => {
-    if (!totals.playlist_open_count) return 0;
-    return (totals.replay_click_count / totals.playlist_open_count) * 100;
-  }, [totals]);
-
-  const totalWatchNextRate = useMemo(() => {
-    if (!totals.playlist_open_count) return 0;
-    return (totals.watch_next_click_count / totals.playlist_open_count) * 100;
-  }, [totals]);
 
   async function handleSetBaseline() {
     setClearing(true);
@@ -172,6 +170,30 @@ export default function AdminUserEventsPage() {
     }
   }
 
+  async function openDefinitionsModal() {
+    setDefinitionsModalOpen(true);
+    if (definitions.audiences.length || definitions.sources.length || definitions.events.length) return;
+
+    setDefinitionsLoading(true);
+    setDefinitionsError("");
+    try {
+      const res = await fetch(`${DEFINITIONS_URL}?_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load tracking definitions");
+      setDefinitions({
+        audiences: Array.isArray(data.audiences) ? data.audiences : [],
+        sources: Array.isArray(data.sources) ? data.sources : [],
+        events: Array.isArray(data.events) ? data.events : [],
+      });
+    } catch (err) {
+      setDefinitionsError(err?.message || "Failed to load tracking definitions");
+    } finally {
+      setDefinitionsLoading(false);
+    }
+  }
+
   return (
     <div className="admin-user-events">
       <aside className="admin-user-events__sidebar">
@@ -196,6 +218,13 @@ export default function AdminUserEventsPage() {
           >
             {clearing ? "Setting Baseline..." : "Set New Baseline"}
           </button>
+          <button
+            type="button"
+            className="admin-user-events__secondary admin-user-events__secondary--compact"
+            onClick={openDefinitionsModal}
+          >
+            Definitions
+          </button>
         </div>
 
         <div className="admin-user-events__filters">
@@ -218,6 +247,7 @@ export default function AdminUserEventsPage() {
             <option value="share">Share</option>
             <option value="qr">QR</option>
             <option value="watch_next">Watch Next</option>
+            <option value="admin">Admin</option>
             <option value="direct">Direct / none</option>
           </select>
           <label className="admin-user-events__checkbox">
@@ -238,12 +268,18 @@ export default function AdminUserEventsPage() {
           <div className="admin-user-events__total-card">
             <div className="admin-user-events__total-label">Replays</div>
             <div className="admin-user-events__total-value">{totals.replay_click_count}</div>
-            <div className="admin-user-events__total-meta">{formatPercent(totalReplayRate)} of opens</div>
           </div>
           <div className="admin-user-events__total-card">
             <div className="admin-user-events__total-label">Watch Next</div>
             <div className="admin-user-events__total-value">{totals.watch_next_click_count}</div>
-            <div className="admin-user-events__total-meta">{formatPercent(totalWatchNextRate)} of opens</div>
+          </div>
+          <div className="admin-user-events__total-card">
+            <div className="admin-user-events__total-label">Shares</div>
+            <div className="admin-user-events__total-value">{totals.share_click_count}</div>
+          </div>
+          <div className="admin-user-events__total-card">
+            <div className="admin-user-events__total-label">Browse</div>
+            <div className="admin-user-events__total-value">{totals.browse_playlists_click_count}</div>
           </div>
         </div>
       </aside>
@@ -281,8 +317,8 @@ export default function AdminUserEventsPage() {
                     <th>Opens</th>
                     <th>Replays</th>
                     <th>Watch Next</th>
-                    <th>Replay %</th>
-                    <th>Next %</th>
+                    <th>Shares</th>
+                    <th>Browse</th>
                     <th>Last Event</th>
                   </tr>
                 </thead>
@@ -305,8 +341,8 @@ export default function AdminUserEventsPage() {
                       <td>{item.playlist_open_count}</td>
                       <td>{item.replay_click_count}</td>
                       <td>{item.watch_next_click_count}</td>
-                      <td>{formatPercent(item.replay_rate)}</td>
-                      <td>{formatPercent(item.watch_next_rate)}</td>
+                      <td>{item.share_click_count}</td>
+                      <td>{item.browse_playlists_click_count}</td>
                       <td>{formatEventTime(item.last_event_at, item.last_event_at_iso)}</td>
                     </tr>
                   ))}
@@ -362,6 +398,59 @@ export default function AdminUserEventsPage() {
           </div>
         </div>
       </ModalDialog>
+
+      <ModalDialog
+        open={definitionsModalOpen}
+        onClose={() => setDefinitionsModalOpen(false)}
+        title="Tracking Definitions"
+        subtitle="Audience belongs to the playlist instance. Source belongs to the link or visit. Event is what the viewer did."
+        width="860px"
+      >
+        <div className="admin-user-events__definitions-modal">
+          {definitionsLoading ? <div className="admin-user-events__empty">Loading definitions...</div> : null}
+          {definitionsError ? (
+            <div className="admin-user-events__message admin-user-events__message--error">{definitionsError}</div>
+          ) : null}
+          {!definitionsLoading && !definitionsError ? (
+            <>
+              <DefinitionTable title="Audiences" rows={definitions.audiences} />
+              <DefinitionTable title="Sources" rows={definitions.sources} />
+              <DefinitionTable title="Events Counted" rows={definitions.events} />
+            </>
+          ) : null}
+        </div>
+      </ModalDialog>
     </div>
+  );
+}
+
+function DefinitionTable({ title, rows }) {
+  return (
+    <section className="admin-user-events__definition-section">
+      <h3>{title}</h3>
+      {rows.length === 0 ? (
+        <div className="admin-user-events__empty">No definitions found.</div>
+      ) : (
+        <table className="admin-user-events__definition-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}>
+                <td>
+                  <code>{row.key}</code>
+                  <div>{row.label}</div>
+                </td>
+                <td>{row.definition || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }

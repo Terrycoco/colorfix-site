@@ -48,6 +48,7 @@ export default function AdminPlayerPage() {
       setPlaybackEnded,
       firstNonIntroIndex,
       navigate,
+      shareSource: "",
     })
   ), [data, firstNonIntroIndex, navigate]);
 

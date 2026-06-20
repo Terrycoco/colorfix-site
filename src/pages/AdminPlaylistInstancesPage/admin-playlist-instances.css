@@ -1,8 +1,9 @@
 .admin-playlist-instances {
   display: grid;
   grid-template-columns: 320px 1fr;
-  gap: 24px;
-  padding: 24px;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
   min-height: calc(100vh - 40px);
   background: #f6f6f6;
   min-width: 0;
@@ -10,13 +11,20 @@
 
 .playlist-panel {
   background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  border: 1px solid #777;
+  border-radius: 0;
+  padding: 10px;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   min-width: 0;
+}
+
+.list-panel {
+  position: sticky;
+  top: 14px;
+  align-self: start;
 }
 
 .panel-header {
@@ -36,15 +44,16 @@
 
 .header-actions select {
   min-width: 150px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  padding: 6px 7px;
+  border-radius: 2px;
+  border: 1px solid #9ca3af;
   background: #fff;
+  font: inherit;
 }
 
 .panel-title {
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .panel-title-wrap {
@@ -74,21 +83,43 @@
   min-width: 0;
 }
 
-.editor-panel .panel-actions {
-  flex: 1 1 100%;
+.editor-panel .panel-actions,
+.instance-editor-actions {
   width: 100%;
   max-width: 100%;
   justify-content: flex-start;
-  margin-top: 4px;
+  margin-top: 0;
   row-gap: 8px;
   overflow: hidden;
 }
 
-.editor-panel .panel-header {
+.instance-editor-panel {
+  align-self: start;
+  height: auto;
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.instance-editor-header {
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.instance-editor-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .editor-panel .panel-actions button,
+.instance-editor-actions button,
 .editor-panel .primary-btn {
   white-space: nowrap;
 }
@@ -104,25 +135,28 @@
 
 .panel-controls input {
   flex: 1;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  padding: 6px 7px;
+  border-radius: 2px;
+  border: 1px solid #9ca3af;
+  font: inherit;
 }
 
 .panel-controls select {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  padding: 6px 7px;
+  border-radius: 2px;
+  border: 1px solid #9ca3af;
   background: #fff;
+  font: inherit;
 }
 
 .panel-controls button,
 .panel-actions button,
 .primary-btn {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+  padding: 7px 10px;
+  border-radius: 2px;
+  border: 1px solid #777;
   cursor: pointer;
+  font-weight: 700;
 }
 
 .panel-controls button:disabled,
@@ -230,7 +264,7 @@
 .instance-picker {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .instance-picker label {
@@ -241,28 +275,31 @@
 
 .instance-picker select {
   width: 100%;
-  padding: 11px 12px;
-  border: 1px solid #d8d8d8;
-  border-radius: 10px;
+  padding: 6px 7px;
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
   background: #fff;
-  font-size: 16px;
+  font: inherit;
   color: #111;
 }
 
 .instance-action-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  border: 1px solid #999;
+  background: #f7f7f7;
+  padding: 8px;
 }
 
 .instance-action-strip button {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #d5ccb9;
-  background: #f5efe3;
-  color: #2a241d;
-  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 2px;
+  border: 1px solid #777;
+  background: #f5f5f5;
+  color: #111;
+  font-weight: 700;
 }
 
 .instance-action-strip .primary-btn {
@@ -662,5 +699,25 @@
 @media (max-width: 980px) {
   .admin-playlist-instances {
     grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .list-panel {
+    position: static;
+  }
+
+  .instance-picker {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #fff;
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 8px;
+  }
+
+  .instance-action-strip {
+    position: sticky;
+    top: 54px;
+    z-index: 5;
   }
 }

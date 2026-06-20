@@ -82,6 +82,21 @@ final class PdoUserEventRepository
         return (int)($stmt->fetchColumn() ?: 0);
     }
 
+    public function isAllowedEventType(string $eventType): bool
+    {
+        $eventType = strtolower(trim($eventType));
+        if ($eventType === '' || preg_match('/^[a-z0-9_-]{1,100}$/', $eventType) !== 1) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM tracking_event_types WHERE `key` = :event_type AND is_active = 1 LIMIT 1'
+        );
+        $stmt->execute(['event_type' => $eventType]);
+
+        return (bool)$stmt->fetchColumn();
+    }
+
     /**
      * @return array<string, int>
      */
@@ -166,6 +181,8 @@ final class PdoUserEventRepository
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_click' THEN 1 ELSE 0 END) AS hire_terry_cta_click_count,
                 SUM(CASE WHEN ue.event_type = 'replay_click' THEN 1 ELSE 0 END) AS replay_click_count,
                 SUM(CASE WHEN ue.event_type = 'watch_next_click' THEN 1 ELSE 0 END) AS watch_next_click_count,
+                SUM(CASE WHEN ue.event_type = 'share_click' THEN 1 ELSE 0 END) AS share_click_count,
+                SUM(CASE WHEN ue.event_type = 'browse_playlists_click' THEN 1 ELSE 0 END) AS browse_playlists_click_count,
                 MAX(ue.created_at) AS last_event_at
             FROM playlist_instances pi
             LEFT JOIN playlists p
@@ -187,6 +204,8 @@ final class PdoUserEventRepository
                 OR hire_terry_cta_click_count > 0
                 OR replay_click_count > 0
                 OR watch_next_click_count > 0
+                OR share_click_count > 0
+                OR browse_playlists_click_count > 0
             ORDER BY last_event_at DESC, pi.playlist_instance_id DESC, source ASC
             SQL;
 
@@ -246,7 +265,9 @@ final class PdoUserEventRepository
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_visible' THEN 1 ELSE 0 END) AS hire_terry_cta_visible_count,
                 SUM(CASE WHEN ue.event_type = 'hire_terry_cta_click' THEN 1 ELSE 0 END) AS hire_terry_cta_click_count,
                 SUM(CASE WHEN ue.event_type = 'replay_click' THEN 1 ELSE 0 END) AS replay_click_count,
-                SUM(CASE WHEN ue.event_type = 'watch_next_click' THEN 1 ELSE 0 END) AS watch_next_click_count
+                SUM(CASE WHEN ue.event_type = 'watch_next_click' THEN 1 ELSE 0 END) AS watch_next_click_count,
+                SUM(CASE WHEN ue.event_type = 'share_click' THEN 1 ELSE 0 END) AS share_click_count,
+                SUM(CASE WHEN ue.event_type = 'browse_playlists_click' THEN 1 ELSE 0 END) AS browse_playlists_click_count
             FROM user_events ue
             LEFT JOIN playlist_instances pi
               ON pi.playlist_instance_id = ue.playlist_instance_id
@@ -265,6 +286,8 @@ final class PdoUserEventRepository
             'hire_terry_cta_click_count' => (int)($row['hire_terry_cta_click_count'] ?? 0),
             'replay_click_count' => (int)($row['replay_click_count'] ?? 0),
             'watch_next_click_count' => (int)($row['watch_next_click_count'] ?? 0),
+            'share_click_count' => (int)($row['share_click_count'] ?? 0),
+            'browse_playlists_click_count' => (int)($row['browse_playlists_click_count'] ?? 0),
         ];
     }
 

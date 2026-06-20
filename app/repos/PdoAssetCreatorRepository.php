@@ -16,8 +16,11 @@ final class PdoAssetCreatorRepository
 
         $q = trim((string)($filters['q'] ?? ''));
         if ($q !== '') {
-            $where[] = '(acj.title LIKE :q OR acj.creator_key LIKE :q OR CAST(acj.asset_creator_job_id AS CHAR) LIKE :q)';
-            $params[':q'] = '%' . $q . '%';
+            $where[] = '(acj.title LIKE :q_title OR acj.creator_key LIKE :q_creator OR CAST(acj.asset_creator_job_id AS CHAR) LIKE :q_id)';
+            $like = '%' . $q . '%';
+            $params[':q_title'] = $like;
+            $params[':q_creator'] = $like;
+            $params[':q_id'] = $like;
         }
 
         $creatorKey = trim((string)($filters['creator_key'] ?? ''));
@@ -200,13 +203,97 @@ final class PdoAssetCreatorRepository
         }
     }
 
+    public function syncOutputAssetMetadataFromInstructions(int $jobId, array $instructions): void
+    {
+        $pairs = array_values(array_filter(
+            is_array($instructions['pairs'] ?? null) ? $instructions['pairs'] : [],
+            static fn(mixed $pair): bool => is_array($pair) && ($pair['include'] ?? true) !== false
+        ));
+        if (!$pairs) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT aco.asset_creator_output_id, aco.asset_library_id, aco.metadata_json
+               FROM asset_creator_outputs aco
+              WHERE aco.asset_creator_job_id = :job_id
+           ORDER BY aco.asset_creator_output_id ASC'
+        );
+        $stmt->execute([':job_id' => $jobId]);
+        $outputs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!$outputs) {
+            return;
+        }
+
+        $assetStmt = $this->pdo->prepare(
+            'UPDATE asset_library
+                SET title = :title,
+                    alt_text = :alt_text,
+                    updated_at = NOW()
+              WHERE asset_library_id = :asset_library_id'
+        );
+        $outputStmt = $this->pdo->prepare(
+            'UPDATE asset_creator_outputs
+                SET metadata_json = :metadata_json
+              WHERE asset_creator_output_id = :asset_creator_output_id'
+        );
+
+        foreach ($outputs as $index => $output) {
+            $pair = $pairs[$index] ?? null;
+            if (!is_array($pair)) {
+                continue;
+            }
+            $title = trim((string)($pair['search_title'] ?? $pair['pin_title'] ?? $pair['title'] ?? ''));
+            $description = trim((string)($pair['description'] ?? $pair['pin_description'] ?? $pair['caption'] ?? ''));
+            if ($title === '' && $description === '') {
+                continue;
+            }
+
+            $metadata = json_decode((string)($output['metadata_json'] ?? ''), true);
+            if (!is_array($metadata)) {
+                $metadata = [];
+            }
+            if ($title !== '') {
+                $metadata['search_title'] = $title;
+            }
+            if ($description !== '') {
+                $metadata['description'] = $description;
+            }
+
+            if ($title !== '') {
+                $assetStmt->execute([
+                    ':title' => $title,
+                    ':alt_text' => $description !== '' ? $description : null,
+                    ':asset_library_id' => (int)$output['asset_library_id'],
+                ]);
+            }
+            $outputStmt->execute([
+                ':metadata_json' => json_encode($metadata, JSON_UNESCAPED_SLASHES),
+                ':asset_creator_output_id' => (int)$output['asset_creator_output_id'],
+            ]);
+        }
+    }
+
     private function listInputs(int $jobId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT aci.*, al.rel_path, al.title, al.asset_kind, al.mime_type
+            'SELECT aci.*, al.rel_path, al.title, al.asset_kind, al.mime_type,
+                    COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
+                    COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
+                    c.name AS client_name,
+                    c.email AS client_email,
+                    COALESCE(NULLIF(pl_after.photo_permission_status, \'\'), NULLIF(pl_before.photo_permission_status, \'\'), NULLIF(pl.photo_permission_status, \'\'), c.photo_permission_status, \'unknown\') AS photo_permission_status
                FROM asset_creator_inputs aci
           LEFT JOIN asset_library al
                  ON al.asset_library_id = aci.asset_library_id
+          LEFT JOIN photo_library pl
+                 ON pl.photo_library_id = al.legacy_photo_library_id
+          LEFT JOIN photo_library pl_before
+                 ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(aci.metadata_json, "$.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN photo_library pl_after
+                 ON pl_after.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(aci.metadata_json, "$.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN clients c
+                 ON c.id = COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id)
               WHERE aci.asset_creator_job_id = :job_id
            ORDER BY aci.sort_order ASC, aci.asset_creator_input_id ASC'
         );
@@ -217,10 +304,23 @@ final class PdoAssetCreatorRepository
     private function listOutputs(int $jobId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT aco.*, al.rel_path, al.title, al.asset_kind, al.mime_type
+            'SELECT aco.*, al.rel_path, al.title, al.asset_kind, al.mime_type,
+                    COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
+                    COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
+                    c.name AS client_name,
+                    c.email AS client_email,
+                    COALESCE(NULLIF(pl_after.photo_permission_status, \'\'), NULLIF(pl_before.photo_permission_status, \'\'), NULLIF(pl.photo_permission_status, \'\'), c.photo_permission_status, \'unknown\') AS photo_permission_status
                FROM asset_creator_outputs aco
                JOIN asset_library al
                  ON al.asset_library_id = aco.asset_library_id
+          LEFT JOIN photo_library pl
+                 ON pl.photo_library_id = al.legacy_photo_library_id
+          LEFT JOIN photo_library pl_before
+                 ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(aco.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN photo_library pl_after
+                 ON pl_after.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(aco.metadata_json, "$.after.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN clients c
+                 ON c.id = COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id)
               WHERE aco.asset_creator_job_id = :job_id
            ORDER BY aco.asset_creator_output_id ASC'
         );
@@ -240,7 +340,7 @@ final class PdoAssetCreatorRepository
 
     private function normalizeInputRow(array $row): array
     {
-        foreach (['asset_creator_input_id', 'asset_creator_job_id', 'asset_library_id'] as $key) {
+        foreach (['asset_creator_input_id', 'asset_creator_job_id', 'asset_library_id', 'permission_photo_library_id', 'client_id'] as $key) {
             if (array_key_exists($key, $row) && $row[$key] !== null) {
                 $row[$key] = (int)$row[$key];
             }
@@ -253,7 +353,7 @@ final class PdoAssetCreatorRepository
 
     private function normalizeOutputRow(array $row): array
     {
-        foreach (['asset_creator_output_id', 'asset_creator_job_id', 'asset_library_id'] as $key) {
+        foreach (['asset_creator_output_id', 'asset_creator_job_id', 'asset_library_id', 'permission_photo_library_id', 'client_id'] as $key) {
             if (array_key_exists($key, $row) && $row[$key] !== null) {
                 $row[$key] = (int)$row[$key];
             }

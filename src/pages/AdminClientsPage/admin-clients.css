@@ -61,6 +61,29 @@
   color: #7e7b74;
 }
 
+.admin-clients__note-badge,
+.admin-clients__tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #b42318;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-clients__tab-badge {
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
 .admin-clients__sidebar-header p {
   margin: 4px 0 0;
   font-size: 12px;
@@ -510,6 +533,11 @@
   background: #faf6f0;
 }
 
+.admin-clients__activity-table tbody tr.is-unread {
+  background: #fff7ed;
+  font-weight: 700;
+}
+
 .admin-clients__table-btn {
   border: 1px solid #b7ac9d;
   background: #fff;
@@ -556,6 +584,10 @@
   gap: 8px 12px;
   font-size: 13px;
   color: #2a2723;
+}
+
+.admin-clients__activity-detail-grid--note {
+  grid-template-columns: 1fr;
 }
 
 .admin-clients__activity-detail-body {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import PermissionStatus from "@components/PermissionStatus";
 import "./admin-publishing.css";
 
 const JOBS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/list.php`;
@@ -7,6 +8,7 @@ const SAVE_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/save.php
 const MARK_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/mark-published.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
+const LANDING_PAGES_URL = `${API_FOLDER}/v2/admin/landing-pages/list.php`;
 
 const assetTypes = [
   {
@@ -30,6 +32,7 @@ const emptyForm = {
   asset_type: "pinterest.before_after_pin",
   playlist_id: "",
   playlist_instance_id: "",
+  landing_page_id: "",
   title: "",
   description: "",
   board: "",
@@ -45,6 +48,7 @@ export default function AdminPublishingPage() {
   const [jobs, setJobs] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [instances, setInstances] = useState([]);
+  const [landingPages, setLandingPages] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [q, setQ] = useState("");
   const [sort, setSort] = useState({ key: "created_at", direction: "desc" });
@@ -90,6 +94,7 @@ export default function AdminPublishingPage() {
 
   useEffect(() => {
     fetchPlaylists();
+    fetchLandingPages();
     fetchJobs();
   }, []);
 
@@ -128,6 +133,17 @@ export default function AdminPublishingPage() {
       setPlaylists(data.items || []);
     } catch (err) {
       setError(err?.message || "Failed to load playlists");
+    }
+  }
+
+  async function fetchLandingPages() {
+    try {
+      const res = await fetch(`${LANDING_PAGES_URL}?_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load landing pages");
+      setLandingPages(data.items || []);
+    } catch (err) {
+      setError(err?.message || "Failed to load landing pages");
     }
   }
 
@@ -195,6 +211,7 @@ export default function AdminPublishingPage() {
         ...form,
         playlist_id: Number(form.playlist_id || 0),
         playlist_instance_id: form.playlist_instance_id ? Number(form.playlist_instance_id) : null,
+        landing_page_id: form.landing_page_id ? Number(form.landing_page_id) : null,
         library_asset_id: form.library_asset_id ? Number(form.library_asset_id) : null,
       };
       const res = await fetch(SAVE_PINTEREST_URL, {
@@ -332,10 +349,12 @@ export default function AdminPublishingPage() {
               <SortableTh label="Channel" keyName="channel_key" sort={sort} onSort={changeSort} />
               <SortableTh label="Asset Type" keyName="output_type" sort={sort} onSort={changeSort} />
               <SortableTh label="Library ID" keyName="library_asset_id" sort={sort} onSort={changeSort} />
+              <th>Permission</th>
               <SortableTh label="Status" keyName="status" sort={sort} onSort={changeSort} />
               <SortableTh label="Playlist" keyName="playlist_title" sort={sort} onSort={changeSort} />
               <SortableTh label="Instance" keyName="instance_title" sort={sort} onSort={changeSort} />
               <SortableTh label="Tracking" keyName="tracking_code" sort={sort} onSort={changeSort} />
+              <SortableTh label="Destination" keyName="destination_url" sort={sort} onSort={changeSort} />
               <SortableTh label="Live URL" keyName="external_url" sort={sort} onSort={changeSort} />
               <SortableTh label="Published" keyName="published_at" sort={sort} onSort={changeSort} />
             </tr>
@@ -348,19 +367,21 @@ export default function AdminPublishingPage() {
                 <td>{row.channel_key}</td>
                 <td>{row.output_type}</td>
                 <td>{row.library_asset_id || "-"}</td>
+                <td><PermissionStatus {...permissionProps(row)} /></td>
                 <td>{row.status}</td>
                 <td>
                   #{row.source_id} {row.playlist_title || row.job_title}
                 </td>
                 <td>{row.instance_title || "-"}</td>
                 <td>{row.tracking_code || "-"}</td>
+                <td>{row.destination_url || "-"}</td>
                 <td>{row.external_url ? "yes" : "-"}</td>
                 <td>{row.published_at || "-"}</td>
               </tr>
             ))}
             {!loading && sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="pubdb-empty">
+                <td colSpan={13} className="pubdb-empty">
                   No publishing assets yet.
                 </td>
               </tr>
@@ -374,6 +395,7 @@ export default function AdminPublishingPage() {
           form={form}
           playlists={playlists}
           instances={instances}
+          landingPages={landingPages}
           selectedPlaylist={selectedPlaylist}
           saving={saving}
           onClose={() => setOpenCreate(false)}
@@ -499,6 +521,7 @@ function AssetDialog({
   form,
   playlists,
   instances,
+  landingPages,
   selectedPlaylist,
   saving,
   onClose,
@@ -552,6 +575,21 @@ function AssetDialog({
               {instances.map((instance) => (
                 <option key={instance.playlist_instance_id} value={instance.playlist_instance_id}>
                   #{instance.playlist_instance_id} {instance.display_title || instance.instance_name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Landing page
+            <select
+              value={form.landing_page_id}
+              onChange={(event) => onUpdate("landing_page_id", event.target.value)}
+            >
+              <option value="">None - fallback to player URL</option>
+              {landingPages.map((page) => (
+                <option key={page.id} value={page.id}>
+                  #{page.id} /s/{page.slug} ({page.status})
                 </option>
               ))}
             </select>
@@ -638,11 +676,14 @@ function RowDialog({ row, saving, onClose, onMarkPublished }) {
           <dt>Channel</dt><dd>{row.channel_key}</dd>
           <dt>Type</dt><dd>{row.output_type}</dd>
           <dt>Library ID</dt><dd>{row.library_asset_id || "-"}</dd>
+          <dt>Permission</dt><dd><PermissionStatus {...permissionProps(row)} showLabel /></dd>
           <dt>Status</dt><dd>{row.status}</dd>
           <dt>Playlist</dt><dd>#{row.source_id} {row.playlist_title || row.job_title}</dd>
           <dt>Tracking code</dt><dd>{row.tracking_code || "-"}</dd>
           <dt>Tracking URL</dt>
           <dd>{row.tracking_url ? <a href={row.tracking_url} target="_blank" rel="noreferrer">{row.tracking_url}</a> : "-"}</dd>
+          <dt>Destination URL</dt>
+          <dd>{row.destination_url ? <a href={row.destination_url} target="_blank" rel="noreferrer">{row.destination_url}</a> : "-"}</dd>
           <dt>Live URL</dt>
           <dd>{row.external_url ? <a href={row.external_url} target="_blank" rel="noreferrer">{row.external_url}</a> : "-"}</dd>
           <dt>Published at</dt><dd>{row.published_at || "-"}</dd>
@@ -658,4 +699,14 @@ function RowDialog({ row, saving, onClose, onMarkPublished }) {
       </div>
     </div>
   );
+}
+
+function permissionProps(item = {}) {
+  return {
+    status: item.photo_permission_status,
+    photoLibraryId: item.permission_photo_library_id,
+    clientId: item.client_id,
+    clientName: item.client_name,
+    clientEmail: item.client_email,
+  };
 }

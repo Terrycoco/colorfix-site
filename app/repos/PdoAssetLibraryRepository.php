@@ -12,9 +12,22 @@ final class PdoAssetLibraryRepository
     public function findById(int $assetLibraryId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT *
-               FROM asset_library
-              WHERE asset_library_id = :asset_library_id
+            'SELECT al.*,
+                    COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
+                    COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
+                    c.name AS client_name,
+                    c.email AS client_email,
+                    COALESCE(NULLIF(pl_after.photo_permission_status, \'\'), NULLIF(pl_before.photo_permission_status, \'\'), NULLIF(pl.photo_permission_status, \'\'), c.photo_permission_status, \'unknown\') AS photo_permission_status
+               FROM asset_library al
+          LEFT JOIN photo_library pl
+                 ON pl.photo_library_id = al.legacy_photo_library_id
+          LEFT JOIN photo_library pl_before
+                 ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN photo_library pl_after
+                 ON pl_after.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.after.photo_library_id")) AS UNSIGNED)
+          LEFT JOIN clients c
+                 ON c.id = COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id)
+              WHERE al.asset_library_id = :asset_library_id
               LIMIT 1'
         );
         $stmt->execute([':asset_library_id' => $assetLibraryId]);
@@ -41,14 +54,14 @@ final class PdoAssetLibraryRepository
             foreach ($tokens as $idx => $token) {
                 $suffix = '_' . $idx;
                 $numericToken = preg_replace('/^#/', '', $token);
-                $clause = '(title LIKE :q_title' . $suffix
-                    . ' OR tags LIKE :q_tags' . $suffix
-                    . ' OR rel_path LIKE :q_path' . $suffix
-                    . ' OR source_type LIKE :q_source' . $suffix;
+                $clause = '(al.title LIKE :q_title' . $suffix
+                    . ' OR al.tags LIKE :q_tags' . $suffix
+                    . ' OR al.rel_path LIKE :q_path' . $suffix
+                    . ' OR al.source_type LIKE :q_source' . $suffix;
                 if (ctype_digit($numericToken)) {
-                    $clause .= ' OR asset_library_id = :q_id_exact' . $suffix
-                        . ' OR legacy_photo_library_id = :q_legacy_exact' . $suffix
-                        . ' OR CAST(asset_library_id AS CHAR) LIKE :q_id' . $suffix;
+                    $clause .= ' OR al.asset_library_id = :q_id_exact' . $suffix
+                        . ' OR al.legacy_photo_library_id = :q_legacy_exact' . $suffix
+                        . ' OR CAST(al.asset_library_id AS CHAR) LIKE :q_id' . $suffix;
                     $params[':q_id_exact' . $suffix] = (int)$numericToken;
                     $params[':q_legacy_exact' . $suffix] = (int)$numericToken;
                     $params[':q_id' . $suffix] = $numericToken . '%';
@@ -65,32 +78,32 @@ final class PdoAssetLibraryRepository
 
         $kind = trim((string)($filters['asset_kind'] ?? ''));
         if ($kind !== '') {
-            $where[] = 'asset_kind = :asset_kind';
+            $where[] = 'al.asset_kind = :asset_kind';
             $params[':asset_kind'] = $kind;
         }
 
         $sourceType = trim((string)($filters['source_type'] ?? ''));
         if ($sourceType !== '') {
-            $where[] = 'source_type = :source_type';
+            $where[] = 'al.source_type = :source_type';
             $params[':source_type'] = $sourceType;
         }
 
         $includeInactive = !empty($filters['include_inactive']);
         $inactiveOnly = !empty($filters['inactive_only']);
         if ($inactiveOnly) {
-            $where[] = '(is_inactive = 1 OR is_retired = 1)';
+            $where[] = '(al.is_inactive = 1 OR al.is_retired = 1)';
         } elseif (!$includeInactive) {
-            $where[] = 'is_inactive = 0 AND is_retired = 0';
+            $where[] = 'al.is_inactive = 0 AND al.is_retired = 0';
         }
 
         $sort = (string)($filters['sort'] ?? 'newest');
         $orderBy = match ($sort) {
-            'oldest' => 'created_at ASC, asset_library_id ASC',
-            'title' => 'title ASC, asset_library_id DESC',
-            'kind' => 'asset_kind ASC, asset_library_id DESC',
-            'id_asc' => 'asset_library_id ASC',
-            'id_desc' => 'asset_library_id DESC',
-            default => 'created_at DESC, asset_library_id DESC',
+            'oldest' => 'al.created_at ASC, al.asset_library_id ASC',
+            'title' => 'al.title ASC, al.asset_library_id DESC',
+            'kind' => 'al.asset_kind ASC, al.asset_library_id DESC',
+            'id_asc' => 'al.asset_library_id ASC',
+            'id_desc' => 'al.asset_library_id DESC',
+            default => 'al.created_at DESC, al.asset_library_id DESC',
         };
 
         $limit = max(1, min(300, (int)($filters['limit'] ?? 100)));
@@ -99,8 +112,21 @@ final class PdoAssetLibraryRepository
             $limit = min($limit, 50);
         }
 
-        $sql = 'SELECT *
-                  FROM asset_library';
+        $sql = 'SELECT al.*,
+                       COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
+                       COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
+                       c.name AS client_name,
+                       c.email AS client_email,
+                       COALESCE(NULLIF(pl_after.photo_permission_status, \'\'), NULLIF(pl_before.photo_permission_status, \'\'), NULLIF(pl.photo_permission_status, \'\'), c.photo_permission_status, \'unknown\') AS photo_permission_status
+                  FROM asset_library al
+             LEFT JOIN photo_library pl
+                    ON pl.photo_library_id = al.legacy_photo_library_id
+             LEFT JOIN photo_library pl_before
+                    ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
+             LEFT JOIN photo_library pl_after
+                    ON pl_after.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.after.photo_library_id")) AS UNSIGNED)
+             LEFT JOIN clients c
+                    ON c.id = COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id)';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
@@ -278,7 +304,7 @@ final class PdoAssetLibraryRepository
 
     private function normalizeRow(array $row): array
     {
-        foreach (['asset_library_id', 'legacy_photo_library_id', 'source_id', 'client_id', 'width', 'height', 'file_size_bytes'] as $key) {
+        foreach (['asset_library_id', 'legacy_photo_library_id', 'permission_photo_library_id', 'source_id', 'client_id', 'width', 'height', 'file_size_bytes'] as $key) {
             if (array_key_exists($key, $row) && $row[$key] !== null) {
                 $row[$key] = (int)$row[$key];
             }

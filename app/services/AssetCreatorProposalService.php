@@ -34,10 +34,18 @@ final class AssetCreatorProposalService
             throw new RuntimeException('Playlist not found');
         }
 
-        $items = $this->playlistItems($sourceId);
-        $pairs = $this->pairsFromSavedPaletteSets($items, $playlist);
         $warnings = [];
-        if (!$pairs) {
+        $items = $this->playlistItems($sourceId);
+        $hasAnalyzerRoles = $this->hasAnalyzerRoles($items);
+        $pairs = $this->pairsFromAnalyzerRoles($items, $playlist);
+        if ($pairs) {
+            $warnings[] = 'Using playlist analyzer roles.';
+        } elseif ($hasAnalyzerRoles) {
+            $warnings[] = 'Analyzer roles were found, but no complete before/after pair was marked.';
+        } else {
+            $pairs = $this->pairsFromSavedPaletteSets($items, $playlist);
+        }
+        if (!$pairs && !$hasAnalyzerRoles) {
             $pairs = $this->fallbackPairsFromPlaylistOrder($items, $playlist);
             if ($pairs) {
                 $warnings[] = 'No saved palette before/after pairs were found. These are low-confidence playlist-order guesses.';
@@ -60,7 +68,7 @@ final class AssetCreatorProposalService
             'instructions' => [
                 'asset_type' => 'pin_composite',
                 'layout' => 'before_after_vertical',
-                'input_strategy' => 'saved_palette_set_photo_roles',
+                'input_strategy' => $hasAnalyzerRoles ? 'playlist_analyzer_roles' : 'saved_palette_set_photo_roles',
             ],
             'pairs' => array_values($pairs),
             'ignored' => $this->ignoredItems($items, $pairs),
@@ -85,8 +93,10 @@ final class AssetCreatorProposalService
     {
         $hasPhotoLibraryId = $this->columnExists('playlist_items', 'photo_library_id');
         $hasSavedPaletteSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
+        $hasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
         $photoSelect = $hasPhotoLibraryId ? 'photo_library_id' : 'NULL AS photo_library_id';
         $setSelect = $hasSavedPaletteSetId ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
+        $analyzerRoleSelect = $hasAnalyzerRole ? 'analyzer_role' : "'ignore' AS analyzer_role";
 
         $stmt = $this->pdo->prepare(
             "SELECT playlist_item_id,
@@ -97,7 +107,8 @@ final class AssetCreatorProposalService
                     subtitle,
                     image_url,
                     {$photoSelect},
-                    {$setSelect}
+                    {$setSelect},
+                    {$analyzerRoleSelect}
                FROM playlist_items
               WHERE playlist_id = :playlist_id
                 AND is_active = 1
@@ -105,6 +116,61 @@ final class AssetCreatorProposalService
         );
         $stmt->execute(['playlist_id' => $playlistId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function pairsFromAnalyzerRoles(array $items, array $playlist): array
+    {
+        $beforeItems = [];
+        $afterItems = [];
+        foreach ($items as $item) {
+            $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+            if ($role === 'before') {
+                $beforeItems[] = $item;
+            } elseif ($role === 'after') {
+                $afterItems[] = $item;
+            }
+        }
+
+        $count = min(count($beforeItems), count($afterItems));
+        if ($count <= 0) {
+            return [];
+        }
+
+        $pairs = [];
+        for ($i = 0; $i < $count; $i++) {
+            $before = $beforeItems[$i];
+            $after = $afterItems[$i];
+            $sort = $i + 1;
+            $title = trim((string)($after['title'] ?? '')) ?: trim((string)($playlist['title'] ?? '')) ?: 'Pin ' . $sort;
+            $description = $this->defaultDescription((string)($playlist['title'] ?? ''), $title);
+            $pairs[] = [
+                'pair_key' => 'analyzer-items-' . (int)$before['playlist_item_id'] . '-' . (int)$after['playlist_item_id'],
+                'include' => true,
+                'sort_order' => $sort,
+                'source' => 'playlist_analyzer_roles',
+                'confidence' => 1.0,
+                'saved_palette_set_id' => null,
+                'search_title' => $this->defaultSearchTitle($title, (string)($playlist['title'] ?? '')),
+                'description' => $description,
+                'title' => $title,
+                'caption' => $description,
+                'before' => $this->playlistItemAssetPayload($before),
+                'after' => $this->playlistItemAssetPayload($after),
+            ];
+        }
+
+        return $pairs;
+    }
+
+    private function hasAnalyzerRoles(array $items): bool
+    {
+        foreach ($items as $item) {
+            $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+            if (in_array($role, ['before', 'after'], true)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function pairsFromSavedPaletteSets(array $items, array $playlist): array
@@ -135,9 +201,14 @@ final class AssetCreatorProposalService
                     sp.display_title,
                     pl.title AS photo_title,
                     pl.rel_path AS photo_rel_path,
-                    COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS asset_library_id,
-                    COALESCE(al_direct.title, al_legacy.title, pl.title) AS asset_title,
-                    COALESCE(al_direct.rel_path, al_legacy.rel_path, pl.rel_path, spsp.rel_path) AS asset_rel_path
+                    COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS existing_asset_library_id,
+                    COALESCE(pl.title, al_direct.title, al_legacy.title) AS asset_title,
+                    COALESCE(pl.rel_path, spsp.rel_path, al_direct.rel_path, al_legacy.rel_path) AS asset_rel_path,
+                    COALESCE(al_direct.client_id, al_legacy.client_id, pl.client_id) AS client_id,
+                    pl.photo_library_id AS permission_photo_library_id,
+                    c.name AS client_name,
+                    c.email AS client_email,
+                    COALESCE(NULLIF(pl.photo_permission_status, ''), c.photo_permission_status, 'unknown') AS photo_permission_status
                FROM saved_palette_set_photos spsp
                JOIN saved_palette_sets sps
                  ON sps.id = spsp.saved_palette_set_id
@@ -149,6 +220,8 @@ final class AssetCreatorProposalService
                  ON al_direct.asset_library_id = pl.asset_library_id
           LEFT JOIN asset_library al_legacy
                  ON al_legacy.legacy_photo_library_id = pl.photo_library_id
+          LEFT JOIN clients c
+                 ON c.id = COALESCE(al_direct.client_id, al_legacy.client_id, pl.client_id)
               WHERE spsp.saved_palette_set_id IN ({$placeholders})
            ORDER BY spsp.saved_palette_set_id ASC,
                     CASE
@@ -277,43 +350,62 @@ final class AssetCreatorProposalService
     {
         $relPath = trim((string)($row['asset_rel_path'] ?? $row['photo_rel_path'] ?? $row['set_rel_path'] ?? ''));
         return [
-            'asset_library_id' => isset($row['asset_library_id']) && (int)$row['asset_library_id'] > 0 ? (int)$row['asset_library_id'] : null,
+            'asset_library_id' => null,
+            'existing_asset_library_id' => isset($row['existing_asset_library_id']) && (int)$row['existing_asset_library_id'] > 0 ? (int)$row['existing_asset_library_id'] : null,
             'photo_library_id' => isset($row['photo_library_id']) && (int)$row['photo_library_id'] > 0 ? (int)$row['photo_library_id'] : null,
+            'permission_photo_library_id' => isset($row['permission_photo_library_id']) && (int)$row['permission_photo_library_id'] > 0 ? (int)$row['permission_photo_library_id'] : null,
             'photo_type' => (string)($row['photo_type'] ?? ''),
             'title' => (string)($row['asset_title'] ?? $row['photo_title'] ?? ''),
             'caption' => (string)($row['caption'] ?? ''),
             'rel_path' => $relPath,
             'public_url' => $this->publicUrl($relPath),
+            'client_id' => isset($row['client_id']) && (int)$row['client_id'] > 0 ? (int)$row['client_id'] : null,
+            'client_name' => (string)($row['client_name'] ?? ''),
+            'client_email' => (string)($row['client_email'] ?? ''),
+            'photo_permission_status' => (string)($row['photo_permission_status'] ?? 'unknown'),
         ];
     }
 
     private function playlistItemAssetPayload(array $item): array
     {
         $photoId = (int)($item['photo_library_id'] ?? 0);
-        $asset = $photoId > 0 ? $this->assetForPhoto($photoId) : null;
+        $asset = $photoId > 0 ? $this->photoForCreator($photoId) : null;
         $relPath = trim((string)($asset['rel_path'] ?? $item['image_url'] ?? ''));
         return [
-            'asset_library_id' => isset($asset['asset_library_id']) ? (int)$asset['asset_library_id'] : null,
+            'asset_library_id' => null,
+            'existing_asset_library_id' => isset($asset['existing_asset_library_id']) ? (int)$asset['existing_asset_library_id'] : null,
             'photo_library_id' => $photoId > 0 ? $photoId : null,
+            'permission_photo_library_id' => $photoId > 0 ? $photoId : null,
             'photo_type' => '',
             'title' => (string)($asset['title'] ?? $item['title'] ?? ''),
             'caption' => (string)($item['subtitle'] ?? ''),
             'rel_path' => $relPath,
             'public_url' => $this->publicUrl($relPath),
+            'client_id' => isset($asset['client_id']) && (int)$asset['client_id'] > 0 ? (int)$asset['client_id'] : null,
+            'client_name' => (string)($asset['client_name'] ?? ''),
+            'client_email' => (string)($asset['client_email'] ?? ''),
+            'photo_permission_status' => (string)($asset['photo_permission_status'] ?? 'unknown'),
         ];
     }
 
-    private function assetForPhoto(int $photoLibraryId): ?array
+    private function photoForCreator(int $photoLibraryId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS asset_library_id,
-                    COALESCE(al_direct.rel_path, al_legacy.rel_path, pl.rel_path) AS rel_path,
-                    COALESCE(al_direct.title, al_legacy.title, pl.title) AS title
+            'SELECT COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS existing_asset_library_id,
+                    pl.rel_path AS rel_path,
+                    pl.title AS title,
+                    COALESCE(al_direct.client_id, al_legacy.client_id, pl.client_id) AS client_id,
+                    pl.photo_library_id AS permission_photo_library_id,
+                    c.name AS client_name,
+                    c.email AS client_email,
+                    COALESCE(NULLIF(pl.photo_permission_status, \'\'), c.photo_permission_status, \'unknown\') AS photo_permission_status
                FROM photo_library pl
           LEFT JOIN asset_library al_direct
                  ON al_direct.asset_library_id = pl.asset_library_id
           LEFT JOIN asset_library al_legacy
                  ON al_legacy.legacy_photo_library_id = pl.photo_library_id
+          LEFT JOIN clients c
+                 ON c.id = COALESCE(al_direct.client_id, al_legacy.client_id, pl.client_id)
               WHERE pl.photo_library_id = :photo_library_id
               LIMIT 1'
         );

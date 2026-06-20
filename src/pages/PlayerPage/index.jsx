@@ -8,7 +8,7 @@ import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { getPaletteTargets } from "@helpers/playerPaletteItems";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
-import { isHireTerryCta, trackUserEvent } from "@helpers/userEvents";
+import { isHireTerryCta, trackCtaOnclickEvent, trackUserEvent } from "@helpers/userEvents";
 import './playerpage.css';
 
 const PLAYER_CLOSE_ON_EXIT_KEY = "cf.player.close_on_exit.v1";
@@ -277,7 +277,8 @@ export default function PlayerPage() {
   function handleCta(cta) {
     const key = getCtaKey(cta);
     if (!key) return;
-    if (isHireTerryCta(cta)) {
+    const emittedOnclick = trackCtaOnclickEvent({ cta, data });
+    if (!emittedOnclick && isHireTerryCta(cta)) {
       trackUserEvent({
         event_type: "hire_terry_cta_click",
         playlist_instance_id: Number(data?.playlist_instance_id || 0),
@@ -285,7 +286,7 @@ export default function PlayerPage() {
         cta_id: Number(cta?.cta_id || 0) || null,
       });
     }
-    if (key === "watch_next") {
+    if (!emittedOnclick && key === "watch_next") {
       trackUserEvent({
         event_type: "watch_next_click",
         playlist_instance_id: Number(data?.playlist_instance_id || 0),
@@ -295,9 +296,18 @@ export default function PlayerPage() {
         allow_internal_tracking: true,
       });
     }
-    if (key === "replay" || key === "replay_liked" || key === "replay_filtered") {
+    if (!emittedOnclick && (key === "replay" || key === "replay_liked" || key === "replay_filtered")) {
       trackUserEvent({
         event_type: "replay_click",
+        playlist_instance_id: Number(data?.playlist_instance_id || 0),
+        playlist_id: Number(data?.playlist_id || 0) || null,
+        cta_id: Number(cta?.cta_id || 0) || null,
+        allow_internal_tracking: true,
+      });
+    }
+    if (!emittedOnclick && (key === "share" || key === "share_playlist" || key === "copy_link")) {
+      trackUserEvent({
+        event_type: "share_click",
         playlist_instance_id: Number(data?.playlist_instance_id || 0),
         playlist_id: Number(data?.playlist_id || 0) || null,
         cta_id: Number(cta?.cta_id || 0) || null,
@@ -341,6 +351,7 @@ const ctas = useMemo(() => {
       variant,
       display_mode: cta?.display_mode ?? parsedParams.display_mode,
       icon: cta?.icon ?? parsedParams.icon,
+      onclick: cta?.onclick || "",
       params: parsedParams,
     };
   });

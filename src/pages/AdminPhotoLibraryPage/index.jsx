@@ -46,6 +46,7 @@ const defaultUpload = {
   client_name: "",
   client_email: "",
   client_id: "",
+  photo_permission_status: "",
   tags: "",
   alt_text: "",
   show_in_gallery: false,
@@ -683,6 +684,7 @@ export default function AdminPhotoLibraryPage() {
         formData.append("photo_type", uploadForm.photo_type || "full");
         formData.append("tags", uploadForm.tags || "");
         formData.append("alt_text", uploadForm.alt_text || "");
+        formData.append("photo_permission_status", uploadForm.photo_permission_status || "");
         res = await fetch(SAVED_UPLOAD_URL, {
           method: "POST",
           credentials: "include",
@@ -694,6 +696,7 @@ export default function AdminPhotoLibraryPage() {
         formData.append("title_prefix", uploadForm.title_prefix || "");
         formData.append("client_name", uploadForm.client_name || "");
         formData.append("client_email", uploadForm.client_email || "");
+        formData.append("photo_permission_status", uploadForm.photo_permission_status || "");
         formData.append("tags", uploadForm.tags || "");
         formData.append("alt_text", uploadForm.alt_text || "");
         if (uploadForm.show_in_gallery) formData.append("show_in_gallery", "1");
@@ -732,6 +735,7 @@ export default function AdminPhotoLibraryPage() {
         tags: item.tags,
         alt_text: item.alt_text,
         note: item.note,
+        photo_permission_status: item.photo_permission_override_status || "",
         show_in_gallery: !!item.show_in_gallery,
         has_palette: !!item.has_palette,
         is_inactive: !!item.is_inactive,
@@ -774,6 +778,7 @@ export default function AdminPhotoLibraryPage() {
           tags: item.tags,
           alt_text: item.alt_text,
           note: item.note,
+          photo_permission_status: item.photo_permission_override_status || "",
           show_in_gallery: !!item.show_in_gallery,
           has_palette: !!item.has_palette,
           is_inactive: !!item.is_inactive,
@@ -1205,6 +1210,21 @@ export default function AdminPhotoLibraryPage() {
               />
             </label>
           )}
+
+          <label>
+            Permission
+            <select
+              value={uploadForm.photo_permission_status}
+              onChange={(e) => handleUploadField("photo_permission_status", e.target.value)}
+            >
+              <option value="">Use client/default</option>
+              <option value="not_needed">Not needed</option>
+              <option value="granted">Granted</option>
+              <option value="requested">Requested</option>
+              <option value="declined">Declined</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </label>
 
           {showTagFields && (
             <label>
@@ -1689,6 +1709,23 @@ export default function AdminPhotoLibraryPage() {
                             onChange={(e) => handleLibraryField(item.photo_library_id, "is_inactive", e.target.checked)}
                           />
                           Retired
+                        </label>
+                        <label className="admin-photo-library__permission-select">
+                          Permission
+                          <select
+                            value={item.photo_permission_override_status || ""}
+                            onChange={(e) => {
+                              handleLibraryField(item.photo_library_id, "photo_permission_override_status", e.target.value);
+                              handleLibraryField(item.photo_library_id, "photo_permission_status", e.target.value || item.client_photo_permission_status || "unknown");
+                            }}
+                          >
+                            <option value="">Use client/default</option>
+                            <option value="not_needed">Not needed</option>
+                            <option value="granted">Granted</option>
+                            <option value="requested">Requested</option>
+                            <option value="declined">Declined</option>
+                            <option value="unknown">Unknown</option>
+                          </select>
                         </label>
                       </div>
                     </td>

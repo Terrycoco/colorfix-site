@@ -1,17 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import ModalDialog from "@components/ModalDialog";
 import "./admin-ctas.css";
 
 const TYPES_LIST_URL = `${API_FOLDER}/v2/admin/cta-types/list.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 const CTAS_SAVE_URL = `${API_FOLDER}/v2/admin/ctas/save.php`;
+const EVENT_DEFINITIONS_URL = `${API_FOLDER}/v2/admin/user-events/definitions.php`;
+const EVENT_SAVE_URL = `${API_FOLDER}/v2/admin/user-events/save-event.php`;
 
 const emptyCta = {
   cta_id: null,
   cta_type_id: "",
   label: "",
   params: "",
+  onclick: "",
   is_active: true,
+};
+
+const emptyEventForm = {
+  key: "",
+  label: "",
+  definition: "",
+  sort_order: "100",
 };
 
 
@@ -53,13 +64,19 @@ function updateParamsString(current, key, value) {
 export default function AdminCtasPage() {
   const [types, setTypes] = useState([]);
   const [ctas, setCtas] = useState([]);
+  const [eventTypes, setEventTypes] = useState([]);
   const [ctaForm, setCtaForm] = useState(emptyCta);
+  const [eventsModalOpen, setEventsModalOpen] = useState(false);
+  const [eventForm, setEventForm] = useState(emptyEventForm);
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventError, setEventError] = useState("");
 
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     fetchTypes();
     fetchCtas();
+    fetchEventTypes();
   }, []);
 
   async function fetchTypes() {
@@ -88,6 +105,55 @@ export default function AdminCtasPage() {
       setCtas(items);
     } catch (err) {
       setError(err?.message || "Failed to load CTAs");
+    }
+  }
+
+  async function fetchEventTypes() {
+    try {
+      const res = await fetch(`${EVENT_DEFINITIONS_URL}?_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load tracking events");
+      setEventTypes(Array.isArray(data.events) ? data.events : []);
+    } catch (err) {
+      setError(err?.message || "Failed to load tracking events");
+    }
+  }
+
+  function updateEventForm(field, value) {
+    setEventForm((prev) => ({
+      ...prev,
+      [field]: field === "key" ? normalizeEventKey(value) : value,
+    }));
+    setEventError("");
+  }
+
+  async function saveEvent() {
+    setEventSaving(true);
+    setEventError("");
+    setStatus("");
+    setError("");
+    try {
+      const payload = {
+        ...eventForm,
+        sort_order: Number(eventForm.sort_order) || 100,
+      };
+      const res = await fetch(EVENT_SAVE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save event");
+      setStatus(`Event saved: ${data.key}`);
+      setEventForm(emptyEventForm);
+      await fetchEventTypes();
+    } catch (err) {
+      setEventError(err?.message || "Failed to save event");
+    } finally {
+      setEventSaving(false);
     }
   }
 
@@ -184,7 +250,7 @@ export default function AdminCtasPage() {
   const paramsHint = useMemo(() => {
     switch (selectedActionKey) {
       case "navigate":
-        return 'Example: {"url":"/hoa/contact", "target":"_blank"}';
+        return 'Example: {"url":"/playlists", "target":"_self", "preserve_src":true}';
       case "jump_to_item":
         return 'Example: {"item_index":2}';
       case "replay_filtered":
@@ -232,8 +298,11 @@ export default function AdminCtasPage() {
     if (selectedActionKey === "jump_to_item" && (ctaParams.item_index === undefined || ctaParams.item_index === "")) {
       errors.push("Item index is required.");
     }
+    if (ctaForm.onclick && !eventTypes.some((eventType) => eventType.key === ctaForm.onclick)) {
+      errors.push("Onclick event must be an active tracking event.");
+    }
     return errors;
-  }, [ctaForm.cta_type_id, ctaForm.label, selectedActionKey, articleIdValue, ctaParams]);
+  }, [ctaForm.cta_type_id, ctaForm.label, ctaForm.onclick, selectedActionKey, articleIdValue, ctaParams, eventTypes]);
 
   const canSaveCta = ctaErrors.length === 0;
 
@@ -266,6 +335,7 @@ export default function AdminCtasPage() {
                     cta_type_id: cta.cta_type_id,
                     label: cta.label || "",
                     params: normalizeParams(cta.params),
+                    onclick: cta.onclick || "",
                     is_active: toBool(cta.is_active),
                   })
                 }
@@ -273,6 +343,7 @@ export default function AdminCtasPage() {
                 <div className="row-title">{cta.label}</div>
                 <div className="row-meta">
                   #{cta.cta_id} • {cta.type_label || "Unknown type"}
+                  {cta.onclick ? ` • onclick: ${cta.onclick}` : ""}
                   {(() => {
                     const note = parseParams(cta.params).note;
                     return note ? ` • ${note}` : "";
@@ -288,13 +359,25 @@ export default function AdminCtasPage() {
         <div className="cta-panel">
           <div className="panel-header">
             <div className="panel-title">CTAs</div>
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={() => setCtaForm(emptyCta)}
-            >
-              New CTA
-            </button>
+            <div className="panel-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  setEventsModalOpen(true);
+                  fetchEventTypes();
+                }}
+              >
+                Events
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => setCtaForm(emptyCta)}
+              >
+                New CTA
+              </button>
+            </div>
           </div>
           <div className="form-grid">
             <label>
@@ -306,7 +389,6 @@ export default function AdminCtasPage() {
               <select
                 value={ctaForm.cta_type_id}
                 onChange={(e) => updateCtaForm("cta_type_id", e.target.value)}
-                onDoubleClick={() => setShowTypes(true)}
               >
                 <option value="">Select action</option>
                 {typeOptions.map((opt) => (
@@ -323,6 +405,21 @@ export default function AdminCtasPage() {
                 value={ctaForm.label}
                 onChange={(e) => updateCtaForm("label", e.target.value)}
               />
+            </label>
+            <label className="full-width">
+              Onclick event
+              <select
+                value={ctaForm.onclick || ""}
+                onChange={(e) => updateCtaForm("onclick", e.target.value)}
+              >
+                <option value="">No click event</option>
+                {eventTypes.map((eventType) => (
+                  <option key={eventType.key} value={eventType.key}>
+                    {eventType.label} ({eventType.key})
+                  </option>
+                ))}
+              </select>
+              <div className="field-hint">Fires this tracking event when the CTA is clicked.</div>
             </label>
             <label className="full-width">
               Note (short internal reminder)
@@ -515,6 +612,10 @@ export default function AdminCtasPage() {
               <div className="cta-cheatsheet-value">auto | standard | full</div>
             </div>
             <div className="cta-cheatsheet-row">
+              <div className="cta-cheatsheet-key">preserve_src</div>
+              <div className="cta-cheatsheet-value">true keeps the current src query param on navigation</div>
+            </div>
+            <div className="cta-cheatsheet-row">
               <div className="cta-cheatsheet-key">require_psi</div>
               <div className="cta-cheatsheet-value">true | false</div>
             </div>
@@ -543,6 +644,90 @@ export default function AdminCtasPage() {
         </div>
       )}
 
+      <ModalDialog
+        open={eventsModalOpen}
+        title="Tracking Events"
+        subtitle="Create events that CTAs can emit from the Onclick event dropdown."
+        onClose={() => setEventsModalOpen(false)}
+        width="860px"
+      >
+        <div className="cta-events-modal">
+          <div className="cta-events-list">
+            {eventTypes.length === 0 ? (
+              <div className="cta-listbox-empty">No active events found.</div>
+            ) : (
+              eventTypes.map((eventType) => (
+                <div key={eventType.key} className="cta-event-row">
+                  <div className="row-title">{eventType.label}</div>
+                  <div className="row-meta">
+                    <code>{eventType.key}</code>
+                    {eventType.definition ? ` • ${eventType.definition}` : ""}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="cta-event-form">
+            <div className="panel-title">Add Event</div>
+            <label>
+              Key
+              <input
+                type="text"
+                value={eventForm.key}
+                onChange={(e) => updateEventForm("key", e.target.value)}
+                placeholder="browse_more_playlists_click"
+              />
+            </label>
+            <label>
+              Label
+              <input
+                type="text"
+                value={eventForm.label}
+                onChange={(e) => updateEventForm("label", e.target.value)}
+                placeholder="Browse More Playlists Click"
+              />
+            </label>
+            <label>
+              Definition
+              <textarea
+                rows={4}
+                value={eventForm.definition}
+                onChange={(e) => updateEventForm("definition", e.target.value)}
+                placeholder="A viewer clicked a CTA to browse playlist choices."
+              />
+            </label>
+            <label>
+              Sort order
+              <input
+                type="number"
+                value={eventForm.sort_order}
+                onChange={(e) => updateEventForm("sort_order", e.target.value)}
+              />
+            </label>
+            {eventError ? <div className="cta-form-error">{eventError}</div> : null}
+            <div className="panel-actions">
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={saveEvent}
+                disabled={eventSaving || !eventForm.key || !eventForm.label}
+              >
+                {eventSaving ? "Saving..." : "Save Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </ModalDialog>
+
     </div>
   );
+}
+
+function normalizeEventKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_-]+/g, "")
+    .slice(0, 100);
 }

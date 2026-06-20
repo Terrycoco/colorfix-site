@@ -12,7 +12,7 @@ class PdoPhotoLibraryRepository
     public function findById(int $id): ?array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT photo_library_id, source_type, source_id, client_id, rel_path, title, is_inactive
+            "SELECT photo_library_id, asset_library_id, source_type, source_id, client_id, photo_permission_status, rel_path, title, tags, alt_text, show_in_gallery, has_palette, is_inactive
                FROM photo_library
               WHERE photo_library_id = :id
               LIMIT 1"
@@ -142,14 +142,15 @@ class PdoPhotoLibraryRepository
     {
         $stmt = $this->pdo->prepare(
             "INSERT INTO photo_library
-                (source_type, source_id, client_id, rel_path, title, tags, alt_text, note, show_in_gallery, has_palette, created_at)
+                (source_type, source_id, client_id, photo_permission_status, rel_path, title, tags, alt_text, note, show_in_gallery, has_palette, created_at)
              VALUES
-                (:source_type, :source_id, :client_id, :rel_path, :title, :tags, :alt_text, :note, :show_in_gallery, :has_palette, NOW())"
+                (:source_type, :source_id, :client_id, :photo_permission_status, :rel_path, :title, :tags, :alt_text, :note, :show_in_gallery, :has_palette, NOW())"
         );
         $stmt->execute([
             ':source_type' => $data['source_type'],
             ':source_id' => $data['source_id'] ?? null,
             ':client_id' => $data['client_id'] ?? null,
+            ':photo_permission_status' => $this->normalizePermissionStatus($data['photo_permission_status'] ?? null),
             ':rel_path' => $data['rel_path'],
             ':title' => $data['title'] ?? null,
             ':tags' => $data['tags'] ?? null,
@@ -163,7 +164,7 @@ class PdoPhotoLibraryRepository
 
     public function update(int $id, array $data): void
     {
-        $allowed = ['source_type', 'rel_path', 'title', 'tags', 'alt_text', 'note', 'show_in_gallery', 'has_palette', 'is_inactive', 'client_id'];
+        $allowed = ['source_type', 'asset_library_id', 'rel_path', 'title', 'tags', 'alt_text', 'note', 'show_in_gallery', 'has_palette', 'is_inactive', 'client_id', 'photo_permission_status'];
         $setParts = [];
         $params = [':id' => $id];
         foreach ($allowed as $key) {
@@ -173,6 +174,10 @@ class PdoPhotoLibraryRepository
             $paramKey = ':' . $key;
             if (in_array($key, ['show_in_gallery', 'has_palette', 'is_inactive'], true)) {
                 $params[$paramKey] = !empty($data[$key]) ? 1 : 0;
+            } elseif ($key === 'asset_library_id') {
+                $params[$paramKey] = !empty($data[$key]) ? (int)$data[$key] : null;
+            } elseif ($key === 'photo_permission_status') {
+                $params[$paramKey] = $this->normalizePermissionStatus($data[$key] ?? null);
             } else {
                 $params[$paramKey] = $data[$key];
             }
@@ -184,6 +189,55 @@ class PdoPhotoLibraryRepository
         $sql = "UPDATE photo_library SET " . implode(', ', $setParts) . ", updated_at = NOW() WHERE photo_library_id = :id";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+    }
+
+    public function updatePermissionStatus(int $id, ?string $status): array
+    {
+        $this->update($id, ['photo_permission_status' => $this->normalizePermissionStatus($status)]);
+        return $this->getPermissionStatus($id) ?? [
+            'photo_library_id' => $id,
+            'photo_permission_status' => 'unknown',
+            'photo_permission_override_status' => null,
+        ];
+    }
+
+    public function getPermissionStatus(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                pl.photo_library_id,
+                pl.photo_permission_status AS photo_permission_override_status,
+                c.id AS client_id,
+                c.name AS client_name,
+                c.email AS client_email,
+                c.photo_permission_status AS client_photo_permission_status,
+                COALESCE(NULLIF(pl.photo_permission_status, ''), c.photo_permission_status, 'unknown') AS photo_permission_status
+               FROM photo_library pl
+          LEFT JOIN clients c
+                 ON c.id = pl.client_id
+              WHERE pl.photo_library_id = :id
+              LIMIT 1"
+        );
+        $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        foreach (['photo_library_id', 'client_id'] as $key) {
+            if (array_key_exists($key, $row) && $row[$key] !== null) {
+                $row[$key] = (int)$row[$key];
+            }
+        }
+        return $row;
+    }
+
+    private function normalizePermissionStatus(?string $status): ?string
+    {
+        $value = strtolower(trim((string)$status));
+        if ($value === '' || $value === 'client' || $value === 'default') {
+            return null;
+        }
+        return in_array($value, ['not_needed', 'unknown', 'requested', 'granted', 'declined'], true)
+            ? $value
+            : null;
     }
 
     public function listUsages(int $photoLibraryId): array

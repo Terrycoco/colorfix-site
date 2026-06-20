@@ -141,6 +141,7 @@ try {
                    photo_library.source_type,
                    photo_library.source_id,
                    photo_library.client_id,
+                   photo_library.photo_permission_status AS photo_permission_override_status,
                    photo_library.rel_path,
                    photo_library.title,
                    photo_library.tags,
@@ -161,6 +162,8 @@ try {
                    photo_library.updated_at,
                    clients.name AS client_name,
                    clients.email AS client_email,
+                   clients.photo_permission_status AS client_photo_permission_status,
+                   COALESCE(NULLIF(photo_library.photo_permission_status, ''), clients.photo_permission_status, 'unknown') AS photo_permission_status,
                    (
                      SELECT s.saved_palette_id
                        FROM saved_palette_set_photos sp
@@ -266,6 +269,9 @@ try {
             'client_id' => $row['client_id'] !== null ? (int)$row['client_id'] : null,
             'client_name' => $row['client_name'] ?? '',
             'client_email' => $row['client_email'] ?? '',
+            'photo_permission_status' => $row['photo_permission_status'] ?? 'unknown',
+            'photo_permission_override_status' => $row['photo_permission_override_status'] ?? '',
+            'client_photo_permission_status' => $row['client_photo_permission_status'] ?? '',
             'raw_rel_path' => $rawRelPath,
             'rel_path' => $rawRelPath,
             'image_url' => $rawRelPath,

@@ -8,7 +8,9 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Repos\PdoAssetLibraryRepository;
 use App\Repos\PdoClientRepository;
+use App\Services\AssetLibraryService;
 use App\Services\ClientService;
 use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;
@@ -48,6 +50,7 @@ try {
     $titlePrefix = trim((string)($_POST['title_prefix'] ?? ''));
     $tags = trim((string)($_POST['tags'] ?? ''));
     $altText = trim((string)($_POST['alt_text'] ?? ''));
+    $permissionStatus = trim((string)($_POST['photo_permission_status'] ?? ''));
     $showInGallery = !empty($_POST['show_in_gallery']);
     $hasPalette = !empty($_POST['has_palette']);
     $clientName = trim((string)($_POST['client_name'] ?? ''));
@@ -92,6 +95,7 @@ try {
 
     $repo = new PdoPhotoLibraryRepository($pdo);
     $library = new PhotoLibraryService($repo);
+    $assetLibrary = new AssetLibraryService(new PdoAssetLibraryRepository($pdo), '');
     $altTextQueue = PhotoAltTextQueueService::fromPdo($pdo);
 
     for ($i = 0; $i < $count; $i++) {
@@ -131,16 +135,43 @@ try {
             'title' => $title,
             'tags' => $tags !== '' ? $tags : null,
             'alt_text' => $altText !== '' ? $altText : null,
+            'photo_permission_status' => $permissionStatus,
             'show_in_gallery' => $showInGallery ? 1 : 0,
             'has_palette' => $hasPalette ? 1 : 0,
         ]);
 
         if ($libraryId > 0) {
+            $asset = $assetLibrary->upsertAssetForPhoto($libraryId, $relPath, [
+                'asset_kind' => 'image',
+                'mime_type' => $info['mime'] ?? null,
+                'title' => $title,
+                'tags' => $tags !== '' ? $tags : null,
+                'alt_text' => $altText !== '' ? $altText : null,
+                'note' => 'Uploaded via Photo Library',
+                'source_type' => 'photo_library',
+                'source_id' => $libraryId,
+                'client_id' => $clientId,
+                'width' => isset($info[0]) ? (int)$info[0] : null,
+                'height' => isset($info[1]) ? (int)$info[1] : null,
+                'file_size_bytes' => is_file($absPath) ? filesize($absPath) : null,
+                'checksum' => is_file($absPath) ? hash_file('sha256', $absPath) : null,
+                'metadata_json' => [
+                    'photo_library_id' => $libraryId,
+                    'upload_source_type' => $sourceType,
+                    'upload_series' => $series,
+                ],
+                'is_inactive' => 0,
+                'is_retired' => 0,
+            ]);
+            if (!empty($asset['asset_library_id'])) {
+                $repo->update($libraryId, ['asset_library_id' => (int)$asset['asset_library_id']]);
+            }
             if ($altText === '') {
                 $altTextQueue->enqueue($libraryId);
             }
             $added[] = [
                 'photo_library_id' => $libraryId,
+                'asset_library_id' => isset($asset['asset_library_id']) ? (int)$asset['asset_library_id'] : null,
                 'rel_path' => $relPath,
                 'title' => $title,
                 'client_id' => $clientId,

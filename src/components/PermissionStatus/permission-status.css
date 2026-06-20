@@ -1,0 +1,162 @@
+.permission-status-wrap {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.permission-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
+  vertical-align: middle;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.permission-status__dot {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  border: 2px solid #6b7280;
+  border-radius: 999px;
+  background: #9ca3af;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.permission-status--granted .permission-status__dot {
+  border-color: #047857;
+  background: #10b981;
+}
+
+.permission-status--not_needed .permission-status__dot {
+  border-color: #047857;
+  background: #10b981;
+}
+
+.permission-status--requested .permission-status__dot {
+  border-color: #a16207;
+  background: #facc15;
+}
+
+.permission-status--declined .permission-status__dot {
+  border-color: #991b1b;
+  background: #ef4444;
+}
+
+.permission-status--unknown .permission-status__dot {
+  border-color: #4b5563;
+  background: #9ca3af;
+}
+
+.permission-status--none .permission-status__dot {
+  border-color: #9ca3af;
+  background: transparent;
+}
+
+.permission-status__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #333;
+  white-space: nowrap;
+}
+
+.permission-status--editable {
+  cursor: pointer;
+}
+
+.permission-status--editable:hover .permission-status__dot {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 5px rgba(20, 184, 166, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.permission-status.is-saving {
+  opacity: 0.65;
+}
+
+.permission-status-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 3px;
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid #c8c8c8;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+}
+
+.permission-status-menu__title {
+  display: block;
+  padding: 0 2px 4px;
+  color: #555;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.permission-status-menu__option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.permission-status-menu__option:hover {
+  background: #eef2f7;
+}
+
+.permission-status-menu__option input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.permission-status-menu__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.permission-status-menu button {
+  border: 1px solid #999;
+  border-radius: 2px;
+  background: #f7f7f7;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.permission-status-menu__save {
+  border-color: #111 !important;
+  background: #111 !important;
+  color: #fff;
+}
+
+.permission-status-menu button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.permission-status-menu button:hover {
+  background: #eef2f7;
+}
+
+.permission-status-menu__save:hover {
+  background: #222 !important;
+}

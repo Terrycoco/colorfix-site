@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import PermissionStatus from "@components/PermissionStatus";
 import "./admin-asset-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/asset-library/list.php`;
@@ -159,6 +160,7 @@ export default function AdminAssetLibraryPage() {
               <th>Legacy Photo</th>
               <th>Preview</th>
               <th>Kind</th>
+              <th>Permission</th>
               <th>MIME</th>
               <th>Title</th>
               <th>Tags</th>
@@ -177,6 +179,9 @@ export default function AdminAssetLibraryPage() {
                   <AssetPreview item={item} />
                 </td>
                 <td>{item.asset_kind || "-"}</td>
+                <td>
+                  <PermissionStatus {...permissionProps(item)} />
+                </td>
                 <td>{item.mime_type || "-"}</td>
                 <td>{item.title || "-"}</td>
                 <td className="assetlib-tags">{item.tags || "-"}</td>
@@ -188,7 +193,7 @@ export default function AdminAssetLibraryPage() {
             ))}
             {!loading && items.length === 0 ? (
               <tr>
-                <td colSpan={11} className="assetlib-empty">
+                <td colSpan={12} className="assetlib-empty">
                   No library assets found.
                 </td>
               </tr>
@@ -226,6 +231,7 @@ function AssetDialog({ item, onClose }) {
           </div>
           <dl className="assetlib-details">
             <dt>Kind</dt><dd>{item.asset_kind || "-"}</dd>
+            <dt>Permission</dt><dd><PermissionStatus {...permissionProps(item)} showLabel /></dd>
             <dt>MIME</dt><dd>{item.mime_type || "-"}</dd>
             <dt>Title</dt><dd>{item.title || "-"}</dd>
             <dt>Tags</dt><dd>{item.tags || "-"}</dd>
@@ -247,6 +253,16 @@ function AssetDialog({ item, onClose }) {
       </div>
     </div>
   );
+}
+
+function permissionProps(item = {}) {
+  return {
+    status: item.photo_permission_status,
+    photoLibraryId: item.permission_photo_library_id || item.legacy_photo_library_id,
+    clientId: item.client_id,
+    clientName: item.client_name,
+    clientEmail: item.client_email,
+  };
 }
 
 async function parseJsonResponse(res, label) {

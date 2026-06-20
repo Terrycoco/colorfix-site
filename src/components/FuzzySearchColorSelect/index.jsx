@@ -53,6 +53,7 @@ export default function FuzzySearchColorSelect({
   const sheetInputRef = useRef(null);
   const pickingRef = useRef(false);
   const reqSeq = useRef(0);
+  const abortRef = useRef(null);
   const suppressNextSearchRef = useRef(false);
 
   useIOSNoZoomOnFocus(inputRef);
@@ -125,6 +126,10 @@ export default function FuzzySearchColorSelect({
     return () => document.removeEventListener('pointerdown', onDocPointerDown, { capture: true });
   }, []);
 
+  useEffect(() => {
+    return () => abortActiveSearch();
+  }, []);
+
 function getFontColor(color) {
   const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l ?? hexLightness(color?.hex6 || color?.hex);
   if (typeof lightness === "number" && !Number.isNaN(lightness)) {
@@ -169,6 +174,7 @@ function pick(color) {
 
   function runSearch(text) {
     const q = (text || '').trim();
+    abortActiveSearch();
     if (q.length < 2) {
       setResults([]);
       setOpen(false);
@@ -176,8 +182,10 @@ function pick(color) {
       return;
     }
     const seq = ++reqSeq.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
     const url = `${API_FOLDER}/v2/fuzzy-search.php?q=${encodeURIComponent(q)}&ts=${Date.now()}`;
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(r => r.text())
       .then(txt => {
         if (seq !== reqSeq.current) return;
@@ -192,7 +200,8 @@ function pick(color) {
         setHighlightedIndex(-1);
         setOpen(arr.length > 0);
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err?.name === "AbortError") return;
         if (seq !== reqSeq.current) return;
         setResults([]);
         setOpen(false);
@@ -200,14 +209,13 @@ function pick(color) {
       });
   }
 
-  useEffect(() => {
-    if (suppressNextSearchRef.current) {
-      suppressNextSearchRef.current = false;
-      return;
+  function abortActiveSearch() {
+    reqSeq.current += 1;
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
     }
-    const t = setTimeout(() => runSearch(query), 220);
-    return () => clearTimeout(t);
-  }, [query]);
+  }
 
   function handleKeyDown(e) {
     if (e.key === " ") {
@@ -229,6 +237,8 @@ function pick(color) {
         e.preventDefault();
         if (highlightedIndex >= 0 && results[highlightedIndex]) {
           pick(results[highlightedIndex]);
+        } else {
+          runSearch(query);
         }
         return;
       }
@@ -240,9 +250,7 @@ function pick(color) {
     }
     if (e.key === 'Enter' && (!open || results.length === 0)) {
       e.preventDefault();
-      if (window.matchMedia?.('(pointer: coarse)').matches) {
-        inputRef.current?.blur();
-      }
+      runSearch(query);
     }
   }
 
@@ -255,6 +263,7 @@ function pick(color) {
     setResults([]);
     setHighlightedIndex(-1);
     setOpen(false);
+    abortActiveSearch();
     inputRef.current?.focus();
   }
 
@@ -326,8 +335,6 @@ function pick(color) {
               if (suppressFocus || manualOpen) { e.target.blur(); return; }
               onFocus && onFocus(e);
               if (!selectedColor && results.length > 0) setOpen(true);
-              const q = query.trim();
-              if (!selectedColor && q.length >= 2 && results.length === 0) runSearch(q);
             }}
             onChange={(e) => {
               const val = e.target.value;
@@ -336,21 +343,19 @@ function pick(color) {
                 setSelectedColor(null);
                 onSelect && onSelect(null);
               }
-              if (val.trim().length >= 2) setOpen(true);
+              setResults([]);
+              setHighlightedIndex(-1);
+              setOpen(false);
             }}
             onMouseDown={(e) => {
               if (!manualOpen) return;
               e.preventDefault();
-              const val = query.trim();
-              if (val.length >= 2) runSearch(val);
-              setOpen(true);
+              if (results.length > 0) setOpen(true);
             }}
             onClick={(e) => {
               if (!manualOpen) return;
               e.preventDefault();
-              const val = query.trim();
-              if (val.length >= 2) runSearch(val);
-              setOpen(true);
+              if (results.length > 0) setOpen(true);
             }}
             onInput={(e) => {
               const val = e.currentTarget.value || '';
@@ -443,7 +448,12 @@ function pick(color) {
                 enterKeyHint="search"
                 autoFocus
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setResults([]);
+                  setHighlightedIndex(-1);
+                }}
+                onKeyDown={handleKeyDown}
                 placeholder="Color name or code"
                 className="fuzzy-sheet-input"
               />
@@ -465,9 +475,6 @@ function pick(color) {
                     <span className="sheet-brand">{c.brand}</span>
                   </button>
                 ))}
-                {results.length === 0 && query.trim().length >= 2 && (
-                  <div className="fuzzy-sheet-empty">No colors matched.</div>
-                )}
               </div>
             </div>
           </div>

@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { isAdmin } from "@helpers/authHelper";
 import { useAppState } from "@context/AppStateContext";
+import { API_FOLDER } from "@helpers/config";
 import { adminMenuItems } from "./adminMenuItems";
 import "./adminmenu.css";
+
+const CLIENT_INBOX_COUNT_URL = `${API_FOLDER}/v2/admin/clients/inbox-count.php`;
+const INBOX_COUNT_CACHE_KEY = "colorfix.admin.inboxCount";
+const INBOX_COUNT_CACHE_MS = 60_000;
+const INBOX_COUNT_TIMEOUT_MS = 1500;
 
 function normalizeHrefPath(href = "") {
   if (!href) return "";
@@ -16,13 +22,25 @@ function isPathMatch(currentPath, href) {
   return currentPath === target || currentPath.startsWith(`${target}/`);
 }
 
+function shouldUseInboxBadge(currentPath) {
+  return currentPath === "/admin/clients"
+    || currentPath.startsWith("/admin/clients/")
+    || currentPath.startsWith("/admin/asset-")
+    || currentPath === "/admin/library"
+    || currentPath === "/admin/publishing"
+    || currentPath === "/admin/publisher"
+    || currentPath === "/admin/pinterest-publisher";
+}
+
 export default function AdminMenu() {
   const { user, setAdminExitPath } = useAppState();
   const admin = Boolean(user?.is_admin) || isAdmin();
   const currentPath = normalizeHrefPath(window.location.pathname);
   const isAdminEntry = currentPath === "/admin" || currentPath.startsWith("/admin/");
+  const useInboxBadge = shouldUseInboxBadge(currentPath);
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
+  const [unreadSiteNotes, setUnreadSiteNotes] = useState(0);
   const menuRef = useRef(null);
   const hoverTimerRef = useRef(null);
   const touchHandledRef = useRef(false);
@@ -46,6 +64,65 @@ export default function AdminMenu() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!admin || !isAdminEntry || !useInboxBadge) return undefined;
+    let ignore = false;
+    let timeoutId = null;
+
+    function readCachedInboxCount() {
+      try {
+        const cached = JSON.parse(window.sessionStorage.getItem(INBOX_COUNT_CACHE_KEY) || "null");
+        if (!cached || Date.now() - Number(cached.savedAt || 0) > INBOX_COUNT_CACHE_MS) return null;
+        return Number(cached.count || 0);
+      } catch {
+        return null;
+      }
+    }
+
+    function writeCachedInboxCount(count) {
+      try {
+        window.sessionStorage.setItem(
+          INBOX_COUNT_CACHE_KEY,
+          JSON.stringify({ count: Number(count || 0), savedAt: Date.now() })
+        );
+      } catch {
+        // Ignore storage failures; the badge is non-critical.
+      }
+    }
+
+    async function loadInboxCount() {
+      const controller = new AbortController();
+      const abortId = window.setTimeout(() => controller.abort(), INBOX_COUNT_TIMEOUT_MS);
+      try {
+        const res = await fetch(`${CLIENT_INBOX_COUNT_URL}?_=${Date.now()}`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!ignore && res.ok && data?.ok) {
+          const count = Number(data.unread_site_note_count || 0);
+          setUnreadSiteNotes(count);
+          writeCachedInboxCount(count);
+        }
+      } catch {
+        const cached = readCachedInboxCount();
+        if (!ignore && cached !== null) setUnreadSiteNotes(cached);
+      } finally {
+        window.clearTimeout(abortId);
+      }
+    }
+
+    const cached = readCachedInboxCount();
+    if (cached !== null) setUnreadSiteNotes(cached);
+    timeoutId = window.setTimeout(loadInboxCount, 750);
+    const intervalId = window.setInterval(loadInboxCount, 60000);
+    return () => {
+      ignore = true;
+      if (timeoutId) window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [admin, isAdminEntry, useInboxBadge]);
 
   function scheduleHoverClose() {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -167,7 +244,10 @@ export default function AdminMenu() {
                           setHovered(null);
                         }}
                       >
-                        {item.label}
+                        <span>{item.label}</span>
+                        {useInboxBadge && item.href === "/admin/clients" && unreadSiteNotes > 0 ? (
+                          <span className="admin-menu__badge">{unreadSiteNotes}</span>
+                        ) : null}
                       </a>
                     ))}
                   </div>

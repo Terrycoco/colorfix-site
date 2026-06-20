@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import PermissionStatus from "@components/PermissionStatus";
 import "./admin-asset-creators.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/asset-creators/list.php`;
@@ -17,8 +18,8 @@ const CREATOR_TYPES = [
 ];
 
 const EMPTY_SIDE = {
-  asset_library_id: "",
   photo_library_id: "",
+  asset_library_id: "",
   title: "",
   public_url: "",
 };
@@ -26,6 +27,7 @@ const EMPTY_SIDE = {
 export default function AdminAssetCreatorsPage() {
   const [jobs, setJobs] = useState([]);
   const [jobOutputs, setJobOutputs] = useState({});
+  const [jobPermissions, setJobPermissions] = useState({});
   const [playlists, setPlaylists] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
@@ -72,13 +74,14 @@ export default function AdminAssetCreatorsPage() {
   }
 
   async function loadJobOutputs(items) {
-    const generatedJobs = (items || []).filter((job) => Number(job.output_count || 0) > 0);
-    if (!generatedJobs.length) {
+    const jobsToLoad = items || [];
+    if (!jobsToLoad.length) {
       setJobOutputs({});
+      setJobPermissions({});
       return;
     }
     const details = await Promise.all(
-      generatedJobs.map(async (job) => {
+      jobsToLoad.map(async (job) => {
         try {
           const params = new URLSearchParams({
             id: String(job.asset_creator_job_id),
@@ -86,14 +89,20 @@ export default function AdminAssetCreatorsPage() {
           });
           const res = await fetch(`${DETAIL_URL}?${params.toString()}`, { credentials: "include" });
           const data = await res.json();
-          if (!res.ok || !data?.ok) return [job.asset_creator_job_id, []];
-          return [job.asset_creator_job_id, data.item?.outputs || []];
+          if (!res.ok || !data?.ok) return [job.asset_creator_job_id, [], null];
+          const item = data.item || {};
+          return [
+            job.asset_creator_job_id,
+            item.outputs || [],
+            firstPermissionItem([...(item.outputs || []), ...(item.inputs || [])]),
+          ];
         } catch {
-          return [job.asset_creator_job_id, []];
+          return [job.asset_creator_job_id, [], null];
         }
       })
     );
-    setJobOutputs(Object.fromEntries(details));
+    setJobOutputs(Object.fromEntries(details.map(([jobId, outputs]) => [jobId, outputs])));
+    setJobPermissions(Object.fromEntries(details.map(([jobId, , permission]) => [jobId, permission])));
   }
 
   async function fetchPlaylists() {
@@ -326,7 +335,10 @@ export default function AdminAssetCreatorsPage() {
         playlist_id: playlistId,
         title: source.title || job.title || "",
       };
-      const nextPairs = Array.isArray(instructions.pairs) ? instructions.pairs : [];
+      const nextPairs = withLiveInputPermissions(
+        Array.isArray(instructions.pairs) ? instructions.pairs : [],
+        job.inputs || []
+      );
       const outputs = job.outputs || [];
 
       setEditingJobId(job.asset_creator_job_id || jobId);
@@ -445,7 +457,12 @@ export default function AdminAssetCreatorsPage() {
           <tbody>
             {jobs.map((job) => (
               <tr key={job.asset_creator_job_id}>
-                <td>{job.asset_creator_job_id}</td>
+                <td>
+                  <span className="assetcreator-job-id">
+                    <PermissionStatus {...permissionProps(jobPermissions[job.asset_creator_job_id])} />
+                    <span>{job.asset_creator_job_id}</span>
+                  </span>
+                </td>
                 <td className="assetcreator-job-actions">
                   <button
                     type="button"
@@ -562,6 +579,7 @@ export default function AdminAssetCreatorsPage() {
                           title: output.title || `Asset #${output.asset_library_id}`,
                           side: "Generated",
                           asset_library_id: output.asset_library_id,
+                          ...permissionProps(output),
                         })
                       }
                     >
@@ -636,24 +654,26 @@ export default function AdminAssetCreatorsPage() {
                     <tbody>
                       {pairs.map((pair, index) => (
                         <tr key={pair.pair_key || index}>
-                          <td>
+                          <td className="assetcreator-use-cell">
                             <input
                               type="checkbox"
                               checked={!!pair.include}
                               onChange={(event) => updatePair(index, "include", event.target.checked)}
                             />
                           </td>
-                          <td>{index + 1}</td>
+                          <td className="assetcreator-order-cell">{index + 1}</td>
                           <td>{renderSideEditor(pair, index, "before", updatePairSide, toggleImagePreview)}</td>
                           <td>{renderSideEditor(pair, index, "after", updatePairSide, toggleImagePreview)}</td>
                           <td>
                             <input
+                              className="assetcreator-title-input"
                               value={pair.search_title}
                               onChange={(event) => updatePair(index, "search_title", event.target.value)}
                             />
                           </td>
                           <td>
                             <textarea
+                              className="assetcreator-description-input"
                               value={pair.description}
                               onChange={(event) => updatePair(index, "description", event.target.value)}
                             />
@@ -753,13 +773,23 @@ function renderOutputPreview(outputs = [], openImagePreview = () => {}) {
           title: first.title || `Asset #${first.asset_library_id}`,
           side: "Generated",
           asset_library_id: first.asset_library_id,
+          ...permissionProps(first),
         })
       }
     >
       <img src={url} alt="" />
-      <span>Asset #{first.asset_library_id}</span>
+      <span className="assetcreator-output-preview__label">
+        <span>Asset #{first.asset_library_id}</span>
+      </span>
     </button>
   );
+}
+
+function firstPermissionItem(items = []) {
+  return (items || []).find((item) =>
+    Number(item?.client_id || 0) > 0
+    || String(item?.photo_permission_status || "").trim()
+  ) || null;
 }
 
 function versionedAssetUrl(url, item = {}) {
@@ -811,6 +841,44 @@ function normalizePair(pair) {
   };
 }
 
+function withLiveInputPermissions(pairs, inputs = []) {
+  if (!Array.isArray(inputs) || inputs.length === 0) return pairs;
+  const byPairAndSide = new Map();
+  const byPhotoAndSide = new Map();
+  inputs.forEach((input) => {
+    const metadata = parseInstructions(input.metadata_json);
+    const pairKey = String(metadata.pair_key || "").trim();
+    const side = String(input.role || metadata.side || "").trim();
+    if (pairKey && side) {
+      byPairAndSide.set(`${pairKey}:${side}`, input);
+    }
+    const photoId = Number(metadata.photo_library_id || 0);
+    if (photoId > 0 && side) {
+      byPhotoAndSide.set(`${photoId}:${side}`, input);
+    }
+  });
+
+  return pairs.map((pair) => ({
+    ...pair,
+    before: withLiveSidePermission(pair.before, pair.pair_key, "before", byPairAndSide, byPhotoAndSide),
+    after: withLiveSidePermission(pair.after, pair.pair_key, "after", byPairAndSide, byPhotoAndSide),
+  }));
+}
+
+function withLiveSidePermission(side, pairKey, role, byPairAndSide, byPhotoAndSide) {
+  const value = side || EMPTY_SIDE;
+  const photoId = Number(value.photo_library_id || 0);
+  const input = byPairAndSide.get(`${pairKey}:${role}`) || byPhotoAndSide.get(`${photoId}:${role}`);
+  if (!input) return value;
+  return {
+    ...value,
+    client_id: input.client_id || value.client_id || null,
+    client_name: input.client_name || value.client_name || "",
+    client_email: input.client_email || value.client_email || "",
+    photo_permission_status: input.photo_permission_status || value.photo_permission_status || "",
+  };
+}
+
 function normalizeRecipeSide(side) {
   const value = side || EMPTY_SIDE;
   return {
@@ -818,6 +886,10 @@ function normalizeRecipeSide(side) {
     photo_library_id: nullableNumber(value.photo_library_id),
     title: value.title || "",
     public_url: value.public_url || "",
+    client_id: nullableNumber(value.client_id),
+    client_name: value.client_name || "",
+    client_email: value.client_email || "",
+    photo_permission_status: value.photo_permission_status || "",
   };
 }
 
@@ -838,6 +910,10 @@ function buildRecipeInputs(reviewedPairs) {
           photo_library_id: nullableNumber(value.photo_library_id),
           title: value.title || "",
           public_url: value.public_url || "",
+          client_id: nullableNumber(value.client_id),
+          client_name: value.client_name || "",
+          client_email: value.client_email || "",
+          photo_permission_status: value.photo_permission_status || "",
           search_title: pair.search_title || pair.title || "",
           description: pair.description || pair.caption || "",
           pin_title: pair.search_title || pair.title || "",
@@ -861,42 +937,61 @@ function renderSideEditor(pair, index, side, updatePairSide, openImagePreview) {
   return (
     <div className="assetcreator-side-editor">
       {value.public_url ? (
-        <button
-          type="button"
-          className="assetcreator-thumb-button"
-          onClick={() =>
-            openImagePreview({
-              ...value,
-              side,
-            })
-          }
-        >
-          <img src={value.public_url} alt="" />
-        </button>
+        <div className="assetcreator-thumb-wrap">
+          <PermissionStatus {...permissionProps(value)} className="assetcreator-thumb-permission" />
+          <button
+            type="button"
+            className="assetcreator-thumb-button"
+            onClick={() =>
+              openImagePreview({
+                ...value,
+                side,
+              })
+            }
+          >
+            <img src={value.public_url} alt="" />
+          </button>
+        </div>
       ) : (
-        <div className="assetcreator-thumb-empty">No image</div>
+        <div className="assetcreator-thumb-wrap">
+          <PermissionStatus {...permissionProps(value)} className="assetcreator-thumb-permission" />
+          <div className="assetcreator-thumb-empty">No image</div>
+        </div>
       )}
-      <label>
-        Library ID
-        <input
-          value={value.asset_library_id || ""}
-          onChange={(event) => updatePairSide(index, side, "asset_library_id", event.target.value)}
-        />
-      </label>
       <label>
         Photo ID
         <input
+          className="assetcreator-number-input"
           value={value.photo_library_id || ""}
           onChange={(event) => updatePairSide(index, side, "photo_library_id", event.target.value)}
         />
       </label>
       <label>
+        Asset ID
+        <input
+          className="assetcreator-number-input"
+          value={value.asset_library_id || ""}
+          onChange={(event) => updatePairSide(index, side, "asset_library_id", event.target.value)}
+        />
+      </label>
+      <label>
         URL
         <input
+          className="assetcreator-url-input"
           value={value.public_url || ""}
           onChange={(event) => updatePairSide(index, side, "public_url", event.target.value)}
         />
       </label>
     </div>
   );
+}
+
+function permissionProps(item = {}) {
+  return {
+    status: item.photo_permission_status,
+    photoLibraryId: item.permission_photo_library_id || item.photo_library_id,
+    clientId: item.client_id,
+    clientName: item.client_name,
+    clientEmail: item.client_email,
+  };
 }

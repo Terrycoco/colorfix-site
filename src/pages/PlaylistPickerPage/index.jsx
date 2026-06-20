@@ -20,6 +20,7 @@ export default function PlaylistPickerPage() {
   const includePrivateParam = searchParams.get("include_private") ?? "";
   const closeParam = searchParams.get("close") ?? "";
   const setVersionParam = searchParams.get("set_v") ?? searchParams.get("v") ?? "";
+  const sourceParam = searchParams.get("src") ?? "";
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -79,6 +80,7 @@ export default function PlaylistPickerPage() {
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
     if (setVersionParam !== "") params.set("set_v", setVersionParam);
+    if (sourceParam !== "") params.set("src", sourceParam);
     if (closeParam === "1") params.set("close", "1");
     if (setId) params.set("psi", String(setId));
     const returnTo = buildReturnTo(location, searchParams);
@@ -95,6 +97,7 @@ export default function PlaylistPickerPage() {
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
+    if (sourceParam !== "") params.set("src", sourceParam);
     if (tile?.target_set_version) params.set("set_v", tile.target_set_version);
     const returnTo = buildReturnTo(location, searchParams);
     if (returnTo) params.set("return_to", returnTo);

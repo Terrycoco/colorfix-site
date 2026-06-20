@@ -13,6 +13,7 @@ const DELETE_URL = `${API_FOLDER}/v2/admin/clients/delete.php`;
 const DELETE_ACTIVITY_URL = `${API_FOLDER}/v2/admin/clients/delete-activity.php`;
 const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/clients/send-email.php`;
 const ACTIVITY_URL = `${API_FOLDER}/v2/admin/clients/activity.php`;
+const MARK_ACTIVITY_READ_URL = `${API_FOLDER}/v2/admin/clients/mark-activity-read.php`;
 const PHOTO_LIBRARY_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
 const CLIENT_TYPES_URL = `${API_FOLDER}/v2/admin/client-types/list.php`;
@@ -287,6 +288,26 @@ function activityRowId(item) {
   return Number(item?.id || item?.client_activity_id || 0);
 }
 
+function isUnreadSiteNote(item) {
+  return item?.activity_type === "site_note_received" && item?.needs_attention !== false && !item?.admin_read_at;
+}
+
+function isSiteNoteActivity(item) {
+  return item?.activity_type === "site_note_received" || item?.email?.direction === "inbound";
+}
+
+function siteNoteMessage(item) {
+  const text = String(item?.email?.text_body || item?.details || "").trim();
+  if (!text) return "";
+
+  const match = text.match(/(?:^|\n)Message:\s*\n?([\s\S]*)$/i);
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+
+  return text;
+}
+
 function clientPhotoHref(photoLibraryId) {
   const id = Number(photoLibraryId || 0);
   return id > 0 ? `/admin/photo-library?photo_library_ids=${id}` : "/admin/photo-library";
@@ -362,6 +383,10 @@ export default function AdminClientsPage() {
   );
 
   const selectedUsage = useMemo(() => usageSummary(form), [form]);
+  const selectedUnreadSiteNoteCount = useMemo(
+    () => activityItems.filter(isUnreadSiteNote).length,
+    [activityItems]
+  );
   const clientTypeLabelMap = useMemo(
     () => new Map(clientTypes.map((item) => [item.key, item.label])),
     [clientTypes]
@@ -919,6 +944,53 @@ export default function AdminClientsPage() {
     }
   }
 
+  async function handleOpenActivity(item) {
+    setActivityDetail(item);
+    if (!isUnreadSiteNote(item)) return;
+
+    const activityId = activityRowId(item);
+    const clientId = Number(item?.client_id || form.id || 0);
+    if (!activityId) return;
+
+    const readAt = new Date().toISOString();
+    const markLocalRead = () => {
+      setActivityItems((prev) => prev.map((activity) => (
+        activityRowId(activity) === activityId
+          ? { ...activity, needs_attention: false, admin_read_at: readAt }
+          : activity
+      )));
+      setItems((prev) => prev.map((client) => {
+        if (String(client.id) !== String(clientId)) return client;
+        return {
+          ...client,
+          unread_site_note_count: Math.max(0, Number(client.unread_site_note_count || 0) - 1),
+        };
+      }));
+      setActivityDetail((prev) => (
+        prev && activityRowId(prev) === activityId
+          ? { ...prev, needs_attention: false, admin_read_at: readAt }
+          : prev
+      ));
+    };
+
+    try {
+      const res = await fetch(MARK_ACTIVITY_READ_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activity_id: activityId,
+          client_id: clientId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to mark note read");
+      markLocalRead();
+    } catch (err) {
+      setError(err?.message || "Failed to mark note read");
+    }
+  }
+
   function handleLinkInsert(payload) {
     const line = payload.text?.trim() ? `${payload.text.trim()}: ${payload.url}` : payload.url;
     const insertion = line ? `${line}\n` : "";
@@ -1079,6 +1151,9 @@ export default function AdminClientsPage() {
             >
               <div className="admin-clients__card-row">
                 <div className="admin-clients__card-title">{displayClientListName(client) || "Unnamed client"}</div>
+                {Number(client.unread_site_note_count || 0) > 0 ? (
+                  <span className="admin-clients__note-badge">{client.unread_site_note_count}</span>
+                ) : null}
               </div>
               <div className="admin-clients__card-email">{client.email || "No email"}</div>
               <div className="admin-clients__card-meta">{client.phone || "No phone"}</div>
@@ -1118,7 +1193,7 @@ export default function AdminClientsPage() {
               { key: "details", label: "Details" },
               { key: "email", label: "Email" },
               { key: "text", label: "Text" },
-              { key: "activity", label: "Activity" },
+              { key: "activity", label: "Activity", count: selectedUnreadSiteNoteCount },
               { key: "photos", label: "Photos" },
             ].map((tab) => (
               <button
@@ -1130,6 +1205,9 @@ export default function AdminClientsPage() {
                 onClick={() => setActiveTab(tab.key)}
               >
                 {tab.label}
+                {Number(tab.count || 0) > 0 ? (
+                  <span className="admin-clients__tab-badge">{tab.count}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -1521,7 +1599,7 @@ export default function AdminClientsPage() {
                         <th>When</th>
                         <th>Type</th>
                         <th>Summary</th>
-                        <th>To</th>
+                        <th>To / From</th>
                         <th>Subject</th>
                         <th>View</th>
                         <th>Delete</th>
@@ -1529,17 +1607,17 @@ export default function AdminClientsPage() {
                     </thead>
                     <tbody>
                       {activityItems.map((item) => (
-                        <tr key={item.id}>
+                        <tr key={item.id} className={isUnreadSiteNote(item) ? "is-unread" : ""}>
                           <td>{formatDateTime(item.occurred_at)}</td>
                           <td>{item.activity_type}</td>
                           <td>{item.summary || "—"}</td>
-                          <td>{item.email?.to_email || "—"}</td>
+                          <td>{item.email?.direction === "inbound" ? item.email?.from_email || "—" : item.email?.to_email || "—"}</td>
                           <td>{item.email?.subject || "—"}</td>
                           <td>
                             <button
                               type="button"
                               className="admin-clients__table-btn"
-                              onClick={() => setActivityDetail(item)}
+                              onClick={() => { void handleOpenActivity(item); }}
                             >
                               Open
                             </button>
@@ -1653,33 +1731,52 @@ export default function AdminClientsPage() {
       >
         {activityDetail ? (
           <div className="admin-clients__activity-detail">
-            <div className="admin-clients__activity-detail-grid">
-              <div><strong>Type:</strong> {activityDetail.activity_type}</div>
-              <div><strong>When:</strong> {formatDateTime(activityDetail.occurred_at)}</div>
-              <div><strong>To:</strong> {activityDetail.email?.to_email || "—"}</div>
-              <div><strong>Subject:</strong> {activityDetail.email?.subject || "—"}</div>
-              {activityDetail.email?.cc_emails ? <div><strong>Cc:</strong> {activityDetail.email.cc_emails}</div> : null}
-              {activityDetail.email?.bcc_emails ? <div><strong>Bcc:</strong> {activityDetail.email.bcc_emails}</div> : null}
-            </div>
-            {activityDetail.email?.html_body ? (
+            {isSiteNoteActivity(activityDetail) ? (
+              <>
+                <div className="admin-clients__activity-detail-grid admin-clients__activity-detail-grid--note">
+                  <div><strong>Sent:</strong> {formatDateTime(activityDetail.occurred_at) || "—"}</div>
+                </div>
+                <div className="admin-clients__activity-detail-section">
+                  <div className="admin-clients__activity-detail-label">Message</div>
+                  <div className="admin-clients__activity-detail-body">
+                    <pre>{siteNoteMessage(activityDetail) || "No message text."}</pre>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="admin-clients__activity-detail-grid">
+                  <div><strong>Type:</strong> {activityDetail.activity_type}</div>
+                  <div><strong>When:</strong> {formatDateTime(activityDetail.occurred_at)}</div>
+                  {activityDetail.email?.from_email ? <div><strong>From:</strong> {activityDetail.email.from_email}</div> : null}
+                  <div><strong>To:</strong> {activityDetail.email?.to_email || "—"}</div>
+                  <div><strong>Subject:</strong> {activityDetail.email?.subject || "—"}</div>
+                  {activityDetail.email?.cc_emails ? <div><strong>Cc:</strong> {activityDetail.email.cc_emails}</div> : null}
+                  {activityDetail.email?.bcc_emails ? <div><strong>Bcc:</strong> {activityDetail.email.bcc_emails}</div> : null}
+                </div>
+                {activityDetail.email?.html_body ? (
               <div className="admin-clients__activity-detail-section">
-                <div className="admin-clients__activity-detail-label">Exact sent email</div>
+                <div className="admin-clients__activity-detail-label">
+                  Exact sent email
+                </div>
                 <div
                   className="admin-clients__activity-detail-body"
                   dangerouslySetInnerHTML={{ __html: activityDetail.email.html_body }}
                 />
               </div>
-            ) : null}
-            {activityDetail.email?.text_body ? (
+                ) : null}
+                {activityDetail.email?.text_body ? (
               <div className="admin-clients__activity-detail-section">
                 <div className="admin-clients__activity-detail-label">Plain text record</div>
                 <div className="admin-clients__activity-detail-body">
                   <pre>{activityDetail.email.text_body}</pre>
                 </div>
               </div>
-            ) : activityDetail.details ? (
-              <div className="admin-clients__activity-detail-body">{activityDetail.details}</div>
-            ) : null}
+                ) : activityDetail.details ? (
+                  <div className="admin-clients__activity-detail-body">{activityDetail.details}</div>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
       </ModalDialog>

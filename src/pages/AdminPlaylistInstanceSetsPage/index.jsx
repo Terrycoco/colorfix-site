@@ -39,6 +39,7 @@ function buildSetPlayUrl(setId) {
   const params = new URLSearchParams({
     psi: String(id),
     include_private: "1",
+    src: "admin",
     close: "1",
     return_to: "/admin/playlist-sets",
   });
@@ -46,6 +47,7 @@ function buildSetPlayUrl(setId) {
 }
 
 export default function AdminPlaylistInstanceSetsPage() {
+  const [query, setQuery] = useState("");
   const [sets, setSets] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [instances, setInstances] = useState([]);
@@ -460,6 +462,22 @@ export default function AdminPlaylistInstanceSetsPage() {
       });
     });
   }, [sets]);
+
+  const filteredSets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return safeSets;
+    return safeSets.filter((set) => {
+      const haystack = [
+        set.id,
+        set.handle,
+        set.title,
+        set.subtitle,
+        set.context,
+      ].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [safeSets, query]);
+
   const safeSetItems = Array.isArray(setItems) ? setItems : [];
 
   const instanceOptions = useMemo(() => {
@@ -505,6 +523,9 @@ export default function AdminPlaylistInstanceSetsPage() {
   }, [activeSetId, safeSets]);
 
   const activeSetLabel = activeSetSummary?.title || activeSetSummary?.handle || setForm.title || setForm.handle || "Untitled set";
+  const activeSetMeta = activeSetSummary
+    ? `#${activeSetSummary.id}${activeSetSummary.handle ? ` / ${activeSetSummary.handle}` : ""}`
+    : "";
   const playUrl = buildSetPlayUrl(activeSetId || setForm.id);
 
   function handlePlaySet() {
@@ -518,44 +539,68 @@ export default function AdminPlaylistInstanceSetsPage() {
         <div className="panel-header">
           <div className="panel-title">Playlist Instance Sets</div>
           <div className="panel-actions">
-            <button
-              type="button"
-              className="primary-btn primary-btn--play"
-              onClick={handlePlaySet}
-              disabled={!playUrl}
-            >
-              Play
-            </button>
             <button type="button" className="primary-btn" onClick={handleNewSet}>
               New Set
             </button>
           </div>
         </div>
-        <div className="pi-play-summary">
-          {activeSetId ? (
-            <>
-              <div className="pi-play-summary__label">Selected</div>
-              <div className="pi-play-summary__title">{activeSetLabel}</div>
-            </>
-          ) : (
-            <div className="pi-play-summary__empty">Select a set to play it.</div>
-          )}
+
+        <div className="panel-controls">
+          <input
+            type="text"
+            placeholder="Search by id, handle, or title"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
-        <div className="panel-list">
-          {safeSets.map((set) => (
-            <button
-              key={set.id}
-              type="button"
-              className={`list-row${Number(activeSetId) === Number(set.id) ? " active" : ""}`}
-              onClick={() => {
-                setActiveSetId(set.id);
-                setMobileEditorOpen(false);
-              }}
-            >
-              <div className="row-title">{set.handle} (#{set.id})</div>
-            </button>
-          ))}
-          {!safeSets.length && <div className="panel-empty">No sets yet.</div>}
+
+        {loading && <div className="panel-status">Loading…</div>}
+        {error && <div className="panel-status error">{error}</div>}
+
+        <div className="set-picker">
+          <label htmlFor="playlist-set-select">Choose Playlist Set</label>
+          <select
+            id="playlist-set-select"
+            value={activeSetId || ""}
+            onChange={(e) => {
+              setActiveSetId(e.target.value ? Number(e.target.value) : null);
+              setMobileEditorOpen(false);
+            }}
+          >
+            <option value="">Pick a set...</option>
+            {filteredSets.map((set) => (
+              <option key={set.id} value={set.id}>
+                {getSetOptionLabel(set)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="set-action-strip">
+          <button
+            type="button"
+            className="primary-btn primary-btn--play"
+            onClick={handlePlaySet}
+            disabled={!playUrl}
+          >
+            Play
+          </button>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => setMobileEditorOpen((prev) => !prev)}
+            disabled={!activeSetId && !setForm.id}
+          >
+            {mobileEditorOpen ? "Hide Editor" : "Show Editor"}
+          </button>
+          {activeSetId ? (
+            <div className="set-action-strip__meta">
+              {activeSetMeta}
+              {activeSetLabel ? ` · ${activeSetLabel}` : ""}
+            </div>
+          ) : (
+            <div className="set-action-strip__meta">Choose a set to edit or play it.</div>
+          )}
         </div>
       </div>
       <PhotoPickerModal
@@ -932,6 +977,12 @@ export default function AdminPlaylistInstanceSetsPage() {
         </div>
 
 </div>
+        <div className="pi-bottom-actions">
+          <button type="button" className="primary-btn" onClick={handleSaveAll} disabled={loading}>
+            {loading ? "Saving..." : "Save All"}
+          </button>
+        </div>
+
         {(status || error) && (
           <div className={`panel-status ${error ? "error" : "success"}`}>
             {error || status}
@@ -940,4 +991,11 @@ export default function AdminPlaylistInstanceSetsPage() {
       </div>
     </div>
   );
+}
+
+function getSetOptionLabel(set) {
+  if (!set) return "";
+  const title = set.title || set.handle || "Untitled set";
+  const handle = set.handle ? ` / ${set.handle}` : "";
+  return `${title} (#${set.id})${handle}`;
 }

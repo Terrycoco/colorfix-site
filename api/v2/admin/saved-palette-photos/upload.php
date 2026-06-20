@@ -10,6 +10,8 @@ require_once __DIR__ . '/../auth.php';
 
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPhotoLibraryRepository;
+use App\Repos\PdoAssetLibraryRepository;
+use App\Services\AssetLibraryService;
 use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;
 
@@ -33,6 +35,7 @@ try {
     $photoType = isset($_POST['photo_type']) ? trim((string)$_POST['photo_type']) : 'full';
     $tags = trim((string)($_POST['tags'] ?? ''));
     $altText = trim((string)($_POST['alt_text'] ?? ''));
+    $permissionStatus = trim((string)($_POST['photo_permission_status'] ?? ''));
     if ($paletteId <= 0) {
         respond(400, ['ok' => false, 'error' => 'palette_id required']);
     }
@@ -50,6 +53,7 @@ try {
     $repo = new PdoSavedPaletteRepository($pdo);
     $photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
     $photoLibrary = new PhotoLibraryService($photoLibraryRepo);
+    $assetLibrary = new AssetLibraryService(new PdoAssetLibraryRepository($pdo), '');
     $altTextQueue = PhotoAltTextQueueService::fromPdo($pdo);
     if (!$repo->getSavedPaletteById($paletteId)) {
         respond(404, ['ok' => false, 'error' => 'Saved palette not found']);
@@ -156,16 +160,52 @@ try {
             if ($altText !== '') {
                 $libraryUpdate['alt_text'] = $altText;
             }
+            if ($permissionStatus !== '') {
+                $libraryUpdate['photo_permission_status'] = $permissionStatus;
+            }
             $photoLibraryRepo->update($existingLibraryId, $libraryUpdate);
             $canonicalId = $existingLibraryId;
         } else {
             $canonicalId = $photoLibrary->syncSavedPalettePhoto($photoRow, [
                 'tags' => $tags !== '' ? $tags : null,
                 'alt_text' => $altText !== '' ? $altText : null,
+                'photo_permission_status' => $permissionStatus,
             ]);
         }
 
         if ($canonicalId > 0) {
+            if ($permissionStatus !== '') {
+                $photoLibraryRepo->update($canonicalId, ['photo_permission_status' => $permissionStatus]);
+            }
+            $libraryRow = $photoLibraryRepo->findById($canonicalId) ?: [];
+            $asset = $assetLibrary->upsertAssetForPhoto($canonicalId, $relPath, [
+                'asset_kind' => 'image',
+                'mime_type' => $info['mime'] ?? null,
+                'title' => $libraryRow['title'] ?? ($photoRow['caption'] ?? null),
+                'tags' => $tags !== '' ? $tags : ($libraryRow['tags'] ?? null),
+                'alt_text' => $altText !== '' ? $altText : ($libraryRow['alt_text'] ?? null),
+                'note' => 'Uploaded via Photo Library saved palette flow',
+                'source_type' => 'photo_library',
+                'source_id' => $canonicalId,
+                'client_id' => $libraryRow['client_id'] ?? null,
+                'width' => isset($info[0]) ? (int)$info[0] : null,
+                'height' => isset($info[1]) ? (int)$info[1] : null,
+                'file_size_bytes' => is_file($absPath) ? filesize($absPath) : null,
+                'checksum' => is_file($absPath) ? hash_file('sha256', $absPath) : null,
+                'metadata_json' => [
+                    'photo_library_id' => $canonicalId,
+                    'saved_palette_photo_id' => $photoId,
+                    'saved_palette_id' => $paletteId,
+                    'saved_palette_set_id' => $setId > 0 ? $setId : null,
+                    'photo_type' => $photoType,
+                ],
+                'is_inactive' => 0,
+                'is_retired' => 0,
+            ]);
+            if (!empty($asset['asset_library_id'])) {
+                $photoLibraryRepo->update($canonicalId, ['asset_library_id' => (int)$asset['asset_library_id']]);
+                $photoRow['asset_library_id'] = (int)$asset['asset_library_id'];
+            }
             if ($altText === '') {
                 $altTextQueue->enqueue($canonicalId, $replaceRow !== null);
             }

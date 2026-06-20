@@ -136,6 +136,21 @@
   gap: 6px;
 }
 
+.admin-photo-library__permission-select {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: #1b2433;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-photo-library__permission-select select {
+  max-width: 150px;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
 .admin-photo-library__file input {
   padding: 8px;
 }

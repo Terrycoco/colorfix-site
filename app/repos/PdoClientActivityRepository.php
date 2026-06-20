@@ -22,7 +22,8 @@ final class PdoClientActivityRepository
                 details,
                 related_client_email_id,
                 metadata_json,
-                occurred_at
+                occurred_at,
+                admin_read_at
             ) VALUES (
                 :client_id,
                 :activity_type,
@@ -30,7 +31,8 @@ final class PdoClientActivityRepository
                 :details,
                 :related_client_email_id,
                 :metadata_json,
-                :occurred_at
+                :occurred_at,
+                :admin_read_at
             )
         SQL;
 
@@ -43,9 +45,41 @@ final class PdoClientActivityRepository
             'related_client_email_id' => $payload['related_client_email_id'] ?? null,
             'metadata_json' => $payload['metadata_json'] ?? null,
             'occurred_at' => $payload['occurred_at'] ?? AppTime::now(),
+            'admin_read_at' => $payload['admin_read_at'] ?? null,
         ]);
 
         return (int)$this->pdo->lastInsertId();
+    }
+
+    public function countUnreadSiteNotes(): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*)
+             FROM client_activity
+             WHERE activity_type = 'site_note_received'
+               AND admin_read_at IS NULL"
+        );
+        $stmt->execute();
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
+    public function markRead(int $activityId, ?int $clientId = null): bool
+    {
+        $sql = "UPDATE client_activity
+                SET admin_read_at = COALESCE(admin_read_at, :admin_read_at)
+                WHERE client_activity_id = :activity_id";
+        $params = [
+            'admin_read_at' => AppTime::now(),
+            'activity_id' => $activityId,
+        ];
+        if ($clientId !== null && $clientId > 0) {
+            $sql .= ' AND client_id = :client_id';
+            $params['client_id'] = $clientId;
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount() > 0;
     }
 
     public function listByClient(int $clientId, int $limit = 200): array
@@ -57,6 +91,7 @@ final class PdoClientActivityRepository
                 ce.direction AS email_direction,
                 ce.status AS email_status,
                 ce.subject AS email_subject,
+                ce.from_email AS email_from_email,
                 ce.to_email AS email_to_email,
                 ce.cc_emails AS email_cc_emails,
                 ce.bcc_emails AS email_bcc_emails,

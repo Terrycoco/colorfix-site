@@ -1,0 +1,36 @@
+.privacy-page {
+  min-height: calc(100vh - 96px);
+  padding: 44px 20px 64px;
+  color: #151515;
+}
+
+.privacy-policy {
+  max-width: 820px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.privacy-policy h1 {
+  margin: 0 0 24px;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.05;
+}
+
+.privacy-policy h2 {
+  margin: 0 0 20px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.privacy-policy h3 {
+  margin: 28px 0 8px;
+  font-size: 16px;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.privacy-policy p {
+  margin: 0;
+  font-size: 17px;
+}

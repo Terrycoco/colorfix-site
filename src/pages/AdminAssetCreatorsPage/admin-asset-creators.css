@@ -181,6 +181,7 @@
 }
 
 .assetcreator-output-card {
+  position: relative;
   width: 138px;
   border: 1px solid #999;
   background: #fff;
@@ -308,6 +309,13 @@
   color: #333;
 }
 
+.assetcreator-job-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+}
+
 .assetcreator-output-preview {
   display: grid;
   grid-template-columns: 48px auto;
@@ -321,6 +329,18 @@
   background: transparent;
   padding: 0;
   cursor: zoom-in;
+}
+
+.assetcreator-thumb-permission {
+  position: absolute;
+  z-index: 2;
+}
+
+.assetcreator-output-preview__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .assetcreator-output-preview img {
@@ -337,34 +357,94 @@
 }
 
 .assetcreator-pairs-grid {
-  min-width: 1380px;
+  min-width: 1320px;
 }
 
 .assetcreator-pairs-grid td {
   white-space: normal;
 }
 
-.assetcreator-pairs-grid input[type="checkbox"] {
-  width: auto;
+.assetcreator-pairs-grid > thead > tr > th:nth-child(1),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(1) {
+  width: 42px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
+.assetcreator-pairs-grid > thead > tr > th:nth-child(2),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(2) {
+  width: 48px;
+  text-align: center;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.assetcreator-pairs-grid > thead > tr > th:nth-child(3),
 .assetcreator-pairs-grid > tbody > tr > td:nth-child(3),
+.assetcreator-pairs-grid > thead > tr > th:nth-child(4),
 .assetcreator-pairs-grid > tbody > tr > td:nth-child(4) {
-  min-width: 260px;
+  width: 220px;
+}
+
+.assetcreator-pairs-grid > thead > tr > th:nth-child(5),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(5) {
+  width: 250px;
+}
+
+.assetcreator-pairs-grid > thead > tr > th:nth-child(6),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(6) {
+  width: 330px;
+}
+
+.assetcreator-pairs-grid > thead > tr > th:nth-child(7),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(7) {
+  width: 135px;
+}
+
+.assetcreator-pairs-grid > thead > tr > th:nth-child(8),
+.assetcreator-pairs-grid > tbody > tr > td:nth-child(8) {
+  width: 110px;
+}
+
+.assetcreator-pairs-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.assetcreator-use-cell,
+.assetcreator-order-cell {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .assetcreator-side-editor {
   display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: 6px 8px;
+  grid-template-columns: 72px 1fr;
+  gap: 5px 7px;
   align-items: start;
+}
+
+.assetcreator-thumb-wrap,
+.assetcreator-thumb-button,
+.assetcreator-thumb-empty {
+  grid-row: span 3;
+  width: 72px;
+  height: 72px;
+}
+
+.assetcreator-thumb-wrap {
+  position: relative;
+}
+
+.assetcreator-thumb-permission {
+  top: 4px;
+  right: 4px;
 }
 
 .assetcreator-thumb-button,
 .assetcreator-thumb-empty {
-  grid-row: span 3;
-  width: 80px;
-  height: 80px;
   border: 1px solid #bbb;
   background: #eee;
 }
@@ -397,7 +477,37 @@
 
 .assetcreator-side-editor input {
   width: 100%;
-  min-width: 130px;
+  min-width: 0;
+}
+
+.assetcreator-side-editor label {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.assetcreator-pairs-grid .assetcreator-number-input {
+  width: 70px;
+  padding: 4px 5px;
+}
+
+.assetcreator-pairs-grid .assetcreator-url-input {
+  width: 100%;
+  max-width: 120px;
+  padding: 4px 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assetcreator-pairs-grid .assetcreator-title-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.assetcreator-pairs-grid .assetcreator-description-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 132px;
 }
 
 .assetcreator-source,

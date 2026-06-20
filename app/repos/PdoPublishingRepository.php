@@ -29,8 +29,12 @@ final class PdoPublishingRepository
 
         $q = trim((string)($filters['q'] ?? ''));
         if ($q !== '') {
-            $where[] = '(pj.title LIKE :q OR CAST(pj.source_id AS CHAR) LIKE :q OR p.title LIKE :q OR pi.instance_name LIKE :q)';
-            $params['q'] = '%' . $q . '%';
+            $where[] = '(pj.title LIKE :q_job OR CAST(pj.source_id AS CHAR) LIKE :q_source OR p.title LIKE :q_playlist OR pi.instance_name LIKE :q_instance)';
+            $like = '%' . $q . '%';
+            $params['q_job'] = $like;
+            $params['q_source'] = $like;
+            $params['q_playlist'] = $like;
+            $params['q_instance'] = $like;
         }
 
         $sql = <<<SQL
@@ -56,10 +60,16 @@ final class PdoPublishingRepository
                   COALESCE(po.title, ''),
                   COALESCE(po.tracking_code, ''),
                   COALESCE(po.tracking_url, ''),
+                  COALESCE(po.destination_url, ''),
                   COALESCE(po.external_url, ''),
                   COALESCE(po.published_at, ''),
                   COALESCE(po.created_at, ''),
-                  COALESCE(po.library_asset_id, '')
+                  COALESCE(po.library_asset_id, ''),
+                  COALESCE(NULLIF(pl_after.photo_permission_status, ''), NULLIF(pl_before.photo_permission_status, ''), NULLIF(pl.photo_permission_status, ''), c.photo_permission_status, 'unknown'),
+                  COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id, ''),
+                  COALESCE(c.id, ''),
+                  COALESCE(c.name, ''),
+                  COALESCE(c.email, '')
                 )
                 ORDER BY po.publish_output_id
                 SEPARATOR '\n'
@@ -71,6 +81,16 @@ final class PdoPublishingRepository
               ON pi.playlist_instance_id = pj.playlist_instance_id
             LEFT JOIN publish_outputs po
               ON po.publish_job_id = pj.publish_job_id
+            LEFT JOIN asset_library al
+              ON al.asset_library_id = po.library_asset_id
+            LEFT JOIN photo_library pl
+              ON pl.photo_library_id = al.legacy_photo_library_id
+            LEFT JOIN photo_library pl_before
+              ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
+            LEFT JOIN photo_library pl_after
+              ON pl_after.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.after.photo_library_id")) AS UNSIGNED)
+            LEFT JOIN clients c
+              ON c.id = COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id)
             SQL;
 
         if ($where) {
@@ -219,6 +239,24 @@ final class PdoPublishingRepository
         return $row ?: null;
     }
 
+    public function getLandingPageForPublishing(int $landingPageId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id, slug, title, status, page_type, primary_playlist_instance_id
+               FROM landing_pages
+              WHERE id = :id
+              LIMIT 1'
+        );
+        $stmt->execute([':id' => $landingPageId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $row['id'] = (int)$row['id'];
+        $row['primary_playlist_instance_id'] = $row['primary_playlist_instance_id'] !== null
+            ? (int)$row['primary_playlist_instance_id']
+            : null;
+        return $row;
+    }
+
     private function hydrateJobRow(array $row): array
     {
         $outputs = [];
@@ -235,10 +273,16 @@ final class PdoPublishingRepository
                     'title' => $parts[4],
                     'tracking_code' => $parts[5],
                     'tracking_url' => $parts[6],
-                    'external_url' => $parts[7],
-                    'published_at' => $parts[8],
-                    'created_at' => $parts[9] ?? '',
-                    'library_asset_id' => isset($parts[10]) && $parts[10] !== '' ? (int)$parts[10] : null,
+                    'destination_url' => $parts[7],
+                    'external_url' => $parts[8],
+                    'published_at' => $parts[9],
+                    'created_at' => $parts[10] ?? '',
+                    'library_asset_id' => isset($parts[11]) && $parts[11] !== '' ? (int)$parts[11] : null,
+                    'photo_permission_status' => $parts[12] ?? '',
+                    'permission_photo_library_id' => isset($parts[13]) && $parts[13] !== '' ? (int)$parts[13] : null,
+                    'client_id' => isset($parts[14]) && $parts[14] !== '' ? (int)$parts[14] : null,
+                    'client_name' => $parts[15] ?? '',
+                    'client_email' => $parts[16] ?? '',
                 ];
             }
         }

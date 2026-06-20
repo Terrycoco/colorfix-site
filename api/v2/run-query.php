@@ -215,7 +215,11 @@ try {
                 ON pl.photo_library_id = p.photo_library_id
              WHERE m.color_id IN ($placeholders)
                AND (
-                 (p.photo_library_id IS NOT NULL AND COALESCE(pl.show_in_gallery, 0) = 1 AND COALESCE(pl.has_palette, 0) = 1)
+                 (p.photo_library_id IS NOT NULL
+                  AND COALESCE(pl.show_in_gallery, 0) = 1
+                  AND COALESCE(pl.has_palette, 0) = 1
+                  AND COALESCE(pl.is_inactive, 0) = 0
+                  AND COALESCE(pl.is_retired, 0) = 0)
                  OR (p.photo_library_id IS NULL AND p.show_in_gallery = 1)
                )
                AND p.trigger_mode <> 'none'
@@ -243,6 +247,8 @@ try {
              WHERE m.color_id IN ($placeholders)
                AND pl.show_in_gallery = 1
                AND pl.has_palette = 1
+               AND COALESCE(pl.is_inactive, 0) = 0
+               AND COALESCE(pl.is_retired, 0) = 0
                AND NOT EXISTS (
                  SELECT 1
                    FROM saved_palette_sets modern_set

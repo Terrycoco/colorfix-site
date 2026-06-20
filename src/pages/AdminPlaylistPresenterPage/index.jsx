@@ -188,6 +188,7 @@ export default function AdminPlaylistPresenterPage() {
       playerRef,
       setPlaybackEnded,
       firstNonIntroIndex,
+      shareSource: "",
     })
   ), [data, firstNonIntroIndex]);
 
@@ -201,11 +202,19 @@ export default function AdminPlaylistPresenterPage() {
     setActiveItem(item);
   }
 
+  function buildAdminPlayerUrl(playlistInstanceId) {
+    const params = new URLSearchParams({
+      mode: PRESENTER_MODE,
+      src: "admin",
+    });
+    return `${PLAYER_ROUTE_BASE}/${playlistInstanceId}?${params.toString()}`;
+  }
+
   function handleFullscreen() {
     if (!stageRef.current?.requestFullscreen) {
       if (activeItem?.playlist_instance_id) {
         window.open(
-          `${PLAYER_ROUTE_BASE}/${activeItem.playlist_instance_id}?mode=${encodeURIComponent(PRESENTER_MODE)}`,
+          buildAdminPlayerUrl(activeItem.playlist_instance_id),
           "_blank",
           "noopener"
         );
@@ -329,7 +338,7 @@ export default function AdminPlaylistPresenterPage() {
                 className="btn ghost"
                 type="button"
                 onClick={() => window.open(
-                  `${PLAYER_ROUTE_BASE}/${activeItem.playlist_instance_id}?mode=${encodeURIComponent(PRESENTER_MODE)}`,
+                  buildAdminPlayerUrl(activeItem.playlist_instance_id),
                   "_blank",
                   "noopener"
                 )}

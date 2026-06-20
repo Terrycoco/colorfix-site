@@ -379,6 +379,7 @@ export default function AdminPlaylistInstancesPage() {
     const params = new URLSearchParams();
     if (audience && audience !== "any") params.set("aud", audience);
     if (demoEnabled) params.set("demo", "1");
+    params.set("src", "admin");
     params.set("close", "1");
     params.set("return_to", "/admin/playlist-instances");
     const qs = params.toString();
@@ -395,6 +396,7 @@ export default function AdminPlaylistInstancesPage() {
     const params = new URLSearchParams();
     if (audience && audience !== "any") params.set("aud", audience);
     if (demoEnabled) params.set("demo", "1");
+    params.set("src", "admin");
     params.set("close", "1");
     params.set("return_to", "/admin/playlist-instances");
     const qs = params.toString();
@@ -421,6 +423,7 @@ export default function AdminPlaylistInstancesPage() {
     const params = new URLSearchParams();
     if (audience && audience !== "any") params.set("aud", audience);
     if (demoEnabled) params.set("demo", "1");
+    params.set("src", "admin");
     const qs = params.toString();
     navigate(`/admin/player-preview/${id}${qs ? `?${qs}` : ""}`);
   }
@@ -687,7 +690,7 @@ export default function AdminPlaylistInstancesPage() {
     if (!item) return "";
     const name = item.instance_name || item.display_title || item.slug || "Untitled";
     const audience = audienceLabelMap[item.audience] || item.audience || "Any";
-    return `#${item.playlist_instance_id} ${name} - ${audience}`;
+    return `${name} - #${item.playlist_instance_id} - ${audience}`;
   }
 
   const duplicateNotice =
@@ -892,15 +895,15 @@ export default function AdminPlaylistInstancesPage() {
         </div>
       </div>
 
-      <div className="playlist-panel editor-panel">
-        <div className="panel-header">
+      <div className="playlist-panel editor-panel instance-editor-panel">
+        <div className="instance-editor-header">
           <div className="panel-title-wrap">
             <div className="panel-title">
               {form.playlist_instance_id ? `Instance #${form.playlist_instance_id}` : "New Instance"}
             </div>
             {duplicateNotice ? <div className="panel-subtitle">{duplicateNotice}</div> : null}
           </div>
-          <div className="panel-actions">
+          <div className="instance-editor-actions">
             <button
               type="button"
               className="primary-btn"

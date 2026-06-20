@@ -76,8 +76,9 @@ try {
   }
 
   $repo = new PdoSwatchRepository($pdo);
-  // Keep existing behavior/limit; adjust if you add ?limit= later
-  $out = $repo->fuzzySearchByNameCode($q, 2000);
+  $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 80;
+  $limit = max(1, min(100, $limit));
+  $out = $repo->fuzzySearchByNameCode($q, $limit);
 
   // Normalize shape
   $results = [];

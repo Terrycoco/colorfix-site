@@ -29,6 +29,7 @@ try {
             'last_name' => isset($row['last_name']) ? (string)$row['last_name'] : '',
             'email' => (string)($row['email'] ?? ''),
             'phone' => isset($row['phone']) ? (string)$row['phone'] : '',
+            'unread_site_note_count' => (int)($row['unread_site_note_count'] ?? 0),
         ];
     }, $rows);
 

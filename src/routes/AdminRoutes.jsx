@@ -42,6 +42,7 @@ const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'))
 const AdminAssetCreatorsPage = lazy(() => import('@pages/AdminAssetCreatorsPage'));
 const AdminAssetAnalyticsPage = lazy(() => import('@pages/AdminAssetAnalyticsPage'));
 const AdminPublishingPage = lazy(() => import('@pages/AdminPublishingPage'));
+const AdminLandingPagesPage = lazy(() => import('@pages/AdminLandingPagesPage'));
 const AdminPinterestPublisherPage = lazy(() => import('@pages/AdminPinterestPublisherPage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
@@ -132,6 +133,7 @@ export default function AdminRoutes() {
         <Route path="asset-creators" element={renderWithSuspense(AdminAssetCreatorsPage, 'Loading asset creator...')} />
         <Route path="publishing" element={renderWithSuspense(AdminPublishingPage, 'Loading publishing...')} />
         <Route path="publisher" element={renderWithSuspense(AdminPublishingPage, 'Loading publisher...')} />
+        <Route path="landing-pages" element={renderWithSuspense(AdminLandingPagesPage, 'Loading landing pages...')} />
         <Route path="asset-analytics" element={renderWithSuspense(AdminAssetAnalyticsPage, 'Loading asset analytics...')} />
         <Route path="pinterest-publisher" element={renderWithSuspense(AdminPinterestPublisherPage, 'Loading Pinterest publisher...')} />
         <Route path="user-events" element={renderWithSuspense(AdminUserEventsPage, 'Loading view counts...')} />
@@ -143,6 +145,7 @@ export default function AdminRoutes() {
         <Route path="email-templates" element={renderWithSuspense(AdminEmailTemplatesPage, 'Loading email templates...')} />
         <Route path="applied-palettes" element={renderWithSuspense(AdminAppliedPalettesPage, 'Loading applied palettes...')} />
         <Route path="applied-palettes/:paletteId/edit" element={renderWithSuspense(AdminAppliedPaletteEditorPage, 'Loading palette editor...')} />
+        <Route path="send-note" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="picker" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="p/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="p/:playlistId/:start" element={<PublicPathRedirect stripPrefix="/admin" />} />

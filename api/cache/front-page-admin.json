@@ -2,7 +2,7 @@
     "ok": true,
     "success": true,
     "variant": "admin",
-    "generated_at": "2026-05-25T02:44:19+00:00",
+    "generated_at": "2026-06-15T19:53:55+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -34,7 +34,7 @@
             "sort_order": "8.00",
             "query": "SELECT *, query_id as on_click_query\n FROM sql_queries\n WHERE type='family'\nORDER BY name",
             "notes": "",
-            "created_at": "2025-07-21 19:34:43",
+            "created_at": "2025-07-21 18:34:43",
             "item_type": "search",
             "on_click_query": 2,
             "on_click_url": "",
@@ -64,7 +64,7 @@
             "is_clickable": 0,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-04-11 11:25:26",
+            "created_at": "2026-04-11 10:25:26",
             "color": "",
             "insert_position": "0.00"
         },
@@ -110,14 +110,14 @@
                     "rel_path": "/photos/articles/highlighter-combo/article_highlighter-combo_b942b7663df7.jpg",
                     "title": "highlighter_yellow_combo",
                     "alt_text": "Split-view suburban house exterior with terracotta roof, gray-blue walls, and yellow trim before and after repainting.",
-                    "updated_at": "2026-04-20 16:30:08"
+                    "updated_at": "2026-06-08 14:35:05"
                 },
                 "hero_mobile": {
                     "photo_library_id": 375,
                     "rel_path": "/photos/articles/eye-go/article_eye-go_ff804a2b5c36.jpg",
                     "title": "eye-go highlighter_combo_vert",
                     "alt_text": "Split-view suburban house exterior showing before and after trim color changes, with terracotta roof and desert landscaping.",
-                    "updated_at": "2026-04-22 10:30:06"
+                    "updated_at": "2026-06-08 14:35:05"
                 }
             }
         },
@@ -136,7 +136,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-03-23 14:47:16",
+            "created_at": "2026-03-23 13:47:16",
             "color": "",
             "insert_position": "2.00"
         },
@@ -155,7 +155,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-07-25 10:01:02",
+            "created_at": "2025-07-25 09:01:02",
             "color": "",
             "insert_position": "4.00"
         },
@@ -174,7 +174,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-07 15:59:11",
+            "created_at": "2025-09-07 14:59:11",
             "color": "",
             "insert_position": "5.00"
         },
@@ -193,7 +193,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-13 19:20:45",
+            "created_at": "2025-09-13 18:20:45",
             "color": "",
             "insert_position": "6.00"
         },
@@ -212,7 +212,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-07-31 08:59:12",
+            "created_at": "2025-07-31 07:59:12",
             "color": "",
             "insert_position": "7.00"
         },
@@ -231,7 +231,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-24 01:52:05",
+            "created_at": "2025-08-24 00:52:05",
             "color": "",
             "insert_position": "9.00"
         },
@@ -250,7 +250,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-05 07:28:08",
+            "created_at": "2025-09-05 06:28:08",
             "color": "",
             "insert_position": "10.00"
         },
@@ -269,7 +269,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-05 11:17:43",
+            "created_at": "2025-08-05 10:17:43",
             "color": "",
             "insert_position": "11.00"
         },
@@ -288,9 +288,28 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-07 10:26:26",
+            "created_at": "2025-08-07 09:26:26",
             "color": "",
             "insert_position": "12.00"
+        },
+        {
+            "id": 75,
+            "handle": "SendNote",
+            "item_type": "search",
+            "query_id": 4,
+            "title": "Say Hello",
+            "subtitle": "",
+            "display": "Say Hello",
+            "description": "Love a makeover? Have a comment? I'd love to hear from you.",
+            "image_url": "",
+            "body": "",
+            "target_url": "/send-note",
+            "is_clickable": 1,
+            "is_pinnable": 0,
+            "is_active": 1,
+            "created_at": "2026-06-15 11:08:45",
+            "color": "",
+            "insert_position": "5000.00"
         },
         {
             "id": 44,
@@ -307,7 +326,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-23 08:05:04",
+            "created_at": "2025-08-23 07:05:04",
             "color": "",
             "insert_position": "9999.00"
         }
@@ -323,7 +342,7 @@
                 "id": 1028,
                 "title": "Where does the eye go?",
                 "subtitle": "Fixing the focal point with color",
-                "photo_url": "/photos/progressions/eye-go/progression_eye-go_012e5debfaf8.jpg",
+                "photo_url": "/photos/progressions/eye-go/progression_eye-go_012e5debfaf8.jpg?v=1780954505",
                 "photo_library_id": 574,
                 "player_url": "/p/where-does-the-eye-go"
             },
@@ -331,7 +350,7 @@
                 "id": 1029,
                 "title": "Orange Roof Makeovers",
                 "subtitle": "Taming the So Cal orange",
-                "photo_url": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_e56e1f90e1b1.jpg",
+                "photo_url": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_e56e1f90e1b1.jpg?v=1780954505",
                 "photo_library_id": 566,
                 "player_url": "/p/orange-roof-makeovers"
             },
@@ -339,7 +358,7 @@
                 "id": 1030,
                 "title": "Door Fixes",
                 "subtitle": "Small change. Big impact.",
-                "photo_url": "/photos/articles/doors-fixed/article_doors-fixed_8cfe200f4f58.jpg",
+                "photo_url": "/photos/articles/doors-fixed/article_doors-fixed_8cfe200f4f58.jpg?v=1780954505",
                 "photo_library_id": 581,
                 "player_url": "/p/door-fixes"
             }
@@ -353,5 +372,5 @@
         "/api/v2/image-thumb.php?id=581&w=520&q=72"
     ],
     "rowCount": 1,
-    "insertCount": 12
+    "insertCount": 13
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PhotoPickerModal from "@components/PhotoPickerModal";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import PermissionStatus from "@components/PermissionStatus";
 import { makePhotoRef, parsePhotoRef } from "@helpers/assetImage";
 import fetchColorDetail from "@data/fetchColorDetail";
 import "./admin-playlist-editor.css";
@@ -15,6 +16,7 @@ const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const PLAYLIST_INSTANCES_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const PHOTO_LIBRARY_LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
+const PERMISSION_STATUS_EVENT = "colorfix:photo-permission-status";
 
 const emptyPlaylist = {
   playlist_id: null,
@@ -58,6 +60,7 @@ const emptyItem = {
   is_share_image: false,
   site: true,
   yt: true,
+  analyzer_role: "ignore",
   is_active: true,
 };
 
@@ -83,6 +86,7 @@ const DEFAULT_HUE_WHEEL_CONFIG = {
 const HUE_WHEEL_BODY_TEMPLATE = serializeHueWheelConfig(DEFAULT_HUE_WHEEL_CONFIG);
 
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
+const ANALYZER_ROLES = ["ignore", "before", "after"];
 
 function slugifyPlaylistValue(value) {
   return String(value || "")
@@ -255,6 +259,10 @@ export default function AdminPlaylistEditorPage() {
               attachedSavedPaletteSetId: row?.attached_saved_palette_set_id ?? null,
               attachedSavedPaletteSetLabel: row?.attached_saved_palette_set_label || "",
               attachedSavedPalettePhotoType: row?.attached_saved_palette_photo_type || "",
+              clientId: row?.client_id ?? null,
+              clientName: row?.client_name || "",
+              clientEmail: row?.client_email || "",
+              photoPermissionStatus: row?.photo_permission_status || "unknown",
             };
           }
           return next;
@@ -268,6 +276,27 @@ export default function AdminPlaylistEditorPage() {
       cancelled = true;
     };
   }, [items, photoThumbs]);
+
+  useEffect(() => {
+    function onPermissionChange(event) {
+      const detail = event?.detail || {};
+      const photoId = String(detail.photo_library_id || "").trim();
+      if (!photoId) return;
+      const nextStatus = detail.permission?.photo_permission_status || detail.photo_permission_status || "unknown";
+      setPhotoInfo((prev) => {
+        if (!prev[photoId]) return prev;
+        return {
+          ...prev,
+          [photoId]: {
+            ...prev[photoId],
+            photoPermissionStatus: nextStatus,
+          },
+        };
+      });
+    }
+    window.addEventListener(PERMISSION_STATUS_EVENT, onPermissionChange);
+    return () => window.removeEventListener(PERMISSION_STATUS_EVENT, onPermissionChange);
+  }, []);
 
   const fetchPlaylist = useCallback(async (id) => {
     setLoading(true);
@@ -327,6 +356,9 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: item.site === null || item.site == null ? true : Boolean(Number(item.site)),
           yt: item.yt === null || item.yt == null ? true : Boolean(Number(item.yt)),
+          analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
+            ? String(item.analyzer_role || "").toLowerCase()
+            : "ignore",
           is_active: item.is_active === null ? true : Boolean(item.is_active),
         }))
       );
@@ -655,6 +687,14 @@ export default function AdminPlaylistEditorPage() {
     return "";
   };
 
+  const permissionPropsForPhotoInfo = (photoLibraryId, info = null) => ({
+    status: info?.photoPermissionStatus || "unknown",
+    photoLibraryId,
+    clientId: info?.clientId,
+    clientName: info?.clientName || "",
+    clientEmail: info?.clientEmail || "",
+  });
+
   function clearItemPhoto(index) {
     setItems((prev) =>
       prev.map((item, idx) => (
@@ -730,6 +770,9 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: Boolean(item.site),
           yt: Boolean(item.yt),
+          analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
+            ? String(item.analyzer_role || "").toLowerCase()
+            : "ignore",
         })),
       };
       const itemsRes = await fetch(SAVE_ITEMS_URL, {
@@ -778,6 +821,7 @@ export default function AdminPlaylistEditorPage() {
       const pathId = slug || instance.playlist_instance_id;
       const params = new URLSearchParams({
         fresh: "1",
+        src: "admin",
         close: "1",
         _: String(Date.now()),
         return_to: `/admin/playlists/${savedPlaylistId}`,
@@ -990,6 +1034,17 @@ export default function AdminPlaylistEditorPage() {
                   <option value="non-palette">no palette</option>
                 </select>
               </label>
+              <label className="item-cell item-analyzer-role">
+                Analyzer
+                <select
+                  value={item.analyzer_role || "ignore"}
+                  onChange={(e) => updateItem(index, "analyzer_role", e.target.value)}
+                >
+                  <option value="ignore">ignore</option>
+                  <option value="before">before</option>
+                  <option value="after">after</option>
+                </select>
+              </label>
               <label className="item-cell item-title">
                 Title
                 <input
@@ -1054,6 +1109,10 @@ export default function AdminPlaylistEditorPage() {
                   ) : (
                     <div className="item-photo-thumb item-photo-thumb--empty" aria-hidden="true" />
                   )}
+                  <PermissionStatus
+                    {...permissionPropsForPhotoInfo(getPhotoLibraryId(item), getAttachedPaletteInfo(item))}
+                    className="item-photo-permission"
+                  />
                   <input
                     type="text"
                     value={getPhotoLibraryId(item)}

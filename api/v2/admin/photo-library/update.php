@@ -38,6 +38,7 @@ try {
     if (array_key_exists('tags', $payload)) $fields['tags'] = trim((string)$payload['tags']);
     if (array_key_exists('alt_text', $payload)) $fields['alt_text'] = trim((string)$payload['alt_text']);
     if (array_key_exists('note', $payload)) $fields['note'] = trim((string)$payload['note']);
+    if (array_key_exists('photo_permission_status', $payload)) $fields['photo_permission_status'] = trim((string)$payload['photo_permission_status']);
     if (array_key_exists('show_in_gallery', $payload)) $fields['show_in_gallery'] = !empty($payload['show_in_gallery']);
     if (array_key_exists('has_palette', $payload)) $fields['has_palette'] = !empty($payload['has_palette']);
     if (array_key_exists('is_inactive', $payload)) $fields['is_inactive'] = !empty($payload['is_inactive']);

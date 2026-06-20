@@ -140,6 +140,7 @@ export default function AdminPlaylistsPage() {
     if (instance.audience && instance.audience !== "any") {
       params.set("aud", instance.audience);
     }
+    params.set("src", "admin");
     params.set("close", "1");
     params.set("return_to", "/admin/playlists");
     const qs = params.toString();
@@ -170,7 +171,12 @@ export default function AdminPlaylistsPage() {
     const sorted = [...items].sort((a, b) => {
       const aLabel = String(a?.title || a?.playlist_id || "").toLowerCase();
       const bLabel = String(b?.title || b?.playlist_id || "").toLowerCase();
-      return aLabel.localeCompare(bLabel);
+      const byLabel = aLabel.localeCompare(bLabel, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (byLabel !== 0) return byLabel;
+      return Number(a?.playlist_id || 0) - Number(b?.playlist_id || 0);
     });
     if (!query.trim()) return sorted;
     const needle = query.trim().toLowerCase();
@@ -186,6 +192,8 @@ export default function AdminPlaylistsPage() {
       || items.find((row) => row.playlist_id === activeId)
       || null;
   }, [activeId, filtered, items]);
+
+  const selectedPlaylistId = selectedPlaylist?.playlist_id || "";
 
   const linkedInstances = useMemo(() => {
     const playlistId = Number(activeId || 0);
@@ -237,32 +245,54 @@ export default function AdminPlaylistsPage() {
         {loading && <div className="panel-status">Loading…</div>}
         {error && <div className="panel-status error">{error}</div>}
 
-        <div className="panel-list">
-          {filtered.map((row) => (
-            <div
-              key={row.playlist_id}
-              className={`list-row ${activeId === row.playlist_id ? "active" : ""}`}
-            >
-              <button
-                type="button"
-                className="list-row-main"
-                onClick={() => setActiveId(row.playlist_id)}
-              >
-                <div className="row-title">{row.title || "Untitled"}</div>
-                <div className="row-meta">
-                  #{row.playlist_id} • {row.type} • {Number(row.is_active) !== 0 ? "Active" : "Inactive"} • {Number(row.is_public) === 1 ? "Public" : "Private"}
-                </div>
-              </button>
-              <button
-                type="button"
-                className="list-row-delete"
-                onClick={() => handleDelete(row)}
-                disabled={deletingId === row.playlist_id}
-              >
-                {deletingId === row.playlist_id ? "Deleting..." : "Delete"}
-              </button>
+        <div className="playlist-picker">
+          <label htmlFor="admin-playlist-select">Choose Playlist</label>
+          <select
+            id="admin-playlist-select"
+            value={selectedPlaylistId}
+            onChange={(e) => setActiveId(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Pick a playlist...</option>
+            {filtered.map((row) => (
+              <option key={row.playlist_id} value={row.playlist_id}>
+                {row.title || "Untitled"} - #{row.playlist_id}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="playlist-action-strip">
+          <button type="button" className="primary-btn" onClick={handleViewPlaylist} disabled={!viewInstance}>
+            View
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/admin/playlists/${selectedPlaylist.playlist_id}`)}
+            disabled={!selectedPlaylist}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            className="danger-btn"
+            onClick={() => handleDelete(selectedPlaylist)}
+            disabled={!selectedPlaylist || deletingId === selectedPlaylist.playlist_id}
+          >
+            {selectedPlaylist && deletingId === selectedPlaylist.playlist_id ? "Deleting..." : "Delete"}
+          </button>
+          {selectedPlaylist ? (
+            <div className="playlist-action-strip__meta">
+              #{selectedPlaylist.playlist_id}
+              {" · "}
+              {selectedPlaylist.type || "Untyped"}
+              {" · "}
+              {Number(selectedPlaylist.is_active) !== 0 ? "Active" : "Inactive"}
+              {" · "}
+              {Number(selectedPlaylist.is_public) === 1 ? "Public" : "Private"}
             </div>
-          ))}
+          ) : (
+            <div className="playlist-action-strip__meta">Choose a playlist to use the actions.</div>
+          )}
         </div>
 
         <div className="playlist-mobile-card">

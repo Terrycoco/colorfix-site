@@ -46,6 +46,7 @@ final class AssetCreatorService
         if (isset($payload['inputs']) && is_array($payload['inputs'])) {
             $this->repo->replaceInputs($jobId, $payload['inputs']);
         }
+        $this->syncOutputMetadata($jobId, $payload);
 
         $job = $this->repo->findJob($jobId);
         if (!$job) {
@@ -72,6 +73,7 @@ final class AssetCreatorService
         if (isset($payload['inputs']) && is_array($payload['inputs'])) {
             $this->repo->replaceInputs($jobId, $payload['inputs']);
         }
+        $this->syncOutputMetadata($jobId, $payload);
 
         $job = $this->repo->findJob($jobId);
         if (!$job) {
@@ -105,5 +107,17 @@ final class AssetCreatorService
             throw new RuntimeException('Asset creator job not found');
         }
         return $job;
+    }
+
+    private function syncOutputMetadata(int $jobId, array $payload): void
+    {
+        $instructions = $payload['instructions'] ?? $payload['instructions_json'] ?? null;
+        if (!is_array($instructions)) {
+            $decoded = json_decode((string)($instructions ?? ''), true);
+            $instructions = is_array($decoded) ? $decoded : null;
+        }
+        if (is_array($instructions)) {
+            $this->repo->syncOutputAssetMetadataFromInstructions($jobId, $instructions);
+        }
     }
 }

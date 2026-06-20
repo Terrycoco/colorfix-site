@@ -5,9 +5,9 @@ export function getCtaKey(cta) {
   return (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
 }
 
-function buildShareUrl(shareFolder, playlistInstanceId) {
+function buildShareUrl(shareFolder, playlistInstanceId, source = "share") {
   return appendParams(`${shareFolder}/playlist.php?id=${playlistInstanceId}`, {
-    src: "share",
+    src: source || undefined,
   });
 }
 
@@ -16,10 +16,10 @@ function buildPlayerPath(data) {
   return pathId ? `/p/${pathId}` : "";
 }
 
-function runShare({ data, shareFolder }) {
+function runShare({ data, shareFolder, shareSource }) {
   if (!data?.playlist_instance_id) return;
   if (data?.share_enabled === false) return;
-  const url = buildShareUrl(shareFolder, data.playlist_instance_id);
+  const url = buildShareUrl(shareFolder, data.playlist_instance_id, shareSource);
   const title = data?.share_title || data?.title || "ColorFix Playlist";
   const text = data?.share_description || "I'm sharing a playlist I found on ColorFix";
   if (navigator.share) {
@@ -33,9 +33,9 @@ function runShare({ data, shareFolder }) {
   window.location.href = `sms:&body=${body}`;
 }
 
-function runCopyLink({ data, shareFolder }) {
+function runCopyLink({ data, shareFolder, shareSource }) {
   if (!data?.playlist_instance_id) return;
-  const url = buildShareUrl(shareFolder, data.playlist_instance_id);
+  const url = buildShareUrl(shareFolder, data.playlist_instance_id, shareSource);
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(url).catch(() => {});
     return;
@@ -57,12 +57,33 @@ function runNavigate({ navigate, cta, psi, thumb, demo }) {
       .replaceAll("{thumb}", thumb ? "1" : "")
       .replaceAll("{demo}", demo ? "1" : "");
   }
+  if (shouldPreserveSource(cta, url)) {
+    url = appendParams(url, {
+      src: getCurrentSource(),
+    });
+  }
   const target = cta?.params?.target || "_blank";
   if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
   }
   window.open(url, target, "noopener");
+}
+
+function shouldPreserveSource(cta, url) {
+  if (cta?.params?.preserve_src !== undefined) {
+    return cta.params.preserve_src === true || cta.params.preserve_src === "true" || cta.params.preserve_src === 1 || cta.params.preserve_src === "1";
+  }
+  return typeof url === "string" && (url === "/playlists" || url.startsWith("/playlists?"));
+}
+
+function getCurrentSource() {
+  if (typeof window === "undefined") return "";
+  try {
+    return new URLSearchParams(window.location.search).get("src") || "";
+  } catch {
+    return "";
+  }
 }
 
 function runArticleLink({ navigate, cta }) {
@@ -229,6 +250,7 @@ export function buildCtaHandlers({
   thumb,
   demo,
   returnTo,
+  shareSource = "share",
 } = {}) {
   const replayStartIndex = data?.skip_intro_on_replay ? firstNonIntroIndex : 0;
 
@@ -253,9 +275,9 @@ export function buildCtaHandlers({
       setPlaybackEnded?.(false);
       playerRef?.current?.replay({ likedOnly: false, startIndex: index });
     },
-    share: () => runShare({ data, shareFolder }),
-    copy_link: () => runCopyLink({ data, shareFolder }),
-    share_playlist: () => runShare({ data, shareFolder }),
+    share: () => runShare({ data, shareFolder, shareSource }),
+    copy_link: () => runCopyLink({ data, shareFolder, shareSource }),
+    share_playlist: () => runShare({ data, shareFolder, shareSource }),
     navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } }, psi, thumb, demo }),
     article_link: (cta) => runArticleLink({ navigate, cta }),
     playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } } }),

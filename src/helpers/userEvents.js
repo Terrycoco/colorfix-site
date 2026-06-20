@@ -43,6 +43,29 @@ export function isHireTerryCta(cta) {
   return false;
 }
 
+export function getCtaOnclickEvent(cta) {
+  const raw = cta?.onclick || cta?.onClick || cta?.click_event || "";
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "")
+    .slice(0, 100);
+}
+
+export function trackCtaOnclickEvent({ cta, data, allowInternalTracking = true } = {}) {
+  const eventType = getCtaOnclickEvent(cta);
+  if (!eventType) return false;
+
+  trackUserEvent({
+    event_type: eventType,
+    playlist_instance_id: Number(data?.playlist_instance_id || 0),
+    playlist_id: Number(data?.playlist_id || 0) || null,
+    cta_id: Number(cta?.cta_id || 0) || null,
+    allow_internal_tracking: allowInternalTracking,
+  });
+  return true;
+}
+
 export function trackUserEvent(payload) {
   if (typeof window === "undefined") return;
   if (isAdmin() && !payload?.allow_internal_tracking) return;

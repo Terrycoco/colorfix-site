@@ -147,6 +147,7 @@ export default function AppliedPaletteViewPage() {
         swatches={swatches}
         adminMode={isAdminView}
         onBack={isAdminView ? handleBack : undefined}
+        onExit={handleBack}
         showBackButton={isAdminView}
         showLogo={!isAdminView}
         showShare={true}

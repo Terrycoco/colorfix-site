@@ -57,6 +57,9 @@ class PhotoLibraryService
             'title' => $overrides['title'] ?? ($photo['caption'] ?? null),
             'tags' => $tags ?: null,
             'alt_text' => $overrides['alt_text'] ?? ($photo['alt_text'] ?? null),
+            'photo_permission_status' => array_key_exists('photo_permission_status', $overrides)
+                ? $overrides['photo_permission_status']
+                : null,
             'show_in_gallery' => array_key_exists('show_in_gallery', $overrides)
                 ? (int)$overrides['show_in_gallery']
                 : ($triggerMode === 'none' || $photoType === 'before' ? 0 : 1),
@@ -79,6 +82,9 @@ class PhotoLibraryService
             }
             if (array_key_exists('alt_text', $overrides) || array_key_exists('alt_text', $photo)) {
                 $update['alt_text'] = $data['alt_text'];
+            }
+            if (array_key_exists('photo_permission_status', $overrides)) {
+                $update['photo_permission_status'] = $data['photo_permission_status'];
             }
             if (!empty($data['has_palette'])) {
                 $update['has_palette'] = 1;
@@ -285,6 +291,7 @@ class PhotoLibraryService
             'source_type' => $sourceType,
             'source_id' => array_key_exists('source_id', $overrides) ? $overrides['source_id'] : null,
             'client_id' => array_key_exists('client_id', $overrides) ? $overrides['client_id'] : null,
+            'photo_permission_status' => array_key_exists('photo_permission_status', $overrides) ? $overrides['photo_permission_status'] : null,
             'rel_path' => $relPath,
             'title' => $overrides['title'] ?? null,
             'tags' => $overrides['tags'] ?? null,

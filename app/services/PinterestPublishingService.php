@@ -50,7 +50,15 @@ final class PinterestPublishingService
         ]);
 
         $trackingCode = $this->buildTrackingCode($playlistId);
-        $destinationUrl = $this->buildDestinationUrl($playlistId, $instance, $trackingCode);
+        $landingPage = null;
+        $landingPageId = isset($payload['landing_page_id']) ? (int)$payload['landing_page_id'] : 0;
+        if ($landingPageId > 0) {
+            $landingPage = $this->repo->getLandingPageForPublishing($landingPageId);
+            if (!$landingPage) {
+                throw new RuntimeException("Landing page not found: {$landingPageId}");
+            }
+        }
+        $destinationUrl = $this->buildDestinationUrl($playlistId, $instance, $landingPage);
         $trackingUrl = $destinationUrl;
         $externalUrl = $this->nullableString($payload['external_url'] ?? null);
         $publishedAt = $this->normalizeDateTime($payload['published_at'] ?? null);
@@ -82,6 +90,9 @@ final class PinterestPublishingService
                 'board' => $this->nullableString($payload['board'] ?? null),
                 'pin_type' => self::OUTPUT_TYPE,
                 'manual_entry' => true,
+                'landing_page_id' => $landingPage['id'] ?? null,
+                'landing_page_slug' => $landingPage['slug'] ?? null,
+                'destination_kind' => $landingPage ? 'landing_page' : 'player_fallback',
             ], JSON_UNESCAPED_SLASHES),
             'generated_at' => null,
             'staged_at' => null,
@@ -93,6 +104,7 @@ final class PinterestPublishingService
             'publish_output_id' => $outputId,
             'tracking_code' => $trackingCode,
             'tracking_url' => $trackingUrl,
+            'destination_url' => $destinationUrl,
             'status' => $status,
         ];
     }
@@ -122,8 +134,15 @@ final class PinterestPublishingService
         return 'pin-' . $playlistId . '-' . date('YmdHis') . '-' . bin2hex(random_bytes(2));
     }
 
-    private function buildDestinationUrl(int $playlistId, ?array $instance, string $trackingCode): string
+    private function buildDestinationUrl(int $playlistId, ?array $instance, ?array $landingPage): string
     {
+        if ($landingPage) {
+            $slug = trim((string)($landingPage['slug'] ?? ''));
+            if ($slug !== '') {
+                return '/s/' . rawurlencode($slug) . '?src=pinterest';
+            }
+        }
+
         $pathId = null;
         if ($instance) {
             $slug = trim((string)($instance['slug'] ?? ''));
@@ -132,7 +151,7 @@ final class PinterestPublishingService
         if (!$pathId) {
             $pathId = (string)$playlistId;
         }
-        return '/p/' . rawurlencode($pathId) . '?src=' . rawurlencode($trackingCode);
+        return '/p/' . rawurlencode($pathId) . '?src=pinterest';
     }
 
     private function firstNonEmpty(array $values): string

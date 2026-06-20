@@ -207,7 +207,14 @@ class PdoClientRepository
                     clients.first_name,
                     clients.last_name,
                     clients.email,
-                    clients.phone
+                    clients.phone,
+                    (
+                        SELECT COUNT(*)
+                        FROM client_activity ca
+                        WHERE ca.client_id = clients.id
+                          AND ca.activity_type = 'site_note_received'
+                          AND ca.admin_read_at IS NULL
+                    ) AS unread_site_note_count
                 FROM clients";
     }
 }

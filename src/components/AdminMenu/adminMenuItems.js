@@ -43,6 +43,7 @@ export const adminMenuItems = [
       { label: "Asset Library", href: "/admin/library" },
       { label: "Creator", href: "/admin/asset-creators" },
       { label: "Publisher", href: "/admin/publisher" },
+      { label: "Landing Pages", href: "/admin/landing-pages" },
       { label: "Analytics", href: "/admin/asset-analytics" },
       { label: "Pinterest Publisher", href: "/admin/pinterest-publisher" },
     ],

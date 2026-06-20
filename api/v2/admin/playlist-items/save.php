@@ -61,6 +61,7 @@ try {
     $hasIsShareImage = columnExists($pdo, 'playlist_items', 'is_share_image');
     $hasSite = columnExists($pdo, 'playlist_items', 'site');
     $hasYt = columnExists($pdo, 'playlist_items', 'yt');
+    $hasAnalyzerRole = columnExists($pdo, 'playlist_items', 'analyzer_role');
     $selectedShareIndex = null;
     foreach ($items as $idx => $candidate) {
         $candidateHasPhoto = (
@@ -110,6 +111,10 @@ try {
         if ($hasYt) {
             $data['yt'] = array_key_exists('yt', $item) ? (int)(bool)$item['yt'] : 1;
         }
+        if ($hasAnalyzerRole) {
+            $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+            $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after'], true) ? $role : 'ignore';
+        }
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
         }
@@ -149,6 +154,7 @@ try {
             'is_share_image',
             'site',
             'yt',
+            'analyzer_role',
         ];
         if (!$hasPhotoLibraryId) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
@@ -164,6 +170,9 @@ try {
         }
         if (!$hasYt) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'yt'));
+        }
+        if (!$hasAnalyzerRole) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'analyzer_role'));
         }
         if ($hasExcludeFromThumbs) {
             $columns[] = 'exclude_from_thumbs';

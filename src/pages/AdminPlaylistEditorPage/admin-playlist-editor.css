@@ -376,7 +376,7 @@
 
 .item-row {
   display: grid;
-  grid-template-columns: 40px 90px minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  grid-template-columns: 40px 90px 110px minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr);
   gap: 12px;
   align-items: end;
 }
@@ -429,11 +429,11 @@
 }
 
 .item-photo {
-  grid-column: 1 / span 3;
+  grid-column: 1 / span 4;
 }
 
 .item-transition {
-  grid-column: 4 / span 1;
+  grid-column: 5 / span 1;
 }
 
 .item-transition select {
@@ -441,7 +441,7 @@
 }
 
 .item-venues {
-  grid-column: 5 / span 1;
+  grid-column: 6 / span 1;
 }
 
 .item-venue-toggles {
@@ -534,6 +534,10 @@
   background:
     linear-gradient(135deg, #f7f7f7 25%, #ededed 25%, #ededed 50%, #f7f7f7 50%, #f7f7f7 75%, #ededed 75%, #ededed 100%);
   background-size: 8px 8px;
+}
+
+.item-photo-permission {
+  flex: 0 0 auto;
 }
 
 @media (max-width: 900px) {
