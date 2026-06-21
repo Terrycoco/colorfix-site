@@ -2,6 +2,22 @@ export const pinterestChannel = {
   channelKey: "pinterest",
   label: "Pinterest",
   defaultOutputStatus: "draft",
+  defaultBoard: {
+    board_name: "ColorFix Makeovers",
+    board_url: "https://www.pinterest.com/terrymarr/colorfix-makeovers/",
+    board_slug: "terrymarr/colorfix-makeovers",
+    board_id: null,
+  },
+  apiPublishGate: {
+    requiresBoardId: true,
+    syncStatus: "pending_pinterest_api_access",
+    syncPlan: [
+      "Call Pinterest list boards after API access is approved.",
+      "Find the board named ColorFix Makeovers.",
+      "Store the returned board_id.",
+      "Allow queued pins to publish once board_id is available.",
+    ],
+  },
   assetCreators: [
     {
       assetType: "before_after_pin",

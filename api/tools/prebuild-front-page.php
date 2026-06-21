@@ -42,7 +42,7 @@ if (empty($playlistSet['ok']) || empty($playlistSet['set']['items']) || !is_arra
 }
 
 $frontPageRailItem = buildFrontPageRailItem($playlistSet['set'], $setId);
-$inserts = attachFeaturedArticlePayloads($baseUrl, $runQuery['inserts'] ?? []);
+$inserts = normalizeFrontPageInserts(attachFeaturedArticlePayloads($baseUrl, $runQuery['inserts'] ?? []), $queryId);
 $imagePreloads = collectImagePreloads($runQuery['results'] ?? [], $inserts, $frontPageRailItem);
 
 foreach ($variants as $variant) {
@@ -201,6 +201,20 @@ function attachFeaturedArticlePayloads(string $baseUrl, array $inserts): array {
         }
     }
     unset($item);
+    return $inserts;
+}
+
+function normalizeFrontPageInserts(array $inserts, int $queryId): array {
+    if ($queryId !== 4) return $inserts;
+
+    foreach ($inserts as &$item) {
+        if (strtolower((string)($item['item_type'] ?? '')) !== 'front-blurb') continue;
+        $item['title'] = 'ColorFix by Terry';
+        $item['subtitle'] = '';
+        $item['body'] = 'Home color transformations, before-and-ColorFixed makeovers, real examples, and paint palettes by Terry Marr.';
+    }
+    unset($item);
+
     return $inserts;
 }
 

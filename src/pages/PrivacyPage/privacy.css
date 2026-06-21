@@ -31,6 +31,17 @@
 }
 
 .privacy-policy p {
-  margin: 0;
+  margin: 0 0 14px;
   font-size: 17px;
+}
+
+.privacy-policy ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+  font-size: 17px;
+}
+
+.privacy-policy a {
+  color: #111827;
+  font-weight: 800;
 }

@@ -113,7 +113,7 @@ try {
         }
         if ($hasAnalyzerRole) {
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
-            $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after'], true) ? $role : 'ignore';
+            $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single'], true) ? $role : 'ignore';
         }
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;

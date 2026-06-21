@@ -20,7 +20,7 @@ final class AssetCreatorProposalService
         $sourceId = (int)($payload['source_id'] ?? $payload['playlist_id'] ?? 0);
 
         if ($creatorKey !== 'pinterest.before_after_composite') {
-            throw new RuntimeException('Unsupported creator type');
+            throw new RuntimeException('Unsupported channel');
         }
         if ($sourceType !== 'playlist') {
             throw new RuntimeException('Only playlist sources are supported right now');
@@ -37,24 +37,23 @@ final class AssetCreatorProposalService
         $warnings = [];
         $items = $this->playlistItems($sourceId);
         $hasAnalyzerRoles = $this->hasAnalyzerRoles($items);
-        $pairs = $this->pairsFromAnalyzerRoles($items, $playlist);
-        if ($pairs) {
-            $warnings[] = 'Using playlist analyzer roles.';
-        } elseif ($hasAnalyzerRoles) {
-            $warnings[] = 'Analyzer roles were found, but no complete before/after pair was marked.';
-        } else {
-            $pairs = $this->pairsFromSavedPaletteSets($items, $playlist);
+        $rows = $this->pinRowsFromAnalyzerRoles($items, $playlist);
+        if (!$rows && $hasAnalyzerRoles) {
+            $warnings[] = 'Analyzer roles were found, but no publishable pin rows were found.';
+        } elseif (!$hasAnalyzerRoles) {
+            $rows = $this->pairsFromSavedPaletteSets($items, $playlist);
         }
-        if (!$pairs && !$hasAnalyzerRoles) {
-            $pairs = $this->fallbackPairsFromPlaylistOrder($items, $playlist);
-            if ($pairs) {
+        if (!$rows && !$hasAnalyzerRoles) {
+            $rows = $this->fallbackPairsFromPlaylistOrder($items, $playlist);
+            if ($rows) {
                 $warnings[] = 'No saved palette before/after pairs were found. These are low-confidence playlist-order guesses.';
             }
         }
 
-        if (!$pairs) {
-            $warnings[] = 'No before/after pairs found. Add pairs manually or mark photos as before/full on palette sets.';
+        if (!$rows) {
+            $warnings[] = 'No pin rows found. Tag playlist photos as before/after/single or add rows manually.';
         }
+        $rows = $this->applyPayloadDefaults($rows, $payload);
 
         return [
             'creator_key' => $creatorKey,
@@ -66,12 +65,13 @@ final class AssetCreatorProposalService
                 'type' => (string)($playlist['type'] ?? ''),
             ],
             'instructions' => [
-                'asset_type' => 'pin_composite',
-                'layout' => 'before_after_vertical',
+                'asset_type' => 'pinterest_pin',
+                'layout' => 'platform_specific',
                 'input_strategy' => $hasAnalyzerRoles ? 'playlist_analyzer_roles' : 'saved_palette_set_photo_roles',
             ],
-            'pairs' => array_values($pairs),
-            'ignored' => $this->ignoredItems($items, $pairs),
+            'pin_rows' => array_values($rows),
+            'pairs' => array_values($rows),
+            'ignored' => $this->ignoredItems($items, $rows),
             'warnings' => $warnings,
         ];
     }
@@ -94,83 +94,165 @@ final class AssetCreatorProposalService
         $hasPhotoLibraryId = $this->columnExists('playlist_items', 'photo_library_id');
         $hasSavedPaletteSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
         $hasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
-        $photoSelect = $hasPhotoLibraryId ? 'photo_library_id' : 'NULL AS photo_library_id';
-        $setSelect = $hasSavedPaletteSetId ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
-        $analyzerRoleSelect = $hasAnalyzerRole ? 'analyzer_role' : "'ignore' AS analyzer_role";
+        $hasPaletteHash = $this->columnExists('playlist_items', 'palette_hash');
+        $hasApId = $this->columnExists('playlist_items', 'ap_id');
+        $photoSelect = $hasPhotoLibraryId ? 'pi.photo_library_id' : 'NULL AS photo_library_id';
+        $setSelect = $hasSavedPaletteSetId ? 'pi.saved_palette_set_id' : 'NULL AS saved_palette_set_id';
+        $analyzerRoleSelect = $hasAnalyzerRole ? 'pi.analyzer_role' : "'ignore' AS analyzer_role";
+        $paletteHashSelect = $hasPaletteHash ? 'pi.palette_hash' : 'NULL AS palette_hash';
+        $apIdSelect = $hasApId ? 'pi.ap_id' : 'NULL AS ap_id';
+        $photoJoin = $hasPhotoLibraryId ? 'LEFT JOIN photo_library pl ON pl.photo_library_id = pi.photo_library_id' : '';
+        $photoHasPaletteSelect = $hasPhotoLibraryId ? 'COALESCE(pl.has_palette, 0) AS photo_has_palette' : '0 AS photo_has_palette';
+        $savedPaletteIdSelect = $hasSavedPaletteSetId
+            ? '(SELECT sps.saved_palette_id FROM saved_palette_sets sps WHERE sps.id = pi.saved_palette_set_id LIMIT 1) AS saved_palette_id'
+            : 'NULL AS saved_palette_id';
 
         $stmt = $this->pdo->prepare(
-            "SELECT playlist_item_id,
-                    playlist_id,
-                    order_index,
-                    item_type,
-                    title,
-                    subtitle,
-                    image_url,
+            "SELECT pi.playlist_item_id,
+                    pi.playlist_id,
+                    pi.order_index,
+                    pi.item_type,
+                    pi.title,
+                    pi.subtitle,
+                    pi.image_url,
+                    {$paletteHashSelect},
+                    {$apIdSelect},
                     {$photoSelect},
                     {$setSelect},
-                    {$analyzerRoleSelect}
-               FROM playlist_items
-              WHERE playlist_id = :playlist_id
-                AND is_active = 1
-           ORDER BY order_index ASC, playlist_item_id ASC"
+                    {$savedPaletteIdSelect},
+                    {$analyzerRoleSelect},
+                    {$photoHasPaletteSelect}
+               FROM playlist_items pi
+                    {$photoJoin}
+              WHERE pi.playlist_id = :playlist_id
+                AND pi.is_active = 1
+           ORDER BY pi.order_index ASC, pi.playlist_item_id ASC"
         );
         $stmt->execute(['playlist_id' => $playlistId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    private function pairsFromAnalyzerRoles(array $items, array $playlist): array
+    private function pinRowsFromAnalyzerRoles(array $items, array $playlist): array
     {
-        $beforeItems = [];
-        $afterItems = [];
+        $rows = [];
+        $sort = 1;
+
         foreach ($items as $item) {
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
             if ($role === 'before') {
-                $beforeItems[] = $item;
-            } elseif ($role === 'after') {
-                $afterItems[] = $item;
+                foreach ($this->followingAfterItems($items, $item) as $after) {
+                    $rows[] = $this->compositePinRow($item, $after, $playlist, $sort++, 'playlist_analyzer_roles', 1.0);
+                }
+                continue;
+            }
+
+            if (!in_array($role, ['after', 'single'], true)) {
+                continue;
+            }
+
+            $rows[] = $this->ideaPinRow($item, $playlist, $sort++, 'idea', 'playlist_analyzer_roles', 1.0);
+            if ($this->itemHasPalette($item)) {
+                $rows[] = $this->ideaPinRow($item, $playlist, $sort++, 'idea_palette', 'playlist_analyzer_roles', 1.0);
             }
         }
 
-        $count = min(count($beforeItems), count($afterItems));
-        if ($count <= 0) {
-            return [];
-        }
-
-        $pairs = [];
-        for ($i = 0; $i < $count; $i++) {
-            $before = $beforeItems[$i];
-            $after = $afterItems[$i];
-            $sort = $i + 1;
-            $title = trim((string)($after['title'] ?? '')) ?: trim((string)($playlist['title'] ?? '')) ?: 'Pin ' . $sort;
-            $description = $this->defaultDescription((string)($playlist['title'] ?? ''), $title);
-            $pairs[] = [
-                'pair_key' => 'analyzer-items-' . (int)$before['playlist_item_id'] . '-' . (int)$after['playlist_item_id'],
-                'include' => true,
-                'sort_order' => $sort,
-                'source' => 'playlist_analyzer_roles',
-                'confidence' => 1.0,
-                'saved_palette_set_id' => null,
-                'search_title' => $this->defaultSearchTitle($title, (string)($playlist['title'] ?? '')),
-                'description' => $description,
-                'title' => $title,
-                'caption' => $description,
-                'before' => $this->playlistItemAssetPayload($before),
-                'after' => $this->playlistItemAssetPayload($after),
-            ];
-        }
-
-        return $pairs;
+        return $rows;
     }
 
     private function hasAnalyzerRoles(array $items): bool
     {
         foreach ($items as $item) {
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
-            if (in_array($role, ['before', 'after'], true)) {
+            if (in_array($role, ['before', 'after', 'single'], true)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private function followingAfterItems(array $items, array $before): array
+    {
+        $afterItems = [];
+        $beforeOrder = (float)($before['order_index'] ?? -1);
+        $beforeId = (int)($before['playlist_item_id'] ?? 0);
+        foreach ($items as $item) {
+            $order = (float)($item['order_index'] ?? -1);
+            $id = (int)($item['playlist_item_id'] ?? 0);
+            if ($order < $beforeOrder || ($order === $beforeOrder && $id <= $beforeId)) {
+                continue;
+            }
+
+            $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+            if ($role === 'before' || $role === 'single') {
+                break;
+            }
+            if ($role === 'after') {
+                $afterItems[] = $item;
+            }
+        }
+        return $afterItems;
+    }
+
+    private function compositePinRow(array $before, array $after, array $playlist, int $sort, string $source, float $confidence): array
+    {
+        $title = trim((string)($after['title'] ?? '')) ?: trim((string)($playlist['title'] ?? '')) ?: 'Pin ' . $sort;
+        $description = $this->defaultDescription((string)($playlist['title'] ?? ''), $title);
+        return [
+            'pair_key' => 'analyzer-composite-' . (int)$before['playlist_item_id'] . '-' . (int)$after['playlist_item_id'],
+            'pin_type' => 'composite',
+            'asset_type' => 'pin_composite',
+            'include' => true,
+            'sort_order' => $sort,
+            'source' => $source,
+            'confidence' => $confidence,
+            'saved_palette_set_id' => null,
+            'search_title' => $this->defaultSearchTitle($title, (string)($playlist['title'] ?? '')),
+            'description' => $description,
+            'title' => $title,
+            'caption' => $description,
+            'before' => $this->playlistItemAssetPayload($before),
+            'after' => $this->playlistItemAssetPayload($after),
+        ];
+    }
+
+    private function ideaPinRow(array $item, array $playlist, int $sort, string $pinType, string $source, float $confidence): array
+    {
+        $asset = $this->playlistItemAssetPayload($item);
+        $baseTitle = trim((string)($asset['title'] ?? ''))
+            ?: trim((string)($item['title'] ?? ''))
+            ?: trim((string)($playlist['title'] ?? ''))
+            ?: 'Pin ' . $sort;
+        $searchTitle = $this->defaultIdeaSearchTitle($baseTitle, $pinType);
+        $description = $this->defaultDescription((string)($playlist['title'] ?? ''), $baseTitle);
+
+        return [
+            'pair_key' => 'analyzer-' . $pinType . '-' . (int)$item['playlist_item_id'],
+            'pin_type' => $pinType,
+            'asset_type' => $pinType === 'idea_palette' ? 'pin_idea_palette' : 'pin_idea',
+            'include' => true,
+            'sort_order' => $sort,
+            'source' => $source,
+            'confidence' => $confidence,
+            'saved_palette_set_id' => isset($item['saved_palette_set_id']) && (int)$item['saved_palette_set_id'] > 0 ? (int)$item['saved_palette_set_id'] : null,
+            'search_title' => $searchTitle,
+            'description' => $description,
+            'title' => $searchTitle,
+            'caption' => $description,
+            'asset' => $asset,
+            'after' => $asset,
+            'before' => null,
+            'has_palette' => $this->itemHasPalette($item),
+            'palette_hash' => trim((string)($item['palette_hash'] ?? '')) ?: null,
+            'ap_id' => isset($item['ap_id']) && (int)$item['ap_id'] > 0 ? (int)$item['ap_id'] : null,
+        ];
+    }
+
+    private function itemHasPalette(array $item): bool
+    {
+        return (int)($item['saved_palette_set_id'] ?? 0) > 0
+            || trim((string)($item['palette_hash'] ?? '')) !== ''
+            || (int)($item['ap_id'] ?? 0) > 0
+            || (int)($item['photo_has_palette'] ?? 0) > 0;
     }
 
     private function pairsFromSavedPaletteSets(array $items, array $playlist): array
@@ -190,6 +272,7 @@ final class AssetCreatorProposalService
         $stmt = $this->pdo->prepare(
             "SELECT spsp.id AS saved_palette_set_photo_id,
                     spsp.saved_palette_set_id,
+                    sps.saved_palette_id,
                     spsp.photo_library_id,
                     spsp.rel_path AS set_rel_path,
                     spsp.photo_type,
@@ -199,6 +282,7 @@ final class AssetCreatorProposalService
                     sps.title AS set_title,
                     sp.nickname,
                     sp.display_title,
+                    sp.palette_hash,
                     pl.title AS photo_title,
                     pl.rel_path AS photo_rel_path,
                     COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS existing_asset_library_id,
@@ -266,11 +350,13 @@ final class AssetCreatorProposalService
 
             $pairs[] = [
                 'pair_key' => 'set-' . $setId,
+                'pin_type' => 'composite',
+                'asset_type' => 'pin_composite',
                 'include' => true,
                 'sort_order' => $sort++,
                 'source' => 'saved_palette_set',
                 'confidence' => 0.95,
-                'saved_palette_set_id' => $setId,
+            'saved_palette_set_id' => $setId,
                 'search_title' => $this->defaultSearchTitle($title, (string)($playlist['title'] ?? '')),
                 'description' => $description,
                 'title' => $title,
@@ -301,6 +387,8 @@ final class AssetCreatorProposalService
             $description = $this->defaultDescription((string)($playlist['title'] ?? ''), $title);
             $pairs[] = [
                 'pair_key' => 'playlist-items-' . (int)$before['playlist_item_id'] . '-' . (int)$after['playlist_item_id'],
+                'pin_type' => 'composite',
+                'asset_type' => 'pin_composite',
                 'include' => true,
                 'sort_order' => $sort,
                 'source' => 'playlist_order_guess',
@@ -323,10 +411,16 @@ final class AssetCreatorProposalService
         $used = [];
         foreach ($pairs as $pair) {
             foreach (['before', 'after'] as $side) {
-                $photoId = (int)($pair[$side]['photo_library_id'] ?? 0);
+                $asset = is_array($pair[$side] ?? null) ? $pair[$side] : [];
+                $photoId = (int)($asset['photo_library_id'] ?? 0);
                 if ($photoId > 0) {
                     $used[$photoId] = true;
                 }
+            }
+            $asset = is_array($pair['asset'] ?? null) ? $pair['asset'] : [];
+            $photoId = (int)($asset['photo_library_id'] ?? 0);
+            if ($photoId > 0) {
+                $used[$photoId] = true;
             }
         }
 
@@ -346,6 +440,27 @@ final class AssetCreatorProposalService
         return $ignored;
     }
 
+    private function applyPayloadDefaults(array $rows, array $payload): array
+    {
+        $defaultTitle = trim((string)($payload['default_title'] ?? ''));
+        $defaultDescription = trim((string)($payload['default_description'] ?? ''));
+        if ($defaultTitle === '' && $defaultDescription === '') {
+            return $rows;
+        }
+
+        return array_map(static function (array $row) use ($defaultTitle, $defaultDescription): array {
+            if ($defaultTitle !== '') {
+                $row['search_title'] = $defaultTitle;
+                $row['title'] = $defaultTitle;
+            }
+            if ($defaultDescription !== '') {
+                $row['description'] = $defaultDescription;
+                $row['caption'] = $defaultDescription;
+            }
+            return $row;
+        }, $rows);
+    }
+
     private function assetPayload(array $row): array
     {
         $relPath = trim((string)($row['asset_rel_path'] ?? $row['photo_rel_path'] ?? $row['set_rel_path'] ?? ''));
@@ -354,6 +469,9 @@ final class AssetCreatorProposalService
             'existing_asset_library_id' => isset($row['existing_asset_library_id']) && (int)$row['existing_asset_library_id'] > 0 ? (int)$row['existing_asset_library_id'] : null,
             'photo_library_id' => isset($row['photo_library_id']) && (int)$row['photo_library_id'] > 0 ? (int)$row['photo_library_id'] : null,
             'permission_photo_library_id' => isset($row['permission_photo_library_id']) && (int)$row['permission_photo_library_id'] > 0 ? (int)$row['permission_photo_library_id'] : null,
+            'saved_palette_id' => isset($row['saved_palette_id']) && (int)$row['saved_palette_id'] > 0 ? (int)$row['saved_palette_id'] : null,
+            'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0 ? (int)$row['saved_palette_set_id'] : null,
+            'palette_hash' => trim((string)($row['palette_hash'] ?? '')) ?: null,
             'photo_type' => (string)($row['photo_type'] ?? ''),
             'title' => (string)($row['asset_title'] ?? $row['photo_title'] ?? ''),
             'caption' => (string)($row['caption'] ?? ''),
@@ -371,11 +489,18 @@ final class AssetCreatorProposalService
         $photoId = (int)($item['photo_library_id'] ?? 0);
         $asset = $photoId > 0 ? $this->photoForCreator($photoId) : null;
         $relPath = trim((string)($asset['rel_path'] ?? $item['image_url'] ?? ''));
+        $savedPaletteId = (int)($item['saved_palette_id'] ?? $asset['saved_palette_id'] ?? 0);
+        $savedPaletteSetId = (int)($item['saved_palette_set_id'] ?? $asset['saved_palette_set_id'] ?? 0);
+        $paletteHash = trim((string)($item['palette_hash'] ?? $asset['palette_hash'] ?? ''));
         return [
             'asset_library_id' => null,
             'existing_asset_library_id' => isset($asset['existing_asset_library_id']) ? (int)$asset['existing_asset_library_id'] : null,
             'photo_library_id' => $photoId > 0 ? $photoId : null,
             'permission_photo_library_id' => $photoId > 0 ? $photoId : null,
+            'saved_palette_id' => $savedPaletteId > 0 ? $savedPaletteId : null,
+            'saved_palette_set_id' => $savedPaletteSetId > 0 ? $savedPaletteSetId : null,
+            'palette_hash' => $paletteHash !== '' ? $paletteHash : null,
+            'ap_id' => isset($item['ap_id']) && (int)$item['ap_id'] > 0 ? (int)$item['ap_id'] : null,
             'photo_type' => '',
             'title' => (string)($asset['title'] ?? $item['title'] ?? ''),
             'caption' => (string)($item['subtitle'] ?? ''),
@@ -394,6 +519,33 @@ final class AssetCreatorProposalService
             'SELECT COALESCE(al_direct.asset_library_id, al_legacy.asset_library_id, pl.asset_library_id) AS existing_asset_library_id,
                     pl.rel_path AS rel_path,
                     pl.title AS title,
+                    (
+                        SELECT sps.saved_palette_id
+                          FROM saved_palette_set_photos spsp
+                          JOIN saved_palette_sets sps
+                            ON sps.id = spsp.saved_palette_set_id
+                         WHERE spsp.photo_library_id = pl.photo_library_id
+                         ORDER BY spsp.id DESC
+                         LIMIT 1
+                    ) AS saved_palette_id,
+                    (
+                        SELECT spsp.saved_palette_set_id
+                          FROM saved_palette_set_photos spsp
+                         WHERE spsp.photo_library_id = pl.photo_library_id
+                         ORDER BY spsp.id DESC
+                         LIMIT 1
+                    ) AS saved_palette_set_id,
+                    (
+                        SELECT sp.palette_hash
+                          FROM saved_palette_set_photos spsp
+                          JOIN saved_palette_sets sps
+                            ON sps.id = spsp.saved_palette_set_id
+                          JOIN saved_palettes sp
+                            ON sp.id = sps.saved_palette_id
+                         WHERE spsp.photo_library_id = pl.photo_library_id
+                         ORDER BY spsp.id DESC
+                         LIMIT 1
+                    ) AS palette_hash,
                     COALESCE(al_direct.client_id, al_legacy.client_id, pl.client_id) AS client_id,
                     pl.photo_library_id AS permission_photo_library_id,
                     c.name AS client_name,
@@ -422,6 +574,23 @@ final class AssetCreatorProposalService
         }
         $playlistTitle = trim($playlistTitle);
         return $playlistTitle !== '' ? $playlistTitle : 'ColorFix before and after';
+    }
+
+    private function defaultIdeaSearchTitle(string $title, string $pinType): string
+    {
+        $title = trim($title);
+        if ($title === '') {
+            return $pinType === 'idea_palette' ? 'ColorFix paint palette' : 'ColorFix color idea';
+        }
+
+        if ($pinType === 'idea_palette' && !preg_match('/\bpalette(s)?\b/i', $title)) {
+            return $title . ' Palettes';
+        }
+        if ($pinType === 'idea' && !preg_match('/\bidea(s)?\b/i', $title)) {
+            return $title . ' Ideas';
+        }
+
+        return $title;
     }
 
     private function defaultDescription(string $playlistTitle, string $pairTitle): string

@@ -86,7 +86,7 @@ const DEFAULT_HUE_WHEEL_CONFIG = {
 const HUE_WHEEL_BODY_TEMPLATE = serializeHueWheelConfig(DEFAULT_HUE_WHEEL_CONFIG);
 
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
-const ANALYZER_ROLES = ["ignore", "before", "after"];
+const ANALYZER_ROLES = ["ignore", "before", "after", "single"];
 
 function slugifyPlaylistValue(value) {
   return String(value || "")
@@ -194,7 +194,6 @@ export default function AdminPlaylistEditorPage() {
   const [photoThumbs, setPhotoThumbs] = useState({});
   const [photoInfo, setPhotoInfo] = useState({});
   const [previewPhoto, setPreviewPhoto] = useState(null);
-  const [linkedInstances, setLinkedInstances] = useState([]);
   const [playing, setPlaying] = useState(false);
   const [hueWheelEditorIndex, setHueWheelEditorIndex] = useState(null);
 
@@ -371,7 +370,6 @@ export default function AdminPlaylistEditorPage() {
 
   const fetchLinkedInstances = useCallback(async (id) => {
     if (!id) {
-      setLinkedInstances([]);
       return [];
     }
     try {
@@ -385,10 +383,8 @@ export default function AdminPlaylistEditorPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlist instances");
       const rows = Array.isArray(data.items) ? data.items : [];
-      setLinkedInstances(rows);
       return rows;
     } catch {
-      setLinkedInstances([]);
       return [];
     }
   }, []);
@@ -398,7 +394,6 @@ export default function AdminPlaylistEditorPage() {
       setPlaylist(emptyPlaylist);
       setItems([]);
       setExpandedItems({});
-      setLinkedInstances([]);
       return;
     }
     fetchPlaylist(playlistId);
@@ -805,6 +800,13 @@ export default function AdminPlaylistEditorPage() {
     await savePlaylist();
   }
 
+  async function handleAnalyzePlaylist() {
+    setSaveError("");
+    const savedPlaylistId = await savePlaylist();
+    if (!savedPlaylistId) return;
+    navigate(`/admin/asset-creators?playlist_id=${encodeURIComponent(String(savedPlaylistId))}&modal=1`);
+  }
+
   async function handleSaveAndPlay() {
     setPlaying(true);
     setSaveError("");
@@ -902,6 +904,13 @@ export default function AdminPlaylistEditorPage() {
           </button>
           <button type="button" onClick={() => navigate("/admin/playlist-instances")}>
             Back to Instances
+          </button>
+          <button
+            type="button"
+            onClick={handleAnalyzePlaylist}
+            disabled={saving || !items.length}
+          >
+            Analyzer
           </button>
           <button
             type="button"
@@ -1043,6 +1052,7 @@ export default function AdminPlaylistEditorPage() {
                   <option value="ignore">ignore</option>
                   <option value="before">before</option>
                   <option value="after">after</option>
+                  <option value="single">single</option>
                 </select>
               </label>
               <label className="item-cell item-title">

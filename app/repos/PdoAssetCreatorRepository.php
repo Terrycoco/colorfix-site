@@ -134,6 +134,15 @@ final class PdoAssetCreatorRepository
         $stmt->execute($params);
     }
 
+    public function deleteJob(int $jobId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM asset_creator_jobs
+              WHERE asset_creator_job_id = :asset_creator_job_id'
+        );
+        $stmt->execute([':asset_creator_job_id' => $jobId]);
+    }
+
     public function replaceInputs(int $jobId, array $inputs): void
     {
         $this->pdo->beginTransaction();

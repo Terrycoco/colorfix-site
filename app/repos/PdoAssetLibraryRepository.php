@@ -245,6 +245,15 @@ final class PdoAssetLibraryRepository
         $this->update($assetLibraryId, ['is_retired' => 1, 'is_inactive' => 1]);
     }
 
+    public function delete(int $assetLibraryId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM asset_library
+              WHERE asset_library_id = :asset_library_id'
+        );
+        $stmt->execute([':asset_library_id' => $assetLibraryId]);
+    }
+
     private function bindablePayload(array $data): array
     {
         $keys = [

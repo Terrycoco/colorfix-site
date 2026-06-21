@@ -11,6 +11,15 @@ function AboutPage() {
         padding: "48px 20px",
       }}
     >
+      <section style={{ maxWidth: 760, textAlign: "center" }}>
+        <h1 style={{ margin: "0 0 16px", fontSize: "clamp(2rem, 5vw, 3.5rem)", lineHeight: 1.05 }}>
+          ColorFix by Terry
+        </h1>
+        <p style={{ margin: 0, color: "#475569", fontSize: "1.1rem", lineHeight: 1.7 }}>
+          ColorFix by Terry is Terry Marr’s home color transformation project, showing how color changes a house, a room, a door, or a detail by controlling where the eye goes.
+        </p>
+      </section>
+
       <AnimatedHueWheel
         animated={true}
         items={[

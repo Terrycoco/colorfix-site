@@ -8,7 +8,11 @@ use RuntimeException;
 
 final class AssetCreatorService
 {
-    public function __construct(private PdoAssetCreatorRepository $repo) {}
+    public function __construct(
+        private PdoAssetCreatorRepository $repo,
+        private ?AssetLibraryService $assetLibrary = null,
+        private string $rootDir = ''
+    ) {}
 
     public function listJobs(array $filters = []): array
     {
@@ -109,6 +113,42 @@ final class AssetCreatorService
         return $job;
     }
 
+    public function deleteJob(int $jobId): array
+    {
+        if ($jobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+
+        $job = $this->repo->findJob($jobId);
+        if (!$job) {
+            throw new RuntimeException('Asset creator job not found');
+        }
+
+        $deletedAssetIds = [];
+        foreach (($job['outputs'] ?? []) as $output) {
+            if (!is_array($output)) {
+                continue;
+            }
+            $assetId = (int)($output['asset_library_id'] ?? 0);
+            if ($assetId <= 0) {
+                continue;
+            }
+            $this->deleteGeneratedOutputFile($jobId, (string)($output['rel_path'] ?? ''));
+            if ($this->assetLibrary) {
+                $this->assetLibrary->deleteAsset($assetId);
+                $deletedAssetIds[] = $assetId;
+            }
+        }
+
+        $this->repo->deleteJob($jobId);
+
+        return [
+            'asset_creator_job_id' => $jobId,
+            'deleted_asset_ids' => $deletedAssetIds,
+            'deleted_count' => count($deletedAssetIds),
+        ];
+    }
+
     private function syncOutputMetadata(int $jobId, array $payload): void
     {
         $instructions = $payload['instructions'] ?? $payload['instructions_json'] ?? null;
@@ -118,6 +158,30 @@ final class AssetCreatorService
         }
         if (is_array($instructions)) {
             $this->repo->syncOutputAssetMetadataFromInstructions($jobId, $instructions);
+        }
+    }
+
+    private function deleteGeneratedOutputFile(int $jobId, string $relPath): void
+    {
+        $root = realpath($this->rootDir);
+        if (!$root) {
+            return;
+        }
+
+        $path = parse_url($relPath, PHP_URL_PATH);
+        $path = $path !== false && $path !== null ? (string)$path : $relPath;
+        $expectedPrefix = "/photos/pins/generated/job-{$jobId}/";
+        if (!str_starts_with($path, $expectedPrefix)) {
+            return;
+        }
+
+        $absPath = $root . DIRECTORY_SEPARATOR . ltrim($path, '/');
+        $dir = realpath(dirname($absPath));
+        if (!$dir || !str_starts_with($dir, $root . DIRECTORY_SEPARATOR)) {
+            return;
+        }
+        if (is_file($absPath)) {
+            @unlink($absPath);
         }
     }
 }

@@ -19,7 +19,7 @@ export async function propose(context = {}) {
     instructions: {
       layout: "vertical_before_after",
       beforeLabel: "BEFORE",
-      afterLabel: "AFTER",
+      afterLabel: "ColorFixed",
       output,
       ...instructions,
     },

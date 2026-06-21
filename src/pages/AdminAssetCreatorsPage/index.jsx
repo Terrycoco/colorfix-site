@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PermissionStatus from "@components/PermissionStatus";
 import "./admin-asset-creators.css";
@@ -9,13 +10,23 @@ const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const PROPOSE_URL = `${API_FOLDER}/v2/admin/asset-creators/propose.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/asset-creators/save.php`;
 const RUN_URL = `${API_FOLDER}/v2/admin/asset-creators/run.php`;
+const DELETE_URL = `${API_FOLDER}/v2/admin/asset-creators/delete.php`;
 
 const CREATOR_TYPES = [
   {
     value: "pinterest.before_after_composite",
-    label: "Composite Pin",
+    label: "Pinterest",
   },
 ];
+
+const PINTEREST_BOARD = {
+  board_name: "ColorFix Makeovers",
+  board_url: "https://www.pinterest.com/terrymarr/colorfix-makeovers/",
+  board_slug: "terrymarr/colorfix-makeovers",
+  board_id: null,
+};
+
+const DEFAULT_ANALYZER_DESCRIPTION = "This [house style / room type] was struggling with [problem]. By [what you changed], the eye is now drawn toward [focal point or benefit]. See the complete before-and-after makeover, color palette, and design reasoning.";
 
 const EMPTY_SIDE = {
   photo_library_id: "",
@@ -25,6 +36,8 @@ const EMPTY_SIDE = {
 };
 
 export default function AdminAssetCreatorsPage() {
+  const [searchParams] = useSearchParams();
+  const autoAnalyzeKeyRef = useRef("");
   const [jobs, setJobs] = useState([]);
   const [jobOutputs, setJobOutputs] = useState({});
   const [jobPermissions, setJobPermissions] = useState({});
@@ -36,6 +49,7 @@ export default function AdminAssetCreatorsPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [runningJobId, setRunningJobId] = useState(null);
+  const [deletingJobId, setDeletingJobId] = useState(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [creatorModalOpen, setCreatorModalOpen] = useState(false);
@@ -44,14 +58,45 @@ export default function AdminAssetCreatorsPage() {
   const [form, setForm] = useState({
     creator_key: CREATOR_TYPES[0].value,
     playlist_id: "",
+    default_title: "",
+    default_description: DEFAULT_ANALYZER_DESCRIPTION,
   });
   const [proposal, setProposal] = useState(null);
   const [pairs, setPairs] = useState([]);
+  const [pinTypeFilter, setPinTypeFilter] = useState("all");
 
   useEffect(() => {
     fetchJobs("");
     fetchPlaylists();
   }, []);
+
+  useEffect(() => {
+    const playlistId = Number(searchParams.get("playlist_id") || 0);
+    const shouldOpenModal = searchParams.get("modal") === "1" || searchParams.get("analyze") === "1";
+    if (!playlistId || !shouldOpenModal) return;
+
+    const requestKey = `${playlistId}:pinterest`;
+    if (autoAnalyzeKeyRef.current === requestKey) return;
+    autoAnalyzeKeyRef.current = requestKey;
+
+    setForm({
+      creator_key: CREATOR_TYPES[0].value,
+      playlist_id: String(playlistId),
+      default_title: "",
+      default_description: DEFAULT_ANALYZER_DESCRIPTION,
+    });
+    setEditingJobId(null);
+    setProposal(null);
+    setPairs([]);
+    setPinTypeFilter("all");
+    setCreatorModalOpen(true);
+    if (searchParams.get("analyze") === "1") {
+      analyzePlaylistById(playlistId, CREATOR_TYPES[0].value, {
+        default_title: "",
+        default_description: DEFAULT_ANALYZER_DESCRIPTION,
+      });
+    }
+  }, [searchParams]);
 
   async function fetchJobs(nextQ = q) {
     setLoading(true);
@@ -125,26 +170,40 @@ export default function AdminAssetCreatorsPage() {
       setError("Pick a playlist first.");
       return;
     }
+    await analyzePlaylistById(Number(form.playlist_id), form.creator_key, {
+      default_title: form.default_title,
+      default_description: form.default_description,
+    });
+  }
+
+  async function analyzePlaylistById(playlistId, creatorKey = CREATOR_TYPES[0].value, defaults = {}) {
+    if (!playlistId) {
+      setError("Pick a playlist first.");
+      return;
+    }
     setAnalyzing(true);
     setError("");
     setStatus("");
     setProposal(null);
     setPairs([]);
+    setPinTypeFilter("all");
     try {
       const res = await fetch(PROPOSE_URL, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          creator_key: form.creator_key,
+          creator_key: creatorKey,
           source_type: "playlist",
-          playlist_id: Number(form.playlist_id),
+          playlist_id: Number(playlistId),
+          default_title: defaults.default_title || "",
+          default_description: defaults.default_description || "",
         }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to analyze playlist");
       setProposal(data.item);
-      setPairs((data.item?.pairs || []).map(normalizePair));
+      setPairs((data.item?.pin_rows || data.item?.pairs || []).map(normalizePair));
     } catch (err) {
       setError(err?.message || "Failed to analyze playlist");
     } finally {
@@ -179,8 +238,11 @@ export default function AdminAssetCreatorsPage() {
         pin_description: pair.description || pair.caption || "",
         title: pair.search_title || pair.title || "",
         caption: pair.description || pair.caption || "",
+        pin_type: pair.pin_type || "composite",
+        asset_type: assetTypeForPinType(pair.pin_type),
         before: normalizeRecipeSide(pair.before),
         after: normalizeRecipeSide(pair.after),
+        asset: normalizeRecipeSide(pair.pin_type === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
       }));
       const payload = {
         asset_creator_job_id: editingJobId || undefined,
@@ -197,7 +259,13 @@ export default function AdminAssetCreatorsPage() {
             playlist_id: Number(form.playlist_id),
             title: playlist.title || proposal.playlist?.title || "",
           },
-          recipe_type: "before_after_pairs",
+          recipe_type: "pinterest_pin_rows",
+          pinterest_board: PINTEREST_BOARD,
+          analyzer_defaults: {
+            title: form.default_title || "",
+            description: form.default_description || "",
+          },
+          pin_rows: reviewedPairs,
           pairs: reviewedPairs,
           warnings: proposal.warnings || [],
         },
@@ -268,6 +336,43 @@ export default function AdminAssetCreatorsPage() {
     }
   }
 
+  async function deleteCreatorJob(jobId) {
+    if (!jobId) return;
+    const ok = window.confirm(`Delete creator job #${jobId} and its generated assets?`);
+    if (!ok) return;
+
+    setDeletingJobId(jobId);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_creator_job_id: jobId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to delete creator job");
+      setJobs((current) => current.filter((job) => Number(job.asset_creator_job_id) !== Number(jobId)));
+      setJobOutputs((current) => {
+        const next = { ...current };
+        delete next[jobId];
+        return next;
+      });
+      setJobPermissions((current) => {
+        const next = { ...current };
+        delete next[jobId];
+        return next;
+      });
+      setStatus(`Deleted creator job #${jobId}.`);
+      await fetchJobs(q);
+    } catch (err) {
+      setError(err?.message || "Failed to delete creator job");
+    } finally {
+      setDeletingJobId(null);
+    }
+  }
+
   async function saveAndRunRecipe() {
     const saved = await saveRecipe({ closeModal: false, showStatus: false });
     const jobId = saved?.asset_creator_job_id || editingJobId;
@@ -302,6 +407,8 @@ export default function AdminAssetCreatorsPage() {
         confidence: 1,
         search_title: "",
         description: "",
+        pin_type: "composite",
+        asset_type: "pin_composite",
         before: EMPTY_SIDE,
         after: EMPTY_SIDE,
       }),
@@ -336,10 +443,11 @@ export default function AdminAssetCreatorsPage() {
         title: source.title || job.title || "",
       };
       const nextPairs = withLiveInputPermissions(
-        Array.isArray(instructions.pairs) ? instructions.pairs : [],
+        Array.isArray(instructions.pin_rows) ? instructions.pin_rows : (Array.isArray(instructions.pairs) ? instructions.pairs : []),
         job.inputs || []
       );
       const outputs = job.outputs || [];
+      const analyzerDefaults = analyzerDefaultsFromInstructions(instructions, nextPairs);
 
       setEditingJobId(job.asset_creator_job_id || jobId);
       setJobOutputs((current) => ({
@@ -349,6 +457,8 @@ export default function AdminAssetCreatorsPage() {
       setForm({
         creator_key: job.creator_key || instructions.creator_key || CREATOR_TYPES[0].value,
         playlist_id: playlistId ? String(playlistId) : "",
+        default_title: analyzerDefaults.title,
+        default_description: analyzerDefaults.description,
       });
       setProposal({
         creator_key: job.creator_key || instructions.creator_key || CREATOR_TYPES[0].value,
@@ -385,9 +495,12 @@ export default function AdminAssetCreatorsPage() {
     setForm({
       creator_key: CREATOR_TYPES[0].value,
       playlist_id: "",
+      default_title: "",
+      default_description: DEFAULT_ANALYZER_DESCRIPTION,
     });
     setProposal(null);
     setPairs([]);
+    setPinTypeFilter("all");
     setCreatorModalOpen(true);
     if (!playlists.length) {
       fetchPlaylists();
@@ -409,6 +522,20 @@ export default function AdminAssetCreatorsPage() {
     });
   }
 
+  function moveImagePreview(direction) {
+    setImagePreview((current) => {
+      const items = Array.isArray(current?.items) ? current.items : [];
+      if (!items.length) return current;
+      const currentIndex = Number(current?.index || 0);
+      const nextIndex = (currentIndex + direction + items.length) % items.length;
+      return outputPreviewFromItems(items, nextIndex);
+    });
+  }
+
+  const visiblePairs = pairs
+    .map((pair, index) => ({ pair, index }))
+    .filter(({ pair }) => pinTypeFilter === "all" || (pair.pin_type || "composite") === pinTypeFilter);
+
   return (
     <div className="admin-asset-creators">
       <header className="assetcreator-header">
@@ -417,7 +544,7 @@ export default function AdminAssetCreatorsPage() {
           <p>Recipes that create new files from playlist and library ingredients.</p>
         </div>
         <button type="button" className="assetcreator-command assetcreator-command--primary" onClick={openNewCreatorModal}>
-          New Creator Job
+          Analyzer
         </button>
       </header>
 
@@ -443,7 +570,7 @@ export default function AdminAssetCreatorsPage() {
             <tr>
               <th>Job ID</th>
               <th>Actions</th>
-              <th>Creator</th>
+              <th>Channel</th>
               <th>Status</th>
               <th>Title</th>
               <th>Source</th>
@@ -476,12 +603,20 @@ export default function AdminAssetCreatorsPage() {
                     type="button"
                     className="assetcreator-mini"
                     onClick={() => runCreatorJob(job.asset_creator_job_id)}
-                    disabled={!!runningJobId || loadingJob}
+                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id}
                   >
                     {runningJobId === job.asset_creator_job_id ? "Running..." : "Run"}
                   </button>
+                  <button
+                    type="button"
+                    className="assetcreator-mini assetcreator-mini--danger"
+                    onClick={() => deleteCreatorJob(job.asset_creator_job_id)}
+                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id}
+                  >
+                    {deletingJobId === job.asset_creator_job_id ? "Deleting..." : "Delete"}
+                  </button>
                 </td>
-                <td>{job.creator_key}</td>
+                <td>{creatorLabel(job.creator_key)}</td>
                 <td>{job.status}</td>
                 <td>{job.title || "-"}</td>
                 <td>{sourceLabel(job)}</td>
@@ -505,14 +640,14 @@ export default function AdminAssetCreatorsPage() {
 
       {creatorModalOpen ? (
         <div className="assetcreator-modal-backdrop">
-          <div className="assetcreator-modal" role="dialog" aria-modal="true" aria-label="New creator job">
+          <div className="assetcreator-modal" role="dialog" aria-modal="true" aria-label="Analyzer">
             <header className="assetcreator-modal-head">
               <div>
-                <h2>{editingJobId ? `Edit Creator Job #${editingJobId}` : "New Creator Job"}</h2>
+                <h2>{editingJobId ? `Analyzer Job #${editingJobId}` : "Analyzer"}</h2>
                 <p>
                   {editingJobId
                     ? "Adjust the saved recipe, then save it back to this job."
-                    : "Analyze a playlist, then adjust the proposed recipe before saving it."}
+                    : "What is possible from this playlist?"}
                 </p>
               </div>
               <button type="button" className="assetcreator-command" onClick={closeNewCreatorModal}>
@@ -523,7 +658,7 @@ export default function AdminAssetCreatorsPage() {
             <section className="assetcreator-launch assetcreator-launch--modal">
               <form className="assetcreator-launch-form" onSubmit={analyzePlaylist}>
                 <label>
-                  Type
+                  Channel
                   <select
                     value={form.creator_key}
                     onChange={(event) => setForm((current) => ({ ...current, creator_key: event.target.value }))}
@@ -550,6 +685,22 @@ export default function AdminAssetCreatorsPage() {
                     ))}
                   </select>
                 </label>
+                <label className="assetcreator-default-title-field">
+                  Default Title
+                  <input
+                    value={form.default_title}
+                    placeholder="Leave blank for analyzer titles"
+                    onChange={(event) => setForm((current) => ({ ...current, default_title: event.target.value }))}
+                  />
+                </label>
+                <label className="assetcreator-default-description-field">
+                  Default Description
+                  <textarea
+                    value={form.default_description}
+                    rows={3}
+                    onChange={(event) => setForm((current) => ({ ...current, default_description: event.target.value }))}
+                  />
+                </label>
                 <button type="submit" className="assetcreator-command assetcreator-command--primary" disabled={analyzing}>
                   {analyzing ? "Analyzing..." : "Analyze"}
                 </button>
@@ -564,38 +715,16 @@ export default function AdminAssetCreatorsPage() {
             {editingJobId && jobOutputs[editingJobId]?.length ? (
               <section className="assetcreator-outputs">
                 <h2>Created Assets</h2>
-                <div className="assetcreator-output-list">
-                  {jobOutputs[editingJobId].map((output) => (
-                    (() => {
-                      const previewUrl = versionedAssetUrl(output.public_url || output.rel_path, output);
-                      return (
-                    <button
-                      type="button"
-                      key={output.asset_creator_output_id || output.asset_library_id}
-                      className="assetcreator-output-card"
-                      onClick={() =>
-                        toggleImagePreview({
-                          public_url: previewUrl,
-                          title: output.title || `Asset #${output.asset_library_id}`,
-                          side: "Generated",
-                          asset_library_id: output.asset_library_id,
-                          ...permissionProps(output),
-                        })
-                      }
-                    >
-                      {previewUrl ? (
-                        <img src={previewUrl} alt="" />
-                      ) : null}
-                      <span>
-                        Asset #{output.asset_library_id}
-                        <br />
-                        Preview pin
-                      </span>
-                    </button>
-                      );
-                    })()
-                  ))}
-                </div>
+                <span>
+                  {jobOutputs[editingJobId].length} asset{jobOutputs[editingJobId].length === 1 ? "" : "s"} created
+                </span>
+                <button
+                  type="button"
+                  className="assetcreator-mini assetcreator-mini--strong"
+                  onClick={() => toggleImagePreview(outputPreviewFromItems(jobOutputs[editingJobId], 0))}
+                >
+                  Preview assets
+                </button>
               </section>
             ) : null}
 
@@ -603,14 +732,24 @@ export default function AdminAssetCreatorsPage() {
               <section className="assetcreator-proposal">
                 <div className="assetcreator-proposal-head">
                   <div>
-                    <h2>Proposed Pairs</h2>
+                    <h2>Possible Pins</h2>
                     <p>
-                      {proposal.playlist?.title || "Playlist"} · {pairs.length} pair{pairs.length === 1 ? "" : "s"}
+                      {proposal.playlist?.title || "Playlist"} · {pairs.length} row{pairs.length === 1 ? "" : "s"}
+                      {pinTypeFilter !== "all" ? ` · showing ${visiblePairs.length}` : ""}
                     </p>
                   </div>
                   <div className="assetcreator-proposal-actions">
+                    <label className="assetcreator-inline-filter">
+                      Pin Type
+                      <select value={pinTypeFilter} onChange={(event) => setPinTypeFilter(event.target.value)}>
+                        <option value="all">All</option>
+                        <option value="composite">Composite</option>
+                        <option value="idea">Idea</option>
+                        <option value="idea_palette">Idea + Palette</option>
+                      </select>
+                    </label>
                     <button type="button" className="assetcreator-command" onClick={addPair}>
-                      Add Pair
+                      Add Row
                     </button>
                     <button
                       type="button"
@@ -643,8 +782,9 @@ export default function AdminAssetCreatorsPage() {
                       <tr>
                         <th>Use</th>
                         <th>Order</th>
+                        <th>Type</th>
                         <th>Before</th>
-                        <th>After</th>
+                        <th>Photo / After</th>
                         <th>Search Title</th>
                         <th>Description</th>
                         <th>Source</th>
@@ -652,7 +792,7 @@ export default function AdminAssetCreatorsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pairs.map((pair, index) => (
+                      {visiblePairs.map(({ pair, index }) => (
                         <tr key={pair.pair_key || index}>
                           <td className="assetcreator-use-cell">
                             <input
@@ -662,12 +802,23 @@ export default function AdminAssetCreatorsPage() {
                             />
                           </td>
                           <td className="assetcreator-order-cell">{index + 1}</td>
-                          <td>{renderSideEditor(pair, index, "before", updatePairSide, toggleImagePreview)}</td>
+                          <td>
+                            <select
+                              value={pair.pin_type || "composite"}
+                              onChange={(event) => updatePair(index, "pin_type", event.target.value)}
+                            >
+                              <option value="composite">composite</option>
+                              <option value="idea">idea</option>
+                              <option value="idea_palette">idea_palette</option>
+                            </select>
+                          </td>
+                          <td>{pair.pin_type === "composite" ? renderSideEditor(pair, index, "before", updatePairSide, toggleImagePreview) : "-"}</td>
                           <td>{renderSideEditor(pair, index, "after", updatePairSide, toggleImagePreview)}</td>
                           <td>
-                            <input
+                            <textarea
                               className="assetcreator-title-input"
                               value={pair.search_title}
+                              rows={3}
                               onChange={(event) => updatePair(index, "search_title", event.target.value)}
                             />
                           </td>
@@ -675,6 +826,7 @@ export default function AdminAssetCreatorsPage() {
                             <textarea
                               className="assetcreator-description-input"
                               value={pair.description}
+                              wrap="soft"
                               onChange={(event) => updatePair(index, "description", event.target.value)}
                             />
                           </td>
@@ -697,8 +849,14 @@ export default function AdminAssetCreatorsPage() {
                       ))}
                       {pairs.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="assetcreator-empty">
-                            No pairs yet. Add a pair manually.
+                          <td colSpan={9} className="assetcreator-empty">
+                            No possible pins yet. Add a row manually.
+                          </td>
+                        </tr>
+                      ) : visiblePairs.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="assetcreator-empty">
+                            No rows match this pin type filter.
                           </td>
                         </tr>
                       ) : null}
@@ -708,7 +866,7 @@ export default function AdminAssetCreatorsPage() {
               </section>
             ) : (
               <div className="assetcreator-modal-empty">
-                Pick a creator type and playlist, then click Analyze.
+                Pick a channel and playlist, then click Analyze.
               </div>
             )}
           </div>
@@ -723,21 +881,44 @@ export default function AdminAssetCreatorsPage() {
           aria-label="Image preview"
           onClick={() => setImagePreview(null)}
         >
-          <div className="assetcreator-image-preview__panel">
+          <div className="assetcreator-image-preview__panel" onClick={(event) => event.stopPropagation()}>
             <div className="assetcreator-image-preview__head">
               <div>
-                <h2>{imagePreview.title || "Preview"}</h2>
+                <h2>{imagePreview.pin_type_label || "Pin Source"}</h2>
                 <p>
-                  {imagePreview.side ? `${imagePreview.side} photo` : "Photo"}
+                  {imagePreview.title || "Preview"}
                   {imagePreview.photo_library_id ? ` #${imagePreview.photo_library_id}` : ""}
                   {imagePreview.asset_library_id ? ` #${imagePreview.asset_library_id}` : ""}
+                  {imagePreview.items?.length ? ` · ${Number(imagePreview.index || 0) + 1} of ${imagePreview.items.length}` : ""}
                 </p>
               </div>
               <button type="button" className="assetcreator-command" onClick={() => setImagePreview(null)}>
                 Close
               </button>
             </div>
-            <img src={imagePreview.public_url} alt={imagePreview.title || ""} />
+            <div className="assetcreator-image-preview__body">
+              {imagePreview.items?.length > 1 ? (
+                <button
+                  type="button"
+                  className="assetcreator-image-preview__nav assetcreator-image-preview__nav--prev"
+                  aria-label="Previous asset"
+                  onClick={() => moveImagePreview(-1)}
+                >
+                  &lt;
+                </button>
+              ) : null}
+              <img src={imagePreview.public_url} alt={imagePreview.title || ""} />
+              {imagePreview.items?.length > 1 ? (
+                <button
+                  type="button"
+                  className="assetcreator-image-preview__nav assetcreator-image-preview__nav--next"
+                  aria-label="Next asset"
+                  onClick={() => moveImagePreview(1)}
+                >
+                  &gt;
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -759,7 +940,8 @@ function formatShortDateTime(value) {
 }
 
 function renderOutputPreview(outputs = [], openImagePreview = () => {}) {
-  const first = Array.isArray(outputs) ? outputs[0] : null;
+  const items = Array.isArray(outputs) ? outputs : [];
+  const first = items[0] || null;
   if (!first) return "-";
   const url = versionedAssetUrl(first.public_url || first.rel_path || "", first);
   if (!url) return `Asset #${first.asset_library_id}`;
@@ -767,22 +949,64 @@ function renderOutputPreview(outputs = [], openImagePreview = () => {}) {
     <button
       type="button"
       className="assetcreator-output-preview"
-      onClick={() =>
-        openImagePreview({
-          public_url: url,
-          title: first.title || `Asset #${first.asset_library_id}`,
-          side: "Generated",
-          asset_library_id: first.asset_library_id,
-          ...permissionProps(first),
-        })
-      }
+      onClick={() => openImagePreview(outputPreviewFromItems(items, 0))}
     >
       <img src={url} alt="" />
       <span className="assetcreator-output-preview__label">
         <span>Asset #{first.asset_library_id}</span>
+        {items.length > 1 ? <span>+{items.length - 1}</span> : null}
       </span>
     </button>
   );
+}
+
+function outputPreviewFromItems(outputs = [], index = 0) {
+  const items = (Array.isArray(outputs) ? outputs : [])
+    .map(normalizeOutputPreviewItem)
+    .filter((item) => item.public_url);
+  const safeIndex = Math.min(Math.max(Number(index || 0), 0), Math.max(items.length - 1, 0));
+  const item = items[safeIndex] || {};
+  return {
+    ...item,
+    index: safeIndex,
+    items,
+  };
+}
+
+function normalizeOutputPreviewItem(output = {}) {
+  const metadata = parseInstructions(output.metadata_json);
+  const pinType = inferOutputPinType(output, metadata);
+  return {
+    public_url: versionedAssetUrl(output.public_url || output.rel_path || "", output),
+    title: output.title || metadata.search_title || `Asset #${output.asset_library_id}`,
+    side: "Generated",
+    pin_type: pinType,
+    pin_type_label: pinTypeLabel(pinType),
+    asset_library_id: output.asset_library_id,
+    photo_library_id: output.photo_library_id,
+    ...permissionProps(output),
+  };
+}
+
+function inferOutputPinType(output = {}, metadata = {}) {
+  const direct = String(metadata.pin_type || output.pin_type || "").trim();
+  if (direct) return direct;
+  const assetType = String(metadata.asset_type || output.asset_type || "").trim();
+  if (assetType === "pin_composite") return "composite";
+  if (assetType === "pin_idea") return "idea";
+  if (assetType === "pin_idea_palette") return "idea_palette";
+  const path = String(output.rel_path || output.public_url || "").toLowerCase();
+  if (path.includes("idea-palette") || path.includes("idea_palette")) return "idea_palette";
+  if (path.includes("idea")) return "idea";
+  if (path.includes("composite") || path.includes("before_after")) return "composite";
+  return "";
+}
+
+function pinTypeLabel(pinType) {
+  if (pinType === "composite") return "Composite Pin";
+  if (pinType === "idea") return "Idea Pin";
+  if (pinType === "idea_palette") return "Idea + Palette Pin";
+  return "";
 }
 
 function firstPermissionItem(items = []) {
@@ -827,9 +1051,35 @@ function parseInstructions(value) {
   }
 }
 
+function analyzerDefaultsFromInstructions(instructions = {}, pairs = []) {
+  const defaults = instructions.analyzer_defaults || instructions.analyzerDefaults || {};
+  const title = String(defaults.title || defaults.default_title || "").trim();
+  const description = String(defaults.description || defaults.default_description || "").trim();
+  if (title || description) {
+    return {
+      title,
+      description: description || DEFAULT_ANALYZER_DESCRIPTION,
+    };
+  }
+
+  const firstPair = (Array.isArray(pairs) ? pairs : []).find(Boolean) || {};
+  return {
+    title: String(firstPair.search_title || firstPair.pin_title || firstPair.title || "").trim(),
+    description: String(
+      firstPair.description
+        || firstPair.pin_description
+        || firstPair.caption
+        || DEFAULT_ANALYZER_DESCRIPTION
+    ).trim(),
+  };
+}
+
 function normalizePair(pair) {
+  const pinType = pair.pin_type || "composite";
   return {
     pair_key: pair.pair_key || `pair-${Date.now()}-${Math.random()}`,
+    pin_type: pinType,
+    asset_type: assetTypeForPinType(pinType),
     include: pair.include !== false,
     sort_order: pair.sort_order || 0,
     source: pair.source || "manual",
@@ -838,7 +1088,14 @@ function normalizePair(pair) {
     description: pair.description || pair.pin_description || pair.caption || "",
     before: { ...EMPTY_SIDE, ...(pair.before || {}) },
     after: { ...EMPTY_SIDE, ...(pair.after || {}) },
+    asset: { ...EMPTY_SIDE, ...(pair.asset || pair.after || {}) },
   };
+}
+
+function assetTypeForPinType(pinType = "composite") {
+  if (pinType === "idea_palette") return "pin_idea_palette";
+  if (pinType === "idea") return "pin_idea";
+  return "pin_composite";
 }
 
 function withLiveInputPermissions(pairs, inputs = []) {
@@ -884,6 +1141,10 @@ function normalizeRecipeSide(side) {
   return {
     asset_library_id: nullableNumber(value.asset_library_id),
     photo_library_id: nullableNumber(value.photo_library_id),
+    saved_palette_id: nullableNumber(value.saved_palette_id),
+    saved_palette_set_id: nullableNumber(value.saved_palette_set_id),
+    palette_hash: value.palette_hash || "",
+    ap_id: nullableNumber(value.ap_id),
     title: value.title || "",
     public_url: value.public_url || "",
     client_id: nullableNumber(value.client_id),
@@ -897,17 +1158,24 @@ function buildRecipeInputs(reviewedPairs) {
   const inputs = [];
   reviewedPairs.forEach((pair, index) => {
     if (!pair.include) return;
-    ["before", "after"].forEach((side, sideIndex) => {
+    const sides = pair.pin_type === "composite" ? ["before", "after"] : ["asset"];
+    sides.forEach((side, sideIndex) => {
       const value = pair[side] || EMPTY_SIDE;
       inputs.push({
         asset_library_id: nullableNumber(value.asset_library_id),
-        role: side,
+        role: side === "asset" ? "source" : side,
         sort_order: index + 1 + sideIndex / 10,
         metadata_json: {
           pair_key: pair.pair_key || `pair-${index + 1}`,
           pair_order: index + 1,
+          pin_type: pair.pin_type || "composite",
+          asset_type: assetTypeForPinType(pair.pin_type),
           side,
           photo_library_id: nullableNumber(value.photo_library_id),
+          saved_palette_id: nullableNumber(value.saved_palette_id),
+          saved_palette_set_id: nullableNumber(value.saved_palette_set_id),
+          palette_hash: value.palette_hash || "",
+          ap_id: nullableNumber(value.ap_id),
           title: value.title || "",
           public_url: value.public_url || "",
           client_id: nullableNumber(value.client_id),
@@ -934,6 +1202,7 @@ function nullableNumber(value) {
 
 function renderSideEditor(pair, index, side, updatePairSide, openImagePreview) {
   const value = pair[side] || EMPTY_SIDE;
+  const pinType = pair.pin_type || "composite";
   return (
     <div className="assetcreator-side-editor">
       {value.public_url ? (
@@ -946,6 +1215,8 @@ function renderSideEditor(pair, index, side, updatePairSide, openImagePreview) {
               openImagePreview({
                 ...value,
                 side,
+                pin_type: pinType,
+                pin_type_label: pinTypeLabel(pinType),
               })
             }
           >

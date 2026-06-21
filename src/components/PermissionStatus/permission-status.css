@@ -87,10 +87,11 @@
   top: calc(100% + 6px);
   left: 0;
   display: grid;
-  gap: 3px;
-  min-width: 210px;
-  padding: 8px;
+  gap: 4px;
+  min-width: 250px;
+  padding: 10px;
   border: 1px solid #c8c8c8;
+  border-radius: 4px;
   background: #fff;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
 }
@@ -104,10 +105,12 @@
 }
 
 .permission-status-menu__option {
-  display: flex;
+  display: grid;
+  grid-template-columns: 18px 18px 1fr;
   align-items: center;
-  gap: 7px;
-  padding: 5px 4px;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 3px;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
@@ -119,33 +122,73 @@
 }
 
 .permission-status-menu__option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.permission-status-menu__dot {
   width: 14px;
   height: 14px;
-  margin: 0;
+  border: 2px solid #6b7280;
+  border-radius: 999px;
+  background: #9ca3af;
+}
+
+.permission-status-menu__dot--not_needed,
+.permission-status-menu__dot--granted {
+  border-color: #047857;
+  background: #10b981;
+}
+
+.permission-status-menu__dot--requested {
+  border-color: #a16207;
+  background: #facc15;
+}
+
+.permission-status-menu__dot--declined {
+  border-color: #991b1b;
+  background: #ef4444;
+}
+
+.permission-status-menu__dot--default {
+  border-color: #4b5563;
+  background: transparent;
 }
 
 .permission-status-menu__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 6px;
-  padding-top: 6px;
+  gap: 8px;
+  padding-top: 8px;
 }
 
 .permission-status-menu button {
   border: 1px solid #999;
   border-radius: 2px;
   background: #f7f7f7;
-  padding: 5px 8px;
+  color: #111;
+  min-width: 74px;
+  padding: 6px 9px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
+  line-height: 1.15;
   cursor: pointer;
+  text-align: center;
 }
 
 .permission-status-menu__save {
   border-color: #111 !important;
   background: #111 !important;
-  color: #fff;
+  color: #fff !important;
+  min-width: 108px;
+}
+
+.permission-status-menu__save span {
+  color: #fff !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .permission-status-menu button:disabled {

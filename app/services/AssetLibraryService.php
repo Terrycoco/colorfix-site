@@ -99,6 +99,11 @@ final class AssetLibraryService
         $this->repo->retire($assetLibraryId);
     }
 
+    public function deleteAsset(int $assetLibraryId): void
+    {
+        $this->repo->delete($assetLibraryId);
+    }
+
     public function publicUrlForRelPath(string $relPath): string
     {
         $relPath = trim($relPath);

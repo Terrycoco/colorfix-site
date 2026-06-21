@@ -5,13 +5,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(20
 header('Content-Type: application/json; charset=UTF-8');
 header('Cache-Control: no-store');
 
-require_once __DIR__ . '/../../../../autoload.php';
-require_once __DIR__ . '/../../../../db.php';
+require_once __DIR__ . '/../../../autoload.php';
+require_once __DIR__ . '/../../../db.php';
 
-use App\Repos\PdoPublishingRepository;
-use App\Repos\PdoPublisherRepository;
-use App\Controllers\PinterestPublishingController;
-use App\Services\PinterestPublishingService;
+use App\Controllers\AssetCreatorController;
+use App\Repos\PdoAssetCreatorRepository;
+use App\Repos\PdoAssetLibraryRepository;
+use App\Services\AssetCreatorService;
+use App\Services\AssetLibraryService;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -28,13 +29,20 @@ try {
     if (!is_array($payload)) {
         respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
     }
-    $controller = new PinterestPublishingController(
-        new PinterestPublishingService(
-            new PdoPublishingRepository($pdo),
-            new PdoPublisherRepository($pdo)
+
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $baseUrl = $host !== '' ? $scheme . '://' . $host : '';
+    $rootDir = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 4)), '/');
+
+    $controller = new AssetCreatorController(
+        new AssetCreatorService(
+            new PdoAssetCreatorRepository($pdo),
+            new AssetLibraryService(new PdoAssetLibraryRepository($pdo), $baseUrl),
+            $rootDir
         )
     );
-    respond($controller->save($payload));
+    respond($controller->delete($payload));
 } catch (RuntimeException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);
 } catch (Throwable $e) {

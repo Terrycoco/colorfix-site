@@ -52,4 +52,13 @@ final class AssetCreatorController
         }
         return ['ok' => true, 'item' => $this->service->addOutput($jobId, $payload)];
     }
+
+    public function delete(array $payload): array
+    {
+        $jobId = (int)($payload['asset_creator_job_id'] ?? $payload['id'] ?? 0);
+        if ($jobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+        return ['ok' => true, 'item' => $this->service->deleteJob($jobId)];
+    }
 }

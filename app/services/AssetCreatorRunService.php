@@ -5,6 +5,9 @@ namespace App\Services;
 
 use App\Lib\AppTime;
 use App\Repos\PdoAssetCreatorRepository;
+use App\Services\AssetCreators\PinterestIdeaPalettePinCreator;
+use App\Services\AssetCreators\PinterestIdeaPinCreator;
+use App\Services\AssetCreators\PinterestPinRenderToolkit;
 use PDO;
 use RuntimeException;
 
@@ -14,10 +17,10 @@ final class AssetCreatorRunService
     private const PIN_HEIGHT = 1500;
     private const CREATOR_PIN_COMPOSITE = 'pinterest.before_after_composite';
     private const PIN_LOGO_FILE = 'colorfix-pin-logo-compact-right-aligned-transparent.png';
-    private const PIN_LOGO_WIDTH = 210;
-    private const PIN_LOGO_MARGIN = 32;
-    private const PIN_LOGO_BADGE_PADDING = 14;
-    private const PIN_LOGO_BADGE_RADIUS = 10;
+    private const PIN_LOGO_WIDTH = 188;
+    private const PIN_LOGO_MARGIN = 20;
+    private const PIN_LOGO_BADGE_PADDING = 12;
+    private const PIN_LOGO_BADGE_RADIUS = 8;
 
     public function __construct(
         private PdoAssetCreatorRepository $creatorRepo,
@@ -47,19 +50,26 @@ final class AssetCreatorRunService
         }
 
         $instructions = $this->decodeJsonObject($job['instructions_json'] ?? null);
+        $recipePairs = is_array($instructions['pairs'] ?? null)
+            ? $instructions['pairs']
+            : (is_array($instructions['pin_rows'] ?? null) ? $instructions['pin_rows'] : []);
         $pairs = array_values(array_filter(
-            is_array($instructions['pairs'] ?? null) ? $instructions['pairs'] : [],
+            $recipePairs,
             static fn(mixed $pair): bool => is_array($pair) && ($pair['include'] ?? true) !== false
         ));
 
         if (!$pairs) {
-            throw new RuntimeException('No included pairs found in this creator recipe.');
+            throw new RuntimeException('No included pin rows found in this creator recipe.');
         }
+
+        $previousOutputAssets = $this->outputAssets($job['outputs'] ?? []);
 
         $outputs = [];
         foreach ($pairs as $idx => $pair) {
-            $outputs[] = $this->createCompositePin($job, $pair, $idx + 1);
+            $outputs[] = $this->createPin($job, $pair, $idx + 1);
         }
+
+        $currentOutputAssetIds = $this->outputAssetIds($outputs);
 
         $this->creatorRepo->replaceOutputs($jobId, array_map(
             static fn(array $output): array => [
@@ -71,6 +81,8 @@ final class AssetCreatorRunService
             ],
             $outputs
         ));
+
+        $deletedAssetIds = $this->deleteReplacedOutputAssets($jobId, $previousOutputAssets, $currentOutputAssetIds);
 
         $this->creatorRepo->updateJob($jobId, [
             'status' => 'generated',
@@ -85,7 +97,94 @@ final class AssetCreatorRunService
         return [
             'job' => $updated,
             'outputs' => $outputs,
+            'deleted_asset_ids' => $deletedAssetIds,
+            'deleted_count' => count($deletedAssetIds),
         ];
+    }
+
+    private function outputAssets(array $outputs): array
+    {
+        $assets = [];
+        foreach ($outputs as $output) {
+            if (!is_array($output)) {
+                continue;
+            }
+            $assetId = (int)($output['asset_library_id'] ?? 0);
+            if ($assetId <= 0) {
+                continue;
+            }
+            $assets[$assetId] = [
+                'asset_library_id' => $assetId,
+                'rel_path' => trim((string)($output['rel_path'] ?? '')),
+            ];
+        }
+        return $assets;
+    }
+
+    private function outputAssetIds(array $outputs): array
+    {
+        $ids = [];
+        foreach ($outputs as $output) {
+            if (!is_array($output)) {
+                continue;
+            }
+            $assetId = (int)($output['asset_library_id'] ?? 0);
+            if ($assetId > 0) {
+                $ids[$assetId] = $assetId;
+            }
+        }
+        return array_values($ids);
+    }
+
+    private function deleteReplacedOutputAssets(int $jobId, array $previousAssets, array $currentAssetIds): array
+    {
+        $deleted = [];
+        $current = array_fill_keys($currentAssetIds, true);
+        foreach ($previousAssets as $assetId => $asset) {
+            if (isset($current[$assetId])) {
+                continue;
+            }
+            $this->deleteGeneratedOutputFile($jobId, (string)($asset['rel_path'] ?? ''));
+            $this->assetLibrary->deleteAsset((int)$assetId);
+            $deleted[] = (int)$assetId;
+        }
+        return $deleted;
+    }
+
+    private function deleteGeneratedOutputFile(int $jobId, string $relPath): void
+    {
+        $path = parse_url($relPath, PHP_URL_PATH);
+        $path = $path !== false && $path !== null ? (string)$path : $relPath;
+        $expectedPrefix = "/photos/pins/generated/job-{$jobId}/";
+        if (!str_starts_with($path, $expectedPrefix)) {
+            return;
+        }
+
+        $absPath = $this->absolutePathForRelPath($path);
+        $root = realpath($this->rootDir);
+        $dir = realpath(dirname($absPath));
+        if (!$root || !$dir || !str_starts_with($dir, $root . DIRECTORY_SEPARATOR)) {
+            return;
+        }
+        if (is_file($absPath)) {
+            @unlink($absPath);
+        }
+    }
+
+    private function createPin(array $job, array $pair, int $pairOrder): array
+    {
+        $pinType = trim((string)($pair['pin_type'] ?? 'composite'));
+        return match ($pinType) {
+            'idea' => (new PinterestIdeaPinCreator($this->pinRenderToolkit()))->create($job, $pair, $pairOrder),
+            'idea_palette' => (new PinterestIdeaPalettePinCreator($this->pinRenderToolkit()))->create($job, $pair, $pairOrder),
+            'composite', '' => $this->createCompositePin($job, $pair, $pairOrder),
+            default => throw new RuntimeException("Unsupported pin type: {$pinType}"),
+        };
+    }
+
+    private function pinRenderToolkit(): PinterestPinRenderToolkit
+    {
+        return new PinterestPinRenderToolkit($this->assetLibrary, $this->rootDir, $this->pdo);
     }
 
     private function createCompositePin(array $job, array $pair, int $pairOrder): array
@@ -105,8 +204,9 @@ final class AssetCreatorRunService
 
         $divider = imagecolorallocatealpha($canvas, 255, 255, 255, 18);
         imagefilledrectangle($canvas, 0, $halfHeight - 4, self::PIN_WIDTH, $halfHeight + 4, $divider);
-        $this->drawBadge($canvas, 'BEFORE', 34, 34);
-        $this->drawBadge($canvas, 'AFTER', 34, $halfHeight + 34);
+        $badgeInset = 32;
+        $this->drawBadge($canvas, 'BEFORE', $badgeInset, $badgeInset);
+        $this->drawBadge($canvas, 'ColorFixed', $badgeInset, $halfHeight + $badgeInset);
         $this->drawPinLogo($canvas);
 
         $jobId = (int)$job['asset_creator_job_id'];
@@ -133,7 +233,10 @@ final class AssetCreatorRunService
         $metadata = [
             'creator_key' => self::CREATOR_PIN_COMPOSITE,
             'asset_creator_job_id' => $jobId,
+            'pinterest_board' => PinterestBoardConfig::defaultBoard(),
             'pair_key' => $pair['pair_key'] ?? null,
+            'pin_type' => 'composite',
+            'asset_type' => $pair['asset_type'] ?? 'pin_composite',
             'pair_order' => $pairOrder,
             'before' => $before,
             'after' => $after,
@@ -313,17 +416,28 @@ final class AssetCreatorRunService
 
     private function drawBadge(\GdImage $canvas, string $label, int $x, int $y): void
     {
-        $width = 235;
-        $height = 72;
+        $isColorFixed = $label === 'ColorFixed';
+        $font = $this->findFont();
+        $fontSize = $isColorFixed ? 32 : 36;
+        $width = 225;
+        if ($isColorFixed && $font) {
+            $beforeBox = imagettfbbox(36, 0, $font, 'BEFORE');
+            $colorFixedBox = imagettfbbox($fontSize, 0, $font, $label);
+            $beforeTextW = $beforeBox ? abs((int)$beforeBox[4] - (int)$beforeBox[0]) : 0;
+            $colorFixedTextW = $colorFixedBox ? abs((int)$colorFixedBox[4] - (int)$colorFixedBox[0]) : 0;
+            $sidePadding = max(18, (int)round((225 - $beforeTextW) / 2));
+            $width = $colorFixedTextW + ($sidePadding * 2);
+        } elseif ($isColorFixed) {
+            $width = 250;
+        }
+        $height = $isColorFixed ? 68 : 72;
         $radius = 0;
         $black = imagecolorallocatealpha($canvas, 0, 0, 0, 48);
         $white = imagecolorallocate($canvas, 255, 255, 255);
         $shadow = imagecolorallocatealpha($canvas, 0, 0, 0, 8);
         $this->drawRoundedRect($canvas, $x, $y, $width, $height, $radius, $black);
 
-        $font = $this->findFont();
         if ($font) {
-            $fontSize = 36;
             $box = imagettfbbox($fontSize, 0, $font, $label);
             $textW = $box ? abs((int)$box[4] - (int)$box[0]) : 0;
             $textH = $box ? abs((int)$box[5] - (int)$box[1]) : 0;
@@ -362,7 +476,7 @@ final class AssetCreatorRunService
 
         if ($this->pinLogoNeedsBadge($canvas, $dstX, $dstY, $dstW, $dstH)) {
             $padding = self::PIN_LOGO_BADGE_PADDING;
-            $badge = imagecolorallocatealpha($canvas, 255, 255, 255, 38);
+            $badge = imagecolorallocatealpha($canvas, 255, 255, 255, 52);
             $this->drawRoundedRect(
                 $canvas,
                 $dstX - $padding,
@@ -482,7 +596,7 @@ final class AssetCreatorRunService
         $font = 5;
         $baseW = imagefontwidth($font) * strlen($label);
         $baseH = imagefontheight($font);
-        $scale = 4;
+        $scale = min(4, max(1, (int)floor(($badgeW - 32) / max(1, $baseW))));
         $tmpW = max(1, $baseW);
         $tmpH = max(1, $baseH);
         $tmp = imagecreatetruecolor($tmpW, $tmpH);

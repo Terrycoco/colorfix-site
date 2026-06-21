@@ -8,12 +8,23 @@ const MARK_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/mark-published.php
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 
+const PINTEREST_BOARD = {
+  board_name: "ColorFix Makeovers",
+  board_url: "https://www.pinterest.com/terrymarr/colorfix-makeovers/",
+  board_slug: "terrymarr/colorfix-makeovers",
+  board_id: null,
+};
+
 const emptyForm = {
   playlist_id: "",
   playlist_instance_id: "",
   title: "",
   description: "",
-  board: "",
+  board: PINTEREST_BOARD.board_name,
+  board_name: PINTEREST_BOARD.board_name,
+  board_url: PINTEREST_BOARD.board_url,
+  board_slug: PINTEREST_BOARD.board_slug,
+  board_id: "",
   external_url: "",
   published_at: "",
   notes: "",
@@ -240,8 +251,29 @@ export default function AdminPinterestPublisherPage() {
             Board
             <input
               value={form.board}
-              onChange={(event) => updateForm("board", event.target.value)}
+              onChange={(event) => {
+                updateForm("board", event.target.value);
+                updateForm("board_name", event.target.value);
+              }}
               placeholder="Board name"
+            />
+          </label>
+
+          <label>
+            Board slug
+            <input
+              value={form.board_slug}
+              onChange={(event) => updateForm("board_slug", event.target.value)}
+              placeholder="terrymarr/colorfix-makeovers"
+            />
+          </label>
+
+          <label className="appub-form__wide">
+            Board URL
+            <input
+              value={form.board_url}
+              onChange={(event) => updateForm("board_url", event.target.value)}
+              placeholder="https://www.pinterest.com/terrymarr/colorfix-makeovers/"
             />
           </label>
 
@@ -314,28 +346,12 @@ export default function AdminPinterestPublisherPage() {
               </div>
               <div className="appub-outputs">
                 {(job.outputs || []).map((output) => (
-                  <div className="appub-output" key={output.publish_output_id}>
-                    <div>
-                      <strong>{output.output_type}</strong>
-                      <span>{output.status}</span>
-                    </div>
-                    <code>{output.tracking_code}</code>
-                    {output.tracking_url ? (
-                      <a href={output.tracking_url} target="_blank" rel="noreferrer">
-                        Tracking link
-                      </a>
-                    ) : null}
-                    {output.external_url ? (
-                      <a href={output.external_url} target="_blank" rel="noreferrer">
-                        Pinterest pin
-                      </a>
-                    ) : (
-                      <button type="button" onClick={() => markPublished(job, output)} disabled={saving}>
-                        Mark Published
-                      </button>
-                    )}
-                    {output.published_at ? <span>{output.published_at}</span> : null}
-                  </div>
+                  <PinterestOutput
+                    key={output.publish_output_id}
+                    output={output}
+                    saving={saving}
+                    onMarkPublished={() => markPublished(job, output)}
+                  />
                 ))}
               </div>
             </article>
@@ -344,4 +360,48 @@ export default function AdminPinterestPublisherPage() {
       </section>
     </div>
   );
+}
+
+function PinterestOutput({ output, saving, onMarkPublished }) {
+  const metadata = parseMetadata(output.metadata_json);
+  const boardName = metadata.board_name || metadata.board || PINTEREST_BOARD.board_name;
+  const boardId = metadata.board_id || "";
+
+  return (
+    <div className="appub-output">
+      <div>
+        <strong>{output.output_type}</strong>
+        <span>{output.status}</span>
+      </div>
+      <span>{boardName}</span>
+      {!boardId ? <span>Board ID pending API sync</span> : null}
+      <code>{output.tracking_code}</code>
+      {output.tracking_url ? (
+        <a href={output.tracking_url} target="_blank" rel="noreferrer">
+          Tracking link
+        </a>
+      ) : null}
+      {output.external_url ? (
+        <a href={output.external_url} target="_blank" rel="noreferrer">
+          Pinterest pin
+        </a>
+      ) : (
+        <button type="button" onClick={onMarkPublished} disabled={saving}>
+          Mark Published
+        </button>
+      )}
+      {output.published_at ? <span>{output.published_at}</span> : null}
+    </div>
+  );
+}
+
+function parseMetadata(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 }

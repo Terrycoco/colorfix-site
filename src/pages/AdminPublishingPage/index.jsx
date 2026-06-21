@@ -28,6 +28,13 @@ const assetTypes = [
   },
 ];
 
+const PINTEREST_BOARD = {
+  board_name: "ColorFix Makeovers",
+  board_url: "https://www.pinterest.com/terrymarr/colorfix-makeovers/",
+  board_slug: "terrymarr/colorfix-makeovers",
+  board_id: null,
+};
+
 const emptyForm = {
   asset_type: "pinterest.before_after_pin",
   playlist_id: "",
@@ -35,7 +42,11 @@ const emptyForm = {
   landing_page_id: "",
   title: "",
   description: "",
-  board: "",
+  board: PINTEREST_BOARD.board_name,
+  board_name: PINTEREST_BOARD.board_name,
+  board_url: PINTEREST_BOARD.board_url,
+  board_slug: PINTEREST_BOARD.board_slug,
+  board_id: "",
   external_url: "",
   library_asset_id: "",
   published_at: "",
@@ -63,16 +74,23 @@ export default function AdminPublishingPage() {
 
   const rows = useMemo(() => {
     return jobs.flatMap((job) =>
-      (job.outputs || []).map((output) => ({
-        ...output,
-        publish_job_id: job.publish_job_id,
-        source_type: job.source_type,
-        source_id: job.source_id,
-        job_status: job.status,
-        job_title: job.title,
-        playlist_title: job.playlist_title,
-        instance_title: job.instance_display_title || job.instance_name || "",
-      }))
+      (job.outputs || []).map((output) => {
+        const metadata = parseMetadata(output.metadata_json);
+        return {
+          ...output,
+          board_name: metadata.board_name || metadata.board || "",
+          board_url: metadata.board_url || "",
+          board_slug: metadata.board_slug || "",
+          board_id: metadata.board_id || "",
+          publish_job_id: job.publish_job_id,
+          source_type: job.source_type,
+          source_id: job.source_id,
+          job_status: job.status,
+          job_title: job.title,
+          playlist_title: job.playlist_title,
+          instance_title: job.instance_display_title || job.instance_name || "",
+        };
+      })
     );
   }, [jobs]);
 
@@ -257,6 +275,10 @@ export default function AdminPublishingPage() {
             playlist_instance_id: entry.playlist_instance_id || null,
             title: entry.title,
             board: entry.board,
+            board_name: entry.board || PINTEREST_BOARD.board_name,
+            board_url: PINTEREST_BOARD.board_url,
+            board_slug: PINTEREST_BOARD.board_slug,
+            board_id: null,
             external_url: entry.external_url,
             library_asset_id: entry.library_asset_id || null,
             published_at: entry.published_at,
@@ -485,6 +507,17 @@ function sortValue(row, key) {
   return String(row[key] || "").toLowerCase();
 }
 
+function parseMetadata(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function parsePinImport(text) {
   return String(text || "")
     .split(/\r?\n/)
@@ -620,7 +653,23 @@ function AssetDialog({
 
           <label>
             Board
-            <input value={form.board} onChange={(event) => onUpdate("board", event.target.value)} />
+            <input
+              value={form.board}
+              onChange={(event) => {
+                onUpdate("board", event.target.value);
+                onUpdate("board_name", event.target.value);
+              }}
+            />
+          </label>
+
+          <label>
+            Board URL
+            <input value={form.board_url} onChange={(event) => onUpdate("board_url", event.target.value)} />
+          </label>
+
+          <label>
+            Board slug
+            <input value={form.board_slug} onChange={(event) => onUpdate("board_slug", event.target.value)} />
           </label>
 
           <label>
@@ -678,6 +727,9 @@ function RowDialog({ row, saving, onClose, onMarkPublished }) {
           <dt>Library ID</dt><dd>{row.library_asset_id || "-"}</dd>
           <dt>Permission</dt><dd><PermissionStatus {...permissionProps(row)} showLabel /></dd>
           <dt>Status</dt><dd>{row.status}</dd>
+          <dt>Board</dt><dd>{row.board_name || PINTEREST_BOARD.board_name}</dd>
+          <dt>Board slug</dt><dd>{row.board_slug || PINTEREST_BOARD.board_slug}</dd>
+          <dt>Board ID</dt><dd>{row.board_id || "Pending Pinterest API board sync"}</dd>
           <dt>Playlist</dt><dd>#{row.source_id} {row.playlist_title || row.job_title}</dd>
           <dt>Tracking code</dt><dd>{row.tracking_code || "-"}</dd>
           <dt>Tracking URL</dt>

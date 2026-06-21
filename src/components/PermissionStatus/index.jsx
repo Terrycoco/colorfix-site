@@ -160,13 +160,20 @@ export default function PermissionStatus({
                 checked={draftStatus === option.value}
                 onChange={() => setDraftStatus(option.value)}
               />
+              <span
+                className={[
+                  "permission-status-menu__dot",
+                  `permission-status-menu__dot--${option.value}`,
+                ].join(" ")}
+                aria-hidden="true"
+              />
               <span>{option.label}</span>
             </label>
           ))}
           <span className="permission-status-menu__actions">
             <button type="button" onClick={() => setOpen(false)} disabled={saving}>Cancel</button>
             <button type="button" className="permission-status-menu__save" onClick={saveStatus} disabled={saving}>
-              {saving ? "Saving..." : "Save & Close"}
+              <span>{saving ? "Saving..." : "Save & Close"}</span>
             </button>
           </span>
         </span>

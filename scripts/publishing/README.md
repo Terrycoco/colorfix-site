@@ -40,6 +40,22 @@ scripts/publishing/
 - Each asset creator must be runnable and testable without posting anything.
 - Re-rendering an asset should not force a new tracking URL.
 - Posting scripts report the external URL and live timestamp back to the app.
+- Pinterest asset creation, queue records, manual export, and setup do not
+  require `board_id`. Use the known board name, URL, and slug until Pinterest
+  API access is approved:
+  - `board_name`: `ColorFix Makeovers`
+  - `board_url`: `https://www.pinterest.com/terrymarr/colorfix-makeovers/`
+  - `board_slug`: `terrymarr/colorfix-makeovers`
+  - `board_id`: `null`
+- Once Pinterest API access is approved, add a board sync step before API
+  publishing: list boards, find `ColorFix Makeovers`, store the returned
+  `board_id`, then allow queued pins to publish.
+- Core publisher records stay platform-neutral. Shared fields live in normal
+  columns on `publishing_channels` and `publisher_assets`; platform-specific
+  API settings live in `metadata_json`.
+- Publisher services own API request shaping by platform:
+  - `PinterestPublisher`
+  - future `YouTubePublisher`
 
 ## Standard Asset Result
 

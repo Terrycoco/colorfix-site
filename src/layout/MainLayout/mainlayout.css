@@ -7,6 +7,15 @@
   min-height: 0;
 }
 
+.site-footer {
+  max-width: var(--cap, 1320px);
+  margin: 8px auto 0;
+  padding: 18px max(var(--gutter-x, clamp(16px,4vw,32px)), env(safe-area-inset-left)) 28px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 768px) {
   .main-layout {
     padding-top: 8px;

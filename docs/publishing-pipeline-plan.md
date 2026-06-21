@@ -259,6 +259,49 @@ Publisher comes after creator:
 3. Post to Pinterest later.
 4. Store live URL and published timestamp.
 
+Pinterest board setup while API access is pending:
+
+- Use `board_name = "ColorFix Makeovers"`.
+- Use `board_url = "https://www.pinterest.com/terrymarr/colorfix-makeovers/"`.
+- Use `board_slug = "terrymarr/colorfix-makeovers"`.
+- Store `board_id = null`.
+- Do not require `board_id` for asset generation, queue creation, manual export,
+  or publisher setup.
+- After Pinterest API access is approved, add a board sync step:
+  1. Call Pinterest list boards.
+  2. Find the board named `ColorFix Makeovers`.
+  3. Store the returned `board_id`.
+  4. Allow queued pins to publish.
+
+## Publish Infrastructure Tables
+
+Publisher infrastructure keeps shared fields in normal columns and
+platform-specific API details in `metadata_json`.
+
+- `publishing_channels`: one external destination/account/config. Multiple
+  Pinterest rows can point at different boards, and future YouTube rows can use
+  different API/account settings. Auth payloads belong here as encrypted blobs,
+  never as raw token columns.
+- `publisher_assets`: platform-neutral publish queue/assets using common
+  columns: `platform`, `source_type`, `source_id`, `asset_type`, `title`,
+  `description`, `image_url`, `destination_url`, and `status`.
+- `publisher_attempts`: each API publish attempt, request/response payloads,
+  retry timing, external ids/URLs, and errors.
+- `publisher_sync_runs`: API sync jobs such as Pinterest list-boards.
+
+Do not add channel-specific DB columns like `pinterest_board_id` or
+`youtube_playlist_id` to the core queue. Use `metadata_json`:
+
+- Pinterest asset/channel metadata: `board_id`, `board_name`, `board_url`,
+  `board_slug`.
+- YouTube asset/channel metadata: `video_path`, `thumbnail_path`,
+  `youtube_channel_id`, `youtube_playlist_id`, `privacy_status`,
+  `category_id`, `tags`, `made_for_kids`.
+
+Publisher services are platform boundaries. `PinterestPublisher` and future
+`YouTubePublisher` read common asset fields plus their metadata/settings and
+shape the API-specific request payload outside the DB layer.
+
 ## 2026-06-10 Creator Script Starter
 
 Added local creator-script structure:

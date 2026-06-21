@@ -5,7 +5,6 @@ import process from "node:process";
 const root = process.cwd();
 const distIndex = path.join(root, "dist", "index.html");
 const payloadPath = path.join(root, "api", "cache", "front-page-public.json");
-const brandLogo = findAsset(/^colorfix_lightbg-.*\.png$/) || "/brand/full_lightbg.png";
 
 if (!fs.existsSync(distIndex)) {
   fail("dist/index.html not found. Run npm run build first.");
@@ -58,7 +57,7 @@ function renderItem(item) {
 function renderFrontBlurb(item) {
   return `
     <section class="cf-static-card cf-static-blurb">
-      <img src="${escapeAttr(brandLogo)}" alt="ColorFix" class="cf-static-blurb__logo">
+      <h1>${escapeHtml(item.title || "ColorFix by Terry")}</h1>
       ${item.subtitle ? `<div class="cf-static-blurb__subtitle">${escapeHtml(item.subtitle)}</div>` : ""}
       <p>${escapeHtml(item.body || "")}</p>
     </section>
@@ -192,13 +191,6 @@ function toFastPlayerPath(url) {
   }
 }
 
-function findAsset(pattern) {
-  const assetDir = path.join(root, "dist", "assets");
-  if (!fs.existsSync(assetDir)) return "";
-  const found = fs.readdirSync(assetDir).find((file) => pattern.test(file));
-  return found ? `/assets/${found}` : "";
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -258,11 +250,11 @@ function getStaticCss() {
   border: 1px solid #e5e7eb;
   border-radius: 22px;
 }
-.cf-static-blurb__logo {
-  display: block;
-  width: 132px;
-  height: auto;
-  margin: 0 0 14px;
+.cf-static-blurb h1 {
+  color: #1f2937;
+  font-size: 28px;
+  line-height: 1.12;
+  margin: 0 0 12px;
 }
 .cf-static-blurb__subtitle,
 .cf-static-kicker {

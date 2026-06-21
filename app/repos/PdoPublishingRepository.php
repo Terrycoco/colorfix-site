@@ -69,7 +69,8 @@ final class PdoPublishingRepository
                   COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id, ''),
                   COALESCE(c.id, ''),
                   COALESCE(c.name, ''),
-                  COALESCE(c.email, '')
+                  COALESCE(c.email, ''),
+                  COALESCE(po.metadata_json, '')
                 )
                 ORDER BY po.publish_output_id
                 SEPARATOR '\n'
@@ -127,17 +128,7 @@ final class PdoPublishingRepository
 
     public function createOutput(array $data): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO publish_outputs
-                (publish_job_id, channel_key, output_type, status, title, description, tracking_code,
-                 tracking_url, destination_url, external_url, asset_path, library_asset_id, metadata_json, generated_at,
-                 staged_at, published_at)
-             VALUES
-                (:publish_job_id, :channel_key, :output_type, :status, :title, :description, :tracking_code,
-                 :tracking_url, :destination_url, :external_url, :asset_path, :library_asset_id, :metadata_json, :generated_at,
-                 :staged_at, :published_at)'
-        );
-        $stmt->execute([
+        $values = [
             'publish_job_id' => $data['publish_job_id'],
             'channel_key' => $data['channel_key'],
             'output_type' => $data['output_type'],
@@ -154,7 +145,13 @@ final class PdoPublishingRepository
             'generated_at' => $data['generated_at'],
             'staged_at' => $data['staged_at'],
             'published_at' => $data['published_at'],
-        ]);
+        ];
+
+        $columns = array_keys($values);
+        $columnList = implode(', ', $columns);
+        $placeholderList = ':' . implode(', :', $columns);
+        $stmt = $this->pdo->prepare("INSERT INTO publish_outputs ({$columnList}) VALUES ({$placeholderList})");
+        $stmt->execute($values);
         return (int)$this->pdo->lastInsertId();
     }
 
@@ -283,6 +280,7 @@ final class PdoPublishingRepository
                     'client_id' => isset($parts[14]) && $parts[14] !== '' ? (int)$parts[14] : null,
                     'client_name' => $parts[15] ?? '',
                     'client_email' => $parts[16] ?? '',
+                    'metadata_json' => $parts[17] ?? '',
                 ];
             }
         }
@@ -293,4 +291,5 @@ final class PdoPublishingRepository
         $row['outputs'] = $outputs;
         return $row;
     }
+
 }

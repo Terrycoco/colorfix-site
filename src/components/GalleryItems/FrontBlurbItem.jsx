@@ -7,7 +7,7 @@ function normalizeText(value) {
 
 function renderBrandText(value) {
   const text = normalizeText(value);
-  const parts = text.split(/(ColorFix)/g);
+  const parts = text.split(/(\bColorFix\b)/g);
 
   return parts.map((part, index) => {
     if (part !== "ColorFix") {
@@ -36,7 +36,7 @@ function renderBrandTitle(value) {
 export default function FrontBlurbItem({ item }) {
   return (
     <div className="item front-blurb-item">
-      {item?.title ? <div className="front-blurb-item__title">{renderBrandTitle(item.title)}</div> : null}
+      {item?.title ? <h1 className="front-blurb-item__title">{renderBrandTitle(item.title)}</h1> : null}
       {item?.subtitle ? <div className="front-blurb-item__subtitle">{normalizeText(item.subtitle)}</div> : null}
       <div className="front-blurb-item__body">{renderBrandText(item?.body)}</div>
     </div>

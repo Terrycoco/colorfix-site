@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../../autoload.php';
 require_once __DIR__ . '/../../../../db.php';
 
 use App\Repos\PdoPublishingRepository;
+use App\Repos\PdoPublisherRepository;
 use App\Controllers\PinterestPublishingController;
 use App\Services\PinterestPublishingService;
 
@@ -24,7 +25,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 try {
     $controller = new PinterestPublishingController(
-        new PinterestPublishingService(new PdoPublishingRepository($pdo))
+        new PinterestPublishingService(
+            new PdoPublishingRepository($pdo),
+            new PdoPublisherRepository($pdo)
+        )
     );
     respond($controller->list($_GET));
 } catch (Throwable $e) {

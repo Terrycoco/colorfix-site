@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../../autoload.php';
 require_once __DIR__ . '/../../../../db.php';
 
 use App\Repos\PdoPublishingRepository;
+use App\Repos\PdoPublisherRepository;
 use App\Controllers\PinterestPublishingController;
 use App\Services\PinterestPublishingService;
 
@@ -28,7 +29,10 @@ try {
         respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
     }
     $controller = new PinterestPublishingController(
-        new PinterestPublishingService(new PdoPublishingRepository($pdo))
+        new PinterestPublishingService(
+            new PdoPublishingRepository($pdo),
+            new PdoPublisherRepository($pdo)
+        )
     );
     respond($controller->markPublished($payload));
 } catch (RuntimeException $e) {

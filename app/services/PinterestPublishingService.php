@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Repos\PdoPublishingRepository;
+use App\Repos\PdoPublisherRepository;
 use RuntimeException;
 
 final class PinterestPublishingService
@@ -12,7 +13,8 @@ final class PinterestPublishingService
     private const OUTPUT_TYPE = 'before_after_pin';
 
     public function __construct(
-        private PdoPublishingRepository $repo
+        private PdoPublishingRepository $repo,
+        private ?PdoPublisherRepository $publisherRepo = null
     ) {}
 
     public function listJobs(array $filters = []): array
@@ -63,6 +65,9 @@ final class PinterestPublishingService
         $externalUrl = $this->nullableString($payload['external_url'] ?? null);
         $publishedAt = $this->normalizeDateTime($payload['published_at'] ?? null);
         $status = $externalUrl || $publishedAt ? 'published' : 'draft';
+        $board = $this->boardMetadata($payload);
+        $channel = $this->publisherRepo?->findChannelByKey('pinterest_colorfix_makeovers')
+            ?? $this->publisherRepo?->findDefaultChannelForPlatform('pinterest');
 
         $jobId = $this->repo->createJob([
             'source_type' => 'playlist',
@@ -87,7 +92,13 @@ final class PinterestPublishingService
             'asset_path' => $this->nullableString($payload['asset_path'] ?? null),
             'library_asset_id' => isset($payload['library_asset_id']) ? (int)$payload['library_asset_id'] : null,
             'metadata_json' => json_encode([
-                'board' => $this->nullableString($payload['board'] ?? null),
+                'board' => $board['board_name'],
+                'board_name' => $board['board_name'],
+                'board_url' => $board['board_url'],
+                'board_slug' => $board['board_slug'],
+                'board_id' => $board['board_id'],
+                'pinterest_api_publish_ready' => $board['board_id'] !== null,
+                'pinterest_publish_blocked_reason' => $board['board_id'] === null ? 'pending_board_sync' : null,
                 'pin_type' => self::OUTPUT_TYPE,
                 'manual_entry' => true,
                 'landing_page_id' => $landingPage['id'] ?? null,
@@ -99,9 +110,28 @@ final class PinterestPublishingService
             'published_at' => $publishedAt,
         ]);
 
+        $publisherAssetId = $this->publisherRepo?->createPublisherAsset([
+            'publishing_channel_id' => $channel['publishing_channel_id'] ?? null,
+            'publish_output_id' => $outputId,
+            'asset_library_id' => isset($payload['library_asset_id']) ? (int)$payload['library_asset_id'] : null,
+            'platform' => 'pinterest',
+            'source_type' => 'playlist',
+            'source_id' => $playlistId,
+            'asset_type' => self::OUTPUT_TYPE,
+            'title' => $title,
+            'description' => $description,
+            'image_url' => $this->nullableString($payload['image_url'] ?? $payload['asset_path'] ?? null),
+            'destination_url' => $destinationUrl,
+            'status' => $status,
+            'external_url' => $externalUrl,
+            'metadata_json' => $board,
+            'published_at' => $publishedAt,
+        ]);
+
         return [
             'publish_job_id' => $jobId,
             'publish_output_id' => $outputId,
+            'publisher_asset_id' => $publisherAssetId,
             'tracking_code' => $trackingCode,
             'tracking_url' => $trackingUrl,
             'destination_url' => $destinationUrl,
@@ -126,6 +156,24 @@ final class PinterestPublishingService
             'publish_output_id' => $outputId,
             'status' => 'published',
             'published_at' => $publishedAt,
+        ];
+    }
+
+    private function boardMetadata(array $payload): array
+    {
+        $default = PinterestBoardConfig::defaultBoard();
+        $boardName = $this->nullableString($payload['board_name'] ?? null)
+            ?? $this->nullableString($payload['board'] ?? null)
+            ?? $default['board_name'];
+        $boardUrl = $this->nullableString($payload['board_url'] ?? null) ?? $default['board_url'];
+        $boardSlug = $this->nullableString($payload['board_slug'] ?? null) ?? $default['board_slug'];
+        $boardId = $this->nullableString($payload['board_id'] ?? null);
+
+        return [
+            'board_name' => $boardName,
+            'board_url' => $boardUrl,
+            'board_slug' => $boardSlug,
+            'board_id' => $boardId,
         ];
     }
 
