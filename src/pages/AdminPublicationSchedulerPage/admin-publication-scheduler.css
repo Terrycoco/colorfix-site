@@ -1,0 +1,358 @@
+.admin-publication-scheduler {
+  --scheduler-table-min-width: 1800px;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #111;
+  font-size: 14px;
+}
+
+.scheduler-header,
+.scheduler-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.scheduler-header {
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.scheduler-header h1,
+.scheduler-panel h2 {
+  margin: 0;
+}
+
+.scheduler-header h1 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.scheduler-panel h2 {
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.scheduler-header p,
+.scheduler-panel p {
+  margin: 4px 0 0;
+  color: #555;
+}
+
+.scheduler-header__actions,
+.scheduler-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.scheduler-panel__actions--below {
+  margin-top: 10px;
+  justify-content: flex-start;
+}
+
+.admin-publication-scheduler button {
+  border: 1px solid #999;
+  border-radius: 2px;
+  background: #f7f7f7;
+  color: #111;
+  padding: 7px 12px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-publication-scheduler button.primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.admin-publication-scheduler button.danger {
+  color: #9b0000;
+}
+
+.admin-publication-scheduler button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scheduler-panel {
+  border: 1px solid #9b9b9b;
+  background: #fff;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.scheduler-panel--queue {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 88px);
+}
+
+.scheduler-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  align-items: end;
+}
+
+.scheduler-form--filters {
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+}
+
+.scheduler-form label {
+  display: grid;
+  gap: 3px;
+  font-weight: 800;
+}
+
+.scheduler-form input,
+.scheduler-form select {
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 7px 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.scheduler-table-wrap {
+  flex: 1 1 auto;
+  min-height: 280px;
+  overflow: auto;
+  border: 1px solid #bdbdbd;
+}
+
+.scheduler-table-scrollbar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 20px;
+  margin-top: 10px;
+  border: 1px solid #bdbdbd;
+  border-bottom: 0;
+  background: #f7f7f7;
+}
+
+.scheduler-table-scrollbar > div {
+  height: 1px;
+  min-width: var(--scheduler-table-min-width);
+}
+
+.scheduler-table {
+  width: 100%;
+  min-width: var(--scheduler-table-min-width);
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.scheduler-table th,
+.scheduler-table td {
+  border-right: 1px solid #d7d7d7;
+  border-bottom: 1px solid #d7d7d7;
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.scheduler-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #dcdcdc;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.scheduler-table th:last-child,
+.scheduler-table td:last-child {
+  position: sticky;
+  right: 0;
+  background: #fff;
+  box-shadow: -1px 0 0 #d7d7d7;
+}
+
+.scheduler-table th:last-child {
+  z-index: 3;
+  background: #dcdcdc;
+}
+
+.scheduler-table td:last-child {
+  z-index: 2;
+}
+
+.scheduler-time-button {
+  min-width: 150px;
+  text-align: left;
+  background: #fff !important;
+}
+
+.scheduler-thumb {
+  display: block;
+  width: 54px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #c8c8c8;
+  background: #f5f5f5;
+}
+
+.scheduler-actions-cell {
+  white-space: nowrap;
+}
+
+.scheduler-actions-cell button {
+  margin: 0 4px 4px 0;
+}
+
+.scheduler-use-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-weight: 900;
+}
+
+.scheduler-alert {
+  border: 1px solid #cfcfcf;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-weight: 800;
+}
+
+.scheduler-alert--success {
+  background: #e7f6ec;
+  border-color: #9ac4a7;
+  color: #115c2a;
+}
+
+.scheduler-alert--error {
+  background: #ffe9e9;
+  border-color: #f1b4b4;
+  color: #a10000;
+}
+
+.scheduler-empty {
+  color: #666;
+  padding: 16px !important;
+}
+
+.scheduler-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.scheduler-modal {
+  width: min(560px, 100%);
+  border: 1px solid #777;
+  background: #fff;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+.scheduler-modal--wide {
+  width: min(760px, 100%);
+}
+
+.scheduler-modal__header,
+.scheduler-modal__actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #cfcfcf;
+  background: #ececec;
+}
+
+.scheduler-modal__header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.scheduler-modal__header p {
+  margin: 4px 0 0;
+  color: #555;
+}
+
+.scheduler-modal__body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 12px;
+}
+
+.scheduler-modal__body--grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scheduler-modal__body label {
+  display: grid;
+  gap: 4px;
+  font-weight: 800;
+}
+
+.scheduler-modal__body input,
+.scheduler-modal__body select {
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 8px;
+  font: inherit;
+  background: #fff;
+}
+
+.scheduler-modal__full {
+  grid-column: 1 / -1;
+}
+
+.scheduler-note {
+  border: 1px solid #ead091;
+  background: #fff8e4;
+  color: #614000;
+  padding: 8px 10px;
+  font-weight: 800;
+}
+
+.scheduler-modal__details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.scheduler-modal__details dt {
+  font-weight: 900;
+}
+
+.scheduler-modal__details dd {
+  margin: 0;
+}
+
+.scheduler-modal__actions {
+  justify-content: flex-end;
+  border-top: 1px solid #cfcfcf;
+  border-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .scheduler-header,
+  .scheduler-panel__header {
+    display: grid;
+  }
+
+  .scheduler-form--filters,
+  .scheduler-modal__body--grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduler-panel--queue {
+    position: static;
+    max-height: none;
+  }
+}

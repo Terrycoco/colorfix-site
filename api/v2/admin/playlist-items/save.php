@@ -61,6 +61,7 @@ try {
     $hasIsShareImage = columnExists($pdo, 'playlist_items', 'is_share_image');
     $hasSite = columnExists($pdo, 'playlist_items', 'site');
     $hasYt = columnExists($pdo, 'playlist_items', 'yt');
+    $hasPin = columnExists($pdo, 'playlist_items', 'pin');
     $hasAnalyzerRole = columnExists($pdo, 'playlist_items', 'analyzer_role');
     $selectedShareIndex = null;
     foreach ($items as $idx => $candidate) {
@@ -111,6 +112,9 @@ try {
         if ($hasYt) {
             $data['yt'] = array_key_exists('yt', $item) ? (int)(bool)$item['yt'] : 1;
         }
+        if ($hasPin) {
+            $data['pin'] = array_key_exists('pin', $item) ? (int)(bool)$item['pin'] : 1;
+        }
         if ($hasAnalyzerRole) {
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
             $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single'], true) ? $role : 'ignore';
@@ -154,6 +158,7 @@ try {
             'is_share_image',
             'site',
             'yt',
+            'pin',
             'analyzer_role',
         ];
         if (!$hasPhotoLibraryId) {
@@ -170,6 +175,9 @@ try {
         }
         if (!$hasYt) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'yt'));
+        }
+        if (!$hasPin) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'pin'));
         }
         if (!$hasAnalyzerRole) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'analyzer_role'));

@@ -63,6 +63,7 @@ final class AssetCreatorRunService
         }
 
         $previousOutputAssets = $this->outputAssets($job['outputs'] ?? []);
+        $this->assetLibrary->assertAssetsCanBeHardDeleted(array_keys($previousOutputAssets));
 
         $outputs = [];
         foreach ($pairs as $idx => $pair) {
@@ -144,9 +145,10 @@ final class AssetCreatorRunService
             if (isset($current[$assetId])) {
                 continue;
             }
-            $this->deleteGeneratedOutputFile($jobId, (string)($asset['rel_path'] ?? ''));
-            $this->assetLibrary->deleteAsset((int)$assetId);
-            $deleted[] = (int)$assetId;
+            $result = $this->assetLibrary->hardDeleteUnpublishedAsset((int)$assetId, $this->rootDir);
+            if (!empty($result['deleted'])) {
+                $deleted[] = (int)$assetId;
+            }
         }
         return $deleted;
     }

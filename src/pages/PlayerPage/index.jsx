@@ -9,6 +9,7 @@ import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { getPaletteTargets } from "@helpers/playerPaletteItems";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
 import { isHireTerryCta, trackCtaOnclickEvent, trackUserEvent } from "@helpers/userEvents";
+import colorfixLogoUrl from "../../assets/brand/colorfix_lightbg.png";
 import './playerpage.css';
 
 const PLAYER_CLOSE_ON_EXIT_KEY = "cf.player.close_on_exit.v1";
@@ -41,6 +42,7 @@ export default function PlayerPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
   const [likedCount, setLikedCount] = useState(0);
   const [playbackEnded, setPlaybackEnded] = useState(false);
   const [watchNextCta, setWatchNextCta] = useState(null);
@@ -80,7 +82,8 @@ export default function PlayerPage() {
 
   useEffect(() => {
     if (!playlistId) {
-      setError("Missing playlist");
+      setError("Playlist unavailable");
+      setErrorCode("playlist_unavailable");
       setLoading(false);
       return;
     }
@@ -99,6 +102,7 @@ export default function PlayerPage() {
     let cancelled = false;
     setLoading(true);
     setError("");
+    setErrorCode("");
     fetchPlayerPlaylist(`/api/v2/player-playlist.php?${params.toString()}`)
       .then((payload) => {
         if (cancelled) return;
@@ -113,6 +117,7 @@ export default function PlayerPage() {
       .catch((err) => {
         if (cancelled) return;
         setError(err?.message || "Failed to load playlist");
+        setErrorCode(err?.code || "");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -391,6 +396,7 @@ function resolveVariant(raw, isBack = false) {
   if (!raw) return isBack ? "link" : undefined;
   const normalized = String(raw).toLowerCase();
   if (normalized === "anchor" || normalized === "link") return "link";
+  if (normalized === "button_logo" || normalized === "button-logo" || normalized === "logo_button") return "button-logo";
   if (normalized === "button") return isBack ? "link" : undefined;
   if (normalized === "primary" || normalized === "secondary" || normalized === "ghost") return normalized;
   return isBack ? "link" : undefined;
@@ -421,7 +427,9 @@ function writePlayerCloseOnExit(enabled) {
     } else {
       sessionStorage.removeItem(PLAYER_CLOSE_ON_EXIT_KEY);
     }
-  } catch {}
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 function isNumericId(value) {
@@ -685,6 +693,9 @@ const visibleCTAs = useMemo(
     );
   }
   if (error) {
+    if (errorCode === "playlist_unavailable") {
+      return <PlaylistUnavailable />;
+    }
     return (
       <div className="player-error" role="alert">
         <div className="player-error__panel">
@@ -733,6 +744,22 @@ const visibleCTAs = useMemo(
   );
 }
 
+function PlaylistUnavailable() {
+  return (
+    <main className="playlist-unavailable" role="alert">
+      <section className="playlist-unavailable__panel" aria-labelledby="playlist-unavailable-title">
+        <img className="playlist-unavailable__logo" src={colorfixLogoUrl} alt="ColorFix" />
+        <h1 id="playlist-unavailable-title">This playlist isn&rsquo;t available.</h1>
+        <p>It may have been moved or taken offline.</p>
+        <div className="playlist-unavailable__actions">
+          <a href="/picker">Browse Playlists</a>
+          <a href="/">Go to ColorFix Home</a>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function PlayerLoadingIndicator({ label = "Loading" }) {
   return (
     <div className="player-page-loading" role="status" aria-live="polite" aria-label={label}>
@@ -769,7 +796,10 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
       throw new Error("Playlist returned a server page instead of data. Please try again.");
     }
     if (!response.ok) {
-      throw new Error(payload?.error || `Playlist request failed (${response.status})`);
+      const error = new Error(payload?.error || `Playlist request failed (${response.status})`);
+      error.status = response.status;
+      error.code = payload?.code || "";
+      throw error;
     }
     return payload;
   } finally {
@@ -944,29 +974,6 @@ function buildEndSetCta(rawEndCta, setId) {
       brand: "colorfix",
     },
   };
-}
-
-function readWatchNextSeenPlaylists(setId) {
-  if (typeof sessionStorage === "undefined") return [];
-  try {
-    const raw = sessionStorage.getItem(`cf_watch_next_seen_playlist_${setId}`);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(Number).filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
-function markWatchNextSeenPlaylist(setId, playlistId) {
-  if (typeof sessionStorage === "undefined") return;
-  const current = readWatchNextSeenPlaylists(setId);
-  if (current.includes(playlistId)) return;
-  const next = [...current, playlistId];
-  try {
-    sessionStorage.setItem(`cf_watch_next_seen_playlist_${setId}`, JSON.stringify(next));
-  } catch {
-    // ignore
-  }
 }
 
 function clearWatchNextSeenPlaylists(setId) {

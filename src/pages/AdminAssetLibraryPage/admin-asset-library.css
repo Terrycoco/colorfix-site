@@ -83,6 +83,12 @@
   color: #fff;
 }
 
+.assetlib-command--danger {
+  border-color: #8b0000;
+  background: #fff0f0;
+  color: #8b0000;
+}
+
 .assetlib-command:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -260,6 +266,17 @@
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid #bbb;
+}
+
+.assetlib-danger {
+  border-color: #8b0000 !important;
+  background: #fff0f0 !important;
+  color: #8b0000 !important;
+}
+
+.assetlib-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 @media (max-width: 720px) {

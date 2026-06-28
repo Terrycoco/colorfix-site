@@ -163,6 +163,14 @@
   padding-top: 8px;
 }
 
+.permission-status-menu__saving {
+  display: block;
+  padding: 6px 2px 0;
+  color: #555;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .permission-status-menu button {
   border: 1px solid #999;
   border-radius: 2px;

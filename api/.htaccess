@@ -1,1 +1,7 @@
 php_value auto_prepend_file "/home1/shortgal/public_html/colorfix/app/bootstrap.php"
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^pinterest/connect/?$ pinterest-connect.php [L,QSA]
+  RewriteRule ^pinterest/oauth/callback/?$ pinterest-oauth-callback.php [L,QSA]
+</IfModule>

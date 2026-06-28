@@ -13,6 +13,17 @@ final class PdoAssetLibraryRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT al.*,
+                    acj.asset_creator_job_id AS creator_job_id,
+                    acj.title AS creator_job_title,
+                    CASE
+                        WHEN acj.source_type = \'playlist\' THEN acj.source_id
+                        ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(acj.instructions_json, "$.source.playlist_id")) AS UNSIGNED)
+                    END AS source_playlist_id,
+                    p.title AS source_playlist_title,
+                    COALESCE(
+                        JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.pin_type")),
+                        JSON_UNQUOTE(JSON_EXTRACT(aco.metadata_json, "$.pin_type"))
+                    ) AS pin_type,
                     COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
                     COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
                     c.name AS client_name,
@@ -21,6 +32,18 @@ final class PdoAssetLibraryRepository
                FROM asset_library al
           LEFT JOIN photo_library pl
                  ON pl.photo_library_id = al.legacy_photo_library_id
+          LEFT JOIN asset_creator_outputs aco
+                 ON aco.asset_library_id = al.asset_library_id
+          LEFT JOIN asset_creator_jobs acj
+                 ON acj.asset_creator_job_id = COALESCE(
+                    CASE WHEN al.source_type = \'asset_creator_job\' THEN al.source_id ELSE NULL END,
+                    aco.asset_creator_job_id
+                 )
+          LEFT JOIN playlists p
+                 ON p.playlist_id = CASE
+                    WHEN acj.source_type = \'playlist\' THEN acj.source_id
+                    ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(acj.instructions_json, "$.source.playlist_id")) AS UNSIGNED)
+                 END
           LEFT JOIN photo_library pl_before
                  ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
           LEFT JOIN photo_library pl_after
@@ -57,13 +80,21 @@ final class PdoAssetLibraryRepository
                 $clause = '(al.title LIKE :q_title' . $suffix
                     . ' OR al.tags LIKE :q_tags' . $suffix
                     . ' OR al.rel_path LIKE :q_path' . $suffix
-                    . ' OR al.source_type LIKE :q_source' . $suffix;
+                    . ' OR al.source_type LIKE :q_source' . $suffix
+                    . ' OR acj.title LIKE :q_job_title' . $suffix
+                    . ' OR p.title LIKE :q_playlist_title' . $suffix;
                 if (ctype_digit($numericToken)) {
                     $clause .= ' OR al.asset_library_id = :q_id_exact' . $suffix
                         . ' OR al.legacy_photo_library_id = :q_legacy_exact' . $suffix
+                        . ' OR al.source_id = :q_source_id_exact' . $suffix
+                        . ' OR acj.asset_creator_job_id = :q_creator_job_exact' . $suffix
+                        . ' OR p.playlist_id = :q_playlist_exact' . $suffix
                         . ' OR CAST(al.asset_library_id AS CHAR) LIKE :q_id' . $suffix;
                     $params[':q_id_exact' . $suffix] = (int)$numericToken;
                     $params[':q_legacy_exact' . $suffix] = (int)$numericToken;
+                    $params[':q_source_id_exact' . $suffix] = (int)$numericToken;
+                    $params[':q_creator_job_exact' . $suffix] = (int)$numericToken;
+                    $params[':q_playlist_exact' . $suffix] = (int)$numericToken;
                     $params[':q_id' . $suffix] = $numericToken . '%';
                 }
                 $clause .= ')';
@@ -72,6 +103,8 @@ final class PdoAssetLibraryRepository
                 $params[':q_tags' . $suffix] = '%' . $token . '%';
                 $params[':q_path' . $suffix] = '%' . $token . '%';
                 $params[':q_source' . $suffix] = '%' . $token . '%';
+                $params[':q_job_title' . $suffix] = '%' . $token . '%';
+                $params[':q_playlist_title' . $suffix] = '%' . $token . '%';
             }
             $where[] = '(' . implode(' AND ', $clauses) . ')';
         }
@@ -113,6 +146,17 @@ final class PdoAssetLibraryRepository
         }
 
         $sql = 'SELECT al.*,
+                       acj.asset_creator_job_id AS creator_job_id,
+                       acj.title AS creator_job_title,
+                       CASE
+                           WHEN acj.source_type = \'playlist\' THEN acj.source_id
+                           ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(acj.instructions_json, "$.source.playlist_id")) AS UNSIGNED)
+                       END AS source_playlist_id,
+                       p.title AS source_playlist_title,
+                       COALESCE(
+                           JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.pin_type")),
+                           JSON_UNQUOTE(JSON_EXTRACT(aco.metadata_json, "$.pin_type"))
+                       ) AS pin_type,
                        COALESCE(al.client_id, pl.client_id, pl_after.client_id, pl_before.client_id) AS client_id,
                        COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id) AS permission_photo_library_id,
                        c.name AS client_name,
@@ -121,6 +165,18 @@ final class PdoAssetLibraryRepository
                   FROM asset_library al
              LEFT JOIN photo_library pl
                     ON pl.photo_library_id = al.legacy_photo_library_id
+             LEFT JOIN asset_creator_outputs aco
+                    ON aco.asset_library_id = al.asset_library_id
+             LEFT JOIN asset_creator_jobs acj
+                    ON acj.asset_creator_job_id = COALESCE(
+                       CASE WHEN al.source_type = \'asset_creator_job\' THEN al.source_id ELSE NULL END,
+                       aco.asset_creator_job_id
+                    )
+             LEFT JOIN playlists p
+                    ON p.playlist_id = CASE
+                       WHEN acj.source_type = \'playlist\' THEN acj.source_id
+                       ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(acj.instructions_json, "$.source.playlist_id")) AS UNSIGNED)
+                    END
              LEFT JOIN photo_library pl_before
                     ON pl_before.photo_library_id = CAST(JSON_UNQUOTE(JSON_EXTRACT(al.metadata_json, "$.before.photo_library_id")) AS UNSIGNED)
              LEFT JOIN photo_library pl_after
@@ -254,6 +310,231 @@ final class PdoAssetLibraryRepository
         $stmt->execute([':asset_library_id' => $assetLibraryId]);
     }
 
+    /**
+     * @return string[]
+     */
+    public function hardDeleteBlockers(int $assetLibraryId): array
+    {
+        $blockers = [];
+
+        if ($this->tableExists('publishing_assets')) {
+            $hasPublications = $this->tableExists('publications');
+            $publicationJoin = $hasPublications
+                ? 'LEFT JOIN publications pub ON pub.publishing_asset_id = pa.publishing_asset_id'
+                : '';
+            $publishedConditions = [];
+            if ($hasPublications) {
+                $hasPublicationStatus = $this->columnExists('publications', 'status');
+                $hasPublicationEnvironment = $this->columnExists('publications', 'environment');
+                if ($hasPublicationStatus && $hasPublicationEnvironment) {
+                    $publishedConditions[] = "(pub.status IN ('published', 'posted') AND pub.environment = 'production')";
+                } elseif ($hasPublicationStatus) {
+                    $publishedConditions[] = "pub.status IN ('published', 'posted')";
+                } else {
+                    $publishedConditions[] = 'pub.publication_id IS NOT NULL';
+                }
+            }
+            if ($this->columnExists('publishing_assets', 'status')) {
+                $publishedConditions[] = $this->columnExists('publishing_assets', 'environment')
+                    ? "(pa.status IN ('published', 'posted') AND pa.environment = 'production')"
+                    : "pa.status IN ('published', 'posted')";
+            }
+            if ($this->columnExists('publishing_assets', 'published_at')) {
+                $publishedConditions[] = $this->columnExists('publishing_assets', 'environment')
+                    ? "(pa.published_at IS NOT NULL AND pa.environment = 'production')"
+                    : 'pa.published_at IS NOT NULL';
+            }
+            if ($this->columnExists('publishing_assets', 'locked_at')) {
+                $publishedConditions[] = 'pa.locked_at IS NOT NULL';
+            }
+            if ($publishedConditions === []) {
+                $publishedConditions[] = '0 = 1';
+            }
+            $publishedWhere = implode(' OR ', $publishedConditions);
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(*)
+                   FROM publishing_assets pa
+                   {$publicationJoin}
+                  WHERE pa.asset_library_id = :id
+                    AND ({$publishedWhere})"
+            );
+            $stmt->execute([':id' => $assetLibraryId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Used by {$count} published publishing asset" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        if ($this->tableExists('landing_pages') && $this->columnExists('landing_pages', 'featured_pin_asset_id')) {
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(*)
+                   FROM landing_pages
+                  WHERE featured_pin_asset_id = :id
+                    AND status = 'public'"
+            );
+            $stmt->execute([':id' => $assetLibraryId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Used by {$count} public landing page" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        return $blockers;
+    }
+
+    public function hardDeleteUnpublished(int $assetLibraryId): array
+    {
+        $blockers = $this->hardDeleteBlockers($assetLibraryId);
+        if ($blockers !== []) {
+            return ['deleted' => false, 'blocked' => true, 'blockers' => $blockers];
+        }
+
+        $counts = [
+            'publication_schedule_attempts' => 0,
+            'publication_schedule' => 0,
+            'publications' => 0,
+            'publisher_attempts' => 0,
+            'publishing_assets' => 0,
+            'asset_creator_outputs' => 0,
+            'asset_creator_inputs' => 0,
+            'photo_library_detached' => 0,
+            'landing_pages_detached' => 0,
+            'publishing_jobs_deleted' => 0,
+            'asset_library' => 0,
+        ];
+        $publishingJobIds = [];
+
+        $this->pdo->beginTransaction();
+        try {
+            if ($this->tableExists('publishing_assets') && $this->columnExists('publishing_assets', 'publishing_job_id')) {
+                $stmt = $this->pdo->prepare(
+                    'SELECT DISTINCT publishing_job_id
+                       FROM publishing_assets
+                      WHERE asset_library_id = :id
+                        AND publishing_job_id IS NOT NULL'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $publishingJobIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+            }
+
+            if ($this->tableExists('publication_schedule_attempts') && $this->tableExists('publication_schedule')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE psa
+                       FROM publication_schedule_attempts psa
+                       JOIN publication_schedule ps
+                         ON ps.publication_schedule_id = psa.publication_schedule_id
+                       JOIN publishing_assets pa
+                         ON pa.publishing_asset_id = ps.publishing_asset_id
+                      WHERE pa.asset_library_id = :id'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['publication_schedule_attempts'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('publication_schedule') && $this->tableExists('publishing_assets')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE ps
+                       FROM publication_schedule ps
+                       JOIN publishing_assets pa
+                         ON pa.publishing_asset_id = ps.publishing_asset_id
+                      WHERE pa.asset_library_id = :id'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['publication_schedule'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('publisher_attempts') && $this->tableExists('publishing_assets')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE pat
+                       FROM publisher_attempts pat
+                       JOIN publishing_assets pa
+                         ON pa.publishing_asset_id = pat.publishing_asset_id
+                      WHERE pa.asset_library_id = :id'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['publisher_attempts'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('publications') && $this->tableExists('publishing_assets')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE pub
+                       FROM publications pub
+                       JOIN publishing_assets pa
+                         ON pa.publishing_asset_id = pub.publishing_asset_id
+                      WHERE pa.asset_library_id = :id'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['publications'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('publishing_assets')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE FROM publishing_assets
+                      WHERE asset_library_id = :id'
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['publishing_assets'] = $stmt->rowCount();
+
+                if ($this->tableExists('publishing_jobs') && $publishingJobIds !== []) {
+                    $placeholders = implode(',', array_fill(0, count($publishingJobIds), '?'));
+                    $stmt = $this->pdo->prepare(
+                        "DELETE pj
+                           FROM publishing_jobs pj
+                      LEFT JOIN publishing_assets pa
+                             ON pa.publishing_job_id = pj.publishing_job_id
+                          WHERE pj.publishing_job_id IN ({$placeholders})
+                            AND pa.publishing_asset_id IS NULL
+                            AND pj.status NOT IN ('published', 'posted')"
+                    );
+                    $stmt->execute($publishingJobIds);
+                    $counts['publishing_jobs_deleted'] = $stmt->rowCount();
+                }
+            }
+
+            if ($this->tableExists('asset_creator_outputs')) {
+                $stmt = $this->pdo->prepare('DELETE FROM asset_creator_outputs WHERE asset_library_id = :id');
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['asset_creator_outputs'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('asset_creator_inputs')) {
+                $stmt = $this->pdo->prepare('DELETE FROM asset_creator_inputs WHERE asset_library_id = :id');
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['asset_creator_inputs'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('photo_library') && $this->columnExists('photo_library', 'asset_library_id')) {
+                $stmt = $this->pdo->prepare('UPDATE photo_library SET asset_library_id = NULL WHERE asset_library_id = :id');
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['photo_library_detached'] = $stmt->rowCount();
+            }
+
+            if ($this->tableExists('landing_pages') && $this->columnExists('landing_pages', 'featured_pin_asset_id')) {
+                $stmt = $this->pdo->prepare(
+                    "UPDATE landing_pages
+                        SET featured_pin_asset_id = NULL
+                      WHERE featured_pin_asset_id = :id
+                        AND status <> 'public'"
+                );
+                $stmt->execute([':id' => $assetLibraryId]);
+                $counts['landing_pages_detached'] = $stmt->rowCount();
+            }
+
+            $stmt = $this->pdo->prepare('DELETE FROM asset_library WHERE asset_library_id = :id');
+            $stmt->execute([':id' => $assetLibraryId]);
+            $counts['asset_library'] = $stmt->rowCount();
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return ['deleted' => $counts['asset_library'] > 0, 'blocked' => false, 'counts' => $counts];
+    }
+
     private function bindablePayload(array $data): array
     {
         $keys = [
@@ -313,7 +594,7 @@ final class PdoAssetLibraryRepository
 
     private function normalizeRow(array $row): array
     {
-        foreach (['asset_library_id', 'legacy_photo_library_id', 'permission_photo_library_id', 'source_id', 'client_id', 'width', 'height', 'file_size_bytes'] as $key) {
+        foreach (['asset_library_id', 'legacy_photo_library_id', 'permission_photo_library_id', 'source_id', 'creator_job_id', 'source_playlist_id', 'client_id', 'width', 'height', 'file_size_bytes'] as $key) {
             if (array_key_exists($key, $row) && $row[$key] !== null) {
                 $row[$key] = (int)$row[$key];
             }
@@ -327,5 +608,30 @@ final class PdoAssetLibraryRepository
             }
         }
         return $row;
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name'
+        );
+        $stmt->execute([':table_name' => $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name
+                AND COLUMN_NAME = :column_name'
+        );
+        $stmt->execute([':table_name' => $table, ':column_name' => $column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 }

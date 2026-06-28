@@ -24,6 +24,14 @@
   color: #555;
 }
 
+.assetcreator-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .assetcreator-toolbar {
   display: flex;
   align-items: end;
@@ -130,6 +138,13 @@
   cursor: pointer;
 }
 
+.assetcreator-command-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .assetcreator-command--primary {
   background: #111;
   border-color: #111;
@@ -234,7 +249,7 @@
 
 .assetcreator-grid {
   width: 100%;
-  min-width: 1060px;
+  min-width: 1160px;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -269,7 +284,7 @@
 
 .assetcreator-grid:not(.assetcreator-pairs-grid) th:nth-child(2),
 .assetcreator-grid:not(.assetcreator-pairs-grid) td:nth-child(2) {
-  width: 190px;
+  width: 168px;
 }
 
 .assetcreator-grid:not(.assetcreator-pairs-grid) th:nth-child(3),
@@ -286,7 +301,7 @@
 
 .assetcreator-grid:not(.assetcreator-pairs-grid) th:nth-child(5),
 .assetcreator-grid:not(.assetcreator-pairs-grid) td:nth-child(5) {
-  width: 220px;
+  width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -305,7 +320,7 @@
 
 .assetcreator-grid:not(.assetcreator-pairs-grid) th:nth-child(9),
 .assetcreator-grid:not(.assetcreator-pairs-grid) td:nth-child(9) {
-  width: 150px;
+  width: 170px;
 }
 
 .assetcreator-grid:not(.assetcreator-pairs-grid) th:nth-child(10),
@@ -316,10 +331,10 @@
 }
 
 .assetcreator-job-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
-  align-items: center;
-  flex-wrap: nowrap;
+  align-items: stretch;
 }
 
 .assetcreator-date-cell {

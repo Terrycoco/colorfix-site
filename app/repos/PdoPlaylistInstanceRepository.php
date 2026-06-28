@@ -285,6 +285,148 @@ final class PdoPlaylistInstanceRepository
         return $instance;
     }
 
+    public function deleteIfUnlocked(int $instanceId): array
+    {
+        if ($instanceId <= 0) {
+            throw new \InvalidArgumentException('playlist_instance_id required');
+        }
+
+        $instance = $this->getById($instanceId);
+        if (!$instance) {
+            throw new \RuntimeException('Playlist instance not found');
+        }
+
+        $blocking = $this->deleteBlockers($instanceId);
+        if ($blocking !== []) {
+            return [
+                'deleted' => false,
+                'playlist_instance_id' => $instanceId,
+                'blocked' => true,
+                'blockers' => $blocking,
+            ];
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $deletedLandingPages = 0;
+            if ($this->tableExists('landing_pages')) {
+                $stmt = $this->pdo->prepare(
+                    "DELETE FROM landing_pages
+                      WHERE primary_playlist_instance_id = :id
+                        AND status <> 'public'"
+                );
+                $stmt->execute(['id' => $instanceId]);
+                $deletedLandingPages = $stmt->rowCount();
+            }
+
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM playlist_instances
+                  WHERE playlist_instance_id = :id
+                  LIMIT 1'
+            );
+            $stmt->execute(['id' => $instanceId]);
+            $deletedInstances = $stmt->rowCount();
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return [
+            'deleted' => $deletedInstances > 0,
+            'playlist_instance_id' => $instanceId,
+            'deleted_landing_pages' => $deletedLandingPages,
+        ];
+    }
+
+    private function deleteBlockers(int $instanceId): array
+    {
+        $blockers = [];
+
+        if ($this->tableExists('landing_pages')) {
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(*)
+                   FROM landing_pages
+                  WHERE primary_playlist_instance_id = :id
+                    AND status = 'public'"
+            );
+            $stmt->execute(['id' => $instanceId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Linked to {$count} public landing page" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        if ($this->tableExists('publishing_jobs') && $this->tableExists('publishing_assets')) {
+            $hasPublications = $this->tableExists('publications');
+            $publicationJoin = $hasPublications
+                ? 'LEFT JOIN publications pub ON pub.publishing_asset_id = pa.publishing_asset_id'
+                : '';
+            $publishedConditions = [];
+            if ($this->columnExists('publishing_jobs', 'status')) {
+                $publishedConditions[] = "pj.status IN ('published', 'posted')";
+            }
+            if ($this->columnExists('publishing_assets', 'status')) {
+                $publishedConditions[] = "pa.status IN ('published', 'posted', 'test_published')";
+            }
+            if ($this->columnExists('publishing_assets', 'published_at')) {
+                $publishedConditions[] = 'pa.published_at IS NOT NULL';
+            }
+            if ($hasPublications) {
+                $publishedConditions[] = 'pub.publication_id IS NOT NULL';
+            }
+            if ($publishedConditions === []) {
+                $publishedConditions[] = '0 = 1';
+            }
+            $publishedWhere = implode(' OR ', $publishedConditions);
+            $stmt = $this->pdo->prepare(
+                "SELECT COUNT(DISTINCT pj.publishing_job_id)
+                   FROM publishing_jobs pj
+                   LEFT JOIN publishing_assets pa
+                     ON pa.publishing_job_id = pj.publishing_job_id
+                   {$publicationJoin}
+                  WHERE pj.playlist_instance_id = :id
+                    AND ({$publishedWhere})"
+            );
+            $stmt->execute(['id' => $instanceId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Linked to {$count} published publishing job" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        if ($this->tableExists('playlist_instance_set_items') && $this->columnExists('playlist_instance_set_items', 'playlist_instance_id')) {
+            $stmt = $this->pdo->prepare(
+                'SELECT COUNT(*)
+                   FROM playlist_instance_set_items
+                  WHERE playlist_instance_id = :id'
+            );
+            $stmt->execute(['id' => $instanceId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Used in {$count} playlist instance set item" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        if ($this->tableExists('playlist_instance_sets') && $this->columnExists('playlist_instance_sets', 'playlist_instance_id')) {
+            $stmt = $this->pdo->prepare(
+                'SELECT COUNT(*)
+                   FROM playlist_instance_sets
+                  WHERE playlist_instance_id = :id'
+            );
+            $stmt->execute(['id' => $instanceId]);
+            $count = (int)$stmt->fetchColumn();
+            if ($count > 0) {
+                $blockers[] = "Used in {$count} playlist instance set" . ($count === 1 ? '' : 's');
+            }
+        }
+
+        return $blockers;
+    }
+
     /**
      * @return PlaylistInstance[]
      */
@@ -431,5 +573,30 @@ final class PdoPlaylistInstanceRepository
         $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
         $value = trim($value, '-');
         return $value !== '' ? substr($value, 0, 191) : '';
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name'
+        );
+        $stmt->execute(['table_name' => $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name
+                AND COLUMN_NAME = :column_name'
+        );
+        $stmt->execute(['table_name' => $table, 'column_name' => $column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 }

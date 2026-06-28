@@ -60,11 +60,11 @@ export default function PermissionStatus({
     if (!open) return undefined;
     function onPointerDown(event) {
       if (!rootRef.current || rootRef.current.contains(event.target)) return;
-      setOpen(false);
+      saveStatus();
     }
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open]);
+  }, [open, draftStatus, saving]);
 
   const normalized = normalizeStatus(localStatus);
   const hasClient = Number(clientId || 0) > 0 || Boolean(clientName) || Boolean(clientEmail);
@@ -78,14 +78,23 @@ export default function PermissionStatus({
 
   function toggleEditor() {
     if (!canEdit) return;
+    if (open) {
+      saveStatus();
+      return;
+    }
     setDraftStatus(normalizeDraftStatus(localStatus));
-    setOpen((value) => !value);
+    setOpen(true);
   }
 
   async function saveStatus() {
     if (!canEdit || saving) return;
-    setSaving(true);
     const nextStatus = draftStatus === "default" ? "" : draftStatus;
+    const nextDisplayStatus = nextStatus || "unknown";
+    if (normalizeStatus(localStatus) === normalizeStatus(nextDisplayStatus)) {
+      setOpen(false);
+      return;
+    }
+    setSaving(true);
     try {
       const res = await fetch(PERMISSION_STATUS_URL, {
         method: "POST",
@@ -170,12 +179,7 @@ export default function PermissionStatus({
               <span>{option.label}</span>
             </label>
           ))}
-          <span className="permission-status-menu__actions">
-            <button type="button" onClick={() => setOpen(false)} disabled={saving}>Cancel</button>
-            <button type="button" className="permission-status-menu__save" onClick={saveStatus} disabled={saving}>
-              <span>{saving ? "Saving..." : "Save & Close"}</span>
-            </button>
-          </span>
+          {saving ? <span className="permission-status-menu__saving">Saving...</span> : null}
         </span>
       ) : null}
     </span>

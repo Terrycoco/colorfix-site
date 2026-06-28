@@ -57,11 +57,26 @@ function renderItem(item) {
 function renderFrontBlurb(item) {
   return `
     <section class="cf-static-card cf-static-blurb">
-      <h1>${escapeHtml(item.title || "ColorFix by Terry")}</h1>
+      ${renderFrontPageTitle(item.title || "ColorFix by Terry")}
       ${item.subtitle ? `<div class="cf-static-blurb__subtitle">${escapeHtml(item.subtitle)}</div>` : ""}
       <p>${escapeHtml(item.body || "")}</p>
     </section>
   `;
+}
+
+function renderFrontPageTitle(title) {
+  const text = String(title || "").trim();
+  if (!["colorfix", "colorfix by terry"].includes(text.toLowerCase())) {
+    return `<h1>${escapeHtml(text || "ColorFix by Terry")}</h1>`;
+  }
+
+  return `
+      <h1 class="cf-static-blurb__seo-logo" aria-label="ColorFix by Terry">
+        <span class="cf-static-blurb__seo-logo-main">
+          <span class="cf-static-blurb__seo-logo-color">Color</span><span class="cf-static-blurb__seo-logo-fix">Fix</span>
+        </span>
+        <span class="cf-static-blurb__seo-logo-by" aria-label="by Terry"><span>by</span><span>Terry</span></span>
+      </h1>`;
 }
 
 function renderFeaturedArticle(item) {
@@ -211,6 +226,8 @@ function fail(message) {
 
 function getStaticCss() {
   return `
+@import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&display=swap');
+
 .cf-static-home {
   background: #f5f5f5;
   color: #1f2937;
@@ -246,6 +263,7 @@ function getStaticCss() {
   padding: 16px;
 }
 .cf-static-blurb {
+  container-type: inline-size;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 22px;
@@ -255,6 +273,87 @@ function getStaticCss() {
   font-size: 28px;
   line-height: 1.12;
   margin: 0 0 12px;
+}
+.cf-static-blurb__seo-logo {
+  --cf-static-logo-size: clamp(32px, 13cqw, 44px);
+  position: relative;
+  display: inline-block;
+  width: min-content;
+  max-width: 100%;
+  padding: 0 0 calc(var(--cf-static-logo-size) * .46);
+  margin: 0 0 12px;
+  line-height: 1;
+}
+.cf-static-blurb__seo-logo-main {
+  display: inline-block;
+  font-family: Poppins, Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--cf-static-logo-size);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: .95;
+  white-space: nowrap;
+  animation: cf-static-wordmark-settle 360ms ease-out both;
+}
+.cf-static-blurb__seo-logo-color {
+  color: #111;
+}
+.cf-static-blurb__seo-logo-fix {
+  color: #009ca6;
+}
+.cf-static-blurb__seo-logo-by {
+  position: absolute;
+  left: 66%;
+  top: calc(var(--cf-static-logo-size) * .92);
+  display: inline-flex;
+  gap: .16em;
+  color: rgba(71, 112, 111, .85);
+  font-family: "Nothing You Could Do", cursive;
+  font-size: clamp(17px, calc(var(--cf-static-logo-size) * .48), 22px);
+  font-weight: 400;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+  transform: rotate(-1.5deg);
+  white-space: nowrap;
+  clip-path: inset(0 100% 0 0);
+  animation: cf-static-signature-reveal 800ms ease-out 350ms both;
+  transform-origin: left center;
+}
+@media (max-width: 700px) {
+  .cf-static-blurb__seo-logo {
+    --cf-static-logo-size: clamp(28px, 12cqw, 34px);
+  }
+  .cf-static-blurb__seo-logo-by {
+    font-size: clamp(15px, calc(var(--cf-static-logo-size) * .42), 19px);
+  }
+}
+@keyframes cf-static-wordmark-settle {
+  from {
+    opacity: .94;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes cf-static-signature-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-static-blurb__seo-logo-main,
+  .cf-static-blurb__seo-logo-by {
+    animation: none;
+  }
+  .cf-static-blurb__seo-logo-by {
+    clip-path: inset(0 0 0 0);
+  }
 }
 .cf-static-blurb__subtitle,
 .cf-static-kicker {

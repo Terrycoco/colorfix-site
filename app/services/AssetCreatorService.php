@@ -124,28 +124,61 @@ final class AssetCreatorService
             throw new RuntimeException('Asset creator job not found');
         }
 
-        $deletedAssetIds = [];
-        foreach (($job['outputs'] ?? []) as $output) {
-            if (!is_array($output)) {
-                continue;
-            }
-            $assetId = (int)($output['asset_library_id'] ?? 0);
-            if ($assetId <= 0) {
-                continue;
-            }
-            $this->deleteGeneratedOutputFile($jobId, (string)($output['rel_path'] ?? ''));
-            if ($this->assetLibrary) {
-                $this->assetLibrary->deleteAsset($assetId);
-                $deletedAssetIds[] = $assetId;
-            }
-        }
+        $deleted = $this->deleteOutputsForJob($jobId, false);
 
         $this->repo->deleteJob($jobId);
 
         return [
             'asset_creator_job_id' => $jobId,
+            'deleted_asset_ids' => $deleted['deleted_asset_ids'],
+            'deleted_count' => $deleted['deleted_count'],
+        ];
+    }
+
+    public function deleteOutputsForJob(int $jobId, bool $refreshJob = true): array
+    {
+        if ($jobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+        if (!$this->assetLibrary) {
+            throw new RuntimeException('Asset library service is required to delete generated outputs.');
+        }
+
+        $job = $this->repo->findJob($jobId);
+        if (!$job) {
+            throw new RuntimeException('Asset creator job not found');
+        }
+
+        $outputs = array_values(array_filter(
+            $job['outputs'] ?? [],
+            static fn(mixed $output): bool => is_array($output) && (int)($output['asset_library_id'] ?? 0) > 0
+        ));
+        $assetIds = array_map(static fn(array $output): int => (int)$output['asset_library_id'], $outputs);
+        $this->assetLibrary->assertAssetsCanBeHardDeleted($assetIds);
+
+        $deletedAssetIds = [];
+        $counts = [];
+        foreach ($outputs as $output) {
+            $assetId = (int)($output['asset_library_id'] ?? 0);
+            $result = $this->assetLibrary->hardDeleteUnpublishedAsset($assetId, $this->rootDir);
+            if (!empty($result['deleted'])) {
+                $deletedAssetIds[] = $assetId;
+            }
+            $counts[$assetId] = $result['counts'] ?? [];
+        }
+
+        if ($refreshJob) {
+            $this->repo->updateJob($jobId, [
+                'status' => 'draft',
+                'last_run_at' => null,
+            ]);
+        }
+
+        return [
+            'asset_creator_job_id' => $jobId,
             'deleted_asset_ids' => $deletedAssetIds,
             'deleted_count' => count($deletedAssetIds),
+            'counts' => $counts,
         ];
     }
 

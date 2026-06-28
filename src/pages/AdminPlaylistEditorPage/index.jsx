@@ -60,6 +60,7 @@ const emptyItem = {
   is_share_image: false,
   site: true,
   yt: true,
+  pin: true,
   analyzer_role: "ignore",
   is_active: true,
 };
@@ -355,6 +356,7 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: item.site === null || item.site == null ? true : Boolean(Number(item.site)),
           yt: item.yt === null || item.yt == null ? true : Boolean(Number(item.yt)),
+          pin: item.pin === null || item.pin == null ? true : Boolean(Number(item.pin)),
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
             : "ignore",
@@ -765,6 +767,7 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: Boolean(item.site),
           yt: Boolean(item.yt),
+          pin: item.pin !== false,
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
             : "ignore",
@@ -1181,7 +1184,7 @@ export default function AdminPlaylistEditorPage() {
                       checked={item.site !== false}
                       onChange={(e) => updateItem(index, "site", e.target.checked)}
                     />
-                    Site
+                    Player
                   </label>
                   <label>
                     <input
@@ -1190,6 +1193,14 @@ export default function AdminPlaylistEditorPage() {
                       onChange={(e) => updateItem(index, "yt", e.target.checked)}
                     />
                     YT
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={item.pin !== false}
+                      onChange={(e) => updateItem(index, "pin", e.target.checked)}
+                    />
+                    Pin
                   </label>
                 </div>
               </div>

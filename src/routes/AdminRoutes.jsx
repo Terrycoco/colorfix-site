@@ -42,6 +42,7 @@ const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'))
 const AdminAssetCreatorsPage = lazy(() => import('@pages/AdminAssetCreatorsPage'));
 const AdminAssetAnalyticsPage = lazy(() => import('@pages/AdminAssetAnalyticsPage'));
 const AdminPublishingPage = lazy(() => import('@pages/AdminPublishingPage'));
+const AdminPublicationSchedulerPage = lazy(() => import('@pages/AdminPublicationSchedulerPage'));
 const AdminLandingPagesPage = lazy(() => import('@pages/AdminLandingPagesPage'));
 const AdminPinterestPublisherPage = lazy(() => import('@pages/AdminPinterestPublisherPage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
@@ -63,6 +64,7 @@ const AdminHOAPage = lazy(() => import('@pages/AdminHOAPage'));
 const AdminHoaSchemeTesterPage = lazy(() => import('@pages/AdminHoaSchemeTesterPage'));
 const AdminHoaMaskTesterPage = lazy(() => import('@pages/AdminHoaMaskTesterPage'));
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
+const AdminCtaPagesPage = lazy(() => import('@pages/AdminCtaPagesPage'));
 const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
@@ -133,6 +135,7 @@ export default function AdminRoutes() {
         <Route path="asset-creators" element={renderWithSuspense(AdminAssetCreatorsPage, 'Loading asset creator...')} />
         <Route path="publishing" element={renderWithSuspense(AdminPublishingPage, 'Loading publishing...')} />
         <Route path="publisher" element={renderWithSuspense(AdminPublishingPage, 'Loading publisher...')} />
+        <Route path="scheduler" element={renderWithSuspense(AdminPublicationSchedulerPage, 'Loading scheduler...')} />
         <Route path="landing-pages" element={renderWithSuspense(AdminLandingPagesPage, 'Loading landing pages...')} />
         <Route path="asset-analytics" element={renderWithSuspense(AdminAssetAnalyticsPage, 'Loading asset analytics...')} />
         <Route path="pinterest-publisher" element={renderWithSuspense(AdminPinterestPublisherPage, 'Loading Pinterest publisher...')} />
@@ -159,6 +162,7 @@ export default function AdminRoutes() {
         <Route path="playlist-instances" element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances...')} />
         <Route path="playlist-instance-sets" element={renderWithSuspense(AdminPlaylistInstanceSetsPage, 'Loading playlist instance sets...')} />
         <Route path="ctas" element={renderWithSuspense(AdminCtasPage, 'Loading CTAs...')} />
+        <Route path="cta-pages" element={renderWithSuspense(AdminCtaPagesPage, 'Loading CTA pages...')} />
         <Route path="hoas" element={renderWithSuspense(AdminHOAPage, 'Loading HOAs...')} />
         <Route path="hoa-scheme-tester" element={renderWithSuspense(AdminHoaSchemeTesterPage, 'Loading HOA scheme tester...')} />
         <Route path="hoa-mask-tester" element={renderWithSuspense(AdminHoaMaskTesterPage, 'Loading HOA mask tester...')} />

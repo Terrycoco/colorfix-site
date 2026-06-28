@@ -12,11 +12,13 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
   const isLink = variant === "link";
   const href = cta?.params?.url || cta?.href || cta?.url || "#";
   const isColorFixBrandCta = cta?.params?.brand === "colorfix";
+  const usesLogoText = variant === "button-logo";
   const className = [
     "cta-button",
     `cta-button--${variant}`,
     `cta-button--${displayMode}`,
     isColorFixBrandCta ? "cta-button--brand-colorfix" : "",
+    usesLogoText ? "cta-button--logo-text" : "",
   ].filter(Boolean).join(" ");
 
   const content = (
@@ -27,7 +29,11 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
 
       {displayMode !== "icon" && (
         <span className="cta-button__label">
-          {isColorFixBrandCta ? renderColorFixLabel(cta.label) : cta.label}
+          {usesLogoText
+            ? renderColorFixTextLabel(cta.label)
+            : isColorFixBrandCta
+              ? renderColorFixImageLabel(cta.label)
+              : cta.label}
         </span>
       )}
     </>
@@ -63,7 +69,21 @@ export default function CTAButton({ cta, onClick, disabled = false }) {
   );
 }
 
-function renderColorFixLabel(label) {
+function renderColorFixTextLabel(label) {
+  const text = String(label || "");
+  const parts = text.split(/(ColorFix)/g);
+  return parts.map((part, index) => {
+    if (part !== "ColorFix") return part;
+    return (
+      <span key={`brand-${index}`} className="cta-button__logo-word" aria-label="ColorFix">
+        <span className="cta-button__logo-word-color">Color</span>
+        <span className="cta-button__logo-word-fix">Fix</span>
+      </span>
+    );
+  });
+}
+
+function renderColorFixImageLabel(label) {
   const text = String(label || "");
   const parts = text.split(/(ColorFix)/g);
   return parts.map((part, index) => {

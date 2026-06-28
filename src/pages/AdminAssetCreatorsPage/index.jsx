@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import PermissionStatus from "@components/PermissionStatus";
 import "./admin-asset-creators.css";
@@ -50,6 +50,7 @@ export default function AdminAssetCreatorsPage() {
   const [savingRecipe, setSavingRecipe] = useState(false);
   const [runningJobId, setRunningJobId] = useState(null);
   const [deletingJobId, setDeletingJobId] = useState(null);
+  const [deletingOutputsJobId, setDeletingOutputsJobId] = useState(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [creatorModalOpen, setCreatorModalOpen] = useState(false);
@@ -228,22 +229,26 @@ export default function AdminAssetCreatorsPage() {
     setStatus("");
     try {
       const playlist = getSelectedPlaylist(playlists, form.playlist_id) || proposal.playlist || {};
-      const reviewedPairs = pairs.map((pair, index) => ({
-        ...pair,
-        include: !!pair.include,
-        sort_order: index + 1,
-        search_title: pair.search_title || pair.title || "",
-        pin_title: pair.search_title || pair.title || "",
-        description: pair.description || pair.caption || "",
-        pin_description: pair.description || pair.caption || "",
-        title: pair.search_title || pair.title || "",
-        caption: pair.description || pair.caption || "",
-        pin_type: pair.pin_type || "composite",
-        asset_type: assetTypeForPinType(pair.pin_type),
-        before: normalizeRecipeSide(pair.before),
-        after: normalizeRecipeSide(pair.after),
-        asset: normalizeRecipeSide(pair.pin_type === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
-      }));
+      const reviewedPairs = pairs.map((pair, index) => {
+        const pinType = pair.pin_type || "composite";
+        const title = titleForPinType(pair.search_title || pair.title || "", pinType);
+        return {
+          ...pair,
+          include: !!pair.include,
+          sort_order: index + 1,
+          search_title: title,
+          pin_title: title,
+          description: pair.description || pair.caption || "",
+          pin_description: pair.description || pair.caption || "",
+          title,
+          caption: pair.description || pair.caption || "",
+          pin_type: pinType,
+          asset_type: assetTypeForPinType(pinType),
+          before: normalizeRecipeSide(pair.before),
+          after: normalizeRecipeSide(pair.after),
+          asset: normalizeRecipeSide(pinType === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
+        };
+      });
       const payload = {
         asset_creator_job_id: editingJobId || undefined,
         creator_key: form.creator_key,
@@ -338,7 +343,7 @@ export default function AdminAssetCreatorsPage() {
 
   async function deleteCreatorJob(jobId) {
     if (!jobId) return;
-    const ok = window.confirm(`Delete creator job #${jobId} and its generated assets?`);
+    const ok = window.confirm(`Delete creator job #${jobId} and all deletable generated outputs? Source playlist photos will not be deleted.`);
     if (!ok) return;
 
     setDeletingJobId(jobId);
@@ -370,6 +375,36 @@ export default function AdminAssetCreatorsPage() {
       setError(err?.message || "Failed to delete creator job");
     } finally {
       setDeletingJobId(null);
+    }
+  }
+
+  async function deleteCreatorOutputs(jobId) {
+    if (!jobId) return;
+    const ok = window.confirm(`Delete generated outputs for creator job #${jobId}? The recipe and source playlist photos will stay.`);
+    if (!ok) return;
+
+    setDeletingOutputsJobId(jobId);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset_creator_job_id: jobId, action: "outputs" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to delete creator outputs");
+      setJobOutputs((current) => ({
+        ...current,
+        [jobId]: [],
+      }));
+      setStatus(`Deleted ${data.item?.deleted_count || 0} generated output${Number(data.item?.deleted_count || 0) === 1 ? "" : "s"} from creator job #${jobId}.`);
+      await fetchJobs(q);
+    } catch (err) {
+      setError(err?.message || "Failed to delete creator outputs");
+    } finally {
+      setDeletingOutputsJobId(null);
     }
   }
 
@@ -541,11 +576,16 @@ export default function AdminAssetCreatorsPage() {
       <header className="assetcreator-header">
         <div>
           <h1>Asset Creator</h1>
-          <p>Recipes that create new files from playlist and library ingredients.</p>
+          <p>Generated publishing assets from playlist recipes.</p>
         </div>
-        <button type="button" className="assetcreator-command assetcreator-command--primary" onClick={openNewCreatorModal}>
-          Analyzer
-        </button>
+        <div className="assetcreator-header-actions">
+          <button type="button" className="assetcreator-command assetcreator-command--primary" onClick={openNewCreatorModal}>
+            Analyzer
+          </button>
+          <Link className="assetcreator-command assetcreator-command--primary assetcreator-command-link" to="/admin/publisher">
+            Publisher
+          </Link>
+        </div>
       </header>
 
       <div className="assetcreator-toolbar">
@@ -603,15 +643,23 @@ export default function AdminAssetCreatorsPage() {
                     type="button"
                     className="assetcreator-mini"
                     onClick={() => runCreatorJob(job.asset_creator_job_id)}
-                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id}
+                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id || deletingOutputsJobId === job.asset_creator_job_id}
                   >
                     {runningJobId === job.asset_creator_job_id ? "Running..." : "Run"}
                   </button>
                   <button
                     type="button"
                     className="assetcreator-mini assetcreator-mini--danger"
+                    onClick={() => deleteCreatorOutputs(job.asset_creator_job_id)}
+                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id || deletingOutputsJobId === job.asset_creator_job_id || !(job.output_count > 0)}
+                  >
+                    {deletingOutputsJobId === job.asset_creator_job_id ? "Deleting..." : "Outputs"}
+                  </button>
+                  <button
+                    type="button"
+                    className="assetcreator-mini assetcreator-mini--danger"
                     onClick={() => deleteCreatorJob(job.asset_creator_job_id)}
-                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id}
+                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id || deletingOutputsJobId === job.asset_creator_job_id}
                   >
                     {deletingJobId === job.asset_creator_job_id ? "Deleting..." : "Delete"}
                   </button>
@@ -724,6 +772,14 @@ export default function AdminAssetCreatorsPage() {
                   onClick={() => toggleImagePreview(outputPreviewFromItems(jobOutputs[editingJobId], 0))}
                 >
                   Preview assets
+                </button>
+                <button
+                  type="button"
+                  className="assetcreator-mini assetcreator-mini--danger"
+                  onClick={() => deleteCreatorOutputs(editingJobId)}
+                  disabled={deletingOutputsJobId === editingJobId || !!runningJobId}
+                >
+                  {deletingOutputsJobId === editingJobId ? "Deleting..." : "Delete Outputs"}
                 </button>
               </section>
             ) : null}
@@ -1096,6 +1152,14 @@ function assetTypeForPinType(pinType = "composite") {
   if (pinType === "idea_palette") return "pin_idea_palette";
   if (pinType === "idea") return "pin_idea";
   return "pin_composite";
+}
+
+function titleForPinType(title, pinType = "composite") {
+  const value = String(title || "").trim();
+  if (pinType === "idea_palette") {
+    return value.replace(/\bIdeas\b/gi, "Palettes");
+  }
+  return value;
 }
 
 function withLiveInputPermissions(pairs, inputs = []) {

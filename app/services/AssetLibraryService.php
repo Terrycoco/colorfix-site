@@ -104,6 +104,108 @@ final class AssetLibraryService
         $this->repo->delete($assetLibraryId);
     }
 
+    public function hardDeleteBlockers(int $assetLibraryId): array
+    {
+        return $this->repo->hardDeleteBlockers($assetLibraryId);
+    }
+
+    public function assertAssetsCanBeHardDeleted(array $assetLibraryIds): void
+    {
+        $blocked = [];
+        foreach (array_values(array_unique(array_map('intval', $assetLibraryIds))) as $assetLibraryId) {
+            if ($assetLibraryId <= 0) {
+                continue;
+            }
+            $blockers = $this->hardDeleteBlockers($assetLibraryId);
+            if ($blockers !== []) {
+                $blocked[] = "Asset #{$assetLibraryId}: " . implode('; ', $blockers);
+            }
+        }
+        if ($blocked !== []) {
+            throw new RuntimeException('Cannot delete published or locked generated assets. ' . implode(' ', $blocked));
+        }
+    }
+
+    public function hardDeleteUnpublishedAsset(int $assetLibraryId, string $rootDir): array
+    {
+        $asset = $this->getAsset($assetLibraryId);
+        if (!$asset) {
+            throw new RuntimeException("Asset not found: {$assetLibraryId}");
+        }
+
+        $result = $this->repo->hardDeleteUnpublished($assetLibraryId);
+        if (empty($result['deleted'])) {
+            return $result;
+        }
+
+        $relPath = (string)($asset['rel_path'] ?? '');
+        $sourceType = (string)($asset['source_type'] ?? '');
+        if ($sourceType === 'asset_creator_job' && $relPath !== '') {
+            $abs = $this->diskPathForRelPath($relPath, $rootDir);
+            if (is_file($abs)) {
+                @unlink($abs);
+                $result['file_deleted'] = true;
+            } else {
+                $result['file_deleted'] = false;
+            }
+        }
+
+        return $result;
+    }
+
+    public function hardDeleteUnpublishedAssets(array $assetLibraryIds, string $rootDir): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $assetLibraryIds),
+            static fn(int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            throw new RuntimeException('asset_library_ids required');
+        }
+
+        $blocked = [];
+        $assets = [];
+        foreach ($ids as $assetLibraryId) {
+            $asset = $this->getAsset($assetLibraryId);
+            if (!$asset) {
+                $blocked[] = "Asset #{$assetLibraryId}: not found";
+                continue;
+            }
+            $blockers = $this->hardDeleteBlockers($assetLibraryId);
+            if ($blockers !== []) {
+                $blocked[] = "Asset #{$assetLibraryId}: " . implode('; ', $blockers);
+                continue;
+            }
+            $assets[$assetLibraryId] = $asset;
+        }
+
+        if ($blocked !== []) {
+            throw new RuntimeException('Cannot delete unpublished assets. ' . implode(' ', $blocked));
+        }
+
+        $deleted = [];
+        $results = [];
+        foreach (array_keys($assets) as $assetLibraryId) {
+            $result = $this->hardDeleteUnpublishedAsset($assetLibraryId, $rootDir);
+            $results[$assetLibraryId] = $result;
+            if (!empty($result['deleted'])) {
+                $deleted[] = $assetLibraryId;
+            }
+        }
+
+        return [
+            'requested_count' => count($ids),
+            'deleted_count' => count($deleted),
+            'deleted_asset_ids' => $deleted,
+            'results' => $results,
+        ];
+    }
+
+    public function hardDeleteUnpublishedGeneratedAssets(array $assetLibraryIds, string $rootDir): array
+    {
+        return $this->hardDeleteUnpublishedAssets($assetLibraryIds, $rootDir);
+    }
+
     public function publicUrlForRelPath(string $relPath): string
     {
         $relPath = trim($relPath);

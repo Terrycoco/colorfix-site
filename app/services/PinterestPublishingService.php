@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Lib\UrlNormalizer;
+use App\Repos\PdoAssetCreatorRepository;
 use App\Repos\PdoPublishingRepository;
 use App\Repos\PdoPublisherRepository;
 use RuntimeException;
@@ -14,7 +16,8 @@ final class PinterestPublishingService
 
     public function __construct(
         private PdoPublishingRepository $repo,
-        private ?PdoPublisherRepository $publisherRepo = null
+        private ?PdoPublisherRepository $publisherRepo = null,
+        private ?PdoAssetCreatorRepository $assetCreatorRepo = null
     ) {}
 
     public function listJobs(array $filters = []): array
@@ -68,27 +71,52 @@ final class PinterestPublishingService
         $board = $this->boardMetadata($payload);
         $channel = $this->publisherRepo?->findChannelByKey('pinterest_colorfix_makeovers')
             ?? $this->publisherRepo?->findDefaultChannelForPlatform('pinterest');
+        $environment = $this->nullableString($payload['environment'] ?? null) ?? 'test';
+        $channelId = isset($channel['publishing_channel_id']) ? (int)$channel['publishing_channel_id'] : null;
+        $assetCreatorJobId = isset($payload['asset_creator_job_id']) ? (int)$payload['asset_creator_job_id'] : null;
+        $ctaGroupId = isset($payload['cta_group_id']) ? (int)$payload['cta_group_id'] : null;
+        $landingPageIdForJob = isset($landingPage['id']) ? (int)$landingPage['id'] : null;
 
         $jobId = $this->repo->createJob([
+            'publishing_channel_id' => $channelId,
+            'platform' => 'pinterest',
+            'environment' => $environment,
             'source_type' => 'playlist',
             'source_id' => $playlistId,
+            'asset_creator_job_id' => $assetCreatorJobId,
             'playlist_instance_id' => isset($instance['playlist_instance_id']) ? (int)$instance['playlist_instance_id'] : null,
+            'cta_group_id' => $ctaGroupId,
+            'landing_page_id' => $landingPageIdForJob,
             'title' => $title,
+            'description' => $description,
             'status' => $status === 'published' ? 'published' : 'draft',
             'notes' => $this->nullableString($payload['notes'] ?? null),
+            'metadata_json' => [
+                'destination_key' => $this->nullableString($payload['destination_key'] ?? null),
+                'board' => $board,
+            ],
         ]);
 
         $outputId = $this->repo->createOutput([
-            'publish_job_id' => $jobId,
-            'channel_key' => self::CHANNEL_KEY,
-            'output_type' => self::OUTPUT_TYPE,
+            'publishing_job_id' => $jobId,
+            'publishing_channel_id' => $channelId,
+            'platform' => 'pinterest',
+            'environment' => $environment,
+            'source_type' => 'playlist',
+            'source_id' => $playlistId,
+            'asset_creator_output_id' => isset($payload['asset_creator_output_id']) ? (int)$payload['asset_creator_output_id'] : null,
+            'asset_creator_job_id' => $assetCreatorJobId,
+            'playlist_instance_id' => isset($instance['playlist_instance_id']) ? (int)$instance['playlist_instance_id'] : null,
+            'cta_group_id' => $ctaGroupId,
+            'landing_page_id' => $landingPageIdForJob,
+            'asset_type' => self::OUTPUT_TYPE,
             'status' => $status,
             'title' => $title,
             'description' => $description,
+            'image_url' => $this->nullableString($payload['image_url'] ?? $payload['asset_path'] ?? null),
             'tracking_code' => $trackingCode,
             'tracking_url' => $trackingUrl,
             'destination_url' => $destinationUrl,
-            'external_url' => $externalUrl,
             'asset_path' => $this->nullableString($payload['asset_path'] ?? null),
             'library_asset_id' => isset($payload['library_asset_id']) ? (int)$payload['library_asset_id'] : null,
             'metadata_json' => json_encode([
@@ -110,28 +138,11 @@ final class PinterestPublishingService
             'published_at' => $publishedAt,
         ]);
 
-        $publisherAssetId = $this->publisherRepo?->createPublisherAsset([
-            'publishing_channel_id' => $channel['publishing_channel_id'] ?? null,
-            'publish_output_id' => $outputId,
-            'asset_library_id' => isset($payload['library_asset_id']) ? (int)$payload['library_asset_id'] : null,
-            'platform' => 'pinterest',
-            'source_type' => 'playlist',
-            'source_id' => $playlistId,
-            'asset_type' => self::OUTPUT_TYPE,
-            'title' => $title,
-            'description' => $description,
-            'image_url' => $this->nullableString($payload['image_url'] ?? $payload['asset_path'] ?? null),
-            'destination_url' => $destinationUrl,
-            'status' => $status,
-            'external_url' => $externalUrl,
-            'metadata_json' => $board,
-            'published_at' => $publishedAt,
-        ]);
-
         return [
             'publish_job_id' => $jobId,
             'publish_output_id' => $outputId,
-            'publisher_asset_id' => $publisherAssetId,
+            'publishing_job_id' => $jobId,
+            'publishing_asset_id' => $outputId,
             'tracking_code' => $trackingCode,
             'tracking_url' => $trackingUrl,
             'destination_url' => $destinationUrl,
@@ -159,6 +170,206 @@ final class PinterestPublishingService
         ];
     }
 
+    public function prepareFromCreatorJob(array $payload): array
+    {
+        if (!$this->assetCreatorRepo) {
+            throw new RuntimeException('Asset creator repository unavailable.');
+        }
+
+        $assetCreatorJobId = (int)($payload['asset_creator_job_id'] ?? 0);
+        if ($assetCreatorJobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+
+        $creatorJob = $this->assetCreatorRepo->findJob($assetCreatorJobId);
+        if (!$creatorJob) {
+            throw new RuntimeException("Creator job not found: {$assetCreatorJobId}");
+        }
+        if (($creatorJob['source_type'] ?? '') !== 'playlist') {
+            throw new RuntimeException('Only playlist creator jobs can be prepared for publishing right now.');
+        }
+
+        $playlistId = (int)($creatorJob['source_id'] ?? 0);
+        if ($playlistId <= 0) {
+            throw new RuntimeException('Creator job is missing its source playlist.');
+        }
+        $playlist = $this->repo->getPlaylistSummary($playlistId);
+        if (!$playlist) {
+            throw new RuntimeException("Playlist not found: {$playlistId}");
+        }
+
+        $playlistInstanceId = (int)($payload['playlist_instance_id'] ?? 0);
+        if ($playlistInstanceId <= 0) {
+            throw new RuntimeException('playlist_instance_id required. Use Instance Preview first.');
+        }
+        $instance = $this->repo->getDefaultPlaylistInstance($playlistId, $playlistInstanceId);
+        if (!$instance || (int)($instance['playlist_instance_id'] ?? 0) !== $playlistInstanceId) {
+            throw new RuntimeException("Playlist instance not found for playlist {$playlistId}: {$playlistInstanceId}");
+        }
+
+        $ctaGroupId = (int)($payload['cta_group_id'] ?? 0);
+        if ($ctaGroupId <= 0) {
+            throw new RuntimeException('cta_group_id required');
+        }
+
+        $environment = $this->nullableString($payload['environment'] ?? null) ?? 'test';
+        $destinationKey = $this->nullableString($payload['destination_key'] ?? null)
+            ?? ($environment === 'production' ? 'colorfix_makeovers' : 'colorfix_api_test');
+        $channel = $this->publisherRepo?->findChannelByKey('pinterest_colorfix_makeovers')
+            ?? $this->publisherRepo?->findDefaultChannelForPlatform('pinterest');
+        if (!$channel && $this->publisherRepo) {
+            $channel = $this->publisherRepo->upsertPinterestChannel();
+        }
+        $channelId = isset($channel['publishing_channel_id']) ? (int)$channel['publishing_channel_id'] : null;
+        $board = $this->destinationBoardMetadata($channel ?? [], $environment, $destinationKey);
+
+        $title = $this->firstNonEmpty([
+            $payload['title'] ?? null,
+            $payload['instance_title'] ?? null,
+            $instance['share_title'] ?? null,
+            $instance['display_title'] ?? null,
+            $playlist['headline'] ?? null,
+            $playlist['title'] ?? null,
+        ]);
+        $description = $this->firstNonEmpty([
+            $payload['description'] ?? null,
+            $instance['share_description'] ?? null,
+            $playlist['meta_description'] ?? null,
+            $title,
+        ]);
+
+        $job = $this->repo->findJobForCreatorSetup(
+            $assetCreatorJobId,
+            'pinterest',
+            $environment,
+            $playlistInstanceId,
+            $ctaGroupId,
+            $destinationKey
+        );
+        $createdJob = false;
+        if (!$job) {
+            $jobId = $this->repo->createJob([
+                'publishing_channel_id' => $channelId,
+                'platform' => 'pinterest',
+                'environment' => $environment,
+                'source_type' => 'playlist',
+                'source_id' => $playlistId,
+                'asset_creator_job_id' => $assetCreatorJobId,
+                'playlist_instance_id' => $playlistInstanceId,
+                'cta_group_id' => $ctaGroupId,
+                'landing_page_id' => null,
+                'title' => $title,
+                'description' => $description,
+                'status' => 'draft',
+                'notes' => 'Prepared from creator job.',
+                'metadata_json' => [
+                    'destination_key' => $destinationKey,
+                    'board' => $board,
+                    'prepared_from_creator_job' => true,
+                ],
+            ]);
+            $job = $this->repo->findJobById($jobId);
+            $createdJob = true;
+        }
+
+        $jobId = (int)($job['publishing_job_id'] ?? $job['publish_job_id'] ?? 0);
+        if ($jobId <= 0) {
+            throw new RuntimeException('Failed to create publishing job.');
+        }
+
+        $destinationUrl = $this->buildDestinationUrl($playlistId, $instance, null);
+        $maxOutputs = isset($payload['max_outputs']) ? max(0, (int)$payload['max_outputs']) : 0;
+        $creatorOutputs = array_values($creatorJob['outputs'] ?? []);
+        if ($maxOutputs > 0) {
+            $creatorOutputs = array_slice($creatorOutputs, 0, $maxOutputs);
+        }
+        $createdOutputs = 0;
+        $reusedOutputs = 0;
+        $outputIds = [];
+        foreach ($creatorOutputs as $output) {
+            $creatorOutputId = (int)($output['asset_creator_output_id'] ?? 0);
+            $assetLibraryId = (int)($output['asset_library_id'] ?? 0);
+            if ($creatorOutputId <= 0 || $assetLibraryId <= 0) {
+                continue;
+            }
+            $existing = $this->repo->findOutputByCreatorOutput($jobId, $creatorOutputId);
+            if ($existing) {
+                $reusedOutputs += 1;
+                $outputIds[] = (int)$existing['publishing_asset_id'];
+                continue;
+            }
+
+            $outputMeta = $this->decodeJson($output['metadata_json'] ?? null);
+            $assetTitle = $this->firstNonEmpty([
+                $outputMeta['search_title'] ?? null,
+                $outputMeta['pin_title'] ?? null,
+                $output['title'] ?? null,
+                $title,
+            ]);
+            $assetDescription = $this->firstNonEmpty([
+                $outputMeta['description'] ?? null,
+                $outputMeta['pin_description'] ?? null,
+                $description,
+            ]);
+            $pinType = $this->nullableString($outputMeta['pin_type'] ?? $output['role'] ?? null) ?? 'pin';
+            $trackingCode = $this->buildTrackingCode($playlistId);
+
+            $outputId = $this->repo->createOutput([
+                'publishing_job_id' => $jobId,
+                'publishing_channel_id' => $channelId,
+                'platform' => 'pinterest',
+                'environment' => $environment,
+                'source_type' => 'playlist',
+                'source_id' => $playlistId,
+                'asset_creator_output_id' => $creatorOutputId,
+                'asset_creator_job_id' => $assetCreatorJobId,
+                'playlist_instance_id' => $playlistInstanceId,
+                'cta_group_id' => $ctaGroupId,
+                'landing_page_id' => null,
+                'asset_type' => $pinType,
+                'status' => 'ready_to_schedule',
+                'title' => $assetTitle,
+                'description' => $assetDescription,
+                'alt_text' => $assetDescription,
+                'image_url' => UrlNormalizer::absoluteOrNull($output['public_url'] ?? $output['rel_path'] ?? ''),
+                'media_url' => UrlNormalizer::absoluteOrNull($output['public_url'] ?? $output['rel_path'] ?? ''),
+                'asset_path' => $this->nullableString($output['rel_path'] ?? null),
+                'destination_url' => $destinationUrl,
+                'canonical_destination_url' => $destinationUrl,
+                'tracking_url' => $destinationUrl,
+                'library_asset_id' => $assetLibraryId,
+                'metadata_json' => [
+                    'board' => $board['board_name'],
+                    'board_name' => $board['board_name'],
+                    'board_url' => $board['board_url'],
+                    'board_slug' => $board['board_slug'],
+                    'board_id' => $board['board_id'],
+                    'destination_key' => $destinationKey,
+                    'pin_type' => $pinType,
+                    'tracking_code' => $trackingCode,
+                    'creator_metadata' => $outputMeta,
+                ],
+                'published_at' => null,
+            ]);
+            $createdOutputs += 1;
+            $outputIds[] = $outputId;
+        }
+
+        $this->repo->updateJobStatusFromOutputs($jobId);
+
+        return [
+            'publishing_job_id' => $jobId,
+            'publish_job_id' => $jobId,
+            'created_job' => $createdJob,
+            'created_outputs' => $createdOutputs,
+            'reused_outputs' => $reusedOutputs,
+            'output_ids' => $outputIds,
+            'playlist_instance_id' => $playlistInstanceId,
+            'destination_url' => $destinationUrl,
+            'environment' => $environment,
+        ];
+    }
+
     private function boardMetadata(array $payload): array
     {
         $default = PinterestBoardConfig::defaultBoard();
@@ -175,6 +386,29 @@ final class PinterestPublishingService
             'board_slug' => $boardSlug,
             'board_id' => $boardId,
         ];
+    }
+
+    private function destinationBoardMetadata(array $channel, string $environment, string $destinationKey): array
+    {
+        $metadata = $this->decodeJson($channel['metadata_json'] ?? null);
+        $destinations = is_array($metadata['destinations'] ?? null) ? $metadata['destinations'] : [];
+        foreach ($destinations as $destination) {
+            if (!is_array($destination)) {
+                continue;
+            }
+            if (
+                (string)($destination['destination_key'] ?? '') === $destinationKey
+                || (string)($destination['environment'] ?? '') === $environment
+            ) {
+                return [
+                    'board_name' => $this->nullableString($destination['board_name'] ?? null) ?? PinterestBoardConfig::BOARD_NAME,
+                    'board_url' => $this->nullableString($destination['board_url'] ?? null),
+                    'board_slug' => $this->nullableString($destination['board_slug'] ?? null),
+                    'board_id' => $this->nullableString($destination['board_id'] ?? null),
+                ];
+            }
+        }
+        return $this->boardMetadata([]);
     }
 
     private function buildTrackingCode(int $playlistId): string
@@ -225,4 +459,14 @@ final class PinterestPublishingService
         if ($stamp === false) return null;
         return date('Y-m-d H:i:s', $stamp);
     }
+
+    private function decodeJson(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        $decoded = json_decode((string)($value ?? ''), true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
 }

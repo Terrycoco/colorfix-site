@@ -38,14 +38,15 @@ export const adminMenuItems = [
     ],
   },
   {
-    label: "Assets",
+    label: "Publishing",
     items: [
       { label: "Asset Library", href: "/admin/library" },
       { label: "Creator", href: "/admin/asset-creators" },
       { label: "Publisher", href: "/admin/publisher" },
+      { label: "Scheduler", href: "/admin/scheduler" },
+      { label: "CTA Pages", href: "/admin/cta-pages" },
       { label: "Landing Pages", href: "/admin/landing-pages" },
       { label: "Analytics", href: "/admin/asset-analytics" },
-      { label: "Pinterest Publisher", href: "/admin/pinterest-publisher" },
     ],
   },
   {

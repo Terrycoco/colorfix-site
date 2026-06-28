@@ -368,7 +368,6 @@ class PlayerExperienceService
                 palette_hash,
                 COALESCE(
                     NULLIF(TRIM(display_title), ''),
-                    NULLIF(TRIM(nickname), ''),
                     palette_hash
                 ) AS palette_title
              FROM saved_palettes
@@ -416,7 +415,6 @@ class PlayerExperienceService
                 (
                   SELECT COALESCE(
                       NULLIF(TRIM(spalette.display_title), ''),
-                      NULLIF(TRIM(spalette.nickname), ''),
                       NULLIF(TRIM(sps.title), ''),
                       spalette.palette_hash
                     )
@@ -487,7 +485,6 @@ class PlayerExperienceService
                 spsp.photo_type AS saved_palette_photo_type,
                 COALESCE(
                     NULLIF(TRIM(sp.display_title), ''),
-                    NULLIF(TRIM(sp.nickname), ''),
                     NULLIF(TRIM(sps.title), ''),
                     sp.palette_hash
                 ) AS palette_title

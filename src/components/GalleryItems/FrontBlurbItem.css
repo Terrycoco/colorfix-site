@@ -1,4 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&display=swap');
+
 .front-blurb-item {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -42,6 +45,76 @@
   padding: 0;
 }
 
+.front-blurb-item__seo-logo {
+  --front-blurb-logo-size: clamp(2rem, 13cqw, 2.75rem);
+  position: relative;
+  display: inline-block;
+  width: min-content;
+  max-width: 100%;
+  padding: 0 0 calc(var(--front-blurb-logo-size) * 0.46);
+  line-height: 1;
+}
+
+.front-blurb-item__seo-logo-main {
+  display: inline-block;
+  font-family: Poppins, Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--front-blurb-logo-size);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.95;
+  white-space: nowrap;
+  animation: front-blurb-wordmark-settle 360ms ease-out both;
+}
+
+.front-blurb-item__seo-logo-color {
+  color: #111;
+}
+
+.front-blurb-item__seo-logo-fix {
+  color: #009ca6;
+}
+
+.front-blurb-item__seo-logo-by {
+  position: absolute;
+  left: 66%;
+  top: calc(var(--front-blurb-logo-size) * 0.92);
+  display: inline-flex;
+  gap: 0.16em;
+  color: rgba(71, 112, 111, 0.85);
+  font-family: "Nothing You Could Do", cursive;
+  font-size: clamp(1.05rem, calc(var(--front-blurb-logo-size) * 0.48), 1.38rem);
+  font-weight: 400;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+  transform: rotate(-1.5deg);
+  white-space: nowrap;
+  clip-path: inset(0 100% 0 0);
+  animation: front-blurb-signature-reveal 800ms ease-out 350ms both;
+  transform-origin: left center;
+}
+
+@keyframes front-blurb-wordmark-settle {
+  from {
+    opacity: 0.94;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes front-blurb-signature-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
 .front-blurb-item__body {
   font-family: 'Quicksand', sans-serif;
   font-size: 0.98rem;
@@ -82,6 +155,14 @@
     width: 6.4rem;
   }
 
+  .front-blurb-item__seo-logo {
+    --front-blurb-logo-size: clamp(1.75rem, 12cqw, 2.15rem);
+  }
+
+  .front-blurb-item__seo-logo-by {
+    font-size: clamp(0.92rem, calc(var(--front-blurb-logo-size) * 0.42), 1.18rem);
+  }
+
   .front-blurb-item__subtitle {
     font-size: 0.62rem;
     line-height: 1.15;
@@ -97,5 +178,16 @@
 
   .front-blurb-item__brand-image {
     width: 6.2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .front-blurb-item__seo-logo-main,
+  .front-blurb-item__seo-logo-by {
+    animation: none;
+  }
+
+  .front-blurb-item__seo-logo-by {
+    clip-path: inset(0 0 0 0);
   }
 }

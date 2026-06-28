@@ -25,6 +25,7 @@ class PlaylistItem
         public ?bool $is_share_image = null,
         public ?bool $site = null,
         public ?bool $yt = null,
+        public ?bool $pin = null,
         public ?string $alt_tag = null,
         public ?string $palette_title = null
     ) {

@@ -72,6 +72,7 @@ $hasSavedPaletteSetId = columnExists($pdo, 'playlist_items', 'saved_palette_set_
 $hasIsShareImage = columnExists($pdo, 'playlist_items', 'is_share_image');
 $hasSite = columnExists($pdo, 'playlist_items', 'site');
 $hasYt = columnExists($pdo, 'playlist_items', 'yt');
+$hasPin = columnExists($pdo, 'playlist_items', 'pin');
 $hasAnalyzerRole = columnExists($pdo, 'playlist_items', 'analyzer_role');
 $excludeSelect = $hasExcludeFromThumbs ? 'exclude_from_thumbs' : '0 AS exclude_from_thumbs';
 $photoSelect = $hasPhotoLibraryId ? 'photo_library_id' : 'NULL AS photo_library_id';
@@ -79,6 +80,7 @@ $savedPaletteSetSelect = $hasSavedPaletteSetId ? 'saved_palette_set_id' : 'NULL 
 $shareImageSelect = $hasIsShareImage ? 'is_share_image' : '0 AS is_share_image';
 $siteSelect = $hasSite ? 'site' : '1 AS site';
 $ytSelect = $hasYt ? 'yt' : '1 AS yt';
+$pinSelect = $hasPin ? 'pin' : '1 AS pin';
 $analyzerRoleSelect = $hasAnalyzerRole ? 'analyzer_role' : "'ignore' AS analyzer_role";
 $itemSql = <<<SQL
     SELECT
@@ -104,6 +106,7 @@ $itemSql = <<<SQL
       {$shareImageSelect},
       {$siteSelect},
       {$ytSelect},
+      {$pinSelect},
       {$analyzerRoleSelect},
       is_active
     FROM playlist_items

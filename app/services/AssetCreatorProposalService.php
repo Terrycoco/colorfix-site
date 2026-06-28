@@ -94,11 +94,13 @@ final class AssetCreatorProposalService
         $hasPhotoLibraryId = $this->columnExists('playlist_items', 'photo_library_id');
         $hasSavedPaletteSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
         $hasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
+        $hasPin = $this->columnExists('playlist_items', 'pin');
         $hasPaletteHash = $this->columnExists('playlist_items', 'palette_hash');
         $hasApId = $this->columnExists('playlist_items', 'ap_id');
         $photoSelect = $hasPhotoLibraryId ? 'pi.photo_library_id' : 'NULL AS photo_library_id';
         $setSelect = $hasSavedPaletteSetId ? 'pi.saved_palette_set_id' : 'NULL AS saved_palette_set_id';
         $analyzerRoleSelect = $hasAnalyzerRole ? 'pi.analyzer_role' : "'ignore' AS analyzer_role";
+        $pinSelect = $hasPin ? 'pi.pin' : '1 AS pin';
         $paletteHashSelect = $hasPaletteHash ? 'pi.palette_hash' : 'NULL AS palette_hash';
         $apIdSelect = $hasApId ? 'pi.ap_id' : 'NULL AS ap_id';
         $photoJoin = $hasPhotoLibraryId ? 'LEFT JOIN photo_library pl ON pl.photo_library_id = pi.photo_library_id' : '';
@@ -121,6 +123,7 @@ final class AssetCreatorProposalService
                     {$setSelect},
                     {$savedPaletteIdSelect},
                     {$analyzerRoleSelect},
+                    {$pinSelect},
                     {$photoHasPaletteSelect}
                FROM playlist_items pi
                     {$photoJoin}
@@ -138,6 +141,9 @@ final class AssetCreatorProposalService
         $sort = 1;
 
         foreach ($items as $item) {
+            if (!$this->pinEnabled($item)) {
+                continue;
+            }
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
             if ($role === 'before') {
                 foreach ($this->followingAfterItems($items, $item) as $after) {
@@ -187,10 +193,17 @@ final class AssetCreatorProposalService
                 break;
             }
             if ($role === 'after') {
-                $afterItems[] = $item;
+                if ($this->pinEnabled($item)) {
+                    $afterItems[] = $item;
+                }
             }
         }
         return $afterItems;
+    }
+
+    private function pinEnabled(array $item): bool
+    {
+        return !array_key_exists('pin', $item) || (int)($item['pin'] ?? 1) === 1;
     }
 
     private function compositePinRow(array $before, array $after, array $playlist, int $sort, string $source, float $confidence): array
@@ -448,10 +461,11 @@ final class AssetCreatorProposalService
             return $rows;
         }
 
-        return array_map(static function (array $row) use ($defaultTitle, $defaultDescription): array {
+        return array_map(function (array $row) use ($defaultTitle, $defaultDescription): array {
             if ($defaultTitle !== '') {
-                $row['search_title'] = $defaultTitle;
-                $row['title'] = $defaultTitle;
+                $title = $this->titleForPinType($defaultTitle, (string)($row['pin_type'] ?? ''));
+                $row['search_title'] = $title;
+                $row['title'] = $title;
             }
             if ($defaultDescription !== '') {
                 $row['description'] = $defaultDescription;
@@ -459,6 +473,15 @@ final class AssetCreatorProposalService
             }
             return $row;
         }, $rows);
+    }
+
+    private function titleForPinType(string $title, string $pinType): string
+    {
+        $title = trim($title);
+        if ($pinType === 'idea_palette') {
+            return preg_replace('/\bIdeas\b/i', 'Palettes', $title) ?? $title;
+        }
+        return $title;
     }
 
     private function assetPayload(array $row): array

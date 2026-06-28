@@ -39,7 +39,11 @@ $addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null
 $debugTiming = isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0';
 
 if ($playlistInstanceId <= 0 && $playlistSlug === '') {
-    respond(['ok' => false, 'error' => 'playlist_instance_id or playlist_slug required'], 400);
+    respond([
+        'ok' => false,
+        'error' => 'playlist_instance_id or playlist_slug required',
+        'code' => 'playlist_unavailable',
+    ], 400);
 }
 
 try {
@@ -47,7 +51,7 @@ try {
         $repo = new PdoPlaylistInstanceRepository($pdo);
         $playlistInstanceId = $repo->findIdBySlug($playlistSlug) ?? 0;
         if ($playlistInstanceId <= 0) {
-            throw new RuntimeException("Playlist instance slug not found: {$playlistSlug}");
+            throw new RuntimeException('Playlist unavailable');
         }
     }
 
@@ -64,7 +68,11 @@ try {
 
     respond($payload);
 } catch (RuntimeException $e) {
-    respond(['ok' => false, 'error' => $e->getMessage()], 404);
+    respond([
+        'ok' => false,
+        'error' => 'Playlist unavailable',
+        'code' => 'playlist_unavailable',
+    ], 404);
 } catch (Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 500);
 }

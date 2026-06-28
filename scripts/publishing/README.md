@@ -2,15 +2,21 @@
 
 This folder is the script side of the publishing system.
 
-The PHP app owns publishing records:
+The publishing architecture source of truth is
+`docs/publishing-arm-architecture.md`.
 
-- `publish_jobs`
-- `publish_outputs`
-- channel status
-- live URLs and timestamps
+The PHP app owns publishing records through services and repositories:
 
-Scripts own asset creation and channel-specific work. Each script should be
-small, testable, and replaceable.
+- `publishing_jobs`
+- `publishing_assets`
+- `publications`
+- scheduler queue rows
+- channel status, destinations, auth metadata
+- stable URLs, tracked URLs, live URLs, and timestamps
+
+Scripts may assist with asset creation or channel-specific rendering work. Each
+script should be small, testable, and replaceable. Scripts must not own
+database persistence; app services and repositories do.
 
 ## Structure
 
@@ -34,6 +40,9 @@ scripts/publishing/
 
 ## Rules
 
+- Only repository classes may access the database.
+- Scripts and workers trigger services; they must not contain SQL or lifecycle
+  rules.
 - Core publishing records stay generic.
 - Channel folders own channel-specific specs.
 - Each asset creator gets its own folder.
@@ -51,11 +60,13 @@ scripts/publishing/
   publishing: list boards, find `ColorFix Makeovers`, store the returned
   `board_id`, then allow queued pins to publish.
 - Core publisher records stay platform-neutral. Shared fields live in normal
-  columns on `publishing_channels` and `publisher_assets`; platform-specific
-  API settings live in `metadata_json`.
-- Publisher services own API request shaping by platform:
-  - `PinterestPublisher`
-  - future `YouTubePublisher`
+  columns on `publishing_channels`, `publishing_jobs`, `publishing_assets`,
+  and `publications`; platform-specific API settings live in `metadata_json`.
+- Publisher services own publishing workflow.
+- Channel adapters own API request shaping and external API calls:
+  - `PinterestPublisherAdapter`
+  - future `YouTubePublisherAdapter`
+- Channel adapters must not access the database or update local records.
 
 ## Standard Asset Result
 

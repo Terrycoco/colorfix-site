@@ -24,13 +24,22 @@ function renderBrandText(value) {
 
 function renderBrandTitle(value) {
   const text = normalizeText(value).trim();
-  if (text.toLowerCase() !== "colorfix") {
-    return text;
+  if (["colorfix", "colorfix by terry"].includes(text.toLowerCase())) {
+    return (
+      <span className="front-blurb-item__seo-logo" aria-label="ColorFix by Terry">
+        <span className="front-blurb-item__seo-logo-main">
+          <span className="front-blurb-item__seo-logo-color">Color</span>
+          <span className="front-blurb-item__seo-logo-fix">Fix</span>
+        </span>
+        <span className="front-blurb-item__seo-logo-by" aria-label="by Terry">
+          <span>by</span>
+          <span>Terry</span>
+        </span>
+      </span>
+    );
   }
 
-  return (
-    <img src={colorfixLightBgUrl} alt="ColorFix" className="front-blurb-item__title-brand-image" />
-  );
+  return text;
 }
 
 export default function FrontBlurbItem({ item }) {

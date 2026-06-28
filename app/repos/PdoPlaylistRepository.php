@@ -443,7 +443,12 @@ class PdoPlaylistRepository
         $shareImageSelect = $this->getIsShareImageSelect();
         $siteSelect = $this->getPlaylistItemFlagSelect('site');
         $ytSelect = $this->getPlaylistItemFlagSelect('yt');
-        $venueColumn = $venue === 'yt' ? 'yt' : 'site';
+        $pinSelect = $this->getPlaylistItemFlagSelect('pin');
+        $venueColumn = match ($venue) {
+            'yt' => 'yt',
+            'pin' => 'pin',
+            default => 'site',
+        };
         $venueWhere = $this->hasPlaylistItemColumn($venueColumn) ? "\n              AND {$venueColumn} = 1" : '';
         $sql = <<<SQL
             SELECT
@@ -467,7 +472,8 @@ class PdoPlaylistRepository
                 {$excludeSelect},
                 {$shareImageSelect},
                 {$siteSelect},
-                {$ytSelect}
+                {$ytSelect},
+                {$pinSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
@@ -509,7 +515,8 @@ class PdoPlaylistRepository
                 isset($row['exclude_from_thumbs']) ? (bool)$row['exclude_from_thumbs'] : null,
                 isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null,
                 isset($row['site']) ? (bool)$row['site'] : true,
-                isset($row['yt']) ? (bool)$row['yt'] : true
+                isset($row['yt']) ? (bool)$row['yt'] : true,
+                isset($row['pin']) ? (bool)$row['pin'] : true
             );
         }
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import ModalDialog from "@components/ModalDialog";
 import "./admin-ctas.css";
@@ -48,6 +49,16 @@ function parseParams(value) {
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
+  }
+}
+
+function hasInvalidParamsJson(value) {
+  if (!value || typeof value === "object") return false;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed === null || typeof parsed !== "object" || Array.isArray(parsed);
+  } catch {
+    return true;
   }
 }
 
@@ -101,7 +112,13 @@ export default function AdminCtasPage() {
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTAs");
       const raw = data.items || [];
       const items = Array.isArray(raw) ? raw : Object.values(raw || {});
-      items.sort((a, b) => (Number(b.cta_id) || 0) - (Number(a.cta_id) || 0));
+      items.sort((a, b) => {
+        const labelCompare = String(a.label || "").localeCompare(String(b.label || ""), undefined, {
+          sensitivity: "base",
+        });
+        if (labelCompare !== 0) return labelCompare;
+        return (Number(a.cta_id) || 0) - (Number(b.cta_id) || 0);
+      });
       setCtas(items);
     } catch (err) {
       setError(err?.message || "Failed to load CTAs");
@@ -273,10 +290,14 @@ export default function AdminCtasPage() {
   }, [selectedActionKey]);
 
   const ctaParams = useMemo(() => parseParams(ctaForm.params), [ctaForm.params]);
+  const paramsJsonInvalid = useMemo(() => hasInvalidParamsJson(ctaForm.params), [ctaForm.params]);
   const styleValue = (ctaParams.style || ctaParams.variant || "").toString();
   const themeValue = (ctaParams.theme || "").toString();
   const alignValue = (ctaParams.align || "").toString();
   const widthValue = (ctaParams.width || "").toString();
+  const navigateUrlValue = (ctaParams.url || "").toString();
+  const navigateTargetValue = (ctaParams.target || "").toString();
+  const preserveSrcValue = ctaParams.preserve_src === true || ctaParams.preserve_src === 1 || ctaParams.preserve_src === "true";
   const articleIdValue = (ctaParams.article_id || ctaParams.articleId || "").toString();
   const articleTitleValue = (ctaParams.title || "").toString();
   const articleDekValue = (ctaParams.dek || ctaParams.subtitle || "").toString();
@@ -289,10 +310,13 @@ export default function AdminCtasPage() {
     const errors = [];
     if (!ctaForm.cta_type_id) errors.push("Select an action.");
     if (!ctaForm.label.trim()) errors.push("Label is required.");
+    if (paramsJsonInvalid) {
+      errors.push("Params must be a valid JSON object.");
+    }
     if (selectedActionKey === "article_link" && !articleIdValue) {
       errors.push("Article ID is required.");
     }
-    if (selectedActionKey === "navigate" && !(ctaParams.url || "").toString().trim()) {
+    if (selectedActionKey === "navigate" && !navigateUrlValue.trim()) {
       errors.push("URL is required.");
     }
     if (selectedActionKey === "jump_to_item" && (ctaParams.item_index === undefined || ctaParams.item_index === "")) {
@@ -302,7 +326,7 @@ export default function AdminCtasPage() {
       errors.push("Onclick event must be an active tracking event.");
     }
     return errors;
-  }, [ctaForm.cta_type_id, ctaForm.label, ctaForm.onclick, selectedActionKey, articleIdValue, ctaParams, eventTypes]);
+  }, [ctaForm.cta_type_id, ctaForm.label, ctaForm.onclick, selectedActionKey, articleIdValue, navigateUrlValue, paramsJsonInvalid, ctaParams, eventTypes]);
 
   const canSaveCta = ctaErrors.length === 0;
 
@@ -360,6 +384,9 @@ export default function AdminCtasPage() {
           <div className="panel-header">
             <div className="panel-title">CTAs</div>
             <div className="panel-actions">
+              <Link className="secondary-btn" to="/admin/cta-pages">
+                CTA Pages
+              </Link>
               <button
                 type="button"
                 className="secondary-btn"
@@ -432,6 +459,38 @@ export default function AdminCtasPage() {
                 placeholder="Where this CTA is used, or any reminder"
               />
             </label>
+            {selectedActionKey === "navigate" && (
+              <>
+                <label className="full-width">
+                  URL
+                  <input
+                    type="text"
+                    value={navigateUrlValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "url", e.target.value))}
+                    placeholder="/send-note"
+                  />
+                </label>
+                <label>
+                  Target
+                  <select
+                    value={navigateTargetValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "target", e.target.value))}
+                  >
+                    <option value="">(same tab)</option>
+                    <option value="_self">Same tab</option>
+                    <option value="_blank">New tab</option>
+                  </select>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={preserveSrcValue}
+                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "preserve_src", e.target.checked))}
+                  />
+                  Preserve src tracking
+                </label>
+              </>
+            )}
             {selectedActionKey === "article_link" && (
               <>
                 <label>
@@ -522,6 +581,7 @@ export default function AdminCtasPage() {
               >
                 <option value="">(default)</option>
                 <option value="button">Button</option>
+                <option value="button_logo">Button with Logo</option>
                 <option value="link">Anchor</option>
                 <option value="primary">Primary</option>
                 <option value="secondary">Secondary</option>
@@ -597,7 +657,7 @@ export default function AdminCtasPage() {
           <div className="cta-cheatsheet-body">
             <div className="cta-cheatsheet-row">
               <div className="cta-cheatsheet-key">style</div>
-              <div className="cta-cheatsheet-value">button | link | primary | secondary | ghost</div>
+              <div className="cta-cheatsheet-value">button | button_logo | link | primary | secondary | ghost</div>
             </div>
             <div className="cta-cheatsheet-row">
               <div className="cta-cheatsheet-key">theme</div>

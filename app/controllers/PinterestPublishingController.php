@@ -36,4 +36,12 @@ final class PinterestPublishingController
             'item' => $this->service->markPublished($payload),
         ];
     }
+
+    public function prepareFromCreatorJob(array $payload): array
+    {
+        return [
+            'ok' => true,
+            'item' => $this->service->prepareFromCreatorJob($payload),
+        ];
+    }
 }

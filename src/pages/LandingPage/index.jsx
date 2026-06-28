@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
+import colorfixLogoUrl from "../../assets/brand/colorfix_lightbg.png";
 import "./landing-page.css";
 
 const GET_URL = `${API_FOLDER}/v2/landing-pages/get.php`;
@@ -61,9 +62,16 @@ export default function LandingPage() {
 
   if (error || !page) {
     return (
-      <main className="landing-page landing-page--quiet">
-        <h1>Page Not Found</h1>
-        <p>This ColorFix link is not available.</p>
+      <main className="landing-page landing-page--unavailable">
+        <section className="landing-page__unavailable-panel" aria-labelledby="landing-unavailable-title">
+          <img className="landing-page__unavailable-logo" src={colorfixLogoUrl} alt="ColorFix" />
+          <h1 id="landing-unavailable-title">This playlist isn&rsquo;t available.</h1>
+          <p>It may have been moved or taken offline.</p>
+          <div className="landing-page__unavailable-actions">
+            <Link to="/picker">Browse Playlists</Link>
+            <Link to="/">Go to ColorFix Home</Link>
+          </div>
+        </section>
       </main>
     );
   }

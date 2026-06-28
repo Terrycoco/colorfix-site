@@ -205,6 +205,72 @@ class PdoSavedPaletteRepository
         $stmt->execute([':id' => $id]);
     }
 
+    public function countPlaylistUsageForPalette(int $savedPaletteId): int
+    {
+        if ($savedPaletteId <= 0 || !$this->tableExists('playlist_items')) {
+            return 0;
+        }
+
+        $queries = [];
+        $params = [];
+
+        if (
+            $this->usesPaletteSets()
+            && $this->columnExists('playlist_items', 'saved_palette_set_id')
+        ) {
+            $queries[] = "
+                SELECT pi.playlist_item_id
+                  FROM saved_palette_sets s
+                  JOIN playlist_items pi
+                    ON pi.saved_palette_set_id = s.id
+                 WHERE s.saved_palette_id = :id_sets
+            ";
+            $params[':id_sets'] = $savedPaletteId;
+        }
+
+        if (
+            $this->usesPaletteSets()
+            && $this->columnExists('playlist_items', 'photo_library_id')
+            && $this->columnExists('saved_palette_set_photos', 'photo_library_id')
+        ) {
+            $queries[] = "
+                SELECT pi.playlist_item_id
+                  FROM saved_palette_sets s
+                  JOIN saved_palette_set_photos sp
+                    ON sp.saved_palette_set_id = s.id
+                  JOIN playlist_items pi
+                    ON pi.photo_library_id = sp.photo_library_id
+                 WHERE s.saved_palette_id = :id_photos
+            ";
+            $params[':id_photos'] = $savedPaletteId;
+        }
+
+        if (
+            !$this->usesPaletteSets()
+            && $this->tableExists('saved_palette_photos')
+            && $this->columnExists('playlist_items', 'photo_library_id')
+            && $this->columnExists('saved_palette_photos', 'photo_library_id')
+        ) {
+            $queries[] = "
+                SELECT pi.playlist_item_id
+                  FROM saved_palette_photos sp
+                  JOIN playlist_items pi
+                    ON pi.photo_library_id = sp.photo_library_id
+                 WHERE sp.saved_palette_id = :id_legacy_photos
+            ";
+            $params[':id_legacy_photos'] = $savedPaletteId;
+        }
+
+        if ($queries === []) {
+            return 0;
+        }
+
+        $sql = 'SELECT COUNT(*) FROM (' . implode(' UNION ', $queries) . ') used_palette_items';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    }
+
     /**
      * Remove all views for a palette.
      */
@@ -1146,6 +1212,31 @@ class PdoSavedPaletteRepository
         }
 
         return $this->hasSetTables;
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name'
+        );
+        $stmt->execute([':table_name' => $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name
+                AND COLUMN_NAME = :column_name'
+        );
+        $stmt->execute([':table_name' => $table, ':column_name' => $column]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     private function resolveSetIdForPalette(int $savedPaletteId, ?int $setId = null, bool $createIfMissing = false): int

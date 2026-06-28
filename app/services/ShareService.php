@@ -3,13 +3,12 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Lib\UrlNormalizer;
 use App\Repos\PdoSavedPaletteRepository;
 use InvalidArgumentException;
 
 final class ShareService
 {
-    private const DEFAULT_HOST = 'colorfix.terrymarr.com';
-
     public function __construct(
         private ?PdoSavedPaletteRepository $savedPaletteRepo = null
     ) {}
@@ -51,16 +50,7 @@ final class ShareService
         if ($trimmed === '') {
             throw new InvalidArgumentException('Share URL cannot be empty');
         }
-        if (preg_match('#^https?://#i', $trimmed)) {
-            return $trimmed;
-        }
-        if (str_starts_with($trimmed, '//')) {
-            return 'https:' . $trimmed;
-        }
-        if (!str_starts_with($trimmed, '/')) {
-            $trimmed = '/' . $trimmed;
-        }
-        return rtrim($this->baseUrl(), '/') . $trimmed;
+        return UrlNormalizer::absolute($trimmed, $this->baseUrl());
     }
 
     private function buildPlaylistInstancePath(int $playlistInstanceId, array $options): string
@@ -164,7 +154,7 @@ final class ShareService
     {
         $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
         if ($host === '') {
-            $host = self::DEFAULT_HOST;
+            return UrlNormalizer::baseUrl();
         }
 
         return $this->schemeForHost($host) . '://' . $host;

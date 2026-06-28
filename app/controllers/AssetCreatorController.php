@@ -59,6 +59,10 @@ final class AssetCreatorController
         if ($jobId <= 0) {
             throw new RuntimeException('asset_creator_job_id required');
         }
+        $action = trim((string)($payload['action'] ?? 'job'));
+        if ($action === 'outputs') {
+            return ['ok' => true, 'item' => $this->service->deleteOutputsForJob($jobId)];
+        }
         return ['ok' => true, 'item' => $this->service->deleteJob($jobId)];
     }
 }

@@ -168,6 +168,14 @@ class SavedPaletteService
         if ($savedPaletteId <= 0) {
             throw new InvalidArgumentException('saved_palette_id required');
         }
+
+        $playlistUsage = $this->repo->countPlaylistUsageForPalette($savedPaletteId);
+        if ($playlistUsage > 0) {
+            throw new InvalidArgumentException(
+                'Saved palette is used by ' . $playlistUsage . ' playlist item' . ($playlistUsage === 1 ? '' : 's') . '. Remove it from playlists before deleting.'
+            );
+        }
+
         $photos = [];
         $sets = $this->repo->getSetsForPalette($savedPaletteId);
         if ($sets) {

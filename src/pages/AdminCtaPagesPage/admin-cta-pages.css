@@ -1,0 +1,281 @@
+.admin-cta-pages {
+  padding: 24px 32px;
+  background: #f6f6f6;
+  min-height: calc(100vh - 56px);
+}
+
+.cta-pages-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.cta-pages-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cta-pages-header h1 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.cta-pages-header p {
+  margin: 0;
+  color: #555;
+  font-size: 15px;
+}
+
+.cta-pages-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(640px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.cta-pages-panel {
+  background: #fff;
+  border: 1px solid #d4d4d4;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.cta-pages-list-panel {
+  position: sticky;
+  top: 12px;
+}
+
+.cta-pages-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cta-pages-panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+
+.cta-pages-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cta-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  background: #f7f7f7;
+  color: #111;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 12px;
+  text-decoration: none;
+}
+
+.cta-page-btn--primary {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.cta-page-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.cta-pages-list,
+.cta-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 68vh;
+  overflow: auto;
+}
+
+.cta-page-row,
+.cta-picker-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #111;
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.cta-page-row.is-active,
+.cta-picker-row.is-active {
+  border-color: #111;
+  background: #efefef;
+}
+
+.cta-page-row-title,
+.cta-picker-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cta-page-row-meta,
+.cta-picker-meta {
+  color: #666;
+  font-size: 12px;
+}
+
+.cta-pages-empty {
+  color: #666;
+  font-size: 13px;
+  padding: 10px;
+}
+
+.cta-page-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.55fr) minmax(180px, 1fr) minmax(220px, 1.4fr) minmax(160px, 0.8fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.cta-page-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #333;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cta-page-form input,
+.cta-page-form select,
+.cta-page-form textarea,
+.cta-picker-header input {
+  border: 1px solid #aaa;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px;
+}
+
+.cta-page-form input[readonly] {
+  background: #f4f4f4;
+  color: #555;
+}
+
+.cta-page-form-wide {
+  grid-column: 1 / -1;
+}
+
+.cta-page-builder {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto minmax(260px, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.cta-picker {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fbfbfb;
+  padding: 10px;
+  min-height: 360px;
+}
+
+.cta-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cta-picker-header input {
+  max-width: 180px;
+}
+
+.cta-page-builder-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cta-page-note {
+  margin-top: 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f8f8f8;
+  color: #444;
+  font-size: 13px;
+  padding: 10px;
+}
+
+.cta-page-status {
+  margin-top: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 10px;
+}
+
+.cta-page-status--success {
+  background: #eaf7ef;
+  border: 1px solid #9bd0ac;
+  color: #155c2c;
+}
+
+.cta-page-status--error {
+  background: #fdecea;
+  border: 1px solid #f0aaa3;
+  color: #9a1f12;
+}
+
+@media (max-width: 1120px) {
+  .cta-pages-layout,
+  .cta-page-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .cta-pages-list-panel {
+    position: static;
+  }
+
+  .cta-page-builder-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-cta-pages {
+    padding: 16px;
+  }
+
+  .cta-pages-header,
+  .cta-pages-panel-header {
+    flex-direction: column;
+  }
+
+  .cta-page-form {
+    grid-template-columns: 1fr;
+  }
+}

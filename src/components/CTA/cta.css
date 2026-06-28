@@ -100,6 +100,31 @@
   border: 1px solid #d7d7d7;
 }
 
+.cta-button--button-logo {
+  background: #f2f2f2;
+  color: #111;
+  border: 1px solid #d7d7d7;
+}
+
+.cta-button--logo-text .cta-button__label {
+  font-weight: 400;
+}
+
+.cta-button__logo-word {
+  display: inline-block;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.cta-button__logo-word-color {
+  color: #111;
+}
+
+.cta-button__logo-word-fix {
+  color: #009ca6;
+}
+
 .cta-button--ghost {
   background: transparent;
   color: #aaa;

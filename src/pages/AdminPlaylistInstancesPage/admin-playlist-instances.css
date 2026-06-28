@@ -151,6 +151,7 @@
 
 .panel-controls button,
 .panel-actions button,
+.danger-btn,
 .primary-btn {
   padding: 7px 10px;
   border-radius: 2px;
@@ -161,6 +162,7 @@
 
 .panel-controls button:disabled,
 .panel-actions button:disabled,
+.danger-btn:disabled,
 .primary-btn:disabled,
 .mobile-share button:disabled {
   opacity: 0.45;
@@ -171,6 +173,12 @@
   border-color: #111;
   background: #111;
   color: #fff;
+}
+
+.danger-btn {
+  border-color: #9f1d1d;
+  background: #fff1f1;
+  color: #9f1d1d;
 }
 
 .link-btn {

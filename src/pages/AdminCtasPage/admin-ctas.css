@@ -11,6 +11,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .cta-panel {
@@ -21,6 +22,16 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
+}
+
+.cta-column:first-child .cta-panel {
+  height: calc(100vh - 72px);
+}
+
+.cta-column:first-child .cta-listbox-items {
+  flex: 1;
+  max-height: none;
 }
 
 .panel-header {
@@ -52,6 +63,9 @@
 }
 
 .secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid #bbb;
@@ -59,6 +73,7 @@
   background: #f5f5f5;
   color: #222;
   font-size: 12px;
+  text-decoration: none;
 }
 
 .panel-list {

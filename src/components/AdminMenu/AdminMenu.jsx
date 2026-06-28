@@ -29,6 +29,7 @@ function shouldUseInboxBadge(currentPath) {
     || currentPath === "/admin/library"
     || currentPath === "/admin/publishing"
     || currentPath === "/admin/publisher"
+    || currentPath === "/admin/scheduler"
     || currentPath === "/admin/pinterest-publisher";
 }
 

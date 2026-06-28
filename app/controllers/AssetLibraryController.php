@@ -22,4 +22,14 @@ final class AssetLibraryController
             'offset' => isset($query['offset']) ? (int)$query['offset'] : 0,
         ]);
     }
+
+    public function hardDeleteUnpublished(int $assetLibraryId, string $rootDir): array
+    {
+        return $this->service->hardDeleteUnpublishedAsset($assetLibraryId, $rootDir);
+    }
+
+    public function hardDeleteUnpublishedGenerated(array $assetLibraryIds, string $rootDir): array
+    {
+        return $this->service->hardDeleteUnpublishedAssets($assetLibraryIds, $rootDir);
+    }
 }

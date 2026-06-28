@@ -52,15 +52,19 @@ try {
         }
         $photoLibraryIds = array_values($photoLibraryIds);
     }
+    $exactPhotoIdSearch = preg_match('/^#?\d+$/', $q) === 1;
 
     $where = [];
     $params = [];
-    $needsPaletteJoin = $paletteId > 0 || $sourceType === 'saved_palette_photo';
-    if ($sourceType !== '' && $sourceType !== 'saved_palette_photo') {
+    $needsPaletteJoin = !$exactPhotoIdSearch && ($paletteId > 0 || $sourceType === 'saved_palette_photo');
+    if (!$exactPhotoIdSearch && $sourceType !== '' && $sourceType !== 'saved_palette_photo') {
         $where[] = 'source_type = :source_type';
         $params[':source_type'] = $sourceType;
     }
-    if ($q !== '') {
+    if ($exactPhotoIdSearch) {
+        $where[] = 'photo_library.photo_library_id = :exact_photo_library_id';
+        $params[':exact_photo_library_id'] = (int)ltrim($q, '#');
+    } elseif ($q !== '') {
         $tokens = array_values(array_filter(array_map(
             static fn(string $part): string => trim($part),
             explode(',', $q)
@@ -104,14 +108,18 @@ try {
         }
         $where[] = 'photo_library.photo_library_id IN (' . implode(', ', $placeholders) . ')';
     }
-    if ($clientId > 0) {
+    if (!$exactPhotoIdSearch && $clientId > 0) {
         $where[] = 'photo_library.client_id = :client_id';
         $params[':client_id'] = $clientId;
     }
-    if ($missingTags) {
+    if (!$exactPhotoIdSearch && $missingTags) {
         $where[] = "(photo_library.tags IS NULL OR TRIM(photo_library.tags) = '')";
     }
-    if ($inactiveOnly) {
+    $explicitSearch = $q !== '' || !empty($photoLibraryIds);
+    if ($explicitSearch) {
+        // Direct searches should find matching rows even when inactive/retired;
+        // otherwise replacement and cleanup workflows hide the exact photo needed.
+    } elseif ($inactiveOnly) {
         $where[] = 'photo_library.is_inactive = 1';
     } elseif (!$includeInactive) {
         $where[] = 'photo_library.is_inactive = 0';
@@ -132,7 +140,7 @@ try {
         $joins .= " JOIN saved_palette_set_photos spsp ON spsp.photo_library_id = photo_library.photo_library_id";
         $joins .= " JOIN saved_palette_sets sps ON sps.id = spsp.saved_palette_set_id";
     }
-    if ($paletteId > 0) {
+    if (!$exactPhotoIdSearch && $paletteId > 0) {
         $where[] = "sps.saved_palette_id = :palette_id";
         $params[':palette_id'] = $paletteId;
     }

@@ -9,6 +9,7 @@ import "./admin-playlist-instances.css";
 const LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const GET_URL = `${API_FOLDER}/v2/admin/playlist-instances/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instances/save.php`;
+const DELETE_URL = `${API_FOLDER}/v2/admin/playlist-instances/delete.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
@@ -89,6 +90,7 @@ export default function AdminPlaylistInstancesPage() {
   const [form, setForm] = useState(emptyInstance);
   const [slugLocked, setSlugLocked] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
   const [emailTemplates, setEmailTemplates] = useState([]);
@@ -657,6 +659,41 @@ export default function AdminPlaylistInstancesPage() {
     }
   }
 
+  async function handleDelete() {
+    const instanceId = Number(form.playlist_instance_id || 0);
+    if (!instanceId) return;
+    const ok = window.confirm(`Delete playlist instance #${instanceId}? This is allowed only when it is not published or locked.`);
+    if (!ok) return;
+    setDeleting(true);
+    setSaveError("");
+    setSaveStatus("");
+    try {
+      const res = await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playlist_instance_id: instanceId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        const blockers = Array.isArray(data?.blockers) && data.blockers.length
+          ? ` ${data.blockers.join("; ")}`
+          : "";
+        throw new Error(`${data?.error || "Delete failed"}${blockers}`);
+      }
+      setActiveId(null);
+      activeIdRef.current = null;
+      setForm(emptyInstance);
+      setSlugLocked(false);
+      setSaveStatus(`Deleted instance #${instanceId}`);
+      await fetchInstances();
+    } catch (err) {
+      setSaveError(err?.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const filteredItems = useMemo(() => {
     const getInstanceSortLabel = (item) => {
       return String(item?.instance_name || item?.display_title || "").trim().toLowerCase();
@@ -963,9 +1000,17 @@ export default function AdminPlaylistInstancesPage() {
               type="button"
               className="primary-btn"
               onClick={handleSave}
-              disabled={saving || (!form.playlist_instance_id && !form.playlist_id)}
+              disabled={saving || deleting || (!form.playlist_instance_id && !form.playlist_id)}
             >
               {saving ? "Saving..." : "Save"}
+            </button>
+            <button
+              type="button"
+              className="danger-btn"
+              onClick={handleDelete}
+              disabled={saving || deleting || !form.playlist_instance_id}
+            >
+              {deleting ? "Deleting..." : "Delete"}
             </button>
           </div>
         </div>

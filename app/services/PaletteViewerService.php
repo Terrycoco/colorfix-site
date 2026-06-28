@@ -197,7 +197,9 @@ class PaletteViewerService
             'id' => $palette['id'] ?? null,
             'hash' => $palette['palette_hash'] ?? $hash,
             'title' => $this->firstNonEmpty([
-                $palette['nickname'] ?? null,
+                $palette['display_title'] ?? null,
+                $sets[0]['title'] ?? null,
+                $palette['palette_hash'] ?? $hash,
                 'ColorFix Palette',
             ]),
             'nickname' => $palette['nickname'] ?? null,

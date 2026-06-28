@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS publishing_channels (
   KEY idx_publishing_channels_external (platform, external_account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS publisher_assets (
-  publisher_asset_id INT NOT NULL AUTO_INCREMENT,
+CREATE TABLE IF NOT EXISTS publishing_jobs (
+  publishing_job_id INT NOT NULL AUTO_INCREMENT,
   publishing_channel_id INT NULL,
   publish_output_id INT NULL,
   asset_library_id INT NULL,
@@ -47,18 +47,18 @@ CREATE TABLE IF NOT EXISTS publisher_assets (
   published_at DATETIME NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (publisher_asset_id),
-  KEY idx_publisher_assets_channel_status (publishing_channel_id, status),
-  KEY idx_publisher_assets_platform_status (platform, status),
-  KEY idx_publisher_assets_source (source_type, source_id),
-  KEY idx_publisher_assets_asset_library (asset_library_id),
-  KEY idx_publisher_assets_publish_output (publish_output_id),
-  KEY idx_publisher_assets_next_attempt (status, next_attempt_at),
-  CONSTRAINT fk_publisher_assets_channel
+  PRIMARY KEY (publishing_job_id),
+  KEY idx_publishing_jobs_channel_status (publishing_channel_id, status),
+  KEY idx_publishing_jobs_platform_status (platform, status),
+  KEY idx_publishing_jobs_source (source_type, source_id),
+  KEY idx_publishing_jobs_asset_library (asset_library_id),
+  KEY idx_publishing_jobs_publish_output (publish_output_id),
+  KEY idx_publishing_jobs_next_attempt (status, next_attempt_at),
+  CONSTRAINT fk_publishing_jobs_channel
     FOREIGN KEY (publishing_channel_id)
     REFERENCES publishing_channels (publishing_channel_id)
     ON DELETE SET NULL,
-  CONSTRAINT fk_publisher_assets_output
+  CONSTRAINT fk_publishing_jobs_output
     FOREIGN KEY (publish_output_id)
     REFERENCES publish_outputs (publish_output_id)
     ON DELETE SET NULL
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS publisher_assets (
 
 CREATE TABLE IF NOT EXISTS publisher_attempts (
   publisher_attempt_id INT NOT NULL AUTO_INCREMENT,
-  publisher_asset_id INT NOT NULL,
+  publishing_job_id INT NOT NULL,
   publishing_channel_id INT NULL,
   platform VARCHAR(80) NOT NULL,
   publisher_service VARCHAR(120) NOT NULL,
@@ -84,13 +84,13 @@ CREATE TABLE IF NOT EXISTS publisher_attempts (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (publisher_attempt_id),
-  KEY idx_publisher_attempts_asset (publisher_asset_id),
+  KEY idx_publisher_attempts_publishing_job (publishing_job_id),
   KEY idx_publisher_attempts_channel_status (publishing_channel_id, status),
   KEY idx_publisher_attempts_platform_status (platform, status),
   KEY idx_publisher_attempts_retry (status, next_retry_at),
-  CONSTRAINT fk_publisher_attempts_asset
-    FOREIGN KEY (publisher_asset_id)
-    REFERENCES publisher_assets (publisher_asset_id)
+  CONSTRAINT fk_publisher_attempts_publishing_job
+    FOREIGN KEY (publishing_job_id)
+    REFERENCES publishing_jobs (publishing_job_id)
     ON DELETE CASCADE,
   CONSTRAINT fk_publisher_attempts_channel
     FOREIGN KEY (publishing_channel_id)

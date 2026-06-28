@@ -695,7 +695,7 @@ function startPlayback(nextMode, nextIndex = 0) {
 
           {imageLoaded && fadeReady && titleVisible && titleReady && isIntro && IntroRenderer && (
             <div
-              className={`player-title${introNoImage ? " is-intro-full is-text-intro" : " is-static"}`}
+              className={`player-title${introNoImage ? " is-intro-full is-text-intro" : " is-static is-intro-image"}`}
               style={
                 introNoImage
                   ? undefined
@@ -707,7 +707,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               ref={titleRef}
             >
               <IntroRenderer item={currentItem} />
-              {shouldShowAdvanceHint && introNoImage ? (
+              {shouldShowAdvanceHint ? (
                 <div className="player-advance-hint player-advance-hint--inline">Tap to Advance</div>
               ) : null}
             </div>
@@ -732,7 +732,7 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
         </div>
-        {shouldShowAdvanceHint && !introNoImage && (
+        {shouldShowAdvanceHint && !isIntro && (
           <div className="player-advance-hint">Tap to Advance</div>
         )}
       </div>

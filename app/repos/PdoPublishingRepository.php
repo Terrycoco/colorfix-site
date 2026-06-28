@@ -20,11 +20,14 @@ final class PdoPublishingRepository
         if ($channel !== '') {
             $where[] = 'EXISTS (
                 SELECT 1
-                  FROM publish_outputs po_filter
-                 WHERE po_filter.publish_job_id = pj.publish_job_id
-                   AND po_filter.channel_key = :channel_key
+                  FROM publishing_assets pa_filter
+                  LEFT JOIN publishing_channels pc_filter
+                    ON pc_filter.publishing_channel_id = pa_filter.publishing_channel_id
+                 WHERE pa_filter.publishing_job_id = pj.publishing_job_id
+                   AND (pc_filter.channel_key = :channel_key OR pa_filter.platform = :channel_platform)
             )';
             $params['channel_key'] = $channel;
+            $params['channel_platform'] = $channel === 'pinterest_pin' ? 'pinterest' : $channel;
         }
 
         $q = trim((string)($filters['q'] ?? ''));
@@ -39,7 +42,8 @@ final class PdoPublishingRepository
 
         $sql = <<<SQL
             SELECT
-              pj.publish_job_id,
+              pj.publishing_job_id,
+              pj.publishing_job_id AS publish_job_id,
               pj.source_type,
               pj.source_id,
               pj.playlist_instance_id,
@@ -53,37 +57,51 @@ final class PdoPublishingRepository
               pi.display_title AS instance_display_title,
               GROUP_CONCAT(
                 CONCAT_WS('|',
-                  po.publish_output_id,
-                  po.channel_key,
-                  po.output_type,
-                  po.status,
-                  COALESCE(po.title, ''),
-                  COALESCE(po.tracking_code, ''),
-                  COALESCE(po.tracking_url, ''),
-                  COALESCE(po.destination_url, ''),
-                  COALESCE(po.external_url, ''),
-                  COALESCE(po.published_at, ''),
-                  COALESCE(po.created_at, ''),
-                  COALESCE(po.library_asset_id, ''),
+                  pa.publishing_asset_id,
+                  COALESCE(pc.channel_key, pa.platform),
+                  pa.environment,
+                  pa.asset_type,
+                  pa.status,
+                  COALESCE(pa.title, ''),
+                  COALESCE(JSON_UNQUOTE(JSON_EXTRACT(pa.metadata_json, "$.tracking_code")), ''),
+                  COALESCE(pa.tracked_destination_url, pa.destination_url, ''),
+                  COALESCE(pa.destination_url, ''),
+                  COALESCE(pub.external_post_url, ''),
+                  COALESCE(pa.published_at, pub.published_at, ''),
+                  COALESCE(pa.created_at, ''),
+                  COALESCE(pa.asset_library_id, ''),
                   COALESCE(NULLIF(pl_after.photo_permission_status, ''), NULLIF(pl_before.photo_permission_status, ''), NULLIF(pl.photo_permission_status, ''), c.photo_permission_status, 'unknown'),
                   COALESCE(al.legacy_photo_library_id, pl_after.photo_library_id, pl_before.photo_library_id, pl.photo_library_id, ''),
                   COALESCE(c.id, ''),
                   COALESCE(c.name, ''),
                   COALESCE(c.email, ''),
-                  COALESCE(po.metadata_json, '')
+                  COALESCE(pa.metadata_json, '')
                 )
-                ORDER BY po.publish_output_id
+                ORDER BY pa.publishing_asset_id
                 SEPARATOR '\n'
               ) AS output_rows
-            FROM publish_jobs pj
+            FROM publishing_jobs pj
             LEFT JOIN playlists p
               ON p.playlist_id = pj.source_id
             LEFT JOIN playlist_instances pi
               ON pi.playlist_instance_id = pj.playlist_instance_id
-            LEFT JOIN publish_outputs po
-              ON po.publish_job_id = pj.publish_job_id
+            LEFT JOIN publishing_assets pa
+              ON pa.publishing_job_id = pj.publishing_job_id
+            LEFT JOIN publishing_channels pc
+              ON pc.publishing_channel_id = pa.publishing_channel_id
+            LEFT JOIN publications pub
+              ON pub.publishing_asset_id = pa.publishing_asset_id
+             AND pub.publication_id = (
+                SELECT pub_latest.publication_id
+                  FROM publications pub_latest
+                 WHERE pub_latest.publishing_asset_id = pa.publishing_asset_id
+                   AND pub_latest.status IN ('published', 'test_published')
+                 ORDER BY CASE WHEN pub_latest.status = 'published' THEN 0 ELSE 1 END,
+                          pub_latest.publication_id DESC
+                 LIMIT 1
+             )
             LEFT JOIN asset_library al
-              ON al.asset_library_id = po.library_asset_id
+              ON al.asset_library_id = pa.asset_library_id
             LEFT JOIN photo_library pl
               ON pl.photo_library_id = al.legacy_photo_library_id
             LEFT JOIN photo_library pl_before
@@ -98,7 +116,7 @@ final class PdoPublishingRepository
             $sql .= "\nWHERE " . implode("\n  AND ", $where);
         }
 
-        $sql .= "\nGROUP BY pj.publish_job_id\nORDER BY pj.updated_at DESC, pj.publish_job_id DESC\nLIMIT 200";
+        $sql .= "\nGROUP BY pj.publishing_job_id\nORDER BY pj.updated_at DESC, pj.publishing_job_id DESC\nLIMIT 200";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -110,85 +128,245 @@ final class PdoPublishingRepository
     public function createJob(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO publish_jobs
-                (source_type, source_id, playlist_instance_id, title, status, notes)
+            'INSERT INTO publishing_jobs
+                (publishing_channel_id, platform, environment, source_type, source_id, asset_creator_job_id,
+                 playlist_instance_id, cta_group_id, landing_page_id, title, description, status, notes, metadata_json)
              VALUES
-                (:source_type, :source_id, :playlist_instance_id, :title, :status, :notes)'
+                (:publishing_channel_id, :platform, :environment, :source_type, :source_id, :asset_creator_job_id,
+                 :playlist_instance_id, :cta_group_id, :landing_page_id, :title, :description, :status, :notes, :metadata_json)'
         );
         $stmt->execute([
+            'publishing_channel_id' => $data['publishing_channel_id'] ?? null,
+            'platform' => $data['platform'] ?? 'pinterest',
+            'environment' => $data['environment'] ?? 'test',
             'source_type' => $data['source_type'],
             'source_id' => $data['source_id'],
+            'asset_creator_job_id' => $data['asset_creator_job_id'] ?? null,
             'playlist_instance_id' => $data['playlist_instance_id'],
+            'cta_group_id' => $data['cta_group_id'] ?? null,
+            'landing_page_id' => $data['landing_page_id'] ?? null,
             'title' => $data['title'],
+            'description' => $data['description'] ?? null,
             'status' => $data['status'],
             'notes' => $data['notes'],
+            'metadata_json' => $this->jsonValue($data['metadata_json'] ?? null),
         ]);
         return (int)$this->pdo->lastInsertId();
     }
 
     public function createOutput(array $data): int
     {
+        $metadata = $data['metadata_json'] ?? [];
+        if (is_string($metadata)) {
+            $decoded = json_decode($metadata, true);
+            $metadata = is_array($decoded) ? $decoded : [];
+        }
+        if (isset($data['tracking_code'])) $metadata['tracking_code'] = $data['tracking_code'];
+
         $values = [
-            'publish_job_id' => $data['publish_job_id'],
-            'channel_key' => $data['channel_key'],
-            'output_type' => $data['output_type'],
+            'publishing_job_id' => $data['publishing_job_id'] ?? $data['publish_job_id'],
+            'publishing_channel_id' => $data['publishing_channel_id'] ?? null,
+            'platform' => $data['platform'] ?? 'pinterest',
+            'environment' => $data['environment'] ?? 'test',
+            'source_type' => $data['source_type'] ?? 'playlist',
+            'source_id' => $data['source_id'],
+            'asset_creator_output_id' => $data['asset_creator_output_id'] ?? null,
+            'asset_library_id' => $data['asset_library_id'] ?? $data['library_asset_id'] ?? null,
+            'playlist_instance_id' => $data['playlist_instance_id'] ?? null,
+            'cta_group_id' => $data['cta_group_id'] ?? null,
+            'landing_page_id' => $data['landing_page_id'] ?? null,
+            'asset_type' => $data['asset_type'] ?? $data['output_type'],
             'status' => $data['status'],
             'title' => $data['title'],
             'description' => $data['description'],
-            'tracking_code' => $data['tracking_code'],
-            'tracking_url' => $data['tracking_url'],
+            'alt_text' => $data['alt_text'] ?? null,
+            'image_url' => $data['image_url'] ?? null,
+            'media_path' => $data['media_path'] ?? $data['asset_path'] ?? null,
+            'media_url' => $data['media_url'] ?? null,
             'destination_url' => $data['destination_url'],
-            'external_url' => $data['external_url'],
-            'asset_path' => $data['asset_path'],
-            'library_asset_id' => $data['library_asset_id'] ?? null,
-            'metadata_json' => $data['metadata_json'],
-            'generated_at' => $data['generated_at'],
-            'staged_at' => $data['staged_at'],
+            'canonical_destination_url' => $data['canonical_destination_url'] ?? $data['destination_url'],
+            'tracked_destination_url' => $data['tracked_destination_url'] ?? $data['tracking_url'] ?? $data['destination_url'],
+            'metadata_json' => $metadata,
             'published_at' => $data['published_at'],
         ];
 
         $columns = array_keys($values);
         $columnList = implode(', ', $columns);
         $placeholderList = ':' . implode(', :', $columns);
-        $stmt = $this->pdo->prepare("INSERT INTO publish_outputs ({$columnList}) VALUES ({$placeholderList})");
+        $values['metadata_json'] = $this->jsonValue($values['metadata_json']);
+        $stmt = $this->pdo->prepare("INSERT INTO publishing_assets ({$columnList}) VALUES ({$placeholderList})");
         $stmt->execute($values);
         return (int)$this->pdo->lastInsertId();
+    }
+
+    public function findJobById(int $jobId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM publishing_jobs
+              WHERE publishing_job_id = :publishing_job_id
+              LIMIT 1'
+        );
+        $stmt->execute([':publishing_job_id' => $jobId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function findJobForCreatorSetup(
+        int $assetCreatorJobId,
+        string $platform,
+        string $environment,
+        int $playlistInstanceId,
+        int $ctaGroupId,
+        string $destinationKey
+    ): ?array {
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM publishing_jobs
+              WHERE asset_creator_job_id = :asset_creator_job_id
+                AND platform = :platform
+                AND environment = :environment
+                AND playlist_instance_id = :playlist_instance_id
+                AND cta_group_id = :cta_group_id
+                AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, "$.destination_key")), "") = :destination_key
+              ORDER BY publishing_job_id DESC
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':asset_creator_job_id' => $assetCreatorJobId,
+            ':platform' => $platform,
+            ':environment' => $environment,
+            ':playlist_instance_id' => $playlistInstanceId,
+            ':cta_group_id' => $ctaGroupId,
+            ':destination_key' => $destinationKey,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    public function findOutputByCreatorOutput(int $publishingJobId, int $assetCreatorOutputId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM publishing_assets
+              WHERE publishing_job_id = :publishing_job_id
+                AND asset_creator_output_id = :asset_creator_output_id
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':publishing_job_id' => $publishingJobId,
+            ':asset_creator_output_id' => $assetCreatorOutputId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
     public function updateOutputStatus(int $outputId, string $status, ?string $externalUrl, ?string $publishedAt): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE publish_outputs
+            'UPDATE publishing_assets
                 SET status = :status,
-                    external_url = :external_url,
                     published_at = :published_at
-              WHERE publish_output_id = :publish_output_id'
+              WHERE publishing_asset_id = :publishing_asset_id'
         );
         $stmt->execute([
             'status' => $status,
-            'external_url' => $externalUrl,
             'published_at' => $publishedAt,
-            'publish_output_id' => $outputId,
+            'publishing_asset_id' => $outputId,
         ]);
+
+        if ($externalUrl !== null || $publishedAt !== null) {
+            $asset = $this->getOutputForPublisher($outputId);
+            if ($asset) {
+                $publication = $this->pdo->prepare(
+                    'INSERT INTO publications
+                        (publishing_job_id, publishing_asset_id, publishing_channel_id, platform, environment, status,
+                         external_post_url, published_at, metadata_json)
+                     VALUES
+                        (:publishing_job_id, :publishing_asset_id, :publishing_channel_id, :platform, :environment, :status,
+                         :external_post_url, :published_at, :metadata_json)'
+                );
+                $publication->execute([
+                    ':publishing_job_id' => (int)$asset['publishing_job_id'],
+                    ':publishing_asset_id' => $outputId,
+                    ':publishing_channel_id' => $asset['publishing_channel_id'] ?? null,
+                    ':platform' => $asset['platform'] ?? 'pinterest',
+                    ':environment' => $asset['environment'] ?? 'test',
+                    ':status' => $status,
+                    ':external_post_url' => $externalUrl,
+                    ':published_at' => $publishedAt,
+                    ':metadata_json' => $this->jsonValue(['manual_mark_published' => true]),
+                ]);
+            }
+        }
     }
 
     public function updateJobStatusFromOutputs(int $jobId): void
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE publish_jobs pj
+            "UPDATE publishing_jobs pj
                 SET pj.status = (
                   SELECT CASE
-                    WHEN SUM(po.status = 'failed') > 0 THEN 'needs_attention'
-                    WHEN COUNT(*) > 0 AND SUM(po.status IN ('published', 'posted')) = COUNT(*) THEN 'published'
-                    WHEN COUNT(*) > 0 AND SUM(po.status IN ('staged', 'generated')) > 0 THEN 'in_progress'
+                    WHEN SUM(pa.status = 'failed') > 0 THEN 'needs_attention'
+                    WHEN COUNT(*) > 0 AND SUM(pa.status IN ('published', 'posted', 'test_published')) = COUNT(*) THEN 'published'
+                    WHEN COUNT(*) > 0 AND SUM(pa.status IN ('staged', 'generated', 'ready_to_publish', 'scheduled')) > 0 THEN 'in_progress'
                     ELSE pj.status
                   END
-                  FROM publish_outputs po
-                  WHERE po.publish_job_id = pj.publish_job_id
+                  FROM publishing_assets pa
+                  WHERE pa.publishing_job_id = pj.publishing_job_id
                 )
-              WHERE pj.publish_job_id = :publish_job_id"
+              WHERE pj.publishing_job_id = :publishing_job_id"
         );
-        $stmt->execute(['publish_job_id' => $jobId]);
+        $stmt->execute(['publishing_job_id' => $jobId]);
+    }
+
+    public function getOutputForPublisher(int $outputId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                pa.*,
+                pa.publishing_asset_id AS publish_output_id,
+                pa.publishing_job_id AS publish_job_id,
+                pa.asset_library_id AS library_asset_id,
+                COALESCE(pc.channel_key, pa.platform) AS channel_key,
+                pa.asset_type AS output_type,
+                pa.tracked_destination_url AS tracking_url,
+                pub.external_post_id AS external_id,
+                pub.external_post_url AS external_url,
+                pj.source_type,
+                pj.source_id,
+                pj.playlist_instance_id,
+                pj.title AS job_title,
+                p.title AS playlist_title,
+                pi.slug AS instance_slug,
+                pi.display_title AS instance_display_title,
+                al.rel_path AS asset_rel_path
+               FROM publishing_assets pa
+               JOIN publishing_jobs pj
+                 ON pj.publishing_job_id = pa.publishing_job_id
+               LEFT JOIN publishing_channels pc
+                 ON pc.publishing_channel_id = pa.publishing_channel_id
+               LEFT JOIN publications pub
+                 ON pub.publishing_asset_id = pa.publishing_asset_id
+                AND pub.status IN ("published", "test_published")
+               LEFT JOIN playlists p
+                 ON p.playlist_id = pj.source_id
+               LEFT JOIN playlist_instances pi
+                 ON pi.playlist_instance_id = pj.playlist_instance_id
+               LEFT JOIN asset_library al
+                 ON al.asset_library_id = pa.asset_library_id
+              WHERE pa.publishing_asset_id = :publish_output_id
+              LIMIT 1'
+        );
+        $stmt->execute([':publish_output_id' => $outputId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $row['publish_output_id'] = (int)$row['publish_output_id'];
+        $row['publish_job_id'] = (int)$row['publish_job_id'];
+        $row['source_id'] = (int)$row['source_id'];
+        $row['playlist_instance_id'] = $row['playlist_instance_id'] !== null ? (int)$row['playlist_instance_id'] : null;
+        $row['library_asset_id'] = $row['library_asset_id'] !== null ? (int)$row['library_asset_id'] : null;
+        return $row;
     }
 
     public function getPlaylistSummary(int $playlistId): ?array
@@ -265,22 +443,23 @@ final class PdoPublishingRepository
                 $outputs[] = [
                     'publish_output_id' => (int)$parts[0],
                     'channel_key' => $parts[1],
-                    'output_type' => $parts[2],
-                    'status' => $parts[3],
-                    'title' => $parts[4],
-                    'tracking_code' => $parts[5],
-                    'tracking_url' => $parts[6],
-                    'destination_url' => $parts[7],
-                    'external_url' => $parts[8],
-                    'published_at' => $parts[9],
-                    'created_at' => $parts[10] ?? '',
-                    'library_asset_id' => isset($parts[11]) && $parts[11] !== '' ? (int)$parts[11] : null,
-                    'photo_permission_status' => $parts[12] ?? '',
-                    'permission_photo_library_id' => isset($parts[13]) && $parts[13] !== '' ? (int)$parts[13] : null,
-                    'client_id' => isset($parts[14]) && $parts[14] !== '' ? (int)$parts[14] : null,
-                    'client_name' => $parts[15] ?? '',
-                    'client_email' => $parts[16] ?? '',
-                    'metadata_json' => $parts[17] ?? '',
+                    'environment' => $parts[2] ?: 'test',
+                    'output_type' => $parts[3],
+                    'status' => $parts[4],
+                    'title' => $parts[5],
+                    'tracking_code' => $parts[6],
+                    'tracking_url' => $parts[7],
+                    'destination_url' => $parts[8],
+                    'external_url' => $parts[9],
+                    'published_at' => $parts[10],
+                    'created_at' => $parts[11] ?? '',
+                    'library_asset_id' => isset($parts[12]) && $parts[12] !== '' ? (int)$parts[12] : null,
+                    'photo_permission_status' => $parts[13] ?? '',
+                    'permission_photo_library_id' => isset($parts[14]) && $parts[14] !== '' ? (int)$parts[14] : null,
+                    'client_id' => isset($parts[15]) && $parts[15] !== '' ? (int)$parts[15] : null,
+                    'client_name' => $parts[16] ?? '',
+                    'client_email' => $parts[17] ?? '',
+                    'metadata_json' => $parts[18] ?? '',
                 ];
             }
         }
@@ -290,6 +469,13 @@ final class PdoPublishingRepository
         $row['playlist_instance_id'] = isset($row['playlist_instance_id']) ? (int)$row['playlist_instance_id'] : null;
         $row['outputs'] = $outputs;
         return $row;
+    }
+
+    private function jsonValue(mixed $value): ?string
+    {
+        if ($value === null || $value === '') return null;
+        if (is_array($value)) return json_encode($value, JSON_UNESCAPED_SLASHES);
+        return (string)$value;
     }
 
 }
