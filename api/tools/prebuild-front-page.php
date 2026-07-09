@@ -46,16 +46,19 @@ $inserts = normalizeFrontPageInserts(attachFeaturedArticlePayloads($baseUrl, $ru
 $imagePreloads = collectImagePreloads($runQuery['results'] ?? [], $inserts, $frontPageRailItem);
 
 foreach ($variants as $variant) {
+    $buildKey = $variant === 'admin' ? 'admin_home' : 'public_home';
     $payload = [
         'ok' => true,
         'success' => true,
         'variant' => $variant,
+        'build_key' => $buildKey,
         'generated_at' => gmdate('c'),
         'source' => [
             'query_id' => $queryId,
             'playlist_set_id' => $setId,
             'base_url' => $baseUrl,
         ],
+        'build_content' => loadBuildContent($baseUrl, $buildKey),
         'meta' => $runQuery['meta'] ?? null,
         'results' => $runQuery['results'] ?? [],
         'inserts' => $inserts,
@@ -93,6 +96,47 @@ function parseVariants(string $raw): array {
         return in_array($value, ['public', 'admin'], true) ? $value : '';
     }, explode(',', $raw)))));
     return $variants ?: ['public', 'admin'];
+}
+
+function loadBuildContent(string $baseUrl, string $buildKey): array {
+    $fallbacks = frontPageBuildContentFallbacks($buildKey);
+    try {
+        $data = httpJson("{$baseUrl}/api/v2/front-page-build-content.php?build_key=" . rawurlencode($buildKey) . '&_=' . time());
+        $content = $data['content'] ?? [];
+        if (!is_array($content)) {
+            return $fallbacks;
+        }
+
+        $active = [];
+        foreach ($content as $key => $value) {
+            $key = trim((string)$key);
+            if ($key === '') continue;
+            $active[$key] = (string)$value;
+        }
+
+        return $active + $fallbacks;
+    } catch (Throwable $e) {
+        return $fallbacks;
+    }
+}
+
+function frontPageBuildContentFallbacks(string $buildKey): array {
+    if ($buildKey === 'admin_home') {
+        return [
+            'title' => 'ColorFix Admin',
+            'robots' => 'noindex,nofollow',
+        ];
+    }
+
+    return [
+        'title' => 'ColorFix by Terry | Home Color Transformations & Paint Palettes',
+        'meta_description' => 'ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr.',
+        'robots' => 'index,follow',
+        'canonical_url' => 'https://colorfix.terrymarr.com/',
+        'footer_brand_text' => 'ColorFix by Terry — home color transformations by Terry Marr',
+        'footer_url' => 'https://colorfix.terrymarr.com/',
+        'footer_url_text' => 'colorfix.terrymarr.com',
+    ];
 }
 
 function httpJson(string $url, string $method = 'GET', ?array $payload = null): array {

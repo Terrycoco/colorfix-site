@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Clipboard } from "lucide-react";
 import { API_FOLDER } from "@helpers/config";
 import PermissionStatus from "@components/PermissionStatus";
 import "./admin-asset-creators.css";
@@ -7,15 +8,24 @@ import "./admin-asset-creators.css";
 const LIST_URL = `${API_FOLDER}/v2/admin/asset-creators/list.php`;
 const DETAIL_URL = `${API_FOLDER}/v2/admin/asset-creators/detail.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const ASSET_LIBRARY_URL = `${API_FOLDER}/v2/admin/asset-library/list.php`;
 const PROPOSE_URL = `${API_FOLDER}/v2/admin/asset-creators/propose.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/asset-creators/save.php`;
 const RUN_URL = `${API_FOLDER}/v2/admin/asset-creators/run.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/asset-creators/delete.php`;
+const PREVIEW_URL = `${API_FOLDER}/v2/admin/asset-creators/preview.php`;
+const DEFAULTS_URL = `${API_FOLDER}/v2/admin/asset-creators/defaults.php`;
 
 const CREATOR_TYPES = [
   {
     value: "pinterest.before_after_composite",
     label: "Pinterest",
+    channel: "pinterest",
+  },
+  {
+    value: "youtube.playlist_video",
+    label: "YouTube",
+    channel: "youtube",
   },
 ];
 
@@ -38,16 +48,21 @@ const EMPTY_SIDE = {
 export default function AdminAssetCreatorsPage() {
   const [searchParams] = useSearchParams();
   const autoAnalyzeKeyRef = useRef("");
+  const loadedDescriptionDefaultRef = useRef(DEFAULT_ANALYZER_DESCRIPTION);
   const [jobs, setJobs] = useState([]);
   const [jobOutputs, setJobOutputs] = useState({});
   const [jobPermissions, setJobPermissions] = useState({});
   const [playlists, setPlaylists] = useState([]);
+  const [musicAssets, setMusicAssets] = useState([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [loadingMusic, setLoadingMusic] = useState(false);
+  const [loadingDefaults, setLoadingDefaults] = useState(false);
   const [loadingJob, setLoadingJob] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [savingRecipe, setSavingRecipe] = useState(false);
+  const [previewingRecipe, setPreviewingRecipe] = useState(false);
   const [runningJobId, setRunningJobId] = useState(null);
   const [deletingJobId, setDeletingJobId] = useState(null);
   const [deletingOutputsJobId, setDeletingOutputsJobId] = useState(null);
@@ -61,14 +76,18 @@ export default function AdminAssetCreatorsPage() {
     playlist_id: "",
     default_title: "",
     default_description: DEFAULT_ANALYZER_DESCRIPTION,
+    music_asset_library_id: "",
+    music_volume: "0.18",
   });
   const [proposal, setProposal] = useState(null);
+  const [recipePreview, setRecipePreview] = useState(null);
   const [pairs, setPairs] = useState([]);
   const [pinTypeFilter, setPinTypeFilter] = useState("all");
 
   useEffect(() => {
     fetchJobs("");
     fetchPlaylists();
+    fetchMusicAssets();
   }, []);
 
   useEffect(() => {
@@ -85,6 +104,8 @@ export default function AdminAssetCreatorsPage() {
       playlist_id: String(playlistId),
       default_title: "",
       default_description: DEFAULT_ANALYZER_DESCRIPTION,
+      music_asset_library_id: "",
+      music_volume: "0.18",
     });
     setEditingJobId(null);
     setProposal(null);
@@ -95,9 +116,16 @@ export default function AdminAssetCreatorsPage() {
       analyzePlaylistById(playlistId, CREATOR_TYPES[0].value, {
         default_title: "",
         default_description: DEFAULT_ANALYZER_DESCRIPTION,
+        music_asset_library_id: "",
+        music_volume: "0.18",
       });
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!creatorModalOpen || editingJobId) return;
+    loadAnalyzerDefaults({ overwrite: false });
+  }, [creatorModalOpen, editingJobId, form.creator_key, form.playlist_id, playlists]);
 
   async function fetchJobs(nextQ = q) {
     setLoading(true);
@@ -165,6 +193,61 @@ export default function AdminAssetCreatorsPage() {
     }
   }
 
+  async function fetchMusicAssets() {
+    setLoadingMusic(true);
+    try {
+      const params = new URLSearchParams({
+        asset_kind: "audio",
+        sort: "newest",
+        limit: "200",
+        _: String(Date.now()),
+      });
+      const res = await fetch(`${ASSET_LIBRARY_URL}?${params.toString()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load music assets");
+      setMusicAssets(data.items || []);
+    } catch (err) {
+      setError(err?.message || "Failed to load music assets");
+    } finally {
+      setLoadingMusic(false);
+    }
+  }
+
+  async function loadAnalyzerDefaults({ overwrite = false } = {}) {
+    const playlist = getSelectedPlaylist(playlists, form.playlist_id);
+    const playlistType = playlist?.type || "any";
+    setLoadingDefaults(true);
+    try {
+      const params = new URLSearchParams({
+        creator_key: form.creator_key,
+        platform: platformForCreator(form.creator_key),
+        asset_type: defaultAssetTypeForCreator(form.creator_key),
+        playlist_type: playlistType || "any",
+        field_key: "description",
+        _: String(Date.now()),
+      });
+      const res = await fetch(`${DEFAULTS_URL}?${params.toString()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load analyzer defaults");
+      const template = String(data.item?.template_text || "").trim();
+      if (!template) return;
+      setForm((current) => {
+        const currentDescription = String(current.default_description || "").trim();
+        const previousLoaded = String(loadedDescriptionDefaultRef.current || "").trim();
+        const canReplace = overwrite
+          || currentDescription === ""
+          || currentDescription === previousLoaded
+          || currentDescription === DEFAULT_ANALYZER_DESCRIPTION;
+        loadedDescriptionDefaultRef.current = template;
+        return canReplace ? { ...current, default_description: template } : current;
+      });
+    } catch (err) {
+      setError(err?.message || "Failed to load analyzer defaults");
+    } finally {
+      setLoadingDefaults(false);
+    }
+  }
+
   async function analyzePlaylist(event) {
     event.preventDefault();
     if (!form.playlist_id) {
@@ -174,6 +257,8 @@ export default function AdminAssetCreatorsPage() {
     await analyzePlaylistById(Number(form.playlist_id), form.creator_key, {
       default_title: form.default_title,
       default_description: form.default_description,
+      music_asset_library_id: form.music_asset_library_id,
+      music_volume: form.music_volume,
     });
   }
 
@@ -199,12 +284,15 @@ export default function AdminAssetCreatorsPage() {
           playlist_id: Number(playlistId),
           default_title: defaults.default_title || "",
           default_description: defaults.default_description || "",
+          music_asset_library_id: defaults.music_asset_library_id || "",
+          music_volume: defaults.music_volume || "0.18",
         }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to analyze playlist");
       setProposal(data.item);
-      setPairs((data.item?.pin_rows || data.item?.pairs || []).map(normalizePair));
+      setRecipePreview(null);
+      setPairs(proposalRows(data.item).map(normalizePair));
     } catch (err) {
       setError(err?.message || "Failed to analyze playlist");
     } finally {
@@ -218,6 +306,7 @@ export default function AdminAssetCreatorsPage() {
       setError("Analyze a playlist before saving the recipe.");
       return null;
     }
+    const isYoutube = isYoutubeCreator(form.creator_key);
     const includedPairs = pairs.filter((pair) => pair.include);
     if (!includedPairs.length) {
       setError("Select at least one pair to save.");
@@ -228,60 +317,19 @@ export default function AdminAssetCreatorsPage() {
     setError("");
     setStatus("");
     try {
-      const playlist = getSelectedPlaylist(playlists, form.playlist_id) || proposal.playlist || {};
-      const reviewedPairs = pairs.map((pair, index) => {
-        const pinType = pair.pin_type || "composite";
-        const title = titleForPinType(pair.search_title || pair.title || "", pinType);
-        return {
-          ...pair,
-          include: !!pair.include,
-          sort_order: index + 1,
-          search_title: title,
-          pin_title: title,
-          description: pair.description || pair.caption || "",
-          pin_description: pair.description || pair.caption || "",
-          title,
-          caption: pair.description || pair.caption || "",
-          pin_type: pinType,
-          asset_type: assetTypeForPinType(pinType),
-          before: normalizeRecipeSide(pair.before),
-          after: normalizeRecipeSide(pair.after),
-          asset: normalizeRecipeSide(pinType === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
-        };
-      });
-      const payload = {
+      const payload = buildCurrentRecipePayload();
+      if (!payload) return null;
+      const savePayload = {
+        ...payload,
         asset_creator_job_id: editingJobId || undefined,
-        creator_key: form.creator_key,
-        source_type: "playlist",
-        source_id: Number(form.playlist_id),
-        title: `${creatorLabel(form.creator_key)}: ${playlist.title || proposal.playlist?.title || `Playlist ${form.playlist_id}`}`,
         status: "draft",
-        instructions: {
-          version: 1,
-          creator_key: form.creator_key,
-          source: {
-            type: "playlist",
-            playlist_id: Number(form.playlist_id),
-            title: playlist.title || proposal.playlist?.title || "",
-          },
-          recipe_type: "pinterest_pin_rows",
-          pinterest_board: PINTEREST_BOARD,
-          analyzer_defaults: {
-            title: form.default_title || "",
-            description: form.default_description || "",
-          },
-          pin_rows: reviewedPairs,
-          pairs: reviewedPairs,
-          warnings: proposal.warnings || [],
-        },
-        inputs: buildRecipeInputs(reviewedPairs),
       };
 
       const res = await fetch(SAVE_URL, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(savePayload),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to save recipe");
@@ -303,6 +351,107 @@ export default function AdminAssetCreatorsPage() {
       return null;
     } finally {
       setSavingRecipe(false);
+    }
+  }
+
+  function buildCurrentRecipePayload() {
+    if (!proposal || !form.playlist_id) {
+      setError("Analyze a playlist first.");
+      return null;
+    }
+    const isYoutube = isYoutubeCreator(form.creator_key);
+    const playlist = getSelectedPlaylist(playlists, form.playlist_id) || proposal.playlist || {};
+    const urlReservation = proposal.url_reservation || proposal.instructions?.playlist_instance_url_reservation || null;
+    const finalPlaylistUrl = String(urlReservation?.public_url || "").trim();
+    const music = selectedMusicForRecipe(form, musicAssets, proposal);
+    const reviewedPairs = pairs.map((pair, index) => {
+      const pinType = isYoutube ? "youtube_video" : (pair.pin_type || "composite");
+      const title = titleForPinType(pair.search_title || pair.title || "", pinType);
+      return {
+        ...pair,
+        include: !!pair.include,
+        sort_order: index + 1,
+        search_title: title,
+        pin_title: title,
+        description: pair.description || pair.caption || "",
+        pin_description: pair.description || pair.caption || "",
+        title,
+        caption: pair.description || pair.caption || "",
+        pin_type: pinType,
+        asset_type: assetTypeForPinType(pinType, form.creator_key),
+        before: normalizeRecipeSide(pair.before),
+        after: normalizeRecipeSide(pair.after),
+        asset: normalizeRecipeSide(pinType === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
+        ...(isYoutube ? { music } : {}),
+      };
+    });
+
+    return {
+      creator_key: form.creator_key,
+      source_type: "playlist",
+      source_id: Number(form.playlist_id),
+      title: `${creatorLabel(form.creator_key)}: ${playlist.title || proposal.playlist?.title || `Playlist ${form.playlist_id}`}`,
+      instructions: {
+        version: 1,
+        creator_key: form.creator_key,
+        source: {
+          type: "playlist",
+          playlist_id: Number(form.playlist_id),
+          title: playlist.title || proposal.playlist?.title || "",
+          final_playlist_url: finalPlaylistUrl,
+          playlist_instance_url_reservation: urlReservation,
+          ...(isYoutube ? { music } : {}),
+        },
+        recipe_type: isYoutube ? "youtube_playlist_video" : "pinterest_pin_rows",
+        ...(isYoutube ? {} : { pinterest_board: PINTEREST_BOARD }),
+        analyzer_defaults: {
+          title: form.default_title || "",
+          description: form.default_description || "",
+          final_playlist_url: finalPlaylistUrl,
+          ...(isYoutube ? { music_asset_library_id: form.music_asset_library_id || "", music_volume: form.music_volume || "0.18" } : {}),
+        },
+        ...(isYoutube ? { music } : {}),
+        ...(isYoutube ? { video_rows: reviewedPairs } : { pin_rows: reviewedPairs }),
+        playlist_instance_url_reservation: urlReservation,
+        pairs: reviewedPairs,
+        warnings: proposal.warnings || [],
+      },
+      inputs: buildRecipeInputs(reviewedPairs, music),
+    };
+  }
+
+  async function previewRecipe() {
+    if (!isYoutubeCreator(form.creator_key)) {
+      setError("Recipe preview is wired for YouTube video first.");
+      return;
+    }
+    const payload = buildCurrentRecipePayload();
+    if (!payload) return;
+
+    setPreviewingRecipe(true);
+    setRecipePreview(null);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch(PREVIEW_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          creator_key: form.creator_key,
+          preview_mode: "local_video",
+          persist: false,
+          recipe: payload.instructions,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to preview recipe");
+      setRecipePreview(data.preview || null);
+      setStatus("Preview video created.");
+    } catch (err) {
+      setError(err?.message || "Failed to preview recipe");
+    } finally {
+      setPreviewingRecipe(false);
     }
   }
 
@@ -330,7 +479,7 @@ export default function AdminAssetCreatorsPage() {
           [data.item.job.asset_creator_job_id]: data.item.job.outputs || outputs,
         }));
       }
-      setStatus(`Created ${outputs.length} pin${outputs.length === 1 ? "" : "s"} from job #${jobId}.`);
+      setStatus(`Created ${outputs.length} asset${outputs.length === 1 ? "" : "s"} from job #${jobId}.`);
       await fetchJobs(q);
       return data.item || null;
     } catch (err) {
@@ -478,11 +627,12 @@ export default function AdminAssetCreatorsPage() {
         title: source.title || job.title || "",
       };
       const nextPairs = withLiveInputPermissions(
-        Array.isArray(instructions.pin_rows) ? instructions.pin_rows : (Array.isArray(instructions.pairs) ? instructions.pairs : []),
+        instructionRows(instructions),
         job.inputs || []
       );
       const outputs = job.outputs || [];
       const analyzerDefaults = analyzerDefaultsFromInstructions(instructions, nextPairs);
+      const music = musicFromInstructions(instructions);
 
       setEditingJobId(job.asset_creator_job_id || jobId);
       setJobOutputs((current) => ({
@@ -494,11 +644,14 @@ export default function AdminAssetCreatorsPage() {
         playlist_id: playlistId ? String(playlistId) : "",
         default_title: analyzerDefaults.title,
         default_description: analyzerDefaults.description,
+        music_asset_library_id: music?.asset_library_id ? String(music.asset_library_id) : "",
+        music_volume: String(music?.volume ?? analyzerDefaults.music_volume ?? "0.18"),
       });
       setProposal({
         creator_key: job.creator_key || instructions.creator_key || CREATOR_TYPES[0].value,
         playlist,
         warnings: instructions.warnings || [],
+        instructions,
       });
       setPairs(nextPairs.map(normalizePair));
       setCreatorModalOpen(true);
@@ -532,6 +685,8 @@ export default function AdminAssetCreatorsPage() {
       playlist_id: "",
       default_title: "",
       default_description: DEFAULT_ANALYZER_DESCRIPTION,
+      music_asset_library_id: "",
+      music_volume: "0.18",
     });
     setProposal(null);
     setPairs([]);
@@ -539,6 +694,9 @@ export default function AdminAssetCreatorsPage() {
     setCreatorModalOpen(true);
     if (!playlists.length) {
       fetchPlaylists();
+    }
+    if (!musicAssets.length) {
+      fetchMusicAssets();
     }
   }
 
@@ -570,6 +728,11 @@ export default function AdminAssetCreatorsPage() {
   const visiblePairs = pairs
     .map((pair, index) => ({ pair, index }))
     .filter(({ pair }) => pinTypeFilter === "all" || (pair.pin_type || "composite") === pinTypeFilter);
+  const finalPlaylistUrl = String(
+    proposal?.url_reservation?.public_url
+      || proposal?.instructions?.playlist_instance_url_reservation?.public_url
+      || ""
+  ).trim();
 
   return (
     <div className="admin-asset-creators">
@@ -579,11 +742,17 @@ export default function AdminAssetCreatorsPage() {
           <p>Generated publishing assets from playlist recipes.</p>
         </div>
         <div className="assetcreator-header-actions">
+          <Link
+            className="assetcreator-command assetcreator-command-link"
+            to="/admin/publishing-defaults"
+          >
+            Defaults
+          </Link>
           <button type="button" className="assetcreator-command assetcreator-command--primary" onClick={openNewCreatorModal}>
             Analyzer
           </button>
-          <Link className="assetcreator-command assetcreator-command--primary assetcreator-command-link" to="/admin/publisher">
-            Publisher
+          <Link className="assetcreator-command assetcreator-command--primary assetcreator-command-link" to="/admin/packager">
+            Packager
           </Link>
         </div>
       </header>
@@ -647,14 +816,16 @@ export default function AdminAssetCreatorsPage() {
                   >
                     {runningJobId === job.asset_creator_job_id ? "Running..." : "Run"}
                   </button>
-                  <button
-                    type="button"
-                    className="assetcreator-mini assetcreator-mini--danger"
-                    onClick={() => deleteCreatorOutputs(job.asset_creator_job_id)}
-                    disabled={!!runningJobId || loadingJob || deletingJobId === job.asset_creator_job_id || deletingOutputsJobId === job.asset_creator_job_id || !(job.output_count > 0)}
+                  <Link
+                    className={job.output_count > 0 ? "assetcreator-mini assetcreator-mini-link" : "assetcreator-mini assetcreator-mini-link assetcreator-mini-link--disabled"}
+                    to={`/admin/packager?creator_job_id=${encodeURIComponent(job.asset_creator_job_id)}`}
+                    aria-disabled={job.output_count > 0 ? undefined : "true"}
+                    onClick={(event) => {
+                      if (!(job.output_count > 0)) event.preventDefault();
+                    }}
                   >
-                    {deletingOutputsJobId === job.asset_creator_job_id ? "Deleting..." : "Outputs"}
-                  </button>
+                    Packager
+                  </Link>
                   <button
                     type="button"
                     className="assetcreator-mini assetcreator-mini--danger"
@@ -742,19 +913,78 @@ export default function AdminAssetCreatorsPage() {
                   />
                 </label>
                 <label className="assetcreator-default-description-field">
-                  Default Description
+                  <span className="assetcreator-label-row">
+                    <span>Default Description</span>
+                    <span className="assetcreator-label-actions">
+                      <button
+                        type="button"
+                        className="assetcreator-inline-command"
+                        onClick={() => loadAnalyzerDefaults({ overwrite: true })}
+                        disabled={loadingDefaults}
+                      >
+                        {loadingDefaults ? "Loading..." : "Load Default"}
+                      </button>
+                      <Link
+                        className="assetcreator-inline-command assetcreator-inline-command-link"
+                        to={defaultsLinkFor(form.creator_key, getSelectedPlaylist(playlists, form.playlist_id))}
+                      >
+                        Defaults
+                      </Link>
+                    </span>
+                  </span>
                   <textarea
                     value={form.default_description}
                     rows={3}
                     onChange={(event) => setForm((current) => ({ ...current, default_description: event.target.value }))}
                   />
                 </label>
+                {isYoutubeCreator(form.creator_key) ? (
+                  <>
+                    <label className="assetcreator-music-field">
+                      Music File
+                      <select
+                        value={form.music_asset_library_id}
+                        onChange={(event) => setForm((current) => ({ ...current, music_asset_library_id: event.target.value }))}
+                        disabled={loadingMusic}
+                      >
+                        <option value="">No music</option>
+                        {musicAssets.map((asset) => (
+                          <option key={asset.asset_library_id} value={asset.asset_library_id}>
+                            #{asset.asset_library_id} {asset.title || asset.rel_path || "Audio"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="assetcreator-volume-field">
+                      Music Volume
+                      <input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={form.music_volume}
+                        onChange={(event) => setForm((current) => ({ ...current, music_volume: event.target.value }))}
+                      />
+                    </label>
+                  </>
+                ) : null}
+                <CopyTextField
+                  label="Final Playlist URL"
+                  value={finalPlaylistUrl}
+                  placeholder="Click Analyze to reserve the future instance URL"
+                  onCopy={(value) => copyText(value, "Final Playlist URL", setStatus)}
+                />
                 <button type="submit" className="assetcreator-command assetcreator-command--primary" disabled={analyzing}>
                   {analyzing ? "Analyzing..." : "Analyze"}
                 </button>
                 <button type="button" className="assetcreator-command" onClick={fetchPlaylists} disabled={loadingPlaylists}>
                   Refresh Playlists
                 </button>
+                {isYoutubeCreator(form.creator_key) ? (
+                  <button type="button" className="assetcreator-command" onClick={fetchMusicAssets} disabled={loadingMusic}>
+                    Refresh Music
+                  </button>
+                ) : null}
               </form>
             </section>
 
@@ -766,13 +996,24 @@ export default function AdminAssetCreatorsPage() {
                 <span>
                   {jobOutputs[editingJobId].length} asset{jobOutputs[editingJobId].length === 1 ? "" : "s"} created
                 </span>
-                <button
-                  type="button"
-                  className="assetcreator-mini assetcreator-mini--strong"
-                  onClick={() => toggleImagePreview(outputPreviewFromItems(jobOutputs[editingJobId], 0))}
-                >
-                  Preview assets
-                </button>
+                {isVideoAsset(jobOutputs[editingJobId][0]) ? (
+                  <a
+                    className="assetcreator-mini assetcreator-mini-link"
+                    href={versionedAssetUrl(jobOutputs[editingJobId][0].public_url || jobOutputs[editingJobId][0].rel_path || "", jobOutputs[editingJobId][0])}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open video
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    className="assetcreator-mini assetcreator-mini--strong"
+                    onClick={() => toggleImagePreview(outputPreviewFromItems(jobOutputs[editingJobId], 0))}
+                  >
+                    Preview assets
+                  </button>
+                )}
                 <button
                   type="button"
                   className="assetcreator-mini assetcreator-mini--danger"
@@ -788,14 +1029,14 @@ export default function AdminAssetCreatorsPage() {
               <section className="assetcreator-proposal">
                 <div className="assetcreator-proposal-head">
                   <div>
-                    <h2>Possible Pins</h2>
+                    <h2>{isYoutubeCreator(form.creator_key) ? "Possible Video" : "Possible Pins"}</h2>
                     <p>
                       {proposal.playlist?.title || "Playlist"} · {pairs.length} row{pairs.length === 1 ? "" : "s"}
                       {pinTypeFilter !== "all" ? ` · showing ${visiblePairs.length}` : ""}
                     </p>
                   </div>
                   <div className="assetcreator-proposal-actions">
-                    <label className="assetcreator-inline-filter">
+                    {!isYoutubeCreator(form.creator_key) ? <label className="assetcreator-inline-filter">
                       Pin Type
                       <select value={pinTypeFilter} onChange={(event) => setPinTypeFilter(event.target.value)}>
                         <option value="all">All</option>
@@ -803,10 +1044,20 @@ export default function AdminAssetCreatorsPage() {
                         <option value="idea">Idea</option>
                         <option value="idea_palette">Idea + Palette</option>
                       </select>
-                    </label>
+                    </label> : null}
                     <button type="button" className="assetcreator-command" onClick={addPair}>
                       Add Row
                     </button>
+                    {isYoutubeCreator(form.creator_key) ? (
+                      <button
+                        type="button"
+                        className="assetcreator-command"
+                        onClick={previewRecipe}
+                        disabled={previewingRecipe || savingRecipe || !!runningJobId}
+                      >
+                        {previewingRecipe ? "Previewing..." : "Preview Video"}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       className="assetcreator-command assetcreator-command--primary"
@@ -821,7 +1072,7 @@ export default function AdminAssetCreatorsPage() {
                       onClick={saveAndRunRecipe}
                       disabled={savingRecipe || !!runningJobId}
                     >
-                      {runningJobId ? "Creating..." : "Create Pin"}
+                      {runningJobId ? "Creating..." : isYoutubeCreator(form.creator_key) ? "Create Video" : "Create Pin"}
                     </button>
                   </div>
                 </div>
@@ -829,6 +1080,23 @@ export default function AdminAssetCreatorsPage() {
                 {proposal.warnings?.length ? (
                   <div className="assetcreator-status assetcreator-status--warn">
                     {proposal.warnings.join(" ")}
+                  </div>
+                ) : null}
+                {recipePreview ? (
+                  <div className="assetcreator-preview-result">
+                    <div>
+                      <strong>Preview video</strong>
+                      <span>
+                        {recipePreview.slide_count || 0} slide{Number(recipePreview.slide_count || 0) === 1 ? "" : "s"}
+                        {recipePreview.duration_seconds ? ` · ${recipePreview.duration_seconds}s` : ""}
+                      </span>
+                    </div>
+                    <input value={recipePreview.local_path || ""} readOnly />
+                    {recipePreview.open_url ? (
+                      <a className="assetcreator-mini assetcreator-mini-link" href={recipePreview.open_url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -840,7 +1108,7 @@ export default function AdminAssetCreatorsPage() {
                         <th>Order</th>
                         <th>Type</th>
                         <th>Before</th>
-                        <th>Photo / After</th>
+                        <th>{isYoutubeCreator(form.creator_key) ? "Video Source" : "Photo / After"}</th>
                         <th>Search Title</th>
                         <th>Description</th>
                         <th>Source</th>
@@ -860,9 +1128,11 @@ export default function AdminAssetCreatorsPage() {
                           <td className="assetcreator-order-cell">{index + 1}</td>
                           <td>
                             <select
-                              value={pair.pin_type || "composite"}
+                              value={pair.pin_type || (isYoutubeCreator(form.creator_key) ? "youtube_video" : "composite")}
                               onChange={(event) => updatePair(index, "pin_type", event.target.value)}
+                              disabled={isYoutubeCreator(form.creator_key)}
                             >
+                              {isYoutubeCreator(form.creator_key) ? <option value="youtube_video">youtube_video</option> : null}
                               <option value="composite">composite</option>
                               <option value="idea">idea</option>
                               <option value="idea_palette">idea_palette</option>
@@ -906,7 +1176,7 @@ export default function AdminAssetCreatorsPage() {
                       {pairs.length === 0 ? (
                         <tr>
                           <td colSpan={9} className="assetcreator-empty">
-                            No possible pins yet. Add a row manually.
+                            No possible assets yet. Add a row manually.
                           </td>
                         </tr>
                       ) : visiblePairs.length === 0 ? (
@@ -999,6 +1269,18 @@ function renderOutputPreview(outputs = [], openImagePreview = () => {}) {
   const items = Array.isArray(outputs) ? outputs : [];
   const first = items[0] || null;
   if (!first) return "-";
+  if (isVideoAsset(first)) {
+    const url = versionedAssetUrl(first.public_url || first.rel_path || "", first);
+    return url ? (
+      <a className="assetcreator-output-preview assetcreator-output-preview--video" href={url} target="_blank" rel="noreferrer">
+        <span className="assetcreator-output-preview__video-icon">MP4</span>
+        <span className="assetcreator-output-preview__label">
+          <span>Asset #{first.asset_library_id}</span>
+          {items.length > 1 ? <span>+{items.length - 1}</span> : null}
+        </span>
+      </a>
+    ) : `Asset #${first.asset_library_id}`;
+  }
   const url = versionedAssetUrl(first.public_url || first.rel_path || "", first);
   if (!url) return `Asset #${first.asset_library_id}`;
   return (
@@ -1042,6 +1324,13 @@ function normalizeOutputPreviewItem(output = {}) {
     photo_library_id: output.photo_library_id,
     ...permissionProps(output),
   };
+}
+
+function isVideoAsset(item = {}) {
+  const kind = String(item.asset_kind || "").toLowerCase();
+  const mime = String(item.mime_type || "").toLowerCase();
+  const path = String(item.rel_path || item.public_url || "").toLowerCase();
+  return kind === "video" || mime.startsWith("video/") || /\.(mp4|mov|webm|m4v)(\?|$)/.test(path);
 }
 
 function inferOutputPinType(output = {}, metadata = {}) {
@@ -1091,9 +1380,86 @@ function creatorLabel(creatorKey) {
   return CREATOR_TYPES.find((type) => type.value === creatorKey)?.label || creatorKey;
 }
 
+function isYoutubeCreator(creatorKey) {
+  return String(creatorKey || "").trim() === "youtube.playlist_video";
+}
+
+function platformForCreator(creatorKey) {
+  const configured = CREATOR_TYPES.find((type) => type.value === creatorKey);
+  if (configured?.channel) return configured.channel;
+  return String(creatorKey || "").split(".")[0] || "any";
+}
+
+function defaultAssetTypeForCreator(creatorKey) {
+  if (isYoutubeCreator(creatorKey)) return "youtube_playlist_video";
+  if (String(creatorKey || "") === "pinterest.before_after_composite") return "pinterest_pin";
+  return "any";
+}
+
+function defaultsLinkFor(creatorKey, playlist = null) {
+  const params = new URLSearchParams({
+    creator_key: creatorKey || CREATOR_TYPES[0].value,
+    channel: platformForCreator(creatorKey),
+    playlist_type: playlist?.type || "any",
+    field_key: "description",
+  });
+  return `/admin/publishing-defaults?${params.toString()}`;
+}
+
+function proposalRows(proposal = {}) {
+  if (Array.isArray(proposal.video_rows)) return proposal.video_rows;
+  if (Array.isArray(proposal.pin_rows)) return proposal.pin_rows;
+  if (Array.isArray(proposal.pairs)) return proposal.pairs;
+  return [];
+}
+
+function instructionRows(instructions = {}) {
+  if (Array.isArray(instructions.video_rows)) return instructions.video_rows;
+  if (Array.isArray(instructions.pin_rows)) return instructions.pin_rows;
+  if (Array.isArray(instructions.pairs)) return instructions.pairs;
+  return [];
+}
+
 function getSelectedPlaylist(playlists, playlistId) {
   const wanted = Number(playlistId || 0);
   return playlists.find((playlist) => Number(playlist.playlist_id) === wanted) || null;
+}
+
+async function copyText(value, label, setStatus = () => {}) {
+  const text = String(value || "").trim();
+  if (!text) return;
+  try {
+    if (!navigator.clipboard?.writeText) {
+      window.prompt(`Copy ${label}:`, text);
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    setStatus(`Copied ${label}.`);
+  } catch {
+    window.prompt(`Copy ${label}:`, text);
+  }
+}
+
+function CopyTextField({ label, value, placeholder = "", onCopy }) {
+  const text = String(value || "").trim();
+  return (
+    <label className="assetcreator-copy-field">
+      {label}
+      <span className="assetcreator-copy-field__control">
+        <input value={text} placeholder={placeholder} readOnly />
+        <button
+          type="button"
+          className="assetcreator-copy-field__button"
+          onClick={() => onCopy(text)}
+          disabled={!text}
+          aria-label={`Copy ${label}`}
+          title={`Copy ${label}`}
+        >
+          <Clipboard size={15} aria-hidden="true" />
+        </button>
+      </span>
+    </label>
+  );
 }
 
 function parseInstructions(value) {
@@ -1115,6 +1481,7 @@ function analyzerDefaultsFromInstructions(instructions = {}, pairs = []) {
     return {
       title,
       description: description || DEFAULT_ANALYZER_DESCRIPTION,
+      music_volume: defaults.music_volume || "0.18",
     };
   }
 
@@ -1127,7 +1494,58 @@ function analyzerDefaultsFromInstructions(instructions = {}, pairs = []) {
         || firstPair.caption
         || DEFAULT_ANALYZER_DESCRIPTION
     ).trim(),
+    music_volume: defaults.music_volume || "0.18",
   };
+}
+
+function musicFromInstructions(instructions = {}) {
+  const music = instructions.music || instructions.source?.music || instructions.analyzer_defaults?.music || null;
+  if (!music || typeof music !== "object") return null;
+  const assetId = Number(music.asset_library_id || 0);
+  const publicUrl = String(music.public_url || music.src || music.rel_path || "").trim();
+  if (!assetId && !publicUrl) return null;
+  return {
+    asset_library_id: assetId || null,
+    title: music.title || "",
+    rel_path: music.rel_path || "",
+    public_url: publicUrl,
+    mime_type: music.mime_type || "",
+    volume: Number.isFinite(Number(music.volume)) ? Number(music.volume) : 0.18,
+  };
+}
+
+function selectedMusicForRecipe(form, musicAssets = [], proposal = {}) {
+  const selectedId = Number(form.music_asset_library_id || 0);
+  if (selectedId <= 0) return null;
+
+  const fromList = musicAssets.find((asset) => Number(asset.asset_library_id) === selectedId);
+  const fromProposal = musicFromInstructions(proposal.instructions || proposal) || null;
+  const asset = fromList || (Number(fromProposal?.asset_library_id || 0) === selectedId ? fromProposal : null);
+  if (!asset) {
+    return {
+      asset_library_id: selectedId,
+      title: "",
+      rel_path: "",
+      public_url: "",
+      mime_type: "",
+      volume: normalizedMusicVolume(form.music_volume),
+    };
+  }
+
+  return {
+    asset_library_id: selectedId,
+    title: asset.title || "",
+    rel_path: asset.rel_path || "",
+    public_url: asset.public_url || asset.src || asset.rel_path || "",
+    mime_type: asset.mime_type || "",
+    volume: normalizedMusicVolume(form.music_volume),
+  };
+}
+
+function normalizedMusicVolume(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0.18;
+  return Math.max(0, Math.min(1, numeric));
 }
 
 function normalizePair(pair) {
@@ -1145,10 +1563,14 @@ function normalizePair(pair) {
     before: { ...EMPTY_SIDE, ...(pair.before || {}) },
     after: { ...EMPTY_SIDE, ...(pair.after || {}) },
     asset: { ...EMPTY_SIDE, ...(pair.asset || pair.after || {}) },
+    slides: Array.isArray(pair.slides) ? pair.slides : [],
+    slide_count: Number(pair.slide_count || (Array.isArray(pair.slides) ? pair.slides.length : 0)),
+    output: pair.output || null,
   };
 }
 
-function assetTypeForPinType(pinType = "composite") {
+function assetTypeForPinType(pinType = "composite", creatorKey = "") {
+  if (isYoutubeCreator(creatorKey) || pinType === "youtube_video") return "youtube_playlist_video";
   if (pinType === "idea_palette") return "pin_idea_palette";
   if (pinType === "idea") return "pin_idea";
   return "pin_composite";
@@ -1218,10 +1640,44 @@ function normalizeRecipeSide(side) {
   };
 }
 
-function buildRecipeInputs(reviewedPairs) {
+function buildRecipeInputs(reviewedPairs, music = null) {
   const inputs = [];
+  if (music?.asset_library_id) {
+    inputs.push({
+      asset_library_id: nullableNumber(music.asset_library_id),
+      role: "background_music",
+      sort_order: 0,
+      metadata_json: {
+        asset_type: "youtube_background_music",
+        title: music.title || "",
+        public_url: music.public_url || "",
+        rel_path: music.rel_path || "",
+        mime_type: music.mime_type || "",
+        volume: normalizedMusicVolume(music.volume),
+      },
+    });
+  }
   reviewedPairs.forEach((pair, index) => {
     if (!pair.include) return;
+    if (pair.pin_type === "youtube_video") {
+      inputs.push({
+        asset_library_id: nullableNumber(pair.asset?.asset_library_id || pair.after?.asset_library_id),
+        role: "video_source",
+        sort_order: index + 1,
+        metadata_json: {
+          pair_key: pair.pair_key || `video-${index + 1}`,
+          pair_order: index + 1,
+          pin_type: "youtube_video",
+          asset_type: "youtube_playlist_video",
+          playlist_item_count: Number(pair.slide_count || pair.slides?.length || 0),
+          search_title: pair.search_title || pair.title || "",
+          description: pair.description || pair.caption || "",
+          source: pair.source || "",
+          confidence: Number(pair.confidence || 0),
+        },
+      });
+      return;
+    }
     const sides = pair.pin_type === "composite" ? ["before", "after"] : ["asset"];
     sides.forEach((side, sideIndex) => {
       const value = pair[side] || EMPTY_SIDE;

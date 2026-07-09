@@ -317,34 +317,34 @@ final class PdoAssetLibraryRepository
     {
         $blockers = [];
 
-        if ($this->tableExists('publishing_assets')) {
-            $hasPublications = $this->tableExists('publications');
+        if ($this->tableExists('packages')) {
+            $hasPublications = $this->tableExists('published_assets');
             $publicationJoin = $hasPublications
-                ? 'LEFT JOIN publications pub ON pub.publishing_asset_id = pa.publishing_asset_id'
+                ? 'LEFT JOIN published_assets pub ON pub.package_id = pa.package_id'
                 : '';
             $publishedConditions = [];
             if ($hasPublications) {
-                $hasPublicationStatus = $this->columnExists('publications', 'status');
-                $hasPublicationEnvironment = $this->columnExists('publications', 'environment');
+                $hasPublicationStatus = $this->columnExists('published_assets', 'status');
+                $hasPublicationEnvironment = $this->columnExists('published_assets', 'environment');
                 if ($hasPublicationStatus && $hasPublicationEnvironment) {
                     $publishedConditions[] = "(pub.status IN ('published', 'posted') AND pub.environment = 'production')";
                 } elseif ($hasPublicationStatus) {
                     $publishedConditions[] = "pub.status IN ('published', 'posted')";
                 } else {
-                    $publishedConditions[] = 'pub.publication_id IS NOT NULL';
+                    $publishedConditions[] = 'pub.published_asset_id IS NOT NULL';
                 }
             }
-            if ($this->columnExists('publishing_assets', 'status')) {
-                $publishedConditions[] = $this->columnExists('publishing_assets', 'environment')
+            if ($this->columnExists('packages', 'status')) {
+                $publishedConditions[] = $this->columnExists('packages', 'environment')
                     ? "(pa.status IN ('published', 'posted') AND pa.environment = 'production')"
                     : "pa.status IN ('published', 'posted')";
             }
-            if ($this->columnExists('publishing_assets', 'published_at')) {
-                $publishedConditions[] = $this->columnExists('publishing_assets', 'environment')
+            if ($this->columnExists('packages', 'published_at')) {
+                $publishedConditions[] = $this->columnExists('packages', 'environment')
                     ? "(pa.published_at IS NOT NULL AND pa.environment = 'production')"
                     : 'pa.published_at IS NOT NULL';
             }
-            if ($this->columnExists('publishing_assets', 'locked_at')) {
+            if ($this->columnExists('packages', 'locked_at')) {
                 $publishedConditions[] = 'pa.locked_at IS NOT NULL';
             }
             if ($publishedConditions === []) {
@@ -353,7 +353,7 @@ final class PdoAssetLibraryRepository
             $publishedWhere = implode(' OR ', $publishedConditions);
             $stmt = $this->pdo->prepare(
                 "SELECT COUNT(*)
-                   FROM publishing_assets pa
+                   FROM packages pa
                    {$publicationJoin}
                   WHERE pa.asset_library_id = :id
                     AND ({$publishedWhere})"
@@ -390,11 +390,11 @@ final class PdoAssetLibraryRepository
         }
 
         $counts = [
-            'publication_schedule_attempts' => 0,
-            'publication_schedule' => 0,
-            'publications' => 0,
+            'scheduler_queue_item_attempts' => 0,
+            'scheduler_queue_items' => 0,
+            'published_assets' => 0,
             'publisher_attempts' => 0,
-            'publishing_assets' => 0,
+            'packages' => 0,
             'asset_creator_outputs' => 0,
             'asset_creator_inputs' => 0,
             'photo_library_detached' => 0,
@@ -406,84 +406,84 @@ final class PdoAssetLibraryRepository
 
         $this->pdo->beginTransaction();
         try {
-            if ($this->tableExists('publishing_assets') && $this->columnExists('publishing_assets', 'publishing_job_id')) {
+            if ($this->tableExists('packages') && $this->columnExists('packages', 'package_batch_id')) {
                 $stmt = $this->pdo->prepare(
-                    'SELECT DISTINCT publishing_job_id
-                       FROM publishing_assets
+                    'SELECT DISTINCT package_batch_id
+                       FROM packages
                       WHERE asset_library_id = :id
-                        AND publishing_job_id IS NOT NULL'
+                        AND package_batch_id IS NOT NULL'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
                 $publishingJobIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
             }
 
-            if ($this->tableExists('publication_schedule_attempts') && $this->tableExists('publication_schedule')) {
+            if ($this->tableExists('scheduler_queue_item_attempts') && $this->tableExists('scheduler_queue_items')) {
                 $stmt = $this->pdo->prepare(
                     'DELETE psa
-                       FROM publication_schedule_attempts psa
-                       JOIN publication_schedule ps
-                         ON ps.publication_schedule_id = psa.publication_schedule_id
-                       JOIN publishing_assets pa
-                         ON pa.publishing_asset_id = ps.publishing_asset_id
+                       FROM scheduler_queue_item_attempts psa
+                       JOIN scheduler_queue_items ps
+                         ON ps.queue_item_id = psa.queue_item_id
+                       JOIN packages pa
+                         ON pa.package_id = ps.package_id
                       WHERE pa.asset_library_id = :id'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
-                $counts['publication_schedule_attempts'] = $stmt->rowCount();
+                $counts['scheduler_queue_item_attempts'] = $stmt->rowCount();
             }
 
-            if ($this->tableExists('publication_schedule') && $this->tableExists('publishing_assets')) {
+            if ($this->tableExists('scheduler_queue_items') && $this->tableExists('packages')) {
                 $stmt = $this->pdo->prepare(
                     'DELETE ps
-                       FROM publication_schedule ps
-                       JOIN publishing_assets pa
-                         ON pa.publishing_asset_id = ps.publishing_asset_id
+                       FROM scheduler_queue_items ps
+                       JOIN packages pa
+                         ON pa.package_id = ps.package_id
                       WHERE pa.asset_library_id = :id'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
-                $counts['publication_schedule'] = $stmt->rowCount();
+                $counts['scheduler_queue_items'] = $stmt->rowCount();
             }
 
-            if ($this->tableExists('publisher_attempts') && $this->tableExists('publishing_assets')) {
+            if ($this->tableExists('publisher_attempts') && $this->tableExists('packages')) {
                 $stmt = $this->pdo->prepare(
                     'DELETE pat
                        FROM publisher_attempts pat
-                       JOIN publishing_assets pa
-                         ON pa.publishing_asset_id = pat.publishing_asset_id
+                       JOIN packages pa
+                         ON pa.package_id = pat.package_id
                       WHERE pa.asset_library_id = :id'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
                 $counts['publisher_attempts'] = $stmt->rowCount();
             }
 
-            if ($this->tableExists('publications') && $this->tableExists('publishing_assets')) {
+            if ($this->tableExists('published_assets') && $this->tableExists('packages')) {
                 $stmt = $this->pdo->prepare(
                     'DELETE pub
-                       FROM publications pub
-                       JOIN publishing_assets pa
-                         ON pa.publishing_asset_id = pub.publishing_asset_id
+                       FROM published_assets pub
+                       JOIN packages pa
+                         ON pa.package_id = pub.package_id
                       WHERE pa.asset_library_id = :id'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
-                $counts['publications'] = $stmt->rowCount();
+                $counts['published_assets'] = $stmt->rowCount();
             }
 
-            if ($this->tableExists('publishing_assets')) {
+            if ($this->tableExists('packages')) {
                 $stmt = $this->pdo->prepare(
-                    'DELETE FROM publishing_assets
+                    'DELETE FROM packages
                       WHERE asset_library_id = :id'
                 );
                 $stmt->execute([':id' => $assetLibraryId]);
-                $counts['publishing_assets'] = $stmt->rowCount();
+                $counts['packages'] = $stmt->rowCount();
 
-                if ($this->tableExists('publishing_jobs') && $publishingJobIds !== []) {
+                if ($this->tableExists('package_batches') && $publishingJobIds !== []) {
                     $placeholders = implode(',', array_fill(0, count($publishingJobIds), '?'));
                     $stmt = $this->pdo->prepare(
                         "DELETE pj
-                           FROM publishing_jobs pj
-                      LEFT JOIN publishing_assets pa
-                             ON pa.publishing_job_id = pj.publishing_job_id
-                          WHERE pj.publishing_job_id IN ({$placeholders})
-                            AND pa.publishing_asset_id IS NULL
+                           FROM package_batches pj
+                      LEFT JOIN packages pa
+                             ON pa.package_batch_id = pj.package_batch_id
+                          WHERE pj.package_batch_id IN ({$placeholders})
+                            AND pa.package_id IS NULL
                             AND pj.status NOT IN ('published', 'posted')"
                     );
                     $stmt->execute($publishingJobIds);

@@ -40,7 +40,9 @@ const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
 const AdminSharePage = lazy(() => import('@pages/AdminSharePage'));
 const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'));
 const AdminAssetCreatorsPage = lazy(() => import('@pages/AdminAssetCreatorsPage'));
+const AdminPublishingDefaultsPage = lazy(() => import('@pages/AdminPublishingDefaultsPage'));
 const AdminAssetAnalyticsPage = lazy(() => import('@pages/AdminAssetAnalyticsPage'));
+const AdminPackagerPage = lazy(() => import('@pages/AdminPackagerPage'));
 const AdminPublishingPage = lazy(() => import('@pages/AdminPublishingPage'));
 const AdminPublicationSchedulerPage = lazy(() => import('@pages/AdminPublicationSchedulerPage'));
 const AdminLandingPagesPage = lazy(() => import('@pages/AdminLandingPagesPage'));
@@ -133,6 +135,8 @@ export default function AdminRoutes() {
         <Route path="library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
         <Route path="asset-library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
         <Route path="asset-creators" element={renderWithSuspense(AdminAssetCreatorsPage, 'Loading asset creator...')} />
+        <Route path="publishing-defaults" element={renderWithSuspense(AdminPublishingDefaultsPage, 'Loading publisher defaults...')} />
+        <Route path="packager" element={renderWithSuspense(AdminPackagerPage, 'Loading packager...')} />
         <Route path="publishing" element={renderWithSuspense(AdminPublishingPage, 'Loading publishing...')} />
         <Route path="publisher" element={renderWithSuspense(AdminPublishingPage, 'Loading publisher...')} />
         <Route path="scheduler" element={renderWithSuspense(AdminPublicationSchedulerPage, 'Loading scheduler...')} />

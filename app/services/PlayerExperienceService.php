@@ -368,6 +368,7 @@ class PlayerExperienceService
                 palette_hash,
                 COALESCE(
                     NULLIF(TRIM(display_title), ''),
+                    NULLIF(TRIM(nickname), ''),
                     palette_hash
                 ) AS palette_title
              FROM saved_palettes
@@ -415,7 +416,7 @@ class PlayerExperienceService
                 (
                   SELECT COALESCE(
                       NULLIF(TRIM(spalette.display_title), ''),
-                      NULLIF(TRIM(sps.title), ''),
+                      NULLIF(TRIM(spalette.nickname), ''),
                       spalette.palette_hash
                     )
                     FROM saved_palette_set_photos spsp
@@ -485,7 +486,7 @@ class PlayerExperienceService
                 spsp.photo_type AS saved_palette_photo_type,
                 COALESCE(
                     NULLIF(TRIM(sp.display_title), ''),
-                    NULLIF(TRIM(sps.title), ''),
+                    NULLIF(TRIM(sp.nickname), ''),
                     sp.palette_hash
                 ) AS palette_title
              FROM saved_palette_set_photos spsp
@@ -620,7 +621,7 @@ class PlayerExperienceService
         $seen = [];
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
-            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'non-palette'], true)) {
+            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'non-palette'], true)) {
                 continue;
             }
             if (!empty($item->exclude_from_thumbs)) continue;

@@ -36,29 +36,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 try {
-    $slugSelect = columnExists($pdo, 'playlists', 'slug') ? 'slug' : 'NULL AS slug';
-    $headlineSelect = columnExists($pdo, 'playlists', 'headline') ? 'headline' : 'NULL AS headline';
-    $publicSelect = columnExists($pdo, 'playlists', 'is_public') ? 'is_public' : '0 AS is_public';
-    $retiredWhere = columnExists($pdo, 'playlists', 'is_retired') ? 'WHERE COALESCE(is_retired, 0) = 0' : '';
-    $indexableSelect = columnExists($pdo, 'playlists', 'indexable') ? 'indexable' : '1 AS indexable';
-    $publishedAtSelect = columnExists($pdo, 'playlists', 'published_at') ? 'published_at' : 'NULL AS published_at';
-    $updatedAtSelect = columnExists($pdo, 'playlists', 'updated_at') ? 'updated_at' : 'NULL AS updated_at';
+    $slugSelect = columnExists($pdo, 'playlists', 'slug') ? 'p.slug' : 'NULL AS slug';
+    $headlineSelect = columnExists($pdo, 'playlists', 'headline') ? 'p.headline' : 'NULL AS headline';
+    $publicSelect = columnExists($pdo, 'playlists', 'is_public') ? 'p.is_public' : '0 AS is_public';
+    $retiredWhere = columnExists($pdo, 'playlists', 'is_retired') ? 'WHERE COALESCE(p.is_retired, 0) = 0' : '';
+    $indexableSelect = columnExists($pdo, 'playlists', 'indexable') ? 'p.indexable' : '1 AS indexable';
+    $publishedAtSelect = columnExists($pdo, 'playlists', 'published_at') ? 'p.published_at' : 'NULL AS published_at';
+    $updatedAtSelect = columnExists($pdo, 'playlists', 'updated_at') ? 'p.updated_at' : 'NULL AS updated_at';
 
     $sql = <<<SQL
         SELECT
-            playlist_id,
-            title,
-            type,
-            is_active,
+            p.playlist_id,
+            p.title,
+            p.type,
+            p.is_active,
             {$publicSelect},
             {$slugSelect},
             {$headlineSelect},
             {$indexableSelect},
             {$publishedAtSelect},
-            {$updatedAtSelect}
-        FROM playlists
+            {$updatedAtSelect},
+            shareable.playlist_instance_id AS watch_playlist_instance_id
+        FROM playlists p
+        LEFT JOIN (
+            SELECT playlist_id, MIN(playlist_instance_id) AS playlist_instance_id
+            FROM playlist_instances
+            WHERE is_active = 1
+              AND share_enabled = 1
+            GROUP BY playlist_id
+        ) shareable
+          ON shareable.playlist_id = p.playlist_id
         {$retiredWhere}
-        ORDER BY playlist_id ASC
+        ORDER BY p.playlist_id ASC
         SQL;
 
     $stmt = $pdo->prepare($sql);

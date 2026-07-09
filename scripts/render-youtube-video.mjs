@@ -53,7 +53,10 @@ async function fetchJson(url) {
 }
 
 function hasYoutubeVenue(item) {
-  return item?.yt == null || item.yt === true || Number(item.yt) !== 0;
+  const analyzerRole = String(item?.analyzer_role || "").trim().toLowerCase();
+  const ignored = analyzerRole === "ignore";
+  const youtubeEnabled = item?.yt === true || Number(item?.yt) === 1;
+  return !ignored && youtubeEnabled;
 }
 
 function flagLabel(value, fallback = "missing") {
@@ -71,6 +74,7 @@ function describeItem(item, index) {
     `type=${type}`,
     `site=${flagLabel(item?.site)}`,
     `yt=${flagLabel(item?.yt)}`,
+    `ignore=${String(item?.analyzer_role || "").trim().toLowerCase() === "ignore" ? "1" : "0"}`,
     `"${title}"`,
   ].join(" ");
 }
@@ -95,8 +99,11 @@ function normalizeImageUrl(value) {
 
 function slideDuration(item) {
   const explicit = Number(item?.duration_ms || 0);
-  if (explicit > 0) return explicit;
   const type = String(item?.type || item?.item_type || "normal").toLowerCase().trim();
+  if (type === "brand-bumper") {
+    return Math.max(YOUTUBE_VIDEO_TIMING.defaultBrandBumperDurationMs, explicit || 0);
+  }
+  if (explicit > 0) return explicit;
   if (type === "intro") return YOUTUBE_VIDEO_TIMING.defaultIntroDurationMs;
   if (type === "text") return YOUTUBE_VIDEO_TIMING.defaultTextDurationMs;
   if (type === "hue-wheel") return YOUTUBE_VIDEO_TIMING.defaultHueWheelDurationMs;
@@ -132,11 +139,12 @@ async function buildPlan(playlistId) {
     .map((item) => ({
       ...item,
       type: item.type || item.item_type || "normal",
+      body: item.body || "",
       image_url: normalizeImageUrl(item.image_url),
     }));
 
   if (!items.length) {
-    throw new Error(`Playlist ${playlistId} does not have YouTube-enabled slides.`);
+    throw new Error(`Playlist ${playlistId} does not have non-ignored YouTube-enabled slides.`);
   }
 
   console.log(`Fetched ${rawItems.length} active playlist items from ${BASE_URL}.`);
@@ -159,14 +167,30 @@ async function buildPlan(playlistId) {
       default_intro_duration_ms: YOUTUBE_VIDEO_TIMING.defaultIntroDurationMs,
       default_text_duration_ms: YOUTUBE_VIDEO_TIMING.defaultTextDurationMs,
       default_hue_wheel_duration_ms: YOUTUBE_VIDEO_TIMING.defaultHueWheelDurationMs,
+      default_brand_bumper_duration_ms: YOUTUBE_VIDEO_TIMING.defaultBrandBumperDurationMs,
       dissolve_ms: YOUTUBE_VIDEO_TIMING.dissolveMs,
       cut_ms: YOUTUBE_VIDEO_TIMING.cutMs,
       caption_delay_after_photo_ms: YOUTUBE_VIDEO_TIMING.captionDelayAfterPhotoMs,
       caption_fade_ms: YOUTUBE_VIDEO_TIMING.captionFadeMs,
+      signature_reveal_delay_ms: YOUTUBE_VIDEO_TIMING.signatureRevealDelayMs,
+      signature_reveal_duration_ms: YOUTUBE_VIDEO_TIMING.signatureRevealDurationMs,
       final_fade_ms: YOUTUBE_VIDEO_TIMING.finalFadeMs,
       timeline: buildTimeline(items),
     },
   };
+}
+
+function readRecipePlan(recipePath) {
+  const raw = fs.readFileSync(recipePath, "utf8");
+  const data = JSON.parse(raw);
+  const plan = data?.plan || data;
+  if (!plan || typeof plan !== "object") {
+    throw new Error(`Recipe file does not contain a render plan: ${recipePath}`);
+  }
+  if (!Array.isArray(plan.items) || !plan.items.length) {
+    throw new Error(`Recipe render plan has no items: ${recipePath}`);
+  }
+  return plan;
 }
 
 function run(command, args) {
@@ -185,17 +209,21 @@ function run(command, args) {
 }
 
 async function main() {
+  const recipePath = readArg("recipe");
+  const explicitOutput = readArg("output");
   const playlistId = Number(process.argv[2] || readArg("playlist-id") || readArg("playlist") || 37);
-  if (!Number.isFinite(playlistId) || playlistId <= 0) {
+  if (!recipePath && (!Number.isFinite(playlistId) || playlistId <= 0)) {
     throw new Error("Usage: npm run render-youtube-video -- 37");
   }
 
   ensureDir(OUT_DIR);
   ensureDir(PROPS_DIR);
 
-  const plan = await buildPlan(playlistId);
-  const propsPath = path.join(PROPS_DIR, `playlist-${playlistId}.json`);
-  const outputPath = path.join(OUT_DIR, `colorfix-youtube-video-${playlistId}.mp4`);
+  const plan = recipePath ? readRecipePlan(recipePath) : await buildPlan(playlistId);
+  const planId = Number(plan.playlist_id || playlistId || 0) || "recipe";
+  const propsPath = recipePath || path.join(PROPS_DIR, `playlist-${planId}.json`);
+  const outputPath = explicitOutput || path.join(OUT_DIR, `colorfix-youtube-video-${planId}.mp4`);
+  ensureDir(path.dirname(outputPath));
   fs.writeFileSync(propsPath, JSON.stringify({ plan }, null, 2));
 
   await run("npx", [

@@ -166,6 +166,11 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
 
+.player-back--end-screen {
+  position: absolute;
+  z-index: 80;
+}
+
 
 .player-image-frame {
   position: relative;
@@ -276,6 +281,25 @@
 
 .player-hue-wheel .animated-hue-wheel__caption {
   color: rgba(255, 255, 255, 0.72);
+}
+
+.player-brand-bumper {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: #000;
+  color: #fff;
+  opacity: 0;
+  animation: player-brand-bumper-outro 4200ms ease-in-out forwards;
+}
+
+@keyframes player-brand-bumper-outro {
+  0% { opacity: 0; }
+  14% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (orientation: landscape) and (max-height: 560px) {

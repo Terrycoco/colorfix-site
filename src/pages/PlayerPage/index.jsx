@@ -219,6 +219,13 @@ export default function PlayerPage() {
     return index >= 0 ? index : 0;
   }, [data?.items]);
 
+  const lastReplayableIndex = useMemo(() => findLastReplayableIndex(data?.items || []), [data?.items]);
+
+  function handleEndScreenBack() {
+    setPlaybackEnded(false);
+    playerRef.current?.replay?.({ likedOnly: false, startIndex: lastReplayableIndex });
+  }
+
   const ctaHandlers = useMemo(() => (
     buildCtaHandlers({
       data,
@@ -728,15 +735,25 @@ const visibleCTAs = useMemo(
             }}
         />
         {playbackEnded && (
-          <PlayerEndScreen scrollable={Boolean(watchNextCta)}>
-            {orderedCTAs.length > 0 && (
-              <CTALayout
-                layout="stacked"
-                ctas={orderedCTAs}
-                onCtaClick={handleCta}
-              />
-            )}
-          </PlayerEndScreen>
+          <>
+            <button
+              className="player-back player-back--end-screen"
+              type="button"
+              onClick={handleEndScreenBack}
+              aria-label="Go back one slide"
+            >
+              ←
+            </button>
+            <PlayerEndScreen scrollable={Boolean(watchNextCta)}>
+              {orderedCTAs.length > 0 && (
+                <CTALayout
+                  layout="stacked"
+                  ctas={orderedCTAs}
+                  onCtaClick={handleCta}
+                />
+              )}
+            </PlayerEndScreen>
+          </>
         )}
       </div>
 
@@ -974,6 +991,15 @@ function buildEndSetCta(rawEndCta, setId) {
       brand: "colorfix",
     },
   };
+}
+
+function findLastReplayableIndex(items) {
+  const list = Array.isArray(items) ? items : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const type = String(list[index]?.type || list[index]?.item_type || "normal").toLowerCase().trim();
+    if (type !== "brand-bumper") return index;
+  }
+  return Math.max(0, list.length - 1);
 }
 
 function clearWatchNextSeenPlaylists(setId) {

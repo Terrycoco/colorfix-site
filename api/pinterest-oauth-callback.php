@@ -19,7 +19,7 @@ function pinterest_redirect(string $status, string $message = ''): void
     if ($message !== '') {
         $params['message'] = $message;
     }
-    header('Location: /admin/publisher?' . http_build_query($params), true, 302);
+    header('Location: /admin/packager?' . http_build_query($params), true, 302);
     exit;
 }
 

@@ -11,12 +11,12 @@ use RuntimeException;
 final class PublicationScheduler
 {
     private const ELIGIBLE_PUBLICATION_STATUSES = [
-        'ready_to_schedule',
-        'ready_to_publish',
-        'ready_for_review',
+        'packaged',
+        'queued',
         'draft',
-        'scheduled',
+        'error',
         'failed',
+        'scheduled_retry_pending',
     ];
 
     public function __construct(private PdoPublicationScheduleRepository $repo) {}
@@ -36,39 +36,39 @@ final class PublicationScheduler
         $this->assertSchedulable($publication);
 
         $existing = $this->repo->findScheduleByPublicationId($publicationId);
-        if ($existing && !in_array($existing['status'], ['cancelled', 'failed'], true)) {
-            throw new RuntimeException('Publication already has an active schedule row.');
+        if ($existing && in_array($existing['status'], ['waiting', 'in_progress'], true)) {
+            throw new RuntimeException('Package already has an active queue item.');
         }
 
         $timezone = $this->timezone($options['timezone'] ?? null);
         $scheduledAtUtc = $this->toUtcSql($scheduledAt, $timezone);
         if ($existing) {
             $this->repo->reschedule(
-                (int)$existing['publication_schedule_id'],
+                (int)$existing['queue_item_id'],
                 $scheduledAtUtc,
                 $timezone,
                 (int)($options['priority'] ?? 100)
             );
-            $this->repo->updatePublicationStatus($publicationId, 'scheduled');
+            $this->repo->updatePublicationStatus($publicationId, 'queued');
             return [
-                'schedule' => $this->repo->findScheduleById((int)$existing['publication_schedule_id']),
+                'schedule' => $this->repo->findScheduleById((int)$existing['queue_item_id']),
                 'publication' => $this->repo->findPublication($publicationId),
             ];
         }
 
         $scheduleId = $this->repo->insertSchedule([
-            'publishing_job_id' => (int)$publication['publishing_job_id'],
-            'publishing_asset_id' => (int)$publication['publishing_asset_id'],
+            'package_batch_id' => (int)$publication['package_batch_id'],
+            'package_id' => (int)$publication['package_id'],
             'channel_id' => $publication['publishing_channel_id'] ?? null,
             'platform' => $publication['platform'] ?? 'unknown',
             'environment' => $publication['environment'] ?? 'production',
             'scheduled_at' => $scheduledAtUtc,
             'timezone' => $timezone,
-            'status' => 'scheduled',
+            'status' => 'waiting',
             'priority' => (int)($options['priority'] ?? 100),
             'max_attempts' => (int)($options['max_attempts'] ?? $this->channelDefault($publication, 'max_attempts', 3)),
         ]);
-        $this->repo->updatePublicationStatus($publicationId, 'scheduled');
+        $this->repo->updatePublicationStatus($publicationId, 'queued');
 
         return [
             'schedule' => $this->repo->findScheduleById($scheduleId),
@@ -82,24 +82,24 @@ final class PublicationScheduler
         $this->assertSchedulable($publication);
 
         $existing = $this->repo->findScheduleByPublicationId($publicationId);
-        if ($existing && !in_array($existing['status'], ['cancelled', 'failed'], true)) {
-            throw new RuntimeException('Publication already has an active schedule row.');
+        if ($existing && in_array($existing['status'], ['waiting', 'in_progress'], true)) {
+            throw new RuntimeException('Package already has an active queue item.');
         }
 
         $settings = $this->schedulerSettings($publication, $options);
         if ($existing) {
-            $this->repo->reschedule((int)$existing['publication_schedule_id'], '', $settings['timezone'], (int)($options['priority'] ?? 100));
-            $this->repo->updatePublicationStatus($publicationId, 'scheduled');
+            $this->repo->reschedule((int)$existing['queue_item_id'], '', $settings['timezone'], (int)($options['priority'] ?? 100));
+            $this->repo->updatePublicationStatus($publicationId, 'queued');
             return [
-                'schedule' => $this->repo->findScheduleById((int)$existing['publication_schedule_id']),
+                'schedule' => $this->repo->findScheduleById((int)$existing['queue_item_id']),
                 'publication' => $this->repo->findPublication($publicationId),
                 'settings' => $settings,
             ];
         }
 
         $scheduleId = $this->repo->insertSchedule([
-            'publishing_job_id' => (int)$publication['publishing_job_id'],
-            'publishing_asset_id' => (int)$publication['publishing_asset_id'],
+            'package_batch_id' => (int)$publication['package_batch_id'],
+            'package_id' => (int)$publication['package_id'],
             'channel_id' => $publication['publishing_channel_id'] ?? null,
             'platform' => $publication['platform'] ?? 'unknown',
             'environment' => $publication['environment'] ?? 'production',
@@ -109,7 +109,7 @@ final class PublicationScheduler
             'priority' => (int)($options['priority'] ?? 100),
             'max_attempts' => (int)($options['max_attempts'] ?? $this->channelDefault($publication, 'max_attempts', 3)),
         ]);
-        $this->repo->updatePublicationStatus($publicationId, 'scheduled');
+        $this->repo->updatePublicationStatus($publicationId, 'queued');
 
         return [
             'schedule' => $this->repo->findScheduleById($scheduleId),
@@ -120,42 +120,53 @@ final class PublicationScheduler
 
     public function enqueueMissingForJob(int $publishingJobId, array $options = []): array
     {
-        if ($publishingJobId <= 0) {
-            throw new RuntimeException('publishing_job_id required.');
+        return $this->enqueueMissingPackagesForBatch($publishingJobId, $options);
+    }
+
+    public function enqueueMissingPackagesForBatch(int $packageBatchId, array $options = []): array
+    {
+        if ($packageBatchId <= 0) {
+            throw new RuntimeException('package_batch_id required.');
         }
 
-        $publications = $this->repo->listPublicationsForJob($publishingJobId);
-        if (!$publications) {
-            throw new RuntimeException("No publishing assets found for publishing job #{$publishingJobId}.");
+        $published_assets = $this->repo->listPublicationsForJob($packageBatchId);
+        if (!$published_assets) {
+            throw new RuntimeException("No packages found for package batch #{$packageBatchId}.");
         }
 
         $result = [
-            'publishing_job_id' => $publishingJobId,
-            'total_assets' => count($publications),
+            'object_type' => 'queue_enqueue_result',
+            'package_batch_id' => $packageBatchId,
+            'total_packages' => count($published_assets),
+            'total_assets' => count($published_assets),
             'enqueued' => 0,
             'already_waiting' => 0,
             'skipped' => 0,
+            'enqueued_package_ids' => [],
             'enqueued_asset_ids' => [],
+            'queue_item_ids' => [],
             'schedule_ids' => [],
+            'already_waiting_package_ids' => [],
             'already_waiting_asset_ids' => [],
+            'skipped_packages' => [],
             'skipped_assets' => [],
         ];
 
-        foreach ($publications as $publication) {
-            $publicationId = (int)($publication['publishing_asset_id'] ?? 0);
+        foreach ($published_assets as $publication) {
+            $publicationId = (int)($publication['package_id'] ?? 0);
             if ($publicationId <= 0) {
                 $result['skipped'] += 1;
-                $result['skipped_assets'][] = [
-                    'publishing_asset_id' => $publicationId,
-                    'reason' => 'missing_publishing_asset_id',
-                ];
+                $skip = ['package_id' => $publicationId, 'reason' => 'missing_package_id'];
+                $result['skipped_packages'][] = $skip;
+                $result['skipped_assets'][] = $skip;
                 continue;
             }
 
             $existing = $this->repo->findScheduleByPublicationId($publicationId);
             $existingStatus = (string)($existing['status'] ?? '');
-            if ($existing && in_array($existingStatus, ['waiting', 'scheduled', 'processing'], true)) {
+            if ($existing && in_array($existingStatus, ['waiting', 'in_progress'], true)) {
                 $result['already_waiting'] += 1;
+                $result['already_waiting_package_ids'][] = $publicationId;
                 $result['already_waiting_asset_ids'][] = $publicationId;
                 continue;
             }
@@ -164,16 +175,18 @@ final class PublicationScheduler
                 $scheduled = $this->scheduleNextAvailable($publicationId, $options);
                 $schedule = $scheduled['schedule'] ?? [];
                 $result['enqueued'] += 1;
+                $result['enqueued_package_ids'][] = $publicationId;
                 $result['enqueued_asset_ids'][] = $publicationId;
-                if (!empty($schedule['publication_schedule_id'])) {
-                    $result['schedule_ids'][] = (int)$schedule['publication_schedule_id'];
+                if (!empty($schedule['queue_item_id'])) {
+                    $queueItemId = (int)$schedule['queue_item_id'];
+                    $result['queue_item_ids'][] = $queueItemId;
+                    $result['schedule_ids'][] = $queueItemId;
                 }
             } catch (RuntimeException $e) {
                 $result['skipped'] += 1;
-                $result['skipped_assets'][] = [
-                    'publishing_asset_id' => $publicationId,
-                    'reason' => $e->getMessage(),
-                ];
+                $skip = ['package_id' => $publicationId, 'reason' => $e->getMessage()];
+                $result['skipped_packages'][] = $skip;
+                $result['skipped_assets'][] = $skip;
             }
         }
 
@@ -183,39 +196,39 @@ final class PublicationScheduler
     public function reschedule(int $scheduleId, string $scheduledAt, array $options = []): array
     {
         $schedule = $this->requireSchedule($scheduleId);
-        if (in_array($schedule['status'], ['completed'], true)) {
-            throw new RuntimeException('Completed schedule rows cannot be rescheduled.');
+        if (in_array($schedule['status'], ['published'], true)) {
+            throw new RuntimeException('Published queue items cannot be rescheduled.');
         }
 
-        $publication = $this->requirePublication((int)$schedule['publishing_asset_id']);
+        $publication = $this->requirePublication((int)$schedule['package_id']);
         if (($publication['status'] ?? '') === 'published') {
-            throw new RuntimeException('Published publications cannot be rescheduled.');
+            throw new RuntimeException('Published packages cannot be rescheduled.');
         }
 
         $timezone = $this->timezone($options['timezone'] ?? ($schedule['timezone'] ?? null));
         $priority = (int)($options['priority'] ?? ($schedule['priority'] ?? 100));
         $this->repo->reschedule($scheduleId, $this->toUtcSql($scheduledAt, $timezone), $timezone, $priority);
-        $this->repo->updatePublicationStatus((int)$schedule['publishing_asset_id'], 'scheduled');
+        $this->repo->updatePublicationStatus((int)$schedule['package_id'], 'queued');
 
         return [
             'schedule' => $this->repo->findScheduleById($scheduleId),
-            'publication' => $this->repo->findPublication((int)$schedule['publishing_asset_id']),
+            'publication' => $this->repo->findPublication((int)$schedule['package_id']),
         ];
     }
 
     public function cancel(int $scheduleId, string $reason = 'Cancelled by admin.'): array
     {
         $schedule = $this->requireSchedule($scheduleId);
-        if (($schedule['status'] ?? '') === 'completed') {
-            throw new RuntimeException('Completed schedule rows cannot be cancelled.');
+        if (($schedule['status'] ?? '') === 'published') {
+            throw new RuntimeException('Published queue items cannot be cancelled.');
         }
 
         $this->repo->cancelSchedule($scheduleId, $reason);
-        $this->repo->updatePublicationStatus((int)$schedule['publishing_asset_id'], 'ready_to_schedule');
+        $this->repo->updatePublicationStatus((int)$schedule['package_id'], 'packaged');
 
         return [
             'schedule' => $this->repo->findScheduleById($scheduleId),
-            'publication' => $this->repo->findPublication((int)$schedule['publishing_asset_id']),
+            'publication' => $this->repo->findPublication((int)$schedule['package_id']),
         ];
     }
 
@@ -223,7 +236,7 @@ final class PublicationScheduler
     {
         $publicationIds = array_values(array_unique(array_filter(array_map('intval', $publicationIds))));
         if (!$publicationIds) {
-            throw new RuntimeException('Select at least one unscheduled publishing asset.');
+            throw new RuntimeException('Select at least one waiting publishing package.');
         }
         return $this->repo->deleteUnscheduledPublicationAssets($publicationIds);
     }
@@ -239,12 +252,12 @@ final class PublicationScheduler
         }
 
         if ($publicationId <= 0) {
-            throw new RuntimeException('publishing_job_id or schedule_id required.');
+            throw new RuntimeException('package_batch_id or schedule_id required.');
         }
 
         $existing = $this->repo->findScheduleByPublicationId($publicationId);
         if ($existing) {
-            return $this->reschedule((int)$existing['publication_schedule_id'], gmdate('Y-m-d H:i:s'), [
+            return $this->reschedule((int)$existing['queue_item_id'], gmdate('Y-m-d H:i:s'), [
                 'timezone' => 'UTC',
                 'priority' => min(1, (int)($existing['priority'] ?? 100)),
             ]);
@@ -262,7 +275,7 @@ final class PublicationScheduler
 
         if ($scheduleId > 0) {
             $schedule = $this->requireSchedule($scheduleId);
-            $publicationId = (int)$schedule['publishing_asset_id'];
+            $publicationId = (int)$schedule['package_id'];
         } elseif ($publicationId > 0) {
             $publication = $this->requirePublication($publicationId);
             $this->assertSchedulable($publication);
@@ -274,11 +287,11 @@ final class PublicationScheduler
                 ]);
                 $existing = $created['schedule'] ?? null;
             }
-            $scheduleId = (int)($existing['publication_schedule_id'] ?? 0);
+            $scheduleId = (int)($existing['queue_item_id'] ?? 0);
         }
 
         if ($publicationId <= 0 || $scheduleId <= 0) {
-            throw new RuntimeException('publishing_job_id or schedule_id required.');
+            throw new RuntimeException('package_batch_id or schedule_id required.');
         }
 
         $claimed = $this->repo->claimScheduleById($scheduleId, $workerId);
@@ -301,10 +314,10 @@ final class PublicationScheduler
             $this->fail($scheduleId, $failure);
             return [
                 'worker_id' => $workerId,
-                'publication_schedule_id' => $scheduleId,
-                'publishing_job_id' => $publicationId,
-                'publishing_asset_id' => $publicationId,
-                'status' => 'failed',
+                'queue_item_id' => $scheduleId,
+                'package_batch_id' => (int)($claimed['package_batch_id'] ?? 0),
+                'package_id' => $publicationId,
+                'status' => 'error',
                 'result' => $failure,
             ];
         }
@@ -313,10 +326,10 @@ final class PublicationScheduler
             $this->complete($scheduleId, $result);
             return [
                 'worker_id' => $workerId,
-                'publication_schedule_id' => $scheduleId,
-                'publishing_job_id' => $publicationId,
-                'publishing_asset_id' => $publicationId,
-                'status' => 'completed',
+                'queue_item_id' => $scheduleId,
+                'package_batch_id' => (int)($claimed['package_batch_id'] ?? 0),
+                'package_id' => $publicationId,
+                'status' => 'published',
                 'result' => $result,
             ];
         }
@@ -335,10 +348,10 @@ final class PublicationScheduler
 
         return [
             'worker_id' => $workerId,
-            'publication_schedule_id' => $scheduleId,
-            'publishing_job_id' => $publicationId,
-            'publishing_asset_id' => $publicationId,
-            'status' => $retryable ? 'retry_scheduled' : 'failed',
+            'queue_item_id' => $scheduleId,
+            'package_batch_id' => (int)($claimed['package_batch_id'] ?? 0),
+            'package_id' => $publicationId,
+            'status' => 'error',
             'result' => $failure,
         ];
     }
@@ -378,17 +391,17 @@ final class PublicationScheduler
         $results = [];
 
         foreach ($claimed as $schedule) {
-            $scheduleId = (int)$schedule['publication_schedule_id'];
-            $publicationId = (int)$schedule['publishing_asset_id'];
+            $scheduleId = (int)$schedule['queue_item_id'];
+            $publicationId = (int)$schedule['package_id'];
             $result = $executor->execute($publicationId);
 
             if (!empty($result['success'])) {
                 $this->complete($scheduleId, $result);
                 $results[] = [
-                    'publication_schedule_id' => $scheduleId,
-                    'publishing_job_id' => $publicationId,
-                    'publishing_asset_id' => $publicationId,
-                    'status' => 'completed',
+                    'queue_item_id' => $scheduleId,
+                    'package_batch_id' => (int)($schedule['package_batch_id'] ?? 0),
+                    'package_id' => $publicationId,
+                    'status' => 'published',
                     'result' => $result,
                 ];
                 continue;
@@ -406,10 +419,10 @@ final class PublicationScheduler
             ];
             $this->fail($scheduleId, $failure);
             $results[] = [
-                'publication_schedule_id' => $scheduleId,
-                'publishing_job_id' => $publicationId,
-                'publishing_asset_id' => $publicationId,
-                'status' => $retryable ? 'retry_scheduled' : 'failed',
+                'queue_item_id' => $scheduleId,
+                'package_batch_id' => (int)($schedule['package_batch_id'] ?? 0),
+                'package_id' => $publicationId,
+                'status' => 'error',
                 'result' => $failure,
             ];
         }
@@ -424,10 +437,10 @@ final class PublicationScheduler
     public function complete(int $scheduleId, array $result): array
     {
         $schedule = $this->requireSchedule($scheduleId);
-        $publication = $this->requirePublication((int)$schedule['publishing_asset_id']);
+        $publication = $this->requirePublication((int)$schedule['package_id']);
         $this->repo->completeSchedule($scheduleId, $result);
         $this->repo->updatePublicationStatus(
-            (int)$schedule['publishing_asset_id'],
+            (int)$schedule['package_id'],
             ($publication['environment'] ?? 'production') === 'production' ? 'published' : 'test_published'
         );
         return ['schedule' => $this->repo->findScheduleById($scheduleId)];
@@ -438,7 +451,7 @@ final class PublicationScheduler
         $schedule = $this->requireSchedule($scheduleId);
         $this->repo->failSchedule($scheduleId, $result);
         if (empty($result['retryable'])) {
-            $this->repo->updatePublicationStatus((int)$schedule['publishing_asset_id'], 'failed');
+            $this->repo->updatePublicationStatus((int)$schedule['package_id'], 'error');
         }
         return ['schedule' => $this->repo->findScheduleById($scheduleId)];
     }
@@ -447,7 +460,7 @@ final class PublicationScheduler
     {
         $publication = $this->repo->findPublication($publicationId);
         if (!$publication) {
-            throw new RuntimeException("Publishing job not found: {$publicationId}");
+            throw new RuntimeException("Package not found: {$publicationId}");
         }
         return $publication;
     }
@@ -464,11 +477,11 @@ final class PublicationScheduler
     private function assertSchedulable(array $publication): void
     {
         if (($publication['status'] ?? '') === 'published' || !empty($publication['published_at'])) {
-            throw new RuntimeException('Published publications cannot be scheduled again.');
+            throw new RuntimeException('Published packages cannot be queued again.');
         }
 
         if (!in_array((string)($publication['status'] ?? ''), self::ELIGIBLE_PUBLICATION_STATUSES, true)) {
-            throw new RuntimeException('Publication is not ready to schedule.');
+            throw new RuntimeException('Package is not ready for Scheduler.');
         }
     }
 
@@ -625,12 +638,12 @@ final class PublicationScheduler
         }
 
         $remainingScheduleIds = array_map(
-            static fn(array $schedule): int => (int)$schedule['publication_schedule_id'],
+            static fn(array $schedule): int => (int)$schedule['queue_item_id'],
             $futureSchedules
         );
 
         foreach ($futureSchedules as $schedule) {
-            $futurePublication = $this->repo->findPublication((int)$schedule['publishing_asset_id']);
+            $futurePublication = $this->repo->findPublication((int)$schedule['package_id']);
             if (!$futurePublication || in_array((string)($futurePublication['status'] ?? ''), ['published', 'test_published'], true)) {
                 array_shift($remainingScheduleIds);
                 continue;
@@ -643,7 +656,7 @@ final class PublicationScheduler
                 'exclude_schedule_ids' => $remainingScheduleIds,
             ]);
             $this->repo->reschedule(
-                (int)$schedule['publication_schedule_id'],
+                (int)$schedule['queue_item_id'],
                 $scheduledAtUtc,
                 $settings['timezone'],
                 (int)($schedule['priority'] ?? 100)
@@ -736,21 +749,21 @@ final class PublicationScheduler
         $counts = [
             'unscheduled' => 0,
             'waiting' => 0,
-            'scheduled_today' => 0,
-            'scheduled_later' => 0,
-            'processing' => 0,
-            'completed' => 0,
-            'retry_scheduled' => 0,
-            'failed' => 0,
+            'timed_today' => 0,
+            'timed_later' => 0,
+            'in_progress' => 0,
+            'published' => 0,
+            'error' => 0,
             'cancelled' => 0,
+            'skipped_duplicate' => 0,
         ];
 
         $today = gmdate('Y-m-d');
         foreach ($rows as $row) {
             $status = (string)($row['schedule_status'] ?? 'unscheduled');
-            if ($status === 'scheduled') {
+            if ($status === 'waiting' && !empty($row['scheduled_at'])) {
                 $day = substr((string)($row['scheduled_at'] ?? ''), 0, 10);
-                $counts[$day === $today ? 'scheduled_today' : 'scheduled_later']++;
+                $counts[$day === $today ? 'timed_today' : 'timed_later']++;
                 continue;
             }
             if (isset($counts[$status])) {

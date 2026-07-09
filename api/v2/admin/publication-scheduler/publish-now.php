@@ -16,8 +16,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $publicationId = (int)($payload['publishing_asset_id'] ?? $payload['publish_output_id'] ?? $payload['publishing_job_id'] ?? $payload['publication_id'] ?? 0);
-    $scheduleId = (int)($payload['publication_schedule_id'] ?? $payload['schedule_id'] ?? 0);
+    $publicationId = (int)($payload['package_id'] ?? $payload['publish_output_id'] ?? 0);
+    $scheduleId = (int)($payload['queue_item_id'] ?? $payload['schedule_id'] ?? 0);
     $workerId = trim((string)($payload['worker_id'] ?? ''));
     $repo = new PdoPublicationScheduleRepository($pdo);
     $service = new PublicationScheduler($repo);

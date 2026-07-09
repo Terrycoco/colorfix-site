@@ -42,8 +42,10 @@ export const adminMenuItems = [
     items: [
       { label: "Asset Library", href: "/admin/library" },
       { label: "Creator", href: "/admin/asset-creators" },
+      { label: "Defaults", href: "/admin/publishing-defaults" },
+      { label: "Packager", href: "/admin/packager" },
+       { label: "Scheduler", href: "/admin/scheduler" },
       { label: "Publisher", href: "/admin/publisher" },
-      { label: "Scheduler", href: "/admin/scheduler" },
       { label: "CTA Pages", href: "/admin/cta-pages" },
       { label: "Landing Pages", href: "/admin/landing-pages" },
       { label: "Analytics", href: "/admin/asset-analytics" },

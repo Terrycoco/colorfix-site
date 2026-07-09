@@ -45,7 +45,7 @@ export default function PlaylistThumbsPage() {
         if (!payload?.ok || !payload?.data) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
-        setTitle(formatTitle(payload.data?.display_title || payload.data?.title || "Playlist Palettes"));
+        setTitle(formatTitle(payload.data?.title || payload.data?.display_title || "Playlist Palettes"));
         setItems(payload.data?.items || []);
         setPaletteViewerCtaGroupId(payload.data?.palette_viewer_cta_group_id ? String(payload.data.palette_viewer_cta_group_id) : "");
       })
@@ -104,8 +104,7 @@ export default function PlaylistThumbsPage() {
         item?.palette_title ||
         item?.saved_palette_title ||
         item?.palette_name ||
-        item?.title ||
-        (paletteHash ? "Saved Palette" : `Palette ${apId}`);
+        (paletteHash ? "ColorFix Palette" : `Palette ${apId}`);
       list.push({
         ap_id: apId,
         palette_hash: paletteHash,

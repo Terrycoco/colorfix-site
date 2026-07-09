@@ -48,6 +48,10 @@ try {
     if ($paletteType !== '') {
         $filters['palette_type'] = $paletteType;
     }
+    $colorFamily = isset($_GET['color_family']) ? trim((string)$_GET['color_family']) : '';
+    if ($colorFamily !== '') {
+        $filters['color_family'] = $colorFamily;
+    }
     $paletteId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : 0;
 

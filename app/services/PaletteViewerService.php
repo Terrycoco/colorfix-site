@@ -135,6 +135,21 @@ class PaletteViewerService
         }
 
         $full = $this->savedRepo->getFullPaletteByHashAndSet($hash, $setId);
+        return $this->buildSavedPalettePayload($full, $hash);
+    }
+
+    public function getSavedById(int $id, ?int $setId = null): array
+    {
+        if ($id <= 0) {
+            throw new InvalidArgumentException('saved palette id required');
+        }
+
+        $full = $this->savedRepo->getFullPalette($id, $setId);
+        return $this->buildSavedPalettePayload($full, '');
+    }
+
+    private function buildSavedPalettePayload(?array $full, string $hash): array
+    {
         if (!$full) {
             throw new RuntimeException('Palette not found');
         }
@@ -192,16 +207,17 @@ class PaletteViewerService
             ];
         }
 
+        $publicTitle = $this->firstNonEmpty([
+            $palette['display_title'] ?? null,
+            $palette['nickname'] ?? null,
+            'ColorFix Palette',
+        ]);
+
         $meta = [
             'source' => 'saved',
             'id' => $palette['id'] ?? null,
             'hash' => $palette['palette_hash'] ?? $hash,
-            'title' => $this->firstNonEmpty([
-                $palette['display_title'] ?? null,
-                $sets[0]['title'] ?? null,
-                $palette['palette_hash'] ?? $hash,
-                'ColorFix Palette',
-            ]),
+            'title' => $publicTitle,
             'nickname' => $palette['nickname'] ?? null,
             'display_title' => $palette['display_title'] ?? null,
             'notes' => $palette['notes'] ?? '',
@@ -211,10 +227,10 @@ class PaletteViewerService
             'kicker' => $kickerText,
             'palette_type' => $palette['palette_type'] ?? null,
             'set_id' => $fullPhoto['saved_palette_set_id'] ?? ($sets[0]['id'] ?? null),
-            'available_sets' => array_map(static fn(array $set): array => [
+            'available_sets' => array_map(fn(array $set): array => [
                 'id' => isset($set['id']) ? (int)$set['id'] : null,
                 'slug' => $set['slug'] ?? null,
-                'title' => $set['title'] ?? null,
+                'title' => $publicTitle,
                 'is_default' => isset($set['is_default']) ? (int)$set['is_default'] : 0,
             ], $sets),
         ];

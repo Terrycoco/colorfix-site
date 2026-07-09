@@ -344,7 +344,32 @@ final class PdoAssetCreatorRepository
                 $row[$key] = (int)$row[$key];
             }
         }
+        $instructions = $this->decodeJson($row['instructions_json'] ?? null);
+        $reservation = is_array($instructions)
+            ? ($instructions['playlist_instance_url_reservation'] ?? $instructions['source']['playlist_instance_url_reservation'] ?? null)
+            : null;
+        if (is_array($reservation)) {
+            $row['url_reservation_key'] = (string)($reservation['reservation_key'] ?? '');
+            $row['reserved_playlist_slug'] = (string)($reservation['slug'] ?? '');
+            $row['reserved_playlist_url'] = (string)($reservation['public_url'] ?? '');
+            $row['reserved_playlist_path'] = (string)($reservation['path'] ?? '');
+            $row['reserved_playlist_instance_id'] = isset($reservation['playlist_instance_id']) && $reservation['playlist_instance_id'] !== null
+                ? (int)$reservation['playlist_instance_id']
+                : null;
+        }
         return $row;
+    }
+
+    private function decodeJson(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value) || trim($value) === '') {
+            return [];
+        }
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     private function normalizeInputRow(array $row): array

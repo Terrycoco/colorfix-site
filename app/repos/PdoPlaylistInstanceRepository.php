@@ -360,33 +360,33 @@ final class PdoPlaylistInstanceRepository
             }
         }
 
-        if ($this->tableExists('publishing_jobs') && $this->tableExists('publishing_assets')) {
-            $hasPublications = $this->tableExists('publications');
+        if ($this->tableExists('package_batches') && $this->tableExists('packages')) {
+            $hasPublications = $this->tableExists('published_assets');
             $publicationJoin = $hasPublications
-                ? 'LEFT JOIN publications pub ON pub.publishing_asset_id = pa.publishing_asset_id'
+                ? 'LEFT JOIN published_assets pub ON pub.package_id = pa.package_id'
                 : '';
             $publishedConditions = [];
-            if ($this->columnExists('publishing_jobs', 'status')) {
+            if ($this->columnExists('package_batches', 'status')) {
                 $publishedConditions[] = "pj.status IN ('published', 'posted')";
             }
-            if ($this->columnExists('publishing_assets', 'status')) {
+            if ($this->columnExists('packages', 'status')) {
                 $publishedConditions[] = "pa.status IN ('published', 'posted', 'test_published')";
             }
-            if ($this->columnExists('publishing_assets', 'published_at')) {
+            if ($this->columnExists('packages', 'published_at')) {
                 $publishedConditions[] = 'pa.published_at IS NOT NULL';
             }
             if ($hasPublications) {
-                $publishedConditions[] = 'pub.publication_id IS NOT NULL';
+                $publishedConditions[] = 'pub.published_asset_id IS NOT NULL';
             }
             if ($publishedConditions === []) {
                 $publishedConditions[] = '0 = 1';
             }
             $publishedWhere = implode(' OR ', $publishedConditions);
             $stmt = $this->pdo->prepare(
-                "SELECT COUNT(DISTINCT pj.publishing_job_id)
-                   FROM publishing_jobs pj
-                   LEFT JOIN publishing_assets pa
-                     ON pa.publishing_job_id = pj.publishing_job_id
+                "SELECT COUNT(DISTINCT pj.package_batch_id)
+                   FROM package_batches pj
+                   LEFT JOIN packages pa
+                     ON pa.package_batch_id = pj.package_batch_id
                    {$publicationJoin}
                   WHERE pj.playlist_instance_id = :id
                     AND ({$publishedWhere})"

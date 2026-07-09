@@ -324,8 +324,8 @@ class PdoSavedPaletteRepository
                        s.is_default AS set_is_default,
                        sp.photo_library_id,
                        CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.rel_path, '')
-                           ELSE ''
+                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
+                           ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
                        END AS rel_path,
                        sp.photo_type,
                        sp.trigger_mode,
@@ -419,8 +419,8 @@ class PdoSavedPaletteRepository
                        sp.saved_palette_set_id,
                        sp.photo_library_id,
                        CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.rel_path, '')
-                           ELSE ''
+                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
+                           ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
                        END AS rel_path,
                        sp.photo_type,
                        sp.trigger_mode,
@@ -473,8 +473,8 @@ class PdoSavedPaletteRepository
             "SELECT sp.id,
                     sp.photo_library_id,
                     CASE
-                        WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.rel_path, '')
-                        ELSE ''
+                        WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
+                        ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
                     END AS rel_path,
                     sp.photo_type,
                     sp.trigger_mode,
@@ -917,6 +917,7 @@ class PdoSavedPaletteRepository
      *   - brand (string)
      *   - terry_fav (bool|int)
      *   - palette_type (string)
+     *   - color_family (string)
      */
     public function listPalettes(array $filters = [], int $limit = 50, int $offset = 0): array
     {
@@ -936,6 +937,25 @@ class PdoSavedPaletteRepository
         if (!empty($filters['palette_type'])) {
             $where[] = 'p.palette_type = :palette_type';
             $params[':palette_type'] = $filters['palette_type'];
+        }
+
+        if (!empty($filters['color_family'])) {
+            $where[] = "
+                EXISTS (
+                    SELECT 1
+                      FROM saved_palette_members family_members
+                      JOIN swatch_view family_color
+                        ON family_color.id = family_members.color_id
+                     WHERE family_members.saved_palette_id = p.id
+                       AND (
+                            family_color.hue_cats LIKE :color_family_hue
+                         OR family_color.neutral_cats LIKE :color_family_neutral
+                       )
+                )
+            ";
+            $familyLike = '%' . $filters['color_family'] . '%';
+            $params[':color_family_hue'] = $familyLike;
+            $params[':color_family_neutral'] = $familyLike;
         }
 
         if (!empty($filters['q'])) {

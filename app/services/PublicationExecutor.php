@@ -6,16 +6,20 @@ namespace App\Services;
 use App\Lib\SecretBox;
 use App\Repos\PdoPublicationScheduleRepository;
 use App\Repos\PdoPublisherRepository;
-use RuntimeException;
+use App\Services\Publishers\PinterestPublicationPublisher;
+use App\Services\Publishers\PublicationPublisher;
+use App\Services\Publishers\YouTubePublicationPublisher;
 
 final class PublicationExecutor
 {
     public function __construct(
         private PdoPublicationScheduleRepository $scheduleRepo,
         private PdoPublisherRepository $publisherRepo,
-        private ?SecretBox $secretBox = null
+        private ?SecretBox $secretBox = null,
+        private ?array $publishers = null
     ) {
         $this->secretBox = $secretBox ?? new SecretBox();
+        $this->publishers = $publishers ?? $this->defaultPublishers();
     }
 
     public function execute(int $publicationId): array
@@ -38,37 +42,37 @@ final class PublicationExecutor
         }
 
         $platform = strtolower(trim((string)($publication['platform'] ?? '')));
-        return match ($platform) {
-            'pinterest' => $this->executePinterest($publication),
-            'youtube' => $this->failure('not_implemented', 'YouTube publisher execution is not implemented yet.', false),
-            default => $this->failure('unsupported_platform', "Unsupported publisher platform: {$platform}", false),
-        };
+        $publisher = $this->publisherForPlatform($platform);
+        if (!$publisher) {
+            return $this->failure('unsupported_platform', "Unsupported publisher platform: {$platform}", false);
+        }
+
+        return $this->executeWithPublisher($publication, $publisher);
     }
 
-    private function executePinterest(array $publication): array
+    private function executeWithPublisher(array $publication, PublicationPublisher $publisher): array
     {
         $channel = $this->resolveChannel($publication);
         if (!$channel) {
-            return $this->failure('missing_channel', 'Pinterest channel is missing.', false);
+            return $this->failure('missing_channel', ucfirst($publisher->platform()) . ' channel is missing.', false);
         }
 
         try {
-            $service = new PinterestOAuthService($this->publisherRepo, null, $this->secretBox);
-            $result = $service->publishPublishingJob($publication, $channel);
+            $result = $publisher->publish($publication, $channel);
             $this->publisherRepo->createAttempt([
-                'publishing_job_id' => (int)$publication['publishing_job_id'],
-                'publishing_asset_id' => (int)$publication['publishing_asset_id'],
+                'package_batch_id' => (int)$publication['package_batch_id'],
+                'package_id' => (int)$publication['package_id'],
                 'publishing_channel_id' => $publication['publishing_channel_id'] ?? null,
-                'platform' => 'pinterest',
+                'platform' => $publisher->platform(),
                 'environment' => (string)($publication['environment'] ?? 'production'),
-                'publisher_service' => 'PinterestPublisher',
+                'publisher_service' => $publisher->serviceName(),
                 'status' => ((string)($publication['environment'] ?? 'production')) === 'production' ? 'published' : 'test_published',
                 'request_payload_json' => $result['request_payload'] ?? null,
                 'response_payload_json' => $result['response_summary'] ?? null,
                 'external_id' => $result['platform_post_id'] ?? null,
                 'external_url' => $result['published_url'] ?? null,
             ]);
-            $this->scheduleRepo->updatePublicationPublished((int)$publication['publishing_asset_id'], [
+            $this->scheduleRepo->updatePublicationPublished((int)$publication['package_id'], [
                 'status' => ((string)($publication['environment'] ?? 'production')) === 'production' ? 'published' : 'test_published',
                 'external_id' => $result['platform_post_id'] ?? null,
                 'external_url' => $result['published_url'] ?? null,
@@ -81,24 +85,56 @@ final class PublicationExecutor
         } catch (\Throwable $e) {
             $classified = $this->classifyException($e);
             $this->publisherRepo->createAttempt([
-                'publishing_job_id' => (int)$publication['publishing_job_id'],
-                'publishing_asset_id' => (int)$publication['publishing_asset_id'],
+                'package_batch_id' => (int)$publication['package_batch_id'],
+                'package_id' => (int)$publication['package_id'],
                 'publishing_channel_id' => $publication['publishing_channel_id'] ?? null,
-                'platform' => 'pinterest',
+                'platform' => $publisher->platform(),
                 'environment' => (string)($publication['environment'] ?? 'production'),
-                'publisher_service' => 'PinterestPublisher',
+                'publisher_service' => $publisher->serviceName(),
                 'status' => 'failed',
                 'error_code' => $classified['error_code'],
                 'error_message' => $classified['error_message'],
             ]);
             $this->scheduleRepo->updatePublicationError(
-                (int)$publication['publishing_asset_id'],
+                (int)$publication['package_id'],
                 $classified['retryable'] ? 'scheduled_retry_pending' : 'failed',
                 $classified['error_code'],
                 $classified['error_message']
             );
             return $classified;
         }
+    }
+
+    /**
+     * @return array<string, PublicationPublisher>
+     */
+    private function defaultPublishers(): array
+    {
+        return $this->indexPublishers([
+            new PinterestPublicationPublisher($this->publisherRepo, $this->secretBox),
+            new YouTubePublicationPublisher(),
+        ]);
+    }
+
+    /**
+     * @param PublicationPublisher[] $publishers
+     * @return array<string, PublicationPublisher>
+     */
+    private function indexPublishers(array $publishers): array
+    {
+        $indexed = [];
+        foreach ($publishers as $publisher) {
+            if (!$publisher instanceof PublicationPublisher) {
+                continue;
+            }
+            $indexed[$publisher->platform()] = $publisher;
+        }
+        return $indexed;
+    }
+
+    private function publisherForPlatform(string $platform): ?PublicationPublisher
+    {
+        return $this->publishers[$platform] ?? null;
     }
 
     private function resolveChannel(array $publication): ?array
@@ -132,6 +168,9 @@ final class PublicationExecutor
         $code = 'publisher_error';
         if (str_contains($lower, 'expired') || str_contains($lower, 'not connected') || str_contains($lower, 'scope')) {
             $code = 'auth_required';
+            $retryable = false;
+        } elseif (str_contains($lower, 'not implemented')) {
+            $code = 'not_implemented';
             $retryable = false;
         } elseif (str_contains($lower, 'not ready') || str_contains($lower, 'missing')) {
             $code = 'invalid_payload';

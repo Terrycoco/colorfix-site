@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../db.php';
 use App\Entities\PlaylistInstance;
 use App\Repos\PdoAudienceTypeRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
+use App\Repos\PdoPlaylistInstanceUrlReservationRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -34,6 +35,7 @@ $id = isset($payload['playlist_instance_id']) ? (int)$payload['playlist_instance
 $playlistId = isset($payload['playlist_id']) ? (int)$payload['playlist_id'] : 0;
 $instanceName = trim((string)($payload['instance_name'] ?? ''));
 $slug = trim((string)($payload['slug'] ?? $payload['playlist_slug'] ?? ''));
+$urlReservationKey = trim((string)($payload['url_reservation_key'] ?? $payload['playlist_instance_url_reservation_key'] ?? ''));
 $allowSlugEdit = !empty($payload['allow_slug_edit']);
 $displayTitle = trim((string)($payload['display_title'] ?? ''));
 $displaySubtitle = trim((string)($payload['display_subtitle'] ?? ''));
@@ -67,6 +69,23 @@ if ($introLayout === '') {
 }
 
 try {
+    $reservationRepo = new PdoPlaylistInstanceUrlReservationRepository($pdo);
+    $urlReservation = $urlReservationKey !== '' ? $reservationRepo->findByKey($urlReservationKey) : null;
+    if ($urlReservationKey !== '' && !$urlReservation) {
+        respond(['ok' => false, 'error' => 'URL reservation not found'], 400);
+    }
+    if ($urlReservation) {
+        if ((int)($urlReservation['playlist_id'] ?? 0) !== $playlistId) {
+            respond(['ok' => false, 'error' => 'URL reservation does not belong to this playlist'], 400);
+        }
+        $slug = trim((string)($urlReservation['slug'] ?? ''));
+    } elseif ($slug !== '') {
+        $reservedSlug = $reservationRepo->findBySlug($slug);
+        if ($reservedSlug && empty($reservedSlug['playlist_instance_id'])) {
+            respond(['ok' => false, 'error' => 'Slug is reserved for a future playlist instance'], 409);
+        }
+    }
+
     if ($id !== null && $id > 0 && !$allowSlugEdit) {
         $existing = $repo->getById($id);
         if ($existing) {
@@ -105,12 +124,21 @@ try {
     );
 
     $instance = $repo->save($instance);
+    $claimedReservation = null;
+    if ($urlReservation) {
+        $claimedReservation = $reservationRepo->claim(
+            $urlReservationKey,
+            (int)$instance->id,
+            (string)($instance->slug ?? $slug)
+        );
+    }
 
     respond([
         'ok' => true,
         'playlist_instance_id' => $instance->id,
         'slug' => $instance->slug,
         'player_url' => $instance->slug ? '/playlist/' . $instance->slug : '/playlist/' . $instance->id,
+        'url_reservation' => $claimedReservation,
     ]);
 } catch (\Throwable $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 500);

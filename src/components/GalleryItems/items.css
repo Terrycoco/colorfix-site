@@ -126,6 +126,36 @@
   margin-bottom: 0.25rem;
 }
 
+.search-display__with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.search-display__icon {
+  width: 1.05em;
+  height: 1.05em;
+  color: currentColor;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.search-display__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.search-display__icon .palette-fill {
+  fill: none;
+}
+
+.search-display__icon .palette-dot {
+  fill: currentColor;
+  stroke: none;
+}
+
 .search-display__brand-image {
   width: 9rem;
   height: auto;

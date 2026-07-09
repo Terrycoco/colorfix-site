@@ -10,9 +10,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $scheduleId = (int)($payload['publication_schedule_id'] ?? $payload['schedule_id'] ?? 0);
+    $scheduleId = (int)($payload['queue_item_id'] ?? $payload['schedule_id'] ?? $payload['publication_schedule_id'] ?? 0);
     $scheduledAt = trim((string)($payload['scheduled_at'] ?? ''));
-    if ($scheduleId <= 0) throw new RuntimeException('publication_schedule_id required');
+    if ($scheduleId <= 0) throw new RuntimeException('queue_item_id required');
     if ($scheduledAt === '') throw new RuntimeException('scheduled_at required');
     $service = scheduler_service($pdo);
     scheduler_respond(['ok' => true, 'item' => $service->reschedule($scheduleId, $scheduledAt, $payload)]);

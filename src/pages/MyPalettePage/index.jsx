@@ -60,6 +60,19 @@ function getExportTextColor(color, hexLike) {
   return luminance > 0.62 ? "#111111" : "#ffffff";
 }
 
+const SAVE_BRAND_CHOICES = [
+  { code: "", label: "Pick Brand" },
+  { code: "de", label: "Dunn Edwards" },
+  { code: "sw", label: "Sherwin-Williams" },
+  { code: "behr", label: "Behr" },
+  { code: "bm", label: "Benjamin Moore" },
+  { code: "multi", label: "Multi" },
+  { code: "ppg", label: "PPG" },
+  { code: "vs", label: "Valspar" },
+  { code: "vist", label: "Vista Paint" },
+  { code: "fb", label: "Farrow & Ball" },
+];
+
 /* ---------- Component ---------- */
 export default function MyPalettePage() {
   const {
@@ -1287,15 +1300,19 @@ const activeBrandCodes = useMemo(() => {
                 )}
               </label>
               <label>
-                Brand Code
-                <input
+                Brand
+                <select
                   name="brand"
-                  type="text"
                   value={saveForm.brand}
                   onChange={handleSaveFieldChange}
-                  placeholder="e.g., de, sw"
                   required
-                />
+                >
+                  {SAVE_BRAND_CHOICES.map((brand) => (
+                    <option key={brand.code || "pick"} value={brand.code}>
+                      {brand.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Nickname

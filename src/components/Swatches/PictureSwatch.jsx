@@ -1,5 +1,3 @@
-// PictureSwatch.jsx
-import { useNavigate } from "react-router-dom";
 import { photoThumbUrl } from "@helpers/imageThumb";
 import "./swatches.css";
 
@@ -10,41 +8,26 @@ export default function PictureSwatch({
   meta,
   to,
   onClick,
+  markerId,
   widthPercent = 20,
 }) {
-  const navigate = useNavigate();
   const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
   const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
   const imageUrl = smallImageUrl || photoUrl;
   const imageSrcSet = smallImageUrl && largeImageUrl
     ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
     : undefined;
+  const href = to || photoUrl || "";
 
   const go = () => {
     if (onClick) {
       onClick();
       return;
     }
-    if (to) {
-      navigate(to);
-    }
   };
 
-  return (
-    <div
-      className="pals-swatch pals-photo"
-      style={{ "--pals-width": `${widthPercent}%` }}
-      onClick={go}
-      role={to || onClick ? "button" : undefined}
-      tabIndex={to || onClick ? 0 : undefined}
-      onKeyDown={(e) => {
-        if (!to && !onClick) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          go();
-        }
-      }}
-    >
+  const content = (
+    <>
       <div className="pals-fill pals-photo-fill">
         {imageUrl && (
           <img
@@ -58,6 +41,46 @@ export default function PictureSwatch({
           />
         )}
       </div>
+    </>
+  );
+
+  const commonProps = {
+    className: "pals-swatch pals-photo",
+    id: markerId || undefined,
+    style: { "--pals-width": `${widthPercent}%` },
+  };
+
+  if (href) {
+    return (
+      <a
+        {...commonProps}
+        href={href}
+        onClick={() => {
+          if (markerId && typeof window !== "undefined" && window.history) {
+            window.history.replaceState(null, "", `#${markerId}`);
+          }
+        }}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div
+      {...commonProps}
+      onClick={go}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!onClick) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          go();
+        }
+      }}
+    >
+      {content}
     </div>
   );
 }

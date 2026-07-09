@@ -128,6 +128,43 @@ final class PdoPublisherRepository
         return $this->findChannelByKey('pinterest_colorfix_makeovers') ?? [];
     }
 
+    public function upsertYouTubeChannel(): array
+    {
+        $existing = $this->findChannelByKey('youtube_colorfix');
+        if ($existing) {
+            return $existing;
+        }
+
+        $metadata = [
+            'environment' => 'production',
+            'auth' => [
+                'status' => 'not_connected',
+                'granted_scopes' => [],
+                'connected_at' => null,
+                'last_auth_error' => null,
+            ],
+        ];
+
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO publishing_channels
+                (platform, channel_key, publisher_service, label, account_name, status, api_base_url, metadata_json)
+             VALUES
+                (:platform, :channel_key, :publisher_service, :label, :account_name, :status, :api_base_url, :metadata_json)'
+        );
+        $stmt->execute([
+            ':platform' => 'youtube',
+            ':channel_key' => 'youtube_colorfix',
+            ':publisher_service' => 'YouTubePublisher',
+            ':label' => 'ColorFix YouTube',
+            ':account_name' => 'ColorFix by Terry',
+            ':status' => 'pending_auth',
+            ':api_base_url' => 'https://www.googleapis.com/youtube/v3',
+            ':metadata_json' => json_encode($metadata, JSON_UNESCAPED_SLASHES),
+        ]);
+
+        return $this->findChannelByKey('youtube_colorfix') ?? [];
+    }
+
     public function updateChannelAuth(int $channelId, array $encrypted, ?string $expiresAt, array $metadata, string $status = 'connected'): void
     {
         $stmt = $this->pdo->prepare(
@@ -211,22 +248,32 @@ final class PdoPublisherRepository
 
     public function createAttempt(array $data): int
     {
+        $package = null;
+        $packageId = $this->nullableInt($data['package_id'] ?? null);
+        if ($packageId !== null) {
+            $package = $this->findPublishingJobByPublishOutputId($packageId);
+        }
         $stmt = $this->pdo->prepare(
             'INSERT INTO publisher_attempts
-                (publishing_job_id, publishing_asset_id, publication_id, publishing_channel_id, platform, environment,
+                (queue_item_id, package_batch_id, package_id, analyzer_job_id, creator_job_id, source_asset_id,
+                 publishing_channel_id, platform, environment,
                  publisher_service, attempt_number, status,
                  request_payload_json, response_payload_json, external_post_id, external_post_url, error_code, error_message,
                  started_at, finished_at)
              VALUES
-                (:publishing_job_id, :publishing_asset_id, :publication_id, :publishing_channel_id, :platform, :environment,
+                (:queue_item_id, :package_batch_id, :package_id, :analyzer_job_id, :creator_job_id, :source_asset_id,
+                 :publishing_channel_id, :platform, :environment,
                  :publisher_service, :attempt_number, :status,
                  :request_payload_json, :response_payload_json, :external_post_id, :external_post_url, :error_code, :error_message,
                  UTC_TIMESTAMP(), UTC_TIMESTAMP())'
         );
         $stmt->execute([
-            ':publishing_job_id' => (int)$data['publishing_job_id'],
-            ':publishing_asset_id' => $this->nullableInt($data['publishing_asset_id'] ?? null),
-            ':publication_id' => $this->nullableInt($data['publication_id'] ?? null),
+            ':queue_item_id' => $this->nullableInt($data['queue_item_id'] ?? null),
+            ':package_batch_id' => (int)$data['package_batch_id'],
+            ':package_id' => $packageId,
+            ':analyzer_job_id' => $this->nullableInt($data['analyzer_job_id'] ?? ($package['analyzer_job_id'] ?? null)),
+            ':creator_job_id' => $this->nullableInt($data['creator_job_id'] ?? ($package['creator_job_id'] ?? null)),
+            ':source_asset_id' => $this->nullableInt($data['source_asset_id'] ?? ($package['source_asset_id'] ?? null)),
             ':publishing_channel_id' => $this->nullableInt($data['publishing_channel_id'] ?? null),
             ':platform' => (string)$data['platform'],
             ':environment' => (string)($data['environment'] ?? 'production'),
@@ -245,81 +292,120 @@ final class PdoPublisherRepository
 
     public function findPublishingJobByPublishOutputId(int $publishOutputId): ?array
     {
-        if (!$this->tableExists('publishing_jobs')) {
+        if (!$this->tableExists('package_batches')) {
             return null;
         }
         $stmt = $this->pdo->prepare(
             'SELECT
                 pa.*,
-                pa.publishing_asset_id AS publish_output_id,
-                pa.publishing_asset_id,
-                pj.publishing_job_id,
+                pa.package_id AS publish_output_id,
+                pa.package_id,
+                pj.package_batch_id,
                 pj.title AS job_title
-               FROM publishing_assets pa
-               JOIN publishing_jobs pj
-                 ON pj.publishing_job_id = pa.publishing_job_id
-              WHERE pa.publishing_asset_id = :publish_output_id
+               FROM packages pa
+               JOIN package_batches pj
+                 ON pj.package_batch_id = pa.package_batch_id
+              WHERE pa.package_id = :publish_output_id
               LIMIT 1'
         );
         $stmt->execute([':publish_output_id' => $publishOutputId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) return null;
-        $row['publishing_job_id'] = (int)$row['publishing_job_id'];
-        $row['publishing_asset_id'] = (int)$row['publishing_asset_id'];
+        $row['package_batch_id'] = (int)$row['package_batch_id'];
+        $row['package_id'] = (int)$row['package_id'];
+        $row['publish_job_id'] = $row['package_batch_id'];
+        $row['publishing_job_id'] = $row['package_batch_id'];
+        $row['publish_output_id'] = (int)$row['publish_output_id'];
+        $row['publishing_asset_id'] = $row['package_id'];
         $row['publishing_channel_id'] = $row['publishing_channel_id'] !== null ? (int)$row['publishing_channel_id'] : null;
         return $row;
     }
 
     public function updatePublishingJobTestPublication(int $publishingJobId, array $metadata, ?string $externalId, ?string $externalUrl, ?string $lastErrorCode = null, ?string $lastErrorMessage = null): void
     {
-        $assetId = (int)($metadata['publishing_asset_id'] ?? $metadata['publish_output_id'] ?? 0);
+        $assetId = (int)($metadata['package_id'] ?? $metadata['publish_output_id'] ?? 0);
         if ($assetId <= 0) {
             $stmt = $this->pdo->prepare(
-                'SELECT publishing_asset_id
-                   FROM publishing_assets
-                  WHERE publishing_job_id = :publishing_job_id
-                  ORDER BY publishing_asset_id DESC
+                'SELECT package_id
+                   FROM packages
+                  WHERE package_batch_id = :package_batch_id
+                  ORDER BY package_id DESC
                   LIMIT 1'
             );
-            $stmt->execute([':publishing_job_id' => $publishingJobId]);
+            $stmt->execute([':package_batch_id' => $publishingJobId]);
             $assetId = (int)($stmt->fetchColumn() ?: 0);
         }
         if ($assetId <= 0) return;
 
         $stmt = $this->pdo->prepare(
-            'UPDATE publishing_assets
+            'UPDATE packages
                 SET metadata_json = :metadata_json,
+                    status = CASE WHEN :external_id IS NOT NULL THEN :published_status ELSE status END,
                     last_error_code = :last_error_code,
                     last_error_message = :last_error_message,
                     published_at = CASE WHEN :external_id IS NOT NULL THEN COALESCE(published_at, UTC_TIMESTAMP()) ELSE published_at END
-              WHERE publishing_asset_id = :publishing_asset_id'
+              WHERE package_id = :package_id'
         );
+        $publishedStatus = (($metadata['test_publication']['environment'] ?? $metadata['production_publication']['environment'] ?? 'test') === 'production')
+            ? 'published'
+            : 'test_published';
         $stmt->execute([
             ':metadata_json' => json_encode($metadata, JSON_UNESCAPED_SLASHES),
+            ':published_status' => $publishedStatus,
             ':last_error_code' => $lastErrorCode,
             ':last_error_message' => $lastErrorMessage,
             ':external_id' => $externalId,
-            ':publishing_asset_id' => $assetId,
+            ':package_id' => $assetId,
         ]);
 
         if ($externalId !== null || $externalUrl !== null) {
             $asset = $this->findPublishingJobByPublishOutputId($assetId);
             if ($asset) {
                 $publication = $this->pdo->prepare(
-                    'INSERT INTO publications
-                        (publishing_job_id, publishing_asset_id, publishing_channel_id, platform, environment, status,
+                    'INSERT INTO published_assets
+                        (package_batch_id, package_id, publishing_channel_id, platform, environment, status,
+                         source_type, source_id, analyzer_job_id, creator_job_id, source_asset_id,
+                         asset_library_id, playlist_instance_id, cta_group_id, landing_page_id, asset_type,
+                         title, description, alt_text, media_url, destination_url, canonical_destination_url,
+                         tracked_destination_url, board_id, board_name, board_url, board_slug, duplicate_fingerprint,
                          external_post_id, external_post_url, response_payload_json, metadata_json, published_at)
                      VALUES
-                        (:publishing_job_id, :publishing_asset_id, :publishing_channel_id, :platform, :environment, :status,
+                        (:package_batch_id, :package_id, :publishing_channel_id, :platform, :environment, :status,
+                         :source_type, :source_id, :analyzer_job_id, :creator_job_id, :source_asset_id,
+                         :asset_library_id, :playlist_instance_id, :cta_group_id, :landing_page_id, :asset_type,
+                         :title, :description, :alt_text, :media_url, :destination_url, :canonical_destination_url,
+                         :tracked_destination_url, :board_id, :board_name, :board_url, :board_slug, :duplicate_fingerprint,
                          :external_post_id, :external_post_url, :response_payload_json, :metadata_json, UTC_TIMESTAMP())'
                 );
                 $publication->execute([
-                    ':publishing_job_id' => (int)$asset['publishing_job_id'],
-                    ':publishing_asset_id' => $assetId,
+                    ':package_batch_id' => (int)$asset['package_batch_id'],
+                    ':package_id' => $assetId,
                     ':publishing_channel_id' => $asset['publishing_channel_id'] ?? null,
                     ':platform' => $asset['platform'] ?? 'pinterest',
                     ':environment' => $asset['environment'] ?? 'test',
                     ':status' => ($asset['environment'] ?? 'test') === 'production' ? 'published' : 'test_published',
+                    ':source_type' => $asset['source_type'] ?? null,
+                    ':source_id' => $asset['source_id'] ?? null,
+                    ':analyzer_job_id' => $asset['analyzer_job_id'] ?? null,
+                    ':creator_job_id' => $asset['creator_job_id'] ?? null,
+                    ':source_asset_id' => $asset['source_asset_id'] ?? null,
+                    ':asset_library_id' => $asset['asset_library_id'] ?? null,
+                    ':playlist_instance_id' => $asset['playlist_instance_id'] ?? null,
+                    ':cta_group_id' => $asset['cta_group_id'] ?? null,
+                    ':landing_page_id' => $asset['landing_page_id'] ?? null,
+                    ':asset_type' => $asset['asset_type'] ?? null,
+                    ':title' => $asset['title'] ?? null,
+                    ':description' => $asset['description'] ?? null,
+                    ':alt_text' => $asset['alt_text'] ?? null,
+                    ':media_url' => $asset['media_url'] ?? ($asset['image_url'] ?? null),
+                    ':destination_url' => $asset['destination_url'] ?? null,
+                    ':canonical_destination_url' => $asset['canonical_destination_url'] ?? null,
+                    ':tracked_destination_url' => $asset['tracked_destination_url'] ?? null,
+                    ':board_id' => $asset['board_id'] ?? null,
+                    ':board_name' => $asset['board_name'] ?? null,
+                    ':board_url' => $asset['board_url'] ?? null,
+                    ':board_slug' => $asset['board_slug'] ?? null,
+                    ':duplicate_fingerprint' => $asset['duplicate_fingerprint'] ?? null,
                     ':external_post_id' => $externalId,
                     ':external_post_url' => $externalUrl,
                     ':response_payload_json' => $this->jsonValue($metadata[$asset['environment'] . '_publication'] ?? null),
@@ -331,17 +417,17 @@ final class PdoPublisherRepository
 
     public function createPublishingJob(array $data): ?int
     {
-        if (!$this->tableExists('publishing_jobs')) {
+        if (!$this->tableExists('package_batches')) {
             return null;
         }
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO publishing_jobs (
+            'INSERT INTO package_batches (
                 publishing_channel_id, platform, environment, source_type, source_id,
-                title, description, status, metadata_json, published_at
+                title, description, status, metadata_json
              ) VALUES (
                 :publishing_channel_id, :platform, :environment, :source_type, :source_id,
-                :title, :description, :status, :metadata_json, :published_at
+                :title, :description, :status, :metadata_json
              )'
         );
         $stmt->execute([
@@ -354,7 +440,6 @@ final class PdoPublisherRepository
             ':description' => $this->nullableString($data['description'] ?? null),
             ':status' => $this->nullableString($data['status'] ?? null) ?: 'draft',
             ':metadata_json' => $this->jsonValue($data['metadata_json'] ?? null),
-            ':published_at' => $this->nullableString($data['published_at'] ?? null),
         ]);
         return (int)$this->pdo->lastInsertId();
     }

@@ -10,9 +10,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $publicationId = (int)($payload['publishing_asset_id'] ?? $payload['publish_output_id'] ?? $payload['publication_id'] ?? 0);
+    $publicationId = (int)($payload['package_id'] ?? $payload['publish_output_id'] ?? $payload['published_asset_id'] ?? 0);
     $scheduledAt = trim((string)($payload['scheduled_at'] ?? ''));
-    if ($publicationId <= 0) throw new RuntimeException('publishing_asset_id required');
+    if ($publicationId <= 0) throw new RuntimeException('package_id required');
     $service = scheduler_service($pdo);
     $item = $scheduledAt === ''
         ? $service->scheduleNextAvailable($publicationId, $payload)

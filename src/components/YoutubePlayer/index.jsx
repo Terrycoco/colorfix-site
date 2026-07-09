@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AnimatedHueWheel from "../AnimatedHueWheel";
+import BrandBumperLogo from "../BrandBumperLogo";
+import { YOUTUBE_VIDEO_TIMING } from "../../remotion/youtubeVideoTiming.js";
 import {
   extractAssetId,
   fetchAssetUrl,
@@ -15,6 +17,9 @@ export default function YoutubePlayer({
   imageComponent: ImageComponent = "img",
   imageOpacity = 1,
   captionOpacity = 1,
+  localMs = 0,
+  slideDurationMs = 0,
+  videoTiming = {},
   showCaption = true,
   transparentBackground = false,
 }) {
@@ -23,6 +28,7 @@ export default function YoutubePlayer({
   const itemType = String(currentItem?.type || "normal").toLowerCase().trim();
   const isTextSlide = itemType === "intro" || itemType === "text";
   const isHueWheel = itemType === "hue-wheel";
+  const isBrandBumper = itemType === "brand-bumper";
   const hueWheelConfig = useMemo(() => parseHueWheelConfig(currentItem?.body), [currentItem?.body]);
   const immediateImageUrl = useMemo(
     () => resolveImmediateImageUrl(currentItem?.image_url || "", isHueWheel),
@@ -98,6 +104,26 @@ export default function YoutubePlayer({
     );
   }
 
+  if (isBrandBumper) {
+    const config = parseBrandBumperConfig(currentItem?.body);
+    const revealDelayMs = Number(videoTiming.signature_reveal_delay_ms || config.signatureRevealDelayMs || YOUTUBE_VIDEO_TIMING.signatureRevealDelayMs);
+    const revealDurationMs = Number(videoTiming.signature_reveal_duration_ms || config.signatureRevealDurationMs || YOUTUBE_VIDEO_TIMING.signatureRevealDurationMs);
+    const durationMs = Math.max(
+      YOUTUBE_VIDEO_TIMING.defaultBrandBumperDurationMs,
+      Number(slideDurationMs || currentItem?.duration_ms || videoTiming.default_brand_bumper_duration_ms || YOUTUBE_VIDEO_TIMING.defaultBrandBumperDurationMs),
+    );
+    const revealProgress = signatureWriteProgress((Number(localMs || 0) - revealDelayMs) / Math.max(1, revealDurationMs));
+    const fadeIn = clamp01(Number(localMs || 0) / 420);
+    const fadeOutStart = Math.max(0, durationMs - 420);
+    const fadeOut = durationMs > 0 ? 1 - clamp01((Number(localMs || 0) - fadeOutStart) / 420) : 1;
+    const logoOpacity = imageOpacity * fadeIn * fadeOut;
+    return (
+      <div className={`${rootClassName} youtube-player-brand-bumper`}>
+        <BrandBumperLogo signatureProgress={revealProgress} style={{ opacity: logoOpacity }} />
+      </div>
+    );
+  }
+
   if (isTextSlide || !imageUrl) {
     return (
       <div className={rootClassName}>
@@ -126,6 +152,72 @@ export default function YoutubePlayer({
       )}
     </div>
   );
+}
+
+function clamp01(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function signatureWriteProgress(rawValue) {
+  const value = clamp01(rawValue);
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  const points = [
+    [0, 0],
+    [0.1, 0.14],
+    [0.16, 0.16],
+    [0.34, 0.43],
+    [0.39, 0.45],
+    [0.58, 0.7],
+    [0.64, 0.72],
+    [0.82, 0.9],
+    [0.88, 0.91],
+    [1, 1],
+  ];
+  for (let i = 1; i < points.length; i += 1) {
+    const [x1, y1] = points[i - 1];
+    const [x2, y2] = points[i];
+    if (value <= x2) {
+      const local = (value - x1) / Math.max(0.001, x2 - x1);
+      const eased = local < 0.5 ? 2 * local * local : 1 - Math.pow(-2 * local + 2, 2) / 2;
+      return y1 + ((y2 - y1) * eased);
+    }
+  }
+  return value;
+}
+
+function parseBrandBumperConfig(rawBody) {
+  const fallback = {
+    signatureRevealDelayMs: YOUTUBE_VIDEO_TIMING.signatureRevealDelayMs,
+    signatureRevealDurationMs: YOUTUBE_VIDEO_TIMING.signatureRevealDurationMs,
+    auto_advance: true,
+    requires_tap: false,
+    signatureSound: {
+      enabled: true,
+      src: "",
+      cueMs: YOUTUBE_VIDEO_TIMING.signatureRevealDelayMs,
+      volume: 0.075,
+      note: "uses synthetic pencil scratch unless src is provided",
+    },
+  };
+  const raw = String(rawBody || "").trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return fallback;
+    return {
+      ...fallback,
+      ...parsed,
+      signatureSound: {
+        ...fallback.signatureSound,
+        ...(parsed.signatureSound && typeof parsed.signatureSound === "object" ? parsed.signatureSound : {}),
+      },
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 function resolveImmediateImageUrl(value, isHueWheel) {

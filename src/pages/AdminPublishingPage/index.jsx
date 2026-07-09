@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import { dateTimeSortValue, formatDateTime } from "@helpers/time";
 import PermissionStatus from "@components/PermissionStatus";
 import "./admin-publishing.css";
 
-const JOBS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/list.php`;
+const JOBS_URL = `${API_FOLDER}/v2/admin/packager/pinterest/list.php`;
 const SAVE_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/save.php`;
-const PREPARE_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/prepare-from-creator.php`;
+const PREPARE_PINTEREST_URL = `${API_FOLDER}/v2/admin/packager/pinterest/package-from-creator.php`;
 const MARK_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/mark-published.php`;
 const PINTEREST_AUTH_STATUS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/auth-status.php`;
 const PINTEREST_CONNECT_URL = `${API_FOLDER}/pinterest/connect`;
 const PINTEREST_SYNC_BOARDS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/sync-boards.php`;
-const PINTEREST_DRY_RUN_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/dry-run.php`;
+const YOUTUBE_AUTH_STATUS_URL = `${API_FOLDER}/v2/admin/publishing/youtube/auth-status.php`;
+const YOUTUBE_CONNECT_URL = `${API_FOLDER}/youtube/connect`;
+const YOUTUBE_PUBLISHER_CONNECT_URL = `${YOUTUBE_CONNECT_URL}?return=${encodeURIComponent("/admin/publisher")}`;
 const PINTEREST_PUBLISH_TEST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/publish-test.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
@@ -20,8 +23,9 @@ const LANDING_PAGES_URL = `${API_FOLDER}/v2/admin/landing-pages/list.php`;
 const CREATOR_JOBS_URL = `${API_FOLDER}/v2/admin/asset-creators/list.php`;
 const CTA_PAGES_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 const SCHEDULER_SCHEDULE_URL = `${API_FOLDER}/v2/admin/publication-scheduler/schedule.php`;
-const SCHEDULER_SCHEDULE_JOB_URL = `${API_FOLDER}/v2/admin/publication-scheduler/schedule-job.php`;
+const SCHEDULER_SCHEDULE_JOB_URL = `${API_FOLDER}/v2/admin/publication-scheduler/schedule-package-batch.php`;
 const SCHEDULER_DELETE_UNSCHEDULED_URL = `${API_FOLDER}/v2/admin/publication-scheduler/delete-unscheduled.php`;
+const SCHEDULER_PUBLISH_NOW_URL = `${API_FOLDER}/v2/admin/publication-scheduler/publish-now.php`;
 
 const assetTypes = [
   {
@@ -78,7 +82,7 @@ const emptySetupForm = {
 
 const publishingChannels = [
   { value: "pinterest", label: "Pinterest", enabled: true },
-  { value: "youtube", label: "YouTube", enabled: false },
+  { value: "youtube", label: "YouTube", enabled: true },
   { value: "instagram", label: "Instagram", enabled: false },
 ];
 
@@ -124,36 +128,21 @@ export default function AdminPublishingPage() {
   const [setupSaving, setSetupSaving] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [pinterestStatus, setPinterestStatus] = useState(null);
+  const [youtubeStatus, setYoutubeStatus] = useState(null);
   const [pinterestSyncing, setPinterestSyncing] = useState(false);
-  const [dryRun, setDryRun] = useState(null);
   const [openConnection, setOpenConnection] = useState(false);
   const [previewInstance, setPreviewInstance] = useState(null);
   const [listMode, setListMode] = useState("published");
+  const [channelFilter, setChannelFilter] = useState("pinterest");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const selectedChannel = setupForm.platform || "pinterest";
+  const selectedChannel = channelFilter || "pinterest";
   const channelLabel = publishingChannels.find((channel) => channel.value === selectedChannel)?.label || selectedChannel;
 
   const rows = useMemo(() => {
     return jobs.flatMap((job) =>
-      (job.outputs || []).map((output) => {
-        const metadata = parseMetadata(output.metadata_json);
-        return {
-          ...output,
-          board_name: metadata.board_name || metadata.board || "",
-          board_url: metadata.board_url || "",
-          board_slug: metadata.board_slug || "",
-          board_id: metadata.board_id || "",
-          publish_job_id: job.publish_job_id,
-          source_type: job.source_type,
-          source_id: job.source_id,
-          job_status: job.status,
-          job_title: job.title,
-          playlist_title: job.playlist_title,
-          instance_title: job.instance_display_title || job.instance_name || "",
-        };
-      })
+      (job.outputs || []).map((output) => hydrateDisplayRow(job, output))
     );
   }, [jobs]);
 
@@ -162,14 +151,14 @@ export default function AdminPublishingPage() {
   }, [rows, selectedChannel]);
 
   const channelTotals = useMemo(() => buildChannelTotals(rows), [rows]);
+  const channelOptions = useMemo(() => buildChannelOptions(channelTotals), [channelTotals]);
 
   const visibleRows = useMemo(() => {
     return channelRows.filter((row) => {
-      if (listMode === "published" && !isPublishedRow(row)) return false;
-      if (listMode === "prepared" && isPublishedRow(row)) return false;
-      return rowInDateRange(row, listMode, dateFrom, dateTo);
+      if (!isPublisherVisibleRow(row)) return false;
+      return rowInDateRange(row, "published", dateFrom, dateTo);
     });
-  }, [channelRows, dateFrom, dateTo, listMode]);
+  }, [channelRows, dateFrom, dateTo]);
 
   const sortedRows = useMemo(() => {
     const direction = sort.direction === "asc" ? 1 : -1;
@@ -209,6 +198,7 @@ export default function AdminPublishingPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authStatus = params.get("pinterest_auth");
+    const youtubeAuthStatus = params.get("youtube_auth");
     const message = params.get("message");
     if (authStatus) {
       if (authStatus === "connected") {
@@ -218,11 +208,22 @@ export default function AdminPublishingPage() {
       }
       window.history.replaceState({}, "", window.location.pathname);
     }
+    if (youtubeAuthStatus) {
+      setChannelFilter("youtube");
+      setOpenConnection(true);
+      if (youtubeAuthStatus === "connected") {
+        setStatus(message || "YouTube connected.");
+      } else {
+        setError(message || `YouTube OAuth ${youtubeAuthStatus}.`);
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     fetchPlaylists();
     fetchLandingPages();
     fetchCreatorJobs();
     fetchCtaPages();
     fetchPinterestStatus();
+    fetchYoutubeStatus();
     fetchJobs();
   }, []);
 
@@ -245,9 +246,12 @@ export default function AdminPublishingPage() {
       const res = await fetch(`${JOBS_URL}?${params.toString()}`, { credentials: "include" });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load publishing records");
-      setJobs(data.items || []);
+      const items = data.items || [];
+      setJobs(items);
+      return items;
     } catch (err) {
       setError(err?.message || "Failed to load publishing records");
+      return null;
     } finally {
       setLoading(false);
     }
@@ -295,6 +299,17 @@ export default function AdminPublishingPage() {
       setPinterestStatus(data.item || null);
     } catch (err) {
       setError(err?.message || "Failed to load Pinterest status");
+    }
+  }
+
+  async function fetchYoutubeStatus() {
+    try {
+      const res = await fetch(`${YOUTUBE_AUTH_STATUS_URL}?_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load YouTube status");
+      setYoutubeStatus(data.item || null);
+    } catch (err) {
+      setError(err?.message || "Failed to load YouTube status");
     }
   }
 
@@ -435,12 +450,12 @@ export default function AdminPublishingPage() {
       });
       const existingData = await existingRes.json();
       if (!existingRes.ok || !existingData?.ok) throw new Error(existingData?.error || "Failed to check existing instances");
-      const existing = (existingData.items || []).find((instance) => (
-        Number(instance.cta_group_id || 0) === ctaGroupId
-        && String(instance.audience || "") === "pinterest"
-        && String(instance.slug || instance.playlist_slug || "") === slug
-        && String(instance.instance_notes || "").includes(marker)
-      ));
+      const existing = findPublisherInstance(existingData.items || [], {
+        ctaGroupId,
+        platform,
+        destinationKey,
+        creatorJobId: job.asset_creator_job_id,
+      });
 
       if (existing) {
         const result = {
@@ -502,13 +517,13 @@ export default function AdminPublishingPage() {
     }
   }
 
-  async function preparePublisherJobs(options = {}) {
+  async function packageForScheduler(options = {}) {
     const maxOutputs = Number(options.maxOutputs || 0);
     setPreparing(true);
     setError("");
     setStatus("");
     try {
-      if (setupForm.platform !== "pinterest") throw new Error(`${channelLabel} publisher setup is not wired yet.`);
+      if (setupForm.platform !== "pinterest") throw new Error(`${channelLabel} packager setup is not wired yet.`);
       const instance = setupResult?.playlist_instance_id ? setupResult : await ensurePublisherInstance({ openPreview: false });
       if (!instance?.playlist_instance_id) throw new Error("Create or preview the playlist instance first.");
       const res = await fetch(PREPARE_PINTEREST_URL, {
@@ -526,10 +541,11 @@ export default function AdminPublishingPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to prepare publishing jobs");
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to package creator outputs");
       const item = data.item || {};
       const scope = maxOutputs > 0 ? `first ${maxOutputs}` : "all";
-      const scheduleResult = await schedulePreparedJob(item.publishing_job_id || item.publish_job_id);
+      const batchId = item.package_batch_id || item.publishing_job_id || item.publish_job_id;
+      const scheduleResult = await sendPackageBatchToScheduler(batchId);
       const scheduledText = scheduleResult.enqueued > 0
         ? ` Added ${scheduleResult.enqueued} missing.`
         : "";
@@ -539,30 +555,30 @@ export default function AdminPublishingPage() {
       const blockedText = scheduleResult.skipped > 0
         ? ` ${scheduleResult.skipped} skipped.`
         : "";
-      setStatus(`Sent missing ${scope} publishing job row${maxOutputs === 1 ? "" : "s"} to Scheduler for batch #${item.publishing_job_id}: ${item.created_outputs || 0} new, ${item.reused_outputs || 0} reused.${scheduledText}${skippedText}${blockedText}`);
+      setStatus(`Packaged ${scope} creator output${maxOutputs === 1 ? "" : "s"} and sent missing packages to Scheduler for batch #${batchId}: ${item.created_packages ?? item.created_outputs ?? 0} new, ${item.reused_packages ?? item.reused_outputs ?? 0} reused.${scheduledText}${skippedText}${blockedText}`);
       setQ("");
       await fetchJobs("");
     } catch (err) {
-      setError(err?.message || "Failed to send publishing jobs to scheduler");
+      setError(err?.message || "Failed to package outputs for scheduler");
     } finally {
       setPreparing(false);
     }
   }
 
-  async function schedulePreparedJob(publishingJobId) {
-    const jobId = Number(publishingJobId || 0);
+  async function sendPackageBatchToScheduler(packageBatchId) {
+    const jobId = Number(packageBatchId || 0);
     if (jobId <= 0) return { enqueued: 0, already_waiting: 0, skipped: 0 };
     const res = await fetch(SCHEDULER_SCHEDULE_JOB_URL, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        publishing_job_id: jobId,
+        package_batch_id: jobId,
         priority: 100,
       }),
     });
     const data = await res.json();
-    if (!res.ok || !data?.ok) throw new Error(data?.error || `Failed to send publishing job #${jobId} to Scheduler`);
+    if (!res.ok || !data?.ok) throw new Error(data?.error || `Failed to send package batch #${jobId} to Scheduler`);
     return data.item || { enqueued: 0, already_waiting: 0, skipped: 0 };
   }
 
@@ -712,32 +728,6 @@ export default function AdminPublishingPage() {
     }
   }
 
-  async function previewPinterestPayload(row) {
-    setSaving(true);
-    setError("");
-    setStatus("");
-    setDryRun(null);
-    try {
-      const res = await fetch(PINTEREST_DRY_RUN_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publish_output_id: row.publish_output_id,
-          environment: row.environment || "test",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to build Pinterest payload");
-      setDryRun(data.item || null);
-      setStatus(`Dry-run Pinterest payload built for ${row.environment === "production" ? "ColorFix Makeovers" : "ColorFix API Test"}.`);
-    } catch (err) {
-      setError(err?.message || "Failed to build Pinterest payload");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function publishPinterestTest(row) {
     const ok = window.confirm("Post this Pin to the ColorFix API Test Pinterest board? This does not lock production.");
     if (!ok) return;
@@ -788,9 +778,54 @@ export default function AdminPublishingPage() {
     }
   }
 
+  async function retryPublish(row) {
+    const packageId = Number(row.package_id || row.publish_output_id || 0);
+    if (packageId <= 0) {
+      setError("Missing package ID for retry.");
+      return;
+    }
+    const ok = window.confirm(`Retry publishing package #${packageId}?`);
+    if (!ok) return;
+
+    setSaving(true);
+    setError("");
+    setStatus("");
+    try {
+      const payload = {
+        package_id: packageId,
+        worker_id: "admin-publisher-retry",
+      };
+      if (row.queue_item_id) payload.queue_item_id = Number(row.queue_item_id);
+
+      const res = await fetch(SCHEDULER_PUBLISH_NOW_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Retry failed");
+
+      const item = data.item || {};
+      if (item.success === false || String(item.status || "").toLowerCase() === "failed") {
+        const message = item.error_message || item.error_code || "Retry failed";
+        setError(`Retry failed: ${message}`);
+      } else {
+        setStatus(`Retry ${item.status || "completed"}${item.published_url ? `: ${item.published_url}` : ""}`);
+      }
+      const refreshed = await fetchJobs();
+      const updatedRow = findPackageRow(refreshed, packageId);
+      if (updatedRow) setSelectedRow(updatedRow);
+    } catch (err) {
+      setError(err?.message || "Retry failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function deleteDisposableTestRow(row) {
     const ok = window.confirm(
-      `Delete test publishing row #${row.publish_output_id}? This only removes the ColorFix test publish record. It will not delete a production publish.`
+      `Delete test publishing row #${row.publish_output_id}? Delete the Pinterest test-board pin manually first if needed. This removes the ColorFix test publish record and may delete its orphaned publisher instance after the last package in that test batch is removed. Production publishes are blocked.`
     );
     if (!ok) return;
     setSaving(true);
@@ -810,7 +845,11 @@ export default function AdminPublishingPage() {
       if (blocked.length) {
         throw new Error(blocked.join(" "));
       }
-      setStatus(`Deleted test publishing row #${row.publish_output_id}.`);
+      const deletedInstances = Array.isArray(item.deleted_playlist_instance_ids) ? item.deleted_playlist_instance_ids : [];
+      const instanceMessage = deletedInstances.length
+        ? ` Deleted orphan publisher instance #${deletedInstances.join(", #")}.`
+        : "";
+      setStatus(`Deleted test publishing row #${row.publish_output_id}.${instanceMessage}`);
       setSelectedRow(null);
       await fetchJobs();
     } catch (err) {
@@ -824,11 +863,11 @@ export default function AdminPublishingPage() {
     <div className="admin-publishing">
       <header className="pubdb-header">
         <div>
-          <h1>Publishing Jobs</h1>
+          <h1>Published Packages</h1>
         </div>
         <div className="pubdb-header__actions">
           <a className="pubdb-command" href="/admin/scheduler">
-            Scheduler
+            Back to Scheduler
           </a>
           <button type="button" className="pubdb-command" onClick={openNewAsset}>
             Manual / Backfill
@@ -836,157 +875,17 @@ export default function AdminPublishingPage() {
         </div>
       </header>
 
-      <section className="pubdb-setup">
-        <div className="pubdb-setup__header">
-          <div>
-            <h2>Publisher Setup</h2>
-            <p>Create or reuse the production-looking playlist instance that finished creator assets will point to.</p>
-          </div>
-          <div className="pubdb-setup__rule">
-            {setupForm.environment === "production" ? "Production mode. Successful publish locks the URL and asset." : "Preview/test mode. No production lock."}
-          </div>
-        </div>
-        <form className="pubdb-setup-form" onSubmit={(event) => {
-          event.preventDefault();
-          ensurePublisherInstance({ openPreview: true });
-        }}>
-          <div className="pubdb-channel-control">
-            <label>
-              Channel
-              <select value={setupForm.platform} onChange={(event) => updateSetupForm("platform", event.target.value)}>
-                {publishingChannels.map((channel) => (
-                  <option key={channel.value} value={channel.value} disabled={!channel.enabled}>
-                    {channel.label}{channel.enabled ? "" : " - later"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="pubdb-command" onClick={() => setOpenConnection(true)}>
-              Connect / Sync
-            </button>
-          </div>
-          <label className="pubdb-setup-form__wide">
-            Creator job
-            <select
-              value={setupForm.asset_creator_job_id}
-              onChange={(event) => updateSetupForm("asset_creator_job_id", event.target.value)}
-              required
-            >
-              <option value="">Choose creator job with outputs</option>
-              {displayedCreatorJobs.map((job) => (
-                <option key={job.asset_creator_job_id} value={job.asset_creator_job_id}>
-                  #{job.asset_creator_job_id} - {job.title || job.creator_key} ({job.output_count || 0} assets)
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Environment
-            <select value={setupForm.environment} onChange={(event) => updateSetupForm("environment", event.target.value)}>
-              <option value="test">Test</option>
-              <option value="production">Production</option>
-            </select>
-          </label>
-          <label>
-            Destination
-            <select value={setupForm.destination_key} onChange={(event) => updateSetupForm("destination_key", event.target.value)}>
-              {availableDestinations.map((destination) => (
-                <option key={destination.value} value={destination.value} disabled={destination.disabled}>
-                  {destination.label}{destination.environment === "test" ? " (test)" : " (production)"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            CTA Page
-            <select value={setupForm.cta_group_id} onChange={(event) => updateSetupForm("cta_group_id", event.target.value)} required>
-              <option value="">Choose CTA Page</option>
-              {ctaPages.map((page) => (
-                <option key={page.id} value={page.id}>
-                  #{page.id} {page.label} ({page.key})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Instance title
-            <input
-              value={setupForm.instance_title}
-              onChange={(event) => updateSetupForm("instance_title", event.target.value)}
-              placeholder="Generated from creator job"
-            />
-          </label>
-          <label>
-            Slug
-            <input
-              value={setupForm.slug}
-              onChange={(event) => updateSetupForm("slug", slugifyPublisher(event.target.value))}
-              placeholder="test-cottage-exterior-ideas"
-            />
-          </label>
-          <div className="pubdb-setup__summary">
-            {selectedCreatorJob ? (
-              <>
-                <strong>Source:</strong> playlist #{selectedCreatorJob.source_id} {setupPlaylist?.title || selectedCreatorJob.title || ""}
-              </>
-            ) : (
-              `Choose a ${channelLabel} creator job to preview the source playlist.`
-            )}
-          </div>
-          <div className="pubdb-setup-actions">
-            <button type="submit" className="pubdb-command pubdb-command--primary" disabled={setupSaving || !selectedCreatorJob || !setupForm.cta_group_id}>
-              {setupSaving ? "Opening..." : "Instance Preview"}
-            </button>
-            <button
-              type="button"
-              className="pubdb-command pubdb-command--primary"
-              onClick={() => preparePublisherJobs({ maxOutputs: 1 })}
-              disabled={preparing || setupSaving || !selectedCreatorJob || !setupForm.cta_group_id}
-            >
-              {preparing ? "Sending..." : "Send 1 Missing to Scheduler"}
-            </button>
-            <button
-              type="button"
-              className="pubdb-command"
-              onClick={() => preparePublisherJobs()}
-              disabled={preparing || setupSaving || !selectedCreatorJob || !setupForm.cta_group_id}
-            >
-              {preparing ? "Sending..." : "Send Missing to Scheduler"}
-            </button>
-          </div>
-        </form>
-        {setupResult ? (
-          <div className="pubdb-setup-result">
-            <strong>{setupResult.mode === "created" ? "Created" : "Reused"} instance #{setupResult.playlist_instance_id}</strong>
-            <a href={setupResult.player_url} target="_blank" rel="noreferrer">Open Player</a>
-            <a href={`/admin/playlist-instances?q=${encodeURIComponent(setupResult.playlist_instance_id)}`}>Open In Instances</a>
-            <button type="button" className="pubdb-command pubdb-command--danger" onClick={deactivatePublisherInstance} disabled={setupSaving}>
-              Deactivate Test Instance
-            </button>
-          </div>
-        ) : null}
-      </section>
-
-      {openConnection ? (
-        <ConnectionDialog
-          channel={selectedChannel}
-          status={pinterestStatus}
-          syncing={pinterestSyncing}
-          connectUrl={PINTEREST_CONNECT_URL}
-          onClose={() => setOpenConnection(false)}
-          onRefresh={fetchPinterestStatus}
-          onSync={syncPinterestBoards}
-        />
-      ) : null}
-
-      {previewInstance ? (
-        <InstancePreviewDialog
-          instance={previewInstance}
-          onClose={() => setPreviewInstance(null)}
-        />
-      ) : null}
-
       <div className="pubdb-toolbar">
+        <label>
+          Channel
+          <select value={selectedChannel} onChange={(event) => setChannelFilter(event.target.value)}>
+            {channelOptions.map((channel) => (
+              <option key={channel.value} value={channel.value}>
+                {channel.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           Search
           <input value={q} onChange={(event) => setQ(event.target.value)} />
@@ -997,6 +896,10 @@ export default function AdminPublishingPage() {
         <button type="button" className="pubdb-command" onClick={() => fetchJobs("")} disabled={loading}>
           Refresh
         </button>
+        <button type="button" className="pubdb-command" onClick={() => setOpenConnection(true)}>
+          Connect Channel
+        </button>
+        <span className="pubdb-toolbar__meta">YouTube: {youtubeConnectionLabel(youtubeStatus)}</span>
         <button type="button" className="pubdb-command" onClick={openImportExisting}>
           Import Existing Pins
         </button>
@@ -1012,39 +915,16 @@ export default function AdminPublishingPage() {
             type="button"
             key={item.channel}
             className={selectedChannel === item.channel ? "pubdb-summary-card pubdb-summary-card--active" : "pubdb-summary-card"}
-            onClick={() => updateSetupForm("platform", item.channel)}
+            onClick={() => setChannelFilter(item.channel)}
           >
             <span>{item.label}</span>
             <strong>{item.published}</strong>
-            <small>{item.prepared} waiting</small>
+            <small>{item.errors ? `${item.errors} error${item.errors === 1 ? "" : "s"}` : "published"}</small>
           </button>
         ))}
       </section>
 
       <section className="pubdb-list-controls">
-        <fieldset className="pubdb-mode">
-          <legend>Show</legend>
-          <label>
-            <input
-              type="radio"
-              name="publisher-list-mode"
-              value="prepared"
-              checked={listMode === "prepared"}
-              onChange={() => setListMode("prepared")}
-            />
-            Jobs waiting for Scheduler
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="publisher-list-mode"
-              value="published"
-              checked={listMode === "published"}
-              onChange={() => setListMode("published")}
-            />
-            Published records
-          </label>
-        </fieldset>
         <label>
           From
           <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
@@ -1060,43 +940,43 @@ export default function AdminPublishingPage() {
           Clear Dates
         </button>
         <span className="pubdb-toolbar__meta">
-          {sortedRows.length} {listMode === "published" ? "published" : "waiting"} {channelLabel} row{sortedRows.length === 1 ? "" : "s"}
+          {sortedRows.length} {channelLabel} published/error record{sortedRows.length === 1 ? "" : "s"}
         </span>
       </section>
 
+      {openConnection ? (
+        <ConnectionDialog
+          channel={selectedChannel}
+          status={selectedChannel === "youtube" ? youtubeStatus : pinterestStatus}
+          syncing={selectedChannel === "pinterest" ? pinterestSyncing : false}
+          connectUrl={selectedChannel === "youtube" ? YOUTUBE_PUBLISHER_CONNECT_URL : PINTEREST_CONNECT_URL}
+          onClose={() => setOpenConnection(false)}
+          onRefresh={selectedChannel === "youtube" ? fetchYoutubeStatus : fetchPinterestStatus}
+          onSync={syncPinterestBoards}
+        />
+      ) : null}
+
       <section className="pubdb-grid-wrap">
         <table className="pubdb-grid">
-          {listMode === "published" ? (
-            <PublishedTableHead sort={sort} onSort={changeSort} />
-          ) : (
-            <PreparedTableHead sort={sort} onSort={changeSort} />
-          )}
+          <PublishedTableHead sort={sort} onSort={changeSort} />
           <tbody>
             {sortedRows.map((row) => (
               <tr key={row.publish_output_id} title="Double-click for details" onDoubleClick={() => {
-                setDryRun(null);
                 setSelectedRow(row);
               }}>
-                {listMode === "published" ? (
-                  <PublishedTableRow row={row} saving={saving} onPayload={previewPinterestPayload} />
-                ) : (
-                  <PreparedTableRow
-                    row={row}
-                    saving={saving}
-                    onPayload={previewPinterestPayload}
-                    onPublishTest={publishPinterestTest}
-                    onSchedule={schedulePinterestTest}
-                    onDelete={deleteDisposableTestRow}
-                  />
-                )}
+                <PublishedTableRow
+                  row={row}
+                  saving={saving}
+                  onDetails={() => {
+                    setSelectedRow(row);
+                  }}
+                />
               </tr>
             ))}
             {!loading && sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={listMode === "published" ? 10 : 9} className="pubdb-empty">
-                  {listMode === "published"
-                    ? `No published ${channelLabel} records in this view.`
-                    : "No prepared jobs waiting in this view. Choose a creator job above, then send one or all to Scheduler."}
+                <td colSpan={12} className="pubdb-empty">
+                  No published or errored {channelLabel} records in this view.
                 </td>
               </tr>
             ) : null}
@@ -1133,13 +1013,12 @@ export default function AdminPublishingPage() {
         <RowDialog
           row={selectedRow}
           saving={saving}
-          dryRun={dryRun}
           onClose={() => setSelectedRow(null)}
           onMarkPublished={() => markPublished(selectedRow)}
-          onPreviewPayload={() => previewPinterestPayload(selectedRow)}
           onPublishTest={() => publishPinterestTest(selectedRow)}
           onScheduleTest={() => schedulePinterestTest(selectedRow)}
           onDeleteTest={() => deleteDisposableTestRow(selectedRow)}
+          onRetry={() => retryPublish(selectedRow)}
         />
       ) : null}
     </div>
@@ -1218,12 +1097,14 @@ function PublishedTableHead({ sort, onSort }) {
   return (
     <thead>
       <tr>
-        <SortableTh label="Published" keyName="published_at" sort={sort} onSort={onSort} />
+        <SortableTh label="Published Local" keyName="published_at" sort={sort} onSort={onSort} />
+        <SortableTh label="Status" keyName="status" sort={sort} onSort={onSort} />
         <SortableTh label="Channel" keyName="channel_key" sort={sort} onSort={onSort} />
         <SortableTh label="Env" keyName="environment" sort={sort} onSort={onSort} />
         <SortableTh label="Type" keyName="output_type" sort={sort} onSort={onSort} />
         <SortableTh label="Asset" keyName="library_asset_id" sort={sort} onSort={onSort} />
         <SortableTh label="Playlist" keyName="playlist_title" sort={sort} onSort={onSort} />
+        <SortableTh label="Instance" keyName="playlist_instance_id" sort={sort} onSort={onSort} />
         <SortableTh label="Title" keyName="title" sort={sort} onSort={onSort} />
         <SortableTh label="Destination" keyName="destination_url" sort={sort} onSort={onSort} />
         <SortableTh label="Live" keyName="external_url" sort={sort} onSort={onSort} />
@@ -1251,15 +1132,22 @@ function PreparedTableHead({ sort, onSort }) {
   );
 }
 
-function PublishedTableRow({ row, saving, onPayload }) {
+function PublishedTableRow({ row, saving, onDetails }) {
+  const errored = isErroredRow(row);
   return (
     <>
-      <td>{row.published_at || "-"}</td>
+      <td>{errored && !row.published_at ? "-" : formatPublisherTime(row.published_at)}</td>
+      <td>
+        <span className={errored ? "pubdb-status-chip pubdb-status-chip--error" : "pubdb-status-chip"}>
+          {errored ? "Error" : row.status || "Published"}
+        </span>
+      </td>
       <td>{channelDisplayLabel(row.channel_key || row.platform)}</td>
       <td>{row.environment || "-"}</td>
       <td>{pinTypeLabel(row.output_type)}</td>
       <td>#{row.library_asset_id || row.publish_output_id}</td>
       <td>#{row.source_id} {row.playlist_title || row.job_title}</td>
+      <td className="pubdb-cell-wrap">{playlistInstanceLink(row)}</td>
       <td className="pubdb-cell-wrap">{row.title || "-"}</td>
       <td className="pubdb-cell-wrap">{shortUrl(row.destination_url || row.tracking_url)}</td>
       <td>
@@ -1270,8 +1158,8 @@ function PublishedTableRow({ row, saving, onPayload }) {
         ) : "-"}
       </td>
       <td className="pubdb-row-actions" onClick={(event) => event.stopPropagation()}>
-        <button type="button" onClick={() => onPayload(row)} disabled={saving}>
-          Payload
+        <button type="button" onClick={onDetails}>
+          Details
         </button>
         {row.external_url ? (
           <a className="pubdb-mini-link" href={row.external_url} target="_blank" rel="noreferrer">
@@ -1283,41 +1171,57 @@ function PublishedTableRow({ row, saving, onPayload }) {
   );
 }
 
-function PreparedTableRow({ row, saving, onPayload, onPublishTest, onSchedule, onDelete }) {
-  return (
-    <>
-      <td>{row.created_at || "-"}</td>
-      <td>Job #{row.publish_job_id}<br />Row #{row.publish_output_id}</td>
-      <td>{channelDisplayLabel(row.channel_key || row.platform)}</td>
-      <td>{pinTypeLabel(row.output_type)}</td>
-      <td>#{row.library_asset_id || "-"}</td>
-      <td><PermissionStatus {...permissionProps(row)} /></td>
-      <td>{row.status}</td>
-      <td className="pubdb-cell-wrap">#{row.source_id} {row.playlist_title || row.job_title}</td>
-      <td className="pubdb-row-actions" onClick={(event) => event.stopPropagation()}>
-        <button type="button" onClick={() => onPayload(row)} disabled={saving}>
-          Payload
-        </button>
-        {row.environment === "production" ? null : (
-          <button type="button" className="pubdb-command--primary" onClick={() => onPublishTest(row)} disabled={saving}>
-            Publish Test
-          </button>
-        )}
-        <button type="button" onClick={() => onSchedule(row)} disabled={saving}>
-          To Scheduler
-        </button>
-        {row.environment === "test" ? (
-          <button type="button" className="pubdb-command--danger" onClick={() => onDelete(row)} disabled={saving}>
-            Delete Test
-          </button>
-        ) : null}
-      </td>
-    </>
-  );
-}
-
 function ConnectionDialog({ channel: channelKey, status, syncing, connectUrl, onClose, onRefresh, onSync }) {
-  const title = channelKey === "pinterest" ? "Pinterest Connection" : "Channel Connection";
+  const title = channelKey === "youtube" ? "YouTube Connection" : channelKey === "pinterest" ? "Pinterest Connection" : "Channel Connection";
+  if (channelKey === "youtube") {
+    const channelInfo = status?.channel || {};
+    const auth = status?.auth || {};
+    const scopes = auth.granted_scopes || status?.scopes_requested || [];
+    const requestedScopes = status?.scopes_requested || [];
+    const missingScopes = Array.isArray(requestedScopes)
+      ? requestedScopes.filter((scope) => !Array.isArray(scopes) || !scopes.includes(scope))
+      : [];
+
+    return (
+      <div className="pubdb-modal-backdrop" role="presentation">
+        <div className="pubdb-modal" role="dialog" aria-modal="true" aria-label={title}>
+          <header className="pubdb-modal__header">
+            <div>
+              <h2>{title}</h2>
+              <p>OAuth status for the ColorFix YouTube upload channel.</p>
+            </div>
+            <button type="button" onClick={onClose}>Close</button>
+          </header>
+          <section className="pubdb-pinterest pubdb-pinterest--modal">
+            {missingScopes.length ? (
+              <div className="pubdb-alert pubdb-alert--error">
+                Missing YouTube scope{missingScopes.length === 1 ? "" : "s"}: {missingScopes.join(", ")}. Click Connect YouTube Channel again to request the upload permission.
+              </div>
+            ) : null}
+            <div className="pubdb-pinterest__actions">
+              <a className="pubdb-command pubdb-command--primary" href={connectUrl}>Connect YouTube Channel</a>
+              <button type="button" className="pubdb-command" onClick={onRefresh}>Refresh</button>
+            </div>
+            <dl className="pubdb-pinterest__details">
+              <dt>YouTube</dt>
+              <dd>{channelInfo.status === "connected" || auth.status === "connected" ? "Connected" : "Not connected"}</dd>
+              <dt>Channel record</dt>
+              <dd>{channelInfo.label || "ColorFix YouTube"} {channelInfo.publishing_channel_id ? `#${channelInfo.publishing_channel_id}` : ""}</dd>
+              <dt>Granted scopes</dt>
+              <dd>{Array.isArray(scopes) && scopes.length ? scopes.join(", ") : "Not connected yet"}</dd>
+              <dt>Connected at</dt>
+              <dd>{auth.connected_at || "-"}</dd>
+              <dt>Access token expires</dt>
+              <dd>{channelInfo.auth_expires_at || "-"}</dd>
+              <dt>Last auth error</dt>
+              <dd>{auth.last_auth_error || "-"}</dd>
+            </dl>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   if (channelKey !== "pinterest") {
     return (
       <div className="pubdb-modal-backdrop" role="presentation">
@@ -1326,9 +1230,7 @@ function ConnectionDialog({ channel: channelKey, status, syncing, connectUrl, on
             <h2>{title}</h2>
             <button type="button" onClick={onClose}>Close</button>
           </header>
-          <div className="pubdb-connection-empty">
-            This channel is not wired yet.
-          </div>
+          <div className="pubdb-connection-empty">This channel is not wired yet.</div>
         </div>
       </div>
     );
@@ -1407,15 +1309,93 @@ function rowMatchesChannel(row, channel) {
   return haystack.includes(String(channel).toLowerCase());
 }
 
+function hydrateDisplayRow(job, output) {
+  const metadata = parseMetadata(output.metadata_json);
+  return {
+    ...output,
+    board_name: output.board_name || metadata.board_name || metadata.board || "",
+    board_url: output.board_url || metadata.board_url || "",
+    board_slug: output.board_slug || metadata.board_slug || "",
+    board_id: output.board_id || metadata.board_id || "",
+    publish_job_id: job.publish_job_id,
+    source_type: job.source_type,
+    source_id: job.source_id,
+    job_status: job.status,
+    job_title: job.title,
+    playlist_title: job.playlist_title,
+    instance_title: job.instance_display_title || job.instance_name || "",
+    playlist_instance_id: job.playlist_instance_id || output.playlist_instance_id || null,
+    instance_slug: job.instance_slug || output.instance_slug || "",
+  };
+}
+
+function findPackageRow(jobs, packageId) {
+  if (!Array.isArray(jobs)) return null;
+  for (const job of jobs) {
+    const output = (job.outputs || []).find((item) => Number(item.package_id || item.publish_output_id || 0) === Number(packageId || 0));
+    if (output) return hydrateDisplayRow(job, output);
+  }
+  return null;
+}
+
 function isPublishedRow(row) {
   const status = String(row.status || "").toLowerCase();
   return Boolean(row.published_at || row.external_url || status === "published" || status === "posted" || status === "test_published");
 }
 
+function isPublisherVisibleRow(row) {
+  return isPublishedRow(row) || isErroredRow(row);
+}
+
+function isErroredRow(row) {
+  const status = String(row.status || "").toLowerCase();
+  const scheduleStatus = String(row.schedule_status || "").toLowerCase();
+  const attemptStatus = String(row.publisher_attempt_status || "").toLowerCase();
+  const errorStatuses = new Set(["error", "failed", "scheduled_retry_pending"]);
+  return (
+    errorStatuses.has(status)
+    || errorStatuses.has(scheduleStatus)
+    || errorStatuses.has(attemptStatus)
+    || Boolean(row.publisher_error_message || row.publisher_error_code || row.schedule_error || row.schedule_error_code || row.last_error_message || row.last_error_code)
+  );
+}
+
+function publisherErrorStage(row) {
+  if (row.publisher_error_message || row.publisher_error_code || String(row.publisher_attempt_status || "").toLowerCase() === "failed") {
+    return row.publisher_service || "Publisher";
+  }
+  if (row.schedule_error || row.schedule_error_code || String(row.schedule_status || "").toLowerCase() === "failed") {
+    return "Scheduler";
+  }
+  if (row.last_error_message || row.last_error_code || String(row.status || "").toLowerCase() === "failed") {
+    return "Package";
+  }
+  return "Publisher";
+}
+
+function publisherErrorMessage(row) {
+  return row.publisher_error_message
+    || row.publisher_error_code
+    || row.schedule_error
+    || row.schedule_error_code
+    || row.last_error_message
+    || row.last_error_code
+    || "";
+}
+
+function attemptSummary(row) {
+  const attempts = row.attempt_count ?? "";
+  const max = row.max_attempts ?? "";
+  if (attempts !== "" && max !== "") return `${attempts} / ${max}`;
+  if (attempts !== "") return String(attempts);
+  return "-";
+}
+
 function rowInDateRange(row, mode, from, to) {
   const value = mode === "published" ? row.published_at : row.created_at;
   if (!from && !to) return true;
-  const timestamp = Date.parse(value || "");
+  if (mode === "published" && isErroredRow(row) && !row.published_at) return true;
+  const timestamp = dateTimeSortValue(value, { sourceTimeZone: mode === "published" ? "utc" : "local" });
   if (!timestamp) return false;
   if (from) {
     const fromTime = Date.parse(`${from}T00:00:00`);
@@ -1444,9 +1424,21 @@ function buildChannelTotals(rows) {
       channel,
       label: channelDisplayLabel(channel),
       published: matching.filter(isPublishedRow).length,
+      errors: matching.filter((row) => isErroredRow(row) && !isPublishedRow(row)).length,
       prepared: matching.filter((row) => !isPublishedRow(row)).length,
     };
   });
+}
+
+function buildChannelOptions(totals) {
+  const options = totals.map((item) => ({
+    value: item.channel,
+    label: `${item.label} (${item.published}${item.errors ? ` + ${item.errors} errors` : ""})`,
+  }));
+  if (!options.some((item) => item.value === "pinterest")) {
+    options.unshift({ value: "pinterest", label: "Pinterest (0)" });
+  }
+  return options;
 }
 
 function channelDisplayLabel(value) {
@@ -1455,6 +1447,12 @@ function channelDisplayLabel(value) {
   if (raw.includes("youtube")) return "YouTube";
   if (raw.includes("instagram")) return "Instagram";
   return String(value || "Channel").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function youtubeConnectionLabel(status) {
+  const channel = status?.channel || {};
+  const auth = status?.auth || {};
+  return channel.status === "connected" || auth.status === "connected" ? "Connected" : "Not connected";
 }
 
 function pinTypeLabel(value) {
@@ -1483,11 +1481,11 @@ function jobMatchesChannel(job, channel) {
 }
 
 function sortValue(row, key) {
-  if (key === "publish_output_id" || key === "publish_job_id" || key === "source_id" || key === "library_asset_id") {
+  if (key === "publish_output_id" || key === "publish_job_id" || key === "source_id" || key === "library_asset_id" || key === "playlist_instance_id") {
     return Number(row[key] || 0);
   }
   if (key === "created_at" || key === "published_at") {
-    return Date.parse(row[key] || "") || 0;
+    return dateTimeSortValue(row[key], { sourceTimeZone: key === "published_at" ? "utc" : "local" });
   }
   if (key === "playlist_title") {
     return String(row.playlist_title || row.job_title || "").toLowerCase();
@@ -1568,6 +1566,17 @@ function publisherInstanceMarker(environment, platform, destinationKey, jobId) {
     `publisher_destination=${destinationKey}`,
     `asset_creator_job_id=${jobId}`,
   ].join("; ");
+}
+
+function findPublisherInstance(items, { ctaGroupId, platform, destinationKey, creatorJobId }) {
+  return (items || []).find((instance) => {
+    const notes = String(instance.instance_notes || "");
+    return Number(instance.cta_group_id || 0) === Number(ctaGroupId || 0)
+      && String(instance.audience || "").toLowerCase() === "pinterest"
+      && notes.includes(`publisher_platform=${platform}`)
+      && notes.includes(`publisher_destination=${destinationKey}`)
+      && notes.includes(`asset_creator_job_id=${creatorJobId}`);
+  }) || null;
 }
 
 function AssetDialog({
@@ -1733,25 +1742,39 @@ function AssetDialog({
   );
 }
 
-function RowDialog({ row, saving, dryRun, onClose, onMarkPublished, onPreviewPayload, onPublishTest, onScheduleTest, onDeleteTest }) {
+function RowDialog({ row, saving, onClose, onMarkPublished, onPublishTest, onScheduleTest, onDeleteTest, onRetry }) {
+  const requestPayload = formatJson(row.publisher_request_payload_json);
+  const responsePayload = formatJson(row.publisher_response_payload_json);
+  const errored = isErroredRow(row);
+  const errorMessage = publisherErrorMessage(row);
+  const hasReceipt = Boolean(row.publisher_attempt_id || requestPayload || responsePayload || row.publisher_error_message || row.publisher_error_code);
+  const published = isPublishedRow(row);
+
   return (
     <div className="pubdb-modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="pubdb-modal pubdb-modal--small" role="dialog" aria-modal="true" aria-label="Publishing job" onClick={(event) => event.stopPropagation()}>
+      <div className="pubdb-modal pubdb-modal--receipt" role="dialog" aria-modal="true" aria-label="Publishing job" onClick={(event) => event.stopPropagation()}>
         <header className="pubdb-modal__header">
-          <h2>Output #{row.publish_output_id}</h2>
+          <div>
+            <h2>Package #{row.package_id || row.publish_output_id}</h2>
+            <p>{row.title || "Published package"}</p>
+          </div>
           <button type="button" onClick={onClose}>Close</button>
         </header>
         <dl className="pubdb-details">
+          <dt>Package batch</dt><dd>#{row.package_batch_id || row.publish_job_id || "-"}</dd>
+          <dt>Package ID</dt><dd>#{row.package_id || row.publish_output_id}</dd>
           <dt>Channel</dt><dd>{row.channel_key}</dd>
           <dt>Environment</dt><dd>{row.environment || "test"}</dd>
           <dt>Type</dt><dd>{row.output_type}</dd>
           <dt>Library ID</dt><dd>{row.library_asset_id || "-"}</dd>
           <dt>Permission</dt><dd><PermissionStatus {...permissionProps(row)} showLabel /></dd>
           <dt>Status</dt><dd>{row.status}</dd>
+          <dt>Scheduler status</dt><dd>{row.schedule_status || "-"}</dd>
           <dt>Board</dt><dd>{row.board_name || PINTEREST_BOARD.board_name}</dd>
           <dt>Board slug</dt><dd>{row.board_slug || PINTEREST_BOARD.board_slug}</dd>
           <dt>Board ID</dt><dd>{row.board_id || "Pending Pinterest API board sync"}</dd>
           <dt>Playlist</dt><dd>#{row.source_id} {row.playlist_title || row.job_title}</dd>
+          <dt>Playlist instance</dt><dd>{playlistInstanceLink(row)}</dd>
           <dt>Tracking code</dt><dd>{row.tracking_code || "-"}</dd>
           <dt>Tracking URL</dt>
           <dd>{row.tracking_url ? <a href={row.tracking_url} target="_blank" rel="noreferrer">{row.tracking_url}</a> : "-"}</dd>
@@ -1759,44 +1782,109 @@ function RowDialog({ row, saving, dryRun, onClose, onMarkPublished, onPreviewPay
           <dd>{row.destination_url ? <a href={row.destination_url} target="_blank" rel="noreferrer">{row.destination_url}</a> : "-"}</dd>
           <dt>Live URL</dt>
           <dd>{row.external_url ? <a href={row.external_url} target="_blank" rel="noreferrer">{row.external_url}</a> : "-"}</dd>
-          <dt>Published at</dt><dd>{row.published_at || "-"}</dd>
+          <dt>Platform post ID</dt><dd>{row.external_id || "-"}</dd>
+          <dt>Published</dt><dd>{formatPublisherTime(row.published_at)}</dd>
+          <dt>Published UTC</dt><dd>{row.published_at || "-"}</dd>
         </dl>
+        {errored ? (
+          <section className="pubdb-error-panel" aria-label="Publish error">
+            <h3>Publish Error</h3>
+            <dl className="pubdb-details pubdb-details--compact">
+              <dt>Where</dt><dd>{publisherErrorStage(row)}</dd>
+              <dt>Message</dt><dd>{errorMessage || "-"}</dd>
+              <dt>Queue item</dt><dd>{row.queue_item_id ? `#${row.queue_item_id}` : "-"}</dd>
+              <dt>Attempts</dt><dd>{attemptSummary(row)}</dd>
+              <dt>Next retry</dt><dd>{formatPublisherTime(row.next_retry_at)}</dd>
+              <dt>Scheduler code</dt><dd>{row.schedule_error_code || "-"}</dd>
+              <dt>Scheduler message</dt><dd>{row.schedule_error || "-"}</dd>
+              <dt>Publisher code</dt><dd>{row.publisher_error_code || "-"}</dd>
+              <dt>Publisher message</dt><dd>{row.publisher_error_message || "-"}</dd>
+              <dt>Package code</dt><dd>{row.last_error_code || "-"}</dd>
+              <dt>Package message</dt><dd>{row.last_error_message || "-"}</dd>
+            </dl>
+          </section>
+        ) : null}
+        {hasReceipt ? (
+          <section className="pubdb-receipt" aria-label="Publication receipt">
+            <h3>Publication Receipt</h3>
+            <dl className="pubdb-details pubdb-details--compact">
+              <dt>Attempt</dt><dd>{row.publisher_attempt_id ? `#${row.publisher_attempt_id}` : "-"}</dd>
+              <dt>Service</dt><dd>{row.publisher_service || "PinterestPublisher"}</dd>
+              <dt>Attempt status</dt><dd>{row.publisher_attempt_status || row.status || "-"}</dd>
+              <dt>Started</dt><dd>{formatPublisherTime(row.publisher_started_at)}</dd>
+              <dt>Finished</dt><dd>{formatPublisherTime(row.publisher_finished_at)}</dd>
+              <dt>Error</dt><dd>{row.publisher_error_message || row.publisher_error_code || "-"}</dd>
+            </dl>
+            {requestPayload ? (
+              <>
+                <h4>Request</h4>
+                <pre>{requestPayload}</pre>
+              </>
+            ) : null}
+            {responsePayload ? (
+              <>
+                <h4>Pinterest Response</h4>
+                <pre>{responsePayload}</pre>
+              </>
+            ) : null}
+          </section>
+        ) : null}
         <div className="pubdb-modal__actions">
           <button type="button" onClick={onClose}>Close</button>
-          <button type="button" onClick={onPreviewPayload} disabled={saving}>
-            Preview Pinterest Payload
-          </button>
-          {row.environment === "production" ? null : (
+          {errored ? (
+            <button type="button" className="pubdb-command--primary" onClick={onRetry} disabled={saving}>
+              {saving ? "Retrying..." : "Retry"}
+            </button>
+          ) : null}
+          {published || row.environment === "production" ? null : (
             <button type="button" className="pubdb-command--primary" onClick={onPublishTest} disabled={saving}>
               Publish Test Pin
             </button>
           )}
-          <button type="button" onClick={onScheduleTest} disabled={saving}>
-            {row.environment === "production" ? "Send to Scheduler" : "Schedule Test Pin"}
-          </button>
+          {published ? null : (
+            <button type="button" onClick={onScheduleTest} disabled={saving}>
+              {row.environment === "production" ? "Send to Scheduler" : "Schedule Test Pin"}
+            </button>
+          )}
           {row.environment === "test" ? (
             <button type="button" className="pubdb-command--danger" onClick={onDeleteTest} disabled={saving}>
-              Delete Test Row
+              {published ? "Delete Test Publication" : "Delete Test Row"}
             </button>
           ) : null}
-          {!row.external_url ? (
+          {!row.external_url && !errored ? (
             <button type="button" className="pubdb-command--primary" onClick={onMarkPublished} disabled={saving}>
               Mark Published
             </button>
           ) : null}
         </div>
-        {dryRun ? (
-          <div className="pubdb-dryrun">
-            <h3>Dry-Run Payload: {dryRun.environment}</h3>
-            <div className={dryRun.readiness?.ready ? "pubdb-dryrun__ready" : "pubdb-dryrun__blocked"}>
-              {dryRun.readiness?.ready ? "Ready for ColorFix API Test" : `Blocked: ${(dryRun.readiness?.errors || []).join("; ")}`}
-            </div>
-            <pre>{JSON.stringify(dryRun.payload || {}, null, 2)}</pre>
-          </div>
-        ) : null}
       </div>
     </div>
   );
+}
+
+function formatPublisherTime(value) {
+  return formatDateTime(value, { sourceTimeZone: "utc" });
+}
+
+function playlistInstanceLink(row) {
+  const id = Number(row.playlist_instance_id || 0);
+  if (id <= 0) return "-";
+  const label = row.instance_title || row.instance_slug || "";
+  return (
+    <a href={`/admin/playlist-instances?q=${encodeURIComponent(id)}`}>
+      #{id}{label ? ` ${label}` : ""}
+    </a>
+  );
+}
+
+function formatJson(value) {
+  if (!value) return "";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function permissionProps(item = {}) {

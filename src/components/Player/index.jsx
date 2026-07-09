@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import AnimatedHueWheel from "@components/AnimatedHueWheel";
+import BrandBumperLogo from "@components/BrandBumperLogo";
 import {
   extractAssetId,
   fetchAssetUrl,
@@ -89,6 +90,20 @@ function queueFadeReady(img, stageEl) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+    if (playbackState === "end") {
+      const lastIndex = findLastReplayableIndex(playItems);
+      setPlaybackState("playing");
+      setPrevIndex(null);
+      setActiveIndex(lastIndex);
+      setTitleIndex(lastIndex);
+      setTitleVisible(false);
+      setTitleReady(false);
+      setImageLoaded(false);
+      setFadeReady(false);
+      setIsFading(false);
+      setTitleFull(false);
+      return;
     }
     if (playbackState !== "playing") return;
     if (activeIndex <= 0) return;
@@ -284,6 +299,11 @@ function startPlayback(nextMode, nextIndex = 0) {
   const currentType = (currentItem?.type || "normal").toLowerCase().trim();
   const isIntro = currentType === "intro" || currentType === "text";
   const isHueWheel = currentType === "hue-wheel";
+  const isBrandBumper = currentType === "brand-bumper";
+  const brandBumperConfig = useMemo(
+    () => parseBrandBumperConfig(currentItem?.body),
+    [currentItem?.body]
+  );
   const hueWheelConfig = useMemo(
     () => parseHueWheelConfig(currentItem?.body),
     [currentItem?.body]
@@ -312,7 +332,7 @@ function startPlayback(nextMode, nextIndex = 0) {
 
   useEffect(() => {
     let cancelled = false;
-    if (isHueWheel) {
+    if (isHueWheel || isBrandBumper) {
       setCurrentImageUrl("");
       return () => { cancelled = true; };
     }
@@ -335,7 +355,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       if (!cancelled) setCurrentImageUrl(url || "");
     });
     return () => { cancelled = true; };
-  }, [currentItem?.image_url, isHueWheel]);
+  }, [currentItem?.image_url, isHueWheel, isBrandBumper]);
 
   useEffect(() => {
     let cancelled = false;
@@ -499,7 +519,7 @@ function startPlayback(nextMode, nextIndex = 0) {
   }, [imageLoaded, fadeReady, currentIndex]);
 
   useEffect(() => {
-    if (!isIntro && !isHueWheel) return;
+    if (!isIntro && !isHueWheel && !isBrandBumper) return;
     if (currentImageUrl) return;
     setImageLoaded(true);
     let cancelled = false;
@@ -511,7 +531,33 @@ function startPlayback(nextMode, nextIndex = 0) {
     return () => {
       cancelled = true;
     };
-  }, [isIntro, isHueWheel, currentIndex, currentImageUrl]);
+  }, [isIntro, isHueWheel, isBrandBumper, currentIndex, currentImageUrl]);
+
+  useEffect(() => {
+    if (!isBrandBumper) return () => {};
+    if (playbackState !== "playing") return () => {};
+    if (!imageLoaded || !fadeReady || !titleVisible || !titleReady) return () => {};
+    if (brandBumperConfig.requires_tap === true) return () => {};
+    const durationMs = Math.max(
+      4200,
+      Number(currentItem?.duration_ms || brandBumperConfig.duration_ms || 4200),
+    );
+    const timer = setTimeout(() => {
+      handleAdvance();
+    }, Math.max(1200, durationMs));
+    return () => clearTimeout(timer);
+  }, [
+    isBrandBumper,
+    playbackState,
+    imageLoaded,
+    fadeReady,
+    titleVisible,
+    titleReady,
+    currentIndex,
+    currentItem?.duration_ms,
+    brandBumperConfig.duration_ms,
+    brandBumperConfig.requires_tap,
+  ]);
 
 
   useEffect(() => {
@@ -568,7 +614,7 @@ function startPlayback(nextMode, nextIndex = 0) {
       >
         ×
       </button>
-      {playbackState === "playing" && activeIndex > 0 && currentType !== "intro" && (
+      {((playbackState === "playing" && activeIndex > 0 && currentType !== "intro") || playbackState === "end") && (
         <button
           className="player-back"
           type="button"
@@ -693,6 +739,12 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
+          {imageLoaded && fadeReady && titleVisible && titleReady && isBrandBumper && (
+            <div className="player-brand-bumper">
+              <BrandBumperLogo />
+            </div>
+          )}
+
           {imageLoaded && fadeReady && titleVisible && titleReady && isIntro && IntroRenderer && (
             <div
               className={`player-title${introNoImage ? " is-intro-full is-text-intro" : " is-static is-intro-image"}`}
@@ -713,7 +765,7 @@ function startPlayback(nextMode, nextIndex = 0) {
             </div>
           )}
 
-          {imageLoaded && fadeReady && hasOverlayText && titleVisible && titleReady && !isIntro && !isHueWheel && (
+          {imageLoaded && fadeReady && hasOverlayText && titleVisible && titleReady && !isIntro && !isHueWheel && !isBrandBumper && (
             <div
               className={`player-title${titleFull ? " is-full" : ""}${titleMode === "static" ? " is-static" : ""}${subtitle ? "" : " no-subtitle"}${title ? "" : " no-title"}`}
               style={{
@@ -759,6 +811,37 @@ function readLikedSet(playlistInstanceId) {
   } catch {
     return new Set();
   }
+}
+
+function parseBrandBumperConfig(rawBody) {
+  const fallback = {
+    duration_ms: 4200,
+    auto_advance: true,
+    requires_tap: false,
+  };
+  const raw = String(rawBody || "").trim();
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return fallback;
+    return {
+      ...fallback,
+      ...parsed,
+      auto_advance: parsed.auto_advance !== false,
+      requires_tap: parsed.requires_tap === true,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function findLastReplayableIndex(items) {
+  const list = Array.isArray(items) ? items : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const type = String(list[index]?.type || list[index]?.item_type || "normal").toLowerCase().trim();
+    if (type !== "brand-bumper") return index;
+  }
+  return Math.max(0, list.length - 1);
 }
 
 function writeLikedSet(playlistInstanceId, likedSet) {

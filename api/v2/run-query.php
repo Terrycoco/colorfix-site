@@ -190,6 +190,7 @@ try {
                merged.trigger_color_id,
                merged.order_index,
                merged.saved_palette_id,
+               merged.saved_palette_set_id,
                merged.palette_hash,
                merged.nickname,
                merged.brand
@@ -201,6 +202,7 @@ try {
                    p.trigger_color_id,
                    p.order_index,
                    sp.id AS saved_palette_id,
+                   sps.id AS saved_palette_set_id,
                    sp.palette_hash,
                    sp.nickname,
                    sp.brand
@@ -233,6 +235,7 @@ try {
                    p.trigger_color_id,
                    p.order_index,
                    sp.id AS saved_palette_id,
+                   NULL AS saved_palette_set_id,
                    sp.palette_hash,
                    sp.nickname,
                    sp.brand
@@ -286,6 +289,7 @@ try {
                 'kind' => 'saved',
                 'id' => $pid,
                 'hash' => $row['palette_hash'] ?? null,
+                'set_id' => isset($row['saved_palette_set_id']) ? (int)$row['saved_palette_set_id'] : null,
                 'nickname' => $row['nickname'] ?? null,
                 'brand' => $row['brand'] ?? null,
               ],
@@ -297,6 +301,7 @@ try {
             'rel_path' => $row['rel_path'] ?? null,
             'photo_type' => $row['photo_type'] ?? null,
             'trigger_color_id' => isset($row['trigger_color_id']) ? (int)$row['trigger_color_id'] : null,
+            'saved_palette_set_id' => isset($row['saved_palette_set_id']) ? (int)$row['saved_palette_set_id'] : null,
           ];
           continue;
         }
@@ -387,8 +392,9 @@ try {
                 'photo_url' => $photo['rel_path'],
                 'photo_type' => $photo['photo_type'] ?? null,
                 'palette_id' => $palette['id'] ?? null,
+                'saved_palette_id' => ($palette['kind'] ?? '') === 'saved' ? ($palette['id'] ?? null) : null,
                 'palette_hash' => $palette['hash'] ?? null,
-                'ap_id' => ($palette['kind'] ?? '') === 'applied' ? ($palette['id'] ?? null) : null,
+                'saved_palette_set_id' => $palette['set_id'] ?? ($photo['saved_palette_set_id'] ?? null),
                 'palette_name' => $palette['nickname'] ?? null,
                 'palette_brand' => $palette['brand'] ?? null,
                 'source_color_id' => $cid,
@@ -417,8 +423,9 @@ try {
                 'photo_url' => $zphoto['rel_path'],
                 'photo_type' => $zphoto['photo_type'] ?? null,
                 'palette_id' => $zpalette['id'] ?? null,
+                'saved_palette_id' => ($zpalette['kind'] ?? '') === 'saved' ? ($zpalette['id'] ?? null) : null,
                 'palette_hash' => $zpalette['hash'] ?? null,
-                'ap_id' => ($zpalette['kind'] ?? '') === 'applied' ? ($zpalette['id'] ?? null) : null,
+                'saved_palette_set_id' => $zpalette['set_id'] ?? ($zphoto['saved_palette_set_id'] ?? null),
                 'palette_name' => $zpalette['nickname'] ?? null,
                 'palette_brand' => $zpalette['brand'] ?? null,
                 'source_color_id' => $cid,

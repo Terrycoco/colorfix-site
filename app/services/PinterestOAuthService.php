@@ -230,7 +230,7 @@ final class PinterestOAuthService
         $pinId = (string)($response['id'] ?? '');
         $pinUrl = $this->pinUrl($pinId, $response);
         $metadata = $this->metadata($asset);
-        $metadata['publishing_asset_id'] = (int)($asset['publishing_asset_id'] ?? $outputId);
+        $metadata['package_id'] = (int)($asset['package_id'] ?? $asset['publishing_asset_id'] ?? $outputId);
         $metadata['publish_output_id'] = $outputId;
         $metadata['test_publication'] = [
             'environment' => 'test',
@@ -243,8 +243,8 @@ final class PinterestOAuthService
         ];
 
         $this->publisherRepo->createAttempt([
-            'publishing_job_id' => (int)$asset['publishing_job_id'],
-            'publishing_asset_id' => (int)($asset['publishing_asset_id'] ?? $outputId),
+            'package_batch_id' => (int)($asset['package_batch_id'] ?? $asset['publishing_job_id'] ?? 0),
+            'package_id' => (int)($asset['package_id'] ?? $asset['publishing_asset_id'] ?? $outputId),
             'publishing_channel_id' => $asset['publishing_channel_id'] ?? null,
             'platform' => 'pinterest',
             'environment' => 'test',
@@ -255,7 +255,7 @@ final class PinterestOAuthService
             'external_id' => $pinId,
             'external_url' => $pinUrl,
         ]);
-        $this->publisherRepo->updatePublishingJobTestPublication((int)$asset['publishing_job_id'], $metadata, $pinId, $pinUrl);
+        $this->publisherRepo->updatePublishingJobTestPublication((int)($asset['package_batch_id'] ?? $asset['publishing_job_id'] ?? 0), $metadata, $pinId, $pinUrl);
 
         return [
             'ok' => true,
@@ -268,10 +268,6 @@ final class PinterestOAuthService
     public function publishPublishingJob(array $asset, array $channel): array
     {
         $environment = (string)($asset['environment'] ?? 'test');
-        if ($environment !== 'test') {
-            throw new RuntimeException('Only test publishing is enabled.');
-        }
-
         $channelMetadata = $this->metadata($channel);
         $destination = $channelMetadata['destinations'][$environment] ?? null;
         if (!$destination) {
@@ -322,7 +318,7 @@ final class PinterestOAuthService
                     'pinterest_pin_id' => $pinId ?: null,
                     'pinterest_pin_url' => $pinUrl ?: null,
                     'published_at' => gmdate('c'),
-                    'locks_production' => false,
+                    'locks_production' => $environment === 'production',
                 ],
             ]),
         ];
@@ -354,7 +350,6 @@ final class PinterestOAuthService
     private function validatePinPayload(array $payload, string $environment): array
     {
         $errors = [];
-        if ($environment !== 'test') $errors[] = 'Only test publishing is enabled.';
         if (trim((string)($payload['board_id'] ?? '')) === '') $errors[] = 'Missing Pinterest board ID.';
         if (trim((string)($payload['title'] ?? '')) === '') $errors[] = 'Missing title.';
         if (trim((string)($payload['description'] ?? '')) === '') $errors[] = 'Missing description.';
@@ -588,7 +583,7 @@ final class PinterestOAuthService
     {
         $url = UrlNormalizer::absoluteOrEmpty((string)($asset['destination_url'] ?: ($output['destination_url'] ?? '')));
         if ($url === '') return '';
-        $publishingJobId = (int)($asset['publishing_job_id'] ?? 0);
+        $publishingJobId = (int)($asset['package_batch_id'] ?? $asset['publishing_job_id'] ?? 0);
         if ($publishingJobId <= 0) return $url;
         return UrlNormalizer::appendQueryParam($url, 'job', (string)$publishingJobId);
     }

@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&display=swap');
+
+.brand-bumper-logo {
+  --brand-bumper-logo-size: clamp(42px, 4.9vw, 88px);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: max-content;
+  max-width: 48vw;
+  padding: 0;
+  line-height: 1;
+  overflow: visible;
+}
+
+.brand-bumper-logo__main {
+  display: inline-block;
+  font-family: Poppins, Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--brand-bumper-logo-size);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: .95;
+  white-space: nowrap;
+}
+
+.brand-bumper-logo__color {
+  color: #fff;
+}
+
+.brand-bumper-logo__fix {
+  color: #009ca6;
+}
+
+.brand-bumper-logo__by {
+  --brand-bumper-signature-cover-x: 105%;
+  position: relative;
+  display: inline-flex;
+  width: max-content;
+  max-width: none;
+  height: auto;
+  overflow: hidden;
+  margin-top: calc(var(--brand-bumper-logo-size) * -.03);
+  margin-left: calc(var(--brand-bumper-logo-size) * 3.08);
+  gap: .16em;
+  color: rgba(170, 205, 202, 1);
+  font-family: "Nothing You Could Do", cursive;
+  font-size: calc(var(--brand-bumper-logo-size) * .48);
+  font-weight: 400;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1;
+  text-transform: none;
+  transform: rotate(-1.5deg);
+  transform-origin: left center;
+  white-space: nowrap;
+  opacity: 1;
+  filter: drop-shadow(0 0 1px rgba(123, 174, 171, .18));
+  padding: .18em .24em .2em 0;
+}
+
+.brand-bumper-logo__by::after {
+  content: "";
+  position: absolute;
+  inset: 0 -.3em 0 0;
+  z-index: 2;
+  background: #000;
+  transform: translateX(var(--brand-bumper-signature-cover-x));
+  transform-origin: right center;
+  pointer-events: none;
+}
+
+.brand-bumper-logo.is-css-animated .brand-bumper-logo__by {
+  animation: brand-bumper-signature-appear 160ms ease-out 520ms both;
+}
+
+.brand-bumper-logo.is-css-animated .brand-bumper-logo__by::after {
+  transform: translateX(0%);
+  animation: brand-bumper-signature-reveal 1100ms ease-out 520ms both;
+}
+
+@keyframes brand-bumper-signature-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes brand-bumper-signature-reveal {
+  from {
+    transform: translateX(0%);
+  }
+  62% {
+    transform: translateX(82%);
+  }
+  76% {
+    transform: translateX(84%);
+  }
+  to {
+    transform: translateX(105%);
+  }
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  .brand-bumper-logo {
+    --brand-bumper-logo-size: clamp(38px, 9.8vw, 62px);
+    max-width: 60vw;
+  }
+
+  .brand-bumper-logo__by {
+    margin-left: calc(var(--brand-bumper-logo-size) * 3.02);
+  }
+}

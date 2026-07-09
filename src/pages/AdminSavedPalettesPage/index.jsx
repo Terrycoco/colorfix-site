@@ -12,15 +12,35 @@ const BRAND_CHOICES = [
   { code: "sw", label: "Sherwin-Williams" },
   { code: "behr", label: "Behr" },
   { code: "bm", label: "Benjamin Moore" },
+  { code: "multi", label: "Multi" },
   { code: "ppg", label: "PPG" },
   { code: "vs", label: "Valspar" },
   { code: "vist", label: "Vista Paint" },
   { code: "fb", label: "Farrow & Ball" },
 ];
 
+const COLOR_FAMILY_CHOICES = [
+  { value: "", label: "All Families" },
+  { value: "Reds", label: "Reds" },
+  { value: "Oranges", label: "Oranges" },
+  { value: "Yellows", label: "Yellows" },
+  { value: "Greens", label: "Greens" },
+  { value: "Cyans", label: "Cyans" },
+  { value: "Blues", label: "Blues" },
+  { value: "Purples", label: "Purples" },
+  { value: "Magentas", label: "Magentas" },
+  { value: "Whites", label: "Whites" },
+  { value: "Grays", label: "Grays" },
+  { value: "Greiges", label: "Greiges" },
+  { value: "Beiges", label: "Beiges" },
+  { value: "Browns", label: "Browns" },
+  { value: "Blacks", label: "Blacks" },
+];
+
 const defaultForm = {
   q: "",
   brand: "",
+  colorFamily: "",
   terryFav: "all",
   limit: 40,
 };
@@ -231,6 +251,7 @@ export default function AdminSavedPalettesPage() {
     };
     if (form.q.trim() !== "") next.q = form.q.trim();
     if (form.brand.trim() !== "") next.brand = form.brand.trim();
+    if (form.colorFamily.trim() !== "") next.color_family = form.colorFamily.trim();
     if (form.terryFav === "fav") next.terry_fav = 1;
     if (form.terryFav === "not") next.terry_fav = 0;
     setFilters(next);
@@ -370,6 +391,17 @@ export default function AdminSavedPalettesPage() {
             {BRAND_CHOICES.map((b) => (
               <option key={b.code || "all"} value={b.code}>
                 {b.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          Color Family
+          <select value={form.colorFamily} onChange={(e) => handleField("colorFamily", e.target.value)}>
+            {COLOR_FAMILY_CHOICES.map((family) => (
+              <option key={family.value || "all"} value={family.value}>
+                {family.label}
               </option>
             ))}
           </select>

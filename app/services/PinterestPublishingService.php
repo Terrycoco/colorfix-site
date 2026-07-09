@@ -73,7 +73,9 @@ final class PinterestPublishingService
             ?? $this->publisherRepo?->findDefaultChannelForPlatform('pinterest');
         $environment = $this->nullableString($payload['environment'] ?? null) ?? 'test';
         $channelId = isset($channel['publishing_channel_id']) ? (int)$channel['publishing_channel_id'] : null;
-        $assetCreatorJobId = isset($payload['asset_creator_job_id']) ? (int)$payload['asset_creator_job_id'] : null;
+        $assetCreatorJobId = isset($payload['creator_job_id'])
+            ? (int)$payload['creator_job_id']
+            : (isset($payload['asset_creator_job_id']) ? (int)$payload['asset_creator_job_id'] : null);
         $ctaGroupId = isset($payload['cta_group_id']) ? (int)$payload['cta_group_id'] : null;
         $landingPageIdForJob = isset($landingPage['id']) ? (int)$landingPage['id'] : null;
 
@@ -83,7 +85,7 @@ final class PinterestPublishingService
             'environment' => $environment,
             'source_type' => 'playlist',
             'source_id' => $playlistId,
-            'asset_creator_job_id' => $assetCreatorJobId,
+            'creator_job_id' => $assetCreatorJobId,
             'playlist_instance_id' => isset($instance['playlist_instance_id']) ? (int)$instance['playlist_instance_id'] : null,
             'cta_group_id' => $ctaGroupId,
             'landing_page_id' => $landingPageIdForJob,
@@ -98,14 +100,16 @@ final class PinterestPublishingService
         ]);
 
         $outputId = $this->repo->createOutput([
-            'publishing_job_id' => $jobId,
+            'package_batch_id' => $jobId,
             'publishing_channel_id' => $channelId,
             'platform' => 'pinterest',
             'environment' => $environment,
             'source_type' => 'playlist',
             'source_id' => $playlistId,
-            'asset_creator_output_id' => isset($payload['asset_creator_output_id']) ? (int)$payload['asset_creator_output_id'] : null,
-            'asset_creator_job_id' => $assetCreatorJobId,
+            'source_asset_id' => isset($payload['source_asset_id'])
+                ? (int)$payload['source_asset_id']
+                : (isset($payload['asset_creator_output_id']) ? (int)$payload['asset_creator_output_id'] : null),
+            'creator_job_id' => $assetCreatorJobId,
             'playlist_instance_id' => isset($instance['playlist_instance_id']) ? (int)$instance['playlist_instance_id'] : null,
             'cta_group_id' => $ctaGroupId,
             'landing_page_id' => $landingPageIdForJob,
@@ -141,8 +145,8 @@ final class PinterestPublishingService
         return [
             'publish_job_id' => $jobId,
             'publish_output_id' => $outputId,
-            'publishing_job_id' => $jobId,
-            'publishing_asset_id' => $outputId,
+            'package_batch_id' => $jobId,
+            'package_id' => $outputId,
             'tracking_code' => $trackingCode,
             'tracking_url' => $trackingUrl,
             'destination_url' => $destinationUrl,
@@ -176,9 +180,9 @@ final class PinterestPublishingService
             throw new RuntimeException('Asset creator repository unavailable.');
         }
 
-        $assetCreatorJobId = (int)($payload['asset_creator_job_id'] ?? 0);
+        $assetCreatorJobId = (int)($payload['creator_job_id'] ?? $payload['asset_creator_job_id'] ?? 0);
         if ($assetCreatorJobId <= 0) {
-            throw new RuntimeException('asset_creator_job_id required');
+            throw new RuntimeException('creator_job_id required');
         }
 
         $creatorJob = $this->assetCreatorRepo->findJob($assetCreatorJobId);
@@ -215,6 +219,21 @@ final class PinterestPublishingService
         $environment = $this->nullableString($payload['environment'] ?? null) ?? 'test';
         $destinationKey = $this->nullableString($payload['destination_key'] ?? null)
             ?? ($environment === 'production' ? 'colorfix_makeovers' : 'colorfix_api_test');
+        $job = $this->repo->findJobForCreatorDestination(
+            $assetCreatorJobId,
+            'pinterest',
+            $environment,
+            $ctaGroupId,
+            $destinationKey
+        );
+        $createdJob = false;
+        if ($job && (int)($job['playlist_instance_id'] ?? 0) > 0) {
+            $playlistInstanceId = (int)$job['playlist_instance_id'];
+            $instance = $this->repo->getDefaultPlaylistInstance($playlistId, $playlistInstanceId);
+            if (!$instance || (int)($instance['playlist_instance_id'] ?? 0) !== $playlistInstanceId) {
+                throw new RuntimeException("Playlist instance not found for existing package batch {$job['package_batch_id']}: {$playlistInstanceId}");
+            }
+        }
         $channel = $this->publisherRepo?->findChannelByKey('pinterest_colorfix_makeovers')
             ?? $this->publisherRepo?->findDefaultChannelForPlatform('pinterest');
         if (!$channel && $this->publisherRepo) {
@@ -238,15 +257,6 @@ final class PinterestPublishingService
             $title,
         ]);
 
-        $job = $this->repo->findJobForCreatorSetup(
-            $assetCreatorJobId,
-            'pinterest',
-            $environment,
-            $playlistInstanceId,
-            $ctaGroupId,
-            $destinationKey
-        );
-        $createdJob = false;
         if (!$job) {
             $jobId = $this->repo->createJob([
                 'publishing_channel_id' => $channelId,
@@ -254,7 +264,7 @@ final class PinterestPublishingService
                 'environment' => $environment,
                 'source_type' => 'playlist',
                 'source_id' => $playlistId,
-                'asset_creator_job_id' => $assetCreatorJobId,
+                'creator_job_id' => $assetCreatorJobId,
                 'playlist_instance_id' => $playlistInstanceId,
                 'cta_group_id' => $ctaGroupId,
                 'landing_page_id' => null,
@@ -272,22 +282,18 @@ final class PinterestPublishingService
             $createdJob = true;
         }
 
-        $jobId = (int)($job['publishing_job_id'] ?? $job['publish_job_id'] ?? 0);
+        $jobId = (int)($job['package_batch_id'] ?? $job['publish_job_id'] ?? 0);
         if ($jobId <= 0) {
             throw new RuntimeException('Failed to create publishing job.');
         }
 
         $destinationUrl = $this->buildDestinationUrl($playlistId, $instance, null);
-        $maxOutputs = isset($payload['max_outputs']) ? max(0, (int)$payload['max_outputs']) : 0;
         $creatorOutputs = array_values($creatorJob['outputs'] ?? []);
-        if ($maxOutputs > 0) {
-            $creatorOutputs = array_slice($creatorOutputs, 0, $maxOutputs);
-        }
         $createdOutputs = 0;
         $reusedOutputs = 0;
         $outputIds = [];
         foreach ($creatorOutputs as $output) {
-            $creatorOutputId = (int)($output['asset_creator_output_id'] ?? 0);
+            $creatorOutputId = (int)($output['source_asset_id'] ?? $output['asset_creator_output_id'] ?? 0);
             $assetLibraryId = (int)($output['asset_library_id'] ?? 0);
             if ($creatorOutputId <= 0 || $assetLibraryId <= 0) {
                 continue;
@@ -295,7 +301,7 @@ final class PinterestPublishingService
             $existing = $this->repo->findOutputByCreatorOutput($jobId, $creatorOutputId);
             if ($existing) {
                 $reusedOutputs += 1;
-                $outputIds[] = (int)$existing['publishing_asset_id'];
+                $outputIds[] = (int)$existing['package_id'];
                 continue;
             }
 
@@ -315,19 +321,19 @@ final class PinterestPublishingService
             $trackingCode = $this->buildTrackingCode($playlistId);
 
             $outputId = $this->repo->createOutput([
-                'publishing_job_id' => $jobId,
+                'package_batch_id' => $jobId,
                 'publishing_channel_id' => $channelId,
                 'platform' => 'pinterest',
                 'environment' => $environment,
                 'source_type' => 'playlist',
                 'source_id' => $playlistId,
-                'asset_creator_output_id' => $creatorOutputId,
-                'asset_creator_job_id' => $assetCreatorJobId,
+                'source_asset_id' => $creatorOutputId,
+                'creator_job_id' => $assetCreatorJobId,
                 'playlist_instance_id' => $playlistInstanceId,
                 'cta_group_id' => $ctaGroupId,
                 'landing_page_id' => null,
                 'asset_type' => $pinType,
-                'status' => 'ready_to_schedule',
+                'status' => 'packaged',
                 'title' => $assetTitle,
                 'description' => $assetDescription,
                 'alt_text' => $assetDescription,
@@ -358,7 +364,7 @@ final class PinterestPublishingService
         $this->repo->updateJobStatusFromOutputs($jobId);
 
         return [
-            'publishing_job_id' => $jobId,
+            'package_batch_id' => $jobId,
             'publish_job_id' => $jobId,
             'created_job' => $createdJob,
             'created_outputs' => $createdOutputs,
@@ -427,8 +433,8 @@ final class PinterestPublishingService
 
         $pathId = null;
         if ($instance) {
-            $slug = trim((string)($instance['slug'] ?? ''));
-            $pathId = $slug !== '' ? $slug : (string)($instance['playlist_instance_id'] ?? '');
+            $instanceId = (int)($instance['playlist_instance_id'] ?? 0);
+            $pathId = $instanceId > 0 ? (string)$instanceId : null;
         }
         if (!$pathId) {
             $pathId = (string)$playlistId;

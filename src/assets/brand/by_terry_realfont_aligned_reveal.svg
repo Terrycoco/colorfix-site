@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 45 570 230" width="570" height="230">
+  <title>by Terry - real font aligned reveal with clean final swap</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&amp;display=swap');
+
+    .sig {
+      font-family: "Nothing You Could Do", "Bradley Hand", "Segoe Script", cursive;
+      font-size: 112px;
+      fill: #7fa9a6;
+    }
+
+    .draw {
+      fill: none;
+      stroke: white;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .animated-terry {
+      opacity: 1;
+      animation: hideAnimated 0.01s linear 2.98s forwards;
+    }
+
+    .clean-terry {
+      opacity: 0;
+      animation: showClean 0.01s linear 2.98s forwards;
+    }
+
+    .s1 { stroke-dasharray: 420; stroke-dashoffset: 420; animation: a1 0.78s linear 0.00s forwards; }
+    .s2 { stroke-dasharray: 130; stroke-dashoffset: 130; animation: a2 0.30s linear 0.86s forwards; }
+    .s3 { stroke-dasharray: 165; stroke-dashoffset: 165; animation: a3 0.18s linear 1.22s forwards; }
+    .s4 { stroke-dasharray: 190; stroke-dashoffset: 190; animation: a4 0.35s linear 1.48s forwards; }
+    .s5 { stroke-dasharray: 120; stroke-dashoffset: 120; animation: a5 0.23s linear 1.90s forwards; }
+    .s6 { stroke-dasharray: 125; stroke-dashoffset: 125; animation: a6 0.24s linear 2.18s forwards; }
+    .s7 { stroke-dasharray: 340; stroke-dashoffset: 340; animation: a7 0.58s linear 2.42s forwards; }
+
+    @keyframes a1 { to { stroke-dashoffset: 0; } }
+    @keyframes a2 { to { stroke-dashoffset: 0; } }
+    @keyframes a3 { to { stroke-dashoffset: 0; } }
+    @keyframes a4 { to { stroke-dashoffset: 0; } }
+    @keyframes a5 { to { stroke-dashoffset: 0; } }
+    @keyframes a6 { to { stroke-dashoffset: 0; } }
+    @keyframes a7 { to { stroke-dashoffset: 0; } }
+    @keyframes hideAnimated { to { opacity: 0; } }
+    @keyframes showClean { to { opacity: 1; } }
+  </style>
+
+  <defs>
+    <mask id="mBy"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s1" stroke-width="86"
+        d="M 74 180 C 86 136, 104 120, 124 132 C 146 148, 154 182, 146 208 C 140 228, 152 234, 164 226 C 186 206, 188 168, 198 146 C 208 126, 222 124, 236 140 C 244 150, 250 164, 258 178 C 246 216, 226 250, 204 292"/>
+    </mask>
+
+    <!-- All Terry masks are aligned to the same final Terry word position -->
+    <mask id="mTStem"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s2" stroke-width="90" d="M 268 112 C 262 146, 254 184, 248 226"/>
+    </mask>
+
+    <mask id="mTCross"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s3" stroke-width="88" d="M 204 108 C 258 92, 311 90, 361 96"/>
+    </mask>
+
+    <mask id="mE"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s4" stroke-width="82"
+        d="M 306 168 C 324 162, 340 162, 356 168 M 356 168 C 344 150, 318 148, 302 162 C 288 174, 292 196, 310 204 C 328 212, 356 206, 374 188"/>
+    </mask>
+
+    <mask id="mR1"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s5" stroke-width="82"
+        d="M 376 166 C 376 184, 376 202, 376 220 M 376 170 C 390 154, 406 154, 420 170"/>
+    </mask>
+
+    <mask id="mR2"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s6" stroke-width="82"
+        d="M 430 164 C 430 182, 430 200, 430 220 M 430 168 C 444 152, 462 152, 476 170"/>
+    </mask>
+
+    <mask id="mY"><rect width="100%" height="100%" fill="black"/>
+      <path class="draw s7" stroke-width="104"
+        d="M 486 154 C 500 176, 518 196, 538 212 M 540 150 C 514 226, 494 326, 460 520"/>
+    </mask>
+  </defs>
+
+  <g transform="translate(24 8) rotate(-5 290 300)">
+    <text class="sig" x="54" y="192" mask="url(#mBy)">by</text>
+
+    <g class="animated-terry">
+      <text class="sig" x="196" y="192" mask="url(#mTStem)">Terry</text>
+      <text class="sig" x="196" y="192" mask="url(#mTCross)">Terry</text>
+      <text class="sig" x="196" y="192" mask="url(#mE)">Terry</text>
+      <text class="sig" x="196" y="192" mask="url(#mR1)">Terry</text>
+      <text class="sig" x="196" y="192" mask="url(#mR2)">Terry</text>
+      <text class="sig" x="196" y="192" mask="url(#mY)">Terry</text>
+    </g>
+
+    <text class="sig clean-terry" x="196" y="192">Terry</text>
+  </g>
+</svg>

@@ -444,6 +444,7 @@ class PdoPlaylistRepository
         $siteSelect = $this->getPlaylistItemFlagSelect('site');
         $ytSelect = $this->getPlaylistItemFlagSelect('yt');
         $pinSelect = $this->getPlaylistItemFlagSelect('pin');
+        $analyzerRoleSelect = $this->hasPlaylistItemColumn('analyzer_role') ? 'analyzer_role' : "'ignore' AS analyzer_role";
         $venueColumn = match ($venue) {
             'yt' => 'yt',
             'pin' => 'pin',
@@ -473,7 +474,8 @@ class PdoPlaylistRepository
                 {$shareImageSelect},
                 {$siteSelect},
                 {$ytSelect},
-                {$pinSelect}
+                {$pinSelect},
+                {$analyzerRoleSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
@@ -516,7 +518,8 @@ class PdoPlaylistRepository
                 isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null,
                 isset($row['site']) ? (bool)$row['site'] : true,
                 isset($row['yt']) ? (bool)$row['yt'] : true,
-                isset($row['pin']) ? (bool)$row['pin'] : true
+                isset($row['pin']) ? (bool)$row['pin'] : true,
+                $row['analyzer_role'] ?? 'ignore'
             );
         }
 

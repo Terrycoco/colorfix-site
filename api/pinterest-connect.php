@@ -27,6 +27,6 @@ try {
     header('Location: ' . $service->authorizationUrl($state), true, 302);
     exit;
 } catch (Throwable $e) {
-    header('Location: /admin/publisher?pinterest_auth=error&message=' . rawurlencode($e->getMessage()), true, 302);
+    header('Location: /admin/packager?pinterest_auth=error&message=' . rawurlencode($e->getMessage()), true, 302);
     exit;
 }

@@ -10,9 +10,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $ids = $payload['publishing_asset_ids']
+    $ids = $payload['package_ids']
+        ?? $payload['publishing_asset_ids']
         ?? $payload['publish_output_ids']
-        ?? $payload['publishing_job_ids']
         ?? [];
     if (!is_array($ids)) {
         $ids = [$ids];

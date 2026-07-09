@@ -29,7 +29,7 @@ final class PdoPublicationScheduleRepository
         $status = trim((string)($filters['schedule_status'] ?? ''));
         if ($status !== '' && $status !== 'all') {
             if ($status === 'unscheduled') {
-                $where[] = 'ps.publication_schedule_id IS NULL';
+                $where[] = 'ps.queue_item_id IS NULL';
             } else {
                 $where[] = 'ps.status = :schedule_status';
                 $params[':schedule_status'] = $status;
@@ -44,20 +44,20 @@ final class PdoPublicationScheduleRepository
 
         $creatorJob = trim((string)($filters['creator_job'] ?? ''));
         if ($creatorJob !== '') {
-            $where[] = '(CAST(pj.asset_creator_job_id AS CHAR) = :creator_job_exact OR acj.title LIKE :creator_job_like)';
+            $where[] = '(CAST(pj.creator_job_id AS CHAR) = :creator_job_exact OR acj.title LIKE :creator_job_like)';
             $params[':creator_job_exact'] = $creatorJob;
             $params[':creator_job_like'] = '%' . $creatorJob . '%';
         }
 
         $sql = <<<SQL
             SELECT
-              pa.publishing_asset_id,
-              pa.publishing_asset_id AS publish_output_id,
-              pa.publishing_job_id,
+              pa.package_id,
+              pa.package_id AS publish_output_id,
+              pa.package_batch_id,
               pa.publishing_channel_id,
               pa.asset_library_id,
-              pj.asset_creator_job_id,
-              pa.asset_creator_output_id,
+              pj.creator_job_id,
+              pa.source_asset_id,
               pa.platform,
               pa.environment,
               pa.source_type,
@@ -76,8 +76,23 @@ final class PdoPublicationScheduleRepository
               pa.canonical_destination_url,
               pa.tracked_destination_url,
               pa.status AS publication_status,
-              pub.external_post_id AS external_id,
-              pub.external_post_url AS external_url,
+              COALESCE(pub.external_post_id, pat.external_post_id) AS external_id,
+              COALESCE(pub.external_post_url, pat.external_post_url) AS external_url,
+              pub.status AS published_asset_status,
+              pub.response_payload_json AS published_response_payload_json,
+              pub.published_at AS published_asset_published_at,
+              pat.attempt_id AS publisher_attempt_id,
+              pat.attempt_number AS publisher_attempt_number,
+              pat.publisher_service,
+              pat.status AS publisher_attempt_status,
+              pat.request_payload_json AS publisher_request_payload_json,
+              pat.response_payload_json AS publisher_response_payload_json,
+              pat.external_post_id AS publisher_external_id,
+              pat.external_post_url AS publisher_external_url,
+              pat.error_code AS publisher_error_code,
+              pat.error_message AS publisher_error_message,
+              pat.started_at AS publisher_started_at,
+              pat.finished_at AS publisher_finished_at,
               pa.published_at,
               pa.locked_at,
               pa.last_error_code,
@@ -89,7 +104,7 @@ final class PdoPublicationScheduleRepository
               acj.title AS creator_job_title,
               p.title AS playlist_title,
               pi.instance_name,
-              ps.publication_schedule_id,
+              ps.queue_item_id,
               ps.scheduled_at,
               ps.timezone,
               ps.status AS schedule_status,
@@ -103,23 +118,39 @@ final class PdoPublicationScheduleRepository
               ps.completed_at,
               ps.last_error_code AS schedule_error_code,
               ps.last_error_message AS schedule_error
-            FROM publishing_assets pa
-            JOIN publishing_jobs pj
-              ON pj.publishing_job_id = pa.publishing_job_id
+            FROM packages pa
+            JOIN package_batches pj
+              ON pj.package_batch_id = pa.package_batch_id
             LEFT JOIN publishing_channels pc
               ON pc.publishing_channel_id = pa.publishing_channel_id
-            LEFT JOIN publications pub
-              ON pub.publishing_asset_id = pa.publishing_asset_id
+            LEFT JOIN published_assets pub
+              ON pub.package_id = pa.package_id
              AND pub.status IN ('published', 'test_published')
+             AND pub.published_asset_id = (
+                SELECT pub_latest.published_asset_id
+                  FROM published_assets pub_latest
+                 WHERE pub_latest.package_id = pa.package_id
+                   AND pub_latest.status IN ('published', 'test_published')
+              ORDER BY pub_latest.published_at DESC, pub_latest.published_asset_id DESC
+                 LIMIT 1
+             )
+            LEFT JOIN publisher_attempts pat
+              ON pat.attempt_id = (
+                SELECT pat_latest.attempt_id
+                  FROM publisher_attempts pat_latest
+                 WHERE pat_latest.package_id = pa.package_id
+              ORDER BY pat_latest.attempt_id DESC
+                 LIMIT 1
+             )
             LEFT JOIN asset_creator_jobs acj
-              ON acj.asset_creator_job_id = pj.asset_creator_job_id
+              ON acj.asset_creator_job_id = pj.creator_job_id
             LEFT JOIN playlists p
               ON p.playlist_id = pa.source_id
              AND pa.source_type = 'playlist'
             LEFT JOIN playlist_instances pi
               ON pi.playlist_instance_id = pa.playlist_instance_id
-            LEFT JOIN publication_schedule ps
-              ON ps.publishing_asset_id = pa.publishing_asset_id
+            LEFT JOIN scheduler_queue_items ps
+              ON ps.package_id = pa.package_id
              AND ps.status <> 'cancelled'
             SQL;
 
@@ -127,7 +158,7 @@ final class PdoPublicationScheduleRepository
             $sql .= "\nWHERE " . implode("\n  AND ", $where);
         }
 
-        $sql .= "\nORDER BY CASE WHEN ps.status = 'waiting' THEN 0 WHEN ps.scheduled_at IS NOT NULL THEN 1 ELSE 2 END ASC, COALESCE(ps.scheduled_at, ps.created_at, pa.updated_at) ASC, pa.updated_at DESC, pa.publishing_asset_id DESC\nLIMIT 300";
+        $sql .= "\nORDER BY CASE WHEN ps.status = 'waiting' THEN 0 WHEN ps.scheduled_at IS NOT NULL THEN 1 ELSE 2 END ASC, COALESCE(ps.scheduled_at, ps.created_at, pa.updated_at) ASC, pa.updated_at DESC, pa.package_id DESC\nLIMIT 300";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -138,13 +169,13 @@ final class PdoPublicationScheduleRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT pa.*, pc.channel_key, pc.label AS channel_label, pc.metadata_json AS channel_metadata_json
-               FROM publishing_assets pa
+               FROM packages pa
                LEFT JOIN publishing_channels pc
                  ON pc.publishing_channel_id = pa.publishing_channel_id
-              WHERE pa.publishing_asset_id = :publishing_asset_id
+              WHERE pa.package_id = :package_id
               LIMIT 1'
         );
-        $stmt->execute([':publishing_asset_id' => $publicationId]);
+        $stmt->execute([':package_id' => $publicationId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ? $this->normalizePublication($row) : null;
     }
@@ -153,19 +184,19 @@ final class PdoPublicationScheduleRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT pa.*, pc.channel_key, pc.label AS channel_label, pc.metadata_json AS channel_metadata_json
-               FROM publishing_assets pa
+               FROM packages pa
                LEFT JOIN publishing_channels pc
                  ON pc.publishing_channel_id = pa.publishing_channel_id
-              WHERE pa.publishing_job_id = :publishing_job_id
-              ORDER BY pa.publishing_asset_id ASC'
+              WHERE pa.package_batch_id = :package_batch_id
+              ORDER BY pa.package_id ASC'
         );
-        $stmt->execute([':publishing_job_id' => $publishingJobId]);
+        $stmt->execute([':package_batch_id' => $publishingJobId]);
         return array_map([$this, 'normalizePublication'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
     public function findScheduleById(int $scheduleId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM publication_schedule WHERE publication_schedule_id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT * FROM scheduler_queue_items WHERE queue_item_id = :id LIMIT 1');
         $stmt->execute([':id' => $scheduleId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ? $this->normalizeSchedule($row) : null;
@@ -173,8 +204,8 @@ final class PdoPublicationScheduleRepository
 
     public function findScheduleByPublicationId(int $publicationId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM publication_schedule WHERE publishing_asset_id = :publishing_asset_id AND status NOT IN ("completed", "cancelled") ORDER BY publication_schedule_id DESC LIMIT 1');
-        $stmt->execute([':publishing_asset_id' => $publicationId]);
+        $stmt = $this->pdo->prepare('SELECT * FROM scheduler_queue_items WHERE package_id = :package_id AND status IN ("waiting", "in_progress") ORDER BY queue_item_id DESC LIMIT 1');
+        $stmt->execute([':package_id' => $publicationId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ? $this->normalizeSchedule($row) : null;
     }
@@ -182,8 +213,8 @@ final class PdoPublicationScheduleRepository
     public function claimScheduleById(int $scheduleId, string $workerId): ?array
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE publication_schedule
-                SET status = 'processing',
+            "UPDATE scheduler_queue_items
+                SET status = 'in_progress',
                     claimed_at = UTC_TIMESTAMP(),
                     claimed_by = :worker_id,
                     last_attempt_at = UTC_TIMESTAMP(),
@@ -191,10 +222,10 @@ final class PdoPublicationScheduleRepository
                     next_retry_at = NULL,
                     last_error_code = NULL,
                     last_error_message = NULL
-              WHERE publication_schedule_id = :schedule_id
-                AND status NOT IN ('completed', 'cancelled')
+              WHERE queue_item_id = :schedule_id
+                AND status NOT IN ('published', 'cancelled')
                 AND (
-                    status <> 'processing'
+                    status <> 'in_progress'
                     OR claimed_at IS NULL
                     OR claimed_at < (UTC_TIMESTAMP() - INTERVAL 5 MINUTE)
                     OR claimed_by LIKE 'admin-now-%'
@@ -231,19 +262,19 @@ final class PdoPublicationScheduleRepository
                 $excludePlaceholders[] = $key;
                 $params[$key] = $scheduleId;
             }
-            $excludeSql = ' AND publication_schedule_id NOT IN (' . implode(',', $excludePlaceholders) . ')';
+            $excludeSql = ' AND queue_item_id NOT IN (' . implode(',', $excludePlaceholders) . ')';
         }
 
         $stmt = $this->pdo->prepare(
-            "SELECT publication_schedule_id, scheduled_at, status
-               FROM publication_schedule
+            "SELECT queue_item_id, scheduled_at, status
+               FROM scheduler_queue_items
               WHERE environment = :environment
                 AND scheduled_at >= :from_utc
                 AND scheduled_at < :to_utc
-                AND status NOT IN ('cancelled', 'failed')
+                AND status NOT IN ('cancelled', 'error', 'published')
                 AND {$channelSql}
                 {$excludeSql}
-           ORDER BY scheduled_at ASC, publication_schedule_id ASC"
+           ORDER BY scheduled_at ASC, queue_item_id ASC"
         );
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -262,12 +293,12 @@ final class PdoPublicationScheduleRepository
 
         $stmt = $this->pdo->prepare(
             "SELECT *
-               FROM publication_schedule
+               FROM scheduler_queue_items
               WHERE environment = :environment
                 AND scheduled_at > :after_utc
-                AND status = 'scheduled'
+                AND status = 'waiting'
                 AND {$channelSql}
-           ORDER BY scheduled_at ASC, priority ASC, publication_schedule_id ASC"
+           ORDER BY scheduled_at ASC, priority ASC, queue_item_id ASC"
         );
         $stmt->execute($params);
         return array_map([$this, 'normalizeSchedule'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
@@ -276,14 +307,14 @@ final class PdoPublicationScheduleRepository
     public function insertSchedule(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO publication_schedule
-                (publishing_job_id, publishing_asset_id, channel_id, platform, environment, scheduled_at, timezone, status, priority, max_attempts)
+            'INSERT INTO scheduler_queue_items
+                (package_batch_id, package_id, channel_id, platform, environment, scheduled_at, timezone, status, priority, max_attempts)
              VALUES
-                (:publishing_job_id, :publishing_asset_id, :channel_id, :platform, :environment, :scheduled_at, :timezone, :status, :priority, :max_attempts)'
+                (:package_batch_id, :package_id, :channel_id, :platform, :environment, :scheduled_at, :timezone, :status, :priority, :max_attempts)'
         );
         $stmt->execute([
-            ':publishing_job_id' => (int)$data['publishing_job_id'],
-            ':publishing_asset_id' => (int)$data['publishing_asset_id'],
+            ':package_batch_id' => (int)$data['package_batch_id'],
+            ':package_id' => (int)$data['package_id'],
             ':channel_id' => $this->nullableInt($data['channel_id'] ?? null),
             ':platform' => (string)$data['platform'],
             ':environment' => (string)$data['environment'],
@@ -299,15 +330,15 @@ final class PdoPublicationScheduleRepository
     public function updatePublicationStatus(int $publicationId, string $status): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE publishing_assets
+            'UPDATE packages
                 SET status = :status,
                     last_error_code = NULL,
                     last_error_message = NULL
-              WHERE publishing_asset_id = :publishing_asset_id'
+              WHERE package_id = :package_id'
         );
         $stmt->execute([
             ':status' => $status,
-            ':publishing_asset_id' => $publicationId,
+            ':package_id' => $publicationId,
         ]);
     }
 
@@ -315,14 +346,14 @@ final class PdoPublicationScheduleRepository
     {
         $asset = $this->findPublication($publicationId);
         $stmt = $this->pdo->prepare(
-            'UPDATE publishing_assets
+            'UPDATE packages
                 SET status = :status,
                     published_at = CASE WHEN :record_publication_result = 1 THEN COALESCE(:published_at, UTC_TIMESTAMP()) ELSE published_at END,
                     locked_at = CASE WHEN :lock_publication = 1 THEN COALESCE(locked_at, UTC_TIMESTAMP()) ELSE locked_at END,
                     metadata_json = :metadata_json,
                     last_error_code = NULL,
                     last_error_message = NULL
-              WHERE publishing_asset_id = :publishing_asset_id'
+              WHERE package_id = :package_id'
         );
         $stmt->execute([
             ':status' => (string)($data['status'] ?? 'published'),
@@ -330,25 +361,55 @@ final class PdoPublicationScheduleRepository
             ':record_publication_result' => !empty($data['record_publication_result']) ? 1 : 0,
             ':lock_publication' => !empty($data['lock_publication']) ? 1 : 0,
             ':metadata_json' => $this->jsonValue($data['metadata_json'] ?? null),
-            ':publishing_asset_id' => $publicationId,
+            ':package_id' => $publicationId,
         ]);
 
         if ($asset && ($this->nullableString($data['external_id'] ?? null) || $this->nullableString($data['external_url'] ?? null))) {
             $insert = $this->pdo->prepare(
-                'INSERT INTO publications
-                    (publishing_job_id, publishing_asset_id, publishing_channel_id, platform, environment, status,
+                'INSERT INTO published_assets
+                    (package_batch_id, package_id, publishing_channel_id, platform, environment, status,
+                     source_type, source_id, analyzer_job_id, creator_job_id, source_asset_id,
+                     asset_library_id, playlist_instance_id, cta_group_id, landing_page_id, asset_type,
+                     title, description, alt_text, media_url, destination_url, canonical_destination_url,
+                     tracked_destination_url, board_id, board_name, board_url, board_slug, duplicate_fingerprint,
                      external_post_id, external_post_url, response_payload_json, metadata_json, published_at)
                  VALUES
-                    (:publishing_job_id, :publishing_asset_id, :publishing_channel_id, :platform, :environment, :status,
+                    (:package_batch_id, :package_id, :publishing_channel_id, :platform, :environment, :status,
+                     :source_type, :source_id, :analyzer_job_id, :creator_job_id, :source_asset_id,
+                     :asset_library_id, :playlist_instance_id, :cta_group_id, :landing_page_id, :asset_type,
+                     :title, :description, :alt_text, :media_url, :destination_url, :canonical_destination_url,
+                     :tracked_destination_url, :board_id, :board_name, :board_url, :board_slug, :duplicate_fingerprint,
                      :external_post_id, :external_post_url, :response_payload_json, :metadata_json, :published_at)'
             );
             $insert->execute([
-                ':publishing_job_id' => (int)$asset['publishing_job_id'],
-                ':publishing_asset_id' => $publicationId,
+                ':package_batch_id' => (int)$asset['package_batch_id'],
+                ':package_id' => $publicationId,
                 ':publishing_channel_id' => $asset['publishing_channel_id'] ?? null,
                 ':platform' => $asset['platform'] ?? 'unknown',
                 ':environment' => $asset['environment'] ?? 'production',
                 ':status' => (string)($data['status'] ?? 'published'),
+                ':source_type' => $asset['source_type'] ?? null,
+                ':source_id' => $asset['source_id'] ?? null,
+                ':analyzer_job_id' => $asset['analyzer_job_id'] ?? null,
+                ':creator_job_id' => $asset['creator_job_id'] ?? null,
+                ':source_asset_id' => $asset['source_asset_id'] ?? null,
+                ':asset_library_id' => $asset['asset_library_id'] ?? null,
+                ':playlist_instance_id' => $asset['playlist_instance_id'] ?? null,
+                ':cta_group_id' => $asset['cta_group_id'] ?? null,
+                ':landing_page_id' => $asset['landing_page_id'] ?? null,
+                ':asset_type' => $asset['asset_type'] ?? null,
+                ':title' => $asset['title'] ?? null,
+                ':description' => $asset['description'] ?? null,
+                ':alt_text' => $asset['alt_text'] ?? null,
+                ':media_url' => $asset['media_url'] ?? ($asset['image_url'] ?? null),
+                ':destination_url' => $asset['destination_url'] ?? null,
+                ':canonical_destination_url' => $asset['canonical_destination_url'] ?? null,
+                ':tracked_destination_url' => $asset['tracked_destination_url'] ?? null,
+                ':board_id' => $asset['board_id'] ?? null,
+                ':board_name' => $asset['board_name'] ?? null,
+                ':board_url' => $asset['board_url'] ?? null,
+                ':board_slug' => $asset['board_slug'] ?? null,
+                ':duplicate_fingerprint' => $asset['duplicate_fingerprint'] ?? null,
                 ':external_post_id' => $this->nullableString($data['external_id'] ?? null),
                 ':external_post_url' => $this->nullableString($data['external_url'] ?? null),
                 ':response_payload_json' => $this->jsonValue($data['response_payload_json'] ?? null),
@@ -361,32 +422,32 @@ final class PdoPublicationScheduleRepository
     public function updatePublicationError(int $publicationId, string $status, ?string $errorCode, ?string $errorMessage): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE publishing_assets
+            'UPDATE packages
                 SET status = :status,
                     last_error_code = :last_error_code,
                     last_error_message = :last_error_message
-              WHERE publishing_asset_id = :publishing_asset_id'
+              WHERE package_id = :package_id'
         );
         $stmt->execute([
             ':status' => $status,
             ':last_error_code' => $errorCode,
             ':last_error_message' => $errorMessage,
-            ':publishing_asset_id' => $publicationId,
+            ':package_id' => $publicationId,
         ]);
     }
 
     public function cancelSchedule(int $scheduleId, string $reason): void
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE publication_schedule
+            "UPDATE scheduler_queue_items
                 SET status = 'cancelled',
                     last_error_code = NULL,
                     last_error_message = :reason,
                     claimed_at = NULL,
                     claimed_by = NULL,
                     next_retry_at = NULL
-              WHERE publication_schedule_id = :schedule_id
-                AND status NOT IN ('completed', 'cancelled')"
+              WHERE queue_item_id = :schedule_id
+                AND status NOT IN ('published', 'cancelled')"
         );
         $stmt->execute([
             ':reason' => $reason,
@@ -398,36 +459,38 @@ final class PdoPublicationScheduleRepository
     {
         $publicationIds = array_values(array_unique(array_filter(array_map('intval', $publicationIds))));
         if (!$publicationIds) {
-            return ['deleted_count' => 0, 'deleted_ids' => [], 'blocked' => []];
+            return ['deleted_count' => 0, 'deleted_ids' => [], 'deleted_playlist_instance_ids' => [], 'blocked' => []];
         }
 
         $deleted = [];
+        $deletedPlaylistInstances = [];
         $blocked = [];
         $this->pdo->beginTransaction();
         try {
             foreach ($publicationIds as $publicationId) {
                 $stmt = $this->pdo->prepare(
                     "SELECT
-                        pa.publishing_asset_id,
-                        pa.publishing_job_id,
+                        pa.package_id,
+                        pa.package_batch_id,
+                        pa.playlist_instance_id,
                         pa.environment,
                         pa.status,
                         pa.published_at,
                         pa.locked_at,
-                        SUM(CASE WHEN ps.status = 'processing' THEN 1 ELSE 0 END) AS processing_schedule_count,
-                        SUM(CASE WHEN ps.status NOT IN ('cancelled', 'failed', 'completed') THEN 1 ELSE 0 END) AS active_schedule_count,
+                        SUM(CASE WHEN ps.status = 'in_progress' THEN 1 ELSE 0 END) AS processing_schedule_count,
+                        SUM(CASE WHEN ps.status IN ('waiting', 'in_progress') THEN 1 ELSE 0 END) AS active_schedule_count,
                         SUM(CASE WHEN pub.status IN ('published', 'test_published') OR pub.external_post_id IS NOT NULL OR pub.external_post_url IS NOT NULL THEN 1 ELSE 0 END) AS external_post_count,
                         SUM(CASE WHEN pub.environment = 'production' OR pub.status = 'published' THEN 1 ELSE 0 END) AS production_publication_count
-                       FROM publishing_assets pa
-                       LEFT JOIN publication_schedule ps
-                         ON ps.publishing_asset_id = pa.publishing_asset_id
-                       LEFT JOIN publications pub
-                         ON pub.publishing_asset_id = pa.publishing_asset_id
-                      WHERE pa.publishing_asset_id = :publishing_asset_id
-                      GROUP BY pa.publishing_asset_id
+                       FROM packages pa
+                       LEFT JOIN scheduler_queue_items ps
+                         ON ps.package_id = pa.package_id
+                       LEFT JOIN published_assets pub
+                         ON pub.package_id = pa.package_id
+                      WHERE pa.package_id = :package_id
+                      GROUP BY pa.package_id
                       LIMIT 1"
                 );
-                $stmt->execute([':publishing_asset_id' => $publicationId]);
+                $stmt->execute([':package_id' => $publicationId]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 if (!$row) {
                     $blocked[] = "Asset #{$publicationId} was not found.";
@@ -438,9 +501,6 @@ final class PdoPublicationScheduleRepository
                 $reasons = [];
                 if ((int)($row['processing_schedule_count'] ?? 0) > 0) {
                     $reasons[] = 'is currently processing';
-                }
-                if (!$isTestDisposable && (int)($row['active_schedule_count'] ?? 0) > 0) {
-                    $reasons[] = 'has an active schedule row';
                 }
                 if ($isTestDisposable && (int)($row['production_publication_count'] ?? 0) > 0) {
                     $reasons[] = 'has production publication history';
@@ -464,54 +524,58 @@ final class PdoPublicationScheduleRepository
                 }
 
                 $scheduleIdsStmt = $this->pdo->prepare(
-                    'SELECT publication_schedule_id FROM publication_schedule WHERE publishing_asset_id = :publishing_asset_id'
+                    'SELECT queue_item_id FROM scheduler_queue_items WHERE package_id = :package_id'
                 );
-                $scheduleIdsStmt->execute([':publishing_asset_id' => $publicationId]);
+                $scheduleIdsStmt->execute([':package_id' => $publicationId]);
                 $scheduleIds = array_map('intval', $scheduleIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
                 if ($scheduleIds) {
                     $placeholders = implode(',', array_fill(0, count($scheduleIds), '?'));
-                    $deleteAttempts = $this->pdo->prepare("DELETE FROM publication_schedule_attempts WHERE publication_schedule_id IN ({$placeholders})");
+                    $deleteAttempts = $this->pdo->prepare("DELETE FROM scheduler_queue_item_attempts WHERE queue_item_id IN ({$placeholders})");
                     $deleteAttempts->execute($scheduleIds);
                 }
 
                 $deleteSchedules = $this->pdo->prepare(
-                    $isTestDisposable
-                        ? 'DELETE FROM publication_schedule
-                            WHERE publishing_asset_id = :publishing_asset_id'
-                        : "DELETE FROM publication_schedule
-                            WHERE publishing_asset_id = :publishing_asset_id
-                              AND status IN ('cancelled', 'failed')"
+                    "DELETE FROM scheduler_queue_items
+                        WHERE package_id = :package_id
+                          AND status IN ('waiting', 'cancelled', 'error', 'skipped_duplicate')"
                 );
-                $deleteSchedules->execute([':publishing_asset_id' => $publicationId]);
+                $deleteSchedules->execute([':package_id' => $publicationId]);
 
                 $deleteAttemptsByAsset = $this->pdo->prepare(
-                    'DELETE FROM publisher_attempts WHERE publishing_asset_id = :publishing_asset_id'
+                    'DELETE FROM publisher_attempts WHERE package_id = :package_id'
                 );
-                $deleteAttemptsByAsset->execute([':publishing_asset_id' => $publicationId]);
+                $deleteAttemptsByAsset->execute([':package_id' => $publicationId]);
 
                 $deletePublications = $this->pdo->prepare(
-                    'DELETE FROM publications WHERE publishing_asset_id = :publishing_asset_id'
+                    'DELETE FROM published_assets WHERE package_id = :package_id'
                 );
-                $deletePublications->execute([':publishing_asset_id' => $publicationId]);
+                $deletePublications->execute([':package_id' => $publicationId]);
 
-                $jobId = (int)($row['publishing_job_id'] ?? 0);
+                $jobId = (int)($row['package_batch_id'] ?? 0);
+                $playlistInstanceId = (int)($row['playlist_instance_id'] ?? 0);
                 $deleteAsset = $this->pdo->prepare(
-                    'DELETE FROM publishing_assets WHERE publishing_asset_id = :publishing_asset_id'
+                    'DELETE FROM packages WHERE package_id = :package_id'
                 );
-                $deleteAsset->execute([':publishing_asset_id' => $publicationId]);
+                $deleteAsset->execute([':package_id' => $publicationId]);
 
                 if ($deleteAsset->rowCount() > 0) {
                     $deleted[] = $publicationId;
                     if ($jobId > 0) {
                         $deleteOrphanJob = $this->pdo->prepare(
                             'DELETE pj
-                               FROM publishing_jobs pj
-                               LEFT JOIN publishing_assets pa
-                                 ON pa.publishing_job_id = pj.publishing_job_id
-                              WHERE pj.publishing_job_id = :publishing_job_id
-                                AND pa.publishing_asset_id IS NULL'
+                               FROM package_batches pj
+                               LEFT JOIN packages pa
+                                 ON pa.package_batch_id = pj.package_batch_id
+                              WHERE pj.package_batch_id = :package_batch_id
+                                AND pa.package_id IS NULL'
                         );
-                        $deleteOrphanJob->execute([':publishing_job_id' => $jobId]);
+                        $deleteOrphanJob->execute([':package_batch_id' => $jobId]);
+                        if ($deleteOrphanJob->rowCount() > 0 && $playlistInstanceId > 0) {
+                            $deletedInstanceId = $this->deleteOrphanPublisherTestInstance($playlistInstanceId);
+                            if ($deletedInstanceId !== null) {
+                                $deletedPlaylistInstances[] = $deletedInstanceId;
+                            }
+                        }
                     }
                 }
             }
@@ -525,16 +589,110 @@ final class PdoPublicationScheduleRepository
         return [
             'deleted_count' => count($deleted),
             'deleted_ids' => $deleted,
+            'deleted_playlist_instance_ids' => array_values(array_unique($deletedPlaylistInstances)),
             'blocked' => $blocked,
         ];
+    }
+
+    private function deleteOrphanPublisherTestInstance(int $playlistInstanceId): ?int
+    {
+        if (!$this->tableExists('playlist_instances')) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT playlist_instance_id, audience, instance_notes
+               FROM playlist_instances
+              WHERE playlist_instance_id = :playlist_instance_id
+              LIMIT 1'
+        );
+        $stmt->execute([':playlist_instance_id' => $playlistInstanceId]);
+        $instance = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$instance) {
+            return null;
+        }
+
+        $notes = (string)($instance['instance_notes'] ?? '');
+        $audience = strtolower((string)($instance['audience'] ?? ''));
+        $isPublisherTestInstance = in_array($audience, ['', 'pinterest'], true)
+            && str_contains($notes, 'publisher_platform=pinterest')
+            && str_contains($notes, 'publisher_destination=colorfix_api_test')
+            && str_contains($notes, 'asset_creator_job_id=');
+        if (!$isPublisherTestInstance) {
+            return null;
+        }
+
+        if ($this->playlistInstanceReferenceCount($playlistInstanceId) > 0) {
+            return null;
+        }
+
+        $delete = $this->pdo->prepare(
+            'DELETE FROM playlist_instances
+              WHERE playlist_instance_id = :playlist_instance_id
+              LIMIT 1'
+        );
+        $delete->execute([':playlist_instance_id' => $playlistInstanceId]);
+
+        return $delete->rowCount() > 0 ? $playlistInstanceId : null;
+    }
+
+    private function playlistInstanceReferenceCount(int $playlistInstanceId): int
+    {
+        $refs = 0;
+        $checks = [
+            ['package_batches', 'playlist_instance_id'],
+            ['packages', 'playlist_instance_id'],
+            ['landing_pages', 'primary_playlist_instance_id'],
+            ['playlist_instance_set_items', 'playlist_instance_id'],
+            ['playlist_instance_sets', 'playlist_instance_id'],
+        ];
+
+        foreach ($checks as [$table, $column]) {
+            if (!$this->tableExists($table) || !$this->columnExists($table, $column)) {
+                continue;
+            }
+            $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM {$table} WHERE {$column} = :playlist_instance_id");
+            $stmt->execute([':playlist_instance_id' => $playlistInstanceId]);
+            $refs += (int)$stmt->fetchColumn();
+        }
+
+        return $refs;
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name'
+        );
+        $stmt->execute([':table_name' => $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*)
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = :table_name
+                AND COLUMN_NAME = :column_name'
+        );
+        $stmt->execute([
+            ':table_name' => $table,
+            ':column_name' => $column,
+        ]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     public function reschedule(int $scheduleId, string $scheduledAt, string $timezone, int $priority): void
     {
         $scheduledAtValue = $this->nullableString($scheduledAt);
-        $status = $scheduledAtValue === null ? 'waiting' : 'scheduled';
+        $status = 'waiting';
         $stmt = $this->pdo->prepare(
-            "UPDATE publication_schedule
+            "UPDATE scheduler_queue_items
                 SET scheduled_at = :scheduled_at,
                     timezone = :timezone,
                     priority = :priority,
@@ -545,8 +703,8 @@ final class PdoPublicationScheduleRepository
                     completed_at = NULL,
                     last_error_code = NULL,
                     last_error_message = NULL
-              WHERE publication_schedule_id = :schedule_id
-                AND status NOT IN ('completed')"
+              WHERE queue_item_id = :schedule_id
+                AND status NOT IN ('published')"
         );
         $stmt->execute([
             ':scheduled_at' => $scheduledAtValue,
@@ -560,18 +718,18 @@ final class PdoPublicationScheduleRepository
     public function claimDueTasks(int $limit, string $workerId): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT publication_schedule_id
-               FROM publication_schedule
+            "SELECT queue_item_id
+               FROM scheduler_queue_items
               WHERE (
-                    status = 'scheduled'
+                    status = 'waiting'
                 AND scheduled_at <= UTC_TIMESTAMP()
               )
                  OR (
-                    status = 'retry_scheduled'
+                    status = 'waiting'
                 AND next_retry_at IS NOT NULL
                 AND next_retry_at <= UTC_TIMESTAMP()
               )
-           ORDER BY priority ASC, scheduled_at ASC, publication_schedule_id ASC
+           ORDER BY priority ASC, scheduled_at ASC, queue_item_id ASC
               LIMIT :limit"
         );
         $stmt->bindValue(':limit', max(1, $limit), PDO::PARAM_INT);
@@ -581,14 +739,14 @@ final class PdoPublicationScheduleRepository
         $claimed = [];
         foreach ($ids as $id) {
             $claim = $this->pdo->prepare(
-                "UPDATE publication_schedule
-                    SET status = 'processing',
+                "UPDATE scheduler_queue_items
+                    SET status = 'in_progress',
                         claimed_at = UTC_TIMESTAMP(),
                         claimed_by = :worker_id,
                         last_attempt_at = UTC_TIMESTAMP(),
                         attempt_count = attempt_count + 1
-                  WHERE publication_schedule_id = :schedule_id
-                    AND status IN ('scheduled', 'retry_scheduled')"
+                  WHERE queue_item_id = :schedule_id
+                    AND status = 'waiting'"
             );
             $claim->execute([
                 ':worker_id' => $workerId,
@@ -606,12 +764,12 @@ final class PdoPublicationScheduleRepository
     public function claimDueRetryTasks(int $limit, string $workerId): array
     {
         $stmt = $this->pdo->prepare(
-            "SELECT publication_schedule_id
-               FROM publication_schedule
-              WHERE status = 'retry_scheduled'
+            "SELECT queue_item_id
+               FROM scheduler_queue_items
+              WHERE status = 'waiting'
                 AND next_retry_at IS NOT NULL
                 AND next_retry_at <= UTC_TIMESTAMP()
-           ORDER BY priority ASC, next_retry_at ASC, publication_schedule_id ASC
+           ORDER BY priority ASC, next_retry_at ASC, queue_item_id ASC
               LIMIT :limit"
         );
         $stmt->bindValue(':limit', max(1, $limit), PDO::PARAM_INT);
@@ -621,14 +779,14 @@ final class PdoPublicationScheduleRepository
         $claimed = [];
         foreach ($ids as $id) {
             $claim = $this->pdo->prepare(
-                "UPDATE publication_schedule
-                    SET status = 'processing',
+                "UPDATE scheduler_queue_items
+                    SET status = 'in_progress',
                         claimed_at = UTC_TIMESTAMP(),
                         claimed_by = :worker_id,
                         last_attempt_at = UTC_TIMESTAMP(),
                         attempt_count = attempt_count + 1
-                  WHERE publication_schedule_id = :schedule_id
-                    AND status = 'retry_scheduled'"
+                  WHERE queue_item_id = :schedule_id
+                    AND status = 'waiting'"
             );
             $claim->execute([
                 ':worker_id' => $workerId,
@@ -652,7 +810,7 @@ final class PdoPublicationScheduleRepository
                 ps.environment,
                 pc.metadata_json AS channel_metadata_json,
                 COUNT(*) AS waiting_count
-               FROM publication_schedule ps
+               FROM scheduler_queue_items ps
                LEFT JOIN publishing_channels pc
                  ON pc.publishing_channel_id = ps.channel_id
               WHERE ps.status = 'waiting'
@@ -676,10 +834,10 @@ final class PdoPublicationScheduleRepository
 
         $stmt = $this->pdo->prepare(
             "SELECT COUNT(*)
-               FROM publication_schedule
+               FROM scheduler_queue_items
               WHERE environment = :environment
                 AND {$channelSql}
-                AND status = 'completed'
+                AND status = 'published'
                 AND completed_at >= :from_utc
                 AND completed_at < :to_utc"
         );
@@ -697,14 +855,14 @@ final class PdoPublicationScheduleRepository
 
         $stmt = $this->pdo->prepare(
             "SELECT ps.*, pa.source_id
-               FROM publication_schedule ps
-               LEFT JOIN publishing_assets pa
-                 ON pa.publishing_asset_id = ps.publishing_asset_id
+               FROM scheduler_queue_items ps
+               LEFT JOIN packages pa
+                 ON pa.package_id = ps.package_id
               WHERE ps.environment = :environment
                 AND {$channelSql}
-                AND ps.status = 'completed'
+                AND ps.status = 'published'
                 AND ps.completed_at IS NOT NULL
-           ORDER BY ps.completed_at DESC, ps.publication_schedule_id DESC
+           ORDER BY ps.completed_at DESC, ps.queue_item_id DESC
               LIMIT 1"
         );
         $stmt->execute($params);
@@ -721,20 +879,20 @@ final class PdoPublicationScheduleRepository
         }
 
         $recentStmt = $this->pdo->prepare(
-            "SELECT ps.publishing_job_id, pa.source_id, pa.asset_type
-               FROM publication_schedule ps
-               LEFT JOIN publishing_assets pa
-                 ON pa.publishing_asset_id = ps.publishing_asset_id
+            "SELECT ps.package_batch_id, pa.source_id, pa.asset_type
+               FROM scheduler_queue_items ps
+               LEFT JOIN packages pa
+                 ON pa.package_id = ps.package_id
               WHERE ps.environment = :environment
                 AND {$channelSql}
-                AND ps.status = 'completed'
+                AND ps.status = 'published'
                 AND ps.completed_at IS NOT NULL
-           ORDER BY ps.completed_at DESC, ps.publication_schedule_id DESC
+           ORDER BY ps.completed_at DESC, ps.queue_item_id DESC
               LIMIT " . max(1, $recentLimit)
         );
         $recentStmt->execute($params);
         $recent = $recentStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        $recentJobIds = array_values(array_unique(array_filter(array_map('intval', array_column($recent, 'publishing_job_id')))));
+        $recentJobIds = array_values(array_unique(array_filter(array_map('intval', array_column($recent, 'package_batch_id')))));
         $recentSourceIds = array_values(array_unique(array_filter(array_map('intval', array_column($recent, 'source_id')))));
         $recentAssetTypes = array_values(array_unique(array_filter(array_map(
             static fn(mixed $value): string => trim((string)$value),
@@ -751,7 +909,7 @@ final class PdoPublicationScheduleRepository
                 $keys[] = $key;
                 $selectParams[$key] = $jobId;
             }
-            $jobCase = 'CASE WHEN ps.publishing_job_id IN (' . implode(',', $keys) . ') THEN 1 ELSE 0 END';
+            $jobCase = 'CASE WHEN ps.package_batch_id IN (' . implode(',', $keys) . ') THEN 1 ELSE 0 END';
         }
 
         $sourceCase = '(0 + 0)';
@@ -777,18 +935,18 @@ final class PdoPublicationScheduleRepository
         }
 
         $stmt = $this->pdo->prepare(
-            "SELECT ps.publication_schedule_id
-               FROM publication_schedule ps
-               JOIN publishing_assets pa
-                 ON pa.publishing_asset_id = ps.publishing_asset_id
+            "SELECT ps.queue_item_id
+               FROM scheduler_queue_items ps
+               JOIN packages pa
+                 ON pa.package_id = ps.package_id
               WHERE ps.environment = :environment
                 AND {$channelSql}
                 AND ps.status = 'waiting'
                 AND NOT EXISTS (
                     SELECT 1
-                      FROM publications prior_pub
-                      JOIN publishing_assets prior_pa
-                        ON prior_pa.publishing_asset_id = prior_pub.publishing_asset_id
+                      FROM published_assets prior_pub
+                      JOIN packages prior_pa
+                        ON prior_pa.package_id = prior_pub.package_id
                      WHERE prior_pub.published_at IS NOT NULL
                        AND prior_pub.published_at >= :duplicate_cutoff
                        AND prior_pub.status IN ('published', 'test_published', 'posted')
@@ -800,17 +958,17 @@ final class PdoPublicationScheduleRepository
                        )
                        AND (
                             (pa.asset_library_id IS NOT NULL AND prior_pa.asset_library_id = pa.asset_library_id)
-                         OR (pa.asset_library_id IS NULL AND pa.asset_creator_output_id IS NOT NULL AND prior_pa.asset_creator_output_id = pa.asset_creator_output_id)
+                         OR (pa.asset_library_id IS NULL AND pa.source_asset_id IS NOT NULL AND prior_pa.source_asset_id = pa.source_asset_id)
                          OR (
                                 pa.asset_library_id IS NULL
-                            AND pa.asset_creator_output_id IS NULL
+                            AND pa.source_asset_id IS NULL
                             AND COALESCE(NULLIF(pa.media_url, ''), NULLIF(pa.image_url, ''), NULLIF(pa.media_path, ''), '') <> ''
                             AND COALESCE(NULLIF(prior_pa.media_url, ''), NULLIF(prior_pa.image_url, ''), NULLIF(prior_pa.media_path, ''), '') =
                                 COALESCE(NULLIF(pa.media_url, ''), NULLIF(pa.image_url, ''), NULLIF(pa.media_path, ''), '')
                             )
                        )
                 )
-           ORDER BY {$jobCase} ASC, {$assetTypeCase} ASC, {$sourceCase} ASC, ps.priority ASC, ps.created_at ASC, ps.publication_schedule_id ASC
+           ORDER BY {$jobCase} ASC, {$assetTypeCase} ASC, {$sourceCase} ASC, ps.priority ASC, ps.created_at ASC, ps.queue_item_id ASC
               LIMIT 1"
         );
         $stmt->execute($selectParams);
@@ -820,13 +978,13 @@ final class PdoPublicationScheduleRepository
         }
 
         $claim = $this->pdo->prepare(
-            "UPDATE publication_schedule
-                SET status = 'processing',
+            "UPDATE scheduler_queue_items
+                SET status = 'in_progress',
                     claimed_at = UTC_TIMESTAMP(),
                     claimed_by = :worker_id,
                     last_attempt_at = UTC_TIMESTAMP(),
                     attempt_count = attempt_count + 1
-              WHERE publication_schedule_id = :schedule_id
+              WHERE queue_item_id = :schedule_id
                 AND status = 'waiting'"
         );
         $claim->execute([
@@ -843,24 +1001,24 @@ final class PdoPublicationScheduleRepository
     public function completeSchedule(int $scheduleId, array $result): void
     {
         $stmt = $this->pdo->prepare(
-            "UPDATE publication_schedule
-                SET status = 'completed',
+            "UPDATE scheduler_queue_items
+                SET status = 'published',
                     completed_at = UTC_TIMESTAMP(),
                     claimed_at = NULL,
                     claimed_by = NULL,
                     next_retry_at = NULL,
                     last_error_code = NULL,
                     last_error_message = NULL
-              WHERE publication_schedule_id = :schedule_id"
+              WHERE queue_item_id = :schedule_id"
         );
         $stmt->execute([':schedule_id' => $scheduleId]);
 
         $schedule = $this->findScheduleById($scheduleId);
         if ($schedule) {
             $this->createAttempt([
-                'publication_schedule_id' => $scheduleId,
-                'publishing_job_id' => $schedule['publishing_job_id'],
-                'publishing_asset_id' => $schedule['publishing_asset_id'],
+                'queue_item_id' => $scheduleId,
+                'package_batch_id' => $schedule['package_batch_id'],
+                'package_id' => $schedule['package_id'],
                 'attempt_number' => max(1, (int)$schedule['attempt_count']),
                 'success' => true,
                 'retryable' => false,
@@ -874,16 +1032,16 @@ final class PdoPublicationScheduleRepository
     public function failSchedule(int $scheduleId, array $result): void
     {
         $retryable = !empty($result['retryable']);
-        $status = $retryable ? 'retry_scheduled' : 'failed';
+        $status = 'error';
         $stmt = $this->pdo->prepare(
-            "UPDATE publication_schedule
+            "UPDATE scheduler_queue_items
                 SET status = :status,
                     claimed_at = NULL,
                     claimed_by = NULL,
                     next_retry_at = :next_retry_at,
                     last_error_code = :last_error_code,
                     last_error_message = :last_error
-              WHERE publication_schedule_id = :schedule_id"
+              WHERE queue_item_id = :schedule_id"
         );
         $stmt->execute([
             ':status' => $status,
@@ -896,9 +1054,9 @@ final class PdoPublicationScheduleRepository
         $schedule = $this->findScheduleById($scheduleId);
         if ($schedule) {
             $this->createAttempt([
-                'publication_schedule_id' => $scheduleId,
-                'publishing_job_id' => $schedule['publishing_job_id'],
-                'publishing_asset_id' => $schedule['publishing_asset_id'],
+                'queue_item_id' => $scheduleId,
+                'package_batch_id' => $schedule['package_batch_id'],
+                'package_id' => $schedule['package_id'],
                 'attempt_number' => max(1, (int)$schedule['attempt_count']),
                 'success' => false,
                 'retryable' => $retryable,
@@ -912,17 +1070,17 @@ final class PdoPublicationScheduleRepository
     public function createAttempt(array $data): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO publication_schedule_attempts
-                (publication_schedule_id, publishing_job_id, publishing_asset_id, attempt_number, started_at, finished_at, success, retryable,
+            'INSERT INTO scheduler_queue_item_attempts
+                (queue_item_id, package_batch_id, package_id, attempt_number, started_at, finished_at, success, retryable,
                  error_code, error_message, platform_post_id, published_url, response_summary)
              VALUES
-                (:publication_schedule_id, :publishing_job_id, :publishing_asset_id, :attempt_number, UTC_TIMESTAMP(), UTC_TIMESTAMP(), :success, :retryable,
+                (:queue_item_id, :package_batch_id, :package_id, :attempt_number, UTC_TIMESTAMP(), UTC_TIMESTAMP(), :success, :retryable,
                  :error_code, :error_message, :platform_post_id, :published_url, :response_summary)'
         );
         $stmt->execute([
-            ':publication_schedule_id' => (int)$data['publication_schedule_id'],
-            ':publishing_job_id' => (int)$data['publishing_job_id'],
-            ':publishing_asset_id' => (int)$data['publishing_asset_id'],
+            ':queue_item_id' => (int)$data['queue_item_id'],
+            ':package_batch_id' => (int)$data['package_batch_id'],
+            ':package_id' => (int)$data['package_id'],
             ':attempt_number' => (int)$data['attempt_number'],
             ':success' => !empty($data['success']) ? 1 : 0,
             ':retryable' => !empty($data['retryable']) ? 1 : 0,
@@ -938,15 +1096,19 @@ final class PdoPublicationScheduleRepository
     private function normalizeQueueRow(array $row): array
     {
         foreach ([
-            'publishing_job_id', 'publishing_asset_id', 'publishing_channel_id', 'publish_output_id', 'asset_library_id',
-            'asset_creator_job_id', 'asset_creator_output_id', 'source_id', 'playlist_instance_id',
-            'cta_group_id', 'landing_page_id', 'publication_schedule_id', 'priority',
-            'attempt_count', 'max_attempts',
+            'package_batch_id', 'package_id', 'publishing_channel_id', 'publish_output_id', 'asset_library_id',
+            'creator_job_id', 'source_asset_id', 'source_id', 'playlist_instance_id',
+            'cta_group_id', 'landing_page_id', 'queue_item_id', 'priority',
+            'attempt_count', 'max_attempts', 'publisher_attempt_id', 'publisher_attempt_number',
         ] as $key) {
             if (array_key_exists($key, $row) && $row[$key] !== null && $row[$key] !== '') {
                 $row[$key] = (int)$row[$key];
             }
         }
+        $row['object_type'] = 'queue_item';
+        $row['queue_item_id'] = $row['queue_item_id'] ?? null;
+        $row['package_id'] = $row['package_id'] ?? $row['publish_output_id'] ?? null;
+        $row['package_batch_id'] = $row['package_batch_id'] ?? null;
         $row['schedule_status'] = $row['schedule_status'] ?? 'unscheduled';
         $row['channel_metadata_json'] = $this->decodeJson($row['channel_metadata_json'] ?? null);
         $row['publication_metadata_json'] = $this->decodeJson($row['publication_metadata_json'] ?? null);
@@ -955,9 +1117,12 @@ final class PdoPublicationScheduleRepository
 
     private function normalizePublication(array $row): array
     {
-        foreach (['publishing_job_id', 'publishing_asset_id', 'publishing_channel_id', 'publish_output_id', 'asset_library_id'] as $key) {
+        foreach (['package_batch_id', 'package_id', 'publishing_channel_id', 'publish_output_id', 'asset_library_id'] as $key) {
             if (isset($row[$key]) && $row[$key] !== '') $row[$key] = (int)$row[$key];
         }
+        $row['object_type'] = 'package';
+        $row['package_id'] = $row['package_id'] ?? $row['publish_output_id'] ?? null;
+        $row['package_batch_id'] = $row['package_batch_id'] ?? null;
         $row['metadata_json'] = $this->decodeJson($row['metadata_json'] ?? null);
         $row['channel_metadata_json'] = $this->decodeJson($row['channel_metadata_json'] ?? null);
         return $row;
@@ -965,9 +1130,13 @@ final class PdoPublicationScheduleRepository
 
     private function normalizeSchedule(array $row): array
     {
-        foreach (['publication_schedule_id', 'publishing_job_id', 'publishing_asset_id', 'channel_id', 'priority', 'attempt_count', 'max_attempts'] as $key) {
+        foreach (['queue_item_id', 'package_batch_id', 'package_id', 'channel_id', 'priority', 'attempt_count', 'max_attempts'] as $key) {
             if (isset($row[$key]) && $row[$key] !== '') $row[$key] = (int)$row[$key];
         }
+        $row['object_type'] = 'queue_item';
+        $row['queue_item_id'] = $row['queue_item_id'] ?? null;
+        $row['package_id'] = $row['package_id'] ?? null;
+        $row['package_batch_id'] = $row['package_batch_id'] ?? null;
         return $row;
     }
 

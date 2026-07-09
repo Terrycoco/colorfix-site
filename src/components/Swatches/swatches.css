@@ -14,6 +14,9 @@
   overflow: visible;
   perspective: 900px;                    /* enables subtle 3D tilt */
   perspective-origin: 80% 20%;           /* emphasize top-right corner */
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* fill block */

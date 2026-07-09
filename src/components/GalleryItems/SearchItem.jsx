@@ -1,11 +1,35 @@
 import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
 import {buildResultsUrl} from '@helpers/routingHelper';
+import { PaletteOutlineIcon } from '../Icons/PaletteIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
+
+function FilterIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <path
+        d="M3 5h18l-7 8v5l-4 2v-7L3 5z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function getDisplayIcon(display) {
+  const key = String(display || '').trim().toLowerCase();
+  if (key === 'my palette') return 'palette';
+  if (key === 'filter by brand') return 'filter';
+  return '';
+}
 
 const SearchItem = ({ item }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isColorFixBrand = String(item?.display || '').trim().toLowerCase() === 'colorfix';
+  const displayIcon = getDisplayIcon(item?.display);
 
   const goToTarget = (url) => {
     const target = String(url || '').trim();
@@ -46,6 +70,17 @@ const SearchItem = ({ item }) => {
         <div className='search-display'>
           {isColorFixBrand ? (
             <img src={colorfixLightBgUrl} alt="ColorFix" className="search-display__brand-image" />
+          ) : displayIcon ? (
+            <span className="search-display__with-icon">
+              <span>{item.display}</span>
+              <span className="search-display__icon" aria-hidden="true">
+                {displayIcon === 'palette' ? (
+                  <PaletteOutlineIcon />
+                ) : (
+                  <FilterIcon />
+                )}
+              </span>
+            </span>
           ) : (
             item.display
           )}

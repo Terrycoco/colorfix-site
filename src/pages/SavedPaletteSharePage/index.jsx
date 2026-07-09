@@ -17,14 +17,17 @@ export default function SavedPaletteSharePage() {
     const params = new URLSearchParams(window.location.search);
     return params.get("set_id") || "";
   }, []);
-
   useEffect(() => {
     if (!hash) return;
     const controller = new AbortController();
     setState({ loading: true, error: "", data: null });
     const params = new URLSearchParams();
     params.set("source", "saved");
-    params.set("hash", hash);
+    if (/^\d+$/.test(String(hash))) {
+      params.set("id", hash);
+    } else {
+      params.set("hash", hash);
+    }
     if (Number(setId || 0) > 0) {
       params.set("set_id", String(Number(setId)));
     }
@@ -72,12 +75,24 @@ export default function SavedPaletteSharePage() {
       showBackButton={true}
       onBack={() => {
         if (typeof window !== "undefined") {
-          window.location.href = returnTo;
+          if (returnTo !== "/") {
+            window.location.href = returnTo;
+          } else if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = "/";
+          }
         }
       }}
       onExit={() => {
         if (typeof window !== "undefined") {
-          window.location.href = returnTo;
+          if (returnTo !== "/") {
+            window.location.href = returnTo;
+          } else if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.location.href = "/";
+          }
         }
       }}
       showLogo={true}

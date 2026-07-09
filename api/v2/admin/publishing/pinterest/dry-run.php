@@ -30,9 +30,9 @@ if (!is_array($payload)) {
 }
 
 try {
-    $outputId = (int)($payload['publish_output_id'] ?? 0);
+    $outputId = (int)($payload['package_id'] ?? $payload['publish_output_id'] ?? 0);
     if ($outputId <= 0) {
-        throw new RuntimeException('publish_output_id required');
+        throw new RuntimeException('package_id required');
     }
     $environment = trim((string)($payload['environment'] ?? 'test')) ?: 'test';
     $service = new PinterestOAuthService(

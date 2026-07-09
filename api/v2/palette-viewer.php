@@ -47,8 +47,14 @@ try {
         respond(['ok' => true, 'data' => $data]);
     }
 
-    $hash = isset($_GET['hash']) ? trim((string)$_GET['hash']) : '';
     $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : null;
+    $savedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    if ($savedId > 0) {
+        $data = $svc->getSavedById($savedId, $setId && $setId > 0 ? $setId : null);
+        respond(['ok' => true, 'data' => $data]);
+    }
+
+    $hash = isset($_GET['hash']) ? trim((string)$_GET['hash']) : '';
     $data = $svc->getSaved($hash, $setId && $setId > 0 ? $setId : null);
     respond(['ok' => true, 'data' => $data]);
 } catch (\InvalidArgumentException $e) {

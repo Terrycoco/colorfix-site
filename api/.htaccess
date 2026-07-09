@@ -4,4 +4,6 @@ php_value auto_prepend_file "/home1/shortgal/public_html/colorfix/app/bootstrap.
   RewriteEngine On
   RewriteRule ^pinterest/connect/?$ pinterest-connect.php [L,QSA]
   RewriteRule ^pinterest/oauth/callback/?$ pinterest-oauth-callback.php [L,QSA]
+  RewriteRule ^youtube/connect/?$ youtube-connect.php [L,QSA]
+  RewriteRule ^youtube/oauth-callback/?$ youtube-oauth-callback.php [L,QSA]
 </IfModule>

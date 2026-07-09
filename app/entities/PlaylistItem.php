@@ -26,6 +26,7 @@ class PlaylistItem
         public ?bool $site = null,
         public ?bool $yt = null,
         public ?bool $pin = null,
+        public ?string $analyzer_role = null,
         public ?string $alt_tag = null,
         public ?string $palette_title = null
     ) {

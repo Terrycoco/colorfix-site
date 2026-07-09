@@ -20,6 +20,7 @@ const BRAND_CHOICES = [
   { code: "sw", label: "Sherwin-Williams" },
   { code: "behr", label: "Behr" },
   { code: "bm", label: "Benjamin Moore" },
+  { code: "multi", label: "Multi" },
   { code: "ppg", label: "PPG" },
   { code: "vs", label: "Valspar" },
   { code: "vist", label: "Vista Paint" },

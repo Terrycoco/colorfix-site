@@ -86,6 +86,24 @@ const DEFAULT_HUE_WHEEL_CONFIG = {
 
 const HUE_WHEEL_BODY_TEMPLATE = serializeHueWheelConfig(DEFAULT_HUE_WHEEL_CONFIG);
 
+const DEFAULT_BRAND_BUMPER_CONFIG = {
+  variant: "colorfix-signature",
+  auto_advance: true,
+  requires_tap: false,
+  duration_ms: 4200,
+  signatureRevealDelayMs: 760,
+  signatureRevealDurationMs: 1750,
+  signatureSound: {
+    enabled: true,
+    src: "",
+    cueMs: 760,
+    volume: 0.075,
+    note: "uses synthetic pencil scratch unless src is provided",
+  },
+};
+
+const BRAND_BUMPER_BODY_TEMPLATE = JSON.stringify(DEFAULT_BRAND_BUMPER_CONFIG, null, 2);
+
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
 const ANALYZER_ROLES = ["ignore", "before", "after", "single"];
 
@@ -497,9 +515,9 @@ export default function AdminPlaylistEditorPage() {
       prev.map((item, idx) => {
         if (idx !== index) return item;
         const nextItem = { ...item, [field]: nextValue };
-        if (field === "item_type" && nextValue === "hue-wheel") {
+        if (field === "item_type" && ["hue-wheel", "brand-bumper"].includes(nextValue)) {
           if (!String(item.body || "").trim()) {
-            nextItem.body = HUE_WHEEL_BODY_TEMPLATE;
+            nextItem.body = nextValue === "brand-bumper" ? BRAND_BUMPER_BODY_TEMPLATE : HUE_WHEEL_BODY_TEMPLATE;
           }
           nextItem.ap_id = "";
           nextItem.palette_hash = "";
@@ -508,6 +526,15 @@ export default function AdminPlaylistEditorPage() {
           nextItem.saved_palette_set_id = "";
           nextItem.is_share_image = false;
           nextItem.star = false;
+          if (nextValue === "brand-bumper") {
+            nextItem.title = nextItem.title || "ColorFix";
+            nextItem.subtitle = nextItem.subtitle || "by Terry";
+            nextItem.site = false;
+            nextItem.yt = true;
+            nextItem.pin = false;
+            nextItem.analyzer_role = "single";
+            nextItem.duration_ms = nextItem.duration_ms || "3000";
+          }
         }
         return nextItem;
       })
@@ -634,8 +661,15 @@ export default function AdminPlaylistEditorPage() {
         ...emptyItem,
         _clientKey: makeClientItemKey(),
         item_type: type,
-        body: type === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : emptyItem.body,
-        star: type === "hue-wheel" ? false : emptyItem.star,
+        body: type === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : type === "brand-bumper" ? BRAND_BUMPER_BODY_TEMPLATE : emptyItem.body,
+        title: type === "brand-bumper" ? "ColorFix" : emptyItem.title,
+        subtitle: type === "brand-bumper" ? "by Terry" : emptyItem.subtitle,
+        star: ["hue-wheel", "brand-bumper"].includes(type) ? false : emptyItem.star,
+        site: type === "brand-bumper" ? false : emptyItem.site,
+        yt: type === "brand-bumper" ? true : emptyItem.yt,
+        pin: type === "brand-bumper" ? false : emptyItem.pin,
+        analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
+        duration_ms: type === "brand-bumper" ? "4200" : emptyItem.duration_ms,
       };
       if (type === "intro") {
         return [nextItem, ...prev];
@@ -1019,6 +1053,7 @@ export default function AdminPlaylistEditorPage() {
           <button type="button" onClick={() => addItem("intro")}>Add Intro</button>
           <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
           <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
+          <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
         </div>
       </div>
 
@@ -1043,6 +1078,7 @@ export default function AdminPlaylistEditorPage() {
                   <option value="intro">intro</option>
                   <option value="text">text</option>
                   <option value="hue-wheel">hue wheel</option>
+                  <option value="brand-bumper">brand bumper</option>
                   <option value="non-palette">no palette</option>
                 </select>
               </label>
@@ -1253,6 +1289,18 @@ export default function AdminPlaylistEditorPage() {
                       {parseHueWheelBody(item.body).items.length} marker{parseHueWheelBody(item.body).items.length === 1 ? "" : "s"}
                     </div>
                   </div>
+                ) : item.item_type === "brand-bumper" ? (
+                  <label className="item-cell item-wide">
+                    Brand Bumper Config
+                    <textarea
+                      rows={5}
+                      value={item.body}
+                      onChange={(e) => updateItem(index, "body", e.target.value)}
+                    />
+                    <div className="muted">
+                      Auto-advances by default. YouTube uses a synthetic pencil scratch unless `signatureSound.src` is set.
+                    </div>
+                  </label>
                 ) : (
                   <label className="item-cell item-wide">
                     Body
@@ -1326,6 +1374,7 @@ export default function AdminPlaylistEditorPage() {
         <button type="button" onClick={() => addItem("intro")}>Add Intro</button>
         <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
         <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
+        <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
         <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </button>

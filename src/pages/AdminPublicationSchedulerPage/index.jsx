@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Clipboard } from "lucide-react";
 import { API_FOLDER } from "@helpers/config";
 import Toast from "@components/Toast";
 import "./admin-publication-scheduler.css";
 
 const API_BASE = `${API_FOLDER}/v2/admin/publication-scheduler`;
+const SITE_ORIGIN = "https://colorfix.terrymarr.com";
 
 export default function AdminPublicationSchedulerPage() {
   const [rows, setRows] = useState([]);
@@ -13,6 +15,8 @@ export default function AdminPublicationSchedulerPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState(null);
   const [timeEditor, setTimeEditor] = useState(null);
+  const [receiptRow, setReceiptRow] = useState(null);
+  const [manualDetailsRow, setManualDetailsRow] = useState(null);
   const [timingsOpen, setTimingsOpen] = useState(false);
   const [timingChannels, setTimingChannels] = useState([]);
   const [timingEditor, setTimingEditor] = useState({
@@ -80,8 +84,12 @@ export default function AdminPublicationSchedulerPage() {
     });
   }
 
-  function selectVisibleUnscheduled() {
-    setVisibleSelection(true, (row) => ["unscheduled", "waiting"].includes(row.schedule_status || "unscheduled"));
+  function isDeletableQueueRow(row) {
+    return ["unscheduled", "waiting", "error", "cancelled", "skipped_duplicate"].includes(row.schedule_status || "unscheduled");
+  }
+
+  function selectVisibleDeletable() {
+    setVisibleSelection(true, isDeletableQueueRow);
   }
 
   function syncHorizontalScroll(sourceRef, targetRef) {
@@ -139,7 +147,7 @@ export default function AdminPublicationSchedulerPage() {
       if (path === "run-due") {
         const claimed = data?.item?.claimed_count ?? 0;
         const results = Array.isArray(data?.item?.results) ? data.item.results : [];
-        const failed = results.filter((result) => result?.status === "failed");
+        const failed = results.filter((result) => result?.status === "error");
         if (failed.length) {
           const detail = failureDetail(failed[0]);
           nextError = `Ran due queue. Claimed ${claimed}. Failed ${failed.length}${detail ? `: ${detail}` : "."}`;
@@ -148,16 +156,16 @@ export default function AdminPublicationSchedulerPage() {
         }
       } else if (path === "publish-now") {
         const item = data?.item || {};
-        if (item.status === "completed") {
-          nextMessage = `Ran selected publishing job #${item.publishing_asset_id || item.publishing_job_id || ""}.`;
-        } else if (["failed", "retry_scheduled"].includes(item.status)) {
+        if (item.status === "published") {
+          nextMessage = `Ran selected package #${item.package_id || ""}.`;
+        } else if (item.status === "error") {
           const detail = failureDetail(item);
-          nextError = `Selected publishing job ${item.status}${detail ? `: ${detail}` : "."}`;
+          nextError = `Selected package ${item.status}${detail ? `: ${detail}` : "."}`;
         } else {
-          nextMessage = `Selected publishing job ${item.status || "updated"}; see row error if it failed.`;
+          nextMessage = `Selected package ${item.status || "updated"}; see row error if it failed.`;
         }
       } else if (path === "cancel") {
-        nextMessage = "Removed from scheduler queue. The publishing job is still available if you want to enqueue it again.";
+        nextMessage = "Removed from scheduler queue. Package the job again if you want to add it back.";
       } else {
         nextMessage = "Scheduler updated.";
       }
@@ -258,11 +266,11 @@ export default function AdminPublicationSchedulerPage() {
   }
 
   async function scheduleRow(row, override = {}) {
-    const rowId = row.publishing_asset_id || row.publish_output_id || row.publishing_job_id;
-    return postAction(row.publication_schedule_id ? "reschedule" : "schedule", {
-      publishing_asset_id: rowId,
-      publishing_job_id: row.publishing_job_id,
-      publication_schedule_id: row.publication_schedule_id,
+    const rowId = row.package_id || row.publish_output_id;
+    return postAction(row.queue_item_id ? "reschedule" : "schedule", {
+      package_id: rowId,
+      package_batch_id: row.package_batch_id,
+      queue_item_id: row.queue_item_id,
       scheduled_at: override.scheduled_at || "",
       timezone: override.timezone || row.timezone || "America/Los_Angeles",
       priority: 100,
@@ -283,74 +291,126 @@ export default function AdminPublicationSchedulerPage() {
     }
   }
 
-  async function scheduleSelected() {
-    if (selectedRows.length === 0) {
-      setError("Select at least one publishing job.");
-      return;
-    }
-
-    const unscheduledRows = selectedRows.filter((row) => (row.schedule_status || "unscheduled") === "unscheduled");
-    if (unscheduledRows.length === 0) {
-      setError("Selected rows are already in the scheduler queue.");
-      return;
-    }
-
-    for (let index = 0; index < unscheduledRows.length; index += 1) {
-      const row = unscheduledRows[index];
-      // eslint-disable-next-line no-await-in-loop
-      await postAction("schedule", {
-        publishing_asset_id: row.publishing_asset_id || row.publish_output_id || row.publishing_job_id,
-        publishing_job_id: row.publishing_job_id,
-        scheduled_at: "",
-        timezone: row.timezone || "America/Los_Angeles",
-        priority: 100,
-      });
-    }
-  }
-
   async function runNow(payload) {
     await postAction("publish-now", payload);
   }
 
-  async function deleteSelectedUnscheduled() {
-    const ids = selectedRows
-      .filter((row) => (row.schedule_status || "unscheduled") === "unscheduled")
-      .map((row) => row.publishing_asset_id || row.publish_output_id)
-      .filter(Boolean);
-    if (!ids.length) {
-      setError("Select at least one unscheduled row.");
-      return;
-    }
-    const ok = window.confirm(`Delete ${ids.length} unscheduled publishing row${ids.length === 1 ? "" : "s"}? Generated assets and creator jobs will not be deleted.`);
-    if (!ok) return;
-
-    const data = await postAction("delete-unscheduled", { publishing_asset_ids: ids });
-    if (data?.ok) {
-      const deleted = Number(data.item?.deleted_count || 0);
-      const blocked = Array.isArray(data.item?.blocked) ? data.item.blocked : [];
-      setSelected({});
-      setMessage(`Deleted ${deleted} unscheduled publishing row${deleted === 1 ? "" : "s"}.${blocked.length ? ` Blocked: ${blocked.join(" ")}` : ""}`);
+  async function copyManualField(value, label = "Field") {
+    const text = String(value || "");
+    if (!text) return;
+    try {
+      if (!navigator.clipboard?.writeText) {
+        window.prompt(`Copy ${label}:`, text);
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      showToast("success", `${label} copied.`);
+    } catch {
+      window.prompt(`Copy ${label}:`, text);
     }
   }
 
-  async function deleteVisibleUnscheduled() {
-    const ids = rows
-      .filter((row) => (row.schedule_status || "unscheduled") === "unscheduled")
-      .map((row) => row.publishing_asset_id || row.publish_output_id)
+  async function markManualPublished(row, payload) {
+    setLoading(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`${API_BASE}/manual-published.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          package_id: row.package_id || row.publish_output_id,
+          package_batch_id: row.package_batch_id,
+          queue_item_id: row.queue_item_id,
+          ...payload,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to mark package published");
+      const item = data.item || {};
+      const nextMessage = `Package #${item.package_id || row.package_id || row.publish_output_id} marked published manually.`;
+      setMessage(nextMessage);
+      showToast("success", nextMessage);
+      setManualDetailsRow((current) => current ? {
+        ...current,
+        schedule_status: "published",
+        publication_status: item.status || current.publication_status,
+        external_id: item.external_id || current.external_id,
+        external_url: item.external_url || current.external_url,
+        published_at: item.published_at || current.published_at,
+      } : current);
+      await loadQueue(filters, { clearAlerts: false });
+      return data;
+    } catch (err) {
+      const nextError = err?.message || "Failed to mark package published";
+      setError(nextError);
+      showToast("error", nextError);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function retryReceiptRow(row) {
+    if (!row) return;
+    const data = await postAction("publish-now", {
+      package_id: row.package_id || row.publish_output_id,
+      package_batch_id: row.package_batch_id,
+      queue_item_id: row.queue_item_id,
+    });
+    if (data?.ok) {
+      setReceiptRow(null);
+    }
+  }
+
+  async function deleteSelectedWaiting() {
+    const ids = selectedRows
+      .filter(isDeletableQueueRow)
+      .map((row) => row.package_id || row.publish_output_id)
       .filter(Boolean);
     if (!ids.length) {
-      setError("No visible unscheduled rows to delete.");
+      setError("Select at least one waiting row.");
       return;
     }
-    const ok = window.confirm(`Delete all ${ids.length} visible unscheduled publishing row${ids.length === 1 ? "" : "s"}? Generated assets and creator jobs will not be deleted.`);
+    const ok = window.confirm(`Delete ${ids.length} waiting publishing row${ids.length === 1 ? "" : "s"}? Generated assets and creator jobs will not be deleted. If this removes the last package in a test publish batch, its orphan publisher instance may also be deleted.`);
     if (!ok) return;
 
-    const data = await postAction("delete-unscheduled", { publishing_asset_ids: ids });
+    const data = await postAction("delete-unscheduled", { package_ids: ids });
     if (data?.ok) {
       const deleted = Number(data.item?.deleted_count || 0);
       const blocked = Array.isArray(data.item?.blocked) ? data.item.blocked : [];
+      const deletedInstances = Array.isArray(data.item?.deleted_playlist_instance_ids) ? data.item.deleted_playlist_instance_ids : [];
+      const instanceMessage = deletedInstances.length
+        ? ` Deleted orphan publisher instance${deletedInstances.length === 1 ? "" : "s"} #${deletedInstances.join(", #")}.`
+        : "";
       setSelected({});
-      setMessage(`Deleted ${deleted} visible unscheduled publishing row${deleted === 1 ? "" : "s"}.${blocked.length ? ` Blocked: ${blocked.join(" ")}` : ""}`);
+      setMessage(`Deleted ${deleted} waiting publishing row${deleted === 1 ? "" : "s"}.${instanceMessage}${blocked.length ? ` Blocked: ${blocked.join(" ")}` : ""}`);
+    }
+  }
+
+  async function deleteVisibleWaiting() {
+    const ids = rows
+      .filter(isDeletableQueueRow)
+      .map((row) => row.package_id || row.publish_output_id)
+      .filter(Boolean);
+    if (!ids.length) {
+      setError("No visible waiting rows to delete.");
+      return;
+    }
+    const ok = window.confirm(`Delete all ${ids.length} visible waiting publishing row${ids.length === 1 ? "" : "s"}? Generated assets and creator jobs will not be deleted. If this removes the last package in a test publish batch, its orphan publisher instance may also be deleted.`);
+    if (!ok) return;
+
+    const data = await postAction("delete-unscheduled", { package_ids: ids });
+    if (data?.ok) {
+      const deleted = Number(data.item?.deleted_count || 0);
+      const blocked = Array.isArray(data.item?.blocked) ? data.item.blocked : [];
+      const deletedInstances = Array.isArray(data.item?.deleted_playlist_instance_ids) ? data.item.deleted_playlist_instance_ids : [];
+      const instanceMessage = deletedInstances.length
+        ? ` Deleted orphan publisher instance${deletedInstances.length === 1 ? "" : "s"} #${deletedInstances.join(", #")}.`
+        : "";
+      setSelected({});
+      setMessage(`Deleted ${deleted} visible waiting publishing row${deleted === 1 ? "" : "s"}.${instanceMessage}${blocked.length ? ` Blocked: ${blocked.join(" ")}` : ""}`);
     }
   }
 
@@ -362,11 +422,11 @@ export default function AdminPublicationSchedulerPage() {
           <h1>Publication Scheduler</h1>
         </div>
         <div className="scheduler-header__actions">
+          <a className="scheduler-link-button" href="/admin/packager">Back to Packager</a>
+          <a className="scheduler-link-button" href="/admin/publisher">Published Assets</a>
           <button type="button" onClick={() => loadQueue()} disabled={loading}>Refresh</button>
           <button type="button" onClick={openChannelTimings} disabled={loading}>Channel Timings</button>
-          <button type="button" className="primary" onClick={() => postAction("run-due", { limit: 5 })} disabled={loading}>Run Due Now</button>
-          <button type="button" className="danger" onClick={deleteSelectedUnscheduled} disabled={loading || selectedRows.length === 0}>Delete Selected Unscheduled</button>
-          <button type="button" className="primary" onClick={scheduleSelected} disabled={loading}>Enqueue Selected</button>
+          <button type="button" className="danger" onClick={deleteSelectedWaiting} disabled={loading || selectedRows.length === 0}>Delete Selected Waiting</button>
         </div>
       </header>
 
@@ -393,6 +453,25 @@ export default function AdminPublicationSchedulerPage() {
         />
       ) : null}
 
+      {receiptRow ? (
+        <PublishReceiptDialog
+          row={receiptRow}
+          loading={loading}
+          onClose={() => setReceiptRow(null)}
+          onRetry={() => retryReceiptRow(receiptRow)}
+        />
+      ) : null}
+
+      {manualDetailsRow ? (
+        <ManualPackageDetailsDialog
+          row={manualDetailsRow}
+          loading={loading}
+          onClose={() => setManualDetailsRow(null)}
+          onCopy={copyManualField}
+          onMarkPublished={markManualPublished}
+        />
+      ) : null}
+
       <section className="scheduler-panel">
         <h2>Filters</h2>
         <div className="scheduler-form scheduler-form--filters">
@@ -410,11 +489,11 @@ export default function AdminPublicationSchedulerPage() {
               <option value="all">All</option>
               <option value="unscheduled">Unscheduled</option>
               <option value="waiting">Waiting</option>
-              <option value="scheduled">Manual time</option>
-              <option value="processing">Processing</option>
-              <option value="retry_scheduled">Retry scheduled</option>
-              <option value="failed">Failed</option>
-              <option value="completed">Completed</option>
+              <option value="in_progress">In progress</option>
+              <option value="error">Error</option>
+              <option value="published">Published</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="skipped_duplicate">Skipped duplicate</option>
             </select>
           </label>
           <label>
@@ -451,11 +530,11 @@ export default function AdminPublicationSchedulerPage() {
             <button type="button" onClick={() => setVisibleSelection(true)} disabled={loading || rows.length === 0}>
               Select All Visible
             </button>
-            <button type="button" onClick={selectVisibleUnscheduled} disabled={loading || rows.length === 0}>
-              Select Visible Unscheduled
+            <button type="button" onClick={selectVisibleDeletable} disabled={loading || rows.length === 0}>
+              Select Visible Waiting
             </button>
-            <button type="button" className="danger" onClick={deleteVisibleUnscheduled} disabled={loading || rows.length === 0}>
-              Delete Visible Unscheduled
+            <button type="button" className="danger" onClick={deleteVisibleWaiting} disabled={loading || rows.length === 0}>
+              Delete Visible Waiting
             </button>
             <button type="button" onClick={() => setSelected({})} disabled={loading || selectedRows.length === 0}>
               Clear Selection
@@ -464,9 +543,9 @@ export default function AdminPublicationSchedulerPage() {
               type="button"
               disabled={loading || selectedRows.length !== 1}
               onClick={() => runNow({
-                publishing_asset_id: selectedRows[0]?.publishing_asset_id || selectedRows[0]?.publish_output_id,
-                publishing_job_id: selectedRows[0]?.publishing_job_id,
-                publication_schedule_id: selectedRows[0]?.publication_schedule_id,
+                package_id: selectedRows[0]?.package_id || selectedRows[0]?.publish_output_id,
+                package_batch_id: selectedRows[0]?.package_batch_id,
+                queue_item_id: selectedRows[0]?.queue_item_id,
               })}
             >
               Run Selected Now
@@ -509,7 +588,7 @@ export default function AdminPublicationSchedulerPage() {
                 <th>Queue Status</th>
                 <th>Job Status</th>
                 <th>Attempts</th>
-                <th>Error</th>
+                <th>Receipt</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -522,8 +601,20 @@ export default function AdminPublicationSchedulerPage() {
                 </tr>
               ) : rows.map((row) => {
                 const id = rowKey(row);
+                const rowStatusClass = rowClassName(row);
                 return (
-                <tr key={id}>
+                <tr
+                  key={id}
+                  className={rowStatusClass}
+                  onDoubleClick={() => {
+                    if (isWaitingRow(row)) {
+                      setManualDetailsRow(row);
+                    } else {
+                      setReceiptRow(row);
+                    }
+                  }}
+                  title="Double-click for details"
+                >
                   <td>
                     <input
                       type="checkbox"
@@ -542,36 +633,44 @@ export default function AdminPublicationSchedulerPage() {
                     </button>
                   </td>
                   <td>{row.media_url || row.image_url ? <img className="scheduler-thumb" src={row.media_url || row.image_url} alt="" /> : "-"}</td>
-                  <td>Job #{row.publishing_job_id}<br />Asset #{row.publishing_asset_id || row.publish_output_id || "-"}</td>
-                  <td>{row.asset_creator_job_id ? `#${row.asset_creator_job_id}` : "-"}<br />{row.creator_job_title || ""}</td>
+                  <td>Batch #{row.package_batch_id || "-"}<br />Package #{row.package_id || row.publish_output_id || "-"}</td>
+                  <td>{row.creator_job_id ? `#${row.creator_job_id}` : "-"}<br />{row.creator_job_title || ""}</td>
                   <td>{row.channel_label || row.platform || "-"}</td>
                   <td>{row.environment || "-"}</td>
                   <td>{row.title || "-"}</td>
-                  <td>{row.schedule_status || "unscheduled"}</td>
-                  <td>{row.publication_status || "-"}</td>
+                  <td><StatusPill value={row.schedule_status || "unscheduled"} /></td>
+                  <td><StatusPill value={row.publication_status || "-"} /></td>
                   <td>{row.attempt_count || 0}/{row.max_attempts || 3}</td>
-                  <td>{row.schedule_error || row.last_error_message || "-"}</td>
+                  <td className={receiptCellClass(row)}>
+                    {receiptLabel(row)}
+                    <div className="scheduler-receipt-hint">{isWaitingRow(row) ? "Manual upload details available" : "Double-click for details"}</div>
+                  </td>
                   <td className="scheduler-actions-cell">
+                    {isWaitingRow(row) ? (
+                      <button type="button" onClick={() => setManualDetailsRow(row)} disabled={loading}>
+                        Details
+                      </button>
+                    ) : null}
                     <button type="button" onClick={() => openTimeEditor(row)} disabled={loading}>
-                      {row.publication_schedule_id ? "Set Time" : "Enqueue"}
+                      Set Time
                     </button>
                     <button
                       type="button"
                       onClick={() => runNow({
-                        publishing_asset_id: row.publishing_asset_id || row.publish_output_id || row.publishing_job_id,
-                        publishing_job_id: row.publishing_job_id,
-                        publication_schedule_id: row.publication_schedule_id,
+                        package_id: row.package_id || row.publish_output_id,
+                        package_batch_id: row.package_batch_id,
+                        queue_item_id: row.queue_item_id,
                       })}
                       disabled={loading}
                     >
                       Run Now
                     </button>
-                    {row.publication_schedule_id ? (
+                    {row.queue_item_id ? (
                       <button
                         type="button"
                         className="danger"
-                        onClick={() => postAction("cancel", { publication_schedule_id: row.publication_schedule_id })}
-                        disabled={loading || row.schedule_status === "completed"}
+                        onClick={() => postAction("cancel", { queue_item_id: row.queue_item_id })}
+                        disabled={loading || row.schedule_status === "published"}
                       >
                         Remove
                       </button>
@@ -722,7 +821,7 @@ function ScheduleTimeDialog({ editor, loading, onClose, onChange, onSave }) {
         <header className="scheduler-modal__header">
           <div>
             <h2>Schedule Time</h2>
-            <p>Asset #{row.publishing_asset_id || row.publish_output_id || "-"} · {row.title || "Untitled"}</p>
+            <p>Package #{row.package_id || row.publish_output_id || "-"} · {row.title || "Untitled"}</p>
           </div>
           <button type="button" onClick={onClose} disabled={loading}>Close</button>
         </header>
@@ -763,8 +862,380 @@ function ScheduleTimeDialog({ editor, loading, onClose, onChange, onSave }) {
   );
 }
 
+function ManualPackageDetailsDialog({ row, loading, onClose, onCopy, onMarkPublished }) {
+  const [publishedUrl, setPublishedUrl] = useState(row.external_url || row.publisher_external_url || "");
+  const [externalId, setExternalId] = useState(row.external_id || row.publisher_external_id || "");
+  const [notes, setNotes] = useState("");
+  const [result, setResult] = useState("");
+  const platform = String(row.platform || "").toLowerCase();
+  const title = platform === "youtube" ? "YouTube Studio Upload Details" : "Manual Publish Details";
+  const fields = platform === "youtube" ? youtubeManualFields(row) : genericManualFields(row);
+
+  async function submitManualPublished() {
+    const data = await onMarkPublished(row, {
+      external_url: publishedUrl,
+      external_id: externalId,
+      notes,
+    });
+    if (data?.ok) {
+      setResult("Recorded. This package is now in Published Assets.");
+      if (!externalId && data.item?.external_id) setExternalId(data.item.external_id);
+      if (!publishedUrl && data.item?.external_url) setPublishedUrl(data.item.external_url);
+    }
+  }
+
+  return (
+    <div className="scheduler-modal-backdrop" role="presentation" onDoubleClick={onClose}>
+      <div
+        className="scheduler-modal scheduler-modal--manual"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        <header className="scheduler-modal__header">
+          <div>
+            <h2>{title}</h2>
+            <p>Package #{row.package_id || row.publish_output_id || "-"} · {row.channel_label || row.platform || "Channel"}</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={loading}>Close</button>
+        </header>
+        <div className="scheduler-modal__body scheduler-manual-body">
+          <section className="scheduler-manual-section">
+            <h3>{platform === "youtube" ? "YouTube Studio Fields" : "Channel Fields"}</h3>
+            <div className="scheduler-manual-fields">
+              {fields.map((field) => (
+                <CopyField
+                  key={field.label}
+                  label={field.label}
+                  value={field.value}
+                  multiline={field.multiline}
+                  href={field.href}
+                  onCopy={onCopy}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="scheduler-manual-section">
+            <h3>Record Channel Result</h3>
+            <div className="scheduler-manual-result-grid">
+              <label>
+                Published URL
+                <input
+                  value={publishedUrl}
+                  onChange={(event) => setPublishedUrl(event.target.value)}
+                  placeholder={platform === "youtube" ? "https://www.youtube.com/watch?v=..." : "Published post URL"}
+                />
+              </label>
+              <label>
+                External ID
+                <input
+                  value={externalId}
+                  onChange={(event) => setExternalId(event.target.value)}
+                  placeholder={platform === "youtube" ? "YouTube video ID, optional if URL has v=" : "Optional"}
+                />
+              </label>
+              <label className="scheduler-modal__full">
+                Notes
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Anything returned by the channel or worth remembering"
+                />
+              </label>
+            </div>
+            {result ? <div className="scheduler-alert scheduler-alert--success">{result}</div> : null}
+          </section>
+        </div>
+        <footer className="scheduler-modal__actions">
+          <button type="button" onClick={onClose} disabled={loading}>Close</button>
+          <button
+            type="button"
+            className="primary"
+            onClick={submitManualPublished}
+            disabled={loading || (!publishedUrl.trim() && !externalId.trim())}
+          >
+            Mark Published
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function CopyField({ label, value, multiline = false, href = "", onCopy }) {
+  const text = String(value || "");
+  return (
+    <div className={multiline ? "scheduler-copy-field scheduler-copy-field--multiline" : "scheduler-copy-field"}>
+      <div className="scheduler-copy-field__label">{label}</div>
+      <div className="scheduler-copy-field__control">
+        {multiline ? (
+          <textarea value={text} readOnly />
+        ) : (
+          <input value={text} readOnly />
+        )}
+        <button
+          type="button"
+          className="scheduler-copy-field__button"
+          onClick={() => onCopy(text, label)}
+          disabled={!text}
+          aria-label={`Copy ${label}`}
+          title={`Copy ${label}`}
+        >
+          <Clipboard size={15} aria-hidden="true" />
+        </button>
+      </div>
+      {href ? (
+        <a className="scheduler-copy-field__link" href={href} target="_blank" rel="noreferrer">
+          Open
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function PublishReceiptDialog({ row, loading, onClose, onRetry }) {
+  const failed = isErroredRow(row);
+  const succeeded = isSuccessfulRow(row);
+  const title = failed ? "Publish Error" : succeeded ? "Publish Receipt" : "Publish Details";
+  const responseJson = row.published_response_payload_json || row.publisher_response_payload_json || "";
+  const requestJson = row.publisher_request_payload_json || "";
+  const externalUrl = row.external_url || row.publisher_external_url || "";
+  const externalId = row.external_id || row.publisher_external_id || "";
+  const errorText = receiptError(row);
+
+  return (
+    <div className="scheduler-modal-backdrop" role="presentation" onDoubleClick={onClose}>
+      <div
+        className="scheduler-modal scheduler-modal--receipt"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        <header className="scheduler-modal__header">
+          <div>
+            <h2>{title}</h2>
+            <p>Package #{row.package_id || row.publish_output_id || "-"} · {row.title || "Untitled"}</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={loading}>Close</button>
+        </header>
+        <div className="scheduler-modal__body scheduler-receipt-body">
+          <dl className="scheduler-modal__details scheduler-receipt-details">
+            <dt>Result</dt>
+            <dd><StatusPill value={failed ? "error" : succeeded ? "published" : (row.schedule_status || row.publication_status || "unknown")} /></dd>
+            <dt>Where</dt>
+            <dd>{receiptWhere(row)}</dd>
+            <dt>Channel</dt>
+            <dd>{row.channel_label || row.platform || "-"}</dd>
+            <dt>Environment</dt>
+            <dd>{row.environment || "-"}</dd>
+            <dt>Creator job</dt>
+            <dd>{row.creator_job_id ? `#${row.creator_job_id}` : "-"} {row.creator_job_title || ""}</dd>
+            <dt>Queue item</dt>
+            <dd>{row.queue_item_id || "-"}</dd>
+            <dt>Attempt</dt>
+            <dd>{row.publisher_attempt_id ? `#${row.publisher_attempt_id}` : "-"} {row.publisher_attempt_status ? `(${row.publisher_attempt_status})` : ""}</dd>
+            <dt>External ID</dt>
+            <dd>{externalId || "-"}</dd>
+            <dt>External URL</dt>
+            <dd>{externalUrl ? <a href={externalUrl} target="_blank" rel="noreferrer">{externalUrl}</a> : "-"}</dd>
+            <dt>Published</dt>
+            <dd>{row.published_asset_published_at || row.published_at || row.completed_at || "-"}</dd>
+          </dl>
+
+          {errorText ? (
+            <section className="scheduler-receipt-section scheduler-receipt-section--error">
+              <h3>Error</h3>
+              <p>{errorText}</p>
+              {row.publisher_error_code || row.schedule_error_code || row.last_error_code ? (
+                <p className="scheduler-receipt-code">
+                  Code: {row.publisher_error_code || row.schedule_error_code || row.last_error_code}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          <section className="scheduler-receipt-section">
+            <h3>Channel Response</h3>
+            <pre className="scheduler-receipt-pre">{formatJson(responseJson) || "No channel response stored yet."}</pre>
+          </section>
+
+          <section className="scheduler-receipt-section">
+            <h3>Request Payload</h3>
+            <pre className="scheduler-receipt-pre">{formatJson(requestJson) || "No request payload stored yet."}</pre>
+          </section>
+        </div>
+        <footer className="scheduler-modal__actions">
+          {failed ? (
+            <button type="button" className="primary" onClick={onRetry} disabled={loading}>
+              Retry
+            </button>
+          ) : null}
+          <button type="button" onClick={onClose} disabled={loading}>Close</button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ value }) {
+  const status = String(value || "-");
+  return <span className={`scheduler-status-pill scheduler-status-pill--${statusClass(status)}`}>{status}</span>;
+}
+
+function youtubeManualFields(row) {
+  const metadata = row.publication_metadata_json || {};
+  const creatorMetadata = metadata.creator_metadata || {};
+  const videoUrl = absoluteUrl(row.media_url || row.image_url || "");
+  const localPath = metadata.local_mp4_path
+    || metadata.local_file_path
+    || creatorMetadata.local_mp4_path
+    || creatorMetadata.local_file_path
+    || row.media_path
+    || creatorMetadata.rel_path
+    || "";
+  const tags = normalizeTags(creatorMetadata.tags || metadata.tags || ["ColorFix", "paint colors", "home makeover"]);
+  const destinationUrl = row.tracked_destination_url || row.destination_url || row.canonical_destination_url || "";
+  const descriptionParts = [
+    row.description || creatorMetadata.description || "",
+    destinationUrl ? `\nWatch the ColorFix palette/player page: ${destinationUrl}` : "",
+  ].filter(Boolean);
+
+  return [
+    { label: "Video file URL", value: videoUrl, href: videoUrl },
+    { label: "Local MP4 path", value: localPath },
+    { label: "Title", value: row.title || creatorMetadata.video_title || row.creator_job_title || "" },
+    { label: "Description", value: descriptionParts.join("\n"), multiline: true },
+    { label: "Tags", value: tags.join(", ") },
+    { label: "Visibility", value: metadata.privacy_status || "Private" },
+    { label: "Made for kids", value: metadata.made_for_kids ? "Yes" : "No" },
+    { label: "Package ID", value: row.package_id || row.publish_output_id || "" },
+    { label: "Asset ID", value: row.asset_library_id || "" },
+    { label: "Destination URL", value: destinationUrl, href: destinationUrl },
+  ];
+}
+
+function genericManualFields(row) {
+  const mediaUrl = absoluteUrl(row.media_url || row.image_url || "");
+  const destinationUrl = row.tracked_destination_url || row.destination_url || row.canonical_destination_url || "";
+  return [
+    { label: "Media URL", value: mediaUrl, href: mediaUrl },
+    { label: "Media path", value: row.media_path || "" },
+    { label: "Title", value: row.title || "" },
+    { label: "Description", value: row.description || "", multiline: true },
+    { label: "Destination URL", value: destinationUrl, href: destinationUrl },
+    { label: "Alt text", value: row.alt_text || "", multiline: true },
+    { label: "Package ID", value: row.package_id || row.publish_output_id || "" },
+    { label: "Asset ID", value: row.asset_library_id || "" },
+  ];
+}
+
+function absoluteUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^https?:\/\//i.test(text)) return text;
+  return `${SITE_ORIGIN}${text.startsWith("/") ? "" : "/"}${text}`;
+}
+
+function normalizeTags(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(/[,#]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function rowKey(row) {
-  return String(row.publishing_asset_id || row.publish_output_id || row.publishing_job_id || "");
+  return String(row.package_id || row.publish_output_id || row.package_batch_id || "");
+}
+
+function isWaitingRow(row) {
+  return String(row.schedule_status || "").toLowerCase() === "waiting";
+}
+
+function isErroredRow(row) {
+  const scheduleStatus = String(row.schedule_status || "").toLowerCase();
+  const publicationStatus = String(row.publication_status || "").toLowerCase();
+  const attemptStatus = String(row.publisher_attempt_status || "").toLowerCase();
+  return scheduleStatus === "error"
+    || ["error", "failed", "scheduled_retry_pending"].includes(publicationStatus)
+    || attemptStatus === "failed"
+    || Boolean(receiptError(row));
+}
+
+function isSuccessfulRow(row) {
+  const scheduleStatus = String(row.schedule_status || "").toLowerCase();
+  const publicationStatus = String(row.publication_status || row.published_asset_status || "").toLowerCase();
+  const attemptStatus = String(row.publisher_attempt_status || "").toLowerCase();
+  return scheduleStatus === "published"
+    || ["published", "test_published"].includes(publicationStatus)
+    || ["published", "test_published"].includes(attemptStatus)
+    || Boolean(row.external_id || row.external_url || row.publisher_external_id || row.publisher_external_url);
+}
+
+function receiptError(row) {
+  return row.publisher_error_message
+    || row.schedule_error
+    || row.last_error_message
+    || "";
+}
+
+function receiptWhere(row) {
+  if (row.publisher_error_message || row.publisher_error_code) return row.publisher_service || "Publisher";
+  if (row.schedule_error || row.schedule_error_code) return "Scheduler";
+  if (row.last_error_message || row.last_error_code) return "Package";
+  if (isSuccessfulRow(row)) return row.publisher_service || row.platform || "Channel";
+  return "Pending";
+}
+
+function receiptLabel(row) {
+  const errorText = receiptError(row);
+  if (errorText) return `Error: ${truncate(errorText, 120)}`;
+  if (isSuccessfulRow(row)) {
+    const externalId = row.external_id || row.publisher_external_id;
+    return externalId ? `Published: ${externalId}` : "Published";
+  }
+  return "No receipt yet";
+}
+
+function receiptCellClass(row) {
+  if (isErroredRow(row)) return "scheduler-receipt-cell scheduler-receipt-cell--error";
+  if (isSuccessfulRow(row)) return "scheduler-receipt-cell scheduler-receipt-cell--success";
+  return "scheduler-receipt-cell";
+}
+
+function rowClassName(row) {
+  if (isErroredRow(row)) return "scheduler-row scheduler-row--error";
+  if (isSuccessfulRow(row)) return "scheduler-row scheduler-row--success";
+  return "scheduler-row";
+}
+
+function statusClass(status) {
+  const value = String(status || "").toLowerCase();
+  if (["error", "failed", "scheduled_retry_pending"].includes(value)) return "error";
+  if (["published", "test_published"].includes(value)) return "success";
+  if (["in_progress"].includes(value)) return "active";
+  if (["waiting", "queued"].includes(value)) return "waiting";
+  return "neutral";
+}
+
+function truncate(value, limit) {
+  const text = String(value || "");
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function formatJson(value) {
+  if (!value) return "";
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return String(value);
+  }
 }
 
 function toLocalInputValue(value) {

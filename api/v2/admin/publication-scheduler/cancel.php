@@ -10,8 +10,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $scheduleId = (int)($payload['publication_schedule_id'] ?? $payload['schedule_id'] ?? 0);
-    if ($scheduleId <= 0) throw new RuntimeException('publication_schedule_id required');
+    $scheduleId = (int)($payload['queue_item_id'] ?? $payload['schedule_id'] ?? $payload['publication_schedule_id'] ?? 0);
+    if ($scheduleId <= 0) throw new RuntimeException('queue_item_id required');
     $reason = trim((string)($payload['reason'] ?? 'Cancelled by admin.'));
     $service = scheduler_service($pdo);
     scheduler_respond(['ok' => true, 'item' => $service->cancel($scheduleId, $reason)]);

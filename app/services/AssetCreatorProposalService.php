@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Repos\PdoPlaylistInstanceUrlReservationRepository;
+use App\Repos\PdoPublishingDefaultTemplateRepository;
 use PDO;
 use RuntimeException;
 
@@ -19,7 +21,7 @@ final class AssetCreatorProposalService
         $sourceType = trim((string)($payload['source_type'] ?? 'playlist'));
         $sourceId = (int)($payload['source_id'] ?? $payload['playlist_id'] ?? 0);
 
-        if ($creatorKey !== 'pinterest.before_after_composite') {
+        if (!in_array($creatorKey, ['pinterest.before_after_composite', 'youtube.playlist_video'], true)) {
             throw new RuntimeException('Unsupported channel');
         }
         if ($sourceType !== 'playlist') {
@@ -33,6 +35,18 @@ final class AssetCreatorProposalService
         if (!$playlist) {
             throw new RuntimeException('Playlist not found');
         }
+
+        if ($creatorKey === 'youtube.playlist_video') {
+            return $this->proposeYoutubePlaylistVideo($creatorKey, $sourceId, $playlist, $payload);
+        }
+
+        $reservationRepo = new PdoPlaylistInstanceUrlReservationRepository($this->pdo);
+        $reservation = $reservationRepo->reserveForPlaylistChannel(
+            $sourceId,
+            'pinterest',
+            trim((string)($playlist['title'] ?? '')) ?: "Playlist {$sourceId}",
+            $this->baseUrl
+        );
 
         $warnings = [];
         $items = $this->playlistItems($sourceId);
@@ -53,7 +67,15 @@ final class AssetCreatorProposalService
         if (!$rows) {
             $warnings[] = 'No pin rows found. Tag playlist photos as before/after/single or add rows manually.';
         }
-        $rows = $this->applyPayloadDefaults($rows, $payload);
+        $rows = $this->applyPayloadDefaults($rows, $payload, $playlist, $reservation, 'pinterest', 'pinterest_pin');
+        $defaultDescription = $this->defaultDescriptionFor(
+            $payload,
+            'pinterest',
+            'pinterest_pin',
+            (string)($playlist['type'] ?? ''),
+            $playlist,
+            $reservation
+        );
 
         return [
             'creator_key' => $creatorKey,
@@ -64,15 +86,192 @@ final class AssetCreatorProposalService
                 'title' => (string)($playlist['title'] ?? ''),
                 'type' => (string)($playlist['type'] ?? ''),
             ],
+            'url_reservation' => $this->reservationPayload($reservation),
             'instructions' => [
                 'asset_type' => 'pinterest_pin',
                 'layout' => 'platform_specific',
                 'input_strategy' => $hasAnalyzerRoles ? 'playlist_analyzer_roles' : 'saved_palette_set_photo_roles',
+                'playlist_instance_url_reservation' => $this->reservationPayload($reservation),
+                'analyzer_defaults' => [
+                    'description' => $defaultDescription,
+                    'template_context' => [
+                        'platform' => 'pinterest',
+                        'asset_type' => 'pinterest_pin',
+                        'playlist_type' => (string)($playlist['type'] ?? ''),
+                    ],
+                ],
             ],
             'pin_rows' => array_values($rows),
             'pairs' => array_values($rows),
             'ignored' => $this->ignoredItems($items, $rows),
             'warnings' => $warnings,
+        ];
+    }
+
+    private function proposeYoutubePlaylistVideo(string $creatorKey, int $playlistId, array $playlist, array $payload): array
+    {
+        $reservationRepo = new PdoPlaylistInstanceUrlReservationRepository($this->pdo);
+        $reservation = $reservationRepo->reserveForPlaylistChannel(
+            $playlistId,
+            'youtube',
+            trim((string)($playlist['title'] ?? '')) ?: "Playlist {$playlistId}",
+            $this->baseUrl
+        );
+        $items = array_values(array_filter(
+            $this->playlistItems($playlistId),
+            fn(array $item): bool => $this->youtubeEnabled($item)
+        ));
+
+        $warnings = [];
+        if (!$items) {
+            $warnings[] = 'No YouTube-enabled playlist rows were found. Turn on yt for at least one playlist item.';
+        }
+
+        $title = trim((string)($payload['default_title'] ?? ''))
+            ?: trim((string)($playlist['title'] ?? ''))
+            ?: "Playlist {$playlistId}";
+        $description = $this->defaultDescriptionFor(
+            $payload,
+            'youtube',
+            'youtube_playlist_video',
+            (string)($playlist['type'] ?? ''),
+            $playlist,
+            $reservation
+        );
+        $music = $this->musicPayloadFromRequest($payload);
+
+        $slides = array_map(function (array $item, int $index): array {
+            $asset = $this->playlistItemAssetPayload($item);
+            return [
+                'playlist_item_id' => (int)($item['playlist_item_id'] ?? 0),
+                'sort_order' => $index + 1,
+                'item_type' => (string)($item['item_type'] ?? ''),
+                'title' => (string)($item['title'] ?? ''),
+                'subtitle' => (string)($item['subtitle'] ?? ''),
+                'body' => (string)($item['body'] ?? ''),
+                'duration_ms' => isset($item['duration_ms']) ? (int)$item['duration_ms'] : null,
+                'asset' => $asset,
+            ];
+        }, $items, array_keys($items));
+
+        $row = [
+            'pair_key' => 'youtube-playlist-' . $playlistId,
+            'pin_type' => 'youtube_video',
+            'asset_type' => 'youtube_playlist_video',
+            'include' => count($items) > 0,
+            'sort_order' => 1,
+            'source' => 'playlist_yt_rows',
+            'confidence' => 1,
+            'search_title' => $title,
+            'description' => $description,
+            'title' => $title,
+            'caption' => $description,
+            'before' => null,
+            'after' => $slides[0]['asset'] ?? null,
+            'asset' => $slides[0]['asset'] ?? null,
+            'slides' => $slides,
+            'slide_count' => count($slides),
+            'output' => [
+                'format' => 'mp4',
+                'width' => 1920,
+                'height' => 1080,
+                'ratio' => '16:9',
+            ],
+            'music' => $music,
+        ];
+
+        return [
+            'creator_key' => $creatorKey,
+            'source_type' => 'playlist',
+            'source_id' => $playlistId,
+            'playlist' => [
+                'playlist_id' => (int)$playlist['playlist_id'],
+                'title' => (string)($playlist['title'] ?? ''),
+                'type' => (string)($playlist['type'] ?? ''),
+            ],
+            'url_reservation' => $this->reservationPayload($reservation),
+            'instructions' => [
+                'asset_type' => 'youtube_playlist_video',
+                'layout' => 'remotion_video',
+                'input_strategy' => 'playlist_yt_rows',
+                'playlist_instance_url_reservation' => $this->reservationPayload($reservation),
+                'music' => $music,
+                'analyzer_defaults' => [
+                    'description' => $description,
+                    'template_context' => [
+                        'platform' => 'youtube',
+                        'asset_type' => 'youtube_playlist_video',
+                        'playlist_type' => (string)($playlist['type'] ?? ''),
+                    ],
+                ],
+            ],
+            'music' => $music,
+            'video_rows' => [$row],
+            'pairs' => [$row],
+            'ignored' => $this->ignoredYoutubeItems($this->playlistItems($playlistId), $items),
+            'warnings' => $warnings,
+        ];
+    }
+
+    private function musicPayloadFromRequest(array $payload): ?array
+    {
+        $music = is_array($payload['music'] ?? null) ? $payload['music'] : [];
+        $assetId = (int)($music['asset_library_id'] ?? $payload['music_asset_library_id'] ?? 0);
+        if ($assetId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT asset_library_id, asset_kind, mime_type, rel_path, title
+               FROM asset_library
+              WHERE asset_library_id = :asset_library_id
+                AND asset_kind = \'audio\'
+                AND is_inactive = 0
+                AND is_retired = 0
+              LIMIT 1'
+        );
+        $stmt->execute([':asset_library_id' => $assetId]);
+        $asset = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$asset) {
+            throw new RuntimeException("Music asset not found or not active audio: #{$assetId}");
+        }
+
+        $relPath = (string)($asset['rel_path'] ?? '');
+        $base = rtrim($this->baseUrl, '/');
+        $publicUrl = preg_match('/^https?:\/\//i', $relPath)
+            ? $relPath
+            : ($base !== '' ? $base . '/' . ltrim($relPath, '/') : $relPath);
+        $volume = (float)($music['volume'] ?? $payload['music_volume'] ?? 0.18);
+        if ($volume < 0) {
+            $volume = 0;
+        } elseif ($volume > 1) {
+            $volume = 1;
+        }
+
+        return [
+            'asset_library_id' => (int)$asset['asset_library_id'],
+            'title' => (string)($asset['title'] ?? ''),
+            'rel_path' => $relPath,
+            'public_url' => $publicUrl,
+            'mime_type' => (string)($asset['mime_type'] ?? ''),
+            'volume' => $volume,
+        ];
+    }
+
+    private function reservationPayload(array $reservation): array
+    {
+        return [
+            'reservation_id' => (int)($reservation['playlist_instance_url_reservation_id'] ?? 0),
+            'reservation_key' => (string)($reservation['reservation_key'] ?? ''),
+            'playlist_id' => isset($reservation['playlist_id']) ? (int)$reservation['playlist_id'] : null,
+            'channel' => (string)($reservation['channel'] ?? ''),
+            'slug' => (string)($reservation['slug'] ?? ''),
+            'path' => (string)($reservation['path'] ?? ''),
+            'public_url' => (string)($reservation['public_url'] ?? ''),
+            'status' => (string)($reservation['status'] ?? ''),
+            'playlist_instance_id' => isset($reservation['playlist_instance_id']) && $reservation['playlist_instance_id'] !== null
+                ? (int)$reservation['playlist_instance_id']
+                : null,
         ];
     }
 
@@ -95,12 +294,18 @@ final class AssetCreatorProposalService
         $hasSavedPaletteSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
         $hasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
         $hasPin = $this->columnExists('playlist_items', 'pin');
+        $hasYt = $this->columnExists('playlist_items', 'yt');
+        $hasSite = $this->columnExists('playlist_items', 'site');
+        $hasDurationMs = $this->columnExists('playlist_items', 'duration_ms');
         $hasPaletteHash = $this->columnExists('playlist_items', 'palette_hash');
         $hasApId = $this->columnExists('playlist_items', 'ap_id');
         $photoSelect = $hasPhotoLibraryId ? 'pi.photo_library_id' : 'NULL AS photo_library_id';
         $setSelect = $hasSavedPaletteSetId ? 'pi.saved_palette_set_id' : 'NULL AS saved_palette_set_id';
         $analyzerRoleSelect = $hasAnalyzerRole ? 'pi.analyzer_role' : "'ignore' AS analyzer_role";
         $pinSelect = $hasPin ? 'pi.pin' : '1 AS pin';
+        $ytSelect = $hasYt ? 'pi.yt' : '1 AS yt';
+        $siteSelect = $hasSite ? 'pi.site' : '1 AS site';
+        $durationSelect = $hasDurationMs ? 'pi.duration_ms' : 'NULL AS duration_ms';
         $paletteHashSelect = $hasPaletteHash ? 'pi.palette_hash' : 'NULL AS palette_hash';
         $apIdSelect = $hasApId ? 'pi.ap_id' : 'NULL AS ap_id';
         $photoJoin = $hasPhotoLibraryId ? 'LEFT JOIN photo_library pl ON pl.photo_library_id = pi.photo_library_id' : '';
@@ -116,6 +321,7 @@ final class AssetCreatorProposalService
                     pi.item_type,
                     pi.title,
                     pi.subtitle,
+                    pi.body,
                     pi.image_url,
                     {$paletteHashSelect},
                     {$apIdSelect},
@@ -124,6 +330,9 @@ final class AssetCreatorProposalService
                     {$savedPaletteIdSelect},
                     {$analyzerRoleSelect},
                     {$pinSelect},
+                    {$ytSelect},
+                    {$siteSelect},
+                    {$durationSelect},
                     {$photoHasPaletteSelect}
                FROM playlist_items pi
                     {$photoJoin}
@@ -133,6 +342,54 @@ final class AssetCreatorProposalService
         );
         $stmt->execute(['playlist_id' => $playlistId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function youtubeEnabled(array $item): bool
+    {
+        $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+        return $role !== 'ignore' && (int)($item['yt'] ?? 0) === 1;
+    }
+
+    private function ignoredYoutubeItems(array $allItems, array $includedItems): array
+    {
+        $used = [];
+        foreach ($includedItems as $item) {
+            $id = (int)($item['playlist_item_id'] ?? 0);
+            if ($id > 0) {
+                $used[$id] = true;
+            }
+        }
+
+        $ignored = [];
+        foreach ($allItems as $item) {
+            $id = (int)($item['playlist_item_id'] ?? 0);
+            if ($id <= 0 || isset($used[$id])) {
+                continue;
+            }
+            $ignored[] = [
+                'playlist_item_id' => $id,
+                'photo_library_id' => isset($item['photo_library_id']) ? (int)$item['photo_library_id'] : null,
+                'title' => (string)($item['title'] ?? ''),
+                'reason' => $this->youtubeIgnoreReason($item),
+            ];
+        }
+        return $ignored;
+    }
+
+    private function youtubeIgnoreReason(array $item): string
+    {
+        $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+        $yt = (int)($item['yt'] ?? 0);
+        if ($role === 'ignore' && $yt !== 1) {
+            return 'Analyzer is ignore and yt is off.';
+        }
+        if ($role === 'ignore') {
+            return 'Analyzer is ignore.';
+        }
+        if ($yt !== 1) {
+            return 'yt is off for this playlist row.';
+        }
+        return 'Not included in YouTube video.';
     }
 
     private function pinRowsFromAnalyzerRoles(array $items, array $playlist): array
@@ -453,10 +710,24 @@ final class AssetCreatorProposalService
         return $ignored;
     }
 
-    private function applyPayloadDefaults(array $rows, array $payload): array
+    private function applyPayloadDefaults(
+        array $rows,
+        array $payload,
+        array $playlist,
+        array $reservation,
+        string $platform,
+        string $assetType
+    ): array
     {
         $defaultTitle = trim((string)($payload['default_title'] ?? ''));
-        $defaultDescription = trim((string)($payload['default_description'] ?? ''));
+        $defaultDescription = $this->defaultDescriptionFor(
+            $payload,
+            $platform,
+            $assetType,
+            (string)($playlist['type'] ?? ''),
+            $playlist,
+            $reservation
+        );
         if ($defaultTitle === '' && $defaultDescription === '') {
             return $rows;
         }
@@ -473,6 +744,52 @@ final class AssetCreatorProposalService
             }
             return $row;
         }, $rows);
+    }
+
+    private function defaultDescriptionFor(
+        array $payload,
+        string $platform,
+        string $assetType,
+        string $playlistType,
+        array $playlist,
+        array $reservation
+    ): string {
+        $template = trim((string)($payload['default_description'] ?? ''));
+        if ($template === '') {
+            $repo = new PdoPublishingDefaultTemplateRepository($this->pdo);
+            $row = $repo->findBest($platform, $assetType, $playlistType, 'description');
+            $template = trim((string)($row['template_text'] ?? ''));
+        }
+        if ($template === '') {
+            return '';
+        }
+        return $this->renderTemplate($template, $platform, $assetType, $playlistType, $playlist, $reservation);
+    }
+
+    private function renderTemplate(
+        string $template,
+        string $platform,
+        string $assetType,
+        string $playlistType,
+        array $playlist,
+        array $reservation
+    ): string {
+        $values = [
+            'playlist_url' => (string)($reservation['public_url'] ?? ''),
+            'final_playlist_url' => (string)($reservation['public_url'] ?? ''),
+            'playlist_title' => (string)($playlist['title'] ?? ''),
+            'playlist_id' => (string)($playlist['playlist_id'] ?? ''),
+            'playlist_type' => $playlistType,
+            'channel' => $platform,
+            'platform' => $platform,
+            'asset_type' => $assetType,
+            'summary' => '',
+        ];
+
+        return preg_replace_callback('/{{\\s*([a-zA-Z0-9_\\-.]+)\\s*}}/', static function (array $matches) use ($values): string {
+            $key = strtolower((string)($matches[1] ?? ''));
+            return array_key_exists($key, $values) ? $values[$key] : $matches[0];
+        }, $template) ?? $template;
     }
 
     private function titleForPinType(string $title, string $pinType): string

@@ -8,6 +8,7 @@ use App\Repos\PdoAssetCreatorRepository;
 use App\Services\AssetCreators\PinterestIdeaPalettePinCreator;
 use App\Services\AssetCreators\PinterestIdeaPinCreator;
 use App\Services\AssetCreators\PinterestPinRenderToolkit;
+use App\Services\AssetCreators\YouTubePlaylistVideoCreator;
 use PDO;
 use RuntimeException;
 
@@ -16,6 +17,7 @@ final class AssetCreatorRunService
     private const PIN_WIDTH = 1000;
     private const PIN_HEIGHT = 1500;
     private const CREATOR_PIN_COMPOSITE = 'pinterest.before_after_composite';
+    private const CREATOR_YOUTUBE_PLAYLIST_VIDEO = 'youtube.playlist_video';
     private const PIN_LOGO_FILE = 'colorfix-pin-logo-compact-right-aligned-transparent.png';
     private const PIN_LOGO_WIDTH = 188;
     private const PIN_LOGO_MARGIN = 20;
@@ -41,6 +43,10 @@ final class AssetCreatorRunService
         }
 
         $creatorKey = trim((string)($job['creator_key'] ?? ''));
+        if ($creatorKey === self::CREATOR_YOUTUBE_PLAYLIST_VIDEO) {
+            return $this->runYoutubePlaylistVideoJob($job);
+        }
+
         if ($creatorKey !== self::CREATOR_PIN_COMPOSITE) {
             throw new RuntimeException("Creator is not runnable yet: {$creatorKey}");
         }
@@ -101,6 +107,188 @@ final class AssetCreatorRunService
             'deleted_asset_ids' => $deletedAssetIds,
             'deleted_count' => count($deletedAssetIds),
         ];
+    }
+
+    private function runYoutubePlaylistVideoJob(array $job): array
+    {
+        $jobId = (int)$job['asset_creator_job_id'];
+        $playlistId = (int)($job['source_id'] ?? 0);
+        if ($playlistId <= 0) {
+            $instructions = $this->decodeJsonObject($job['instructions_json'] ?? null);
+            $source = is_array($instructions['source'] ?? null) ? $instructions['source'] : [];
+            $playlistId = (int)($source['playlist_id'] ?? 0);
+        }
+        if ($playlistId <= 0) {
+            throw new RuntimeException('YouTube creator job is missing source playlist id.');
+        }
+
+        $previousOutputAssets = $this->outputAssets($job['outputs'] ?? []);
+        $this->assetLibrary->assertAssetsCanBeHardDeleted(array_keys($previousOutputAssets));
+
+        $projectRoot = $this->projectRoot();
+        $scriptPath = $projectRoot . DIRECTORY_SEPARATOR . 'scripts' . DIRECTORY_SEPARATOR . 'render-youtube-video.mjs';
+        if (!is_file($scriptPath)) {
+            throw new RuntimeException('YouTube render script is missing.');
+        }
+        if (!$this->commandExists('node')) {
+            throw new RuntimeException('YouTube video rendering requires Node/Remotion on the server. The YouTube analyzer recipe can be saved now, but Create Video cannot run until the render runtime is installed or moved to a worker.');
+        }
+
+        $instructions = $this->decodeJsonObject($job['instructions_json'] ?? null);
+        $plan = (new YouTubePlaylistVideoCreator($this->rootDir))->planForRecipe($instructions);
+        $recipeDir = $projectRoot . DIRECTORY_SEPARATOR . 'exports' . DIRECTORY_SEPARATOR . 'youtube-video-props';
+        if (!is_dir($recipeDir) && !mkdir($recipeDir, 0775, true) && !is_dir($recipeDir)) {
+            throw new RuntimeException('Failed to create YouTube recipe folder.');
+        }
+        $recipePath = $recipeDir . DIRECTORY_SEPARATOR . "job-{$jobId}.json";
+        $renderedPath = $projectRoot . DIRECTORY_SEPARATOR . 'exports' . DIRECTORY_SEPARATOR . "colorfix-youtube-video-job-{$jobId}.mp4";
+        file_put_contents($recipePath, json_encode(['plan' => $plan], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $this->runCommand([
+            'node',
+            $scriptPath,
+            '--recipe=' . $recipePath,
+            '--output=' . $renderedPath,
+        ], $projectRoot);
+
+        if (!is_file($renderedPath)) {
+            throw new RuntimeException('YouTube renderer finished but no MP4 was found.');
+        }
+
+        $relPath = "/photos/youtube/generated/job-{$jobId}/youtube-video-{$jobId}-playlist-{$playlistId}.mp4";
+        $absPath = $this->absolutePathForRelPath($relPath);
+        $dir = dirname($absPath);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('Failed to create YouTube output folder.');
+        }
+        if (!copy($renderedPath, $absPath)) {
+            throw new RuntimeException('Failed to copy rendered YouTube video into asset storage.');
+        }
+
+        $rows = is_array($instructions['video_rows'] ?? null)
+            ? $instructions['video_rows']
+            : (is_array($instructions['pairs'] ?? null) ? $instructions['pairs'] : []);
+        $row = is_array($rows[0] ?? null) ? $rows[0] : [];
+        $metadata = [
+            'creator_key' => self::CREATOR_YOUTUBE_PLAYLIST_VIDEO,
+            'asset_creator_job_id' => $jobId,
+            'playlist_id' => $playlistId,
+            'asset_type' => 'youtube_playlist_video',
+            'video_title' => $row['search_title'] ?? $row['title'] ?? $job['title'] ?? '',
+            'description' => $row['description'] ?? $row['caption'] ?? '',
+            'slides' => is_array($row['slides'] ?? null) ? $row['slides'] : [],
+            'music' => is_array($instructions['music'] ?? null) ? $instructions['music'] : null,
+            'render_source' => 'scripts/render-youtube-video.mjs',
+        ];
+
+        $asset = $this->assetLibrary->upsertAssetByPath($relPath, [
+            'asset_kind' => 'video',
+            'mime_type' => 'video/mp4',
+            'title' => trim((string)($metadata['video_title'] ?: ($job['title'] ?? "YouTube video {$jobId}"))),
+            'tags' => 'youtube, video, playlist, generated',
+            'alt_text' => trim((string)($metadata['description'] ?? '')),
+            'note' => 'Generated by asset creator job #' . $jobId,
+            'source_type' => 'asset_creator_job',
+            'source_id' => $jobId,
+            'width' => 1920,
+            'height' => 1080,
+            'file_size_bytes' => is_file($absPath) ? filesize($absPath) : null,
+            'checksum' => is_file($absPath) ? hash_file('sha256', $absPath) : null,
+            'metadata_json' => $metadata,
+            'is_inactive' => 0,
+            'is_retired' => 0,
+        ]);
+
+        $outputs = [[
+            'asset_library_id' => (int)$asset['asset_library_id'],
+            'rel_path' => $relPath,
+            'public_url' => $asset['public_url'] ?? $this->assetLibrary->publicUrlForRelPath($relPath),
+            'metadata' => $metadata,
+        ]];
+
+        $this->creatorRepo->replaceOutputs($jobId, [[
+            'asset_library_id' => (int)$asset['asset_library_id'],
+            'role' => 'video',
+            'status' => 'created',
+            'generated_at' => AppTime::now(),
+            'metadata_json' => $metadata,
+        ]]);
+
+        $deletedAssetIds = $this->deleteReplacedOutputAssets($jobId, $previousOutputAssets, [(int)$asset['asset_library_id']]);
+
+        $this->creatorRepo->updateJob($jobId, [
+            'status' => 'generated',
+            'last_run_at' => AppTime::now(),
+        ]);
+
+        $updated = $this->creatorRepo->findJob($jobId);
+        if (!$updated) {
+            throw new RuntimeException('Asset creator job not found after run');
+        }
+
+        return [
+            'job' => $updated,
+            'outputs' => $outputs,
+            'deleted_asset_ids' => $deletedAssetIds,
+            'deleted_count' => count($deletedAssetIds),
+        ];
+    }
+
+    private function projectRoot(): string
+    {
+        $root = realpath($this->rootDir);
+        if ($root && is_dir($root . DIRECTORY_SEPARATOR . 'scripts')) {
+            return $root;
+        }
+        $fallback = realpath(dirname(__DIR__, 2));
+        if ($fallback && is_dir($fallback . DIRECTORY_SEPARATOR . 'scripts')) {
+            return $fallback;
+        }
+        return rtrim($this->rootDir, DIRECTORY_SEPARATOR);
+    }
+
+    private function commandExists(string $command): bool
+    {
+        $command = trim($command);
+        if ($command === '') {
+            return false;
+        }
+        $descriptorSpec = [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open('command -v ' . escapeshellarg($command), $descriptorSpec, $pipes);
+        if (!is_resource($process)) {
+            return false;
+        }
+        $stdout = trim((string)stream_get_contents($pipes[1]));
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+        return $code === 0 && $stdout !== '';
+    }
+
+    private function runCommand(array $command, string $cwd): void
+    {
+        $escaped = implode(' ', array_map('escapeshellarg', $command));
+        $descriptorSpec = [
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open($escaped, $descriptorSpec, $pipes, $cwd);
+        if (!is_resource($process)) {
+            throw new RuntimeException('Failed to start YouTube renderer.');
+        }
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($process);
+        if ($code !== 0) {
+            $detail = trim((string)($stderr ?: $stdout));
+            throw new RuntimeException('YouTube renderer failed' . ($detail !== '' ? ': ' . $detail : '.'));
+        }
     }
 
     private function outputAssets(array $outputs): array

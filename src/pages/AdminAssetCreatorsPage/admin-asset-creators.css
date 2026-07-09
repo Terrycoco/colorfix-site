@@ -108,8 +108,107 @@
   flex: 0 0 280px;
 }
 
+.assetcreator-music-field {
+  flex: 1 1 360px;
+}
+
+.assetcreator-music-field select {
+  width: 100%;
+}
+
+.assetcreator-volume-field {
+  flex: 0 0 130px;
+}
+
+.assetcreator-volume-field input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 6px 7px;
+  font: inherit;
+  background: #fff;
+}
+
+.assetcreator-copy-field {
+  flex: 1 1 420px;
+}
+
+.assetcreator-copy-field__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.assetcreator-copy-field__control input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 6px 7px;
+  font: inherit;
+  background: #fff;
+}
+
+.assetcreator-copy-field__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #777;
+  border-radius: 2px;
+  background: #f5f5f5;
+  color: #111;
+  cursor: pointer;
+}
+
+.assetcreator-copy-field__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .assetcreator-default-description-field {
   flex: 1 1 520px;
+}
+
+.assetcreator-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.assetcreator-label-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.assetcreator-inline-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #777;
+  border-radius: 2px;
+  background: #f5f5f5;
+  color: #111;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 7px;
+  cursor: pointer;
+}
+
+.assetcreator-inline-command-link {
+  text-decoration: none;
+}
+
+.assetcreator-inline-command:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .assetcreator-default-title-field input,
@@ -143,6 +242,19 @@
   align-items: center;
   justify-content: center;
   text-decoration: none;
+}
+
+.assetcreator-mini-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.assetcreator-mini-link--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .assetcreator-command--primary {
@@ -235,6 +347,39 @@
 .assetcreator-outputs span {
   color: #555;
   font-weight: 700;
+}
+
+.assetcreator-preview-result {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #777;
+  background: #f7f7f7;
+  padding: 7px 9px;
+  margin-bottom: 8px;
+}
+
+.assetcreator-preview-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assetcreator-preview-result span {
+  color: #555;
+  font-weight: 700;
+}
+
+.assetcreator-preview-result input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 6px 7px;
+  font: inherit;
+  background: #fff;
 }
 
 .assetcreator-grid-wrap {
@@ -362,6 +507,24 @@
   background: transparent;
   padding: 0;
   cursor: zoom-in;
+}
+
+.assetcreator-output-preview--video {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.assetcreator-output-preview__video-icon {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #777;
+  background: #111;
+  color: #fff;
+  display: inline-grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .assetcreator-thumb-permission {

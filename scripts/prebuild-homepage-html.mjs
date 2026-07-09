@@ -5,6 +5,8 @@ import process from "node:process";
 const root = process.cwd();
 const distIndex = path.join(root, "dist", "index.html");
 const payloadPath = path.join(root, "api", "cache", "front-page-public.json");
+const adminDistIndex = path.join(root, "dist", "admin", "index.html");
+const adminPayloadPath = path.join(root, "api", "cache", "front-page-admin.json");
 
 if (!fs.existsSync(distIndex)) {
   fail("dist/index.html not found. Run npm run build first.");
@@ -20,24 +22,36 @@ const preloadLinks = renderPreloadLinks(payload);
 const styleBlock = `<style id="cf-static-home-style">${getStaticCss()}</style>`;
 
 let next = stripExistingStaticHome(html);
+next = applyBuildContentToHead(next, normalizeBuildContent(payload, "public_home"));
 next = replaceRoot(next, staticHtml);
 next = next.replace("</head>", `${preloadLinks}${styleBlock}\n  </head>`);
 
 fs.writeFileSync(distIndex, next);
 console.log(`Prebuilt static homepage HTML into ${distIndex}`);
 
+if (fs.existsSync(adminDistIndex) && fs.existsSync(adminPayloadPath)) {
+  const adminPayload = JSON.parse(fs.readFileSync(adminPayloadPath, "utf8"));
+  const adminHtml = fs.readFileSync(adminDistIndex, "utf8");
+  const adminNext = applyBuildContentToHead(adminHtml, normalizeBuildContent(adminPayload, "admin_home"));
+  fs.writeFileSync(adminDistIndex, adminNext);
+  console.log(`Applied admin homepage metadata into ${adminDistIndex}`);
+}
+
 function renderStaticHome(payload) {
+  const buildContent = normalizeBuildContent(payload, "public_home");
   const items = mergeWithInserts(payload.results || [], [
     ...(payload.inserts || []),
     payload.frontPageRailItem,
   ].filter(Boolean)).filter((item) => !isLoginButton(item));
 
   const cards = items.map(renderItem).filter(Boolean).join("\n");
+  const footer = renderStaticFooter(buildContent);
   return `
     <div class="cf-static-home" aria-hidden="true">
       <main class="cf-static-home__grid">
         ${cards}
       </main>
+      ${footer}
     </div>
   `;
 }
@@ -131,6 +145,22 @@ function renderTextCard(title, description, className, url = "") {
   return wrapStaticLink(body, url);
 }
 
+function renderStaticFooter(content) {
+  const text = String(content.footer_brand_text || "").trim();
+  if (!text) return "";
+  const url = String(content.footer_url || "").trim();
+  const urlText = String(content.footer_url_text || "").trim();
+  const link = url && urlText
+    ? `<a href="${escapeAttr(url)}">${escapeHtml(urlText)}</a>`
+    : "";
+  return `
+      <footer class="cf-static-home__footer">
+        <span>${escapeHtml(text)}</span>
+        ${link}
+      </footer>
+  `;
+}
+
 function wrapStaticLink(html, url) {
   const target = String(url || "").trim();
   if (!target) return html;
@@ -146,6 +176,97 @@ function stripExistingStaticHome(html) {
   return html
     .replace(/\s*<link rel="preload" as="image" href="\/api\/v2\/image-thumb\.php\?id=[^"]*"(?: fetchpriority="high")?>/g, "")
     .replace(/\s*<style id="cf-static-home-style">[\s\S]*?<\/style>/g, "");
+}
+
+function normalizeBuildContent(payload, buildKey) {
+  const content = payload && typeof payload.build_content === "object" && payload.build_content !== null
+    ? payload.build_content
+    : {};
+  return { ...buildContentFallbacks(buildKey), ...content };
+}
+
+function buildContentFallbacks(buildKey) {
+  if (buildKey === "admin_home") {
+    return {
+      title: "ColorFix Admin",
+      robots: "noindex,nofollow",
+    };
+  }
+  return {
+    title: "ColorFix by Terry | Home Color Transformations & Paint Palettes",
+    meta_description: "ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr.",
+    robots: "index,follow",
+    canonical_url: "https://colorfix.terrymarr.com/",
+    footer_brand_text: "ColorFix by Terry — home color transformations by Terry Marr",
+    footer_url: "https://colorfix.terrymarr.com/",
+    footer_url_text: "colorfix.terrymarr.com",
+  };
+}
+
+function applyBuildContentToHead(html, content) {
+  let next = html;
+  const title = String(content.title || "").trim();
+  const description = String(content.meta_description || "").trim();
+  const robots = String(content.robots || "").trim();
+  const canonicalUrl = String(content.canonical_url || "").trim();
+  const ogTitle = String(content.og_title || title || "").trim();
+  const ogDescription = String(content.og_description || description || "").trim();
+  const ogImage = String(content.og_image || "").trim();
+
+  if (title) {
+    next = upsertTitle(next, title);
+  }
+  next = upsertMetaName(next, "description", description);
+  next = upsertMetaName(next, "robots", robots);
+  next = upsertCanonical(next, canonicalUrl);
+  next = upsertMetaProperty(next, "og:title", ogTitle);
+  next = upsertMetaProperty(next, "og:description", ogDescription);
+  next = upsertMetaProperty(next, "og:image", ogImage);
+  return next;
+}
+
+function upsertTitle(html, value) {
+  const tag = `<title>${escapeHtml(value)}</title>`;
+  if (/<title>[\s\S]*?<\/title>/i.test(html)) {
+    return html.replace(/<title>[\s\S]*?<\/title>/i, tag);
+  }
+  return html.replace("</head>", `    ${tag}\n  </head>`);
+}
+
+function upsertMetaName(html, name, value) {
+  const pattern = new RegExp(`\\s*<meta\\s+name=["']${escapeRegExp(name)}["'][^>]*>`, "i");
+  if (!value) {
+    return html.replace(pattern, "");
+  }
+  const tag = `<meta name="${escapeAttr(name)}" content="${escapeAttr(value)}">`;
+  if (pattern.test(html)) {
+    return html.replace(pattern, `\n${tag}`);
+  }
+  return html.replace("</head>", `    ${tag}\n  </head>`);
+}
+
+function upsertMetaProperty(html, property, value) {
+  const pattern = new RegExp(`\\s*<meta\\s+property=["']${escapeRegExp(property)}["'][^>]*>`, "i");
+  if (!value) {
+    return html.replace(pattern, "");
+  }
+  const tag = `<meta property="${escapeAttr(property)}" content="${escapeAttr(value)}">`;
+  if (pattern.test(html)) {
+    return html.replace(pattern, `\n${tag}`);
+  }
+  return html.replace("</head>", `    ${tag}\n  </head>`);
+}
+
+function upsertCanonical(html, value) {
+  const pattern = /\s*<link\s+rel=["']canonical["'][^>]*>/i;
+  if (!value) {
+    return html.replace(pattern, "");
+  }
+  const tag = `<link rel="canonical" href="${escapeAttr(value)}">`;
+  if (pattern.test(html)) {
+    return html.replace(pattern, `\n${tag}`);
+  }
+  return html.replace("</head>", `    ${tag}\n  </head>`);
 }
 
 function replaceRoot(html, staticHtml) {
@@ -219,6 +340,10 @@ function escapeAttr(value) {
   return escapeHtml(value);
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -242,6 +367,20 @@ function getStaticCss() {
   gap: 8px;
   max-width: 1320px;
   margin: 0 auto;
+}
+.cf-static-home__footer {
+  color: #4b5563;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: center;
+  margin: 2rem auto 0;
+  max-width: 1320px;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.cf-static-home__footer a {
+  color: inherit;
 }
 .cf-static-card,
 .cf-static-playlist-set {

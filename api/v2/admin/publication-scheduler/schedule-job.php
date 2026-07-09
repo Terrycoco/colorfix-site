@@ -10,8 +10,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 
 try {
     $payload = scheduler_payload();
-    $publishingJobId = (int)($payload['publishing_job_id'] ?? $payload['publish_job_id'] ?? 0);
-    if ($publishingJobId <= 0) throw new RuntimeException('publishing_job_id required');
+    $publishingJobId = (int)($payload['package_batch_id'] ?? $payload['publish_job_id'] ?? 0);
+    if ($publishingJobId <= 0) throw new RuntimeException('package_batch_id required');
     $service = scheduler_service($pdo);
     $item = $service->enqueueMissingForJob($publishingJobId, $payload);
     scheduler_respond(['ok' => true, 'item' => $item]);
