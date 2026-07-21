@@ -143,6 +143,46 @@
   gap: 1rem;
 }
 
+.asp-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0;
+  flex-wrap: wrap;
+}
+
+.asp-pagination-status {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.asp-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.asp-pagination-actions button {
+  border: none;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.8rem;
+}
+
+.asp-pagination-actions button.ghost {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.asp-pagination-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .asp-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
@@ -266,6 +306,43 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.asp-playlist-uses {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.asp-playlist-uses > span {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.asp-playlist-use-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.asp-playlist-use-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.asp-playlist-use-links a:hover,
+.asp-playlist-use-links a:focus-visible {
+  border-color: #0f172a;
+  background: #eef2f7;
 }
 
 .asp-swatch {

@@ -105,7 +105,7 @@ final class ShareService
         }
 
         $params = ['psi' => $setId];
-        foreach (['aud', 'add_cta_group', 'demo', 'return_to'] as $key) {
+        foreach (['aud', 'add_cta_group', 'demo', 'return_to', 'set_v'] as $key) {
             $value = trim((string)($options[$key] ?? ''));
             if ($value !== '') {
                 $params[$key] = $value;

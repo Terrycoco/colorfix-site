@@ -23,7 +23,7 @@ final class PdoPlaylistInstanceSetRepository
             ? 'end_cta_label, end_cta_url, end_cta_enabled'
             : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
+            SELECT id, handle, title, subtitle, context, updated_at, {$endCtaSelect}
             FROM playlist_instance_sets
             ORDER BY id DESC
             SQL;
@@ -40,7 +40,8 @@ final class PdoPlaylistInstanceSetRepository
                 $row['context'] !== null ? (string)$row['context'] : null,
                 $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
                 $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
-                (bool)((int)($row['end_cta_enabled'] ?? 1))
+                (bool)((int)($row['end_cta_enabled'] ?? 1)),
+                $row['updated_at'] !== null ? (string)$row['updated_at'] : null
             );
         }
         return $sets;
@@ -52,7 +53,7 @@ final class PdoPlaylistInstanceSetRepository
             ? 'end_cta_label, end_cta_url, end_cta_enabled'
             : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
+            SELECT id, handle, title, subtitle, context, updated_at, {$endCtaSelect}
             FROM playlist_instance_sets
             WHERE id = :id
             LIMIT 1
@@ -69,7 +70,8 @@ final class PdoPlaylistInstanceSetRepository
             $row['context'] !== null ? (string)$row['context'] : null,
             $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
             $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
-            (bool)((int)($row['end_cta_enabled'] ?? 1))
+            (bool)((int)($row['end_cta_enabled'] ?? 1)),
+            $row['updated_at'] !== null ? (string)$row['updated_at'] : null
         );
     }
 
@@ -79,7 +81,7 @@ final class PdoPlaylistInstanceSetRepository
             ? 'end_cta_label, end_cta_url, end_cta_enabled'
             : 'NULL AS end_cta_label, NULL AS end_cta_url, 1 AS end_cta_enabled';
         $sql = <<<SQL
-            SELECT id, handle, title, subtitle, context, {$endCtaSelect}
+            SELECT id, handle, title, subtitle, context, updated_at, {$endCtaSelect}
             FROM playlist_instance_sets
             WHERE handle = :handle
             LIMIT 1
@@ -96,7 +98,8 @@ final class PdoPlaylistInstanceSetRepository
             $row['context'] !== null ? (string)$row['context'] : null,
             $row['end_cta_label'] !== null ? (string)$row['end_cta_label'] : null,
             $row['end_cta_url'] !== null ? (string)$row['end_cta_url'] : null,
-            (bool)((int)($row['end_cta_enabled'] ?? 1))
+            (bool)((int)($row['end_cta_enabled'] ?? 1)),
+            $row['updated_at'] !== null ? (string)$row['updated_at'] : null
         );
     }
 

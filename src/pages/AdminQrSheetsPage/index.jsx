@@ -6,6 +6,7 @@ import "./admin-qr-sheets.css";
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const WATCH_GET_URL = `${API_FOLDER}/v2/admin/watch-config/get.php`;
 const WATCH_SAVE_URL = `${API_FOLDER}/v2/admin/watch-config/save.php`;
+const BUSINESS_CARD_QR_URL = "https://colorfix.terrymarr.com/qr";
 
 
 function handlePrintSheet() {
@@ -247,18 +248,8 @@ export default function AdminQrSheetsPage() {
     () => qrOptions.find((option) => option.id === selectedId) || qrOptions[0],
     [selectedId]
   );
-  const selectedWatchTarget = useMemo(
-    () => instances.find((item) => String(item.playlist_instance_id) === String(watchForm.playlist_instance_id)) || null,
-    [instances, watchForm.playlist_instance_id]
-  );
-  const watchSlugUrl = useMemo(() => {
-    const playerUrl = selectedWatchTarget?.player_url || "";
-    if (!playerUrl) return "https://colorfix.terrymarr.com/watch";
-    if (/^https?:\/\//i.test(playerUrl)) return playerUrl;
-    return `https://colorfix.terrymarr.com${playerUrl.startsWith("/") ? "" : "/"}${playerUrl}`;
-  }, [selectedWatchTarget]);
   const selectedUrl = selected?.id === "watch" || selected?.id === "watch-sticker"
-    ? watchSlugUrl
+    ? BUSINESS_CARD_QR_URL
     : selected?.url;
 
   const wheelSrc =
@@ -657,7 +648,7 @@ async function handleDownloadPng() {
           <div>
             <div className="admin-qr-sheets__watch-config-title">Watch Link Target</div>
             <div className="admin-qr-sheets__watch-config-note">
-              Choose which playlist slug the printed Watch QR code opens.
+              Choose which playlist the permanent /qr code opens.
             </div>
           </div>
           <button type="button" onClick={handleSaveWatchConfig} disabled={watchSaving || watchLoading}>

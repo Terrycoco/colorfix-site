@@ -20,9 +20,6 @@ export default function PlayerEndScreen({
 
       {showBranding && (
         <div className="player-end-footer">
-          <a href="/hire-terry" className="player-end-hire-link">
-            Get Your Makeover by Terry <span aria-hidden="true">→</span>
-          </a>
           <div className="player-end-branding">
             <span className="player-end-branding-label">Brought to you by</span>
             <a href="/" className="player-end-branding-link">

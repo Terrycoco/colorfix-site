@@ -23,6 +23,27 @@
   margin-top: -4px;
 }
 
+.playlist-picker__search-link {
+  align-items: center;
+  background: #101010;
+  border: 1px solid #101010;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 16px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.playlist-picker__search-link:hover,
+.playlist-picker__search-link:focus-visible {
+  background: #2a2a2a;
+  border-color: #2a2a2a;
+}
+
 @media (max-width: 600px) {
   .playlist-picker .playlist-thumbs__grid {
     grid-template-columns: 1fr;
@@ -30,5 +51,10 @@
 
   .playlist-picker .playlist-thumbs__card {
     width: 100%;
+  }
+
+  .playlist-picker__search-link {
+    width: 100%;
+    justify-content: center;
   }
 }

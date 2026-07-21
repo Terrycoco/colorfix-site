@@ -62,6 +62,7 @@ const emptyItem = {
   yt: true,
   pin: true,
   analyzer_role: "ignore",
+  finder_start: "auto",
   is_active: true,
 };
 
@@ -106,6 +107,7 @@ const BRAND_BUMPER_BODY_TEMPLATE = JSON.stringify(DEFAULT_BRAND_BUMPER_CONFIG, n
 
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
 const ANALYZER_ROLES = ["ignore", "before", "after", "single"];
+const FINDER_START_VALUES = ["auto", "this", "previous"];
 
 function slugifyPlaylistValue(value) {
   return String(value || "")
@@ -378,6 +380,9 @@ export default function AdminPlaylistEditorPage() {
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
             : "ignore",
+          finder_start: FINDER_START_VALUES.includes(String(item.finder_start || "").toLowerCase())
+            ? String(item.finder_start || "").toLowerCase()
+            : "auto",
           is_active: item.is_active === null ? true : Boolean(item.is_active),
         }))
       );
@@ -529,7 +534,7 @@ export default function AdminPlaylistEditorPage() {
           if (nextValue === "brand-bumper") {
             nextItem.title = nextItem.title || "ColorFix";
             nextItem.subtitle = nextItem.subtitle || "by Terry";
-            nextItem.site = false;
+            nextItem.site = true;
             nextItem.yt = true;
             nextItem.pin = false;
             nextItem.analyzer_role = "single";
@@ -665,7 +670,7 @@ export default function AdminPlaylistEditorPage() {
         title: type === "brand-bumper" ? "ColorFix" : emptyItem.title,
         subtitle: type === "brand-bumper" ? "by Terry" : emptyItem.subtitle,
         star: ["hue-wheel", "brand-bumper"].includes(type) ? false : emptyItem.star,
-        site: type === "brand-bumper" ? false : emptyItem.site,
+        site: type === "brand-bumper" ? true : emptyItem.site,
         yt: type === "brand-bumper" ? true : emptyItem.yt,
         pin: type === "brand-bumper" ? false : emptyItem.pin,
         analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
@@ -805,6 +810,9 @@ export default function AdminPlaylistEditorPage() {
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
             : "ignore",
+          finder_start: FINDER_START_VALUES.includes(String(item.finder_start || "").toLowerCase())
+            ? String(item.finder_start || "").toLowerCase()
+            : "auto",
         })),
       };
       const itemsRes = await fetch(SAVE_ITEMS_URL, {
@@ -1083,7 +1091,7 @@ export default function AdminPlaylistEditorPage() {
                 </select>
               </label>
               <label className="item-cell item-analyzer-role">
-                Analyzer
+                Pin Role
                 <select
                   value={item.analyzer_role || "ignore"}
                   onChange={(e) => updateItem(index, "analyzer_role", e.target.value)}
@@ -1092,6 +1100,17 @@ export default function AdminPlaylistEditorPage() {
                   <option value="before">before</option>
                   <option value="after">after</option>
                   <option value="single">single</option>
+                </select>
+              </label>
+              <label className="item-cell item-finder-start">
+                Finder Start
+                <select
+                  value={item.finder_start || "auto"}
+                  onChange={(e) => updateItem(index, "finder_start", e.target.value)}
+                >
+                  <option value="auto">auto</option>
+                  <option value="this">this slide</option>
+                  <option value="previous">previous slide</option>
                 </select>
               </label>
               <label className="item-cell item-title">

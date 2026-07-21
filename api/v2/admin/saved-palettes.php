@@ -63,6 +63,7 @@ try {
 
     $withMembers = !empty($_GET['with_members']) && (int) $_GET['with_members'] === 1;
     $withPhotos  = !empty($_GET['with_photos']) && (int) $_GET['with_photos'] === 1;
+    $withPlaylistUses = !empty($_GET['with_playlist_uses']) && (int) $_GET['with_playlist_uses'] === 1;
 
     $rows = $controller->list($filters, $limit, $offset);
     if ($paletteId > 0) {
@@ -79,6 +80,17 @@ try {
                 $row['photos'] = $full['photos'] ?? [];
                 $row['sets'] = $full['sets'] ?? [];
             }
+        }
+        unset($row);
+    }
+
+    if ($withPlaylistUses && $rows) {
+        $playlistUses = $paletteRepo->getPlaylistUsesForPaletteIds(array_map(
+            static fn(array $row): int => (int)($row['id'] ?? 0),
+            $rows
+        ));
+        foreach ($rows as &$row) {
+            $row['playlist_uses'] = $playlistUses[(int)($row['id'] ?? 0)] ?? [];
         }
         unset($row);
     }

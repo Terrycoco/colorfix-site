@@ -351,7 +351,7 @@
 
 .assetcreator-preview-result {
   display: grid;
-  grid-template-columns: auto minmax(220px, 1fr) auto;
+  grid-template-columns: auto minmax(220px, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   border: 1px solid #777;
@@ -372,6 +372,46 @@
 }
 
 .assetcreator-preview-result input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #9ca3af;
+  border-radius: 2px;
+  padding: 6px 7px;
+  font: inherit;
+  background: #fff;
+}
+
+.assetcreator-path-result {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #777;
+  background: #f7f7f7;
+  padding: 9px;
+  margin-bottom: 8px;
+}
+
+.assetcreator-path-result > strong {
+  font-size: 16px;
+}
+
+.assetcreator-path-result label {
+  display: grid;
+  grid-template-columns: 150px minmax(220px, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.assetcreator-path-result__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.assetcreator-path-result input {
   min-width: 0;
   width: 100%;
   box-sizing: border-box;

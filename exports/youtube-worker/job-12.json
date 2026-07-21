@@ -1,0 +1,209 @@
+{
+  "plan": {
+    "playlist_id": 3,
+    "title": "Cottage Palettes",
+    "type": "youtube_worker",
+    "total_items": 9,
+    "items": [
+      {
+        "playlist_item_id": 351,
+        "type": "intro",
+        "item_type": "intro",
+        "title": "Surprising & Charming Cottage Palettes",
+        "subtitle": "Link in the description for all colors used",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base_b5d2e3ad1592.jpg",
+        "duration_ms": null,
+        "sort_order": 1
+      },
+      {
+        "playlist_item_id": 13,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "Betsy Ross",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_37_7a892c16555d.jpg",
+        "duration_ms": null,
+        "sort_order": 2
+      },
+      {
+        "playlist_item_id": 18,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "Tiffany's Cottage",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_38_4b5a8b70e49c.jpg",
+        "duration_ms": null,
+        "sort_order": 3
+      },
+      {
+        "playlist_item_id": 20,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "Early Bloomer",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_43_986df3f2a316.jpg",
+        "duration_ms": null,
+        "sort_order": 4
+      },
+      {
+        "playlist_item_id": 22,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "Audrey Hepburn",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_44_192e3b8d6340.jpg",
+        "duration_ms": null,
+        "sort_order": 5
+      },
+      {
+        "playlist_item_id": 26,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "Maime Eisenhower",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_54_2d2a3ba0986e.jpg",
+        "duration_ms": null,
+        "sort_order": 6
+      },
+      {
+        "playlist_item_id": 24,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "The Diva",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_39_e2d88fcd187b.jpg",
+        "duration_ms": null,
+        "sort_order": 7
+      },
+      {
+        "playlist_item_id": 25,
+        "type": "palette",
+        "item_type": "palette",
+        "title": "My Sun's in the Navy",
+        "subtitle": "",
+        "body": "",
+        "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_53_f4f61ede12a8.jpg",
+        "duration_ms": null,
+        "sort_order": 8
+      },
+      {
+        "playlist_item_id": 353,
+        "type": "brand-bumper",
+        "item_type": "brand-bumper",
+        "title": "ColorFix",
+        "subtitle": "by Terry",
+        "body": "{\n  \"variant\": \"colorfix-signature\",\n  \"signatureRevealDelayMs\": 1500,\n  \"signatureRevealDurationMs\": 1500,\n  \"signatureSound\": {\n    \"enabled\": false,\n    \"src\": \"\",\n    \"cueMs\": 1500,\n    \"note\": \"placeholder for pencil scratch signing sound\"\n  }\n}",
+        "image_url": "",
+        "duration_ms": 5200,
+        "sort_order": 9
+      }
+    ],
+    "music": {
+      "asset_library_id": 714,
+      "title": "Bach Cello Suite No. 1, G Major, Prelude - Cooper Cannell (1)",
+      "src": "https://colorfix.terrymarr.com/photos/assets/audio/bach-cello-suite-no-1-g-major-prelude-cooper-cannell-1-14e776cca4.mp3",
+      "public_url": "https://colorfix.terrymarr.com/photos/assets/audio/bach-cello-suite-no-1-g-major-prelude-cooper-cannell-1-14e776cca4.mp3",
+      "rel_path": "/photos/assets/audio/bach-cello-suite-no-1-g-major-prelude-cooper-cannell-1-14e776cca4.mp3",
+      "mime_type": "audio/mpeg",
+      "volume": 0.18
+    },
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "default_slide_duration_ms": 8500,
+      "default_intro_duration_ms": 3600,
+      "default_text_duration_ms": 7600,
+      "default_hue_wheel_duration_ms": 6200,
+      "default_brand_bumper_duration_ms": 4200,
+      "dissolve_ms": 2000,
+      "cut_ms": 200,
+      "caption_delay_after_photo_ms": 120,
+      "caption_fade_ms": 2000,
+      "signature_reveal_delay_ms": 760,
+      "signature_reveal_duration_ms": 1750,
+      "final_fade_ms": 1400,
+      "timeline": [
+        {
+          "index": 0,
+          "start_ms": 0,
+          "duration_ms": 3600,
+          "end_ms": 3600,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 1,
+          "start_ms": 3600,
+          "duration_ms": 8500,
+          "end_ms": 12100,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 2,
+          "start_ms": 12100,
+          "duration_ms": 8500,
+          "end_ms": 20600,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 3,
+          "start_ms": 20600,
+          "duration_ms": 8500,
+          "end_ms": 29100,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 4,
+          "start_ms": 29100,
+          "duration_ms": 8500,
+          "end_ms": 37600,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 5,
+          "start_ms": 37600,
+          "duration_ms": 8500,
+          "end_ms": 46100,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 6,
+          "start_ms": 46100,
+          "duration_ms": 8500,
+          "end_ms": 54600,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 7,
+          "start_ms": 54600,
+          "duration_ms": 8500,
+          "end_ms": 63100,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        },
+        {
+          "index": 8,
+          "start_ms": 63100,
+          "duration_ms": 5200,
+          "end_ms": 68300,
+          "transition": "dissolve",
+          "transition_ms": 2000
+        }
+      ]
+    }
+  }
+}

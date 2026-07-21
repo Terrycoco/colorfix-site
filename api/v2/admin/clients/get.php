@@ -44,6 +44,7 @@ try {
             'phone' => isset($row['phone']) ? (string)$row['phone'] : '',
             'notes' => isset($row['notes']) ? (string)$row['notes'] : '',
             'client_type' => isset($row['client_type_key']) ? (string)$row['client_type_key'] : '',
+            'started_at' => isset($row['started_at']) ? (string)$row['started_at'] : '',
             'photo_permission_status' => (string)($row['photo_permission_status'] ?? 'unknown'),
             'photo_permission_requested_at' => isset($row['photo_permission_requested_at']) ? (string)$row['photo_permission_requested_at'] : '',
             'photo_permission_granted_at' => isset($row['photo_permission_granted_at']) ? (string)$row['photo_permission_granted_at'] : '',

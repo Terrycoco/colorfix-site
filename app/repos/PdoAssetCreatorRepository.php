@@ -71,6 +71,37 @@ final class PdoAssetCreatorRepository
         return $job;
     }
 
+    public function findReusableJobForSource(string $creatorKey, string $sourceType, int $sourceId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT acj.asset_creator_job_id
+               FROM asset_creator_jobs acj
+          LEFT JOIN (
+                    SELECT asset_creator_job_id, COUNT(*) AS output_count
+                      FROM asset_creator_outputs
+                  GROUP BY asset_creator_job_id
+               ) aco
+                 ON aco.asset_creator_job_id = acj.asset_creator_job_id
+              WHERE acj.creator_key = :creator_key
+                AND acj.source_type = :source_type
+                AND acj.source_id = :source_id
+           ORDER BY CASE WHEN COALESCE(aco.output_count, 0) > 0 THEN 0 ELSE 1 END ASC,
+                    acj.updated_at DESC,
+                    acj.asset_creator_job_id DESC
+              LIMIT 1'
+        );
+        $stmt->execute([
+            ':creator_key' => trim($creatorKey),
+            ':source_type' => trim($sourceType),
+            ':source_id' => $sourceId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return $this->findJob((int)$row['asset_creator_job_id']);
+    }
+
     public function findJobsForAsset(int $assetLibraryId): array
     {
         $stmt = $this->pdo->prepare(

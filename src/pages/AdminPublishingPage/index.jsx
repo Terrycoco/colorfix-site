@@ -11,6 +11,7 @@ const MARK_PINTEREST_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/mark-pub
 const PINTEREST_AUTH_STATUS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/auth-status.php`;
 const PINTEREST_CONNECT_URL = `${API_FOLDER}/pinterest/connect`;
 const PINTEREST_SYNC_BOARDS_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/sync-boards.php`;
+const PINTEREST_DISCONNECT_URL = `${API_FOLDER}/v2/admin/publishing/pinterest/disconnect.php`;
 const YOUTUBE_AUTH_STATUS_URL = `${API_FOLDER}/v2/admin/publishing/youtube/auth-status.php`;
 const YOUTUBE_CONNECT_URL = `${API_FOLDER}/youtube/connect`;
 const YOUTUBE_PUBLISHER_CONNECT_URL = `${YOUTUBE_CONNECT_URL}?return=${encodeURIComponent("/admin/publisher")}`;
@@ -201,6 +202,8 @@ export default function AdminPublishingPage() {
     const youtubeAuthStatus = params.get("youtube_auth");
     const message = params.get("message");
     if (authStatus) {
+      setChannelFilter("pinterest");
+      setOpenConnection(true);
       if (authStatus === "connected") {
         setStatus(message || "Pinterest connected.");
       } else {
@@ -330,6 +333,28 @@ export default function AdminPublishingPage() {
       await fetchPinterestStatus();
     } catch (err) {
       setError(err?.message || "Failed to sync Pinterest boards");
+    } finally {
+      setPinterestSyncing(false);
+    }
+  }
+
+  async function disconnectPinterest() {
+    setPinterestSyncing(true);
+    setError("");
+    setStatus("");
+    try {
+      const res = await fetch(PINTEREST_DISCONNECT_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to disconnect Pinterest");
+      setPinterestStatus(data.item || null);
+      setStatus("Pinterest disconnected for OAuth demo.");
+    } catch (err) {
+      setError(err?.message || "Failed to disconnect Pinterest");
     } finally {
       setPinterestSyncing(false);
     }
@@ -899,7 +924,9 @@ export default function AdminPublishingPage() {
         <button type="button" className="pubdb-command" onClick={() => setOpenConnection(true)}>
           Connect Channel
         </button>
-        <span className="pubdb-toolbar__meta">YouTube: {youtubeConnectionLabel(youtubeStatus)}</span>
+        <span className="pubdb-toolbar__meta">
+          {channelLabel}: {connectionLabel(selectedChannel, selectedChannel === "youtube" ? youtubeStatus : pinterestStatus)}
+        </span>
         <button type="button" className="pubdb-command" onClick={openImportExisting}>
           Import Existing Pins
         </button>
@@ -953,6 +980,7 @@ export default function AdminPublishingPage() {
           onClose={() => setOpenConnection(false)}
           onRefresh={selectedChannel === "youtube" ? fetchYoutubeStatus : fetchPinterestStatus}
           onSync={syncPinterestBoards}
+          onDisconnect={disconnectPinterest}
         />
       ) : null}
 
@@ -1171,7 +1199,7 @@ function PublishedTableRow({ row, saving, onDetails }) {
   );
 }
 
-function ConnectionDialog({ channel: channelKey, status, syncing, connectUrl, onClose, onRefresh, onSync }) {
+function ConnectionDialog({ channel: channelKey, status, syncing, connectUrl, onClose, onRefresh, onSync, onDisconnect }) {
   const title = channelKey === "youtube" ? "YouTube Connection" : channelKey === "pinterest" ? "Pinterest Connection" : "Channel Connection";
   if (channelKey === "youtube") {
     const channelInfo = status?.channel || {};
@@ -1265,6 +1293,9 @@ function ConnectionDialog({ channel: channelKey, status, syncing, connectUrl, on
             <a className="pubdb-command pubdb-command--primary" href={connectUrl}>Connect Pinterest</a>
             <button type="button" className="pubdb-command" onClick={onSync} disabled={syncing || channelInfo.status !== "connected"}>
               {syncing ? "Syncing..." : "Sync Pinterest Boards"}
+            </button>
+            <button type="button" className="pubdb-command pubdb-command--danger" onClick={onDisconnect} disabled={syncing}>
+              Disconnect Pinterest
             </button>
             <button type="button" className="pubdb-command" onClick={onRefresh}>Refresh</button>
           </div>
@@ -1447,6 +1478,15 @@ function channelDisplayLabel(value) {
   if (raw.includes("youtube")) return "YouTube";
   if (raw.includes("instagram")) return "Instagram";
   return String(value || "Channel").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function connectionLabel(channelKey, status) {
+  if (channelKey === "youtube") return youtubeConnectionLabel(status);
+  if (channelKey === "pinterest") {
+    const auth = status?.auth || {};
+    return String(auth.status || "").toLowerCase() === "connected" ? "Connected" : "Not connected";
+  }
+  return "Not wired";
 }
 
 function youtubeConnectionLabel(status) {

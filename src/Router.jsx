@@ -35,6 +35,7 @@ const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePag
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
+const PlaylistColorSearchPage = lazy(() => import('@pages/PlaylistColorSearchPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
 const ArticlePage = lazy(() => import('@pages/ArticlePage'));
 const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
@@ -96,6 +97,10 @@ function AppRouter() {
           <Route
             path="picker"
             element={renderWithSuspense(PlaylistPickerPage, 'Loading picker…')}
+          />
+          <Route
+            path="playlist-color-search"
+            element={renderWithSuspense(PlaylistColorSearchPage, 'Loading color search...')}
           />
         </Route>
 

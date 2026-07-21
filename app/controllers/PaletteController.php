@@ -75,6 +75,28 @@ final class PaletteController
         $tagModeAll = !empty($tagsAll);
         $tagsFilter = $tagModeAll ? $tagsAll : $tagsAny;
         $hasTags = !empty($tagsFilter);
+        $idea = isset($in['include_idea']) && is_array($in['include_idea'])
+            ? $in['include_idea']
+            : [];
+        $familyCriteria = [];
+        if (isset($idea['families']) && is_array($idea['families'])) {
+            foreach ($idea['families'] as $family) {
+                if (!is_array($family)) continue;
+                $name = trim((string)($family['name'] ?? ''));
+                if ($name === '' || preg_match('/^show all$/i', $name)) continue;
+                $familyCriteria['families'][] = [
+                    'name' => $name,
+                    'type' => ((string)($family['type'] ?? 'hue') === 'neutral') ? 'neutral' : 'hue',
+                ];
+            }
+        }
+        foreach (['hue_cats', 'neutral_cats'] as $key) {
+            $value = trim((string)($idea[$key] ?? ''));
+            if ($value !== '' && !preg_match('/^show all$/i', $value)) {
+                $familyCriteria[$key] = $value;
+            }
+        }
+        $hasFamilyCriteria = !empty($familyCriteria);
 
         // Anchors: cluster_ids only
         $anchors = [];
@@ -90,6 +112,92 @@ final class PaletteController
         $sizeMax = isset($in['size_max']) ? (int)$in['size_max'] : null;
 
         if (!$anchors) {
+            if ($hasFamilyCriteria) {
+                $paletteRepo = new PdoPaletteRepository($this->pdo);
+                $idsRes = $paletteRepo->findPaletteIdsByFamilyCriteria($familyCriteria, $limit, $offset);
+                $ids = $idsRes['palette_ids'] ?? [];
+                if (!$ids) {
+                    return [
+                        'items'          => [],
+                        'total_count'    => 0,
+                        'counts_by_size' => (object)[],
+                        'limit'          => $limit,
+                        'next_offset'    => null,
+                        'branch'         => 'FamilyOnly',
+                    ];
+                }
+                $svc = new PaletteAnchorService($paletteRepo);
+                $hydrated = $svc->hydrateVisibleAnySizeByIds($ids, $limit, 0);
+                $items = is_array($hydrated['items'] ?? null) ? $hydrated['items'] : [];
+                $total = (int)($idsRes['total_count'] ?? 0);
+
+                // Optional size window
+                if ($sizeMin !== null || $sizeMax !== null) {
+                    $min = ($sizeMin !== null) ? (int)$sizeMin : 1;
+                    $max = ($sizeMax !== null) ? (int)$sizeMax : 99;
+                    $items = array_values(array_filter($items, static function(array $p) use ($min,$max): bool {
+                        $sz = (int)($p['size'] ?? 0);
+                        return ($sz >= $min && $sz <= $max);
+                    }));
+                    $total = count($items);
+                }
+
+                $counts = [];
+                foreach ($items as $p) {
+                    $s = (string)($p['size'] ?? 0);
+                    if ($s !== '0') $counts[$s] = ($counts[$s] ?? 0) + 1;
+                }
+                $next = ($offset + $limit < $total) ? ($offset + $limit) : null;
+
+                // Ensure member_pairs for swatch colors
+                if (!empty($items)) {
+                    $allCids = [];
+                    foreach ($items as $it) {
+                        foreach (($it['member_cluster_ids'] ?? []) as $cid) $allCids[] = (int)$cid;
+                    }
+                    $allCids = array_values(array_unique(array_filter($allCids, fn($v)=>$v>0)));
+                    if ($allCids) {
+                        $hexMap = (new PdoClusterRepository($this->pdo))->getRepHexForClusterIds($allCids);
+                        foreach ($items as &$it) {
+                            $pairs = [];
+                            foreach (($it['member_cluster_ids'] ?? []) as $cid) {
+                                $cid = (int)$cid; $hex = $hexMap[$cid] ?? '';
+                                $pairs[] = $cid . ':' . ltrim($hex, '#');
+                            }
+                            $it['member_pairs'] = implode(',', $pairs);
+                        }
+                        unset($it);
+                    }
+                }
+
+                // Attach meta/tags
+                $pids = array_values(array_unique(array_filter(array_map(
+                    fn($it) => (int)($it['palette_id'] ?? 0), $items
+                ), fn($v)=>$v>0)));
+                if ($pids) {
+                    $metaMap = $paletteRepo->getMetaForPaletteIds($pids);
+                    $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
+                    foreach ($items as &$it) {
+                        $pid = (int)($it['palette_id'] ?? 0);
+                        $it['meta'] = array_merge(
+                            ['nickname'=>null,'terry_says'=>null,'terry_fav'=>0,'tags'=>[]],
+                            $metaMap[$pid] ?? []
+                        );
+                        $it['meta']['tags'] = $tagsMap[$pid] ?? [];
+                    }
+                    unset($it);
+                }
+
+                return [
+                    'items'          => $items,
+                    'total_count'    => $total,
+                    'counts_by_size' => (object)$counts,
+                    'limit'          => $limit,
+                    'next_offset'    => $next,
+                    'branch'         => 'FamilyOnly',
+                ];
+            }
+
             if ($hasTags) {
                 $paletteRepo = new PdoPaletteRepository($this->pdo);
                 $idsRes = $paletteRepo->findPaletteIdsByTags($tagsFilter, $tagModeAll, $limit, $offset);
@@ -236,6 +344,18 @@ final class PaletteController
                 fn($it) => (int)($it['palette_id'] ?? 0), $items
             ), fn($v)=>$v>0)));
 
+            // Filter by selected color categories if requested
+            if ($hasFamilyCriteria && $pids) {
+                $allowedIds = $paletteRepo->filterPaletteIdsByFamilyCriteria($pids, $familyCriteria);
+                $allowedSet = array_fill_keys($allowedIds, true);
+                $items = array_values(array_filter($items, static function(array $it) use ($allowedSet): bool {
+                    return isset($allowedSet[(int)($it['palette_id'] ?? 0)]);
+                }));
+                $pids = array_values(array_unique(array_filter(array_map(
+                    fn($it) => (int)($it['palette_id'] ?? 0), $items
+                ), fn($v)=>$v>0)));
+            }
+
             // Filter by tags if requested
             if ($hasTags && $pids) {
                 $tagsMap = $paletteRepo->getTagsForPaletteIds($pids);
@@ -259,7 +379,7 @@ final class PaletteController
                 $s = (string)($p['size'] ?? 0);
                 if ($s !== '0') $counts[$s] = ($counts[$s] ?? 0) + 1;
             }
-            $total = $hasTags ? count($items) : (int)($res['total_count'] ?? 0);
+            $total = ($hasTags || $hasFamilyCriteria) ? count($items) : (int)($res['total_count'] ?? 0);
             $next  = ($offset + $limit < $total) ? ($offset + $limit) : null;
 
             // ---- Attach meta (nickname/terry_says/terry_fav/tags) ----
@@ -418,6 +538,9 @@ final class PaletteController
 
         // 4) Hydrate full palettes (visible-only), no default size filter in Tier-B
         $finalIds = array_keys($unionIds);
+        if ($hasFamilyCriteria && $finalIds) {
+            $finalIds = $paletteRepo->filterPaletteIdsByFamilyCriteria($finalIds, $familyCriteria);
+        }
         $hydrated = $svcAnchors->hydrateVisibleAnySizeByIds($finalIds, $limit, $offset);
         $items    = is_array($hydrated['items'] ?? null) ? $hydrated['items'] : [];
         $total    = (int)($hydrated['total_count'] ?? 0);

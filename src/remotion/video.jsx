@@ -25,22 +25,24 @@ export function ColorFixYoutubeVideo({ plan }) {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const previousIndex = activeIndex > 0 && localMs < transitionMs ? activeIndex - 1 : null;
   const currentItem = items[activeIndex] || null;
   const isCurrentTextSlide = isTextSlide(currentItem);
   const isCurrentBrandBumper = isBrandBumper(currentItem);
+  const nextItem = items[activeIndex + 1] || null;
+  const exitsToBrandBumper = isBrandBumper(nextItem);
+  const previousIndex = activeIndex > 0 && localMs < transitionMs && !isCurrentBrandBumper ? activeIndex - 1 : null;
   const brandBumperConfig = useMemo(() => parseBrandBumperConfig(currentItem?.body), [currentItem?.body]);
   const syntheticScratchSrc = useMemo(() => makeSyntheticScratchAudioDataUri(), []);
   const currentDurationMs = Number(activeTimeline?.duration_ms || 0);
   const finalFadeMs = Number(plan?.video?.final_fade_ms || YOUTUBE_VIDEO_TIMING.finalFadeMs);
-  const isFinalSlide = activeIndex === items.length - 1;
+  const shouldFadeOutToBlack = activeIndex === items.length - 1 || exitsToBrandBumper;
   const textEnterOpacity = isCurrentTextSlide && activeIndex > 0 && transitionMs > 0
     ? interpolate(localMs, [transitionMs, transitionMs + captionFadeMs], [0, 1], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
       })
     : 1;
-  const finalExitOpacity = isFinalSlide && finalFadeMs > 0 && currentDurationMs > finalFadeMs
+  const finalExitOpacity = shouldFadeOutToBlack && finalFadeMs > 0 && currentDurationMs > finalFadeMs
     ? interpolate(localMs, [currentDurationMs - finalFadeMs, currentDurationMs], [1, 0], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
@@ -60,7 +62,7 @@ export function ColorFixYoutubeVideo({ plan }) {
       {plan?.music?.src ? (
         <Audio
           src={plan.music.src}
-          volume={Number.isFinite(Number(plan.music.volume)) ? Number(plan.music.volume) : 0.18}
+          volume={Number.isFinite(Number(plan.music.volume)) ? Number(plan.music.volume) : 0.35}
         />
       ) : null}
       {scratchActive ? (

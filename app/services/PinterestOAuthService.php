@@ -93,6 +93,22 @@ final class PinterestOAuthService
         $this->publisherRepo->updateChannelMetadata((int)$channel['publishing_channel_id'], $metadata, 'auth_error');
     }
 
+    public function disconnect(): array
+    {
+        $channel = $this->publisherRepo->upsertPinterestChannel();
+        $metadata = $this->metadata($channel);
+        $metadata['auth'] = [
+            'status' => 'not_connected',
+            'connected_at' => null,
+            'granted_scopes' => [],
+            'last_auth_error' => null,
+            'disconnected_at' => gmdate('c'),
+        ];
+
+        $this->publisherRepo->clearChannelAuth((int)$channel['publishing_channel_id'], $metadata, 'pending_auth');
+        return $this->status();
+    }
+
     public function status(): array
     {
         $channel = $this->publisherRepo->upsertPinterestChannel();

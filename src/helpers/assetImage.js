@@ -1,4 +1,4 @@
-import { API_FOLDER } from "./config";
+import { API_FOLDER } from "./config.js";
 
 const cache = new Map();
 const IMAGE_REFRESH_KEY = "cf_force_image_refresh";

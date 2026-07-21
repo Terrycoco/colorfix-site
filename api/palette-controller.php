@@ -177,6 +177,7 @@ if ($anchorsMapRaw !== '') {
           SELECT 1 FROM palette_members pmN{$j}
           JOIN clusters clN{$j} ON clN{$j}.id = pmN{$j}.member_cluster_id
           WHERE pmN{$j}.palette_id = p.id
+            AND (clN{$j}.neutral_cats IS NULL OR clN{$j}.neutral_cats = '')
             AND LOWER(COALESCE(clN{$j}.hue_cats,'')) LIKE {$ph}
         )";
       }

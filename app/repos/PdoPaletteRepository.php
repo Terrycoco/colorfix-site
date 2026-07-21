@@ -478,6 +478,140 @@ public function findVisibleAnySizeByClusterGroups(array $clusterGroups, int $lim
         return $out;
     }
 
+    /**
+     * Fetch palette IDs whose member clusters match a requested color family
+     * or family list.
+     *
+     * $criteria keys:
+     * - families: [['name' => string, 'type' => 'hue'|'neutral'], ...]
+     * - hue_cats
+     * - neutral_cats
+     */
+    public function findPaletteIdsByFamilyCriteria(array $criteria, int $limit = 200, int $offset = 0): array
+    {
+        $params = [];
+        $existsSql = $this->buildFamilyCriteriaExistsSql($criteria, $params);
+        if ($existsSql === '') return ['palette_ids' => [], 'total_count' => 0];
+
+        $limit  = max(1, (int)$limit);
+        $offset = max(0, (int)$offset);
+
+        $countSql = "
+            SELECT COUNT(DISTINCT p.id)
+              FROM palettes p
+             WHERE p.status = 'active'
+               AND {$existsSql}
+        ";
+        $st = $this->pdo->prepare($countSql);
+        foreach ($params as $i => $v) $st->bindValue($i + 1, $v, PDO::PARAM_STR);
+        $st->execute();
+        $total = (int)($st->fetchColumn() ?: 0);
+        if ($total === 0) return ['palette_ids' => [], 'total_count' => 0];
+
+        $pageSql = "
+            SELECT DISTINCT p.id
+              FROM palettes p
+             WHERE p.status = 'active'
+               AND {$existsSql}
+             ORDER BY p.id DESC
+             LIMIT ? OFFSET ?
+        ";
+        $st = $this->pdo->prepare($pageSql);
+        $bind = 1;
+        foreach ($params as $v) $st->bindValue($bind++, $v, PDO::PARAM_STR);
+        $st->bindValue($bind++, $limit, PDO::PARAM_INT);
+        $st->bindValue($bind++, $offset, PDO::PARAM_INT);
+        $st->execute();
+
+        $ids = [];
+        while ($row = $st->fetch(PDO::FETCH_NUM)) {
+            $ids[] = (int)$row[0];
+        }
+
+        return ['palette_ids' => $ids, 'total_count' => $total];
+    }
+
+    /** Return the input IDs that satisfy family criteria, preserving input order. */
+    public function filterPaletteIdsByFamilyCriteria(array $paletteIds, array $criteria): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $paletteIds), fn($v) => $v > 0)));
+        if (!$ids) return [];
+
+        $params = [];
+        $existsSql = $this->buildFamilyCriteriaExistsSql($criteria, $params);
+        if ($existsSql === '') return $ids;
+
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $sql = "
+            SELECT DISTINCT p.id
+              FROM palettes p
+             WHERE p.status = 'active'
+               AND p.id IN ($ph)
+               AND {$existsSql}
+        ";
+        $st = $this->pdo->prepare($sql);
+        $bind = 1;
+        foreach ($ids as $id) $st->bindValue($bind++, $id, PDO::PARAM_INT);
+        foreach ($params as $v) $st->bindValue($bind++, $v, PDO::PARAM_STR);
+        $st->execute();
+
+        $allowed = [];
+        while ($row = $st->fetch(PDO::FETCH_NUM)) {
+            $allowed[(int)$row[0]] = true;
+        }
+
+        return array_values(array_filter($ids, static fn($id) => isset($allowed[$id])));
+    }
+
+    private function buildFamilyCriteriaExistsSql(array $criteria, array &$params): string
+    {
+        $families = [];
+        if (isset($criteria['families']) && is_array($criteria['families'])) {
+            foreach ($criteria['families'] as $family) {
+                if (!is_array($family)) continue;
+                $name = trim((string)($family['name'] ?? ''));
+                if ($name === '') continue;
+                $families[] = [
+                    'name' => $name,
+                    'type' => ((string)($family['type'] ?? 'hue') === 'neutral') ? 'neutral' : 'hue',
+                ];
+            }
+        }
+
+        $hue = trim((string)($criteria['hue_cats'] ?? ''));
+        if ($hue !== '') {
+            $families[] = ['name' => $hue, 'type' => 'hue'];
+        }
+
+        $neutral = trim((string)($criteria['neutral_cats'] ?? ''));
+        if ($neutral !== '') {
+            $families[] = ['name' => $neutral, 'type' => 'neutral'];
+        }
+
+        if (!$families) return '';
+
+        $existsParts = [];
+        foreach ($families as $family) {
+            $clauses = ['pmf.palette_id = p.id'];
+            if ($family['type'] === 'neutral') {
+                $clauses[] = "LOWER(COALESCE(clf.neutral_cats, '')) LIKE ?";
+            } else {
+                $clauses[] = "NULLIF(TRIM(COALESCE(clf.neutral_cats, '')), '') IS NULL";
+                $clauses[] = "LOWER(COALESCE(clf.hue_cats, '')) LIKE ?";
+            }
+            $params[] = '%' . strtolower($family['name']) . '%';
+
+            $existsParts[] = "EXISTS (
+                SELECT 1
+                  FROM palette_members pmf
+                  JOIN clusters clf ON clf.id = pmf.member_cluster_id
+                 WHERE " . implode(' AND ', $clauses) . "
+            )";
+        }
+
+        return implode(' AND ', $existsParts);
+    }
+
     /** Fetch nickname / terry_says / terry_fav for a set of palette IDs */
     public function getMetaForPaletteIds(array $paletteIds): array
     {

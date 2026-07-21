@@ -35,14 +35,27 @@
   overflow-x: auto;
 }
 
-.assetlib-toolbar label {
+.assetlib-upload {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  border: 1px solid #b8b8b8;
+  background: #f6f6f6;
+  padding: 8px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+}
+
+.assetlib-toolbar label,
+.assetlib-upload label {
   display: grid;
   gap: 3px;
   font-weight: 700;
 }
 
 .assetlib-toolbar input,
-.assetlib-toolbar select {
+.assetlib-toolbar select,
+.assetlib-upload input {
   border: 1px solid #9ca3af;
   border-radius: 2px;
   padding: 6px 7px;
@@ -52,6 +65,14 @@
 
 .assetlib-search input {
   width: 320px;
+}
+
+.assetlib-upload__file input {
+  min-width: 260px;
+}
+
+.assetlib-upload__note input {
+  min-width: 260px;
 }
 
 .assetlib-check {
@@ -104,6 +125,51 @@
 .assetlib-status--error {
   color: #8b0000;
   background: #fff0f0;
+}
+
+.assetlib-status--ok {
+  color: #155724;
+  background: #eef9f0;
+}
+
+.asset-clearance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  cursor: pointer;
+}
+
+.asset-clearance__dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #5f6b78;
+  border-radius: 999px;
+  background: #c6ccd3;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.asset-clearance--cleared .asset-clearance__dot {
+  border-color: #1f7a3a;
+  background: #39a957;
+}
+
+.asset-clearance--review .asset-clearance__dot {
+  border-color: #9a6a00;
+  background: #f2b843;
+}
+
+.asset-clearance--blocked .asset-clearance__dot {
+  border-color: #8b0000;
+  background: #dc3545;
+}
+
+.asset-clearance__label {
+  font-weight: 700;
+}
+
+.asset-clearance.is-saving {
+  opacity: 0.65;
 }
 
 .assetlib-grid-wrap {

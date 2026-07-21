@@ -31,6 +31,7 @@ const EMPTY_FORM = {
   phone: "",
   notes: "",
   client_type: "homeowner",
+  started_at: "",
   photo_permission_status: "unknown",
   photo_permission_requested_at: "",
   photo_permission_granted_at: "",
@@ -130,6 +131,23 @@ function formatLocalDateTimeValue(date = new Date()) {
   const minute = String(date.getMinutes()).padStart(2, "0");
   const second = String(date.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+}
+
+function toDateTimeLocalValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const normalized = raw.replace(" ", "T");
+  const match = normalized.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return formatLocalDateTimeValue(parsed).replace(" ", "T").slice(0, 16);
+}
+
+function fromDateTimeLocalValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.replace("T", " ") + (raw.length === 16 ? ":00" : "");
 }
 
 function formatPhoneNumber(value) {
@@ -408,6 +426,7 @@ export default function AdminClientsPage() {
       phone: client?.phone || "",
       notes: client?.notes || "",
       client_type: client?.client_type || "homeowner",
+      started_at: client?.started_at || "",
       photo_permission_status: client?.photo_permission_status || "unknown",
       photo_permission_requested_at: client?.photo_permission_requested_at || "",
       photo_permission_granted_at: client?.photo_permission_granted_at || "",
@@ -667,11 +686,12 @@ export default function AdminClientsPage() {
   }
 
   function startNew() {
+    const nextForm = { ...EMPTY_FORM, started_at: formatLocalDateTimeValue() };
     setSelectedId("");
     setIsCreatingNew(true);
-    setForm(EMPTY_FORM);
-    setEmailDraft(buildDraftFromTemplate(EMPTY_FORM, { key: FREEFORM_TEMPLATE_KEY }));
-    setTextDraft(buildTextDraft(EMPTY_FORM));
+    setForm(nextForm);
+    setEmailDraft(buildDraftFromTemplate(nextForm, { key: FREEFORM_TEMPLATE_KEY }));
+    setTextDraft(buildTextDraft(nextForm));
     setEmailHtmlManuallyEdited(false);
     setActivityItems([]);
     setPhotoItems([]);
@@ -790,6 +810,7 @@ export default function AdminClientsPage() {
           phone: form.phone,
           notes: form.notes,
           client_type: form.client_type || null,
+          started_at: form.started_at || null,
           photo_permission_status: form.photo_permission_status,
           photo_permission_requested_at: form.photo_permission_requested_at || null,
           photo_permission_granted_at: form.photo_permission_granted_at || null,
@@ -1176,6 +1197,7 @@ export default function AdminClientsPage() {
               <h2>{form.id ? (displayClientName(form) || `Client #${form.id}`) : "New Client"}</h2>
               <div className="admin-clients__panel-sub">
                 {clientTypeLabel(form.client_type)} · {selectedUsage}
+                {form.started_at ? ` · Started ${formatDateTime(form.started_at)}` : ""}
                 {form.photo_permission_requested_at ? ` · Requested ${formatDateTime(form.photo_permission_requested_at)}` : ""}
                 {form.photo_permission_granted_at ? ` · Granted ${formatDateTime(form.photo_permission_granted_at)}` : ""}
               </div>
@@ -1283,15 +1305,11 @@ export default function AdminClientsPage() {
                     onChange={(e) => {
                       const nextStatus = e.target.value;
                       updateField("photo_permission_status", nextStatus);
+                      if (nextStatus === "requested" && !form.photo_permission_requested_at) {
+                        updateField("photo_permission_requested_at", formatLocalDateTimeValue());
+                      }
                       if (nextStatus === "granted" && !form.photo_permission_granted_at) {
                         updateField("photo_permission_granted_at", formatLocalDateTimeValue());
-                      }
-                      if (nextStatus === "unknown") {
-                        updateField("photo_permission_requested_at", "");
-                        updateField("photo_permission_granted_at", "");
-                      }
-                      if (nextStatus !== "granted") {
-                        updateField("photo_permission_granted_at", "");
                       }
                     }}
                   >
@@ -1304,12 +1322,28 @@ export default function AdminClientsPage() {
               </div>
               <div className="admin-clients__permission-grid">
                 <label>
+                  Started at
+                  <input
+                    type="datetime-local"
+                    value={toDateTimeLocalValue(form.started_at)}
+                    onChange={(e) => updateField("started_at", fromDateTimeLocalValue(e.target.value))}
+                  />
+                </label>
+                <label>
                   Requested at
-                  <input type="text" value={formatDateTime(form.photo_permission_requested_at)} readOnly />
+                  <input
+                    type="datetime-local"
+                    value={toDateTimeLocalValue(form.photo_permission_requested_at)}
+                    onChange={(e) => updateField("photo_permission_requested_at", fromDateTimeLocalValue(e.target.value))}
+                  />
                 </label>
                 <label>
                   Granted at
-                  <input type="text" value={formatDateTime(form.photo_permission_granted_at)} readOnly />
+                  <input
+                    type="datetime-local"
+                    value={toDateTimeLocalValue(form.photo_permission_granted_at)}
+                    onChange={(e) => updateField("photo_permission_granted_at", fromDateTimeLocalValue(e.target.value))}
+                  />
                 </label>
               </div>
               <label>

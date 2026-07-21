@@ -10,6 +10,7 @@ import {
   parsePhotoRef,
   withImageRefresh,
 } from "@helpers/assetImage";
+import { isPaletteEligibleItem } from "@helpers/playerPaletteItems";
 import "./player.css";
 
 const DEFAULT_TITLE_DELAY_MS = 120;
@@ -26,6 +27,7 @@ const Player = forwardRef(function Player({
   embedded = false,
   galleryName = "",
   galleryDescription = "",
+  onPalettePromptClick,
 }, ref) {
   const allItems = useMemo(() => (Array.isArray(slides) ? slides : []), [slides]);
 
@@ -53,6 +55,7 @@ const Player = forwardRef(function Player({
   const [isPortraitMobile, setIsPortraitMobile] = useState(false);
   const [cacheBustEnabled, setCacheBustEnabled] = useState(() => getImageRefreshEnabled());
   const [showAdvanceHint, setShowAdvanceHint] = useState(true);
+  const [palettePromptReady, setPalettePromptReady] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
   const [prevImageUrl, setPrevImageUrl] = useState("");
   const didInitRef = useRef(false);
@@ -323,6 +326,7 @@ function startPlayback(nextMode, nextIndex = 0) {
     : null;
   const IntroRenderer = isIntro ? getIntroLayout(introLayoutKey) : null;
   const isStarrable = isItemStarrable(currentItem);
+  const showPalettePrompt = playbackState === "playing" && isSavedPaletteEligibleItem(currentItem) && imageLoaded && fadeReady;
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
   const galleryJsonLd = useMemo(
@@ -432,6 +436,15 @@ function startPlayback(nextMode, nextIndex = 0) {
     if (playbackState === "end") return;
     endEmitRef.current = null;
   }, [playbackState]);
+
+  useEffect(() => {
+    setPalettePromptReady(false);
+    if (!showPalettePrompt) return undefined;
+    const timer = setTimeout(() => {
+      setPalettePromptReady(true);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [showPalettePrompt, currentIndex]);
 
   function updateOverlayPositions(imgEl, stageEl) {
     if (!imgEl || !stageEl) return;
@@ -674,7 +687,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               }}
             />
           )}
-          {playbackState === "playing" && !isIntro && isStarrable && imageLoaded && (
+          {false && playbackState === "playing" && !isIntro && isStarrable && imageLoaded && (
             <div
               className={`player-like ${isLiked ? "is-liked" : ""}`}
               role="button"
@@ -783,6 +796,27 @@ function startPlayback(nextMode, nextIndex = 0) {
               <div className="player-loading-spinner" />
             </div>
           )}
+          {showPalettePrompt && (
+            <button
+              type="button"
+              className={`player-palette-prompt${palettePromptReady ? " is-visible" : ""}`}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onPointerUp={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onPalettePromptClick?.(currentItem);
+              }}
+            >
+              See colors →
+            </button>
+          )}
         </div>
         {shouldShowAdvanceHint && !isIntro && (
           <div className="player-advance-hint">Tap to Advance</div>
@@ -853,6 +887,10 @@ function writeLikedSet(playlistInstanceId, likedSet) {
   } catch {
     // ignore storage errors
   }
+}
+
+function isSavedPaletteEligibleItem(item) {
+  return isPaletteEligibleItem(item) && Boolean(item?.palette_hash);
 }
 
 export default Player;

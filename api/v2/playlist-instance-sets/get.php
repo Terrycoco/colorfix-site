@@ -34,12 +34,13 @@ $audienceLower = strtolower($audience);
 $isAdmin = (isset($_COOKIE['cf_admin']) && $_COOKIE['cf_admin'] === '1')
     || (isset($_COOKIE['cf_admin_global']) && $_COOKIE['cf_admin_global'] === '1');
 $privateAudience = $audienceLower !== '' && $audienceLower !== 'any' && $audienceLower !== 'public';
+$explicitPublicOnly = isset($_GET['include_private']) && (string)$_GET['include_private'] === '0';
 $includePrivate = $privateAudience
-    || ($isAdmin && isset($_GET['include_private']) && (string)$_GET['include_private'] !== '0');
+    || ($isAdmin && !$explicitPublicOnly);
 
 header(
     $includePrivate
-        ? 'Cache-Control: private, max-age=120, stale-while-revalidate=300'
+        ? 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0'
         : 'Cache-Control: public, max-age=120, stale-while-revalidate=300'
 );
 
@@ -298,6 +299,10 @@ $rows = array_values(array_filter(array_map(static function ($item) use ($photoU
 }, $items)));
 $markTiming('map_rows');
 
+$setUpdatedAt = trim((string)($set->updatedAt ?? ''));
+$setStamp = $setUpdatedAt !== '' ? strtotime($setUpdatedAt) : false;
+$setVersion = ($setStamp && $setStamp > 0) ? (string)$setStamp : '';
+
 $payload = [
     'ok' => true,
     'set' => [
@@ -306,6 +311,8 @@ $payload = [
         'title' => $set->title,
         'subtitle' => $set->subtitle,
         'context' => $set->context,
+        'updated_at' => $set->updatedAt,
+        'version' => $setVersion,
         'end_cta' => [
             'label' => $set->endCtaLabel ?: 'Explore ColorFix',
             'url' => $set->endCtaUrl ?: '/',

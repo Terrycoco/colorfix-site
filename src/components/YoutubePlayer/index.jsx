@@ -164,28 +164,7 @@ function signatureWriteProgress(rawValue) {
   const value = clamp01(rawValue);
   if (value <= 0) return 0;
   if (value >= 1) return 1;
-  const points = [
-    [0, 0],
-    [0.1, 0.14],
-    [0.16, 0.16],
-    [0.34, 0.43],
-    [0.39, 0.45],
-    [0.58, 0.7],
-    [0.64, 0.72],
-    [0.82, 0.9],
-    [0.88, 0.91],
-    [1, 1],
-  ];
-  for (let i = 1; i < points.length; i += 1) {
-    const [x1, y1] = points[i - 1];
-    const [x2, y2] = points[i];
-    if (value <= x2) {
-      const local = (value - x1) / Math.max(0.001, x2 - x1);
-      const eased = local < 0.5 ? 2 * local * local : 1 - Math.pow(-2 * local + 2, 2) / 2;
-      return y1 + ((y2 - y1) * eased);
-    }
-  }
-  return value;
+  return 1 - Math.pow(1 - value, 2.35);
 }
 
 function parseBrandBumperConfig(rawBody) {

@@ -225,7 +225,11 @@ final class AssetCreatorProposalService
             'SELECT asset_library_id, asset_kind, mime_type, rel_path, title
                FROM asset_library
               WHERE asset_library_id = :asset_library_id
-                AND asset_kind = \'audio\'
+                AND (
+                    asset_kind = \'audio\'
+                    OR mime_type LIKE \'audio/%\'
+                    OR LOWER(rel_path) REGEXP \'\\\\.(mp3|wav|m4a)(\\\\?.*)?$\'
+                )
                 AND is_inactive = 0
                 AND is_retired = 0
               LIMIT 1'
@@ -241,7 +245,7 @@ final class AssetCreatorProposalService
         $publicUrl = preg_match('/^https?:\/\//i', $relPath)
             ? $relPath
             : ($base !== '' ? $base . '/' . ltrim($relPath, '/') : $relPath);
-        $volume = (float)($music['volume'] ?? $payload['music_volume'] ?? 0.18);
+        $volume = (float)($music['volume'] ?? $payload['music_volume'] ?? 0.35);
         if ($volume < 0) {
             $volume = 0;
         } elseif ($volume > 1) {

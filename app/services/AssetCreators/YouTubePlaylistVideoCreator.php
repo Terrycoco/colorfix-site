@@ -179,7 +179,7 @@ final class YouTubePlaylistVideoCreator
             return null;
         }
 
-        $volume = (float)($music['volume'] ?? 0.18);
+        $volume = (float)($music['volume'] ?? 0.35);
         if ($volume < 0) {
             $volume = 0;
         } elseif ($volume > 1) {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import ModalDialog from "@components/ModalDialog";
 import PhotoPickerModal from "@components/PhotoPickerModal";
 import "./admin-playlist-instance-sets.css";
 
@@ -10,6 +11,7 @@ const SET_ITEMS_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instance-set-items/l
 const SET_ITEMS_SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instance-set-items/save.php`;
 const INSTANCES_LIST_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const PLAYLIST_SET_PUBLIC_URL = `${API_FOLDER}/v2/admin/playlists/set-public.php`;
 
 const emptySet = {
   id: null,
@@ -17,6 +19,8 @@ const emptySet = {
   title: "",
   subtitle: "",
   context: "",
+  updated_at: "",
+  version: "",
   end_cta_label: "Explore ColorFix",
   end_cta_url: "/",
   end_cta_enabled: true,
@@ -33,7 +37,7 @@ const emptyItem = {
   photo_library_id: "",
 };
 
-function buildSetPlayUrl(setId) {
+function buildSetPlayUrl(setId, version = "") {
   const id = Number(setId || 0);
   if (id <= 0) return "";
   const params = new URLSearchParams({
@@ -43,6 +47,7 @@ function buildSetPlayUrl(setId) {
     close: "1",
     return_to: "/admin/playlist-sets",
   });
+  if (version) params.set("set_v", String(version));
   return `/picker?${params.toString()}`;
 }
 
@@ -60,6 +65,7 @@ export default function AdminPlaylistInstanceSetsPage() {
   const [error, setError] = useState("");
   const [expectedSaveCount, setExpectedSaveCount] = useState(0);
   const [photoPicker, setPhotoPicker] = useState({ open: false, mode: "", index: null });
+  const [privatePlaylistDialog, setPrivatePlaylistDialog] = useState({ open: false, playlist: null, resolve: null });
   const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
 
   useEffect(() => {
@@ -102,6 +108,8 @@ export default function AdminPlaylistInstanceSetsPage() {
         title: data.item?.title ?? "",
         subtitle: data.item?.subtitle ?? "",
         context: data.item?.context ?? "",
+        updated_at: data.item?.updated_at ?? "",
+        version: data.item?.version ?? "",
         end_cta_label: data.item?.end_cta_label || "Explore ColorFix",
         end_cta_url: data.item?.end_cta_url || "/",
         end_cta_enabled: data.item?.end_cta_enabled !== false,
@@ -158,6 +166,58 @@ export default function AdminPlaylistInstanceSetsPage() {
     } catch {
       // optional list
     }
+  }
+
+  function findPlaylist(playlistId) {
+    const id = Number(playlistId || 0);
+    if (!id) return null;
+    return playlists.find((item) => Number(item?.playlist_id || 0) === id) || null;
+  }
+
+  async function publishPlaylist(playlistId) {
+    const id = Number(playlistId || 0);
+    if (!id) throw new Error("playlist required");
+    const res = await fetch(PLAYLIST_SET_PUBLIC_URL, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playlist_id: id }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to make playlist public");
+    setPlaylists((prev) =>
+      (Array.isArray(prev) ? prev : []).map((item) =>
+        Number(item?.playlist_id || 0) === id
+          ? { ...item, is_public: 1 }
+          : item
+      )
+    );
+    return data.item || null;
+  }
+
+  function requestPublishPrivatePlaylist(playlist) {
+    return new Promise((resolve) => {
+      setPrivatePlaylistDialog({
+        open: true,
+        playlist,
+        resolve,
+      });
+    });
+  }
+
+  function closePrivatePlaylistDialog(answer) {
+    const resolve = privatePlaylistDialog.resolve;
+    setPrivatePlaylistDialog({ open: false, playlist: null, resolve: null });
+    resolve?.(answer);
+  }
+
+  async function ensurePlaylistPublic(playlistId) {
+    const playlist = findPlaylist(playlistId);
+    if (!playlist || Number(playlist.is_public) === 1) return true;
+    const shouldPublish = await requestPublishPrivatePlaylist(playlist);
+    if (!shouldPublish) return false;
+    await publishPlaylist(playlistId);
+    return true;
   }
 
   function updateSet(field, value) {
@@ -301,6 +361,23 @@ export default function AdminPlaylistInstanceSetsPage() {
       setError("Pick a photo.");
       return;
     }
+    if (itemType === "playlist") {
+      setLoading(true);
+      setError("");
+      setStatus("");
+      try {
+        const didPublish = await ensurePlaylistPublic(playlistId);
+        if (!didPublish) {
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        setError(err?.message || "Failed to make playlist public");
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
     let setId = activeSetId;
     if (!setId) {
       setLoading(true);
@@ -343,6 +420,8 @@ export default function AdminPlaylistInstanceSetsPage() {
       await persistSetItems(setId, nextItems);
       setNewItem(emptyItem);
       setStatus("Saved");
+      await fetchSet(setId);
+      await fetchSets();
       await fetchSetItems(setId);
     } catch (err) {
       setError(err?.message || "Save failed");
@@ -424,9 +503,19 @@ export default function AdminPlaylistInstanceSetsPage() {
         setError("Each item needs a target (playlist or set), title, and photo.");
         return;
       }
+      const playlistIdsToPublish = Array.from(new Set(itemsList
+        .filter((item) => (item?.item_type || "playlist") === "playlist")
+        .map((item) => Number(item?.playlist_id || 0))
+        .filter(Boolean)));
+      for (const playlistId of playlistIdsToPublish) {
+        const didPublish = await ensurePlaylistPublic(playlistId);
+        if (!didPublish) return;
+      }
       setExpectedSaveCount(itemsList.length);
       await persistSetItems(setId, itemsList);
       setStatus("Saved");
+      await fetchSet(setId);
+      await fetchSets();
       fetchSetItems(setId);
     } catch (err) {
       setError(err?.message || "Save failed");
@@ -526,7 +615,7 @@ export default function AdminPlaylistInstanceSetsPage() {
   const activeSetMeta = activeSetSummary
     ? `#${activeSetSummary.id}${activeSetSummary.handle ? ` / ${activeSetSummary.handle}` : ""}`
     : "";
-  const playUrl = buildSetPlayUrl(activeSetId || setForm.id);
+  const playUrl = buildSetPlayUrl(activeSetId || setForm.id, activeSetSummary?.version || setForm.version);
 
   function handlePlaySet() {
     if (!playUrl) return;
@@ -641,6 +730,30 @@ export default function AdminPlaylistInstanceSetsPage() {
           setPhotoPicker({ open: false, mode: "", index: null });
         }}
       />
+      <ModalDialog
+        open={privatePlaylistDialog.open}
+        title={privatePlaylistDialog.playlist?.title || "Private Playlist"}
+        onClose={() => closePrivatePlaylistDialog(false)}
+        width="420px"
+      >
+        <p>This is marked private. Change to public?</p>
+        <div className="pi-bottom-actions">
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => closePrivatePlaylistDialog(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={() => closePrivatePlaylistDialog(true)}
+          >
+            Yes
+          </button>
+        </div>
+      </ModalDialog>
 
       <div className="pi-mobile-priority">
         <div className="pi-mobile-priority__copy">

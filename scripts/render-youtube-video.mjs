@@ -180,6 +180,37 @@ async function buildPlan(playlistId) {
   };
 }
 
+async function musicFromAsset(assetId, volume) {
+  const id = Number(assetId || 0);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const payload = await fetchJson(`${BASE_URL}/api/v2/admin/asset-library/list.php?q=${encodeURIComponent(String(id))}&asset_kind=audio&include_inactive=1&limit=20&_=${Date.now()}`);
+  if (!payload?.ok) {
+    throw new Error(payload?.error || `Failed to load music asset ${id}`);
+  }
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const asset = items.find((item) => Number(item?.asset_library_id || 0) === id);
+  if (!asset) {
+    throw new Error(`Music asset not found: ${id}`);
+  }
+  const relPath = String(asset.rel_path || "").trim();
+  const src = String(asset.public_url || normalizeImageUrl(relPath)).trim();
+  if (!src) {
+    throw new Error(`Music asset ${id} has no public URL/path.`);
+  }
+  const normalizedVolume = Number.isFinite(Number(volume))
+    ? Math.max(0, Math.min(1, Number(volume)))
+    : 0.35;
+  return {
+    asset_library_id: id,
+    title: String(asset.title || ""),
+    src,
+    public_url: src,
+    rel_path: relPath,
+    mime_type: String(asset.mime_type || ""),
+    volume: normalizedVolume,
+  };
+}
+
 function readRecipePlan(recipePath) {
   const raw = fs.readFileSync(recipePath, "utf8");
   const data = JSON.parse(raw);
@@ -211,6 +242,8 @@ function run(command, args) {
 async function main() {
   const recipePath = readArg("recipe");
   const explicitOutput = readArg("output");
+  const musicAssetId = Number(readArg("music-asset-id") || readArg("music") || 0);
+  const musicVolume = readArg("music-volume") || readArg("volume") || "0.35";
   const playlistId = Number(process.argv[2] || readArg("playlist-id") || readArg("playlist") || 37);
   if (!recipePath && (!Number.isFinite(playlistId) || playlistId <= 0)) {
     throw new Error("Usage: npm run render-youtube-video -- 37");
@@ -220,6 +253,10 @@ async function main() {
   ensureDir(PROPS_DIR);
 
   const plan = recipePath ? readRecipePlan(recipePath) : await buildPlan(playlistId);
+  if (musicAssetId > 0) {
+    plan.music = await musicFromAsset(musicAssetId, musicVolume);
+    console.log(`Music: #${plan.music.asset_library_id} ${plan.music.title || plan.music.src} @ volume ${plan.music.volume}`);
+  }
   const planId = Number(plan.playlist_id || playlistId || 0) || "recipe";
   const propsPath = recipePath || path.join(PROPS_DIR, `playlist-${planId}.json`);
   const outputPath = explicitOutput || path.join(OUT_DIR, `colorfix-youtube-video-${planId}.mp4`);

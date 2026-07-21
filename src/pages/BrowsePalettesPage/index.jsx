@@ -6,7 +6,6 @@ import CategoryDropdown from "@components/CategoryDropdown";
 import { API_FOLDER } from "@helpers/config";
 import PaletteInspector from "@components/PaletteInspector";
 import PaletteRow from "./PaletteRow";
-import TagMultiSelect from '@components/TagMultiSelect';
 import "./browse-palettes.css";
 
 // Mobile helper
@@ -51,8 +50,8 @@ export default function BrowsePalettesPage({
   const lastScrollYRef = useRef(0);
   // Inputs (live)
   const [selectedColor, setSelectedColor] = useState(null);
-  const [selectedFamily, setSelectedFamily] = useState(null);
-  const [selectedLightness, setSelectedLightness] = useState(""); // "Light" | "Medium" | "Dark" | ""
+  const [selectedFamily1, setSelectedFamily1] = useState(null);
+  const [selectedFamily2, setSelectedFamily2] = useState(null);
 
   // Results (live, inline)
   const [palettes, setPalettes] = useState([]);
@@ -64,8 +63,6 @@ export default function BrowsePalettesPage({
   const [errorMsg, setErrorMsg] = useState("");
   const [hasRun, setHasRun] = useState(false);
   const [inspected, setInspected] = useState(null);
-
-  const [selectedTags, setSelectedTags] = useState([]);
 
   // Snapshot (applied search)
   const [applied, setApplied] = useState(null);
@@ -97,10 +94,8 @@ export default function BrowsePalettesPage({
 
   // Derived
   const hasColor = !!selectedColor?.cluster_id;
-  const famLabel = selectedFamily?.name || null;
-  const hasFamily = !!selectedFamily?.name;
-  const hasLightness = !!selectedLightness;
-  const goEnabled = hasColor || (hasFamily && hasLightness) || selectedTags.length > 0;
+  const hasFamily = !!selectedFamily1?.name || !!selectedFamily2?.name;
+  const goEnabled = hasColor || hasFamily;
 
   // Back/forward closes modal
   useEffect(() => {
@@ -129,9 +124,8 @@ export default function BrowsePalettesPage({
     setTotalCount(snap.totalCount || 0);
     setNextOffset(snap.nextOffset ?? null);
     setSelectedColor(snap.selectedColor || null);
-    setSelectedFamily(snap.selectedFamily || null);
-    setSelectedLightness(snap.selectedLightness || "");
-    setSelectedTags(snap.selectedTags || []);
+    setSelectedFamily1(snap.selectedFamily1 || snap.selectedFamily || null);
+    setSelectedFamily2(snap.selectedFamily2 || null);
     setHasRun(!!snap.hasRun);
 
     requestAnimationFrame(() => {
@@ -141,30 +135,22 @@ export default function BrowsePalettesPage({
   }, []);
 
   const appliedColor = applied?.selectedColor || null;
-  const appliedFamLabel = applied?.selectedFamily?.name || null;
-  const appliedLight = applied?.selectedLightness || "";
+  const appliedFam1Label = applied?.selectedFamily1?.name || applied?.selectedFamily?.name || null;
+  const appliedFam2Label = applied?.selectedFamily2?.name || null;
 
   const emptyMsg = useMemo(() => {
     if (!applied?.hasRun)
-      return "No palettes yet. Pick a color, a family + lightness, or a tag and tap Search.";
+      return "No palettes yet. Pick a color, color category, or both and tap Search.";
     if ((applied?.totalCount || 0) > 0) return "";
     const c = appliedColor?.name;
-    const f = appliedFamLabel;
-    const l = appliedLight;
-    const t = (applied?.selectedTags || selectedTags || []).filter(Boolean);
-    const tagLabel = t.length ? t.join(", ") : "";
-    if (t.length) {
-      return `No palettes tagged ${tagLabel} yet.`;
-    }
-    if (c && f && l)
-      return `No palettes featuring ${c} and ${f} • ${l}. Try widening your search.`;
-    if (c && f)
-      return `No palettes featuring ${c} and ${f}. Try adding Light/Medium/Dark.`;
-    if (f && l)
-      return `No palettes in ${f} • ${l}. Try removing lightness or family.`;
-    if (c) return `No palettes featuring ${c}. Try by family + lightness instead.`;
-    return `No palettes yet. Pick a color, a family + lightness, or a tag and tap Search.`;
-  }, [applied?.hasRun, applied?.totalCount, appliedColor?.name, appliedFamLabel, appliedLight, applied?.selectedTags, selectedTags]);
+    const families = [appliedFam1Label, appliedFam2Label].filter(Boolean);
+    const familyLabel = families.join(" + ");
+    if (c && families.length)
+      return `No palettes featuring ${c} and ${familyLabel}. Try removing one filter.`;
+    if (families.length) return `No palettes in ${familyLabel}. Try a different color category.`;
+    if (c) return `No palettes featuring ${c}. Try by color category instead.`;
+    return `No palettes yet. Pick a color, color category, or both and tap Search.`;
+  }, [applied?.hasRun, applied?.totalCount, appliedColor?.name, appliedFam1Label, appliedFam2Label]);
 
   // Normalize + keep backend grouping metadata
   function normalizeItems(items) {
@@ -218,9 +204,10 @@ export default function BrowsePalettesPage({
     setErrorMsg("");
 
     const sentColor  = selectedColor || null;
-    const sentFamily = selectedFamily || null;
+    const sentFamily1 = selectedFamily1 || null;
+    const sentFamily2 = selectedFamily2 || null;
 
-    const basePayload = buildPayload(sentColor, sentFamily);
+    const basePayload = buildPayload(sentColor, sentFamily1, sentFamily2);
     const sentPayload = overrides ? { ...basePayload, ...overrides } : basePayload;
 
     // Canonical boolean for TierB: include_close
@@ -250,8 +237,8 @@ export default function BrowsePalettesPage({
           totalCount: 0,
           nextOffset: null,
           selectedColor: sentColor,
-          selectedFamily: sentFamily,
-          selectedLightness,
+          selectedFamily1: sentFamily1,
+          selectedFamily2: sentFamily2,
           hasRun: false,
           include_close: sentPayload.include_close,
           exact_anchor_cluster_ids: sentPayload.exact_anchor_cluster_ids || [],
@@ -287,9 +274,8 @@ export default function BrowsePalettesPage({
         totalCount: total,
         nextOffset: next,
         selectedColor: sentColor,
-        selectedFamily: sentFamily,
-        selectedLightness,
-        selectedTags,
+        selectedFamily1: sentFamily1,
+        selectedFamily2: sentFamily2,
         hasRun: true,
         include_close: sentPayload.include_close,
         exact_anchor_cluster_ids: sentPayload.exact_anchor_cluster_ids || [],
@@ -304,9 +290,8 @@ export default function BrowsePalettesPage({
         totalCount: 0,
         nextOffset: null,
         selectedColor: null,
-        selectedFamily: null,
-        selectedLightness: "",
-        selectedTags,
+        selectedFamily1: null,
+        selectedFamily2: null,
         hasRun: false,
         include_close: (overrides && typeof overrides.include_close === "boolean") ? overrides.include_close : includeClose,
         ...(overrides || {}),
@@ -324,12 +309,12 @@ export default function BrowsePalettesPage({
 
     const basePayload = buildPayload(
       applied?.selectedColor || selectedColor,
-      applied?.selectedFamily || selectedFamily,
+      applied?.selectedFamily1 || applied?.selectedFamily || selectedFamily1,
+      applied?.selectedFamily2 || selectedFamily2,
       {
         limit: 60,
         offset: nextOffset
-      },
-      applied?.selectedLightness || selectedLightness
+      }
     );
 
     const overrides = {};
@@ -399,6 +384,35 @@ function handleMetaPatched(delta) {
   });
 }
 
+  function handlePickColor(colorOrNull) {
+    setSelectedColor(colorOrNull || null);
+    clearSnapshot();
+    setHasRun(false);
+    if (isMobile()) setCtrlOpen(true);
+  }
+
+  function normalizeFamily(cat) {
+    if (!cat || /^show all$/i.test(String(cat.name || ""))) return null;
+    return {
+      name: String(cat.name || ""),
+      type: cat.type === "neutral" ? "neutral" : "hue",
+    };
+  }
+
+  function handlePickFamily1(cat) {
+    setHasRun(false);
+    clearSnapshot();
+    setSelectedFamily1(normalizeFamily(cat));
+    if (isMobile()) setCtrlOpen(true);
+  }
+
+  function handlePickFamily2(cat) {
+    setHasRun(false);
+    clearSnapshot();
+    setSelectedFamily2(normalizeFamily(cat));
+    if (isMobile()) setCtrlOpen(true);
+  }
+
 
   // HOT entry: /browse-palettes?clusters=123,456&include_close=1
   useEffect(() => {
@@ -428,9 +442,9 @@ function handleMetaPatched(delta) {
 
   function buildPayload(
     color = selectedColor,
-    family = selectedFamily,
-    overrides = {},
-    lightnessOverride = null
+    family1 = selectedFamily1,
+    family2 = selectedFamily2,
+    overrides = {}
   ) {
     const payload = {
       include_counts: false,
@@ -446,22 +460,23 @@ function handleMetaPatched(delta) {
       payload.exact_anchor_cluster_ids = hotClusterIds;
     }
 
-    // include_idea (family + optional lightness)
+    // include_idea (up to two color categories)
     const idea = {};
-    const famName = (family?.name || "").trim();
-    const famType = family?.type || "hue";
-    const tone    = (lightnessOverride ?? selectedLightness) || "";
-    const isShowAll = !famName || /^show all$/i.test(famName);
+    const families = [family1, family2]
+      .map((family) => ({
+        name: (family?.name || "").trim(),
+        type: family?.type === "neutral" ? "neutral" : "hue",
+      }))
+      .filter((family) => family.name && !/^show all$/i.test(family.name))
+      .filter((family, idx, all) =>
+        idx === all.findIndex((other) =>
+          other.type === family.type &&
+          other.name.toLowerCase() === family.name.toLowerCase()
+        )
+      );
 
-    if (!isShowAll) {
-      if (famType === "neutral") idea.neutral_cats = famName;
-      else                       idea.hue_cats     = famName;
-    }
-    if (tone) idea.lightness_cats = tone;
-
+    if (families.length) idea.families = families;
     if (Object.keys(idea).length) payload.include_idea = idea;
-    if (selectedTags.length > 1) payload.include_tags_all = selectedTags;
-    else if (selectedTags.length === 1) payload.include_tags_any = selectedTags;
 
     return payload;
   }
@@ -539,17 +554,16 @@ function handleMetaPatched(delta) {
   <div className="bpv1-field">
     <FuzzySearchColorSelect
       mobileBreakpoint={0}
-      onSelect={(c) => { setSelectedColor(c || null); clearSnapshot(); setHasRun(false); }}
+      onSelect={handlePickColor}
     />
   </div>
 
   <div className="bpv1-field">
-    <TagMultiSelect
-      simple
-      placeholder="Tags (comma separated)"
-      selected={selectedTags}
-      onChange={(tags) => { setSelectedTags(tags); clearSnapshot(); setHasRun(false); }}
-    />
+    <CategoryDropdown onSelect={handlePickFamily1} useShowAll={true} />
+  </div>
+
+  <div className="bpv1-field">
+    <CategoryDropdown onSelect={handlePickFamily2} useShowAll={true} />
   </div>
 
   <div className="bpv1-actions">

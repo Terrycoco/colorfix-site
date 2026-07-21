@@ -44,6 +44,7 @@ if ($with !== '') {
       FROM palette_members pm2
       JOIN clusters cl2 ON cl2.id = pm2.member_cluster_id
       WHERE pm2.palette_id = p.id
+        AND (cl2.neutral_cats IS NULL OR cl2.neutral_cats = '')
         AND LOWER(COALESCE(cl2.hue_cats,'')) LIKE :with
     )";
   }

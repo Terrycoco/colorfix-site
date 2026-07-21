@@ -93,6 +93,7 @@ final class ClientService
         $phone = $this->normalizeOptionalString($input['phone'] ?? null);
         $notes = $this->normalizeOptionalString($input['notes'] ?? null);
         $clientType = $this->normalizeClientType($input['client_type'] ?? null);
+        $startedAt = $this->normalizeDateTimeOrNull($input['started_at'] ?? null) ?? AppTime::now();
         $permissionStatus = $this->normalizePermissionStatus($input['photo_permission_status'] ?? null);
         $permissionRequestedAt = $this->normalizeDateTimeOrNull($input['photo_permission_requested_at'] ?? null);
         $permissionGrantedAt = $this->normalizeDateTimeOrNull($input['photo_permission_granted_at'] ?? null);
@@ -102,12 +103,6 @@ final class ClientService
         }
         if ($permissionStatus === 'granted' && $permissionGrantedAt === null) {
             $permissionGrantedAt = AppTime::now();
-        }
-        if ($permissionStatus !== 'granted') {
-            $permissionGrantedAt = null;
-        }
-        if ($permissionStatus === 'unknown') {
-            $permissionRequestedAt = null;
         }
 
         if (($id ?? 0) > 0) {
@@ -129,6 +124,7 @@ final class ClientService
                 'phone' => $phone,
                 'notes' => $notes,
                 'client_type_key' => $clientType,
+                'started_at' => $startedAt,
                 'photo_permission_status' => $permissionStatus,
                 'photo_permission_requested_at' => $permissionRequestedAt,
                 'photo_permission_granted_at' => $permissionGrantedAt,
@@ -150,6 +146,7 @@ final class ClientService
                 'phone' => $phone,
                 'notes' => $notes,
                 'client_type_key' => $clientType,
+                'started_at' => $startedAt,
                 'photo_permission_status' => $permissionStatus,
                 'photo_permission_requested_at' => $permissionRequestedAt,
                 'photo_permission_granted_at' => $permissionGrantedAt,
@@ -166,6 +163,7 @@ final class ClientService
             'phone' => $phone,
             'notes' => $notes,
             'client_type_key' => $clientType,
+            'started_at' => $startedAt,
             'photo_permission_status' => $permissionStatus,
             'photo_permission_requested_at' => $permissionRequestedAt,
             'photo_permission_granted_at' => $permissionGrantedAt,
@@ -318,6 +316,7 @@ final class ClientService
             'client_type' => isset($row['client_type']) && $row['client_type'] !== null
                 ? (string)$row['client_type']
                 : (isset($row['client_type_key']) ? (string)$row['client_type_key'] : 'homeowner'),
+            'started_at' => isset($row['started_at']) ? (string)$row['started_at'] : null,
             'photo_permission_status' => (string)($row['photo_permission_status'] ?? 'unknown'),
             'photo_permission_requested_at' => isset($row['photo_permission_requested_at']) ? (string)$row['photo_permission_requested_at'] : null,
             'photo_permission_granted_at' => isset($row['photo_permission_granted_at']) ? (string)$row['photo_permission_granted_at'] : null,

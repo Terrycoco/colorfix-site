@@ -34,6 +34,10 @@ export default function PlayerPage() {
   const reloadParam = searchParams.get("_") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
   const debugTimingParam = searchParams.get("debug_timing") ?? "";
+  const offsetParam = searchParams.get("offset") ?? "";
+  const positionParam = searchParams.get("position") ?? searchParams.get("pos") ?? "";
+  const slideIdParam = searchParams.get("slide_id") ?? searchParams.get("playlist_item_id") ?? searchParams.get("item_id") ?? "";
+  const photoIdParam = searchParams.get("photo_id") ?? searchParams.get("photo_library_id") ?? "";
   const returnTo = resolveReturnTo(returnToParam);
   const startParamValue = start ?? searchParams.get("start") ?? "";
   const shouldCloseOnExit = closeOnExitParam || readPlayerCloseOnExit();
@@ -94,6 +98,10 @@ export default function PlayerPage() {
       params.set("playlist_slug", playlistId);
     }
     if (startParamValue !== "") params.set("start", startParamValue);
+    if (offsetParam !== "") params.set("offset", offsetParam);
+    if (positionParam !== "") params.set("position", positionParam);
+    if (slideIdParam !== "") params.set("slide_id", slideIdParam);
+    if (photoIdParam !== "") params.set("photo_id", photoIdParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
@@ -125,7 +133,7 @@ export default function PlayerPage() {
     return () => {
       cancelled = true;
     };
-  }, [playlistId, startParamValue, addCtaGroup, ctaAudience, debugTimingParam, freshParam, reloadParam]);
+  }, [playlistId, startParamValue, offsetParam, positionParam, slideIdParam, photoIdParam, addCtaGroup, ctaAudience, debugTimingParam, freshParam, reloadParam]);
 
   useEffect(() => {
     if (!data?.playlist_instance_id) return;
@@ -329,6 +337,36 @@ export default function PlayerPage() {
     ctaHandlers[key]?.(cta);
   }
 
+  function handlePalettePromptClick(item) {
+    if (!item) return;
+    trackUserEvent({
+      event_type: "see_colors",
+      playlist_instance_id: Number(data?.playlist_instance_id || 0) || null,
+      playlist_id: Number(data?.playlist_id || 0) || null,
+      slide_id: Number(item?.playlist_item_id || item?.id || 0) || null,
+      palette_id: Number(item?.ap_id || item?.saved_palette_id || item?.saved_palette_set_id || 0) || null,
+      palette_hash: item?.palette_hash || null,
+      source: sourceParam || undefined,
+      allow_internal_tracking: true,
+    });
+    ctaHandlers.to_palette?.({
+      cta_id: "player-see-these-colors",
+      key: "to_palette",
+      label: "See These Colors",
+      params: {
+        target: "_self",
+        return_to: buildSlideReturnTo({
+          data,
+          playlistId,
+          item,
+          location,
+          searchParams,
+          isFastPlayerShell,
+        }),
+      },
+    });
+  }
+
 const ctas = useMemo(() => {
   const raw = data?.ctas || [];
   return raw.map((cta, index) => {
@@ -415,6 +453,27 @@ function resolveReturnTo(value) {
   if (!trimmed.startsWith("/")) return "";
   if (trimmed.startsWith("//")) return "";
   return trimmed;
+}
+
+function buildSlideReturnTo({ data, playlistId, item, location, searchParams, isFastPlayerShell }) {
+  const pathId = data?.slug || data?.playlist_instance_slug || data?.playlist_instance_id || playlistId;
+  const fallbackPath = location?.pathname || "/";
+  const basePath = pathId
+    ? `${isFastPlayerShell ? "/p" : "/playlist"}/${encodeURIComponent(String(pathId))}`
+    : fallbackPath;
+  const params = new URLSearchParams(searchParams);
+  params.delete("end");
+  params.delete("start");
+  params.delete("position");
+  params.delete("pos");
+  params.delete("playlist_item_id");
+  params.delete("item_id");
+  const slideId = Number(item?.playlist_item_id || item?.id || 0);
+  if (slideId > 0) {
+    params.set("slide_id", String(slideId));
+  }
+  const query = params.toString();
+  return `${basePath}${query ? `?${query}` : ""}`;
 }
 
 function readPlayerCloseOnExit() {
@@ -733,6 +792,7 @@ const visibleCTAs = useMemo(
               setLikedCount(nextCount);
               setPlaybackEnded(true);
             }}
+          onPalettePromptClick={handlePalettePromptClick}
         />
         {playbackEnded && (
           <>
@@ -769,8 +829,8 @@ function PlaylistUnavailable() {
         <h1 id="playlist-unavailable-title">This playlist isn&rsquo;t available.</h1>
         <p>It may have been moved or taken offline.</p>
         <div className="playlist-unavailable__actions">
-          <a href="/picker">Browse Playlists</a>
-          <a href="/">Go to ColorFix Home</a>
+          <a href="/picker?psi=11">Browse Playlists</a>
+          <a href="/results/4">Go to ColorFix Home</a>
         </div>
       </section>
     </main>

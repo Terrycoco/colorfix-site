@@ -519,7 +519,10 @@ class PdoPlaylistRepository
                 isset($row['site']) ? (bool)$row['site'] : true,
                 isset($row['yt']) ? (bool)$row['yt'] : true,
                 isset($row['pin']) ? (bool)$row['pin'] : true,
-                $row['analyzer_role'] ?? 'ignore'
+                $row['analyzer_role'] ?? 'ignore',
+                null,
+                null,
+                isset($row['playlist_item_id']) ? (int)$row['playlist_item_id'] : null
             );
         }
 

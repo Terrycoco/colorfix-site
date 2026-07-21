@@ -7,6 +7,7 @@ export default function PaletteViewer({
   swatches = [],
   adminMode = false,
   showBackButton = true,
+  backLabel = "← Back",
   onBack,
   onExit,
   showLogo = true,
@@ -208,7 +209,7 @@ export default function PaletteViewer({
         <div className="apv-header-slot">
           {showBackButton ? (
             <button className="apv-btn apv-btn--ghost" onClick={handleBack}>
-              ← Back
+              {backLabel}
             </button>
           ) : (
             showLogo && (
@@ -337,9 +338,6 @@ export default function PaletteViewer({
                 Share
               </button>
             )}
-            <a href="/hire-terry" className="apv-hire-link">
-              Get Your Makeover by Terry
-            </a>
           </div>
           <div className="apv-branding">
             <span>Brought to you by </span>

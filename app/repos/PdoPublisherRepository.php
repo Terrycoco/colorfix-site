@@ -192,6 +192,28 @@ final class PdoPublisherRepository
         $stmt->execute();
     }
 
+    public function clearChannelAuth(int $channelId, array $metadata, string $status = 'pending_auth'): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE publishing_channels
+                SET status = :status,
+                    encrypted_auth_payload = NULL,
+                    auth_nonce = NULL,
+                    auth_tag = NULL,
+                    auth_key_ref = NULL,
+                    auth_encryption_alg = NULL,
+                    auth_expires_at = NULL,
+                    auth_refreshed_at = NULL,
+                    metadata_json = :metadata_json
+              WHERE publishing_channel_id = :publishing_channel_id'
+        );
+        $stmt->execute([
+            ':status' => $status,
+            ':metadata_json' => json_encode($metadata, JSON_UNESCAPED_SLASHES),
+            ':publishing_channel_id' => $channelId,
+        ]);
+    }
+
     public function updateChannelMetadata(int $channelId, array $metadata, ?string $status = null): void
     {
         $sql = 'UPDATE publishing_channels SET metadata_json = :metadata_json';

@@ -47,6 +47,7 @@ function AdminRouteNormalizer() {
 
 function isPublicPlaylistRoute(pathname) {
   return pathname === "/picker"
+    || pathname === "/playlist-color-search"
     || pathname.startsWith("/p/")
     || pathname.startsWith("/playlist/")
     || pathname.startsWith("/playlist-thumbs/");

@@ -12,7 +12,7 @@ export default function BrandBumperLogo({
   const signatureStyle = controlled
     ? {
         opacity: progress <= 0 ? 0 : 1,
-        "--brand-bumper-signature-cover-x": `${Math.round(progress * 105)}%`,
+        "--brand-bumper-signature-cover-x": `${(progress * 105).toFixed(3)}%`,
       }
     : undefined;
   const rootClass = [

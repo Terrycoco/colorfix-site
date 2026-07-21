@@ -203,7 +203,8 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (psi) params.set("psi", String(psi));
   if (thumb) params.set("thumb", "1");
   if (demo) params.set("demo", "1");
-  if (returnTo) params.set("return_to", returnTo);
+  const resolvedReturnTo = cta?.params?.return_to || cta?.params?.returnTo || returnTo;
+  if (resolvedReturnTo) params.set("return_to", resolvedReturnTo);
   if (savedPaletteSetId > 0) params.set("set_id", String(savedPaletteSetId));
   const qs = params.toString();
   if (!apId && !paletteHash) return;

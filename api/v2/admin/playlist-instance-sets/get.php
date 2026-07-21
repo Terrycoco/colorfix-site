@@ -32,6 +32,9 @@ if (!$set) {
     respond(['ok' => false, 'error' => 'Not found'], 404);
 }
 
+$updatedAt = trim((string)($set->updatedAt ?? ''));
+$stamp = $updatedAt !== '' ? strtotime($updatedAt) : false;
+
 respond([
     'ok' => true,
     'item' => [
@@ -40,6 +43,8 @@ respond([
         'title' => $set->title,
         'subtitle' => $set->subtitle,
         'context' => $set->context,
+        'updated_at' => $set->updatedAt,
+        'version' => ($stamp && $stamp > 0) ? (string)$stamp : '',
         'end_cta_label' => $set->endCtaLabel,
         'end_cta_url' => $set->endCtaUrl,
         'end_cta_enabled' => $set->endCtaEnabled,

@@ -111,8 +111,15 @@ final class PdoAssetLibraryRepository
 
         $kind = trim((string)($filters['asset_kind'] ?? ''));
         if ($kind !== '') {
-            $where[] = 'al.asset_kind = :asset_kind';
-            $params[':asset_kind'] = $kind;
+            if ($kind === 'audio') {
+                $where[] = "(al.asset_kind = :asset_kind
+                    OR al.mime_type LIKE 'audio/%'
+                    OR LOWER(al.rel_path) REGEXP '\\\\.(mp3|wav|m4a)(\\\\?.*)?$')";
+                $params[':asset_kind'] = $kind;
+            } else {
+                $where[] = 'al.asset_kind = :asset_kind';
+                $params[':asset_kind'] = $kind;
+            }
         }
 
         $sourceType = trim((string)($filters['source_type'] ?? ''));

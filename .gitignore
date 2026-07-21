@@ -34,3 +34,4 @@ tmp_partial.jsx
 
 # Local secrets
 config/mail.local.php
+api/worker-token.php

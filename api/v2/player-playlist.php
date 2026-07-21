@@ -34,6 +34,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 $playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
 $playlistSlug = trim((string)($_GET['playlist_slug'] ?? $_GET['slug'] ?? ''));
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
+$offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
+$position = null;
+if (isset($_GET['position'])) {
+    $position = (int)$_GET['position'];
+} elseif (isset($_GET['pos'])) {
+    $position = (int)$_GET['pos'];
+}
+$playlistItemId = 0;
+foreach (['playlist_item_id', 'slide_id', 'item_id'] as $key) {
+    if (isset($_GET[$key])) {
+        $playlistItemId = (int)$_GET[$key];
+        break;
+    }
+}
+$photoLibraryId = 0;
+foreach (['photo_library_id', 'photo_id'] as $key) {
+    if (isset($_GET[$key])) {
+        $photoLibraryId = (int)$_GET[$key];
+        break;
+    }
+}
 $mode = trim((string)($_GET['mode'] ?? ''));
 $addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null;
 $debugTiming = isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0';
@@ -56,7 +77,12 @@ try {
     }
 
     $service = new PlayerExperienceService($pdo);
-    $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start, $mode, $addGroupId);
+    $plan = $service->buildPlaybackPlanFromInstance($playlistInstanceId, $start, $mode, $addGroupId, [
+        'offset' => $offset,
+        'position' => $position,
+        'playlist_item_id' => $playlistItemId,
+        'photo_library_id' => $photoLibraryId,
+    ]);
 
     $payload = [
         'ok'   => true,

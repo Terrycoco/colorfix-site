@@ -36,6 +36,15 @@ final class AssetCreatorService
             throw new RuntimeException('creator_key required');
         }
 
+        $sourceType = trim((string)($payload['source_type'] ?? ''));
+        $sourceId = (int)($payload['source_id'] ?? 0);
+        if ($creatorKey === 'youtube.playlist_video' && $sourceType === 'playlist' && $sourceId > 0) {
+            $existingJob = $this->repo->findReusableJobForSource($creatorKey, $sourceType, $sourceId);
+            if ($existingJob) {
+                return $this->updateJob((int)$existingJob['asset_creator_job_id'], $payload);
+            }
+        }
+
         $jobId = $this->repo->createJob([
             'creator_key' => $creatorKey,
             'source_type' => $payload['source_type'] ?? null,

@@ -376,7 +376,7 @@
 
 .item-row {
   display: grid;
-  grid-template-columns: 40px 90px 110px minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 1fr);
+  grid-template-columns: 40px 90px 110px 130px minmax(150px, 1fr) minmax(150px, 1fr) minmax(170px, 1fr);
   gap: 12px;
   align-items: end;
 }

@@ -99,11 +99,13 @@
     grid-template-columns: 1fr auto;
     grid-template-areas:
       "color  color"
-      "family go";
+      "family family2"
+      "go go";
     gap: 12px;
   }
   .bpv1-field:first-of-type { grid-area: color; }
   .bpv1-field:nth-of-type(2){ grid-area: family; }
+  .bpv1-field:nth-of-type(3){ grid-area: family2; }
   .bpv1-actions            { grid-area: go; }
 
   .bpv1-toolbar .fuzzy-dropdown,

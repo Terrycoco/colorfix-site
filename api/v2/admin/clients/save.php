@@ -38,6 +38,7 @@ try {
         'phone' => $payload['phone'] ?? '',
         'notes' => $payload['notes'] ?? '',
         'client_type' => $payload['client_type'] ?? null,
+        'started_at' => $payload['started_at'] ?? null,
         'photo_permission_status' => $payload['photo_permission_status'] ?? 'unknown',
         'photo_permission_requested_at' => $payload['photo_permission_requested_at'] ?? null,
         'photo_permission_granted_at' => $payload['photo_permission_granted_at'] ?? null,

@@ -42,6 +42,16 @@ try {
         $pdo
     );
 
+    $repo = new PdoAssetCreatorRepository($pdo);
+    $job = $repo->findJob($jobId);
+    if (!$job) {
+        respond(['ok' => false, 'error' => 'Asset creator job not found'], 404);
+    }
+
+    if (trim((string)($job['creator_key'] ?? '')) === 'youtube.playlist_video') {
+        respond(['ok' => true, 'item' => $service->queueYoutubePlaylistVideoJob($jobId)]);
+    }
+
     respond(['ok' => true, 'item' => $service->runJob($jobId)]);
 } catch (RuntimeException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);

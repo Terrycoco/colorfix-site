@@ -5,6 +5,8 @@ import "./admin-asset-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/asset-library/list.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/asset-library/delete.php`;
+const UPLOAD_URL = `${API_FOLDER}/v2/admin/asset-library/upload.php`;
+const CLEARANCE_URL = `${API_FOLDER}/v2/admin/asset-library/clearance.php`;
 
 const defaultFilters = {
   q: "",
@@ -39,7 +41,15 @@ export default function AdminAssetLibraryPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    file: null,
+    title: "",
+    tags: "",
+    note: "",
+  });
 
   const sourceTypes = useMemo(() => {
     const seen = new Set();
@@ -82,6 +92,12 @@ export default function AdminAssetLibraryPage() {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }
 
+  function updateUpload(field, value) {
+    setUploadForm((prev) => ({ ...prev, [field]: value }));
+    setNotice("");
+    setError("");
+  }
+
   function submitSearch(event) {
     event.preventDefault();
     const next = { ...filters, q: searchInput };
@@ -118,6 +134,44 @@ export default function AdminAssetLibraryPage() {
       setError(err?.message || "Failed to delete asset");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function uploadAsset(event) {
+    event.preventDefault();
+    if (!uploadForm.file) {
+      setError("Choose a file to upload.");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+    setNotice("");
+    try {
+      const body = new FormData();
+      body.append("file", uploadForm.file);
+      body.append("title", uploadForm.title);
+      body.append("tags", uploadForm.tags);
+      body.append("note", uploadForm.note);
+      const res = await fetch(UPLOAD_URL, {
+        method: "POST",
+        credentials: "include",
+        body,
+      });
+      const data = await parseJsonResponse(res, "Upload asset");
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to upload asset");
+      const item = data.item || null;
+      setUploadForm({ file: null, title: "", tags: "", note: "" });
+      setNotice(item?.asset_library_id ? `Uploaded asset #${item.asset_library_id}.` : "Uploaded asset.");
+      const nextFilters = item?.asset_kind === "audio"
+        ? { ...filters, asset_kind: "audio", sort: "newest" }
+        : filters;
+      setFilters(nextFilters);
+      await fetchAssets(nextFilters);
+    } catch (err) {
+      setError(err?.message || "Failed to upload asset");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -221,7 +275,50 @@ export default function AdminAssetLibraryPage() {
         </button>
       </form>
 
+      <form className="assetlib-upload" onSubmit={uploadAsset}>
+        <label className="assetlib-upload__file">
+          Upload Asset
+          <input
+            type="file"
+            accept="audio/mpeg,audio/wav,audio/x-wav,audio/mp4,.mp3,.wav,.m4a,video/*,image/*,.pdf,.ppt,.pptx,.key"
+            onChange={(event) => updateUpload("file", event.target.files?.[0] || null)}
+          />
+        </label>
+        <label>
+          Title
+          <input
+            type="text"
+            value={uploadForm.title}
+            onChange={(event) => updateUpload("title", event.target.value)}
+            placeholder={uploadForm.file?.name || "Optional display title"}
+          />
+        </label>
+        <label>
+          Tags
+          <input
+            type="text"
+            value={uploadForm.tags}
+            onChange={(event) => updateUpload("tags", event.target.value)}
+            placeholder="music, youtube"
+          />
+        </label>
+        <label className="assetlib-upload__note">
+          Note
+          <input
+            type="text"
+            value={uploadForm.note}
+            onChange={(event) => updateUpload("note", event.target.value)}
+            placeholder="Optional"
+          />
+        </label>
+        <button type="submit" className="assetlib-command assetlib-command--primary" disabled={uploading || !uploadForm.file}>
+          {uploading ? "Uploading..." : "Upload"}
+        </button>
+      </form>
+
       {error ? <div className="assetlib-status assetlib-status--error">{error}</div> : null}
+      {notice ? <div className="assetlib-status assetlib-status--ok">{notice}</div> : null}
+
 
       <section className="assetlib-grid-wrap">
         <table className="assetlib-grid">
@@ -233,7 +330,7 @@ export default function AdminAssetLibraryPage() {
               <th>Pin Type</th>
               <th>Creator Job</th>
               <th>Source Playlist</th>
-              <th>Permission</th>
+              <th>Clearance</th>
               <th>MIME</th>
               <th>Title</th>
               <th>Source</th>
@@ -253,7 +350,7 @@ export default function AdminAssetLibraryPage() {
                 <td>{creatorJobLabel(item)}</td>
                 <td>{sourcePlaylistLabel(item)}</td>
                 <td>
-                  <PermissionStatus {...permissionProps(item)} />
+                  <AssetClearanceStatus item={item} onChange={setItems} />
                 </td>
                 <td>{item.mime_type || "-"}</td>
                 <td>{item.title || "-"}</td>
@@ -307,7 +404,7 @@ function AssetDialog({ item, deleting = false, onDelete, onClose }) {
           </div>
           <dl className="assetlib-details">
             <dt>Kind</dt><dd>{item.asset_kind || "-"}</dd>
-            <dt>Permission</dt><dd><PermissionStatus {...permissionProps(item)} showLabel /></dd>
+            <dt>Clearance</dt><dd><AssetClearanceStatus item={item} showLabel /></dd>
             <dt>MIME</dt><dd>{item.mime_type || "-"}</dd>
             <dt>Pin type</dt><dd>{pinTypeLabel(item.pin_type)}</dd>
             <dt>Creator job</dt><dd>{creatorJobLabel(item)}</dd>
@@ -345,6 +442,104 @@ function permissionProps(item = {}) {
     clientName: item.client_name,
     clientEmail: item.client_email,
   };
+}
+
+function AssetClearanceStatus({ item, showLabel = false, onChange = null }) {
+  const isStandaloneAudio = String(item?.asset_kind || "").toLowerCase() === "audio"
+    && !Number(item?.permission_photo_library_id || item?.legacy_photo_library_id || 0);
+  if (!isStandaloneAudio) {
+    return <PermissionStatus {...permissionProps(item)} showLabel={showLabel} />;
+  }
+  return (
+    <RightsClearanceStatus
+      assetId={item.asset_library_id}
+      status={rightsClearanceStatus(item)}
+      showLabel={showLabel}
+      onSaved={(nextItem) => {
+        if (!nextItem || !onChange) return;
+        onChange((prev) => prev.map((row) => (
+          Number(row.asset_library_id) === Number(nextItem.asset_library_id) ? nextItem : row
+        )));
+      }}
+    />
+  );
+}
+
+function RightsClearanceStatus({ assetId, status, showLabel = false, onSaved = null }) {
+  const [localStatus, setLocalStatus] = useState(normalizeClearance(status));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLocalStatus(normalizeClearance(status));
+  }, [status]);
+
+  async function cycleStatus(event) {
+    event.stopPropagation();
+    if (saving || !assetId) return;
+    const nextStatus = localStatus === "cleared" ? "review" : "cleared";
+    setSaving(true);
+    try {
+      const res = await fetch(CLEARANCE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          asset_library_id: Number(assetId),
+          rights_clearance: nextStatus,
+        }),
+      });
+      const data = await parseJsonResponse(res, "Asset clearance");
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Clearance update failed");
+      setLocalStatus(rightsClearanceStatus(data.item || {}) || nextStatus);
+      onSaved?.(data.item);
+    } catch (err) {
+      window.alert(err?.message || "Clearance update failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const label = clearanceLabel(localStatus);
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      className={[
+        "asset-clearance",
+        `asset-clearance--${localStatus}`,
+        saving ? "is-saving" : "",
+      ].filter(Boolean).join(" ")}
+      title={`${label} - click to toggle`}
+      aria-label={`${label} - click to toggle`}
+      onClick={cycleStatus}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        cycleStatus(event);
+      }}
+    >
+      <span className="asset-clearance__dot" aria-hidden="true" />
+      {showLabel ? <span className="asset-clearance__label">{label}</span> : null}
+    </span>
+  );
+}
+
+function rightsClearanceStatus(item = {}) {
+  const metadata = parseMetadata(item.metadata_json);
+  return normalizeClearance(metadata.rights_clearance || metadata.permission_status || metadata.clearance_status);
+}
+
+function normalizeClearance(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (value === "cleared" || value === "review" || value === "blocked") return value;
+  return "unknown";
+}
+
+function clearanceLabel(status) {
+  if (status === "cleared") return "Cleared for use";
+  if (status === "review") return "Needs review";
+  if (status === "blocked") return "Do not use";
+  return "Clearance unknown";
 }
 
 async function parseJsonResponse(res, label) {

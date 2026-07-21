@@ -120,9 +120,11 @@ export default function SendNotePage() {
   return (
     <div className="send-note-page">
       <section className="send-note-hero">
-        <h1>Send Terry a Note</h1>
+        <h1>Contact Terry</h1>
         <p>
-          Have a question, comment, or color thought? Send it here.
+          Questions, comments, or a private project inquiry.
+          <br />
+          Private project requests are reviewed personally by Terry.
         </p>
       </section>
 
@@ -181,7 +183,7 @@ export default function SendNotePage() {
           </div>
 
           <div className="send-note-field">
-            <label htmlFor="send-note-message">Note</label>
+            <label htmlFor="send-note-message">Your Message</label>
             <textarea
               id="send-note-message"
               name="message"
@@ -194,7 +196,7 @@ export default function SendNotePage() {
 
           <div className="send-note-actions">
             <button type="submit" disabled={status.loading}>
-              {status.loading ? "Sending..." : "Send Note"}
+              {status.loading ? "Sending..." : "Send to Terry"}
             </button>
           </div>
 

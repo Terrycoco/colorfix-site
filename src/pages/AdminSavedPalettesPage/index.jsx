@@ -37,11 +37,18 @@ const COLOR_FAMILY_CHOICES = [
   { value: "Blacks", label: "Blacks" },
 ];
 
+const PALETTE_TYPE_CHOICES = [
+  { value: "", label: "All Types" },
+  { value: "interior", label: "Interior" },
+  { value: "exterior", label: "Exterior" },
+  { value: "hoa", label: "HOA" },
+];
+
 const defaultForm = {
   q: "",
   brand: "",
   colorFamily: "",
-  terryFav: "all",
+  paletteType: "",
   limit: 40,
 };
 
@@ -181,12 +188,14 @@ export default function AdminSavedPalettesPage() {
   const [form, setForm] = useState(defaultForm);
   const [filters, setFilters] = useState(() => ({
     limit: defaultForm.limit,
+    offset: 0,
     with_members: 1,
   }));
   const [refreshTick, setRefreshTick] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
+  const [resultMeta, setResultMeta] = useState({ limit: defaultForm.limit, offset: 0, count: 0 });
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [editStatus, setEditStatus] = useState({ loading: false, error: "" });
@@ -208,6 +217,7 @@ export default function AdminSavedPalettesPage() {
         });
         qs.set("with_members", "1");
         qs.set("with_photos", "1");
+        qs.set("with_playlist_uses", "1");
         qs.set("_", Date.now().toString());
         const res = await fetch(`${API_FOLDER}/v2/admin/saved-palettes.php?${qs.toString()}`, {
           credentials: "include",
@@ -225,9 +235,15 @@ export default function AdminSavedPalettesPage() {
         if (!json.ok) throw new Error(json.error || "Unknown error");
         if (cancelled) return;
         setItems(Array.isArray(json.items) ? json.items : []);
+        setResultMeta({
+          limit: Number(json.meta?.limit || filters.limit || defaultForm.limit),
+          offset: Number(json.meta?.offset || filters.offset || 0),
+          count: Number(json.meta?.count || 0),
+        });
       } catch (err) {
         if (cancelled) return;
         setItems([]);
+        setResultMeta((prev) => ({ ...prev, count: 0 }));
         setError(err?.message || "Failed to load palettes");
       } finally {
         if (!cancelled) setLoading(false);
@@ -247,20 +263,28 @@ export default function AdminSavedPalettesPage() {
     event.preventDefault();
     const next = {
       limit: Math.max(1, Math.min(200, Number(form.limit) || defaultForm.limit)),
+      offset: 0,
       with_members: 1,
     };
     if (form.q.trim() !== "") next.q = form.q.trim();
     if (form.brand.trim() !== "") next.brand = form.brand.trim();
     if (form.colorFamily.trim() !== "") next.color_family = form.colorFamily.trim();
-    if (form.terryFav === "fav") next.terry_fav = 1;
-    if (form.terryFav === "not") next.terry_fav = 0;
+    if (form.paletteType.trim() !== "") next.palette_type = form.paletteType.trim();
     setFilters(next);
     setRefreshTick((tick) => tick + 1);
   };
 
   const handleClear = () => {
     setForm(defaultForm);
-    setFilters({ limit: defaultForm.limit, with_members: 1 });
+    setFilters({ limit: defaultForm.limit, offset: 0, with_members: 1 });
+    setRefreshTick((tick) => tick + 1);
+  };
+
+  const goToPageOffset = (offset) => {
+    setFilters((prev) => ({
+      ...prev,
+      offset: Math.max(0, Number(offset) || 0),
+    }));
     setRefreshTick((tick) => tick + 1);
   };
 
@@ -336,7 +360,6 @@ export default function AdminSavedPalettesPage() {
 
   const summary = useMemo(() => {
     if (!items.length) return "No saved palettes yet.";
-    const totalFavs = items.filter((p) => Number(p.terry_fav) === 1).length;
     const byBrand = items.reduce((acc, row) => {
       const b = row.brand?.toLowerCase() || "unknown";
       acc[b] = (acc[b] || 0) + 1;
@@ -346,8 +369,16 @@ export default function AdminSavedPalettesPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([code, count]) => `${code.toUpperCase()}: ${count}`);
-    return `${items.length} palette${items.length === 1 ? "" : "s"} • ${totalFavs} fav • ${topBrands.join(" • ")}`;
+    return `${items.length} palette${items.length === 1 ? "" : "s"} • ${topBrands.join(" • ")}`;
   }, [items]);
+
+  const currentLimit = Math.max(1, Number(resultMeta.limit || filters.limit || defaultForm.limit));
+  const currentOffset = Math.max(0, Number(resultMeta.offset || filters.offset || 0));
+  const currentPage = Math.floor(currentOffset / currentLimit) + 1;
+  const canGoPrevious = currentOffset > 0;
+  const canGoNext = items.length >= currentLimit;
+  const showingStart = items.length ? currentOffset + 1 : 0;
+  const showingEnd = currentOffset + items.length;
 
   if (!admin) {
     return (
@@ -408,11 +439,13 @@ export default function AdminSavedPalettesPage() {
         </label>
 
         <label>
-          Favorites
-          <select value={form.terryFav} onChange={(e) => handleField("terryFav", e.target.value)}>
-            <option value="all">All</option>
-            <option value="fav">Only favs</option>
-            <option value="not">Hide favs</option>
+          Palette Type
+          <select value={form.paletteType} onChange={(e) => handleField("paletteType", e.target.value)}>
+            {PALETTE_TYPE_CHOICES.map((type) => (
+              <option key={type.value || "all"} value={type.value}>
+                {type.label}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -452,6 +485,7 @@ export default function AdminSavedPalettesPage() {
                   <span className="asp-pill neutral">#{item.id}</span>
                   {Number(item.terry_fav) === 1 && <span className="asp-pill">Fav</span>}
                   <span className="asp-pill neutral">{(item.brand || "").toUpperCase() || "?"}</span>
+                  <span className="asp-pill neutral">{(item.palette_type || "exterior").toUpperCase()}</span>
                 </div>
               </div>
               <div className="asp-card-times">
@@ -484,6 +518,22 @@ export default function AdminSavedPalettesPage() {
                   onFocus={(e) => e.target.select()}
                 />
               </label>
+            )}
+
+            {item.playlist_uses?.length > 0 && (
+              <div className="asp-playlist-uses">
+                <span>Playlists</span>
+                <div className="asp-playlist-use-links">
+                  {item.playlist_uses.map((use) => (
+                    <a
+                      key={`${use.playlist_instance_id}-${use.playlist_item_id}`}
+                      href={use.player_url}
+                    >
+                      {use.label || `Playlist #${use.playlist_instance_id}`}
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
 
             <div className="asp-swatches">
@@ -532,6 +582,31 @@ export default function AdminSavedPalettesPage() {
           </article>
         ))}
       </div>
+
+      <nav className="asp-pagination" aria-label="Saved palette pages">
+        <div className="asp-pagination-status">
+          {items.length
+            ? `Showing ${showingStart}-${showingEnd} • Page ${currentPage}`
+            : "No results on this page"}
+        </div>
+        <div className="asp-pagination-actions">
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => goToPageOffset(currentOffset - currentLimit)}
+            disabled={loading || !canGoPrevious}
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={() => goToPageOffset(currentOffset + currentLimit)}
+            disabled={loading || !canGoNext}
+          >
+            Next
+          </button>
+        </div>
+      </nav>
 
       <SavedPaletteEditorModal
         open={editModalOpen}

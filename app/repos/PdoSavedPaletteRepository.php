@@ -271,6 +271,189 @@ class PdoSavedPaletteRepository
         return (int)$stmt->fetchColumn();
     }
 
+    public function getPlaylistUsesForPaletteIds(array $savedPaletteIds): array
+    {
+        $savedPaletteIds = array_values(array_unique(array_filter(array_map('intval', $savedPaletteIds), static fn(int $id): bool => $id > 0)));
+        if ($savedPaletteIds === [] || !$this->tableExists('playlist_items') || !$this->tableExists('playlist_instances')) {
+            return [];
+        }
+
+        $usesSets = $this->usesPaletteSets();
+        $hasLegacyPhotos = $this->tableExists('saved_palette_photos');
+        $playlistItemHasSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
+        $playlistItemHasPhotoId = $this->columnExists('playlist_items', 'photo_library_id');
+        $playlistItemHasPaletteHash = $this->columnExists('playlist_items', 'palette_hash');
+        $playlistItemHasImageUrl = $this->columnExists('playlist_items', 'image_url');
+        $playlistItemHasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
+        $playlistItemHasFinderStart = $this->columnExists('playlist_items', 'finder_start');
+        $playlistItemHasItemType = $this->columnExists('playlist_items', 'item_type');
+        $playlistItemHasIsActive = $this->columnExists('playlist_items', 'is_active');
+        $instanceHasIsActive = $this->columnExists('playlist_instances', 'is_active');
+        $setPhotosHasPhotoId = $usesSets && $this->columnExists('saved_palette_set_photos', 'photo_library_id');
+        $setPhotosHasRelPath = $usesSets && $this->columnExists('saved_palette_set_photos', 'rel_path');
+        $setPhotosHasPhotoType = $usesSets && $this->columnExists('saved_palette_set_photos', 'photo_type');
+        $legacyPhotosHasPhotoId = $hasLegacyPhotos && $this->columnExists('saved_palette_photos', 'photo_library_id');
+
+        $matches = [];
+        if ($playlistItemHasPaletteHash) {
+            $matches[] = "(sp.palette_hash IS NOT NULL AND sp.palette_hash <> '' AND pi.palette_hash = sp.palette_hash)";
+        }
+        if ($usesSets && $playlistItemHasSetId) {
+            $matches[] = "(sps.id IS NOT NULL AND pi.saved_palette_set_id = sps.id)";
+        }
+        if ($usesSets && $playlistItemHasPhotoId && $setPhotosHasPhotoId) {
+            $matches[] = "(spsp.photo_library_id IS NOT NULL AND pi.photo_library_id = spsp.photo_library_id)";
+        }
+        if ($usesSets && $playlistItemHasImageUrl && $setPhotosHasRelPath) {
+            $matches[] = "(spsp.rel_path IS NOT NULL AND spsp.rel_path <> '' AND pi.image_url = spsp.rel_path)";
+        }
+        if ($hasLegacyPhotos && $playlistItemHasPhotoId && $legacyPhotosHasPhotoId) {
+            $matches[] = "(spp.photo_library_id IS NOT NULL AND pi.photo_library_id = spp.photo_library_id)";
+        }
+
+        if ($matches === []) {
+            return array_fill_keys($savedPaletteIds, []);
+        }
+
+        $params = [];
+        $placeholders = [];
+        foreach ($savedPaletteIds as $index => $id) {
+            $key = ':id' . $index;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+
+        $joins = [];
+        if ($usesSets) {
+            $joins[] = "LEFT JOIN saved_palette_sets sps ON sps.saved_palette_id = sp.id";
+            $joins[] = "LEFT JOIN saved_palette_set_photos spsp ON spsp.saved_palette_set_id = sps.id";
+        } else {
+            $joins[] = "LEFT JOIN (SELECT NULL AS id, NULL AS saved_palette_id) sps ON 1 = 0";
+            $joins[] = "LEFT JOIN (SELECT NULL AS photo_library_id, NULL AS rel_path, NULL AS photo_type) spsp ON 1 = 0";
+        }
+        if ($hasLegacyPhotos) {
+            $joins[] = "LEFT JOIN saved_palette_photos spp ON spp.saved_palette_id = sp.id";
+        } else {
+            $joins[] = "LEFT JOIN (SELECT NULL AS photo_library_id) spp ON 1 = 0";
+        }
+
+        $itemActiveClause = $playlistItemHasIsActive ? 'AND pi.is_active = 1' : '';
+        $instanceActiveClause = $instanceHasIsActive ? 'AND inst.is_active = 1' : '';
+        $analyzerRoleSelect = $playlistItemHasAnalyzerRole ? 'pi.analyzer_role' : 'NULL AS analyzer_role';
+        $finderStartSelect = $playlistItemHasFinderStart ? 'pi.finder_start' : "'auto' AS finder_start";
+        $itemTypeSelect = $playlistItemHasItemType ? 'pi.item_type' : 'NULL AS item_type';
+        $photoTypeMatches = [];
+        if ($playlistItemHasPhotoId && $setPhotosHasPhotoId) {
+            $photoTypeMatches[] = "(spsp.photo_library_id IS NOT NULL AND pi.photo_library_id = spsp.photo_library_id)";
+        }
+        if ($playlistItemHasImageUrl && $setPhotosHasRelPath) {
+            $photoTypeMatches[] = "(spsp.rel_path IS NOT NULL AND spsp.rel_path <> '' AND pi.image_url = spsp.rel_path)";
+        }
+        $photoTypeSelect = ($setPhotosHasPhotoType && $photoTypeMatches !== [])
+            ? 'CASE WHEN ' . implode(' OR ', $photoTypeMatches) . ' THEN spsp.photo_type ELSE NULL END AS photo_type'
+            : 'NULL AS photo_type';
+
+        $sql = "
+            SELECT
+                sp.id AS saved_palette_id,
+                pi.playlist_item_id,
+                pi.playlist_id,
+                pi.order_index,
+                pi.title AS slide_title,
+                {$analyzerRoleSelect},
+                {$finderStartSelect},
+                {$itemTypeSelect},
+                {$photoTypeSelect},
+                inst.playlist_instance_id,
+                inst.instance_name,
+                inst.display_title AS instance_display_title,
+                p.title AS playlist_title
+              FROM saved_palettes sp
+              " . implode("\n              ", $joins) . "
+              JOIN playlist_items pi
+                ON (" . implode(' OR ', $matches) . ")
+               {$itemActiveClause}
+              JOIN playlist_instances inst
+                ON inst.playlist_id = pi.playlist_id
+               {$instanceActiveClause}
+              LEFT JOIN playlists p
+                ON p.playlist_id = pi.playlist_id
+             WHERE sp.id IN (" . implode(',', $placeholders) . ")
+             ORDER BY sp.id, inst.playlist_instance_id, pi.order_index, pi.playlist_item_id
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $grouped = array_fill_keys($savedPaletteIds, []);
+        $bestByInstance = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $paletteId = (int)($row['saved_palette_id'] ?? 0);
+            $instanceId = (int)($row['playlist_instance_id'] ?? 0);
+            $itemId = (int)($row['playlist_item_id'] ?? 0);
+            if ($paletteId <= 0 || $instanceId <= 0 || $itemId <= 0) {
+                continue;
+            }
+
+            $roleText = strtolower(trim(implode(' ', array_filter([
+                (string)($row['analyzer_role'] ?? ''),
+                (string)($row['photo_type'] ?? ''),
+                (string)($row['item_type'] ?? ''),
+                (string)($row['slide_title'] ?? ''),
+            ]))));
+            $isAfter = preg_match('/\bafter\b/', $roleText) === 1;
+            $finderStart = strtolower(trim((string)($row['finder_start'] ?? 'auto')));
+            if (!in_array($finderStart, ['auto', 'this', 'previous'], true)) {
+                $finderStart = 'auto';
+            }
+            $offset = match ($finderStart) {
+                'this' => 0,
+                'previous' => -1,
+                default => $isAfter ? -1 : 0,
+            };
+            $orderIndex = (int)($row['order_index'] ?? 0);
+            $label = trim((string)($row['instance_display_title'] ?? ''))
+                ?: trim((string)($row['instance_name'] ?? ''))
+                ?: trim((string)($row['playlist_title'] ?? ''))
+                ?: ('Playlist #' . $instanceId);
+
+            $entry = [
+                'playlist_instance_id' => $instanceId,
+                'playlist_id' => (int)($row['playlist_id'] ?? 0),
+                'playlist_item_id' => $itemId,
+                'slide_title' => (string)($row['slide_title'] ?? ''),
+                'label' => $label,
+                'offset' => $offset,
+                'finder_start' => $finderStart,
+                'is_after' => $isAfter,
+                'order_index' => $orderIndex,
+                'player_url' => '/playlist/' . rawurlencode((string)$instanceId) . '?slide_id=' . rawurlencode((string)$itemId) . '&offset=' . rawurlencode((string)$offset),
+            ];
+
+            $key = $paletteId . ':' . $instanceId;
+            $existing = $bestByInstance[$key] ?? null;
+            if (
+                $existing === null
+                || ($entry['is_after'] && !$existing['is_after'])
+                || ($entry['is_after'] === $existing['is_after'] && $entry['order_index'] < $existing['order_index'])
+            ) {
+                $bestByInstance[$key] = $entry;
+            }
+        }
+
+        foreach ($bestByInstance as $key => $entry) {
+            [$paletteId] = explode(':', $key, 2);
+            $grouped[(int)$paletteId][] = $entry;
+        }
+
+        foreach ($grouped as &$entries) {
+            usort($entries, static fn(array $a, array $b): int => strcasecmp((string)$a['label'], (string)$b['label']));
+        }
+        unset($entries);
+
+        return $grouped;
+    }
+
     /**
      * Remove all views for a palette.
      */
@@ -940,6 +1123,12 @@ class PdoSavedPaletteRepository
         }
 
         if (!empty($filters['color_family'])) {
+            $familyValue = strtolower(trim((string)$filters['color_family']));
+            $familySingular = preg_replace('/s$/', '', $familyValue);
+            $isNeutralFamily = in_array($familySingular, ['white', 'black', 'gray', 'grey', 'greige', 'beige', 'brown'], true);
+            $familyClause = $isNeutralFamily
+                ? "family_color.neutral_cats LIKE :color_family_neutral"
+                : "family_color.hue_cats LIKE :color_family_hue AND NULLIF(TRIM(COALESCE(family_color.neutral_cats, '')), '') IS NULL";
             $where[] = "
                 EXISTS (
                     SELECT 1
@@ -947,15 +1136,15 @@ class PdoSavedPaletteRepository
                       JOIN swatch_view family_color
                         ON family_color.id = family_members.color_id
                      WHERE family_members.saved_palette_id = p.id
-                       AND (
-                            family_color.hue_cats LIKE :color_family_hue
-                         OR family_color.neutral_cats LIKE :color_family_neutral
-                       )
+                       AND {$familyClause}
                 )
             ";
             $familyLike = '%' . $filters['color_family'] . '%';
-            $params[':color_family_hue'] = $familyLike;
-            $params[':color_family_neutral'] = $familyLike;
+            if ($isNeutralFamily) {
+                $params[':color_family_neutral'] = $familyLike;
+            } else {
+                $params[':color_family_hue'] = $familyLike;
+            }
         }
 
         if (!empty($filters['q'])) {

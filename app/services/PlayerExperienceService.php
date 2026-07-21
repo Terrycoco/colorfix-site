@@ -26,7 +26,8 @@ class PlayerExperienceService
         int $playlistInstanceId,
         ?int $start = null,
         ?string $ctaContext = null,
-        ?int $addCtaGroupId = null
+        ?int $addCtaGroupId = null,
+        ?array $startTarget = null
     ): array {
         $startedAt = microtime(true);
 
@@ -57,7 +58,7 @@ class PlayerExperienceService
         $this->hydrateItemImages($items);
         $this->markTiming('hydrate_items', $itemsStartedAt);
         $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
-        $startIndex = $this->normalizeStartIndex($start, count($items));
+        $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
         $ctaStartedAt = microtime(true);
@@ -134,6 +135,7 @@ class PlayerExperienceService
             'type'                 => $playlist->type,
             'total_items'          => count($items),
             'start_index'          => $startIndex,
+            'start_target'         => $this->startTargetSummary($startTarget, $startIndex),
             'items'                => $items,
             'ctas'                 => $ctas,
             'cta_context_key'      => $instance->ctaContextKey,
@@ -179,6 +181,64 @@ class PlayerExperienceService
             return 0;
         }
         return $start;
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
+    private function resolveStartIndex(array $items, ?int $start, ?array $target): int
+    {
+        $count = count($items);
+        if ($count <= 0) {
+            return 0;
+        }
+
+        $base = null;
+        $target = is_array($target) ? $target : [];
+
+        $playlistItemId = (int)($target['playlist_item_id'] ?? 0);
+        if ($playlistItemId > 0) {
+            foreach ($items as $index => $item) {
+                if ($item instanceof PlaylistItem && (int)($item->playlist_item_id ?? 0) === $playlistItemId) {
+                    $base = $index;
+                    break;
+                }
+            }
+        }
+
+        $photoLibraryId = (int)($target['photo_library_id'] ?? 0);
+        if ($base === null && $photoLibraryId > 0) {
+            foreach ($items as $index => $item) {
+                if ($item instanceof PlaylistItem && (int)($item->photo_library_id ?? 0) === $photoLibraryId) {
+                    $base = $index;
+                    break;
+                }
+            }
+        }
+
+        if ($base === null && array_key_exists('position', $target) && $target['position'] !== null) {
+            // Public "position" is 1-based. Existing "start" remains 0-based.
+            $base = max(0, (int)$target['position'] - 1);
+        }
+
+        if ($base === null) {
+            $base = $this->normalizeStartIndex($start, $count);
+        }
+
+        $offset = (int)($target['offset'] ?? 0);
+        return max(0, min($count - 1, $base + $offset));
+    }
+
+    private function startTargetSummary(?array $target, int $startIndex): array
+    {
+        $target = is_array($target) ? $target : [];
+        return [
+            'start_index' => $startIndex,
+            'offset' => (int)($target['offset'] ?? 0),
+            'position' => isset($target['position']) && $target['position'] !== null ? (int)$target['position'] : null,
+            'playlist_item_id' => isset($target['playlist_item_id']) ? (int)$target['playlist_item_id'] : null,
+            'photo_library_id' => isset($target['photo_library_id']) ? (int)$target['photo_library_id'] : null,
+        ];
     }
 
     /**

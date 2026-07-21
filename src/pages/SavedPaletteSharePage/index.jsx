@@ -17,6 +17,9 @@ export default function SavedPaletteSharePage() {
     const params = new URLSearchParams(window.location.search);
     return params.get("set_id") || "";
   }, []);
+  const backLabel = returnTo.startsWith("/p/") || returnTo.startsWith("/playlist/")
+    ? "Back to Playlist"
+    : "← Back";
   useEffect(() => {
     if (!hash) return;
     const controller = new AbortController();
@@ -73,6 +76,7 @@ export default function SavedPaletteSharePage() {
       swatches={swatches}
       adminMode={false}
       showBackButton={true}
+      backLabel={backLabel}
       onBack={() => {
         if (typeof window !== "undefined") {
           if (returnTo !== "/") {

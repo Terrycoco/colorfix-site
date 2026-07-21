@@ -109,6 +109,60 @@ final class AssetCreatorRunService
         ];
     }
 
+    public function queueYoutubePlaylistVideoJob(int $jobId): array
+    {
+        if ($jobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+
+        $job = $this->creatorRepo->findJob($jobId);
+        if (!$job) {
+            throw new RuntimeException('Asset creator job not found');
+        }
+        if (trim((string)($job['creator_key'] ?? '')) !== self::CREATOR_YOUTUBE_PLAYLIST_VIDEO) {
+            throw new RuntimeException('Creator job is not a YouTube playlist video.');
+        }
+
+        $this->creatorRepo->updateJob($jobId, [
+            'status' => 'queued',
+            'last_run_at' => AppTime::now(),
+        ]);
+
+        $updated = $this->creatorRepo->findJob($jobId);
+        if (!$updated) {
+            throw new RuntimeException('Asset creator job not found after queue.');
+        }
+
+        return [
+            'job' => $updated,
+            'outputs' => $updated['outputs'] ?? [],
+            'queued' => true,
+            'message' => 'Queued for Mac YouTube render worker.',
+            'worker_recipe_path' => $this->projectRoot() . DIRECTORY_SEPARATOR . 'exports' . DIRECTORY_SEPARATOR . 'youtube-worker' . DIRECTORY_SEPARATOR . "job-{$jobId}.json",
+            'worker_output_path' => $this->projectRoot() . DIRECTORY_SEPARATOR . 'exports' . DIRECTORY_SEPARATOR . 'youtube-worker' . DIRECTORY_SEPARATOR . "job-{$jobId}.mp4",
+        ];
+    }
+
+    public function completeYoutubePlaylistVideoJob(int $jobId, string $renderedPath, string $renderSource = 'mac-youtube-render-worker'): array
+    {
+        if ($jobId <= 0) {
+            throw new RuntimeException('asset_creator_job_id required');
+        }
+        if (!is_file($renderedPath)) {
+            throw new RuntimeException('Rendered MP4 file not found.');
+        }
+
+        $job = $this->creatorRepo->findJob($jobId);
+        if (!$job) {
+            throw new RuntimeException('Asset creator job not found');
+        }
+        if (trim((string)($job['creator_key'] ?? '')) !== self::CREATOR_YOUTUBE_PLAYLIST_VIDEO) {
+            throw new RuntimeException('Creator job is not a YouTube playlist video.');
+        }
+
+        return $this->finishYoutubePlaylistVideoJob($job, $renderedPath, $renderSource);
+    }
+
     private function runYoutubePlaylistVideoJob(array $job): array
     {
         $jobId = (int)$job['asset_creator_job_id'];
@@ -155,6 +209,25 @@ final class AssetCreatorRunService
             throw new RuntimeException('YouTube renderer finished but no MP4 was found.');
         }
 
+        return $this->finishYoutubePlaylistVideoJob($job, $renderedPath, 'scripts/render-youtube-video.mjs');
+    }
+
+    private function finishYoutubePlaylistVideoJob(array $job, string $renderedPath, string $renderSource): array
+    {
+        $jobId = (int)$job['asset_creator_job_id'];
+        $playlistId = (int)($job['source_id'] ?? 0);
+        $instructions = $this->decodeJsonObject($job['instructions_json'] ?? null);
+        if ($playlistId <= 0) {
+            $source = is_array($instructions['source'] ?? null) ? $instructions['source'] : [];
+            $playlistId = (int)($source['playlist_id'] ?? 0);
+        }
+        if ($playlistId <= 0) {
+            throw new RuntimeException('YouTube creator job is missing source playlist id.');
+        }
+
+        $previousOutputAssets = $this->outputAssets($job['outputs'] ?? []);
+        $this->assetLibrary->assertAssetsCanBeHardDeleted(array_keys($previousOutputAssets));
+
         $relPath = "/photos/youtube/generated/job-{$jobId}/youtube-video-{$jobId}-playlist-{$playlistId}.mp4";
         $absPath = $this->absolutePathForRelPath($relPath);
         $dir = dirname($absPath);
@@ -178,7 +251,7 @@ final class AssetCreatorRunService
             'description' => $row['description'] ?? $row['caption'] ?? '',
             'slides' => is_array($row['slides'] ?? null) ? $row['slides'] : [],
             'music' => is_array($instructions['music'] ?? null) ? $instructions['music'] : null,
-            'render_source' => 'scripts/render-youtube-video.mjs',
+            'render_source' => $renderSource,
         ];
 
         $asset = $this->assetLibrary->upsertAssetByPath($relPath, [
@@ -229,6 +302,8 @@ final class AssetCreatorRunService
         return [
             'job' => $updated,
             'outputs' => $outputs,
+            'rendered_path' => $renderedPath,
+            'asset_path' => $absPath,
             'deleted_asset_ids' => $deletedAssetIds,
             'deleted_count' => count($deletedAssetIds),
         ];

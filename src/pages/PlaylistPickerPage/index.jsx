@@ -25,6 +25,7 @@ export default function PlaylistPickerPage() {
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [items, setItems] = useState([]);
+  const [currentSetVersion, setCurrentSetVersion] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -39,7 +40,11 @@ export default function PlaylistPickerPage() {
     const params = new URLSearchParams({
       id: String(setId),
     });
-    if (setVersionParam) params.set("v", setVersionParam);
+    if (setVersionParam) {
+      params.set("v", setVersionParam);
+    } else {
+      params.set("_", String(Date.now()));
+    }
     if (ctaAudience) params.set("aud", ctaAudience);
     if (adminExitPath || includePrivateParam === "1") params.set("include_private", "1");
     fetchPlaylistSet(`${SET_URL}?${params.toString()}`)
@@ -50,6 +55,7 @@ export default function PlaylistPickerPage() {
         setTitle(formatTitle(payload.set.title || "Choose a playlist"));
         setSubtitle(formatTitle(payload.set.subtitle || ""));
         setItems(Array.isArray(payload.set.items) ? payload.set.items : []);
+        setCurrentSetVersion(payload.set.version ? String(payload.set.version) : "");
       })
       .catch((err) => {
         setError(err?.message || "Failed to load playlist set");
@@ -75,11 +81,12 @@ export default function PlaylistPickerPage() {
   const buildPlaylistUrl = (tile) => {
     const playlistPath = tile?.player_url || `/playlist/${tile?.playlist_instance_id || ""}`;
     const params = new URLSearchParams();
+    const effectiveSetVersion = setVersionParam || currentSetVersion;
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
-    if (setVersionParam !== "") params.set("set_v", setVersionParam);
+    if (effectiveSetVersion !== "") params.set("set_v", effectiveSetVersion);
     if (sourceParam !== "") params.set("src", sourceParam);
     if (closeParam === "1") params.set("close", "1");
     if (setId) params.set("psi", String(setId));
@@ -104,6 +111,19 @@ export default function PlaylistPickerPage() {
     params.set("psi", String(targetSetId));
     const qs = params.toString();
     return `/picker${qs ? `?${qs}` : ""}`;
+  };
+
+  const buildColorSearchUrl = () => {
+    const params = new URLSearchParams();
+    if (ctaAudience !== "") params.set("aud", ctaAudience);
+    if (demoParam !== "") params.set("demo", demoParam);
+    if (includePrivateParam === "1") params.set("include_private", "1");
+    if (sourceParam !== "") params.set("src", sourceParam);
+    if (setId) params.set("psi", String(setId));
+    const returnTo = buildReturnTo(location, searchParams);
+    if (returnTo) params.set("return_to", returnTo);
+    const qs = params.toString();
+    return `/playlist-color-search${qs ? `?${qs}` : ""}`;
   };
 
   const handleBackToPrevious = () => {
@@ -152,6 +172,9 @@ export default function PlaylistPickerPage() {
               <h1>{title}</h1>
               {subtitle && <p>{subtitle}</p>}
             </div>
+            <Link className="playlist-picker__search-link" to={buildColorSearchUrl()}>
+              Search by Color Family
+            </Link>
           </div>
         </header>
         {!tiles.length && (

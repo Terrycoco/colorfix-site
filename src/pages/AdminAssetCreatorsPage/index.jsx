@@ -37,6 +37,7 @@ const PINTEREST_BOARD = {
 };
 
 const DEFAULT_ANALYZER_DESCRIPTION = "This [house style / room type] was struggling with [problem]. By [what you changed], the eye is now drawn toward [focal point or benefit]. See the complete before-and-after makeover, color palette, and design reasoning.";
+const DEFAULT_YOUTUBE_MUSIC_VOLUME = "0.35";
 
 const EMPTY_SIDE = {
   photo_library_id: "",
@@ -77,10 +78,11 @@ export default function AdminAssetCreatorsPage() {
     default_title: "",
     default_description: DEFAULT_ANALYZER_DESCRIPTION,
     music_asset_library_id: "",
-    music_volume: "0.18",
+    music_volume: DEFAULT_YOUTUBE_MUSIC_VOLUME,
   });
   const [proposal, setProposal] = useState(null);
   const [recipePreview, setRecipePreview] = useState(null);
+  const [renderResult, setRenderResult] = useState(null);
   const [pairs, setPairs] = useState([]);
   const [pinTypeFilter, setPinTypeFilter] = useState("all");
 
@@ -105,10 +107,11 @@ export default function AdminAssetCreatorsPage() {
       default_title: "",
       default_description: DEFAULT_ANALYZER_DESCRIPTION,
       music_asset_library_id: "",
-      music_volume: "0.18",
+      music_volume: DEFAULT_YOUTUBE_MUSIC_VOLUME,
     });
     setEditingJobId(null);
     setProposal(null);
+    setRenderResult(null);
     setPairs([]);
     setPinTypeFilter("all");
     setCreatorModalOpen(true);
@@ -117,7 +120,7 @@ export default function AdminAssetCreatorsPage() {
         default_title: "",
         default_description: DEFAULT_ANALYZER_DESCRIPTION,
         music_asset_library_id: "",
-        music_volume: "0.18",
+        music_volume: DEFAULT_YOUTUBE_MUSIC_VOLUME,
       });
     }
   }, [searchParams]);
@@ -285,14 +288,35 @@ export default function AdminAssetCreatorsPage() {
           default_title: defaults.default_title || "",
           default_description: defaults.default_description || "",
           music_asset_library_id: defaults.music_asset_library_id || "",
-          music_volume: defaults.music_volume || "0.18",
+          music_volume: defaults.music_volume || DEFAULT_YOUTUBE_MUSIC_VOLUME,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to analyze playlist");
-      setProposal(data.item);
+      const nextProposal = data.item;
+      const nextPairs = proposalRows(nextProposal).map(normalizePair);
+      setProposal(nextProposal);
       setRecipePreview(null);
-      setPairs(proposalRows(data.item).map(normalizePair));
+      setRenderResult(null);
+      setPairs(nextPairs);
+      if (isYoutubeCreator(creatorKey)) {
+        if (canRenderYoutubePreviewHere()) {
+          const previewPayload = buildCurrentRecipePayload({
+            proposal: nextProposal,
+            pairs: nextPairs,
+            creatorKey,
+            playlistId,
+          });
+          if (previewPayload) {
+            setStatus("Recipe analyzed. Rendering fresh preview MP4...");
+            await renderPreviewPayload(previewPayload);
+          }
+        } else {
+          setStatus("Recipe analyzed. Click Save Recipe, then run ./yt-preview.sh on this Mac.");
+        }
+      } else {
+        setStatus("Recipe analyzed.");
+      }
     } catch (err) {
       setError(err?.message || "Failed to analyze playlist");
     } finally {
@@ -306,7 +330,6 @@ export default function AdminAssetCreatorsPage() {
       setError("Analyze a playlist before saving the recipe.");
       return null;
     }
-    const isYoutube = isYoutubeCreator(form.creator_key);
     const includedPairs = pairs.filter((pair) => pair.include);
     if (!includedPairs.length) {
       setError("Select at least one pair to save.");
@@ -336,9 +359,11 @@ export default function AdminAssetCreatorsPage() {
       const savedJobId = data.item?.asset_creator_job_id || editingJobId || null;
       setEditingJobId(savedJobId);
       if (showStatus) {
-        setStatus(`Saved creator job #${savedJobId || ""}.`);
+        setStatus(isYoutubeCreator(form.creator_key)
+          ? `Saved YouTube recipe job #${savedJobId || ""}. Run ./yt-preview.sh ${savedJobId || ""} on this Mac to render the preview.`
+          : `Saved creator job #${savedJobId || ""}.`);
       }
-      if (closeModal) {
+      if (closeModal && !isYoutubeCreator(form.creator_key)) {
         setCreatorModalOpen(false);
         setEditingJobId(null);
         setProposal(null);
@@ -354,17 +379,21 @@ export default function AdminAssetCreatorsPage() {
     }
   }
 
-  function buildCurrentRecipePayload() {
-    if (!proposal || !form.playlist_id) {
+  function buildCurrentRecipePayload(overrides = {}) {
+    const activeProposal = overrides.proposal || proposal;
+    const activePairs = overrides.pairs || pairs;
+    const activeCreatorKey = overrides.creatorKey || form.creator_key;
+    const activePlaylistId = overrides.playlistId || form.playlist_id;
+    if (!activeProposal || !activePlaylistId) {
       setError("Analyze a playlist first.");
       return null;
     }
-    const isYoutube = isYoutubeCreator(form.creator_key);
-    const playlist = getSelectedPlaylist(playlists, form.playlist_id) || proposal.playlist || {};
-    const urlReservation = proposal.url_reservation || proposal.instructions?.playlist_instance_url_reservation || null;
+    const isYoutube = isYoutubeCreator(activeCreatorKey);
+    const playlist = getSelectedPlaylist(playlists, activePlaylistId) || activeProposal.playlist || {};
+    const urlReservation = activeProposal.url_reservation || activeProposal.instructions?.playlist_instance_url_reservation || null;
     const finalPlaylistUrl = String(urlReservation?.public_url || "").trim();
-    const music = selectedMusicForRecipe(form, musicAssets, proposal);
-    const reviewedPairs = pairs.map((pair, index) => {
+    const music = selectedMusicForRecipe(form, musicAssets, activeProposal);
+    const reviewedPairs = activePairs.map((pair, index) => {
       const pinType = isYoutube ? "youtube_video" : (pair.pin_type || "composite");
       const title = titleForPinType(pair.search_title || pair.title || "", pinType);
       return {
@@ -378,7 +407,7 @@ export default function AdminAssetCreatorsPage() {
         title,
         caption: pair.description || pair.caption || "",
         pin_type: pinType,
-        asset_type: assetTypeForPinType(pinType, form.creator_key),
+        asset_type: assetTypeForPinType(pinType, activeCreatorKey),
         before: normalizeRecipeSide(pair.before),
         after: normalizeRecipeSide(pair.after),
         asset: normalizeRecipeSide(pinType === "composite" ? (pair.asset || pair.after) : (pair.after || pair.asset)),
@@ -387,17 +416,17 @@ export default function AdminAssetCreatorsPage() {
     });
 
     return {
-      creator_key: form.creator_key,
+      creator_key: activeCreatorKey,
       source_type: "playlist",
-      source_id: Number(form.playlist_id),
-      title: `${creatorLabel(form.creator_key)}: ${playlist.title || proposal.playlist?.title || `Playlist ${form.playlist_id}`}`,
+      source_id: Number(activePlaylistId),
+      title: `${creatorLabel(activeCreatorKey)}: ${playlist.title || activeProposal.playlist?.title || `Playlist ${activePlaylistId}`}`,
       instructions: {
         version: 1,
-        creator_key: form.creator_key,
+        creator_key: activeCreatorKey,
         source: {
           type: "playlist",
-          playlist_id: Number(form.playlist_id),
-          title: playlist.title || proposal.playlist?.title || "",
+          playlist_id: Number(activePlaylistId),
+          title: playlist.title || activeProposal.playlist?.title || "",
           final_playlist_url: finalPlaylistUrl,
           playlist_instance_url_reservation: urlReservation,
           ...(isYoutube ? { music } : {}),
@@ -408,13 +437,13 @@ export default function AdminAssetCreatorsPage() {
           title: form.default_title || "",
           description: form.default_description || "",
           final_playlist_url: finalPlaylistUrl,
-          ...(isYoutube ? { music_asset_library_id: form.music_asset_library_id || "", music_volume: form.music_volume || "0.18" } : {}),
+          ...(isYoutube ? { music_asset_library_id: form.music_asset_library_id || "", music_volume: form.music_volume || DEFAULT_YOUTUBE_MUSIC_VOLUME } : {}),
         },
         ...(isYoutube ? { music } : {}),
         ...(isYoutube ? { video_rows: reviewedPairs } : { pin_rows: reviewedPairs }),
         playlist_instance_url_reservation: urlReservation,
         pairs: reviewedPairs,
-        warnings: proposal.warnings || [],
+        warnings: activeProposal.warnings || [],
       },
       inputs: buildRecipeInputs(reviewedPairs, music),
     };
@@ -428,10 +457,14 @@ export default function AdminAssetCreatorsPage() {
     const payload = buildCurrentRecipePayload();
     if (!payload) return;
 
+    await renderPreviewPayload(payload);
+  }
+
+  async function renderPreviewPayload(payload) {
     setPreviewingRecipe(true);
     setRecipePreview(null);
     setError("");
-    setStatus("");
+    setStatus("Rendering fresh preview MP4...");
     try {
       const res = await fetch(PREVIEW_URL, {
         method: "POST",
@@ -447,7 +480,8 @@ export default function AdminAssetCreatorsPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to preview recipe");
       setRecipePreview(data.preview || null);
-      setStatus("Preview video created.");
+      setRenderResult(null);
+      setStatus("Fresh preview MP4 created at exports/youtube-preview/current/preview.mp4.");
     } catch (err) {
       setError(err?.message || "Failed to preview recipe");
     } finally {
@@ -473,13 +507,18 @@ export default function AdminAssetCreatorsPage() {
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to run creator");
       const outputs = data.item?.outputs || [];
+      setRenderResult(data.item || null);
       if (data.item?.job?.asset_creator_job_id) {
         setJobOutputs((current) => ({
           ...current,
           [data.item.job.asset_creator_job_id]: data.item.job.outputs || outputs,
         }));
       }
-      setStatus(`Created ${outputs.length} asset${outputs.length === 1 ? "" : "s"} from job #${jobId}.`);
+      if (data.item?.queued) {
+        setStatus(data.item.message || `Queued video job #${jobId} for the Mac render worker.`);
+      } else {
+        setStatus(`Created ${outputs.length} asset${outputs.length === 1 ? "" : "s"} from job #${jobId}.`);
+      }
       await fetchJobs(q);
       return data.item || null;
     } catch (err) {
@@ -645,7 +684,7 @@ export default function AdminAssetCreatorsPage() {
         default_title: analyzerDefaults.title,
         default_description: analyzerDefaults.description,
         music_asset_library_id: music?.asset_library_id ? String(music.asset_library_id) : "",
-        music_volume: String(music?.volume ?? analyzerDefaults.music_volume ?? "0.18"),
+        music_volume: String(music?.volume ?? analyzerDefaults.music_volume ?? DEFAULT_YOUTUBE_MUSIC_VOLUME),
       });
       setProposal({
         creator_key: job.creator_key || instructions.creator_key || CREATOR_TYPES[0].value,
@@ -686,9 +725,10 @@ export default function AdminAssetCreatorsPage() {
       default_title: "",
       default_description: DEFAULT_ANALYZER_DESCRIPTION,
       music_asset_library_id: "",
-      music_volume: "0.18",
+      music_volume: DEFAULT_YOUTUBE_MUSIC_VOLUME,
     });
     setProposal(null);
+    setRenderResult(null);
     setPairs([]);
     setPinTypeFilter("all");
     setCreatorModalOpen(true);
@@ -971,11 +1011,11 @@ export default function AdminAssetCreatorsPage() {
                 <CopyTextField
                   label="Final Playlist URL"
                   value={finalPlaylistUrl}
-                  placeholder="Click Analyze to reserve the future instance URL"
+                  placeholder="Click Analyze Recipe to reserve the future instance URL"
                   onCopy={(value) => copyText(value, "Final Playlist URL", setStatus)}
                 />
                 <button type="submit" className="assetcreator-command assetcreator-command--primary" disabled={analyzing}>
-                  {analyzing ? "Analyzing..." : "Analyze"}
+                  {analyzing ? "Analyzing Recipe..." : "Analyze Recipe"}
                 </button>
                 <button type="button" className="assetcreator-command" onClick={fetchPlaylists} disabled={loadingPlaylists}>
                   Refresh Playlists
@@ -1049,14 +1089,20 @@ export default function AdminAssetCreatorsPage() {
                       Add Row
                     </button>
                     {isYoutubeCreator(form.creator_key) ? (
-                      <button
-                        type="button"
-                        className="assetcreator-command"
-                        onClick={previewRecipe}
-                        disabled={previewingRecipe || savingRecipe || !!runningJobId}
-                      >
-                        {previewingRecipe ? "Previewing..." : "Preview Video"}
-                      </button>
+                      canRenderYoutubePreviewHere() ? (
+                        <button
+                          type="button"
+                          className="assetcreator-command"
+                          onClick={previewRecipe}
+                          disabled={previewingRecipe || savingRecipe || !!runningJobId}
+                        >
+                          {previewingRecipe ? "Rendering Preview..." : "Render Preview MP4"}
+                        </button>
+                      ) : (
+                        <span className="assetcreator-command assetcreator-command--disabled">
+                          Preview on Mac after Save
+                        </span>
+                      )
                     ) : null}
                     <button
                       type="button"
@@ -1082,6 +1128,22 @@ export default function AdminAssetCreatorsPage() {
                     {proposal.warnings.join(" ")}
                   </div>
                 ) : null}
+                {isYoutubeCreator(form.creator_key) && editingJobId ? (
+                  <div className="assetcreator-preview-result">
+                    <div>
+                      <strong>Render preview on Mac</strong>
+                      <span>Run this from /Users/terrymarr/ColorFix/colorfix-site</span>
+                    </div>
+                    <input value={`./yt-preview.sh ${editingJobId}`} readOnly />
+                    <button
+                      type="button"
+                      className="assetcreator-mini"
+                      onClick={() => copyText(`./yt-preview.sh ${editingJobId}`, "Mac preview command", setStatus)}
+                    >
+                      Copy Command
+                    </button>
+                  </div>
+                ) : null}
                 {recipePreview ? (
                   <div className="assetcreator-preview-result">
                     <div>
@@ -1092,12 +1154,33 @@ export default function AdminAssetCreatorsPage() {
                       </span>
                     </div>
                     <input value={recipePreview.local_path || ""} readOnly />
+                    <button
+                      type="button"
+                      className="assetcreator-mini"
+                      onClick={() => copyText(recipePreview.local_path || "", "preview file path", setStatus)}
+                      disabled={!recipePreview.local_path}
+                    >
+                      Copy Path
+                    </button>
                     {recipePreview.open_url ? (
                       <a className="assetcreator-mini assetcreator-mini-link" href={recipePreview.open_url} target="_blank" rel="noreferrer">
                         Open
                       </a>
                     ) : null}
                   </div>
+                ) : isYoutubeCreator(form.creator_key) && proposal ? (
+                  <div className="assetcreator-preview-result assetcreator-preview-result--stale">
+                    <div>
+                      <strong>No fresh preview MP4 yet</strong>
+                      <span>Analyze Recipe does not write the video file. Render Preview MP4 overwrites exports/youtube-preview/current/preview.mp4.</span>
+                    </div>
+                  </div>
+                ) : null}
+                {renderResult ? (
+                  <RenderPathResult
+                    result={renderResult}
+                    onCopy={(value, label) => copyText(value, label, setStatus)}
+                  />
                 ) : null}
 
                 <div className="assetcreator-grid-wrap assetcreator-grid-wrap--proposal">
@@ -1192,7 +1275,7 @@ export default function AdminAssetCreatorsPage() {
               </section>
             ) : (
               <div className="assetcreator-modal-empty">
-                Pick a channel and playlist, then click Analyze.
+                Pick a channel and playlist, then click Analyze Recipe.
               </div>
             )}
           </div>
@@ -1384,6 +1467,11 @@ function isYoutubeCreator(creatorKey) {
   return String(creatorKey || "").trim() === "youtube.playlist_video";
 }
 
+function canRenderYoutubePreviewHere() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname !== "colorfix.terrymarr.com";
+}
+
 function platformForCreator(creatorKey) {
   const configured = CREATOR_TYPES.find((type) => type.value === creatorKey);
   if (configured?.channel) return configured.channel;
@@ -1462,6 +1550,52 @@ function CopyTextField({ label, value, placeholder = "", onCopy }) {
   );
 }
 
+function RenderPathResult({ result, onCopy }) {
+  const outputs = Array.isArray(result?.outputs) ? result.outputs : [];
+  const firstOutput = outputs[0] || {};
+  const pathRows = [
+    {
+      label: result?.queued ? "Worker will create" : "Rendered file",
+      value: result?.queued ? result.worker_output_path : (result?.rendered_path || ""),
+    },
+    {
+      label: "Worker recipe",
+      value: result?.worker_recipe_path || "",
+    },
+    {
+      label: "Final uploaded asset",
+      value: result?.asset_path || firstOutput.rel_path || "",
+    },
+    {
+      label: "Public video URL",
+      value: firstOutput.public_url || "",
+    },
+  ].filter((row) => String(row.value || "").trim());
+
+  if (!pathRows.length) return null;
+
+  return (
+    <div className="assetcreator-path-result">
+      <strong>{result?.queued ? "Video queued" : "Video file"}</strong>
+      {pathRows.map((row) => (
+        <label key={row.label}>
+          <span>{row.label}</span>
+          <span className="assetcreator-path-result__control">
+            <input value={row.value} readOnly />
+            <button
+              type="button"
+              className="assetcreator-mini"
+              onClick={() => onCopy(row.value, row.label)}
+            >
+              Copy
+            </button>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function parseInstructions(value) {
   if (!value) return {};
   if (typeof value === "object") return value;
@@ -1481,7 +1615,7 @@ function analyzerDefaultsFromInstructions(instructions = {}, pairs = []) {
     return {
       title,
       description: description || DEFAULT_ANALYZER_DESCRIPTION,
-      music_volume: defaults.music_volume || "0.18",
+      music_volume: defaults.music_volume || DEFAULT_YOUTUBE_MUSIC_VOLUME,
     };
   }
 
@@ -1494,7 +1628,7 @@ function analyzerDefaultsFromInstructions(instructions = {}, pairs = []) {
         || firstPair.caption
         || DEFAULT_ANALYZER_DESCRIPTION
     ).trim(),
-    music_volume: defaults.music_volume || "0.18",
+    music_volume: defaults.music_volume || DEFAULT_YOUTUBE_MUSIC_VOLUME,
   };
 }
 
@@ -1510,7 +1644,7 @@ function musicFromInstructions(instructions = {}) {
     rel_path: music.rel_path || "",
     public_url: publicUrl,
     mime_type: music.mime_type || "",
-    volume: Number.isFinite(Number(music.volume)) ? Number(music.volume) : 0.18,
+    volume: Number.isFinite(Number(music.volume)) ? Number(music.volume) : Number(DEFAULT_YOUTUBE_MUSIC_VOLUME),
   };
 }
 
@@ -1544,7 +1678,7 @@ function selectedMusicForRecipe(form, musicAssets = [], proposal = {}) {
 
 function normalizedMusicVolume(value) {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0.18;
+  if (!Number.isFinite(numeric)) return Number(DEFAULT_YOUTUBE_MUSIC_VOLUME);
   return Math.max(0, Math.min(1, numeric));
 }
 

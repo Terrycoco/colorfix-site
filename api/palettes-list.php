@@ -57,6 +57,7 @@ if ($withAll !== '') {
         SELECT 1 FROM palette_members pmN{$i}
         JOIN clusters clN{$i} ON clN{$i}.id = pmN{$i}.member_cluster_id
         WHERE pmN{$i}.palette_id = p.id
+          AND (clN{$i}.neutral_cats IS NULL OR clN{$i}.neutral_cats = '')
           AND LOWER(COALESCE(clN{$i}.hue_cats,'')) LIKE {$ph}
       )";
     }

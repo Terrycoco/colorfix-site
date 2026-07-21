@@ -63,6 +63,7 @@ try {
     $hasYt = columnExists($pdo, 'playlist_items', 'yt');
     $hasPin = columnExists($pdo, 'playlist_items', 'pin');
     $hasAnalyzerRole = columnExists($pdo, 'playlist_items', 'analyzer_role');
+    $hasFinderStart = columnExists($pdo, 'playlist_items', 'finder_start');
     $selectedShareIndex = null;
     foreach ($items as $idx => $candidate) {
         $candidateHasPhoto = (
@@ -119,6 +120,10 @@ try {
             $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
             $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single'], true) ? $role : 'ignore';
         }
+        if ($hasFinderStart) {
+            $finderStart = strtolower(trim((string)($item['finder_start'] ?? 'auto')));
+            $data['finder_start'] = in_array($finderStart, ['auto', 'this', 'previous'], true) ? $finderStart : 'auto';
+        }
         if ($hasExcludeFromThumbs) {
             $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
         }
@@ -160,6 +165,7 @@ try {
             'yt',
             'pin',
             'analyzer_role',
+            'finder_start',
         ];
         if (!$hasPhotoLibraryId) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
@@ -181,6 +187,9 @@ try {
         }
         if (!$hasAnalyzerRole) {
             $columns = array_values(array_filter($columns, fn($col) => $col !== 'analyzer_role'));
+        }
+        if (!$hasFinderStart) {
+            $columns = array_values(array_filter($columns, fn($col) => $col !== 'finder_start'));
         }
         if ($hasExcludeFromThumbs) {
             $columns[] = 'exclude_from_thumbs';

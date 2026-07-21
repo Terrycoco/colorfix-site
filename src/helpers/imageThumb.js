@@ -1,4 +1,4 @@
-import { API_FOLDER } from "./config";
+import { API_FOLDER } from "./config.js";
 
 export function photoThumbUrl(photoLibraryId, width = 480, quality = 72, cacheKey = "") {
   const id = Number(photoLibraryId || 0);

@@ -44,6 +44,8 @@ export function normalizeLinkAssetItems(assetType, rows) {
         title: row?.title ?? row?.name ?? "",
         handle: row?.handle ?? row?.slug ?? "",
         context: row?.context ?? row?.subtitle ?? "",
+        version: row?.version ?? "",
+        updated_at: row?.updated_at ?? "",
       }))
       .filter((row) => row.id);
   }
@@ -142,7 +144,9 @@ export function buildLinkAssetUrl(assetType, item) {
 
   if (assetType === "playlist_instance_set") {
     if (!item.id) return "";
-    return `${window.location.origin}/picker?psi=${encodeURIComponent(String(item.id))}`;
+    const params = new URLSearchParams({ psi: String(item.id) });
+    if (item.version) params.set("set_v", String(item.version));
+    return `${window.location.origin}/picker?${params.toString()}`;
   }
 
   const relativeUrl = item.player_url || "/watch";
