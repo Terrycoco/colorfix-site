@@ -69,25 +69,6 @@ try {
     $stmt = $pdo->prepare("DELETE FROM mask_blend_settings WHERE photo_id = ? AND mask_role = ?");
     $stmt->execute([$photoId, $maskRole]);
 
-    $stmt = $pdo->prepare("
-        DELETE ape
-        FROM applied_palette_entries ape
-        JOIN applied_palettes ap ON ap.id = ape.applied_palette_id
-        WHERE ap.asset_id = ?
-          AND ape.mask_role = ?
-    ");
-    $stmt->execute([$assetId, $maskRole]);
-
-    $stmt = $pdo->prepare("
-        UPDATE applied_palettes
-        SET needs_rerender = 1, updated_at = NOW()
-        WHERE asset_id = ?
-    ");
-    $stmt->execute([$assetId]);
-
-    $stmt = $pdo->prepare("DELETE FROM hoa_scheme_mask_maps WHERE asset_id = ? AND mask_role = ?");
-    $stmt->execute([$assetId, $maskRole]);
-
     $pdo->commit();
 
     $docRoot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 3), '/');

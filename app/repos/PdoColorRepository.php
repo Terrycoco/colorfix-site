@@ -103,6 +103,7 @@ public function insertColor(array $fields): int
         // In insertColor(), extend the whitelist:
         $allowed = [
             'name','brand','code','chip_num',
+            'lrv',
             'hex6','hex','r','g','b',
             'lab_l','lab_a','lab_b',
             'hcl_l','hcl_c','hcl_h',
@@ -159,7 +160,9 @@ public function insertColor(array $fields): int
 
         foreach ($data as $k => $v) {
             // ints for r,g,b; strings elsewhere; floats ok as strings (MySQL coerces)
-            if (in_array($k, ['r','g','b','exterior','interior','is_inactive'], true)) {
+            if ($v === null) {
+                $st->bindValue(":$k", null, \PDO::PARAM_NULL);
+            } elseif (in_array($k, ['r','g','b','exterior','interior','is_inactive'], true)) {
                 $st->bindValue(":$k", (int)$v, \PDO::PARAM_INT);
             } else {
                 $st->bindValue(":$k", $v, \PDO::PARAM_STR);
@@ -176,6 +179,7 @@ public function updateColor(int $id, array $fields): void
 // In updateColor(), extend the whitelist:
 $allowed = [
     'name','brand','code','chip_num',
+    'lrv',
     'hex6','r','g','b',
     'lab_l','lab_a','lab_b',
     'hcl_l','hcl_c','hcl_h',
@@ -209,6 +213,10 @@ $allowed = [
     $st->bindValue(':id', $id, \PDO::PARAM_INT);
 
     foreach ($data as $k => $v) {
+        if ($v === null) {
+            $st->bindValue(":$k", null, \PDO::PARAM_NULL);
+            continue;
+        }
         $param = in_array($k, ['r','g','b','exterior','interior','is_inactive'], true)
             ? \PDO::PARAM_INT
             : \PDO::PARAM_STR;

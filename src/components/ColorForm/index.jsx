@@ -13,6 +13,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
   const [form, setForm] = useState({
     id:'', name:'', brand:'', code:'',
     hex6:'', r:'', g:'', b:'',
+    lrv:'',
     lab_l:'', lab_a:'', lab_b:'',
     chip_num:'',       // editable
     cluster_id:'',     // read-only
@@ -36,6 +37,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
       r:          toNum(currentColorDetail.r),
       g:          toNum(currentColorDetail.g),
       b:          toNum(currentColorDetail.b),
+      lrv:        currentColorDetail.lrv ?? '',
       lab_l:      currentColorDetail.lab_l ?? '',
       lab_a:      currentColorDetail.lab_a ?? '',
       lab_b:      currentColorDetail.lab_b ?? '',
@@ -75,6 +77,13 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
       const v = String(form[k]).trim();
       if (v !== '' && !Number.isNaN(Number(v))) body[k] = Number(v);
     });
+
+    if (String(form.lrv).trim() !== '') {
+      const v = Number(form.lrv);
+      if (!Number.isNaN(v)) body.lrv = v;
+    } else if (form.id) {
+      body.lrv = null;
+    }
 
     // optional LAB overrides (usually omit)
     ['lab_l','lab_a','lab_b'].forEach(k => {
@@ -127,6 +136,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
     setForm({
       id:'', name:'', brand:'', code:'',
       hex6:'', r:'', g:'', b:'',
+      lrv:'',
       lab_l:'', lab_a:'', lab_b:'',
       chip_num:'', cluster_id:'',
       exterior: true,
@@ -163,7 +173,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
           <label className="cf-label">
             <span className="cf-tag">Code</span>
             <input className="cf-input" placeholder="PPG1013-5"
-                   value={form.code} onChange={e=>setField('code', e.target.value)} />
+                   value={form.code} onChange={e=>setField('code', e.target.value.toUpperCase())} />
           </label>
         </div>
 
@@ -198,6 +208,13 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
           ))}
         </div>
 
+        <label className="cf-label">
+          <span className="cf-tag">LRV</span>
+          <input className="cf-input" type="number" min="0" max="100" step="0.01"
+                 placeholder="optional"
+                 value={form.lrv} onChange={e=>setField('lrv', e.target.value)} />
+        </label>
+
         <div className="cf-grid-3">
           {['lab_l','lab_a','lab_b'].map(k=>(
             <label key={k} className="cf-label">
@@ -212,7 +229,7 @@ const ColorForm = forwardRef(function ColorForm(_, ref) {
           <label className="cf-label">
             <span className="cf-tag">Chip #</span>
             <input className="cf-input" placeholder="optional"
-                   value={form.chip_num} onChange={e=>setField('chip_num', e.target.value)} />
+                   value={form.chip_num} onChange={e=>setField('chip_num', e.target.value.toUpperCase())} />
           </label>
 
           <label className="cf-label">

@@ -28,7 +28,7 @@ try {
             k.created_at,
             k.updated_at,
             (SELECT COUNT(*) FROM saved_palettes sp WHERE sp.kicker_id = k.kicker_id) AS saved_count,
-            (SELECT COUNT(*) FROM applied_palettes ap WHERE ap.kicker_id = k.kicker_id) AS applied_count,
+            0 AS applied_count,
             (SELECT COUNT(*) FROM playlist_instances pi WHERE pi.kicker_id = k.kicker_id) AS playlist_instance_count
         FROM kickers k
         ORDER BY k.sort_order ASC, k.display_text ASC

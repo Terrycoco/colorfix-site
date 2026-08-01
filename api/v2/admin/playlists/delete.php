@@ -94,6 +94,22 @@ try {
     );
     $stmt->execute(['playlist_id' => $playlistId]);
 
+    if (columnExists($pdo, 'playlist_instance_set_items', 'playlist_id')) {
+        $stmt = $pdo->prepare('DELETE FROM playlist_instance_set_items WHERE playlist_id = :playlist_id');
+        $stmt->execute(['playlist_id' => $playlistId]);
+    }
+
+    if (columnExists($pdo, 'playlist_instance_set_items', 'playlist_instance_id')) {
+        $stmt = $pdo->prepare(
+            'DELETE psi
+               FROM playlist_instance_set_items psi
+               JOIN playlist_instances pi
+                 ON pi.playlist_instance_id = psi.playlist_instance_id
+              WHERE pi.playlist_id = :playlist_id'
+        );
+        $stmt->execute(['playlist_id' => $playlistId]);
+    }
+
     $pdo->commit();
     respond([
         'ok' => true,

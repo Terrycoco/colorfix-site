@@ -66,7 +66,13 @@ final class PdoSwatchRepository implements SwatchRepository
         $limit = max(1, (int)$limit);
         $limitPlusOne = $limit + 1;
         $prefix = $term . '%';
-        $hexPrefix = ltrim($term, '#') . '%';
+        $codeDelimitedPrefix = $term . '-%';
+        $hexTerm = ltrim($term, '#');
+        $hexPrefix = (str_starts_with($term, '#') || strlen($hexTerm) >= 3) ? $hexTerm . '%' : '__NO_HEX_MATCH__';
+        $codeCompact = str_replace(['-', ' '], '', $term);
+        $codeAfterLettersPattern = ctype_digit($codeCompact) && strlen($codeCompact) >= 3
+            ? '^[A-Za-z]+' . preg_quote($codeCompact, '/') . '$'
+            : '__NO_ALPHA_PREFIX_CODE_MATCH__';
 
         $sql = "
             SELECT
@@ -112,16 +118,42 @@ final class PdoSwatchRepository implements SwatchRepository
                   WHERE is_inactive = 0 AND code = :exact_code_filter
                   LIMIT {$limitPlusOne}
                 ) exact_code_matches
+
+                UNION
+
+                SELECT id FROM (
+                  SELECT id
+                  FROM colors
+                  WHERE is_inactive = 0 AND code LIKE :delimited_code_filter
+                  ORDER BY code
+                  LIMIT {$limitPlusOne}
+                ) delimited_code_matches
+
+                UNION
+
+                SELECT id FROM (
+                  SELECT id
+                  FROM colors
+                  WHERE is_inactive = 0
+                    AND (
+                      REPLACE(REPLACE(code, '-', ''), ' ', '') = :compact_code_filter
+                      OR REPLACE(REPLACE(code, '-', ''), ' ', '') REGEXP :code_after_letters_filter
+                    )
+                  ORDER BY code
+                  LIMIT {$limitPlusOne}
+                ) normalized_code_matches
               ) candidates
             )
             ORDER BY
               CASE
                 WHEN c.code = :exact_code THEN 0
-                WHEN c.name = :exact_name THEN 1
-                WHEN c.name LIKE :prefix_name_order THEN 2
-                WHEN c.hex6 LIKE :prefix_hex_order THEN 3
-                WHEN c.code LIKE :prefix_code_order THEN 4
-                ELSE 5
+                WHEN c.code LIKE :delimited_code_order THEN 1
+                WHEN REPLACE(REPLACE(c.code, '-', ''), ' ', '') = :compact_code_order THEN 2
+                WHEN c.name = :exact_name THEN 3
+                WHEN c.name LIKE :prefix_name_order THEN 4
+                WHEN c.hex6 LIKE :prefix_hex_order THEN 5
+                WHEN REPLACE(REPLACE(c.code, '-', ''), ' ', '') REGEXP :code_after_letters_order THEN 6
+                ELSE 8
               END,
               c.name,
               co.name ASC
@@ -133,11 +165,16 @@ final class PdoSwatchRepository implements SwatchRepository
             'prefix_name' => $prefix,
             'prefix_hex' => $hexPrefix,
             'exact_code_filter' => $term,
+            'delimited_code_filter' => $codeDelimitedPrefix,
+            'compact_code_filter' => $codeCompact,
+            'code_after_letters_filter' => $codeAfterLettersPattern,
             'exact_code' => $term,
             'exact_name' => $term,
             'prefix_name_order' => $prefix,
             'prefix_hex_order' => $hexPrefix,
-            'prefix_code_order' => $prefix,
+            'delimited_code_order' => $codeDelimitedPrefix,
+            'compact_code_order' => $codeCompact,
+            'code_after_letters_order' => $codeAfterLettersPattern,
         ]);
 
         $rows    = $stmt->fetchAll(PDO::FETCH_ASSOC);

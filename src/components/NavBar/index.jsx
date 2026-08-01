@@ -83,13 +83,6 @@ function NavBar() {
                 { label: 'Saved Palettes', path: '/admin/saved-palettes' },
               ],
             },
-            {
-              label: 'HOA',
-              items: [
-                { label: 'HOAs', path: '/admin/hoas' },
-                { label: 'Scheme Tester', path: '/admin/hoa-scheme-tester' },
-              ],
-            },
           ]
         }]
       : []),

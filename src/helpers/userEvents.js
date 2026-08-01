@@ -3,7 +3,61 @@ import { isAdmin } from "@helpers/authHelper";
 
 const TRACK_URL = `${API_FOLDER}/v2/user-events/track.php`;
 const SESSION_KEY = "cf_user_event_session_id";
+const INTERNAL_VIEWER_KEY = "cf_internal_viewer";
 const SOURCE_PARAM_KEY = "src";
+
+function readCookie(name) {
+  if (typeof document === "undefined") return "";
+  const prefix = `${name}=`;
+  return (
+    document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(prefix))
+      ?.slice(prefix.length) || ""
+  );
+}
+
+function setInternalViewerCookie() {
+  if (typeof document === "undefined") return;
+  const securePart = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${INTERNAL_VIEWER_KEY}=1; Max-Age=31536000; path=/; SameSite=Lax${securePart}`;
+}
+
+function shouldMarkInternalFromUrl() {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("cf_internal") || params.get("internal_viewer") || "";
+    const value = raw.trim().toLowerCase();
+    return value === "1" || value === "true" || value === "yes";
+  } catch {
+    return false;
+  }
+}
+
+export function markInternalViewer() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(INTERNAL_VIEWER_KEY, "1");
+  } catch {}
+  setInternalViewerCookie();
+}
+
+export function isInternalViewer() {
+  if (typeof window === "undefined") return false;
+  if (isAdmin() || shouldMarkInternalFromUrl()) {
+    markInternalViewer();
+    return true;
+  }
+  try {
+    const stored = window.localStorage.getItem(INTERNAL_VIEWER_KEY) || "";
+    if (stored === "1" || stored.toLowerCase() === "true" || stored.toLowerCase() === "yes") {
+      return true;
+    }
+  } catch {}
+  return readCookie(INTERNAL_VIEWER_KEY) === "1";
+}
 
 function generateSessionId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -68,7 +122,8 @@ export function trackCtaOnclickEvent({ cta, data, allowInternalTracking = true }
 
 export function trackUserEvent(payload) {
   if (typeof window === "undefined") return;
-  if (isAdmin() && !payload?.allow_internal_tracking) return;
+  const internalViewer = isInternalViewer();
+  if (internalViewer && !payload?.allow_internal_tracking) return;
 
   let source = payload?.source || "";
   if (!source) {
@@ -90,7 +145,7 @@ export function trackUserEvent(payload) {
     session_id: payload?.session_id || getUserEventSessionId(),
     referrer: payload?.referrer || document.referrer || "",
     user_agent: payload?.user_agent || navigator.userAgent || "",
-    is_internal: payload?.is_internal ?? isAdmin(),
+    is_internal: payload?.is_internal ?? internalViewer,
   };
 
   const json = JSON.stringify(body);

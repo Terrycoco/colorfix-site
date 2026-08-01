@@ -159,21 +159,7 @@ final class PhotosUploadService
 
     private function flagAppliedPalettesForMask(string $assetId, string $maskRole): void
     {
-        try {
-            $stmt = $this->pdo->prepare("
-                UPDATE applied_palettes ap
-                JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
-                SET ap.needs_rerender = 1, ap.updated_at = NOW()
-                WHERE ap.asset_id = :asset_id
-                  AND ape.mask_role = :mask_role
-            ");
-            $stmt->execute([
-                ':asset_id' => $assetId,
-                ':mask_role' => $maskRole,
-            ]);
-        } catch (\Throwable $e) {
-            // Non-fatal: uploading masks should not fail if rerender flagging does.
-        }
+        // Legacy applied palettes have been removed.
     }
 
     /** Save a texture overlay into textures/overlay.<ext> */

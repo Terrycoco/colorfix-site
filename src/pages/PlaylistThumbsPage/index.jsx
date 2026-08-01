@@ -202,9 +202,8 @@ export default function PlaylistThumbsPage() {
                 params.set("set_id", String(palette.saved_palette_set_id));
               }
               const qs = params.toString();
-              const href = palette.palette_hash
-                ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
-                : `/view/${palette.ap_id}${qs ? `?${qs}` : ""}`;
+              if (!palette.palette_hash) return null;
+              const href = `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`;
               return (
                 <a
                   key={cardKey}

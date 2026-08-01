@@ -9,7 +9,6 @@ require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoAppliedPalettePhotoRepository;
 
 function respond(int $code, array $payload): void {
     http_response_code($code);
@@ -166,12 +165,6 @@ try {
             $photo = $savedRepo->getPhotoById($sourceId);
             if ($photo) {
                 $savedRepo->updatePhoto($sourceId, (int)$photo['saved_palette_id'], ['rel_path' => $newRelPath]);
-            }
-        } elseif ($sourceType === 'applied_palette_photo' || $sourceType === 'applied_before') {
-            $appliedRepo = new PdoAppliedPalettePhotoRepository($pdo);
-            $photo = $appliedRepo->getPhotoById($sourceId);
-            if ($photo) {
-                $appliedRepo->updatePhoto($sourceId, (int)$photo['applied_palette_id'], ['rel_path' => $newRelPath]);
             }
         }
     }

@@ -111,8 +111,7 @@ export default function AdminPalettePhotosPage() {
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
 
-  const isApplied = typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("type") === "applied";
+  const isApplied = false;
   const requestedViewerSetId = useMemo(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);

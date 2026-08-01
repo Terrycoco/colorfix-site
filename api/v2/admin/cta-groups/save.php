@@ -9,8 +9,6 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Repos\PdoAudienceTypeRepository;
-
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_SLASHES);
@@ -31,15 +29,6 @@ $id = isset($payload['id']) ? (int)$payload['id'] : 0;
 $key = trim((string)($payload['key'] ?? ''));
 $label = trim((string)($payload['label'] ?? ''));
 $description = $payload['description'] ?? null;
-$audienceRaw = trim((string)($payload['audience'] ?? ''));
-$audienceRepo = new PdoAudienceTypeRepository($pdo);
-$audience = strtolower($audienceRaw);
-if ($audience === '') {
-    $audience = (string)($audienceRepo->getFallbackKey(['homeowner', 'any']) ?? '');
-}
-if (!$audienceRepo->isAllowedKey($audience)) {
-    respond(['ok' => false, 'error' => 'Invalid audience'], 400);
-}
 
 if ($key === '') {
     respond(['ok' => false, 'error' => 'key required'], 400);
@@ -54,8 +43,7 @@ try {
           UPDATE cta_groups
           SET `key` = :key,
               label = :label,
-              description = :description,
-              audience = :audience
+              description = :description
           WHERE id = :id
 SQL;
         $stmt = $pdo->prepare($sql);
@@ -64,19 +52,17 @@ SQL;
             'key' => $key,
             'label' => $label,
             'description' => $description,
-            'audience' => $audience,
         ]);
     } else {
         $sql = <<<SQL
-          INSERT INTO cta_groups (`key`, label, description, audience)
-          VALUES (:key, :label, :description, :audience)
+          INSERT INTO cta_groups (`key`, label, description)
+          VALUES (:key, :label, :description)
 SQL;
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
             'key' => $key,
             'label' => $label,
             'description' => $description,
-            'audience' => $audience,
         ]);
         $id = (int)$pdo->lastInsertId();
     }

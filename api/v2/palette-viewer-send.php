@@ -8,9 +8,7 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 
 use App\Lib\SmtpMailer;
-use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Services\EmailTemplateService;
 use App\Services\SavedPaletteService;
 use App\Services\ShareService;
 
@@ -31,8 +29,8 @@ try {
     }
 
     $source = strtolower(trim((string)($payload['source'] ?? '')));
-    if (!in_array($source, ['applied', 'saved'], true)) {
-        respond(['ok' => false, 'error' => 'source must be applied or saved'], 400);
+    if ($source !== 'saved') {
+        respond(['ok' => false, 'error' => 'source must be saved'], 400);
     }
 
     $toEmail = trim((string)($payload['to_email'] ?? ''));
@@ -70,49 +68,7 @@ try {
         respond(['ok' => true]);
     }
 
-    $paletteId = isset($payload['id']) ? (int)$payload['id'] : 0;
-    if ($paletteId <= 0) {
-        respond(['ok' => false, 'error' => 'palette id required'], 400);
-    }
-
-    $paletteRepo = new PdoAppliedPaletteRepository($pdo);
-    $palette = $paletteRepo->findById($paletteId);
-    if (!$palette) {
-        respond(['ok' => false, 'error' => 'Palette not found'], 404);
-    }
-
-    $shareUrl = $shareService->resolveShareUrl('applied_palette', $palette->id, $shareUrl);
-
-    $uniqueEntries = [];
-    foreach ($palette->entries as $entry) {
-        $key = $entry['color_id'] ?? null;
-        if (!$key) {
-            $key = ($entry['color_hex6'] ?? '') . '_' . ($entry['color_name'] ?? '');
-        }
-        if (isset($uniqueEntries[$key])) continue;
-        $uniqueEntries[$key] = [
-            'color_name' => $entry['color_name'] ?? null,
-            'color_code' => $entry['color_code'] ?? null,
-            'color_brand' => $entry['color_brand'] ?? null,
-            'color_hex6' => $entry['color_hex6'] ?? null,
-        ];
-    }
-
-    $emailSvc = new EmailTemplateService();
-    $paletteMeta = [
-        'nickname' => $palette->displayTitle ?? $palette->title ?? ('Palette #' . $palette->id),
-    ];
-    [$finalSubject, $htmlBody, $textBody] = $emailSvc->renderPaletteEmail(
-        $paletteMeta,
-        array_values($uniqueEntries),
-        $shareUrl,
-        $message !== '' ? $message : null,
-        $subject !== '' ? $subject : null
-    );
-
-    $mailer->send($toEmail, $finalSubject, $htmlBody, $textBody);
-
-    respond(['ok' => true, 'share_url' => $shareUrl]);
+    respond(['ok' => false, 'error' => 'source must be saved'], 400);
 } catch (InvalidArgumentException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);
 } catch (Throwable $e) {

@@ -32,13 +32,12 @@ try {
     $usageSql = <<<SQL
         SELECT
             (SELECT COUNT(*) FROM saved_palettes sp WHERE sp.kicker_id = :id1) AS saved_count,
-            (SELECT COUNT(*) FROM applied_palettes ap WHERE ap.kicker_id = :id2) AS applied_count,
+            0 AS applied_count,
             (SELECT COUNT(*) FROM playlist_instances pi WHERE pi.kicker_id = :id3) AS playlist_instance_count
     SQL;
     $usageStmt = $pdo->prepare($usageSql);
     $usageStmt->execute([
         ':id1' => $kickerId,
-        ':id2' => $kickerId,
         ':id3' => $kickerId,
     ]);
     $usage = $usageStmt->fetch(PDO::FETCH_ASSOC) ?: [];

@@ -20,7 +20,6 @@ final class ShareService
         return match ($type) {
             'playlist_instance' => $this->buildPlaylistInstancePath((int)$assetRef, $options),
             'saved_palette' => $this->buildSavedPalettePath($assetRef, $options),
-            'applied_palette' => $this->buildAppliedPalettePath((int)$assetRef),
             'playlist_instance_set' => $this->buildPlaylistInstanceSetPath((int)$assetRef, $options),
             default => throw new InvalidArgumentException('Unsupported asset type: ' . $assetType),
         };
@@ -89,15 +88,6 @@ final class ShareService
         return $path;
     }
 
-    private function buildAppliedPalettePath(int $paletteId): string
-    {
-        if ($paletteId <= 0) {
-            throw new InvalidArgumentException('palette_id required');
-        }
-
-        return '/view/' . $paletteId;
-    }
-
     private function buildPlaylistInstanceSetPath(int $setId, array $options): string
     {
         if ($setId <= 0) {
@@ -144,7 +134,6 @@ final class ShareService
         return match (strtolower(trim($assetType))) {
             'playlist_instance', 'playlist-instance', 'playlist' => 'playlist_instance',
             'saved_palette', 'saved-palette', 'palette' => 'saved_palette',
-            'applied_palette', 'applied-palette', 'view' => 'applied_palette',
             'playlist_instance_set', 'playlist-instance-set', 'playlist_set', 'playlist-set', 'set' => 'playlist_instance_set',
             default => trim($assetType),
         };

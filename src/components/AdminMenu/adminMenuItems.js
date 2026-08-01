@@ -74,15 +74,6 @@ export const adminMenuItems = [
     ],
   },
   {
-    label: "HOA",
-    items: [
-      { label: "HOAs", href: "/admin/hoas" },
-      {label: "HOA Landing", href: "/hoa"},
-      { label: "HOA Scheme Mapper", href: "/admin/hoa-scheme-tester" },
-      { label: "HOA Mask Tester", href: "/admin/hoa-mask-tester" },
-    ],
-  },
-  {
     label: "Tools",
     items: [
 

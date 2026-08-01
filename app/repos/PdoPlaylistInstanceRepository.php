@@ -33,6 +33,7 @@ final class PdoPlaylistInstanceRepository
               demo_enabled,
               cta_context_key,
               audience,
+              player_experience_id,
               cta_overrides,
               share_enabled,
               share_title,
@@ -83,7 +84,8 @@ final class PdoPlaylistInstanceRepository
             (bool)$row['is_active'],
             $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null,
             $row['kicker_id'] !== null ? (int)$row['kicker_id'] : null,
-            $row['slug'] !== null ? (string)$row['slug'] : null
+            $row['slug'] !== null ? (string)$row['slug'] : null,
+            $row['player_experience_id'] !== null ? (int)$row['player_experience_id'] : null
         );
     }
 
@@ -319,6 +321,16 @@ final class PdoPlaylistInstanceRepository
                 $deletedLandingPages = $stmt->rowCount();
             }
 
+            $deletedSetItems = 0;
+            if ($this->tableExists('playlist_instance_set_items') && $this->columnExists('playlist_instance_set_items', 'playlist_instance_id')) {
+                $stmt = $this->pdo->prepare(
+                    'DELETE FROM playlist_instance_set_items
+                      WHERE playlist_instance_id = :id'
+                );
+                $stmt->execute(['id' => $instanceId]);
+                $deletedSetItems = $stmt->rowCount();
+            }
+
             $stmt = $this->pdo->prepare(
                 'DELETE FROM playlist_instances
                   WHERE playlist_instance_id = :id
@@ -339,6 +351,7 @@ final class PdoPlaylistInstanceRepository
             'deleted' => $deletedInstances > 0,
             'playlist_instance_id' => $instanceId,
             'deleted_landing_pages' => $deletedLandingPages,
+            'deleted_set_items' => $deletedSetItems,
         ];
     }
 
@@ -398,19 +411,6 @@ final class PdoPlaylistInstanceRepository
             }
         }
 
-        if ($this->tableExists('playlist_instance_set_items') && $this->columnExists('playlist_instance_set_items', 'playlist_instance_id')) {
-            $stmt = $this->pdo->prepare(
-                'SELECT COUNT(*)
-                   FROM playlist_instance_set_items
-                  WHERE playlist_instance_id = :id'
-            );
-            $stmt->execute(['id' => $instanceId]);
-            $count = (int)$stmt->fetchColumn();
-            if ($count > 0) {
-                $blockers[] = "Used in {$count} playlist instance set item" . ($count === 1 ? '' : 's');
-            }
-        }
-
         if ($this->tableExists('playlist_instance_sets') && $this->columnExists('playlist_instance_sets', 'playlist_instance_id')) {
             $stmt = $this->pdo->prepare(
                 'SELECT COUNT(*)
@@ -430,8 +430,16 @@ final class PdoPlaylistInstanceRepository
     /**
      * @return PlaylistInstance[]
      */
-    public function listAll(bool $onlyActive = false): array
+    public function listAll(bool $onlyActive = false, bool $includeRetired = false): array
     {
+        $where = [];
+        if ($onlyActive) {
+            $where[] = 'is_active = 1';
+        }
+        if (!$includeRetired && $this->columnExists('playlist_instances', 'is_retired')) {
+            $where[] = 'COALESCE(is_retired, 0) = 0';
+        }
+
         $sql = <<<SQL
             SELECT
               playlist_instance_id,
@@ -451,6 +459,7 @@ final class PdoPlaylistInstanceRepository
               demo_enabled,
               cta_context_key,
               audience,
+              player_experience_id,
               cta_overrides,
               share_enabled,
               share_title,
@@ -464,8 +473,8 @@ final class PdoPlaylistInstanceRepository
             FROM playlist_instances
             SQL;
 
-        if ($onlyActive) {
-            $sql .= "\nWHERE is_active = 1";
+        if ($where !== []) {
+            $sql .= "\nWHERE " . implode(' AND ', $where);
         }
 
         $sql .= "\nORDER BY playlist_instance_id DESC";
@@ -507,7 +516,8 @@ final class PdoPlaylistInstanceRepository
                 (bool)$row['is_active'],
                 $row['created_from_instance'] !== null ? (int)$row['created_from_instance'] : null,
                 $row['kicker_id'] !== null ? (int)$row['kicker_id'] : null,
-                $row['slug'] !== null ? (string)$row['slug'] : null
+                $row['slug'] !== null ? (string)$row['slug'] : null,
+                $row['player_experience_id'] !== null ? (int)$row['player_experience_id'] : null
             );
         }
 

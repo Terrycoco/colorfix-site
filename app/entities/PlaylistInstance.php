@@ -32,6 +32,7 @@ final class PlaylistInstance
         public bool $isActive,
         public ?int $createdFromInstance,
         public ?int $kickerId,
-        public ?string $slug = null
+        public ?string $slug = null,
+        public ?int $playerExperienceId = null
     ) {}
 }

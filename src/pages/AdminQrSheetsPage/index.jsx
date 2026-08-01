@@ -6,7 +6,10 @@ import "./admin-qr-sheets.css";
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const WATCH_GET_URL = `${API_FOLDER}/v2/admin/watch-config/get.php`;
 const WATCH_SAVE_URL = `${API_FOLDER}/v2/admin/watch-config/save.php`;
-const BUSINESS_CARD_QR_URL = "https://colorfix.terrymarr.com/qr";
+const CARD_GET_URL = `${API_FOLDER}/v2/admin/card-config/get.php`;
+const CARD_SAVE_URL = `${API_FOLDER}/v2/admin/card-config/save.php`;
+const WATCH_QR_URL = "https://colorfix.terrymarr.com/qr";
+const BUSINESS_CARD_QR_URL = "https://colorfix.terrymarr.com/card";
 
 
 function handlePrintSheet() {
@@ -148,6 +151,14 @@ const qrOptions = [
     type: "sticker",
   },
   {
+    id: "business-card",
+    label: "Business Card",
+    headline: "ColorFix by Terry",
+    url: BUSINESS_CARD_QR_URL,
+    subline: "Permanent business card link",
+    type: "plain-qr",
+  },
+  {
     id: "watch",
     label: "Watch Playlist",
     headline: "Watch ColorFix",
@@ -160,13 +171,6 @@ const qrOptions = [
     headline: "Reserve Time with Terry",
     url: "https://outlook.office365.com/book/DunnEdwardsPaintsRanchoCucamonga@dunnedwards.com/?ismsaljsauthenabled=true",
     subline: "Scan to Book Your Color Consultation",
-  },
-  {
-    id: "hoa",
-    label: "HOA Landing Page",
-    headline: "HOA Approved Colors System",
-    url: "https://colorfix.terrymarr.com/hoa",
-    subline: "Scan to learn about HOA playlists",
   },
   {
     id: "colorfix",
@@ -238,10 +242,14 @@ export default function AdminQrSheetsPage() {
   const [selectedId, setSelectedId] = useState(qrOptions[0].id);
   const [instances, setInstances] = useState([]);
   const [watchForm, setWatchForm] = useState({ playlist_instance_id: "" });
+  const [cardForm, setCardForm] = useState({ target_url: "/" });
   const [watchLoading, setWatchLoading] = useState(true);
   const [watchSaving, setWatchSaving] = useState(false);
   const [watchStatus, setWatchStatus] = useState("");
   const [watchError, setWatchError] = useState("");
+  const [cardSaving, setCardSaving] = useState(false);
+  const [cardStatus, setCardStatus] = useState("");
+  const [cardError, setCardError] = useState("");
   const wheelVersion = useMemo(() => Date.now(), []);
 
   const selected = useMemo(
@@ -249,7 +257,7 @@ export default function AdminQrSheetsPage() {
     [selectedId]
   );
   const selectedUrl = selected?.id === "watch" || selected?.id === "watch-sticker"
-    ? BUSINESS_CARD_QR_URL
+    ? WATCH_QR_URL
     : selected?.url;
 
   const wheelSrc =
@@ -292,6 +300,49 @@ export default function AdminQrSheetsPage() {
       setWatchError(err?.message || "Failed to load watch controls");
     } finally {
       setWatchLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCardControls();
+  }, []);
+
+  async function loadCardControls() {
+    setCardError("");
+    try {
+      const res = await fetch(`${CARD_GET_URL}?_=${Date.now()}`, { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to load card config");
+      }
+      setCardForm({ target_url: data?.item?.target_url || "/" });
+    } catch (err) {
+      setCardError(err?.message || "Failed to load card config");
+    }
+  }
+
+  async function handleSaveCardConfig() {
+    setCardStatus("");
+    setCardError("");
+    try {
+      setCardSaving(true);
+      const targetUrl = String(cardForm.target_url || "/").trim() || "/";
+      const res = await fetch(CARD_SAVE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_url: targetUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to save card config");
+      }
+      setCardForm({ target_url: data?.item?.target_url || "/" });
+      setCardStatus("Card link updated");
+    } catch (err) {
+      setCardError(err?.message || "Failed to save card config");
+    } finally {
+      setCardSaving(false);
     }
   }
 
@@ -561,6 +612,33 @@ async function handleDownloadPng() {
     return;
   }
 
+  if (selected?.type === "plain-qr") {
+    const size = 1800;
+    const qrUrl = buildQrUrl(selectedUrl, size);
+    const qrImg = new Image();
+    qrImg.crossOrigin = "anonymous";
+    qrImg.src = qrUrl;
+    await new Promise((resolve, reject) => {
+      qrImg.onload = resolve;
+      qrImg.onerror = reject;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(qrImg, 0, 0, size, size);
+
+    const link = document.createElement("a");
+    link.download = `${selected.id}-qr-code.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    return;
+  }
+
   if (!selectedUrl) return;
 
   const width = 1200;
@@ -646,6 +724,43 @@ async function handleDownloadPng() {
       <section className="admin-qr-sheets__watch-config">
         <div className="admin-qr-sheets__watch-config-header">
           <div>
+            <div className="admin-qr-sheets__watch-config-title">Business Card Link Target</div>
+            <div className="admin-qr-sheets__watch-config-note">
+              The permanent /card code redirects here. Default is the front page.
+            </div>
+          </div>
+          <button type="button" onClick={handleSaveCardConfig} disabled={cardSaving}>
+            {cardSaving ? "Saving..." : "Save Card Target"}
+          </button>
+        </div>
+
+        <div className="admin-qr-sheets__watch-config-grid">
+          <label>
+            Target URL
+            <input
+              type="text"
+              value={cardForm.target_url}
+              onChange={(e) => {
+                setCardForm({ target_url: e.target.value });
+                setCardStatus("");
+                setCardError("");
+              }}
+              placeholder="/"
+            />
+          </label>
+          <label>
+            Permanent QR URL
+            <input type="text" value={BUSINESS_CARD_QR_URL} readOnly />
+          </label>
+        </div>
+
+        {cardStatus ? <div className="admin-qr-sheets__watch-config-status">{cardStatus}</div> : null}
+        {cardError ? <div className="admin-qr-sheets__watch-config-status admin-qr-sheets__watch-config-status--error">{cardError}</div> : null}
+      </section>
+
+      <section className="admin-qr-sheets__watch-config">
+        <div className="admin-qr-sheets__watch-config-header">
+          <div>
             <div className="admin-qr-sheets__watch-config-title">Watch Link Target</div>
             <div className="admin-qr-sheets__watch-config-note">
               Choose which playlist the permanent /qr code opens.
@@ -685,7 +800,7 @@ async function handleDownloadPng() {
 
       <section className="admin-qr-sheets__grid">
           <div className={`admin-qr-sheets__card${selected?.type === "sticker" ? " admin-qr-sheets__card--sticker" : ""}`}>
-            {selected?.type !== "sticker" && (
+            {selected?.type !== "sticker" && selected?.type !== "plain-qr" && (
               <div className="admin-qr-sheets__label">{selected.headline}</div>
             )}
             {selected?.type === "wheel" ? (
@@ -699,6 +814,8 @@ async function handleDownloadPng() {
              
                <Avery15660SheetPreview url={selectedUrl} />
               </>
+            ) : selected?.type === "plain-qr" ? (
+              <img src={buildQrUrl(selectedUrl, 420)} alt="Business card QR code" />
             ) : (
               <img src={buildQrUrl(selectedUrl, 420)} alt={selected.headline} />
             )}

@@ -13,6 +13,31 @@
   color: #6a778b;
 }
 
+.admin-ideas__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 24px;
+}
+
+.admin-ideas__tabs button {
+  border: 1px solid #cfd6e3;
+  border-radius: 6px;
+  background: #fff;
+  color: #1b2433;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+  padding: 7px 10px;
+}
+
+.admin-ideas__tabs button.is-active {
+  background: #14213d;
+  border-color: #14213d;
+  color: #fff;
+}
+
 .admin-ideas__section {
   margin-bottom: 24px;
 }

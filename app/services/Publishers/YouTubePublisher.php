@@ -14,6 +14,7 @@ final class YouTubePublisher implements Publisher
     {
         $metadata = $this->metadata($asset);
         $settings = $this->metadata($channel);
+        $destinationUrl = $this->preferredDestinationUrl($asset);
 
         return [
             'video_path' => $metadata['video_path'] ?? null,
@@ -22,7 +23,7 @@ final class YouTubePublisher implements Publisher
             'youtube_playlist_id' => $metadata['youtube_playlist_id'] ?? $settings['youtube_playlist_id'] ?? null,
             'snippet' => [
                 'title' => $asset['title'] ?? '',
-                'description' => $asset['description'] ?? '',
+                'description' => $this->descriptionWithDestination((string)($asset['description'] ?? ''), $destinationUrl),
                 'categoryId' => $metadata['category_id'] ?? null,
                 'tags' => $metadata['tags'] ?? [],
             ],
@@ -31,6 +32,30 @@ final class YouTubePublisher implements Publisher
                 'selfDeclaredMadeForKids' => (bool)($metadata['made_for_kids'] ?? false),
             ],
         ];
+    }
+
+    private function preferredDestinationUrl(array $asset): string
+    {
+        foreach (['tracked_destination_url', 'tracking_url', 'destination_url', 'canonical_destination_url'] as $key) {
+            $value = trim((string)($asset[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function descriptionWithDestination(string $description, string $destinationUrl): string
+    {
+        $description = trim($description);
+        $destinationUrl = trim($destinationUrl);
+        if ($destinationUrl === '' || str_contains($description, $destinationUrl)) {
+            return $description;
+        }
+
+        $line = 'Watch on ColorFix: ' . $destinationUrl;
+        return $description !== '' ? $description . "\n\n" . $line : $line;
     }
 
     private function metadata(array $row): array

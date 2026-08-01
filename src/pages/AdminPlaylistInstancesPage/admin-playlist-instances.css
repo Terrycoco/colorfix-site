@@ -112,6 +112,10 @@
   padding: 0;
 }
 
+.instance-editor-header .panel-title {
+  flex: 0 0 auto;
+}
+
 .instance-editor-actions {
   display: flex;
   gap: 12px;

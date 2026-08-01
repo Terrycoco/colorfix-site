@@ -25,6 +25,8 @@ class PlaylistItem
         public ?bool $is_share_image = null,
         public ?bool $site = null,
         public ?bool $yt = null,
+        public ?bool $prospect = null,
+        public ?bool $client = null,
         public ?bool $pin = null,
         public ?string $analyzer_role = null,
         public ?string $alt_tag = null,

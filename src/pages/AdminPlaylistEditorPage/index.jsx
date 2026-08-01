@@ -60,6 +60,8 @@ const emptyItem = {
   is_share_image: false,
   site: true,
   yt: true,
+  prospect: true,
+  client: true,
   pin: true,
   analyzer_role: "ignore",
   finder_start: "auto",
@@ -376,6 +378,8 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: item.site === null || item.site == null ? true : Boolean(Number(item.site)),
           yt: item.yt === null || item.yt == null ? true : Boolean(Number(item.yt)),
+          prospect: item.prospect === null || item.prospect == null ? true : Boolean(Number(item.prospect)),
+          client: item.client === null || item.client == null ? true : Boolean(Number(item.client)),
           pin: item.pin === null || item.pin == null ? true : Boolean(Number(item.pin)),
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
@@ -536,6 +540,8 @@ export default function AdminPlaylistEditorPage() {
             nextItem.subtitle = nextItem.subtitle || "by Terry";
             nextItem.site = true;
             nextItem.yt = true;
+            nextItem.prospect = true;
+            nextItem.client = true;
             nextItem.pin = false;
             nextItem.analyzer_role = "single";
             nextItem.duration_ms = nextItem.duration_ms || "3000";
@@ -672,6 +678,8 @@ export default function AdminPlaylistEditorPage() {
         star: ["hue-wheel", "brand-bumper"].includes(type) ? false : emptyItem.star,
         site: type === "brand-bumper" ? true : emptyItem.site,
         yt: type === "brand-bumper" ? true : emptyItem.yt,
+        prospect: type === "brand-bumper" ? true : emptyItem.prospect,
+        client: type === "brand-bumper" ? true : emptyItem.client,
         pin: type === "brand-bumper" ? false : emptyItem.pin,
         analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
         duration_ms: type === "brand-bumper" ? "4200" : emptyItem.duration_ms,
@@ -806,6 +814,8 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: Boolean(item.site),
           yt: Boolean(item.yt),
+          prospect: item.prospect !== false,
+          client: item.client !== false,
           pin: item.pin !== false,
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
@@ -1248,6 +1258,22 @@ export default function AdminPlaylistEditorPage() {
                       onChange={(e) => updateItem(index, "yt", e.target.checked)}
                     />
                     YT
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={item.prospect !== false}
+                      onChange={(e) => updateItem(index, "prospect", e.target.checked)}
+                    />
+                    Prospect
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={item.client !== false}
+                      onChange={(e) => updateItem(index, "client", e.target.checked)}
+                    />
+                    Client
                   </label>
                   <label>
                     <input

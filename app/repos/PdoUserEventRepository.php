@@ -134,8 +134,11 @@ final class PdoUserEventRepository
 
         $query = trim((string)($filters['q'] ?? ''));
         if ($query !== '') {
-            $where[] = '(CAST(pi.playlist_instance_id AS CHAR) LIKE :q OR pi.instance_name LIKE :q OR pi.display_title LIKE :q OR p.title LIKE :q)';
-            $params['q'] = '%' . $query . '%';
+            $where[] = '(CAST(pi.playlist_instance_id AS CHAR) LIKE :q_instance_id OR pi.instance_name LIKE :q_instance_name OR pi.display_title LIKE :q_display_title OR p.title LIKE :q_playlist_title)';
+            $params['q_instance_id'] = '%' . $query . '%';
+            $params['q_instance_name'] = '%' . $query . '%';
+            $params['q_display_title'] = '%' . $query . '%';
+            $params['q_playlist_title'] = '%' . $query . '%';
         }
 
         $audience = trim((string)($filters['audience'] ?? ''));
@@ -226,8 +229,11 @@ final class PdoUserEventRepository
 
         $query = trim((string)($filters['q'] ?? ''));
         if ($query !== '') {
-            $where[] = '(CAST(pi.playlist_instance_id AS CHAR) LIKE :q OR pi.instance_name LIKE :q OR pi.display_title LIKE :q OR p.title LIKE :q)';
-            $params['q'] = '%' . $query . '%';
+            $where[] = '(CAST(pi.playlist_instance_id AS CHAR) LIKE :q_instance_id OR pi.instance_name LIKE :q_instance_name OR pi.display_title LIKE :q_display_title OR p.title LIKE :q_playlist_title)';
+            $params['q_instance_id'] = '%' . $query . '%';
+            $params['q_instance_name'] = '%' . $query . '%';
+            $params['q_display_title'] = '%' . $query . '%';
+            $params['q_playlist_title'] = '%' . $query . '%';
         }
 
         $audience = trim((string)($filters['audience'] ?? ''));

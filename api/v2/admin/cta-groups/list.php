@@ -20,7 +20,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 }
 
 $sql = <<<SQL
-  SELECT id, `key`, label, description, audience, created_at
+  SELECT id, `key`, label, description, created_at
   FROM cta_groups
   ORDER BY id ASC
 SQL;

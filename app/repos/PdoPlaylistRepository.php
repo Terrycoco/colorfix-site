@@ -433,6 +433,276 @@ class PdoPlaylistRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAdminItemRows(int $playlistId): array
+    {
+        $excludeSelect = $this->getExcludeFromThumbsSelect();
+        $photoSelect = $this->getPhotoLibraryIdSelect();
+        $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
+        $shareImageSelect = $this->getIsShareImageSelect();
+        $siteSelect = $this->getPlaylistItemFlagSelect('site');
+        $ytSelect = $this->getPlaylistItemFlagSelect('yt');
+        $prospectSelect = $this->getPlaylistItemFlagSelect('prospect');
+        $clientSelect = $this->getPlaylistItemFlagSelect('client');
+        $pinSelect = $this->getPlaylistItemFlagSelect('pin');
+        $analyzerRoleSelect = $this->hasPlaylistItemColumn('analyzer_role') ? 'analyzer_role' : "'ignore' AS analyzer_role";
+        $finderStartSelect = $this->hasPlaylistItemColumn('finder_start') ? 'finder_start' : "'auto' AS finder_start";
+        $sql = <<<SQL
+            SELECT
+              playlist_item_id,
+              playlist_id,
+              order_index,
+              ap_id,
+              palette_hash,
+              image_url,
+              {$photoSelect},
+              {$savedPaletteSetSelect},
+              title,
+              subtitle,
+              subtitle_2,
+              body,
+              item_type,
+              layout,
+              title_mode,
+              star,
+              transition,
+              duration_ms,
+              {$excludeSelect},
+              {$shareImageSelect},
+              {$siteSelect},
+              {$ytSelect},
+              {$prospectSelect},
+              {$clientSelect},
+              {$pinSelect},
+              {$analyzerRoleSelect},
+              {$finderStartSelect},
+              is_active
+            FROM playlist_items
+            WHERE playlist_id = :playlist_id
+              AND is_active = 1
+            ORDER BY order_index ASC
+            SQL;
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(['playlist_id' => $playlistId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $items
+     * @param callable(array<string, mixed>): array<string, mixed> $normalizeItem
+     */
+    public function saveAdminItems(int $playlistId, array $items, callable $normalizeItem): void
+    {
+        $hasExcludeFromThumbs = $this->hasPlaylistItemColumn('exclude_from_thumbs');
+        $hasPhotoLibraryId = $this->hasPlaylistItemColumn('photo_library_id');
+        $hasSavedPaletteSetId = $this->hasPlaylistItemColumn('saved_palette_set_id');
+        $hasIsShareImage = $this->hasPlaylistItemColumn('is_share_image');
+        $hasSite = $this->hasPlaylistItemColumn('site');
+        $hasYt = $this->hasPlaylistItemColumn('yt');
+        $hasProspect = $this->hasPlaylistItemColumn('prospect');
+        $hasClient = $this->hasPlaylistItemColumn('client');
+        $hasPin = $this->hasPlaylistItemColumn('pin');
+        $hasAnalyzerRole = $this->hasPlaylistItemColumn('analyzer_role');
+        $hasFinderStart = $this->hasPlaylistItemColumn('finder_start');
+
+        $selectedShareIndex = null;
+        foreach ($items as $idx => $candidate) {
+            $candidateHasPhoto = (
+                (isset($candidate['photo_library_id']) && $candidate['photo_library_id'] !== '')
+                || trim((string)($candidate['image_url'] ?? '')) !== ''
+            );
+            if ($candidateHasPhoto && !empty($candidate['is_share_image'])) {
+                $selectedShareIndex = $idx;
+                break;
+            }
+        }
+
+        $stmt = $this->pdo->prepare('UPDATE playlist_items SET order_index = order_index + 10000 WHERE playlist_id = :playlist_id');
+        $stmt->execute(['playlist_id' => $playlistId]);
+
+        $orderIndex = 0;
+        $keepIds = [];
+        foreach ($items as $item) {
+            $itemId = isset($item['playlist_item_id']) ? (int)$item['playlist_item_id'] : 0;
+            $hasPhoto = (
+                (isset($item['photo_library_id']) && $item['photo_library_id'] !== '')
+                || trim((string)($item['image_url'] ?? '')) !== ''
+            );
+            $data = [
+                'playlist_id' => $playlistId,
+                'order_index' => $orderIndex,
+                'ap_id' => isset($item['ap_id']) && $item['ap_id'] !== '' ? (int)$item['ap_id'] : null,
+                'palette_hash' => isset($item['palette_hash']) && $item['palette_hash'] !== '' ? (string)$item['palette_hash'] : null,
+                'image_url' => $item['image_url'] ?? null,
+                'photo_library_id' => isset($item['photo_library_id']) && $item['photo_library_id'] !== '' ? (int)$item['photo_library_id'] : null,
+                'saved_palette_set_id' => isset($item['saved_palette_set_id']) && $item['saved_palette_set_id'] !== '' ? (int)$item['saved_palette_set_id'] : null,
+                'title' => $item['title'] ?? null,
+                'subtitle' => $item['subtitle'] ?? null,
+                'subtitle_2' => $item['subtitle_2'] ?? null,
+                'body' => $item['body'] ?? null,
+                'item_type' => $item['item_type'] ?? 'non-palette',
+                'layout' => $item['layout'] ?? 'default',
+                'title_mode' => $item['title_mode'] ?? null,
+                'star' => isset($item['star']) ? (int)(bool)$item['star'] : 1,
+                'transition' => $item['transition'] ?? null,
+                'duration_ms' => isset($item['duration_ms']) && $item['duration_ms'] !== '' ? (int)$item['duration_ms'] : null,
+                'is_active' => isset($item['is_active']) ? (int)(bool)$item['is_active'] : 1,
+            ];
+            if ($hasSite) {
+                $data['site'] = array_key_exists('site', $item) ? (int)(bool)$item['site'] : 1;
+            }
+            if ($hasYt) {
+                $data['yt'] = array_key_exists('yt', $item) ? (int)(bool)$item['yt'] : 1;
+            }
+            if ($hasProspect) {
+                $data['prospect'] = array_key_exists('prospect', $item) ? (int)(bool)$item['prospect'] : 1;
+            }
+            if ($hasClient) {
+                $data['client'] = array_key_exists('client', $item) ? (int)(bool)$item['client'] : 1;
+            }
+            if ($hasPin) {
+                $data['pin'] = array_key_exists('pin', $item) ? (int)(bool)$item['pin'] : 1;
+            }
+            if ($hasAnalyzerRole) {
+                $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
+                $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single'], true) ? $role : 'ignore';
+            }
+            if ($hasFinderStart) {
+                $finderStart = strtolower(trim((string)($item['finder_start'] ?? 'auto')));
+                $data['finder_start'] = in_array($finderStart, ['auto', 'this', 'previous'], true) ? $finderStart : 'auto';
+            }
+            if ($hasExcludeFromThumbs) {
+                $data['exclude_from_thumbs'] = isset($item['exclude_from_thumbs']) ? (int)(bool)$item['exclude_from_thumbs'] : 0;
+            }
+            if ($hasIsShareImage) {
+                $data['is_share_image'] = ($hasPhoto && $selectedShareIndex === $orderIndex) ? 1 : 0;
+            }
+
+            $data = $normalizeItem($data);
+
+            $columns = [
+                'playlist_id',
+                'order_index',
+                'ap_id',
+                'palette_hash',
+                'image_url',
+                'photo_library_id',
+                'saved_palette_set_id',
+                'title',
+                'subtitle',
+                'subtitle_2',
+                'body',
+                'item_type',
+                'layout',
+                'title_mode',
+                'star',
+                'transition',
+                'duration_ms',
+                'is_active',
+                'is_share_image',
+                'site',
+                'yt',
+                'prospect',
+                'client',
+                'pin',
+                'analyzer_role',
+                'finder_start',
+            ];
+            if (!$hasPhotoLibraryId) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
+                unset($data['photo_library_id']);
+            }
+            if (!$hasSavedPaletteSetId) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'saved_palette_set_id'));
+                unset($data['saved_palette_set_id']);
+            }
+            if (!$hasIsShareImage) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'is_share_image'));
+                unset($data['is_share_image']);
+            }
+            if (!$hasSite) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'site'));
+                unset($data['site']);
+            }
+            if (!$hasYt) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'yt'));
+                unset($data['yt']);
+            }
+            if (!$hasProspect) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'prospect'));
+                unset($data['prospect']);
+            }
+            if (!$hasClient) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'client'));
+                unset($data['client']);
+            }
+            if (!$hasPin) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'pin'));
+                unset($data['pin']);
+            }
+            if (!$hasAnalyzerRole) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'analyzer_role'));
+                unset($data['analyzer_role']);
+            }
+            if (!$hasFinderStart) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'finder_start'));
+                unset($data['finder_start']);
+            }
+            if (!$hasExcludeFromThumbs) {
+                unset($data['exclude_from_thumbs']);
+            } elseif (!in_array('exclude_from_thumbs', $columns, true)) {
+                $columns[] = 'exclude_from_thumbs';
+            }
+
+            $updateColumns = array_values(array_filter($columns, fn($col) => $col !== 'playlist_id'));
+            $setSql = implode(",\n                  ", array_map(fn($col) => "{$col} = :{$col}", $updateColumns));
+            $insertSqlCols = implode(",\n                  ", $columns);
+            $insertSqlVals = implode(",\n                  ", array_map(fn($col) => ":{$col}", $columns));
+
+            if ($itemId > 0) {
+                $sql = <<<SQL
+                    UPDATE playlist_items
+                    SET
+                      {$setSql}
+                    WHERE playlist_item_id = :playlist_item_id
+                      AND playlist_id = :playlist_id
+                    SQL;
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute(array_merge($data, [
+                    'playlist_item_id' => $itemId,
+                ]));
+                $keepIds[] = $itemId;
+            } else {
+                $sql = <<<SQL
+                    INSERT INTO playlist_items (
+                      {$insertSqlCols}
+                    ) VALUES (
+                      {$insertSqlVals}
+                    )
+                    SQL;
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute($data);
+                $keepIds[] = (int)$this->pdo->lastInsertId();
+            }
+
+            $orderIndex++;
+        }
+
+        if ($keepIds) {
+            $placeholders = implode(',', array_fill(0, count($keepIds), '?'));
+            $sql = "DELETE FROM playlist_items WHERE playlist_id = ? AND playlist_item_id NOT IN ({$placeholders})";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute(array_merge([$playlistId], $keepIds));
+            return;
+        }
+
+        $stmt = $this->pdo->prepare("DELETE FROM playlist_items WHERE playlist_id = ?");
+        $stmt->execute([$playlistId]);
+    }
+
+    /**
      * @return PlaylistItem[]|null
      */
     private function getItemsFromDb(string $playlistId, string $venue = 'site'): ?array
@@ -443,11 +713,15 @@ class PdoPlaylistRepository
         $shareImageSelect = $this->getIsShareImageSelect();
         $siteSelect = $this->getPlaylistItemFlagSelect('site');
         $ytSelect = $this->getPlaylistItemFlagSelect('yt');
+        $prospectSelect = $this->getPlaylistItemFlagSelect('prospect');
+        $clientSelect = $this->getPlaylistItemFlagSelect('client');
         $pinSelect = $this->getPlaylistItemFlagSelect('pin');
         $analyzerRoleSelect = $this->hasPlaylistItemColumn('analyzer_role') ? 'analyzer_role' : "'ignore' AS analyzer_role";
         $venueColumn = match ($venue) {
             'yt' => 'yt',
             'pin' => 'pin',
+            'prospect' => 'prospect',
+            'client' => 'client',
             default => 'site',
         };
         $venueWhere = $this->hasPlaylistItemColumn($venueColumn) ? "\n              AND {$venueColumn} = 1" : '';
@@ -474,6 +748,8 @@ class PdoPlaylistRepository
                 {$shareImageSelect},
                 {$siteSelect},
                 {$ytSelect},
+                {$prospectSelect},
+                {$clientSelect},
                 {$pinSelect},
                 {$analyzerRoleSelect}
             FROM playlist_items
@@ -518,6 +794,8 @@ class PdoPlaylistRepository
                 isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null,
                 isset($row['site']) ? (bool)$row['site'] : true,
                 isset($row['yt']) ? (bool)$row['yt'] : true,
+                isset($row['prospect']) ? (bool)$row['prospect'] : true,
+                isset($row['client']) ? (bool)$row['client'] : true,
                 isset($row['pin']) ? (bool)$row['pin'] : true,
                 $row['analyzer_role'] ?? 'ignore',
                 null,

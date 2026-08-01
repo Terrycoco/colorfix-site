@@ -17,7 +17,7 @@ function formatChip(chipNum) {
   if (!chipNum) return '';
   // if it contains anything besides digits
   if (!/^\d+$/.test(chipNum)) {
-    return chipNum + ' Brochure';
+    return chipNum + ' Collection';
   }
   return chipNum;
 }
@@ -419,9 +419,7 @@ export default function ColorDetailPage() {
           const key = `${item.palette_hash || item.palette_id}-${item.saved_palette_set_id || 'default'}-${item.photo_type}-${item.photo_url}`;
           const href = item.palette_hash
             ? `/palette/${item.palette_hash}/share`
-            : item.palette_id
-              ? `/view/${item.palette_id}`
-              : undefined;
+            : undefined;
           const imageUrl = photoThumbUrl(item.photo_library_id, 520, 72) || item.photo_url;
 
           const content = (

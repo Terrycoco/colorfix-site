@@ -51,18 +51,6 @@ if (!$updated) {
     respond(['ok' => false, 'error' => 'Mask not found or no overlay columns present'], 404);
 }
 
-$flagStmt = $pdo->prepare("
-    UPDATE applied_palettes ap
-    JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
-    SET ap.needs_rerender = 1
-    WHERE ap.asset_id = :asset_id
-      AND ape.mask_role = :mask_role
-");
-$flagStmt->execute([
-    ':asset_id' => $assetId,
-    ':mask_role' => $maskRole,
-]);
-
 respond([
     'ok' => true,
     'mask' => $maskRole,

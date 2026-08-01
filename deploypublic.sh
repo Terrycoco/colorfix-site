@@ -11,7 +11,7 @@ deploy_ssh "mkdir -p '$REMOTE_PATH/playlists'"
 
 deploy_rsync -avz \
   -e "$RSYNC_SSH" \
-  .htaccess sitemap.php playlist-share.php oauth-google.php qr.php "$REMOTE_TARGET:$REMOTE_PATH/"
+  .htaccess sitemap.php playlist-share.php oauth-google.php qr.php card.php "$REMOTE_TARGET:$REMOTE_PATH/"
 
 deploy_rsync -avz --delete \
   -e "$RSYNC_SSH" \

@@ -14,6 +14,7 @@ final class PinterestPublisher implements Publisher
     {
         $metadata = $this->metadata($asset);
         $settings = $this->metadata($channel);
+        $destinationUrl = $this->preferredDestinationUrl($asset);
 
         return [
             'board_id' => $metadata['board_id'] ?? $settings['board_id'] ?? null,
@@ -23,8 +24,20 @@ final class PinterestPublisher implements Publisher
                 'source_type' => 'image_url',
                 'url' => $asset['image_url'] ?? '',
             ],
-            'link' => $asset['destination_url'] ?? '',
+            'link' => $destinationUrl,
         ];
+    }
+
+    private function preferredDestinationUrl(array $asset): string
+    {
+        foreach (['tracked_destination_url', 'tracking_url', 'destination_url', 'canonical_destination_url'] as $key) {
+            $value = trim((string)($asset[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     private function metadata(array $row): array

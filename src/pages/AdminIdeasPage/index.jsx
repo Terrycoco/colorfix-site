@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import AdminMilestonesPage from "@pages/AdminMilestonesPage";
 import "./admin-ideas.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/ideas/list.php`;
@@ -22,6 +23,10 @@ function normalizePriority(value) {
 }
 
 export default function AdminIdeasPage() {
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === "undefined") return "todos";
+    return new URLSearchParams(window.location.search).get("tab") === "milestones" ? "milestones" : "todos";
+  });
   const [ideas, setIdeas] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -188,13 +193,44 @@ export default function AdminIdeasPage() {
     }
   }
 
+  function selectTab(tab) {
+    setActiveTab(tab);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (tab === "milestones") {
+      url.searchParams.set("tab", "milestones");
+    } else {
+      url.searchParams.delete("tab");
+    }
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   return (
     <div className="admin-ideas">
       <header className="admin-ideas__header">
-        <h1>Ideas</h1>
-        <p>Keep notes for articles, playlists, palettes, and anything else.</p>
+        <h1>Ideas / ToDos</h1>
+        <div className="admin-ideas__tabs" role="tablist" aria-label="Ideas and milestones">
+          <button
+            type="button"
+            className={activeTab === "todos" ? "is-active" : ""}
+            onClick={() => selectTab("todos")}
+          >
+            To Do
+          </button>
+          <button
+            type="button"
+            className={activeTab === "milestones" ? "is-active" : ""}
+            onClick={() => selectTab("milestones")}
+          >
+            Milestones
+          </button>
+        </div>
       </header>
 
+      {activeTab === "milestones" ? (
+        <AdminMilestonesPage embedded />
+      ) : (
+        <>
       {error && <div className="admin-ideas__error">{error}</div>}
       {status && <div className="admin-ideas__status">{status}</div>}
 
@@ -290,6 +326,8 @@ export default function AdminIdeasPage() {
           </div>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

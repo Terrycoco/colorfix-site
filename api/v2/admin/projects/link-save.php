@@ -7,7 +7,7 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Repos\PdoProjectLinkRepository;
+use App\Repos\PdoLegacyProjectLinkRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -38,7 +38,7 @@ try {
         respond(['ok' => false, 'error' => 'project_id, asset_type, and asset_id are required'], 400);
     }
 
-    $repo = new PdoProjectLinkRepository($pdo);
+    $repo = new PdoLegacyProjectLinkRepository($pdo);
     $payload = [
         'project_id' => $projectId,
         'asset_type' => $assetType,

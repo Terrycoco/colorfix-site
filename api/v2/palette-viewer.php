@@ -8,8 +8,6 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 
-use App\Repos\PdoAppliedPaletteRepository;
-use App\Repos\PdoAppliedPalettePhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
@@ -28,24 +26,15 @@ try {
     }
 
     $source = isset($_GET['source']) ? strtolower(trim((string)$_GET['source'])) : '';
-    if (!in_array($source, ['applied', 'saved'], true)) {
-        respond(['ok' => false, 'error' => 'source must be applied or saved'], 400);
+    if ($source !== 'saved') {
+        respond(['ok' => false, 'error' => 'source must be saved'], 400);
     }
 
-    $appliedRepo = new PdoAppliedPaletteRepository($pdo);
-    $appliedPhotoRepo = new PdoAppliedPalettePhotoRepository($pdo);
     $savedRepo = new PdoSavedPaletteRepository($pdo);
     $photoRepo = new PdoPhotoRepository($pdo);
     $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
     $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
-    $svc = new PaletteViewerService($appliedRepo, $savedRepo, $renderSvc, $playlistInstanceRepo, $appliedPhotoRepo);
-
-    if ($source === 'applied') {
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        $playlistInstanceId = isset($_GET['psi']) ? (int)$_GET['psi'] : null;
-        $data = $svc->getApplied($id, $playlistInstanceId);
-        respond(['ok' => true, 'data' => $data]);
-    }
+    $svc = new PaletteViewerService($savedRepo, $renderSvc, $playlistInstanceRepo);
 
     $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : null;
     $savedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;

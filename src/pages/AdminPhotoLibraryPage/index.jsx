@@ -1394,7 +1394,6 @@ export default function AdminPhotoLibraryPage() {
               >
                 <option value="">All</option>
                 <option value="saved_palette_photo">Saved palette</option>
-                <option value="applied_palette">Applied palette</option>
                 <option value="progression">Progression</option>
                 <option value="client">Client</option>
                 <option value="article">Article</option>

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
-import { DEFAULT_AUDIENCE_OPTIONS, fetchAudienceOptions } from "@helpers/audienceOptions";
 import "./admin-cta-pages.css";
 
 const CTA_PAGES_LIST_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
@@ -15,7 +14,6 @@ const emptyPage = {
   key: "",
   label: "",
   description: "",
-  audience: "pinterest",
 };
 
 function normalizeCtas(items) {
@@ -35,7 +33,6 @@ function normalizePage(row) {
     key: row?.key || "",
     label: row?.label || "",
     description: row?.description || "",
-    audience: row?.audience || "any",
     created_at: row?.created_at || "",
   };
 }
@@ -62,7 +59,6 @@ export default function AdminCtaPagesPage() {
   const [ctas, setCtas] = useState([]);
   const [form, setForm] = useState(emptyPage);
   const [items, setItems] = useState([]);
-  const [audienceOptions, setAudienceOptions] = useState(DEFAULT_AUDIENCE_OPTIONS);
   const [selectedAvailableId, setSelectedAvailableId] = useState("");
   const [selectedPageItemId, setSelectedPageItemId] = useState("");
   const [query, setQuery] = useState("");
@@ -100,9 +96,6 @@ export default function AdminCtaPagesPage() {
   useEffect(() => {
     fetchPages();
     fetchCtas();
-    fetchAudienceOptions()
-      .then(setAudienceOptions)
-      .catch(() => setAudienceOptions(DEFAULT_AUDIENCE_OPTIONS));
   }, [fetchCtas, fetchPages]);
 
   async function fetchPageItems(pageId) {
@@ -174,7 +167,6 @@ export default function AdminCtaPagesPage() {
         id: form.id ? Number(form.id) : null,
         key: form.key.trim(),
         label: form.label.trim(),
-        audience: form.audience || "any",
       };
       if (!payload.key) throw new Error("Page key is required.");
       if (!payload.label) throw new Error("Page name is required.");
@@ -298,7 +290,7 @@ export default function AdminCtaPagesPage() {
                 onClick={() => selectPage(page)}
               >
                 <span className="cta-page-row-title">{page.label}</span>
-                <span className="cta-page-row-meta">#{page.id} - {page.key} - {page.audience || "any"}</span>
+                <span className="cta-page-row-meta">#{page.id} - {page.key}</span>
               </button>
             ))}
           </div>
@@ -339,16 +331,6 @@ export default function AdminCtaPagesPage() {
                 onChange={(event) => updateForm("label", event.target.value)}
                 placeholder="Pinterest"
               />
-            </label>
-            <label>
-              Audience
-              <select value={form.audience || "any"} onChange={(event) => updateForm("audience", event.target.value)}>
-                {audienceOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </label>
             <label className="cta-page-form-wide">
               Description

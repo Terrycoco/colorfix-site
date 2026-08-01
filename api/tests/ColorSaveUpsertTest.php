@@ -56,3 +56,51 @@ test('color-save upsert updates chip_num (transactional)', function () {
         throw $e;
     }
 });
+
+test('color-save upsert updates lrv (transactional)', function () {
+    if (!isset($GLOBALS['pdo']) || !$GLOBALS['pdo'] instanceof PDO) {
+        throw new RuntimeException('DB not available; ensure /api/db.php defines $pdo.');
+    }
+    $pdo = $GLOBALS['pdo'];
+
+    $brand = (string)$pdo->query("SELECT code FROM company ORDER BY code LIMIT 1")->fetchColumn();
+    if ($brand === '' || $brand === false) {
+        $brand = (string)$pdo->query("SELECT DISTINCT brand FROM colors WHERE brand IS NOT NULL AND brand<>'' ORDER BY brand LIMIT 1")->fetchColumn();
+    }
+    if ($brand === '' || $brand === false) {
+        throw new RuntimeException('No valid brand code found for FK.');
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $svc = new ColorSaveService();
+
+        $ins = $svc->save([
+            'name'  => 'LRV Insert ' . uniqid(),
+            'brand' => $brand,
+            'code'  => 'LRV-INS',
+            'hex6'  => 'F4F1EA',
+            'lrv'   => 83.25,
+        ], $pdo);
+        if (empty($ins['ok'])) throw new RuntimeException('insert failed');
+        $id = (int)$ins['id'];
+        if ($id <= 0) throw new RuntimeException('missing id after insert');
+
+        $r1 = $pdo->query("SELECT lrv FROM colors WHERE id = {$id}")->fetch(PDO::FETCH_ASSOC);
+        if (!$r1 || abs((float)$r1['lrv'] - 83.25) > 0.001) throw new RuntimeException('lrv not saved after insert');
+
+        $upd = $svc->save([
+            'id'  => $id,
+            'lrv' => 62.5,
+        ], $pdo);
+        if (empty($upd['ok'])) throw new RuntimeException('update failed');
+
+        $r2 = $pdo->query("SELECT lrv FROM colors WHERE id = {$id}")->fetch(PDO::FETCH_ASSOC);
+        if (!$r2 || abs((float)$r2['lrv'] - 62.5) > 0.001) throw new RuntimeException('lrv not saved after update');
+
+        $pdo->rollBack();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+});

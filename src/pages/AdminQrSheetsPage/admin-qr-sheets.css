@@ -121,7 +121,8 @@
   font-weight: 600;
 }
 
-.admin-qr-sheets__watch-config select {
+.admin-qr-sheets__watch-config select,
+.admin-qr-sheets__watch-config input {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 8px 10px;

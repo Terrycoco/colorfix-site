@@ -36,6 +36,9 @@ final class ColorSaveService
         $brand   = $data['brand'] ?? null;
         $code    = $data['code']  ?? null;
         $chipNum = $data['chip_num'] ?? null;
+        $lrv     = array_key_exists('lrv', $data) && $data['lrv'] !== '' && $data['lrv'] !== null
+            ? (float)$data['lrv']
+            : null;
 
         // Inputs that represent the actual color
         $hex6In = $data['hex6'] ?? null; // "EFEFEF"
@@ -89,6 +92,7 @@ final class ColorSaveService
             if ($brand   !== null) $update['brand']    = (string)$brand;
             if ($code    !== null) $update['code']     = (string)$code;
             if ($chipNum !== null) $update['chip_num'] = (string)$chipNum;
+            if (array_key_exists('lrv', $data)) $update['lrv'] = $lrv;
             if (array_key_exists('exterior', $data)) $update['exterior'] = $data['exterior'] ? 1 : 0;
             if (array_key_exists('interior', $data)) $update['interior'] = $data['interior'] ? 1 : 0;
             if (array_key_exists('is_inactive', $data)) {
@@ -161,6 +165,7 @@ final class ColorSaveService
                 'brand'       => (string)$brand,
                 'code'        => $code !== null ? (string)$code : null,
                 'chip_num'    => $chipNum !== null ? (string)$chipNum : null,
+                'lrv'         => array_key_exists('lrv', $data) ? $lrv : null,
                 'hex6'        => strtoupper((string)$hex6),
                 'r'           => $r, 'g' => $g, 'b' => $b,
                 'lab_l'       => $lab['L'], 'lab_a' => $lab['a'], 'lab_b' => $lab['b'],

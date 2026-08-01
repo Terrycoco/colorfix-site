@@ -254,26 +254,7 @@ final class PinterestPinRenderToolkit
 
     private function appliedPaletteColors(int $appliedPaletteId): array
     {
-        $stmt = $this->pdo?->prepare(
-            'SELECT c.name AS color_name,
-                    c.brand AS color_brand,
-                    c.code AS color_code,
-                    c.hex6 AS color_hex6
-               FROM applied_palette_entries e
-          LEFT JOIN swatch_view c
-                 ON c.id = e.color_id
-              WHERE e.applied_palette_id = :id
-           ORDER BY e.id ASC
-              LIMIT 12'
-        );
-        if (!$stmt) {
-            return [];
-        }
-        $stmt->execute([':id' => $appliedPaletteId]);
-        $colors = array_values(array_filter($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [], static function (array $row): bool {
-            return trim((string)($row['color_hex6'] ?? '')) !== '';
-        }));
-        return array_slice($this->uniqueColors($colors), 0, 4);
+        return [];
     }
 
     public function drawPaintCanLid(\GdImage $canvas, array $color, int $cx, int $cy, int $diameter): void

@@ -25,13 +25,6 @@ const MatchResultsPage = lazy(() => import('@pages/MatchResultsPage'));
 const QuickFindPage = lazy(() => import('@pages/QuickFindPage'));
 const BrowsePalettesPage = lazy(() => import('@pages/BrowsePalettesPage'));
 const PaletteTranslationPage = lazy(() => import('@pages/PaletteTranslationPage'));
-const HOALandingPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOALandingPage })));
-const HOAExplainerPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAExplainerPage })));
-const HOAContactPage = lazy(() => import("@pages/HOAPage").then((mod) => ({ default: mod.HOAContactPage })));
-const HOA_PUBLIC_ENABLED = false;
-
-const AppliedPaletteViewPage = lazy(() => import('@pages/AppliedPaletteViewPage'));
-const PrintAppliedPalettePage = lazy(() => import('@pages/PrintAppliedPalettePage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
@@ -54,16 +47,8 @@ function AppRouter() {
 
       <Routes>
         <Route
-          path="print/applied/:paletteId"
-          element={renderWithSuspense(PrintAppliedPalettePage, 'Loading printable applied palette…')}
-        />
-        <Route
           path="print/my-palette"
           element={renderWithSuspense(PrintMyPalettePage, 'Loading printable palette…')}
-        />
-        <Route
-          path="view/:paletteId"
-          element={renderWithSuspense(AppliedPaletteViewPage, 'Loading palette…')}
         />
         <Route
           path="palette/:hash/share"
@@ -129,18 +114,6 @@ function AppRouter() {
            <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />
            <Route path="palette/:id/brands" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
            <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />   
-           <Route
-             path="/hoa"
-             element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOALandingPage, 'Loading HOA…') : <Navigate to="/results/4" replace />}
-           />
-            <Route
-              path="/hoa/explain"
-              element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOAExplainerPage, 'Loading HOA info…') : <Navigate to="/results/4" replace />}
-            />
-            <Route
-              path="/hoa/contact"
-              element={HOA_PUBLIC_ENABLED ? renderWithSuspense(HOAContactPage, 'Loading contact…') : <Navigate to="/results/4" replace />}
-            />
             <Route path="articles/:id" element={renderWithSuspense(ArticlePage, 'Loading article…')} />
 
            

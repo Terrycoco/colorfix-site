@@ -3,8 +3,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repos\PdoAppliedPalettePhotoRepository;
-use App\Repos\PdoAppliedPaletteRepository;
 use App\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistRepository;
@@ -17,8 +15,6 @@ final class PlaylistPhotoLibrarySyncService
     private PdoPhotoLibraryRepository $photoLibraryRepo;
     private PhotoLibraryService $photoLibraryService;
     private PdoPhotoRepository $photoRepo;
-    private PdoAppliedPaletteRepository $appliedPaletteRepo;
-    private PdoAppliedPalettePhotoRepository $appliedPalettePhotoRepo;
     private PhotoRenderingService $photoRenderingService;
 
     public function __construct(private PDO $pdo)
@@ -27,8 +23,6 @@ final class PlaylistPhotoLibrarySyncService
         $this->photoLibraryRepo = new PdoPhotoLibraryRepository($pdo);
         $this->photoLibraryService = new PhotoLibraryService($this->photoLibraryRepo);
         $this->photoRepo = new PdoPhotoRepository($pdo);
-        $this->appliedPaletteRepo = new PdoAppliedPaletteRepository($pdo);
-        $this->appliedPalettePhotoRepo = new PdoAppliedPalettePhotoRepository($pdo);
         $this->photoRenderingService = new PhotoRenderingService($this->photoRepo, $pdo);
     }
 
@@ -408,44 +402,11 @@ final class PlaylistPhotoLibrarySyncService
             }
 
             if ($sourceType === 'applied_palette' && $sourceId > 0) {
-                $palette = $this->appliedPaletteRepo->findById($sourceId);
-                if (!$palette) {
-                    return ['status' => 'missing_applied_palette'];
-                }
-
-                $renderInfo = $this->photoRenderingService->getCachedAppliedPaletteRender($palette);
-                $renderRel = trim((string)($renderInfo['render_rel_path'] ?? ''));
-                if ($renderRel === '') {
-                    return ['status' => 'cached_applied_palette_render_missing'];
-                }
-
-                $photoLibraryId = $this->photoLibraryService->syncAppliedPalettePhoto($palette, $renderRel);
-                return [
-                    'photo_library_id' => $photoLibraryId > 0 ? $photoLibraryId : (int)$libraryRow['photo_library_id'],
-                    'rel_path' => $renderRel,
-                    'status' => 'relinked_cached_applied_palette_render',
-                    'repaired' => true,
-                ];
+                return ['status' => 'legacy_applied_palette_removed'];
             }
 
             if (in_array($sourceType, ['applied_palette_photo', 'applied_before'], true) && $sourceId > 0) {
-                $photo = $this->appliedPalettePhotoRepo->getPhotoById($sourceId);
-                if (!$photo) {
-                    return ['status' => 'missing_applied_palette_photo'];
-                }
-
-                $relPath = trim((string)($photo['rel_path'] ?? ''));
-                if (!$this->libraryPathExists($relPath)) {
-                    return ['status' => 'applied_palette_photo_still_missing'];
-                }
-
-                $photoLibraryId = $this->photoLibraryService->syncAppliedPaletteAttachmentPhoto($photo);
-                return [
-                    'photo_library_id' => $photoLibraryId > 0 ? $photoLibraryId : (int)$libraryRow['photo_library_id'],
-                    'rel_path' => $relPath,
-                    'status' => 'repaired_applied_palette_attachment',
-                    'repaired' => true,
-                ];
+                return ['status' => 'legacy_applied_palette_photo_removed'];
             }
         } catch (Throwable $e) {
             return [

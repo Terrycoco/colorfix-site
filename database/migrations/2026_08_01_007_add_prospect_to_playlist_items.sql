@@ -1,0 +1,2 @@
+ALTER TABLE playlist_items
+    ADD COLUMN prospect TINYINT(1) NOT NULL DEFAULT 1 AFTER pin;

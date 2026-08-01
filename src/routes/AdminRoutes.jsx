@@ -54,17 +54,11 @@ const AdminPhotoLibraryToolsPage = lazy(() => import('@pages/AdminPhotoLibraryTo
 const AdminFileLockerPage = lazy(() => import('@pages/AdminFileLockerPage'));
 const AdminClientsPage = lazy(() => import('@pages/AdminClientsPage'));
 const AdminEmailTemplatesPage = lazy(() => import('@pages/AdminEmailTemplatesPage'));
-const AdminMaskTesterPage = lazy(() => import('@pages/AdminMaskTesterPage'));
-const AdminAppliedPalettesPage = lazy(() => import('@pages/AdminAppliedPalettesPage'));
-const AdminAppliedPaletteEditorPage = lazy(() => import('@pages/AdminAppliedPaletteEditorPage'));
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresenterPage'));
 const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
 const AdminPlaylistInstanceSetsPage = lazy(() => import('@pages/AdminPlaylistInstanceSetsPage'));
 const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
-const AdminHOAPage = lazy(() => import('@pages/AdminHOAPage'));
-const AdminHoaSchemeTesterPage = lazy(() => import('@pages/AdminHoaSchemeTesterPage'));
-const AdminHoaMaskTesterPage = lazy(() => import('@pages/AdminHoaMaskTesterPage'));
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
 const AdminCtaPagesPage = lazy(() => import('@pages/AdminCtaPagesPage'));
 const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
@@ -122,13 +116,13 @@ export default function AdminRoutes() {
         <Route path="missing-chips" element={renderWithSuspense(MissingChipsPage, 'Loading missing chips...')} />
         <Route path="lrv-editor" element={renderWithSuspense(WhitesLrvEditorPage, 'Loading LRV editor...')} />
         <Route path="upload-photo" element={renderWithSuspense(AdminUploadPhotoPage, 'Loading upload tool...')} />
-        <Route path="mask-tester" element={renderWithSuspense(AdminMaskTesterPage, 'Loading mask tester...')} />
         <Route path="roles-masks" element={renderWithSuspense(AdminRolesMasksPage, 'Loading admin roles/masks...')} />
         <Route path="supercats" element={renderWithSuspense(AdminSupercatsPage, 'Loading supercats...')} />
         <Route path="saved-palettes" element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes...')} />
         <Route path="palette-photos" element={renderWithSuspense(AdminPalettePhotosPage, 'Loading palette photos...')} />
         <Route path="kickers" element={renderWithSuspense(AdminKickersPage, 'Loading kickers...')} />
         <Route path="ideas" element={renderWithSuspense(AdminIdeasPage, 'Loading ideas...')} />
+        <Route path="milestones" element={<Navigate to="/admin/ideas?tab=milestones" replace />} />
         <Route path="articles" element={renderWithSuspense(AdminArticlesPage, 'Loading articles...')} />
         <Route path="projects" element={renderWithSuspense(AdminProjectsPage, 'Loading projects...')} />
         <Route path="share" element={renderWithSuspense(AdminSharePage, 'Loading admin share...')} />
@@ -150,8 +144,6 @@ export default function AdminRoutes() {
         <Route path="file-locker" element={renderWithSuspense(AdminFileLockerPage, 'Loading file locker...')} />
         <Route path="clients" element={renderWithSuspense(AdminClientsPage, 'Loading clients...')} />
         <Route path="email-templates" element={renderWithSuspense(AdminEmailTemplatesPage, 'Loading email templates...')} />
-        <Route path="applied-palettes" element={renderWithSuspense(AdminAppliedPalettesPage, 'Loading applied palettes...')} />
-        <Route path="applied-palettes/:paletteId/edit" element={renderWithSuspense(AdminAppliedPaletteEditorPage, 'Loading palette editor...')} />
         <Route path="send-note" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="picker" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="p/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
@@ -167,9 +159,6 @@ export default function AdminRoutes() {
         <Route path="playlist-instance-sets" element={renderWithSuspense(AdminPlaylistInstanceSetsPage, 'Loading playlist instance sets...')} />
         <Route path="ctas" element={renderWithSuspense(AdminCtasPage, 'Loading CTAs...')} />
         <Route path="cta-pages" element={renderWithSuspense(AdminCtaPagesPage, 'Loading CTA pages...')} />
-        <Route path="hoas" element={renderWithSuspense(AdminHOAPage, 'Loading HOAs...')} />
-        <Route path="hoa-scheme-tester" element={renderWithSuspense(AdminHoaSchemeTesterPage, 'Loading HOA scheme tester...')} />
-        <Route path="hoa-mask-tester" element={renderWithSuspense(AdminHoaMaskTesterPage, 'Loading HOA mask tester...')} />
         <Route path="playlists/:playlistId" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists/new" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />

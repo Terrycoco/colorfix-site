@@ -90,19 +90,6 @@ if (array_key_exists('approved', $entry) && $entry['approved'] !== null) {
     $settingPayload['approved'] = $entry['approved'];
 }
 $saved = $service->saveSetting($assetId, $mask, $settingPayload);
-    $flagStmt = $pdo->prepare("
-        UPDATE applied_palettes ap
-        JOIN applied_palette_entries ape ON ape.applied_palette_id = ap.id
-        SET ap.needs_rerender = 1
-        WHERE ap.asset_id = :asset
-          AND ape.mask_role = :mask
-          AND ape.color_id = :color
-    ");
-    $flagStmt->execute([
-        ':asset' => $assetId,
-        ':mask' => $mask,
-        ':color' => (int)($saved['color_id'] ?? 0),
-    ]);
 
     respond(['ok' => true, 'setting' => $saved]);
 } catch (Throwable $e) {

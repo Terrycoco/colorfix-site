@@ -17,6 +17,21 @@ function respond(array $payload, int $status = 200): void {
     exit;
 }
 
+function columnExists(PDO $pdo, string $table, string $column): bool {
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*)
+           FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND TABLE_NAME = :table_name
+            AND COLUMN_NAME = :column_name'
+    );
+    $stmt->execute([
+        'table_name' => $table,
+        'column_name' => $column,
+    ]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     respond(['ok' => false, 'error' => 'GET only'], 405);
 }
@@ -30,8 +45,10 @@ if ($tagsRaw !== '') {
     $tags = array_map('strtolower', $tags);
 }
 $onlyActive = isset($_GET['active']) ? (int)$_GET['active'] === 1 : false;
+$includeRetired = isset($_GET['include_retired']) ? (int)$_GET['include_retired'] === 1 : false;
 
 if ($playlistId > 0) {
+    $hasRetired = columnExists($pdo, 'playlist_instances', 'is_retired');
     $sql = <<<SQL
         SELECT
           playlist_instance_id,
@@ -54,6 +71,9 @@ if ($playlistId > 0) {
         SQL;
     if ($onlyActive) {
         $sql .= "\n  AND is_active = 1";
+    }
+    if (!$includeRetired && $hasRetired) {
+        $sql .= "\n  AND COALESCE(is_retired, 0) = 0";
     }
     $sql .= "\nORDER BY playlist_instance_id DESC";
     $stmt = $pdo->prepare($sql);
@@ -78,7 +98,7 @@ if ($playlistId > 0) {
 }
 
 $repo = new PdoPlaylistInstanceRepository($pdo);
-$instances = $repo->listAll($onlyActive);
+$instances = $repo->listAll($onlyActive, $includeRetired);
 
 if ($q !== '' || $tags) {
     $instances = array_values(array_filter($instances, static function ($instance) use ($q, $tags) {

@@ -5,11 +5,14 @@ namespace App\Services;
 
 use App\Repos\PdoPlaylistRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
+use App\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
 use App\Entities\Playlist;
 use App\Entities\PlaylistItem;
 use App\Entities\PlaylistInstance;
+use App\Entities\PlayerExperience;
+use DomainException;
 use PDO;
 use RuntimeException;
 
@@ -40,10 +43,14 @@ class PlayerExperienceService
             throw new RuntimeException("Playlist instance not found: {$playlistInstanceId}");
         }
 
+        $experience = $this->resolvePlayerExperience($instance);
+        $experienceBacked = $experience instanceof PlayerExperience;
+        $slideFlag = $experienceBacked ? $this->normalizeSlideFlag($experience->slideFlag) : 'site';
+
         // 2. Load playlist
         $playlistStartedAt = microtime(true);
         $playlistRepo = new PdoPlaylistRepository($this->pdo);
-        $playlist = $playlistRepo->getById((string)$instance->playlistId);
+        $playlist = $playlistRepo->getById((string)$instance->playlistId, $slideFlag);
         $this->markTiming('load_playlist', $playlistStartedAt);
 
         if (!$playlist instanceof Playlist) {
@@ -62,46 +69,53 @@ class PlayerExperienceService
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
         $ctaStartedAt = microtime(true);
-        $overrides = [];
-        if (!empty($instance->ctaOverrides)) {
-            $decoded = json_decode($instance->ctaOverrides, true);
-            if (is_array($decoded)) {
-                $overrides = $decoded;
-            }
-        }
-
-        $ctas = [];
-        $ctaRepo = null;
-
-        $overrideIds = $overrides['_cta_ids'] ?? null;
-        if (is_array($overrideIds)) {
-            // If explicit CTA ids are provided, use only those.
+        if ($experienceBacked) {
             $ctaRepo = new PdoCtaRepository($this->pdo);
-            $ctas = $ctaRepo->getByIds($overrideIds);
+            $ctas = $ctaRepo->getByGroupId($experience->ctaPageId);
         } else {
-            if ($instance->ctaGroupId !== null) {
-                $ctaRepo = new PdoCtaRepository($this->pdo);
-                $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
-            }
-            if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
-                if ($instance->ctaGroupId !== null && (int)$instance->ctaGroupId === (int)$addCtaGroupId) {
-                    // Avoid re-adding the same default group.
-                    $addCtaGroupId = null;
+            $overrides = [];
+            if (!empty($instance->ctaOverrides)) {
+                $decoded = json_decode($instance->ctaOverrides, true);
+                if (is_array($decoded)) {
+                    $overrides = $decoded;
                 }
             }
-            if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
-                if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
-                $extra = $ctaRepo->getByGroupId($addCtaGroupId);
-                if ($extra) {
-                    $ctas = $this->mergeCtas($ctas, $extra);
-                }
-            }
-            $ctas = $this->applyCtaInclusions($ctas, $overrides);
-        }
 
+            $ctas = [];
+            $ctaRepo = null;
+
+            $overrideIds = $overrides['_cta_ids'] ?? null;
+            if (is_array($overrideIds)) {
+                // If explicit CTA ids are provided, use only those.
+                $ctaRepo = new PdoCtaRepository($this->pdo);
+                $ctas = $ctaRepo->getByIds($overrideIds);
+            } else {
+                if ($instance->ctaGroupId !== null) {
+                    $ctaRepo = new PdoCtaRepository($this->pdo);
+                    $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
+                }
+                if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
+                    if ($instance->ctaGroupId !== null && (int)$instance->ctaGroupId === (int)$addCtaGroupId) {
+                        // Avoid re-adding the same default group.
+                        $addCtaGroupId = null;
+                    }
+                }
+                if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
+                    if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
+                    $extra = $ctaRepo->getByGroupId($addCtaGroupId);
+                    if ($extra) {
+                        $ctas = $this->mergeCtas($ctas, $extra);
+                    }
+                }
+                $ctas = $this->applyCtaInclusions($ctas, $overrides);
+            }
+
+            if (!empty($ctas)) {
+                $ctas = $this->applyCtaExclusions($ctas, $overrides);
+                $ctas = $this->applyCtaOverrides($ctas, $overrides);
+            }
+        }
         if (!empty($ctas)) {
-            $ctas = $this->applyCtaExclusions($ctas, $overrides);
-            $ctas = $this->applyCtaOverrides($ctas, $overrides);
             $ctas = $this->hydrateArticleCtas($ctas);
         }
         $this->markTiming('load_ctas', $ctaStartedAt);
@@ -124,7 +138,7 @@ class PlayerExperienceService
             $playlist->meta['meta_description'] ?? null,
             $instance->shareDescription,
         ]);
-        return [
+        $plan = [
             'playlist_instance_id' => $instance->id,
             'playlist_id'          => $playlist->playlist_id,
             'title'                => $playlist->title,
@@ -151,6 +165,16 @@ class PlayerExperienceService
             'hide_stars'           => $instance->hideStars,
             'playlist_instance_set_ids' => $setIds,
         ];
+        if ($experienceBacked) {
+            $plan['player_experience_id'] = $experience->playerExperienceId;
+            $plan['experience_key'] = $experience->experienceKey;
+            $plan['experience_name'] = $experience->name;
+            $plan['slide_flag'] = $slideFlag;
+            $plan['palette_viewer_key'] = $experience->paletteViewerKey;
+            $plan['cta_page_id'] = $experience->ctaPageId;
+        }
+
+        return $plan;
     }
 
     /**
@@ -173,6 +197,37 @@ class PlayerExperienceService
             }
         }
         return $flat;
+    }
+
+    private function resolvePlayerExperience(PlaylistInstance $instance): ?PlayerExperience
+    {
+        $id = (int)($instance->playerExperienceId ?? 0);
+        if ($id <= 0) {
+            return null;
+        }
+
+        $repo = new PdoPlayerExperienceRepository($this->pdo);
+        $experience = $repo->getById($id);
+        if (!$experience instanceof PlayerExperience) {
+            throw new DomainException("Player experience configuration error: referenced experience {$id} was not found.");
+        }
+        if (!$experience->isActive) {
+            throw new DomainException("Player experience configuration error: referenced experience {$id} is inactive.");
+        }
+
+        $this->normalizeSlideFlag($experience->slideFlag);
+
+        return $experience;
+    }
+
+    private function normalizeSlideFlag(string $slideFlag): string
+    {
+        $value = strtolower(trim($slideFlag));
+        $allowed = ['site', 'yt', 'pin', 'prospect', 'client'];
+        if (!in_array($value, $allowed, true)) {
+            throw new DomainException("Player experience configuration error: unsupported slide_flag '{$slideFlag}'.");
+        }
+        return $value;
     }
 
     private function normalizeStartIndex(?int $start, int $count): int
@@ -290,16 +345,11 @@ class PlayerExperienceService
     {
         $photoIds = [];
         $assetIds = [];
-        $appliedPaletteIds = [];
         $savedPaletteHashes = [];
         foreach ($items as $item) {
             if (!$item instanceof PlaylistItem) continue;
             $photoId = $item->photo_library_id ?? null;
             $imageUrl = (string)($item->image_url ?? '');
-            $apId = (int)($item->ap_id ?? 0);
-            if ($apId > 0) {
-                $appliedPaletteIds[$apId] = true;
-            }
             $paletteHash = trim((string)($item->palette_hash ?? ''));
             if ($paletteHash !== '') {
                 $savedPaletteHashes[$paletteHash] = true;
@@ -316,7 +366,6 @@ class PlayerExperienceService
 
         $photoMetaMap = $this->loadPhotoLibraryMeta(array_keys($photoIds));
         $assetUrlMap = $this->loadAssetVariantUrls(array_keys($assetIds));
-        $appliedPaletteTitleMap = $this->loadAppliedPaletteTitles(array_keys($appliedPaletteIds));
         $savedPaletteTitleMap = $this->loadSavedPaletteTitles(array_keys($savedPaletteHashes));
 
         foreach ($items as $item) {
@@ -324,9 +373,6 @@ class PlayerExperienceService
             $imageUrl = (string)($item->image_url ?? '');
             $photoId = $item->photo_library_id ?? null;
             $apId = (int)($item->ap_id ?? 0);
-            if (empty($item->palette_title) && $apId > 0 && !empty($appliedPaletteTitleMap[$apId])) {
-                $item->palette_title = $appliedPaletteTitleMap[$apId];
-            }
             $paletteHash = trim((string)($item->palette_hash ?? ''));
             if (empty($item->palette_title) && $paletteHash !== '' && !empty($savedPaletteTitleMap[$paletteHash])) {
                 $item->palette_title = $savedPaletteTitleMap[$paletteHash];
@@ -378,37 +424,6 @@ class PlayerExperienceService
                 $item->image_url = $resolved;
             }
         }
-    }
-
-    /**
-     * @param int[] $paletteIds
-     * @return array<int, string>
-     */
-    private function loadAppliedPaletteTitles(array $paletteIds): array
-    {
-        $ids = array_values(array_filter(array_map('intval', $paletteIds)));
-        if (!$ids) return [];
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                id,
-                COALESCE(
-                    NULLIF(TRIM(display_title), ''),
-                    NULLIF(TRIM(title), ''),
-                    CONCAT('Palette ', id)
-                ) AS palette_title
-             FROM applied_palettes
-             WHERE id IN ({$placeholders})"
-        );
-        $stmt->execute($ids);
-        $map = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $title = trim((string)($row['palette_title'] ?? ''));
-            if ($title !== '') {
-                $map[(int)$row['id']] = $title;
-            }
-        }
-        return $map;
     }
 
     /**

@@ -191,7 +191,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const apId = targetItem.ap_id;
   const paletteHash = targetItem.palette_hash;
   const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
-  if (!apId && !paletteHash && !savedPaletteSetId) return;
+  if (!paletteHash && !savedPaletteSetId) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
     params.set("add_cta_group", String(cta.params.add_cta_group));
@@ -207,10 +207,8 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (resolvedReturnTo) params.set("return_to", resolvedReturnTo);
   if (savedPaletteSetId > 0) params.set("set_id", String(savedPaletteSetId));
   const qs = params.toString();
-  if (!apId && !paletteHash) return;
-  const url = paletteHash
-    ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
-    : `/view/${apId}${qs ? `?${qs}` : ""}`;
+  if (!paletteHash) return;
+  const url = `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`;
   if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
@@ -229,7 +227,7 @@ function shouldNavigateInPlayerShell(url) {
     || url.startsWith("/playlist-thumbs/")
     || url.startsWith("/picker")
     || url.startsWith("/palette/")
-    || url.startsWith("/view/");
+    || url.startsWith("/palette/");
 }
 
 function isFastPlayerShell() {

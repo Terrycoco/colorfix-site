@@ -143,13 +143,11 @@ class PdoClientRepository
         $stmt = $this->pdo->prepare(
             "SELECT
                 (SELECT COUNT(*) FROM photo_library WHERE client_id = :photo_client_id) AS photo_count,
-                (SELECT COUNT(*) FROM client_applied_palettes WHERE client_id = :applied_client_id) AS applied_palette_count,
-                (SELECT COUNT(*) FROM applied_palette_shares WHERE client_id = :share_client_id) AS share_count"
+                0 AS applied_palette_count,
+                0 AS share_count"
         );
         $stmt->execute([
             ':photo_client_id' => $id,
-            ':applied_client_id' => $id,
-            ':share_client_id' => $id,
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
         return [
@@ -167,14 +165,12 @@ class PdoClientRepository
 
     public function deleteAppliedPaletteLinks(int $id): void
     {
-        $stmt = $this->pdo->prepare("DELETE FROM client_applied_palettes WHERE client_id = :id");
-        $stmt->execute([':id' => $id]);
+        // Legacy applied palette tables have been removed.
     }
 
     public function deleteAppliedPaletteShares(int $id): void
     {
-        $stmt = $this->pdo->prepare("DELETE FROM applied_palette_shares WHERE client_id = :id");
-        $stmt->execute([':id' => $id]);
+        // Legacy applied palette tables have been removed.
     }
 
     public function delete(int $id): void
@@ -199,8 +195,8 @@ class PdoClientRepository
                     clients.photo_permission_requested_at,
                     clients.photo_permission_granted_at,
                     (SELECT COUNT(*) FROM photo_library WHERE client_id = clients.id) AS photo_count,
-                    (SELECT COUNT(*) FROM client_applied_palettes WHERE client_id = clients.id) AS applied_palette_count,
-                    (SELECT COUNT(*) FROM applied_palette_shares WHERE client_id = clients.id) AS share_count
+                    0 AS applied_palette_count,
+                    0 AS share_count
                 FROM clients";
     }
 

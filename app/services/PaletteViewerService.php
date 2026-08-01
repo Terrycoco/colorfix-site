@@ -4,8 +4,6 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Entities\Palette;
-use App\Repos\PdoAppliedPaletteRepository;
-use App\Repos\PdoAppliedPalettePhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use RuntimeException;
@@ -13,118 +11,23 @@ use InvalidArgumentException;
 
 class PaletteViewerService
 {
-    private PdoAppliedPaletteRepository $appliedRepo;
     private PdoSavedPaletteRepository $savedRepo;
     private PhotoRenderingService $renderService;
     private ?PdoPlaylistInstanceRepository $playlistInstanceRepo;
-    private ?PdoAppliedPalettePhotoRepository $appliedPhotoRepo;
 
     public function __construct(
-        PdoAppliedPaletteRepository $appliedRepo,
         PdoSavedPaletteRepository $savedRepo,
         PhotoRenderingService $renderService,
-        ?PdoPlaylistInstanceRepository $playlistInstanceRepo = null,
-        ?PdoAppliedPalettePhotoRepository $appliedPhotoRepo = null
+        ?PdoPlaylistInstanceRepository $playlistInstanceRepo = null
     ) {
-        $this->appliedRepo = $appliedRepo;
         $this->savedRepo = $savedRepo;
         $this->renderService = $renderService;
         $this->playlistInstanceRepo = $playlistInstanceRepo;
-        $this->appliedPhotoRepo = $appliedPhotoRepo;
     }
 
     public function getApplied(int $paletteId, ?int $playlistInstanceId = null): array
     {
-        if ($paletteId <= 0) {
-            throw new InvalidArgumentException('palette_id required');
-        }
-
-        $palette = $this->appliedRepo->findById($paletteId);
-        if (!$palette) {
-            throw new RuntimeException('Palette not found');
-        }
-
-        try {
-            $render = $this->renderService->renderAppliedPalette($palette);
-        } catch (\RuntimeException $e) {
-            $message = strtolower($e->getMessage());
-            $isPreparedImageFailure = str_contains($message, 'unable to open prepared image')
-                || str_contains($message, 'no prepared_base found');
-            if (!$isPreparedImageFailure) {
-                throw $e;
-            }
-
-            $render = $this->renderService->getCachedAppliedPaletteRender($palette);
-            if (!$render) {
-                $render = [
-                    'ok' => true,
-                    'render_rel_path' => null,
-                    'render_url' => '',
-                    'width' => null,
-                    'height' => null,
-                ];
-            }
-        }
-        $kickerText = $palette->kickerId
-            ? $this->appliedRepo->getKickerText($palette->kickerId)
-            : null;
-        if ($playlistInstanceId && $this->playlistInstanceRepo) {
-            $instance = $this->playlistInstanceRepo->getById($playlistInstanceId);
-            if ($instance && $instance->kickerId) {
-                $instanceKicker = $this->appliedRepo->getKickerText($instance->kickerId);
-                if ($instanceKicker) {
-                    $kickerText = $instanceKicker;
-                }
-            }
-        }
-
-        $entries = $palette->entries ?? [];
-        $photos = $this->appliedPhotoRepo ? $this->appliedPhotoRepo->getPhotosForPalette($paletteId) : [];
-        $swatches = [];
-        foreach ($entries as $entry) {
-            $swatches[] = [
-                'id' => $entry['color_id'] ?? null,
-                'name' => $entry['color_name'] ?? null,
-                'code' => $entry['color_code'] ?? null,
-                'brand' => $entry['color_brand'] ?? null,
-                'brand_name' => $entry['color_brand_name'] ?? ($entry['brand_name'] ?? null),
-                'hex6' => $entry['color_hex6'] ?? null,
-                'role' => $entry['mask_role'] ?? null,
-                'int_only' => isset($entry['color_int_only']) ? (int)$entry['color_int_only'] : 0,
-            ];
-        }
-
-        $insets = [];
-        foreach ($photos as $photo) {
-            if (($photo['photo_type'] ?? '') === 'before' && !empty($photo['rel_path'])) {
-                $insets[] = [
-                    'url' => $photo['rel_path'],
-                    'alt_text' => $photo['alt_text'] ?? null,
-                    'caption' => 'Before',
-                ];
-            }
-        }
-        foreach ($photos as $photo) {
-            if (($photo['photo_type'] ?? '') === 'zoom' && !empty($photo['rel_path'])) {
-                $insets[] = [
-                    'url' => $photo['rel_path'],
-                    'alt_text' => $photo['alt_text'] ?? null,
-                    'caption' => $photo['caption'] ?? null,
-                ];
-            }
-        }
-        $meta = [
-            'source' => 'applied',
-            'id' => $palette->id ?? null,
-            'title' => $palette->displayTitle ?: ($palette->title ?: 'ColorFix Palette'),
-            'notes' => $palette->notes ?: '',
-            'photo_url' => $render['render_url'] ?? '',
-            'photo_alt' => $palette->altText ?: null,
-            'inset_photos' => $insets,
-            'kicker' => $kickerText,
-        ];
-
-        return (new Palette($meta, $swatches))->toArray();
+        throw new RuntimeException('Applied palettes have been removed');
     }
 
     public function getSaved(string $hash, ?int $setId = null): array

@@ -93,6 +93,12 @@ try {
     }
 
     respond($payload);
+} catch (DomainException $e) {
+    respond([
+        'ok' => false,
+        'error' => $e->getMessage(),
+        'code' => 'player_experience_config_error',
+    ], 500);
 } catch (RuntimeException $e) {
     respond([
         'ok' => false,
