@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
-import { buildSmsShareUrl } from "@helpers/shareUrls";
+import { canUseNativeShare, copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-share.css";
 
@@ -294,7 +294,7 @@ export default function AdminSharePage() {
     );
   }, [assetType, items]);
   const canText = isTextCapableDevice();
-  const canSystemShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const canSystemShare = canUseNativeShare();
   function handleRecipientField(field, value) {
     setRecipient((prev) => ({ ...prev, [field]: value }));
     setStatus({ error: "", success: "" });
@@ -326,29 +326,20 @@ export default function AdminSharePage() {
 
   async function handleCopyLink() {
     if (!shareLink) return;
-    if (!navigator.clipboard?.writeText) {
-      setStatus({ error: "Clipboard is not available in this browser.", success: "" });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      setStatus({ error: "", success: "Share link copied." });
-    } catch {
-      setStatus({ error: "Copy failed.", success: "" });
-    }
+    const copied = await copyShareText(shareLink);
+    setStatus({
+      error: copied ? "" : "Copy failed.",
+      success: copied ? "Share link copied." : "",
+    });
   }
 
   async function handleSystemShare() {
     if (!shareLink || !canSystemShare) return;
-    try {
-      await navigator.share({
-        title: buildAssetLabel(assetType, selectedAsset),
-        text: buildAssetLabel(assetType, selectedAsset),
-        url: shareLink,
-      });
-    } catch {
-      // ignore cancelled shares
-    }
+    await openNativeShare({
+      title: buildAssetLabel(assetType, selectedAsset),
+      text: buildAssetLabel(assetType, selectedAsset),
+      url: shareLink,
+    });
   }
 
   function sendTextLink(phone) {
@@ -360,10 +351,9 @@ export default function AdminSharePage() {
       return;
     }
     const body = `${buildAssetLabel(assetType, selectedAsset)} ${shareLink}`;
-    const smsUrl = buildSmsShareUrl(body, recipientPhone);
     setRecipient(emptyRecipient);
     window.setTimeout(() => {
-      window.location.href = smsUrl;
+      openTextShare({ text: body, phone: recipientPhone }).catch(() => {});
     }, 0);
   }
 

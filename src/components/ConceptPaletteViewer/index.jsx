@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import LogoAnimated from "@components/LogoAnimated";
+import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import "./conceptpaletteviewer.css";
 
 export default function ConceptPaletteViewer({
@@ -167,33 +168,11 @@ export default function ConceptPaletteViewer({
     };
   }, [seoTitle, seoDescription, photoUrl]);
 
-  const isMobileShare = () => {
-    if (typeof window === "undefined") return false;
-
-    if (
-      window.matchMedia?.("(hover: none) and (pointer: coarse)").matches
-    ) {
-      return true;
-    }
-
-    const userAgent = navigator.userAgent || "";
-    return /Android|iPhone|iPad|iPod/i.test(userAgent);
-  };
-
   const handleShare = async () => {
     if (!resolvedShareUrl) return;
 
-    if (navigator.share && isMobileShare()) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url: resolvedShareUrl,
-        });
-        return;
-      } catch {
-        // Fall through to the email share dialog.
-      }
+    if (await openNativeShare({ title: shareTitle, text: shareText, url: resolvedShareUrl })) {
+      return;
     }
 
     setShareForm((previous) => ({
@@ -259,6 +238,31 @@ export default function ConceptPaletteViewer({
         success: "",
       });
     }
+  };
+
+  const shareMessageBody = () =>
+    `${shareForm.message || shareText}\n${resolvedShareUrl}`;
+
+  const handleShareCopyLink = async () => {
+    const copied = await copyShareText(resolvedShareUrl);
+    setShareStatus({
+      loading: false,
+      error: copied ? "" : "Failed to copy link.",
+      success: copied ? "Link copied." : "",
+    });
+  };
+
+  const handleShareText = async () => {
+    const body = shareMessageBody();
+    await copyShareText(body);
+    setShareStatus({
+      loading: false,
+      error: "",
+      success: "Message copied. Messages will open now.",
+    });
+    window.setTimeout(() => {
+      openTextShare({ text: body }).catch(() => {});
+    }, 0);
   };
 
   return (
@@ -505,9 +509,17 @@ export default function ConceptPaletteViewer({
               <button
                 type="button"
                 className="apv-btn apv-btn--ghost"
-                onClick={() => setShareOpen(false)}
+                onClick={handleShareCopyLink}
               >
-                Close
+                Copy Link
+              </button>
+
+              <button
+                type="button"
+                className="apv-btn apv-btn--ghost"
+                onClick={handleShareText}
+              >
+                Text
               </button>
 
               <button

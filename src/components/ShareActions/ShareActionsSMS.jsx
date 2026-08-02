@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { openTextShare } from "@helpers/shareUrls";
 import './shareactions.css';
 
 export default function ShareActionsSMS({ paletteId }) {
@@ -10,20 +11,13 @@ export default function ShareActionsSMS({ paletteId }) {
   // keep current query (eg: ?only=Dunn-Edwards) if you want:
   // pageUrl.search = window.location.search;
 
-  function cleanPhone(p) {
-    return String(p).replace(/[^\d+]/g, "");
-  }
-
   function openSmsComposer() {
-    const to = cleanPhone(phone);
-    if (!to) { inputRef.current?.focus(); return; }
-    const body = encodeURIComponent(
-      `Palette ${paletteId} — view the swatches:\n${pageUrl.toString()}`
-    );
-    // iOS/Android accept these schemes; the `?` vs `&` separator varies by platform
-    const sep = /iPad|iPhone|iPod/.test(navigator.userAgent) ? "&" : "?";
-    const smsUrl = `sms:${to}${sep}body=${body}`;
-    window.location.href = smsUrl;
+    if (!phone.trim()) { inputRef.current?.focus(); return; }
+    openTextShare({
+      text: `Palette ${paletteId} — view the swatches:`,
+      url: pageUrl.toString(),
+      phone,
+    }).catch(() => {});
   }
 
   return (

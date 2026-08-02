@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import LogoAnimated from "@components/LogoAnimated";
 import BrandFooterLogo from "@components/BrandFooterLogo";
+import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import "./appliedpaletteviewer.css";
 
 export default function PaletteViewer({
@@ -131,26 +132,10 @@ export default function PaletteViewer({
     };
   }, [seoTitle, seoDescription, photoUrl]);
 
-  const isMobileShare = () => {
-    if (typeof window === "undefined") return false;
-    if (window.matchMedia?.("(hover: none) and (pointer: coarse)").matches) return true;
-    const ua = navigator.userAgent || "";
-    return /Android|iPhone|iPad|iPod/i.test(ua);
-  };
-
   const handleShare = async () => {
     if (!resolvedShareUrl) return;
-    if (navigator.share && isMobileShare()) {
-      try {
-        await navigator.share({
-          title: shareTitle,
-          text: shareText,
-          url: resolvedShareUrl,
-        });
-        return;
-      } catch {
-        // fall through to email
-      }
+    if (await openNativeShare({ title: shareTitle, text: shareText, url: resolvedShareUrl })) {
+      return;
     }
     setShareForm((prev) => ({
       toEmail: prev.toEmail,
@@ -195,6 +180,30 @@ export default function PaletteViewer({
     } catch (err) {
       setShareStatus({ loading: false, error: err?.message || "Failed to send email", success: "" });
     }
+  };
+
+  const shareMessageBody = () => `${shareForm.message || shareText}\n${resolvedShareUrl}`;
+
+  const handleShareCopyLink = async () => {
+    const copied = await copyShareText(resolvedShareUrl);
+    setShareStatus({
+      loading: false,
+      error: copied ? "" : "Failed to copy link.",
+      success: copied ? "Link copied." : "",
+    });
+  };
+
+  const handleShareText = async () => {
+    const body = shareMessageBody();
+    await copyShareText(body);
+    setShareStatus({
+      loading: false,
+      error: "",
+      success: "Message copied. Messages will open now.",
+    });
+    window.setTimeout(() => {
+      openTextShare({ text: body }).catch(() => {});
+    }, 0);
   };
 
   return (
@@ -381,8 +390,11 @@ export default function PaletteViewer({
             {shareStatus.error && <div className="apv-share-status apv-share-status--error">{shareStatus.error}</div>}
             {shareStatus.success && <div className="apv-share-status apv-share-status--success">{shareStatus.success}</div>}
             <div className="apv-share-actions">
-              <button type="button" className="apv-btn apv-btn--ghost" onClick={() => setShareOpen(false)}>
-                Close
+              <button type="button" className="apv-btn apv-btn--ghost" onClick={handleShareCopyLink}>
+                Copy Link
+              </button>
+              <button type="button" className="apv-btn apv-btn--ghost" onClick={handleShareText}>
+                Text
               </button>
               <button type="button" className="apv-btn apv-btn--copy" onClick={handleShareSend}>
                 {shareStatus.loading ? "Sending…" : "Send Email"}

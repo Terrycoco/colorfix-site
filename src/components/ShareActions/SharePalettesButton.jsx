@@ -1,5 +1,6 @@
 import React from "react";
 import { useLocation, useParams } from "react-router-dom";
+import { copyShareText, shareOrText } from "@helpers/shareUrls";
 import './shareactions.css';
 
 function buildPermalink(paletteId, search) {
@@ -9,11 +10,6 @@ function buildPermalink(paletteId, search) {
   return u.toString();
 }
 
-function isiOS() {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
-
 export default function SharePalettesButton({ className = "" }) {
   const { id } = useParams();
   const { search } = useLocation();
@@ -21,30 +17,17 @@ export default function SharePalettesButton({ className = "" }) {
   const url = React.useMemo(() => buildPermalink(paletteId, search), [paletteId, search]);
 
   async function handleShare() {
-    const text = `Palette ${paletteId} — view the swatches:\n${url}`;
-
-    // 1) Native share sheet (best UX on mobile)
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: `Palette ${paletteId}`, text, url });
-        return;
-      } catch (e) {
-        // fall through to SMS / clipboard
-      }
-    }
-
-    // 2) SMS composer (no number; user enters it in their Messages app)
-    const sep = isiOS() ? "&" : "?";
-    const smsUrl = `sms:${sep}body=${encodeURIComponent(text)}`;
-    // Attempt to open SMS handler (works on phones/tablets)
-    window.location.href = smsUrl;
-
-    // 3) Desktop fallback: copy link
     try {
-      await navigator.clipboard.writeText(url);
-      alert("Link copied to clipboard!");
+      await shareOrText({
+        title: `Palette ${paletteId}`,
+        text: `Palette ${paletteId} — view the swatches:`,
+        url,
+      });
     } catch {
-      // last resort
+      if (await copyShareText(url)) {
+        alert("Link copied to clipboard!");
+        return;
+      }
       window.prompt("Copy this link:", url);
     }
   }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
 import { DEFAULT_AUDIENCE_OPTIONS, fetchAudienceOptions } from "@helpers/audienceOptions";
-import { buildSmsShareUrl, canUseNativeShare } from "@helpers/shareUrls";
+import { copyShareText, shareOrText } from "@helpers/shareUrls";
 import KickerDropdown from "@components/KickerDropdown";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-playlist-instances.css";
@@ -480,26 +480,19 @@ export default function AdminPlaylistInstancesPage() {
     const id = activeId;
     if (!id) return;
     const url = buildShareUrl(id);
-    if (canUseNativeShare()) {
-      navigator.share({ title: "ColorFix Playlist", url }).catch(() => {});
-      return;
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
-    window.location.href = buildSmsShareUrl(url);
+    shareOrText({ title: "ColorFix Playlist", url }).catch(() => {});
   }
 
   function handleCopyLink() {
     const id = activeId || form.playlist_instance_id;
-    if (!id || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(buildShareUrl(id)).catch(() => {});
+    if (!id) return;
+    copyShareText(buildShareUrl(id)).catch(() => {});
   }
 
   function handleCopyPinterestLink() {
     const id = activeId || form.playlist_instance_id;
-    if (!id || !navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(buildShareUrl(id, "pinterest")).catch(() => {});
+    if (!id) return;
+    copyShareText(buildShareUrl(id, "pinterest")).catch(() => {});
   }
 
   function openEmailModal() {

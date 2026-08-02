@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
+import { buildMailtoUrl, shareOrText } from "@helpers/shareUrls";
 import "./admin-playlists.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
@@ -150,21 +151,16 @@ export default function AdminPlaylistsPage() {
   function handleShareInstance(instance) {
     const url = buildShareUrl(instance);
     if (!url) return;
-    if (navigator.share) {
-      navigator.share({ title: "ColorFix Playlist", url }).catch(() => {});
-      return;
-    }
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
+    shareOrText({ title: "ColorFix Playlist", url }).catch(() => {});
   }
 
   function handleEmailInstance(instance) {
     const url = buildShareUrl(instance);
     if (!url) return;
-    const subject = encodeURIComponent(instance.instance_name || instance.display_title || "ColorFix Playlist");
-    const body = encodeURIComponent(url);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    window.location.href = buildMailtoUrl({
+      subject: instance.instance_name || instance.display_title || "ColorFix Playlist",
+      body: url,
+    });
   }
 
   const filtered = useMemo(() => {

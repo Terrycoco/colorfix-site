@@ -1,14 +1,11 @@
 import React from "react";
 import { useLocation, useParams } from "react-router-dom";
+import { canUseNativeShare, copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import "./shareactions.css";
 
-const isiOS = () =>
-  typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isAndroid = () =>
   typeof navigator !== "undefined" && /Android/.test(navigator.userAgent);
-const isMobile = () => isiOS() || isAndroid();
-const hasWebShare = () =>
-  typeof navigator !== "undefined" && typeof navigator.share === "function";
+const isMobile = () => canUseNativeShare() || isAndroid();
 
 function buildPermalink(paletteId, search) {
   const u = new URL(window.location.href);
@@ -46,22 +43,21 @@ export default function SharePaletteMenu({ className = "" }) {
   const text = `Palette ${paletteId} — view the swatches:\n${link}`;
 
   async function doSystemShare() {
-    try { await navigator.share({ title: `Palette ${paletteId}`, text, url: link }); }
-    catch (_) {}
+    await openNativeShare({ title: `Palette ${paletteId}`, text, url: link });
     setOpen(false);
   }
   function doSMS() {
-    const sep = isiOS() ? "&" : "?";
-    window.location.assign(`sms:${sep}body=${encodeURIComponent(text)}`);
+    openTextShare({ text }).catch(() => {});
     setOpen(false);
   }
   async function doCopy() {
-    try { await navigator.clipboard.writeText(link); }
-    catch { window.prompt("Copy this link:", link); }
+    if (!(await copyShareText(link))) {
+      window.prompt("Copy this link:", link);
+    }
     setOpen(false);
   }
 
-  const showSystem = hasWebShare();
+  const showSystem = canUseNativeShare();
   const showSMS = isMobile();
 
   return (

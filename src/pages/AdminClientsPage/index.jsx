@@ -3,7 +3,7 @@ import InsertLinkModal from "@components/InsertLinkModal";
 import LookupTypeManagerModal from "@components/LookupTypeManagerModal";
 import ModalDialog from "@components/ModalDialog";
 import { API_FOLDER } from "@helpers/config";
-import { buildSmsShareUrl } from "@helpers/shareUrls";
+import { copyShareText, openTextShare } from "@helpers/shareUrls";
 import { BRAND } from "@config/brand";
 import "./admin-clients.css";
 
@@ -1120,8 +1120,7 @@ export default function AdminClientsPage() {
       return;
     }
     const body = String(textDraft.message || "").trim();
-    const smsUrl = buildSmsShareUrl(body, phone);
-    window.location.href = smsUrl;
+    openTextShare({ text: body, phone }).catch(() => {});
   }
 
   async function handleCopyTextMessage() {
@@ -1130,10 +1129,10 @@ export default function AdminClientsPage() {
       setError("Write the text message first.");
       return;
     }
-    try {
-      await navigator.clipboard.writeText(message);
+    const copied = await copyShareText(message);
+    if (copied) {
       setNotice("Text copied.");
-    } catch {
+    } else {
       setError("Failed to copy text.");
     }
   }

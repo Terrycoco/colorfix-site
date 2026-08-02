@@ -437,14 +437,19 @@
 
 .apv-share-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+  max-width: 100%;
 }
 
 .apv-share-panel .apv-btn {
   color: #111;
   background: #f3f4f6;
   border-color: #d1d5db;
+  flex: 1 1 120px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .apv-share-panel .apv-btn--ghost {
@@ -458,6 +463,16 @@
   background: #111;
   color: #fff;
   border-color: #111;
+}
+
+@media (max-width: 520px) {
+  .apv-share-actions {
+    justify-content: stretch;
+  }
+
+  .apv-share-panel .apv-btn {
+    flex-basis: calc(50% - 5px);
+  }
 }
 
 .apv-share-close {

@@ -1,6 +1,6 @@
 // Centralized CTA action handlers shared by player screens.
 import { getPaletteTargets, isPaletteEligibleItem } from "@helpers/playerPaletteItems";
-import { buildSmsShareUrl, canUseNativeShare } from "@helpers/shareUrls";
+import { copyShareText, openTextShare, shareOrText } from "@helpers/shareUrls";
 
 export function getCtaKey(cta) {
   return (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
@@ -23,24 +23,16 @@ function runShare({ data, shareFolder, shareSource }) {
   const url = buildShareUrl(shareFolder, data.playlist_instance_id, shareSource);
   const title = data?.share_title || data?.title || "ColorFix Playlist";
   const text = data?.share_description || "I'm sharing a playlist I found on ColorFix";
-  if (canUseNativeShare()) {
-    navigator.share({ title, text, url }).catch(() => {});
-    return;
-  }
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).catch(() => {});
-  }
-  window.location.href = buildSmsShareUrl(`${text}\n${url}`);
+  shareOrText({ title, text, url }).catch(() => {});
 }
 
-function runCopyLink({ data, shareFolder, shareSource }) {
+async function runCopyLink({ data, shareFolder, shareSource }) {
   if (!data?.playlist_instance_id) return;
   const url = buildShareUrl(shareFolder, data.playlist_instance_id, shareSource);
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(url).catch(() => {});
+  if (await copyShareText(url)) {
     return;
   }
-  window.location.href = buildSmsShareUrl(url);
+  await openTextShare({ url });
 }
 
 function runNavigate({ navigate, cta, psi, thumb, demo }) {

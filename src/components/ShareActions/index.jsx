@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { copyShareText } from "@helpers/shareUrls";
 
 /**
  * ShareActions
@@ -9,12 +10,11 @@ import React, { useRef } from "react";
  */
 export default function ShareActions({ targetRef, filename = "palette.png", className = "" }) {
   async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
+    if (await copyShareText(window.location.href)) {
       alert("Link copied!");
-    } catch {
-      prompt("Copy link:", window.location.href);
+      return;
     }
+    prompt("Copy link:", window.location.href);
   }
 
   async function downloadPng() {
