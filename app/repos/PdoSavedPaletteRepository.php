@@ -207,6 +207,10 @@ class PdoSavedPaletteRepository
                     vc.notes,
                     vc.cta_label,
                     vc.playlist_url,
+                    vc.share_card_template_id,
+                    vc.share_card_fields_json,
+                    vc.share_card_image_path,
+                    vc.share_card_generated_at,
                     vc.is_active,
                     vc.created_at,
                     vc.updated_at
@@ -236,6 +240,10 @@ class PdoSavedPaletteRepository
                     vc.notes,
                     vc.cta_label,
                     vc.playlist_url,
+                    vc.share_card_template_id,
+                    vc.share_card_fields_json,
+                    vc.share_card_image_path,
+                    vc.share_card_generated_at,
                     vc.is_active,
                     vc.created_at,
                     vc.updated_at
@@ -252,6 +260,61 @@ class PdoSavedPaletteRepository
         ]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
+    }
+
+    public function getShareCardTemplateByKey(string $templateKey): ?array
+    {
+        if (!$this->tableExists('share_card_templates')) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT share_card_template_id,
+                    template_key,
+                    name,
+                    svg_template_path,
+                    required_fields_json,
+                    default_fields_json,
+                    is_active,
+                    sort_order,
+                    created_at,
+                    updated_at
+               FROM share_card_templates
+              WHERE template_key = :template_key
+                AND is_active = 1
+              LIMIT 1"
+        );
+        $stmt->execute([':template_key' => $templateKey]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    public function updateViewerContentShareCardImage(
+        int $savedPaletteId,
+        int $setId,
+        string $templateKey,
+        string $imagePath
+    ): void {
+        if ($savedPaletteId <= 0 || $setId <= 0 || trim($imagePath) === '') {
+            throw new \InvalidArgumentException('share card image update requires palette, set, and image path');
+        }
+
+        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
+        $stmt = $this->pdo->prepare(
+            "UPDATE saved_palette_viewer_content
+                SET share_card_image_path = :image_path,
+                    share_card_generated_at = NOW(),
+                    updated_at = NOW()
+              WHERE saved_palette_id = :palette_id
+                AND saved_palette_set_id = :set_id
+                AND template_key = :template_key"
+        );
+        $stmt->execute([
+            ':image_path' => $imagePath,
+            ':palette_id' => $savedPaletteId,
+            ':set_id' => $setId,
+            ':template_key' => $templateKey,
+        ]);
     }
 
     public function upsertViewerContent(int $savedPaletteId, int $setId, string $templateKey, array $fields): array
@@ -271,9 +334,11 @@ class PdoSavedPaletteRepository
 
         $stmt = $this->pdo->prepare(
             "INSERT INTO saved_palette_viewer_content
-                (saved_palette_id, saved_palette_set_id, template_key, kicker_text, title, intro, notes, cta_label, playlist_url, is_active, created_at, updated_at)
+                (saved_palette_id, saved_palette_set_id, template_key, kicker_text, title, intro, notes, cta_label, playlist_url, share_card_template_id, share_card_fields_json, is_active, created_at, updated_at)
              VALUES
-                (:palette_id, :set_id, :template_key, :kicker_text, :title, :intro, :notes, :cta_label, :playlist_url, :is_active, NOW(), NOW())
+                (:palette_id, :set_id, :template_key, :kicker_text, :title, :intro, :notes, :cta_label, :playlist_url,
+                 COALESCE(:share_card_template_id, (SELECT share_card_template_id FROM share_card_templates WHERE template_key = :share_card_template_key LIMIT 1)),
+                 :share_card_fields_json, :is_active, NOW(), NOW())
              ON DUPLICATE KEY UPDATE
                 saved_palette_id = VALUES(saved_palette_id),
                 kicker_text = VALUES(kicker_text),
@@ -282,9 +347,21 @@ class PdoSavedPaletteRepository
                 notes = VALUES(notes),
                 cta_label = VALUES(cta_label),
                 playlist_url = VALUES(playlist_url),
+                share_card_template_id = COALESCE(VALUES(share_card_template_id), share_card_template_id),
+                share_card_fields_json = VALUES(share_card_fields_json),
                 is_active = VALUES(is_active),
                 updated_at = NOW()"
         );
+        $shareCardFieldsJson = null;
+        if (array_key_exists('share_card_fields_json', $fields)) {
+            $value = $fields['share_card_fields_json'];
+            if (is_array($value)) {
+                $shareCardFieldsJson = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            } elseif ($value !== null && trim((string)$value) !== '') {
+                $shareCardFieldsJson = (string)$value;
+            }
+        }
+        $shareCardTemplateKey = $templateKey === 'concept' ? 'concept' : 'palette';
         $stmt->execute([
             ':palette_id' => $savedPaletteId,
             ':set_id' => $setId,
@@ -295,6 +372,11 @@ class PdoSavedPaletteRepository
             ':notes' => $fields['notes'] ?? null,
             ':cta_label' => $fields['cta_label'] ?? null,
             ':playlist_url' => $fields['playlist_url'] ?? null,
+            ':share_card_template_id' => isset($fields['share_card_template_id']) && (int)$fields['share_card_template_id'] > 0
+                ? (int)$fields['share_card_template_id']
+                : null,
+            ':share_card_template_key' => $shareCardTemplateKey,
+            ':share_card_fields_json' => $shareCardFieldsJson,
             ':is_active' => $isActive,
         ]);
 

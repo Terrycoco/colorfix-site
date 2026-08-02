@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/auth.php';
 
 use App\Repos\PdoSavedPaletteRepository;
-use App\Services\PaletteViewerTokenService;
+use App\Services\ShareCardService;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -31,36 +31,12 @@ try {
     $paletteId = isset($payload['palette_id']) ? (int)$payload['palette_id'] : 0;
     $setId = isset($payload['set_id']) ? (int)$payload['set_id'] : 0;
     $templateKey = strtolower(trim((string)($payload['template_key'] ?? 'full_palette')));
-    if (!in_array($templateKey, ['full_palette', 'concept'], true)) {
-        $templateKey = 'full_palette';
-    }
-
-    if ($paletteId <= 0) {
-        respond(['ok' => false, 'error' => 'palette_id required'], 400);
-    }
 
     $repo = new PdoSavedPaletteRepository($pdo);
-    $palette = $repo->getSavedPaletteById($paletteId);
-    if (!$palette) {
-        respond(['ok' => false, 'error' => 'Saved palette not found'], 404);
-    }
+    $service = new ShareCardService($repo, dirname(__DIR__, 3));
+    $result = $service->generateSavedPaletteCard($paletteId, $setId, $templateKey);
 
-    if ($setId > 0) {
-        $set = $repo->getSetById($setId);
-        if (!$set || (int)($set['saved_palette_id'] ?? 0) !== $paletteId) {
-            respond(['ok' => false, 'error' => 'Saved palette set not found'], 404);
-        }
-    }
-
-    $tokenService = new PaletteViewerTokenService($pdo);
-    $url = $tokenService->createSavedPaletteUrl(
-        (string)($palette['palette_hash'] ?? ''),
-        $setId > 0 ? $setId : null,
-        $templateKey,
-        null
-    );
-
-    respond(['ok' => true, 'url' => $url]);
+    respond(['ok' => true, 'data' => $result]);
 } catch (\InvalidArgumentException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);
 } catch (\Throwable $e) {

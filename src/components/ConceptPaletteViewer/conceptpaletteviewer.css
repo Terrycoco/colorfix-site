@@ -236,6 +236,15 @@
 }
 
 /* Sales CTA block */
+.apv-concept-scope-note {
+  max-width: 40ch;
+  margin: 18px auto 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+  color: #7f8998;
+}
+
 .apv-concept-cta {
   width: 100%;
   margin-top: 10px;

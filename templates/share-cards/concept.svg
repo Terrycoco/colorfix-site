@@ -1,0 +1,82 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="1200"
+  height="630"
+  viewBox="0 0 1200 630"
+  role="img"
+  aria-label="{{TITLE}}"
+>
+  <!-- background -->
+  <rect width="1200" height="630" fill="#ffffff" />
+
+  <!-- thin border -->
+  <rect
+    x="34"
+    y="34"
+    width="1132"
+    height="562"
+    fill="none"
+    stroke="#9aa3ad"
+    stroke-width="2"
+  />
+
+  <!-- real brush asset -->
+  <image
+    href="./brush_teal_transparent.png"
+    x="88"
+    y="78"
+    width="140"
+    height="104"
+    preserveAspectRatio="xMidYMid meet"
+  />
+
+  <!-- fixed heading -->
+  <text
+    x="88"
+    y="238"
+    fill="#00a9b7"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="24"
+    font-weight="700"
+    letter-spacing="4"
+  >
+    COLORFIX DESIGN CONCEPT
+  </text>
+
+  <!-- title -->
+  <text
+    x="88"
+    y="322"
+    fill="#111111"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="58"
+    font-weight="700"
+  >
+    {{TITLE}}
+  </text>
+
+
+  <!-- subtitle -->
+  <text
+    x="88"
+    y="458"
+    fill="#5b6470"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="28"
+    font-weight="400"
+  >
+    {{SUBTITLE}}
+  </text>
+
+  <!-- invitation line -->
+  <text
+    x="88"
+    y="540"
+    fill="#7a838d"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="24"
+    font-weight="400"
+  >
+    Open to view the transformation
+  </text>
+</svg>

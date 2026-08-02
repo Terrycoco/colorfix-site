@@ -368,7 +368,7 @@ export default function ConceptPaletteViewer({
 
             {intro && (
               <section className="apv-concept-section">
-                <div className="apv-kicker">The Goal</div>
+                <div className="apv-kicker">The Challenge</div>
                 <p className="apv-notes">{intro}</p>
               </section>
             )}
@@ -380,33 +380,32 @@ export default function ConceptPaletteViewer({
               </section>
             )}
 
-            {(resolvedPlaylistUrl || resolvedContactUrl) && (
-              <div className="apv-concept-cta">
-                <p className="apv-concept-cta-copy">
-                  See how the full concept comes together.
-                </p>
+{(resolvedPlaylistUrl || resolvedContactUrl) && (
+  <div className="apv-concept-cta">
+    {resolvedContactUrl && (
+      <a
+        className="apv-concept-primary"
+        href={resolvedContactUrl}
+      >
+        Discuss Next Steps
+      </a>
+    )}
 
-                <div className="apv-concept-actions">
-                  {resolvedPlaylistUrl && (
-                    <a
-                      className="apv-concept-primary"
-                      href={resolvedPlaylistUrl}
-                    >
-                      {resolvedPlaylistLabel}
-                    </a>
-                  )}
+    <p className="apv-concept-scope-note">
+      Final paint colors, sheens, placement specifications, and contractor
+      support are included in the Implementation Package.
+    </p>
 
-                  {resolvedContactUrl && (
-                    <a
-                      className="apv-concept-secondary"
-                      href={resolvedContactUrl}
-                    >
-                      Talk With Terry
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
+    {resolvedPlaylistUrl && (
+      <a
+        className="apv-concept-secondary"
+        href={resolvedPlaylistUrl}
+      >
+        Replay the Transformation
+      </a>
+    )}
+  </div>
+)}
           </div>
         </div>
       </div>

@@ -9,6 +9,7 @@ import "./admin-palette-photos.css";
 
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
 const PALETTE_VIEWER_TOKEN_URL = `${API_FOLDER}/v2/admin/palette-viewer-token.php`;
+const SHARE_CARD_GENERATE_URL = `${API_FOLDER}/v2/admin/share-card-generate.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const APPLIED_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
 const APPLIED_GET_URL = `${API_FOLDER}/v2/admin/applied-palettes/get.php`;
@@ -37,6 +38,7 @@ const emptySavedForm = {
   notes: "",
   cta_label: "",
   playlist_url: "",
+  share_card_fields: {},
   private_notes: "",
   terry_fav: false,
   kicker_id: "",
@@ -126,6 +128,42 @@ function playlistLabel(playlist) {
   return parts.join(" - ") || "Untitled playlist";
 }
 
+function parseJsonObject(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function defaultShareCardFields(templateKey, form = {}) {
+  const title = form.display_title || form.nickname || "";
+  return {
+    TITLE: title,
+    SUBTITLE: "",
+    CTA_LABEL: form.cta_label || (templateKey === "concept" ? "Tap to See the Reveal" : "Tap to See Colors"),
+  };
+}
+
+function shareCardFieldsForSave(templateKey, fields = {}, form = {}) {
+  const defaults = defaultShareCardFields(templateKey, form);
+  return {
+    TITLE: String(fields.TITLE ?? defaults.TITLE ?? "").trim(),
+    SUBTITLE: String(fields.SUBTITLE ?? defaults.SUBTITLE ?? "").trim(),
+    CTA_LABEL: String(fields.CTA_LABEL ?? defaults.CTA_LABEL ?? "").trim(),
+  };
+}
+
+function shareCardImageUrl(path) {
+  const clean = String(path || "").trim();
+  if (!clean) return "";
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return clean.startsWith("/") ? clean : `/${clean}`;
+}
+
 export default function AdminPalettePhotosPage() {
   const [savedPalettes, setSavedPalettes] = useState([]);
   const [playlists, setPlaylists] = useState([]);
@@ -149,6 +187,7 @@ export default function AdminPalettePhotosPage() {
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
   const [testStatus, setTestStatus] = useState({ loading: false, error: "" });
+  const [shareCardStatus, setShareCardStatus] = useState({ loading: false, error: "", imageUrl: "" });
   const [activeEditorTab, setActiveEditorTab] = useState("photos");
 
   const isApplied = false;
@@ -227,6 +266,7 @@ export default function AdminPalettePhotosPage() {
     setEditPhotos([]);
     setPhotoStatus({ loading: false, error: "" });
     setEditStatus({ loading: false, error: "", success: "" });
+    setShareCardStatus({ loading: false, error: "", imageUrl: "" });
     setLoadError("");
     setEditForm(emptySavedForm);
   }, []);
@@ -236,6 +276,7 @@ export default function AdminPalettePhotosPage() {
       setEditMembers([]);
       setEditPhotos([]);
       setEditForm(isApplied ? emptyAppliedForm : emptySavedForm);
+      setShareCardStatus({ loading: false, error: "", imageUrl: "" });
       return;
     }
 
@@ -255,6 +296,7 @@ export default function AdminPalettePhotosPage() {
             notes: "",
             cta_label: "",
             playlist_url: "",
+            share_card_fields: {},
             private_notes: palette.private_notes || "",
             terry_fav: Number(palette.terry_fav) === 1,
             kicker_id: "",
@@ -491,6 +533,7 @@ export default function AdminPalettePhotosPage() {
         notes: editForm.notes,
         cta_label: editForm.cta_label,
         playlist_url: editForm.playlist_url,
+        share_card_fields_json: shareCardFieldsForSave(templateKey, editForm.share_card_fields, editForm),
         is_active: 1,
       };
     }
@@ -544,6 +587,74 @@ export default function AdminPalettePhotosPage() {
     setEditForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleShareCardField = (name, value) => {
+    setEditForm((prev) => ({
+      ...prev,
+      share_card_fields: {
+        ...(prev.share_card_fields || {}),
+        [name]: value,
+      },
+    }));
+  };
+
+  const handleGenerateShareCard = async () => {
+    if (!selectedPalette?.id || !activeViewer?.setId) return;
+    setShareCardStatus({ loading: true, error: "", imageUrl: "" });
+    try {
+      const saveRes = await fetch(SAVED_UPDATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildSavedPaletteUpdatePayload(selectedViewerTemplateKey)),
+      });
+      const saveJson = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok || !saveJson.ok) {
+        throw new Error(saveJson.error || `HTTP ${saveRes.status}`);
+      }
+      if (Array.isArray(saveJson.data?.viewer_content)) {
+        setViewerContentRows(saveJson.data.viewer_content);
+      }
+
+      const res = await fetch(SHARE_CARD_GENERATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palette_id: Number(selectedPalette.id),
+          set_id: Number(activeViewer.setId),
+          template_key: selectedViewerTemplateKey,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+      const imagePath = json.data?.image_path || "";
+      const imageUrl = json.data?.image_url || imagePath;
+      setViewerContentRows((rows) => rows.map((row) => (
+        String(row.saved_palette_set_id || "") === String(activeViewer.setId)
+          && String(row.template_key || "full_palette") === selectedViewerTemplateKey
+          ? {
+              ...row,
+              share_card_image_path: imagePath,
+              share_card_generated_at: json.data?.generated_at || row.share_card_generated_at || "",
+            }
+          : row
+      )));
+      setShareCardStatus({
+        loading: false,
+        error: "",
+        imageUrl: shareCardImageUrl(imageUrl),
+      });
+    } catch (err) {
+      setShareCardStatus({
+        loading: false,
+        error: err?.message || "Failed to generate share card",
+        imageUrl: "",
+      });
+    }
+  };
+
   const handleEditorTab = (tab) => {
     setActiveEditorTab(tab);
     if (tab === "full") {
@@ -551,6 +662,7 @@ export default function AdminPalettePhotosPage() {
     } else if (tab === "concept") {
       setSelectedViewerTemplateKey("concept");
     }
+    setShareCardStatus({ loading: false, error: "", imageUrl: "" });
   };
 
   const handleAddMember = () => {
@@ -778,6 +890,7 @@ export default function AdminPalettePhotosPage() {
             notes: editForm.notes,
             cta_label: editForm.cta_label,
             playlist_url: editForm.playlist_url,
+            share_card_fields_json: shareCardFieldsForSave(selectedViewerTemplateKey, editForm.share_card_fields, editForm),
             is_active: 1,
           };
         }
@@ -896,6 +1009,11 @@ export default function AdminPalettePhotosPage() {
       && String(row.template_key || "") === "full_palette"
     ) || null;
     const content = activeViewerContent || (selectedViewerTemplateKey === "full_palette" ? fullFallback : null);
+    const shareCardDefaults = defaultShareCardFields(selectedViewerTemplateKey, {
+      nickname: selectedPalette?.nickname || "",
+      display_title: content?.title || "",
+      cta_label: content?.cta_label || "",
+    });
     setEditForm((prev) => ({
       ...prev,
       display_title: content?.title || "",
@@ -905,8 +1023,12 @@ export default function AdminPalettePhotosPage() {
       playlist_url: content?.playlist_url || "",
       viewer_kicker_id: "",
       kicker_text: content?.kicker_text || "",
+      share_card_fields: {
+        ...shareCardDefaults,
+        ...parseJsonObject(content?.share_card_fields_json),
+      },
     }));
-  }, [activeViewer?.setId, selectedViewerTemplateKey, activeViewerContent, viewerContentRows, isApplied]);
+  }, [activeViewer?.setId, selectedViewerTemplateKey, activeViewerContent, viewerContentRows, isApplied, selectedPalette?.nickname]);
 
   const selectedViewerPhotos = useMemo(() => {
     if (isApplied) return editPhotos;
@@ -1336,6 +1458,64 @@ export default function AdminPalettePhotosPage() {
                           <div className="asp-error">{playlistStatus.error}</div>
                         )}
                       </label>
+                    </div>
+                    <div className="app-palette-photos__share-card-copy">
+                      <div className="app-palette-photos__section-head">
+                        <h3>Share Card</h3>
+                      </div>
+                      <label>
+                        Card title
+                        <input
+                          type="text"
+                          value={editForm.share_card_fields?.TITLE || ""}
+                          onChange={(e) => handleShareCardField("TITLE", e.target.value)}
+                          placeholder={editForm.display_title || editForm.nickname || "Design Concept"}
+                        />
+                      </label>
+                      <label>
+                        Card subtitle
+                        <input
+                          type="text"
+                          value={editForm.share_card_fields?.SUBTITLE || ""}
+                          onChange={(e) => handleShareCardField("SUBTITLE", e.target.value)}
+                          placeholder={selectedViewerTemplateKey === "concept" ? "Project or client context" : "Palette context"}
+                        />
+                      </label>
+                      <label>
+                        Card CTA
+                        <input
+                          type="text"
+                          value={editForm.share_card_fields?.CTA_LABEL || ""}
+                          onChange={(e) => handleShareCardField("CTA_LABEL", e.target.value)}
+                          placeholder={selectedViewerTemplateKey === "concept" ? "Tap to See the Reveal" : "Tap to See Colors"}
+                        />
+                      </label>
+                      {activeViewerContent?.share_card_image_path && (
+                        <div className="app-palette-photos__hint">
+                          Current card: {activeViewerContent.share_card_image_path}
+                        </div>
+                      )}
+                      <div className="app-palette-photos__share-card-actions">
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={handleGenerateShareCard}
+                          disabled={shareCardStatus.loading || !selectedPalette?.id || !activeViewer?.setId}
+                        >
+                          {shareCardStatus.loading ? "Generating..." : "Generate Card"}
+                        </button>
+                        {shareCardStatus.error && (
+                          <div className="asp-error">{shareCardStatus.error}</div>
+                        )}
+                      </div>
+                      {(shareCardStatus.imageUrl || activeViewerContent?.share_card_image_path) && (
+                        <div className="app-palette-photos__share-card-preview">
+                          <img
+                            src={shareCardStatus.imageUrl || shareCardImageUrl(activeViewerContent.share_card_image_path)}
+                            alt="Share card preview"
+                          />
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

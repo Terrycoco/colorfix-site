@@ -451,7 +451,7 @@ class PlayerExperienceService
             return;
         }
 
-        $tokenService = new PaletteViewerTokenService();
+        $tokenService = new PaletteViewerTokenService($this->pdo);
         foreach ($items as $item) {
             if (!$item instanceof PlaylistItem) continue;
             if (!$this->isPaletteViewerEligibleItem($item)) continue;

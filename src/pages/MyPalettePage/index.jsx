@@ -949,7 +949,7 @@ const activeBrandCodes = useMemo(() => {
     copyTimerRef.current = setTimeout(() => setCopyStatus(""), 2000);
   };
 
-  async function handleCopyPalette() {
+  async function handleCopyPalette({ plain = false } = {}) {
     const colors = (Array.isArray(paletteFallback) ? paletteFallback : [])
       .map((swatch) => swatch?.color ?? swatch)
       .filter(Boolean);
@@ -958,41 +958,44 @@ const activeBrandCodes = useMemo(() => {
       return;
     }
     const exportNode = document.createElement("div");
-    exportNode.className = "myp-copy-export";
+    exportNode.className = plain ? "myp-copy-export myp-copy-export--plain" : "myp-copy-export";
     const grid = document.createElement("div");
     grid.className = "myp-copy-export__grid";
     exportNode.appendChild(grid);
 
     colors.forEach((color) => {
       const hex = normalizeHexValue(getHex(color));
-      const textColor = getExportTextColor(color, hex);
       const card = document.createElement("div");
       card.className = "myp-copy-export__card";
       card.style.backgroundColor = hex;
-      card.style.color = textColor;
 
-      const chip = document.createElement("div");
-      chip.className = "myp-copy-export__chip";
-      chip.textContent = color?.chip_num || "";
-      card.appendChild(chip);
+      if (!plain) {
+        const textColor = getExportTextColor(color, hex);
+        card.style.color = textColor;
 
-      const label = document.createElement("div");
-      label.className = "myp-copy-export__label";
+        const chip = document.createElement("div");
+        chip.className = "myp-copy-export__chip";
+        chip.textContent = color?.chip_num || "";
+        card.appendChild(chip);
 
-      const name = document.createElement("div");
-      name.className = "myp-copy-export__name";
-      name.textContent = color?.name || "Untitled";
-      label.appendChild(name);
+        const label = document.createElement("div");
+        label.className = "myp-copy-export__label";
 
-      const meta = document.createElement("div");
-      meta.className = "myp-copy-export__meta";
-      const hue = typeof color?.hcl_h === "number" ? Math.round(color.hcl_h) : "–";
-      const chroma = typeof color?.hcl_c === "number" ? Math.round(color.hcl_c) : "–";
-      const lightness = typeof color?.hcl_l === "number" ? Math.round(color.hcl_l) : "–";
-      meta.textContent = `${color?.brand || ""} • H:${hue} • C:${chroma} • L:${lightness}`;
-      label.appendChild(meta);
+        const name = document.createElement("div");
+        name.className = "myp-copy-export__name";
+        name.textContent = color?.name || "Untitled";
+        label.appendChild(name);
 
-      card.appendChild(label);
+        const meta = document.createElement("div");
+        meta.className = "myp-copy-export__meta";
+        const hue = typeof color?.hcl_h === "number" ? Math.round(color.hcl_h) : "–";
+        const chroma = typeof color?.hcl_c === "number" ? Math.round(color.hcl_c) : "–";
+        const lightness = typeof color?.hcl_l === "number" ? Math.round(color.hcl_l) : "–";
+        meta.textContent = `${color?.brand || ""} • H:${hue} • C:${chroma} • L:${lightness}`;
+        label.appendChild(meta);
+
+        card.appendChild(label);
+      }
       grid.appendChild(card);
     });
 
@@ -1009,7 +1012,7 @@ const activeBrandCodes = useMemo(() => {
         throw new Error("Clipboard copy not available in this browser.");
       }
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      pushCopyStatus("Copied.");
+      pushCopyStatus(plain ? "Copied plain swatches." : "Copied.");
     } catch (err) {
       pushCopyStatus(err?.message || "Unable to copy palette.");
     } finally {
@@ -1052,6 +1055,15 @@ const activeBrandCodes = useMemo(() => {
                 {!isMobile && (
                   <button className="myp-clear-btn myp-copy-btn" type="button" onClick={handleCopyPalette}>
                     Copy
+                  </button>
+                )}
+                {!isMobile && (
+                  <button
+                    className="myp-clear-btn myp-copy-btn"
+                    type="button"
+                    onClick={() => handleCopyPalette({ plain: true })}
+                  >
+                    Copy Plain
                   </button>
                 )}
                 {!isMobile && (

@@ -5,11 +5,17 @@ namespace App\Services;
 
 use App\Lib\EnvLoader;
 use InvalidArgumentException;
+use PDO;
 use RuntimeException;
 
 final class PaletteViewerTokenService
 {
     private const CIPHER = 'aes-256-gcm';
+    private const SHORT_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+    public function __construct(
+        private ?PDO $pdo = null
+    ) {}
 
     public function createSavedPaletteUrl(
         string $paletteHash,
@@ -32,7 +38,10 @@ final class PaletteViewerTokenService
             'iat' => time(),
         ];
 
-        return '/pv/' . rawurlencode($this->encode($payload));
+        $token = $this->encode($payload);
+        $shortCode = $this->createShortCode($token, $payload);
+
+        return '/pv/' . rawurlencode($shortCode ?: $token);
     }
 
     /**
@@ -44,6 +53,7 @@ final class PaletteViewerTokenService
         if ($token === '') {
             throw new InvalidArgumentException('palette viewer token required');
         }
+        $token = $this->resolveShortCode($token) ?: $token;
 
         $envelopeJson = $this->base64UrlDecode($token);
         $envelope = json_decode($envelopeJson, true);
@@ -109,6 +119,75 @@ final class PaletteViewerTokenService
             throw new RuntimeException('Unable to encode palette viewer token.');
         }
         return $this->base64UrlEncode($json);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function createShortCode(string $token, array $payload): ?string
+    {
+        if (!$this->pdo instanceof PDO) {
+            return null;
+        }
+
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $code = $this->randomShortCode();
+            try {
+                $stmt = $this->pdo->prepare(
+                    'INSERT INTO palette_viewer_links (code, token, payload_json) VALUES (:code, :token, :payload_json)'
+                );
+                $stmt->execute([
+                    ':code' => $code,
+                    ':token' => $token,
+                    ':payload_json' => $payloadJson !== false ? $payloadJson : null,
+                ]);
+                return $code;
+            } catch (\PDOException $e) {
+                $message = $e->getMessage();
+                if (str_contains($message, 'Duplicate entry') || (string)$e->getCode() === '23000') {
+                    continue;
+                }
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveShortCode(string $tokenOrCode): ?string
+    {
+        if (!$this->pdo instanceof PDO) {
+            return null;
+        }
+        if (!preg_match('/^[A-Za-z0-9]{6,16}$/', $tokenOrCode)) {
+            return null;
+        }
+
+        try {
+            $stmt = $this->pdo->prepare('SELECT token FROM palette_viewer_links WHERE code = ? LIMIT 1');
+            $stmt->execute([$tokenOrCode]);
+            $token = $stmt->fetchColumn();
+            if (!is_string($token) || trim($token) === '') {
+                return null;
+            }
+            $touch = $this->pdo->prepare('UPDATE palette_viewer_links SET last_accessed_at = NOW() WHERE code = ?');
+            $touch->execute([$tokenOrCode]);
+            return $token;
+        } catch (\PDOException) {
+            return null;
+        }
+    }
+
+    private function randomShortCode(int $length = 8): string
+    {
+        $alphabet = self::SHORT_CODE_ALPHABET;
+        $max = strlen($alphabet) - 1;
+        $code = '';
+        for ($i = 0; $i < $length; $i++) {
+            $code .= $alphabet[random_int(0, $max)];
+        }
+        return $code;
     }
 
     private function key(): string

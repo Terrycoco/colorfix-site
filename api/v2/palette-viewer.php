@@ -28,7 +28,7 @@ try {
 
     $token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
     if ($token !== '') {
-        $tokenService = new PaletteViewerTokenService();
+        $tokenService = new PaletteViewerTokenService($pdo);
         $tokenPayload = $tokenService->decode($token);
         $hash = trim((string)($tokenPayload['hash'] ?? ''));
         $setId = isset($tokenPayload['set_id']) ? (int)$tokenPayload['set_id'] : null;

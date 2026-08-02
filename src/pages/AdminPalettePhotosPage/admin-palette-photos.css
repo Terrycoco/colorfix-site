@@ -148,6 +148,38 @@
   background: #f8fafc;
 }
 
+.app-palette-photos__share-card-copy {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #d8dee8;
+  border-top: 4px solid #009c9c;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.app-palette-photos__share-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.app-palette-photos__share-card-preview {
+  max-width: 520px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.app-palette-photos__share-card-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .app-palette-photos__section-head h3 {
   margin: 0;
   font-size: 1rem;

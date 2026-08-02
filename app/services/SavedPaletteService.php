@@ -363,6 +363,12 @@ class SavedPaletteService
             'notes' => $this->nullableText($payload['notes'] ?? null),
             'cta_label' => $this->nullableText($payload['cta_label'] ?? null),
             'playlist_url' => $this->nullableText($payload['playlist_url'] ?? null),
+            'share_card_template_id' => isset($payload['share_card_template_id']) && (int)$payload['share_card_template_id'] > 0
+                ? (int)$payload['share_card_template_id']
+                : null,
+            'share_card_fields_json' => is_array($payload['share_card_fields_json'] ?? null)
+                ? $payload['share_card_fields_json']
+                : null,
             'is_active' => array_key_exists('is_active', $payload) ? (int)(bool)$payload['is_active'] : 1,
         ]);
     }
