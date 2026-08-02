@@ -56,7 +56,9 @@ try {
             {$indexableSelect},
             {$publishedAtSelect},
             {$updatedAtSelect},
-            shareable.playlist_instance_id AS watch_playlist_instance_id
+            shareable.playlist_instance_id AS watch_playlist_instance_id,
+            prospect_shareable.playlist_instance_id AS prospect_playlist_instance_id,
+            prospect_shareable.slug AS prospect_playlist_instance_slug
         FROM playlists p
         LEFT JOIN (
             SELECT playlist_id, MIN(playlist_instance_id) AS playlist_instance_id
@@ -66,6 +68,25 @@ try {
             GROUP BY playlist_id
         ) shareable
           ON shareable.playlist_id = p.playlist_id
+        LEFT JOIN (
+            SELECT
+                pi.playlist_id,
+                MIN(pi.playlist_instance_id) AS playlist_instance_id,
+                SUBSTRING_INDEX(
+                    GROUP_CONCAT(pi.slug ORDER BY pi.playlist_instance_id ASC SEPARATOR '\n'),
+                    '\n',
+                    1
+                ) AS slug
+            FROM playlist_instances pi
+            JOIN player_experiences pe
+              ON pe.player_experience_id = pi.player_experience_id
+            WHERE pi.is_active = 1
+              AND pi.share_enabled = 1
+              AND pe.is_active = 1
+              AND (pe.experience_key = 'prospect' OR pe.slide_flag = 'prospect')
+            GROUP BY pi.playlist_id
+        ) prospect_shareable
+          ON prospect_shareable.playlist_id = p.playlist_id
         {$retiredWhere}
         ORDER BY p.playlist_id ASC
         SQL;

@@ -1,4 +1,5 @@
 import "./playerendscreen.css";
+import BrandFooterLogo from "@components/BrandFooterLogo";
 
 export default function PlayerEndScreen({
   children = null,
@@ -21,10 +22,7 @@ export default function PlayerEndScreen({
       {showBranding && (
         <div className="player-end-footer">
           <div className="player-end-branding">
-            <span className="player-end-branding-label">Brought to you by</span>
-            <a href="/" className="player-end-branding-link">
-              <strong>ColorFix</strong>
-            </a>
+            <BrandFooterLogo />
           </div>
         </div>
       )}

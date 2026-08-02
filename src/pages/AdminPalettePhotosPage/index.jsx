@@ -8,6 +8,8 @@ import "../AdminSavedPalettesPage/admin-saved-palettes.css";
 import "./admin-palette-photos.css";
 
 const SAVED_LIST_URL = `${API_FOLDER}/v2/admin/saved-palettes.php`;
+const PALETTE_VIEWER_TOKEN_URL = `${API_FOLDER}/v2/admin/palette-viewer-token.php`;
+const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const APPLIED_LIST_URL = `${API_FOLDER}/v2/admin/applied-palettes/list.php`;
 const APPLIED_GET_URL = `${API_FOLDER}/v2/admin/applied-palettes/get.php`;
 const SAVED_UPDATE_URL = `${API_FOLDER}/v2/admin/saved-palette-update.php`;
@@ -22,14 +24,24 @@ const APPLIED_PHOTO_DELETE_URL = `${API_FOLDER}/v2/admin/applied-palette-photos/
 const APPLIED_PHOTO_LIBRARY_ADD_URL = `${API_FOLDER}/v2/admin/applied-palette-photos/add-from-library.php`;
 const APPLIED_PHOTO_UPDATE_URL = `${API_FOLDER}/v2/admin/applied-palette-photos/update.php`;
 
+const VIEWER_TEMPLATE_CHOICES = [
+  { value: "full_palette", label: "Full Palette" },
+  { value: "concept", label: "Concept" },
+];
+
 const emptySavedForm = {
   palette_id: null,
   nickname: "",
   display_title: "",
+  intro: "",
   notes: "",
+  cta_label: "",
+  playlist_url: "",
   private_notes: "",
   terry_fav: false,
   kicker_id: "",
+  viewer_kicker_id: "",
+  kicker_text: "",
   palette_type: "exterior",
 };
 
@@ -92,8 +104,32 @@ function entryToSwatch(entry) {
   };
 }
 
+function playlistShareUrl(playlist) {
+  const prospectId = Number(playlist?.prospect_playlist_instance_id || 0);
+  if (prospectId > 0) {
+    return `/share/playlist.php?id=${prospectId}`;
+  }
+  const id = Number(playlist?.playlist_id || 0);
+  return id > 0 ? `/playlist/share/id=${id}` : "";
+}
+
+function playlistLabel(playlist) {
+  const id = Number(playlist?.playlist_id || 0);
+  const title = String(playlist?.title || playlist?.headline || "").trim();
+  const type = String(playlist?.type || "").trim();
+  const prospectId = Number(playlist?.prospect_playlist_instance_id || 0);
+  const parts = [];
+  if (title) parts.push(title);
+  if (type) parts.push(type);
+  if (id > 0) parts.push(`#${id}`);
+  if (prospectId > 0) parts.push(`prospect instance #${prospectId}`);
+  return parts.join(" - ") || "Untitled playlist";
+}
+
 export default function AdminPalettePhotosPage() {
   const [savedPalettes, setSavedPalettes] = useState([]);
+  const [playlists, setPlaylists] = useState([]);
+  const [playlistStatus, setPlaylistStatus] = useState({ loading: false, error: "" });
   const [selectedId, setSelectedId] = useState(() => {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
@@ -105,11 +141,15 @@ export default function AdminPalettePhotosPage() {
   const [editForm, setEditForm] = useState(emptySavedForm);
   const [editMembers, setEditMembers] = useState([]);
   const [editPhotos, setEditPhotos] = useState([]);
+  const [viewerContentRows, setViewerContentRows] = useState([]);
   const [selectedViewerSetId, setSelectedViewerSetId] = useState("");
+  const [selectedViewerTemplateKey, setSelectedViewerTemplateKey] = useState("full_palette");
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
   const [libraryPhotoType, setLibraryPhotoType] = useState("full");
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
+  const [testStatus, setTestStatus] = useState({ loading: false, error: "" });
+  const [activeEditorTab, setActiveEditorTab] = useState("photos");
 
   const isApplied = false;
   const requestedViewerSetId = useMemo(() => {
@@ -154,7 +194,35 @@ export default function AdminPalettePhotosPage() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    async function loadPlaylists() {
+      setPlaylistStatus({ loading: true, error: "" });
+      try {
+        const params = new URLSearchParams();
+        params.set("_", Date.now().toString());
+        const res = await fetch(`${PLAYLISTS_URL}?${params.toString()}`, { credentials: "include" });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load playlists");
+        if (!active) return;
+        setPlaylists(Array.isArray(data.items) ? data.items : []);
+        setPlaylistStatus({ loading: false, error: "" });
+      } catch (err) {
+        if (!active) return;
+        setPlaylists([]);
+        setPlaylistStatus({
+          loading: false,
+          error: err?.message || "Failed to load playlists",
+        });
+      }
+    }
+    loadPlaylists();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     setSelectedViewerSetId("");
+    setSelectedViewerTemplateKey("full_palette");
+    setViewerContentRows([]);
     setEditMembers([]);
     setEditPhotos([]);
     setPhotoStatus({ loading: false, error: "" });
@@ -182,13 +250,19 @@ export default function AdminPalettePhotosPage() {
           setEditForm({
             palette_id: Number(palette.id) || palette.id,
             nickname: palette.nickname || "",
-            display_title: palette.display_title || "",
-            notes: palette.notes || "",
+            display_title: "",
+            intro: "",
+            notes: "",
+            cta_label: "",
+            playlist_url: "",
             private_notes: palette.private_notes || "",
             terry_fav: Number(palette.terry_fav) === 1,
-            kicker_id: palette.kicker_id || "",
+            kicker_id: "",
+            viewer_kicker_id: "",
+            kicker_text: "",
             palette_type: palette.palette_type || "exterior",
           });
+          setViewerContentRows(Array.isArray(palette.viewer_content) ? palette.viewer_content : []);
           const members = (palette.members || []).map((member, index) => ({
             key: member.id ?? `${member.color_id}-${index}`,
             color: memberToSwatch(member),
@@ -261,6 +335,7 @@ export default function AdminPalettePhotosPage() {
           setLoadError(err?.message || "Failed to load saved palette");
           setEditMembers([]);
           setEditPhotos([]);
+          setViewerContentRows([]);
         } finally {
           if (active) setLoadingPalette(false);
         }
@@ -350,6 +425,21 @@ export default function AdminPalettePhotosPage() {
     const qs = params.toString();
     return `/palette/${encodeURIComponent(hash)}/share${qs ? `?${qs}` : ""}`;
   }, [selectedPalette?.palette_hash, selectedViewerSetId]);
+  const paletteSetupReturnUrl = useMemo(() => {
+    const paletteId = Number(selectedPalette?.id || selectedId || 0);
+    const params = new URLSearchParams();
+    params.set("type", "saved");
+    if (paletteId > 0) {
+      params.set("id", String(paletteId));
+    }
+    if (Number(selectedViewerSetId || 0) > 0) {
+      params.set("set_id", String(Number(selectedViewerSetId)));
+    }
+    if (Number(requestedPhotoLibraryId || 0) > 0) {
+      params.set("photo_library_id", String(Number(requestedPhotoLibraryId)));
+    }
+    return `/admin/palette-photos?${params.toString()}`;
+  }, [selectedPalette?.id, selectedId, selectedViewerSetId, requestedPhotoLibraryId]);
   const viewerTestUrl = useMemo(() => {
     const hash = selectedPalette?.palette_hash || "";
     if (!hash || typeof window === "undefined") return "";
@@ -357,12 +447,110 @@ export default function AdminPalettePhotosPage() {
     if (Number(selectedViewerSetId || 0) > 0) {
       params.set("set_id", String(Number(selectedViewerSetId)));
     }
-    params.set("return_to", window.location.pathname + window.location.search);
+    params.set("return_to", paletteSetupReturnUrl);
     return `/palette/${encodeURIComponent(hash)}/share?${params.toString()}`;
-  }, [selectedPalette?.palette_hash, selectedViewerSetId]);
+  }, [selectedPalette?.palette_hash, selectedViewerSetId, paletteSetupReturnUrl]);
+
+  const buildSavedPaletteUpdatePayload = (templateKey = selectedViewerTemplateKey) => {
+    const members = editMembers
+      .map((row, index) => {
+        const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
+        if (!colorId) return null;
+        const role = row?.role?.trim() || null;
+        return { color_id: colorId, order_index: index, role };
+      })
+      .filter(Boolean);
+    if (!members.length) {
+      throw new Error("Add at least one color before saving.");
+    }
+
+    const payload = {
+      palette_id: editForm.palette_id,
+      nickname: editForm.nickname,
+      private_notes: editForm.private_notes,
+      terry_fav: editForm.terry_fav ? 1 : 0,
+      palette_type: editForm.palette_type || "exterior",
+      members,
+      photos: editPhotos.map((photo) => ({
+        id: photo.id,
+        photo_type: photo.photo_type || "full",
+        trigger_mode: photo.trigger_mode || "any",
+        trigger_color_id: photo.trigger_color_id || null,
+        alt_text: photo.alt_text || "",
+        caption: photo.caption || "",
+      })),
+    };
+
+    if (selectedViewerSetId) {
+      payload.viewer_content = {
+        saved_palette_set_id: Number(selectedViewerSetId),
+        template_key: templateKey,
+        kicker_text: editForm.kicker_text,
+        title: editForm.display_title,
+        intro: editForm.intro,
+        notes: editForm.notes,
+        cta_label: editForm.cta_label,
+        playlist_url: editForm.playlist_url,
+        is_active: 1,
+      };
+    }
+
+    return payload;
+  };
+
+  const handleTestConcept = async () => {
+    if (!selectedPalette?.id || !selectedViewerSetId || typeof window === "undefined") return;
+    setTestStatus({ loading: true, error: "" });
+    try {
+      if (selectedViewerTemplateKey === "concept") {
+        const saveRes = await fetch(SAVED_UPDATE_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildSavedPaletteUpdatePayload("concept")),
+        });
+        const saveJson = await saveRes.json().catch(() => ({}));
+        if (!saveRes.ok || !saveJson.ok) {
+          throw new Error(saveJson.error || `HTTP ${saveRes.status}`);
+        }
+        if (Array.isArray(saveJson.data?.viewer_content)) {
+          setViewerContentRows(saveJson.data.viewer_content);
+        }
+      }
+
+      const res = await fetch(PALETTE_VIEWER_TOKEN_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palette_id: Number(selectedPalette.id),
+          set_id: Number(selectedViewerSetId),
+          template_key: "concept",
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok || !json?.url) {
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+      const url = new URL(json.url, window.location.origin);
+      url.searchParams.set("return_to", paletteSetupReturnUrl);
+      window.location.href = url.pathname + url.search;
+    } catch (err) {
+      setTestStatus({ loading: false, error: err?.message || "Failed to create concept viewer link" });
+    }
+  };
 
   const handleEditField = (name, value) => {
     setEditForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditorTab = (tab) => {
+    setActiveEditorTab(tab);
+    if (tab === "full") {
+      setSelectedViewerTemplateKey("full_palette");
+    } else if (tab === "concept") {
+      setSelectedViewerTemplateKey("concept");
+    }
   };
 
   const handleAddMember = () => {
@@ -565,9 +753,10 @@ export default function AdminPalettePhotosPage() {
           throw new Error("Add at least one color before saving.");
         }
         const payload = {
-          ...editForm,
+          palette_id: editForm.palette_id,
+          nickname: editForm.nickname,
+          private_notes: editForm.private_notes,
           terry_fav: editForm.terry_fav ? 1 : 0,
-          kicker_id: editForm.kicker_id ? Number(editForm.kicker_id) : null,
           palette_type: editForm.palette_type || "exterior",
           members,
           photos: editPhotos.map((photo) => ({
@@ -579,6 +768,19 @@ export default function AdminPalettePhotosPage() {
             caption: photo.caption || "",
           })),
         };
+        if (activeViewer?.setId) {
+          payload.viewer_content = {
+            saved_palette_set_id: Number(activeViewer.setId),
+            template_key: selectedViewerTemplateKey,
+            kicker_text: editForm.kicker_text,
+            title: editForm.display_title,
+            intro: editForm.intro,
+            notes: editForm.notes,
+            cta_label: editForm.cta_label,
+            playlist_url: editForm.playlist_url,
+            is_active: 1,
+          };
+        }
         const res = await fetch(SAVED_UPDATE_URL, {
           method: "POST",
           credentials: "include",
@@ -588,6 +790,9 @@ export default function AdminPalettePhotosPage() {
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) {
           throw new Error(json.error || `HTTP ${res.status}`);
+        }
+        if (Array.isArray(json.data?.viewer_content)) {
+          setViewerContentRows(json.data.viewer_content);
         }
       } else {
         const metaPayload = {
@@ -676,12 +881,46 @@ export default function AdminPalettePhotosPage() {
     const target = viewerSets.find((set) => String(set.setId || set.coverPhoto?.id) === String(selectedViewerSetId));
     return target || viewerSets[0] || null;
   }, [viewerSets, selectedViewerSetId, isApplied]);
+  const activeViewerContent = useMemo(() => {
+    if (isApplied || !activeViewer?.setId) return null;
+    return viewerContentRows.find((row) =>
+      String(row.saved_palette_set_id || "") === String(activeViewer.setId)
+      && String(row.template_key || "full_palette") === selectedViewerTemplateKey
+    ) || null;
+  }, [activeViewer, viewerContentRows, selectedViewerTemplateKey, isApplied]);
+
+  useEffect(() => {
+    if (isApplied || !activeViewer?.setId) return;
+    const fullFallback = viewerContentRows.find((row) =>
+      String(row.saved_palette_set_id || "") === String(activeViewer.setId)
+      && String(row.template_key || "") === "full_palette"
+    ) || null;
+    const content = activeViewerContent || (selectedViewerTemplateKey === "full_palette" ? fullFallback : null);
+    setEditForm((prev) => ({
+      ...prev,
+      display_title: content?.title || "",
+      intro: content?.intro || "",
+      notes: content?.notes || "",
+      cta_label: content?.cta_label || "",
+      playlist_url: content?.playlist_url || "",
+      viewer_kicker_id: "",
+      kicker_text: content?.kicker_text || "",
+    }));
+  }, [activeViewer?.setId, selectedViewerTemplateKey, activeViewerContent, viewerContentRows, isApplied]);
+
   const selectedViewerPhotos = useMemo(() => {
     if (isApplied) return editPhotos;
     const activeSetId = activeViewer?.setId ? String(activeViewer.setId) : "";
     if (!activeSetId) return [];
     return editPhotos.filter((photo) => String(photo.saved_palette_set_id || "") === activeSetId);
   }, [editPhotos, activeViewer, isApplied]);
+  const conceptLabels = selectedViewerTemplateKey === "concept";
+  const viewerCopyLabels = {
+    kicker: conceptLabels ? "Project" : "Kicker (optional)",
+    title: conceptLabels ? "Concept title" : "Title",
+    intro: conceptLabels ? "Goal/Problem" : "Intro",
+    notes: conceptLabels ? "Design notes" : "Notes",
+  };
 
   return (
     <section className="app-palette-photos">
@@ -724,9 +963,18 @@ export default function AdminPalettePhotosPage() {
             }}
             disabled={!viewerTestUrl}
           >
-            Test Viewer
+            Full Viewer
+          </button>
+          <button
+            type="button"
+            className="app-palette-photos__back"
+            onClick={handleTestConcept}
+            disabled={!selectedPalette?.id || !selectedViewerSetId || testStatus.loading}
+          >
+            {testStatus.loading ? "Opening…" : "Concept Viewer"}
           </button>
         </div>
+        {testStatus.error && <div className="asp-error">{testStatus.error}</div>}
       </header>
 
       {loadError && <div className="asp-error">{loadError}</div>}
@@ -739,242 +987,360 @@ export default function AdminPalettePhotosPage() {
           </header>
 
           <form className="asp-modal-form" onSubmit={handleSave}>
+            <div className="app-palette-photos__tabs" role="tablist" aria-label="Palette setup sections">
+              {[
+                ["photos", "Photos"],
+                ["colors", "Colors"],
+                ["full", "Full"],
+                ["concept", "Concept"],
+              ].map(([tab, label]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeEditorTab === tab}
+                  className={`app-palette-photos__tab${activeEditorTab === tab ? " is-active" : ""}`}
+                  onClick={() => handleEditorTab(tab)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="app-palette-photos__workspace">
               <div className="app-palette-photos__controls">
-                {!isApplied && viewerSets.length > 0 && (
-                  <div className="app-palette-photos__viewer-setup">
-                    <div className="app-palette-photos__viewer-strip">
-                      {viewerSets.map((viewer, index) => {
-                        const key = String(viewer.setId || viewer.coverPhoto?.id || index);
-                        const active = String(activeViewer?.setId || activeViewer?.coverPhoto?.id || "") === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            className={`app-palette-photos__viewer-thumb${active ? " is-active" : ""}`}
-                            onClick={() => setSelectedViewerSetId(key)}
-                          >
-                            {viewer.coverPhoto ? (
-                              <img src={viewer.coverPhoto.rel_path} alt={viewer.title} />
-                            ) : (
-                              <div className="app-palette-photos__viewer-thumb-empty">No photo</div>
-                            )}
-                            <span>{viewer.title}</span>
-                            {viewer.coverPhoto?.photo_library_id ? (
-                              <small>Photo #{viewer.coverPhoto.photo_library_id}</small>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {activeEditorTab === "photos" && (
+                  <>
+                    {!isApplied && viewerSets.length > 0 && (
+                      <div className="app-palette-photos__viewer-setup">
+                        <div className="app-palette-photos__viewer-strip">
+                          {viewerSets.map((viewer, index) => {
+                            const key = String(viewer.setId || viewer.coverPhoto?.id || index);
+                            const active = String(activeViewer?.setId || activeViewer?.coverPhoto?.id || "") === key;
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                className={`app-palette-photos__viewer-thumb${active ? " is-active" : ""}`}
+                                onClick={() => setSelectedViewerSetId(key)}
+                              >
+                                {viewer.coverPhoto ? (
+                                  <img src={viewer.coverPhoto.rel_path} alt={viewer.title} />
+                                ) : (
+                                  <div className="app-palette-photos__viewer-thumb-empty">No photo</div>
+                                )}
+                                <span>{viewer.title}</span>
+                                {viewer.coverPhoto?.photo_library_id ? (
+                                  <small>Photo #{viewer.coverPhoto.photo_library_id}</small>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
-                <div className="asp-photo-editor">
-                  <div className="asp-member-list-head">
-                    <h3>Viewer Photos</h3>
-                    <div className="asp-photo-actions">
-                      <select
-                        value={libraryPhotoType}
-                        onChange={(e) => setLibraryPhotoType(e.target.value)}
-                        disabled={photoStatus.loading}
-                      >
-                        <option value="full">Full</option>
-                        <option value="before">Before</option>
-                        <option value="zoom">Zoom</option>
-                      </select>
-                      <label className="asp-upload-btn">
-                        Upload
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => handlePhotoUpload(e.target.files)}
-                          disabled={photoStatus.loading}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => setPhotoPickerOpen(true)}
-                        disabled={photoStatus.loading}
-                      >
-                        Add From Library
-                      </button>
-                      <button
-                        type="submit"
-                        className="asp-save-top"
-                        disabled={editStatus.loading}
-                      >
-                        {editStatus.loading ? "Saving…" : "Save"}
-                      </button>
-                    </div>
-                  </div>
-                  {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
-                  {selectedViewerPhotos.length > 0 ? (
-                    <div className="asp-photo-grid">
-                      {selectedViewerPhotos.map((photo) => (
-                        <div key={photo.id} className="asp-photo-card">
-                          <div className="app-palette-photos__photo-meta">
-                            Photo #{photo.photo_library_id || photo.id}
-                          </div>
-                          <img src={photo.rel_path} alt="Palette upload" />
+                    <div className="asp-photo-editor">
+                      <div className="asp-member-list-head">
+                        <h3>Viewer Photos</h3>
+                        <div className="asp-photo-actions">
                           <select
-                            value={photo.photo_type || "full"}
-                            onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
+                            value={libraryPhotoType}
+                            onChange={(e) => setLibraryPhotoType(e.target.value)}
+                            disabled={photoStatus.loading}
                           >
                             <option value="full">Full</option>
-                            <option value="zoom">Zoom</option>
                             <option value="before">Before</option>
+                            <option value="zoom">Zoom</option>
                           </select>
-                          <select
-                            value={photo.trigger_mode || "any"}
-                            onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
-                          >
-                            <option value="any">Trigger: any color</option>
-                            <option value="none">Trigger: none</option>
-                            <option value="color">Trigger: specific color</option>
-                          </select>
-                          <select
-                            value={photo.trigger_color_id || ""}
-                            onChange={(e) =>
-                              handlePhotoField(
-                                photo.id,
-                                "trigger_color_id",
-                                e.target.value ? Number(e.target.value) : null
-                              )
-                            }
-                            disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
-                          >
-                            <option value="">Pick color</option>
-                            {editMembers.map((row) => (
-                              <option
-                                key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
-                                value={row.color?.id || row.color?.color_id || ""}
-                              >
-                                {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
-                              </option>
-                            ))}
-                          </select>
-                          <input
-                            type="text"
-                            placeholder="Alt text (SEO)"
-                            value={photo.alt_text || ""}
-                            onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
-                          />
+                          <label className="asp-upload-btn">
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) => handlePhotoUpload(e.target.files)}
+                              disabled={photoStatus.loading}
+                            />
+                          </label>
                           <button
                             type="button"
                             className="ghost"
-                            onClick={() => handleDeletePhoto(photo.id)}
+                            onClick={() => setPhotoPickerOpen(true)}
                             disabled={photoStatus.loading}
                           >
-                            Remove
+                            Add From Library
                           </button>
-                          {!isApplied && (
-                            <label className="asp-upload-btn ghost">
-                              Replace
+                          <button
+                            type="submit"
+                            className="asp-save-top"
+                            disabled={editStatus.loading}
+                          >
+                            {editStatus.loading ? "Saving…" : "Save"}
+                          </button>
+                        </div>
+                      </div>
+                      {photoStatus.error && <div className="asp-error">{photoStatus.error}</div>}
+                      {selectedViewerPhotos.length > 0 ? (
+                        <div className="asp-photo-grid">
+                          {selectedViewerPhotos.map((photo) => (
+                            <div key={photo.id} className="asp-photo-card">
+                              <div className="app-palette-photos__photo-meta">
+                                Photo #{photo.photo_library_id || photo.id}
+                              </div>
+                              <img src={photo.rel_path} alt="Palette upload" />
+                              <select
+                                value={photo.photo_type || "full"}
+                                onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
+                              >
+                                <option value="full">Full</option>
+                                <option value="zoom">Zoom</option>
+                                <option value="before">Before</option>
+                              </select>
+                              <select
+                                value={photo.trigger_mode || "any"}
+                                onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
+                              >
+                                <option value="any">Trigger: any color</option>
+                                <option value="none">Trigger: none</option>
+                                <option value="color">Trigger: specific color</option>
+                              </select>
+                              <select
+                                value={photo.trigger_color_id || ""}
+                                onChange={(e) =>
+                                  handlePhotoField(
+                                    photo.id,
+                                    "trigger_color_id",
+                                    e.target.value ? Number(e.target.value) : null
+                                  )
+                                }
+                                disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
+                              >
+                                <option value="">Pick color</option>
+                                {editMembers.map((row) => (
+                                  <option
+                                    key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
+                                    value={row.color?.id || row.color?.color_id || ""}
+                                  >
+                                    {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
+                                  </option>
+                                ))}
+                              </select>
                               <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                  handlePhotoUpload(e.target.files, photo.id);
-                                  e.target.value = "";
-                                }}
-                                disabled={photoStatus.loading}
+                                type="text"
+                                placeholder="Alt text (SEO)"
+                                value={photo.alt_text || ""}
+                                onChange={(e) => handlePhotoField(photo.id, "alt_text", e.target.value)}
                               />
-                            </label>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={() => handleDeletePhoto(photo.id)}
+                                disabled={photoStatus.loading}
+                              >
+                                Remove
+                              </button>
+                              {!isApplied && (
+                                <label className="asp-upload-btn ghost">
+                                  Replace
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      handlePhotoUpload(e.target.files, photo.id);
+                                      e.target.value = "";
+                                    }}
+                                    disabled={photoStatus.loading}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="asp-member-empty">
+                          {isApplied ? "No photos yet." : "No photos in this viewer yet."}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {activeEditorTab === "colors" && (
+                  <div className="asp-member-list">
+                    <div className="asp-member-list-head">
+                      <h3>Palette Colors</h3>
+                      {!membersReadOnly && (
+                        <div className="asp-member-actions">
+                          <FuzzySearchColorSelect
+                            className="asp-member-fuzzy"
+                            onSelect={handleAddMemberWithColor}
+                            showLabel={false}
+                            autoFocus={false}
+                            preventAutoFocus
+                            compact
+                          />
+                          <button type="button" className="ghost" onClick={handleAddMember}>
+                            Add Color
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {!membersReadOnly && (
+                      <div className="app-palette-photos__hint">
+                        Palette colors and roles are shared by every viewer template.
+                      </div>
+                    )}
+                    {membersReadOnly && (
+                      <div className="app-palette-photos__hint">
+                        Applied palette colors are read-only here. Use Mask Tester to change colors.
+                      </div>
+                    )}
+                    {!membersReadOnly && (
+                      <label>
+                        Palette Type
+                        <select
+                          value={editForm.palette_type}
+                          onChange={(e) => handleEditField("palette_type", e.target.value)}
+                        >
+                          <option value="exterior">Exterior</option>
+                          <option value="interior">Interior</option>
+                          <option value="hoa">HOA</option>
+                        </select>
+                      </label>
+                    )}
+                    <div className="asp-member-rows">
+                      {editMembers.map((row, index) => (
+                        <div key={row.key || index} className="asp-member-row">
+                          <EditableSwatch
+                            value={row.color}
+                            onChange={(color) => handleEditMemberColor(index, color)}
+                            showName
+                            size="sm"
+                            placement="top"
+                            readOnly={membersReadOnly}
+                          />
+                          <input
+                            type="text"
+                            placeholder={membersReadOnly ? "Mask role" : "Role (e.g. trim, body, door)"}
+                            value={row.role}
+                            onChange={(e) => handleEditMemberRole(index, e.target.value)}
+                            readOnly={membersReadOnly}
+                          />
+                          {!membersReadOnly && (
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => handleRemoveMember(index)}
+                              aria-label="Remove color"
+                            >
+                              ✕
+                            </button>
                           )}
                         </div>
                       ))}
+                      {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
                     </div>
-                  ) : (
-                    <div className="asp-member-empty">
-                      {isApplied ? "No photos yet." : "No photos in this viewer yet."}
-                    </div>
-                  )}
-                </div>
-
-                <div className="asp-member-list">
-              <div className="asp-member-list-head">
-                <h3>Palette Colors</h3>
-                {!membersReadOnly && (
-                  <div className="asp-member-actions">
-                    <FuzzySearchColorSelect
-                      className="asp-member-fuzzy"
-                      onSelect={handleAddMemberWithColor}
-                      showLabel={false}
-                      autoFocus={false}
-                      preventAutoFocus
-                      compact
-                    />
-                    <button type="button" className="ghost" onClick={handleAddMember}>
-                      Add Color
-                    </button>
                   </div>
                 )}
-              </div>
-              {!membersReadOnly && (
-                <label className="asp-kicker-field">
-                  <span>Kicker (optional)</span>
-                  <KickerDropdown
-                    value={editForm.kicker_id}
-                    onChange={(next) => setEditForm((prev) => ({ ...prev, kicker_id: next || "" }))}
-                  />
-                </label>
-              )}
-              {membersReadOnly && (
-                <div className="app-palette-photos__hint">
-                  Applied palette colors are read-only here. Use Mask Tester to change colors.
-                </div>
-              )}
-              {!membersReadOnly && (
-                <label>
-                  Palette Type
-                  <select
-                    value={editForm.palette_type}
-                    onChange={(e) => handleEditField("palette_type", e.target.value)}
-                  >
-                    <option value="exterior">Exterior</option>
-                    <option value="interior">Interior</option>
-                    <option value="hoa">HOA</option>
-                  </select>
-                </label>
-              )}
-              <div className="asp-member-rows">
-                {editMembers.map((row, index) => (
-                  <div key={row.key || index} className="asp-member-row">
-                    <EditableSwatch
-                      value={row.color}
-                      onChange={(color) => handleEditMemberColor(index, color)}
-                      showName
-                      size="sm"
-                      placement="top"
-                      readOnly={membersReadOnly}
-                    />
-                    <input
-                      type="text"
-                      placeholder={membersReadOnly ? "Mask role" : "Role (e.g. trim, body, door)"}
-                      value={row.role}
-                      onChange={(e) => handleEditMemberRole(index, e.target.value)}
-                      readOnly={membersReadOnly}
-                    />
-                    {!membersReadOnly && (
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => handleRemoveMember(index)}
-                        aria-label="Remove color"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
-              </div>
-                </div>
 
-                {!isApplied && (
+                {!isApplied && (activeEditorTab === "full" || activeEditorTab === "concept") && (
+                  <>
+                    <div className="app-palette-photos__viewer-copy">
+                      <div className="app-palette-photos__section-head">
+                        <h3>{activeEditorTab === "concept" ? "Concept Copy" : "Full Viewer Copy"}</h3>
+                      </div>
+                      <label className="asp-kicker-field">
+                        {viewerCopyLabels.kicker}
+                        <div className="app-palette-photos__kicker-copy">
+                          <KickerDropdown
+                            value={editForm.viewer_kicker_id}
+                            blankLabel="Copy saved kicker..."
+                            onChange={(next, kicker) => {
+                              setEditForm((prev) => ({
+                                ...prev,
+                                viewer_kicker_id: next || "",
+                                kicker_text: kicker?.display_text || prev.kicker_text,
+                              }));
+                            }}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={editForm.kicker_text}
+                          onChange={(e) => handleEditField("kicker_text", e.target.value)}
+                          placeholder="Custom viewer kicker"
+                        />
+                      </label>
+                      <label>
+                        {viewerCopyLabels.title}
+                        <input
+                          type="text"
+                          value={editForm.display_title}
+                          onChange={(e) => handleEditField("display_title", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        {viewerCopyLabels.intro}
+                        <textarea
+                          rows={3}
+                          value={editForm.intro}
+                          onChange={(e) => handleEditField("intro", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        {viewerCopyLabels.notes}
+                        <textarea
+                          rows={3}
+                          value={editForm.notes}
+                          onChange={(e) => handleEditField("notes", e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        CTA Label
+                        <input
+                          type="text"
+                          value={editForm.cta_label}
+                          onChange={(e) => handleEditField("cta_label", e.target.value)}
+                          placeholder="See transformation"
+                        />
+                      </label>
+                      <label>
+                        Concept playlist
+                        <select
+                          value={editForm.playlist_url}
+                          onChange={(e) => handleEditField("playlist_url", e.target.value)}
+                          disabled={playlistStatus.loading}
+                        >
+                          <option value="">
+                            {playlistStatus.loading ? "Loading playlists..." : "No concept playlist"}
+                          </option>
+                          {playlists
+                            .map((playlist) => ({
+                              playlist,
+                              url: playlistShareUrl(playlist),
+                              label: playlistLabel(playlist),
+                            }))
+                            .filter((option) => option.url)
+                            .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+                            .map((option) => (
+                              <option key={`${option.url}-${option.playlist.playlist_id}`} value={option.url}>
+                                {option.label}
+                              </option>
+                            ))}
+                        </select>
+                        {editForm.playlist_url && (
+                          <div className="app-palette-photos__hint">{editForm.playlist_url}</div>
+                        )}
+                        {playlistStatus.error && (
+                          <div className="asp-error">{playlistStatus.error}</div>
+                        )}
+                      </label>
+                    </div>
+                  </>
+                )}
+
+                {!isApplied && activeEditorTab === "colors" && (
                   <>
                     <label>
                       Nickname (for me)
@@ -985,12 +1351,20 @@ export default function AdminPalettePhotosPage() {
                       />
                     </label>
                     <label>
-                      Display Title (shown in viewer)
-                      <input
-                        type="text"
-                        value={editForm.display_title}
-                        onChange={(e) => handleEditField("display_title", e.target.value)}
+                      Private Notes (for me)
+                      <textarea
+                        rows={3}
+                        value={editForm.private_notes}
+                        onChange={(e) => handleEditField("private_notes", e.target.value)}
                       />
+                    </label>
+                    <label className="asp-modal-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={!!editForm.terry_fav}
+                        onChange={(e) => handleEditField("terry_fav", e.target.checked)}
+                      />
+                      Mark as Terry favorite
                     </label>
                   </>
                 )}
@@ -1039,34 +1413,14 @@ export default function AdminPalettePhotosPage() {
                   </>
                 )}
 
-                <label>
-                  Public Notes (shown in viewer)
-                  <textarea
-                    rows={3}
-                    value={editForm.notes}
-                    onChange={(e) => handleEditField("notes", e.target.value)}
-                  />
-                </label>
-
-                {!isApplied && (
+                {isApplied && (
                   <label>
-                    Private Notes (for me)
+                    Public Notes (shown in viewer)
                     <textarea
                       rows={3}
-                      value={editForm.private_notes}
-                      onChange={(e) => handleEditField("private_notes", e.target.value)}
+                      value={editForm.notes}
+                      onChange={(e) => handleEditField("notes", e.target.value)}
                     />
-                  </label>
-                )}
-
-                {!isApplied && (
-                  <label className="asp-modal-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={!!editForm.terry_fav}
-                      onChange={(e) => handleEditField("terry_fav", e.target.checked)}
-                    />
-                    Mark as Terry favorite
                   </label>
                 )}
 

@@ -3,6 +3,7 @@ import InsertLinkModal from "@components/InsertLinkModal";
 import LookupTypeManagerModal from "@components/LookupTypeManagerModal";
 import ModalDialog from "@components/ModalDialog";
 import { API_FOLDER } from "@helpers/config";
+import { buildSmsShareUrl } from "@helpers/shareUrls";
 import { BRAND } from "@config/brand";
 import "./admin-clients.css";
 
@@ -1119,9 +1120,7 @@ export default function AdminClientsPage() {
       return;
     }
     const body = String(textDraft.message || "").trim();
-    const smsUrl = body
-      ? `sms:${encodeURIComponent(phone)}&body=${encodeURIComponent(body)}`
-      : `sms:${encodeURIComponent(phone)}`;
+    const smsUrl = buildSmsShareUrl(body, phone);
     window.location.href = smsUrl;
   }
 

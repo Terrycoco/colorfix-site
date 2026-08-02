@@ -59,6 +59,7 @@ const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresen
 const AdminPlaylistInstancesPage = lazy(() => import('@pages/AdminPlaylistInstancesPage'));
 const AdminPlaylistInstanceSetsPage = lazy(() => import('@pages/AdminPlaylistInstanceSetsPage'));
 const AdminPlaylistEditorPage = lazy(() => import('@pages/AdminPlaylistEditorPage'));
+const AdminPlayerExperiencesPage = lazy(() => import('@pages/AdminPlayerExperiencesPage'));
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
 const AdminCtaPagesPage = lazy(() => import('@pages/AdminCtaPagesPage'));
 const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
@@ -156,6 +157,7 @@ export default function AdminRoutes() {
         <Route path="player-preview/:playlistId/:start" element={renderWithSuspense(AdminPlayerPage, 'Loading player preview...')} />
         <Route path="player-presenter" element={renderWithSuspense(AdminPlaylistPresenterPage, 'Loading presenter...')} />
         <Route path="playlist-instances" element={renderWithSuspense(AdminPlaylistInstancesPage, 'Loading playlist instances...')} />
+        <Route path="player-experiences" element={renderWithSuspense(AdminPlayerExperiencesPage, 'Loading player experiences...')} />
         <Route path="playlist-instance-sets" element={renderWithSuspense(AdminPlaylistInstanceSetsPage, 'Loading playlist instance sets...')} />
         <Route path="ctas" element={renderWithSuspense(AdminCtasPage, 'Loading CTAs...')} />
         <Route path="cta-pages" element={renderWithSuspense(AdminCtaPagesPage, 'Loading CTA pages...')} />

@@ -154,32 +154,8 @@
 
 .player-end-branding {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
   text-align: center;
-  font-size: 13px;
-  line-height: 1.3;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.68);
-  pointer-events: none;
-}
-
-.player-end-branding-label {
-  display: block;
-}
-
-.player-end-branding strong {
-  font-weight: 600;
-  color: var(--brand-color);
-}
-
-.player-end-branding-link {
-  color: inherit;
-  text-decoration: none;
   pointer-events: auto;
-}
-
-.player-end-branding-link:hover {
-  opacity: 0.9;
 }

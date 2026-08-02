@@ -162,6 +162,7 @@ export default function AdminPlayerPage() {
                 slides={data?.items || []}
                 startIndex={data?.start_index ?? 0}
                 hideStars={Boolean(data?.hide_stars)}
+                showSlidePalettePrompt={data?.show_slide_palette_prompt !== false}
                 onAbort={() => navigate(-1)}
                 onLikeChange={({ likedCount: nextCount }) => setLikedCount(nextCount)}
                 onPlaybackEnd={({ likedCount: nextCount }) => {

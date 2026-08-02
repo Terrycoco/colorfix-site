@@ -1,5 +1,6 @@
 // Centralized CTA action handlers shared by player screens.
 import { getPaletteTargets, isPaletteEligibleItem } from "@helpers/playerPaletteItems";
+import { buildSmsShareUrl, canUseNativeShare } from "@helpers/shareUrls";
 
 export function getCtaKey(cta) {
   return (cta?.key || cta?.action_key || cta?.action || "").toString().toLowerCase();
@@ -22,15 +23,14 @@ function runShare({ data, shareFolder, shareSource }) {
   const url = buildShareUrl(shareFolder, data.playlist_instance_id, shareSource);
   const title = data?.share_title || data?.title || "ColorFix Playlist";
   const text = data?.share_description || "I'm sharing a playlist I found on ColorFix";
-  if (navigator.share) {
+  if (canUseNativeShare()) {
     navigator.share({ title, text, url }).catch(() => {});
     return;
   }
   if (navigator.clipboard?.writeText) {
     navigator.clipboard.writeText(url).catch(() => {});
   }
-  const body = encodeURIComponent(url);
-  window.location.href = `sms:&body=${body}`;
+  window.location.href = buildSmsShareUrl(`${text}\n${url}`);
 }
 
 function runCopyLink({ data, shareFolder, shareSource }) {
@@ -40,8 +40,7 @@ function runCopyLink({ data, shareFolder, shareSource }) {
     navigator.clipboard.writeText(url).catch(() => {});
     return;
   }
-  const body = encodeURIComponent(url);
-  window.location.href = `sms:&body=${body}`;
+  window.location.href = buildSmsShareUrl(url);
 }
 
 function runNavigate({ navigate, cta, psi, thumb, demo }) {
@@ -191,6 +190,7 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const apId = targetItem.ap_id;
   const paletteHash = targetItem.palette_hash;
   const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
+  const paletteViewerUrl = targetItem.palette_viewer_url || "";
   if (!paletteHash && !savedPaletteSetId) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
@@ -207,8 +207,12 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   if (resolvedReturnTo) params.set("return_to", resolvedReturnTo);
   if (savedPaletteSetId > 0) params.set("set_id", String(savedPaletteSetId));
   const qs = params.toString();
-  if (!paletteHash) return;
-  const url = `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`;
+  const url = paletteViewerUrl
+    ? appendParams(paletteViewerUrl, Object.fromEntries(params.entries()))
+    : paletteHash
+      ? `/palette/${paletteHash}/share${qs ? `?${qs}` : ""}`
+      : "";
+  if (!url) return;
   if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;

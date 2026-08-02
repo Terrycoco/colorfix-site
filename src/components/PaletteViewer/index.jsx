@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import LogoAnimated from "@components/LogoAnimated";
+import BrandFooterLogo from "@components/BrandFooterLogo";
 import "./appliedpaletteviewer.css";
 
 export default function PaletteViewer({
@@ -28,7 +29,7 @@ export default function PaletteViewer({
   const colorGroups = useMemo(() => groupEntriesByColor(swatches), [swatches]);
   const title = formatTitle(meta?.title || "ColorFix Palette");
   const notes = meta?.notes || "";
-  const kicker = meta?.kicker || "";
+  const kicker = meta?.kicker_text || "";
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
@@ -340,9 +341,7 @@ export default function PaletteViewer({
             )}
           </div>
           <div className="apv-branding">
-            <span>Brought to you by </span>
-            <a href="/" className="apv-branding-link">ColorFix</a>
-           
+            <BrandFooterLogo />
           </div>
         </div>
       )}

@@ -13,6 +13,7 @@ use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Services\PhotoRenderingService;
 use App\Services\PaletteViewerService;
+use App\Services\PaletteViewerTokenService;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -23,6 +24,36 @@ function respond(array $payload, int $status = 200): void {
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
         respond(['ok' => false, 'error' => 'GET only'], 405);
+    }
+
+    $token = isset($_GET['token']) ? trim((string)$_GET['token']) : '';
+    if ($token !== '') {
+        $tokenService = new PaletteViewerTokenService();
+        $tokenPayload = $tokenService->decode($token);
+        $hash = trim((string)($tokenPayload['hash'] ?? ''));
+        $setId = isset($tokenPayload['set_id']) ? (int)$tokenPayload['set_id'] : null;
+
+        $savedRepo = new PdoSavedPaletteRepository($pdo);
+        $photoRepo = new PdoPhotoRepository($pdo);
+        $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
+        $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
+        $svc = new PaletteViewerService($savedRepo, $renderSvc, $playlistInstanceRepo);
+
+        $paletteViewerKey = (string)($tokenPayload['palette_viewer_key'] ?? 'full_palette');
+        $data = $svc->getSaved($hash, $setId && $setId > 0 ? $setId : null, $paletteViewerKey);
+        $data['meta']['playlist_instance_id'] = $tokenPayload['playlist_instance_id'] ?? null;
+        $playlistInstanceId = (int)($tokenPayload['playlist_instance_id'] ?? 0);
+        if ($playlistInstanceId > 0) {
+            $instance = $playlistInstanceRepo->getById($playlistInstanceId);
+            if ($instance && $instance->isActive && $instance->shareEnabled) {
+                $pathId = trim((string)($instance->slug ?? '')) !== ''
+                    ? (string)$instance->slug
+                    : (string)$playlistInstanceId;
+                $data['meta']['playlist_url'] = '/p/' . rawurlencode($pathId);
+                $data['meta']['playlist_title'] = $instance->displayTitle ?: $instance->instanceName;
+            }
+        }
+        respond(['ok' => true, 'data' => $data]);
     }
 
     $source = isset($_GET['source']) ? strtolower(trim((string)$_GET['source'])) : '';

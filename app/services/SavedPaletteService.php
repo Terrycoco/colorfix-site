@@ -337,6 +337,36 @@ class SavedPaletteService
         }
     }
 
+    public function updateSavedPaletteViewerContent(int $paletteId, array $payload): array
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException('palette_id required');
+        }
+        $setId = isset($payload['saved_palette_set_id']) ? (int)$payload['saved_palette_set_id'] : 0;
+        if ($setId <= 0) {
+            throw new InvalidArgumentException('saved_palette_set_id required');
+        }
+        $set = $this->repo->getSetById($setId);
+        if (!$set || (int)($set['saved_palette_id'] ?? 0) !== $paletteId) {
+            throw new InvalidArgumentException('Saved palette set not found for this palette');
+        }
+
+        $templateKey = strtolower(trim((string)($payload['template_key'] ?? 'full_palette')));
+        if (!in_array($templateKey, ['full_palette', 'concept'], true)) {
+            $templateKey = 'full_palette';
+        }
+
+        return $this->repo->upsertViewerContent($paletteId, $setId, $templateKey, [
+            'kicker_text' => $this->nullableText($payload['kicker_text'] ?? null),
+            'title' => $this->nullableText($payload['title'] ?? null),
+            'intro' => $this->nullableText($payload['intro'] ?? null),
+            'notes' => $this->nullableText($payload['notes'] ?? null),
+            'cta_label' => $this->nullableText($payload['cta_label'] ?? null),
+            'playlist_url' => $this->nullableText($payload['playlist_url'] ?? null),
+            'is_active' => array_key_exists('is_active', $payload) ? (int)(bool)$payload['is_active'] : 1,
+        ]);
+    }
+
     public function normalizePhotoLinks(?PdoPhotoLibraryRepository $photoLibraryRepo = null, bool $apply = false): array
     {
         $rows = $this->repo->listPhotosNeedingPathNormalization();
@@ -449,6 +479,15 @@ class SavedPaletteService
         }
 
         return $normalized;
+    }
+
+    private function nullableText(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = trim((string)$value);
+        return $text === '' ? null : $text;
     }
 
     /**

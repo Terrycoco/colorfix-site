@@ -109,6 +109,7 @@ export default function PlaylistThumbsPage() {
         ap_id: apId,
         palette_hash: paletteHash,
         saved_palette_set_id: savedPaletteSetId,
+        palette_viewer_url: item?.palette_viewer_url || "",
         title: formatTitle(paletteTitle),
         image_url: item?.image_url || "",
         is_liked: apId ? likedSet.has(String(apId)) : false,
@@ -202,8 +203,12 @@ export default function PlaylistThumbsPage() {
                 params.set("set_id", String(palette.saved_palette_set_id));
               }
               const qs = params.toString();
-              if (!palette.palette_hash) return null;
-              const href = `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`;
+              const href = palette.palette_viewer_url
+                ? appendParams(palette.palette_viewer_url, Object.fromEntries(params.entries()))
+                : palette.palette_hash
+                  ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
+                  : "";
+              if (!href) return null;
               return (
                 <a
                   key={cardKey}
@@ -251,6 +256,23 @@ export default function PlaylistThumbsPage() {
       </div>
     </div>
   );
+}
+
+function appendParams(url, params) {
+  const entries = Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== "");
+  if (!entries.length) return url;
+  try {
+    const base = `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    const next = new URL(base);
+    entries.forEach(([key, value]) => {
+      if (!next.searchParams.has(key)) next.searchParams.set(key, String(value));
+    });
+    return `${next.pathname}${next.search}${next.hash}`;
+  } catch {
+    const sep = url.includes("?") ? "&" : "?";
+    const qs = new URLSearchParams(entries).toString();
+    return qs ? `${url}${sep}${qs}` : url;
+  }
 }
 
 function formatTitle(value) {

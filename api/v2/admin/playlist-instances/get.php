@@ -54,6 +54,7 @@ respond([
         'demo_enabled' => $instance->demoEnabled ? 1 : 0,
         'cta_context_key' => $instance->ctaContextKey,
         'audience' => $instance->audience,
+        'player_experience_id' => $instance->playerExperienceId,
         'cta_overrides' => $instance->ctaOverrides,
         'share_enabled' => $instance->shareEnabled ? 1 : 0,
         'share_title' => $instance->shareTitle,

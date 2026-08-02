@@ -63,6 +63,7 @@ if ($playlistId > 0) {
           demo_enabled,
           cta_context_key,
           audience,
+          player_experience_id,
           cta_overrides,
           kicker_id,
           is_active
@@ -86,6 +87,7 @@ if ($playlistId > 0) {
         $item['demo_enabled'] = (int)($item['demo_enabled'] ?? 0);
         $item['kicker_id'] = $item['kicker_id'] !== null ? (int)$item['kicker_id'] : null;
         $item['is_active'] = (int)($item['is_active'] ?? 0);
+        $item['player_experience_id'] = $item['player_experience_id'] !== null ? (int)$item['player_experience_id'] : null;
         $item['playlist_slug'] = $slug !== '' ? $slug : null;
         $item['player_url'] = $slug ? "/playlist/{$slug}" : "/playlist/{$item['playlist_instance_id']}";
         return $item;
@@ -134,6 +136,7 @@ $items = array_map(static function ($instance) {
         'demo_enabled' => $instance->demoEnabled ? 1 : 0,
         'cta_context_key' => $instance->ctaContextKey,
         'audience' => $instance->audience,
+        'player_experience_id' => $instance->playerExperienceId,
         'cta_overrides' => $instance->ctaOverrides,
         'kicker_id' => $instance->kickerId,
         'is_active' => $instance->isActive ? 1 : 0,

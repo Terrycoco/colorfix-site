@@ -55,6 +55,10 @@ function AppRouter() {
           element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
         />
         <Route
+          path="pv/:token"
+          element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
+        />
+        <Route
           path="watch"
           element={renderWithSuspense(WatchRedirectPage, 'Loading watch link…')}
         />

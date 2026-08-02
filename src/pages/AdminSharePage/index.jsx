@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
+import { buildSmsShareUrl } from "@helpers/shareUrls";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-share.css";
 
@@ -70,21 +71,6 @@ function isTextCapableDevice() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
   return /iPhone|iPad|Android|Macintosh/i.test(ua);
-}
-
-function buildSmsShareUrl(phone, body) {
-  const recipient = (phone || "").trim();
-  const encodedBody = encodeURIComponent(body);
-
-  if (typeof navigator === "undefined") {
-    return `sms:${recipient}?body=${encodedBody}`;
-  }
-
-  const ua = navigator.userAgent || "";
-  const isAppleDevice = /iPhone|iPad|Macintosh/i.test(ua);
-  const separator = recipient && isAppleDevice ? "&" : "?";
-
-  return `sms:${recipient}${separator}body=${encodedBody}`;
 }
 
 function buildAssetLabel(assetType, item) {
@@ -374,7 +360,7 @@ export default function AdminSharePage() {
       return;
     }
     const body = `${buildAssetLabel(assetType, selectedAsset)} ${shareLink}`;
-    const smsUrl = buildSmsShareUrl(recipientPhone, body);
+    const smsUrl = buildSmsShareUrl(body, recipientPhone);
     setRecipient(emptyRecipient);
     window.setTimeout(() => {
       window.location.href = smsUrl;

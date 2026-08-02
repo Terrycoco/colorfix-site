@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import ConceptPaletteViewer from "@components/ConceptPaletteViewer";
 import PaletteViewer from "@components/PaletteViewer";
 import "./saved-palette-share.css";
 
 export default function SavedPaletteSharePage() {
-  const { hash } = useParams();
+  const { hash, token } = useParams();
   const [state, setState] = useState({ loading: true, error: "", data: null });
   const returnTo = useMemo(() => {
     if (typeof window === "undefined") return "/";
@@ -21,17 +22,20 @@ export default function SavedPaletteSharePage() {
     ? "Back to Playlist"
     : "← Back";
   useEffect(() => {
-    if (!hash) return;
+    if (!hash && !token) return;
     const controller = new AbortController();
     setState({ loading: true, error: "", data: null });
     const params = new URLSearchParams();
-    params.set("source", "saved");
-    if (/^\d+$/.test(String(hash))) {
+    if (token) {
+      params.set("token", token);
+    } else if (/^\d+$/.test(String(hash))) {
+      params.set("source", "saved");
       params.set("id", hash);
     } else {
+      params.set("source", "saved");
       params.set("hash", hash);
     }
-    if (Number(setId || 0) > 0) {
+    if (!token && Number(setId || 0) > 0) {
       params.set("set_id", String(Number(setId)));
     }
     fetch(`/api/v2/palette-viewer.php?${params.toString()}`, {
@@ -49,7 +53,7 @@ export default function SavedPaletteSharePage() {
     return () => {
       controller.abort();
     };
-  }, [hash, setId]);
+  }, [hash, token, setId]);
 
   if (state.loading) {
     return (
@@ -69,9 +73,13 @@ export default function SavedPaletteSharePage() {
 
   const meta = state.data?.meta || null;
   const swatches = state.data?.swatches || [];
+  const playlistUrl = meta?.playlist_url || "";
+  const playlistCtaLabel = meta?.cta_label || "View Playlist";
+  const isConcept = meta?.palette_viewer_key === "concept";
+  const ViewerComponent = isConcept ? ConceptPaletteViewer : PaletteViewer;
 
   return (
-    <PaletteViewer
+    <ViewerComponent
       meta={meta}
       swatches={swatches}
       adminMode={false}
@@ -101,6 +109,18 @@ export default function SavedPaletteSharePage() {
       }}
       showLogo={true}
       showShare={true}
+      playlistUrl={playlistUrl}
+      footer={!isConcept && playlistUrl ? (
+        <button
+          type="button"
+          className="apv-btn apv-btn--ghost apv-back-to-playlist"
+          onClick={() => {
+            window.location.href = playlistUrl;
+          }}
+        >
+          {playlistCtaLabel}
+        </button>
+      ) : null}
     />
   );
 }

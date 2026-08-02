@@ -357,6 +357,7 @@ export default function AdminPlaylistPresenterPage() {
                   slides={data?.items || []}
                   startIndex={data?.start_index ?? 0}
                   hideStars={Boolean(data?.hide_stars)}
+                  showSlidePalettePrompt={data?.show_slide_palette_prompt !== false}
                   onAbort={handleExitPlayer}
                   onLikeChange={({ likedCount: nextCount }) => setLikedCount(nextCount)}
                   onPlaybackEnd={({ likedCount: nextCount }) => {

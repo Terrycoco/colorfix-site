@@ -80,6 +80,7 @@ try {
                 $row['photos'] = $full['photos'] ?? [];
                 $row['sets'] = $full['sets'] ?? [];
             }
+            $row['viewer_content'] = $full['viewer_content'] ?? [];
         }
         unset($row);
     }

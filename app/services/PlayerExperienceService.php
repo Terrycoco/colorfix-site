@@ -63,6 +63,11 @@ class PlayerExperienceService
         $itemsStartedAt = microtime(true);
         $items = $this->flattenItems($playlist);
         $this->hydrateItemImages($items);
+        $paletteViewerKey = $experienceBacked ? $experience->paletteViewerKey : 'full_palette';
+        $showSlidePalettePrompt = $experienceBacked
+            ? $this->shouldShowSlidePalettePrompt($experience)
+            : true;
+        $this->hydratePaletteViewerUrls($items, $paletteViewerKey, (int)($instance->id ?? 0));
         $this->markTiming('hydrate_items', $itemsStartedAt);
         $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
         $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
@@ -155,6 +160,7 @@ class PlayerExperienceService
             'cta_context_key'      => $instance->ctaContextKey,
             'audience'             => $instance->audience,
             'palette_viewer_cta_group_id' => $instance->paletteViewerCtaGroupId,
+            'show_slide_palette_prompt' => $showSlidePalettePrompt,
             'thumbs_enabled'       => $thumbsEnabled,
             'demo_enabled'         => $instance->demoEnabled,
             'share_enabled'        => $instance->shareEnabled,
@@ -170,7 +176,7 @@ class PlayerExperienceService
             $plan['experience_key'] = $experience->experienceKey;
             $plan['experience_name'] = $experience->name;
             $plan['slide_flag'] = $slideFlag;
-            $plan['palette_viewer_key'] = $experience->paletteViewerKey;
+            $plan['palette_viewer_key'] = $paletteViewerKey;
             $plan['cta_page_id'] = $experience->ctaPageId;
         }
 
@@ -228,6 +234,15 @@ class PlayerExperienceService
             throw new DomainException("Player experience configuration error: unsupported slide_flag '{$slideFlag}'.");
         }
         return $value;
+    }
+
+    private function shouldShowSlidePalettePrompt(PlayerExperience $experience): bool
+    {
+        if (strtolower(trim($experience->paletteViewerKey)) === 'none') {
+            return false;
+        }
+        return strtolower(trim($experience->experienceKey)) !== 'prospect'
+            && strtolower(trim($experience->slideFlag)) !== 'prospect';
     }
 
     private function normalizeStartIndex(?int $start, int $count): int
@@ -424,6 +439,45 @@ class PlayerExperienceService
                 $item->image_url = $resolved;
             }
         }
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
+    private function hydratePaletteViewerUrls(array $items, string $paletteViewerKey, int $playlistInstanceId): void
+    {
+        $paletteViewerKey = strtolower(trim($paletteViewerKey));
+        if ($paletteViewerKey === 'none') {
+            return;
+        }
+
+        $tokenService = new PaletteViewerTokenService();
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            if (!$this->isPaletteViewerEligibleItem($item)) continue;
+
+            $paletteHash = trim((string)($item->palette_hash ?? ''));
+            if ($paletteHash === '') continue;
+
+            $setId = (int)($item->saved_palette_set_id ?? 0);
+            $item->palette_viewer_url = $tokenService->createSavedPaletteUrl(
+                $paletteHash,
+                $setId > 0 ? $setId : null,
+                $paletteViewerKey,
+                $playlistInstanceId
+            );
+        }
+    }
+
+    private function isPaletteViewerEligibleItem(PlaylistItem $item): bool
+    {
+        $type = strtolower((string)($item->type ?? 'normal'));
+        if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'non-palette'], true)) {
+            return false;
+        }
+        if (!empty($item->exclude_from_thumbs)) return false;
+        if (strtolower((string)($item->saved_palette_photo_type ?? '')) === 'before') return false;
+        return trim((string)($item->palette_hash ?? '')) !== '';
     }
 
     /**

@@ -181,7 +181,15 @@ class SavedPaletteController
             }
         }
 
-        if (!$data && $members === null && $photos === null) {
+        $viewerContent = null;
+        if (array_key_exists('viewer_content', $payload)) {
+            $viewerContent = $payload['viewer_content'];
+            if (!is_array($viewerContent)) {
+                throw new InvalidArgumentException('viewer_content must be an object');
+            }
+        }
+
+        if (!$data && $members === null && $photos === null && $viewerContent === null) {
             throw new InvalidArgumentException('No update fields provided');
         }
 
@@ -195,6 +203,10 @@ class SavedPaletteController
 
         if ($photos !== null) {
             $this->service->updateSavedPalettePhotos($paletteId, $photos);
+        }
+
+        if ($viewerContent !== null) {
+            $this->service->updateSavedPaletteViewerContent($paletteId, $viewerContent);
         }
 
         return $this->service->getSavedPalette($paletteId) ?? [];

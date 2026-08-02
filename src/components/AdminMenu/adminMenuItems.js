@@ -67,6 +67,7 @@ export const adminMenuItems = [
      { label: "All Playlists", href: "/picker?psi=1", adminExitPath: "/admin/" },
       { label: "Upload Photos", href: "/admin/upload-photo" },
       { label: "Playlist Instances", href: "/admin/playlist-instances" },
+      { label: "Player Experiences", href: "/admin/player-experiences" },
       { label: "PI Sets", href: "/admin/playlist-instance-sets" },
       { label: "Playlists", href: "/admin/playlists" },
       { label: "Presenter", href: "/admin/player-presenter" },

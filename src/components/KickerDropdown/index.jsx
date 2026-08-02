@@ -7,6 +7,7 @@ const LIST_URL = `${API_FOLDER}/v2/admin/kickers/list.php`;
 export default function KickerDropdown({
   value = "",
   onChange,
+  blankLabel = "No kicker",
   includeBlank = true,
   disabled = false,
 }) {
@@ -44,10 +45,17 @@ export default function KickerDropdown({
     <div className="kicker-dropdown">
       <select
         value={value ?? ""}
-        onChange={(e) => onChange?.(e.target.value === "" ? null : e.target.value)}
+        onChange={(e) => {
+          const nextValue = e.target.value === "" ? null : e.target.value;
+          const selected = options.find((opt) => opt.value === e.target.value) || null;
+          const raw = selected
+            ? kickers.find((k) => String(k.kicker_id) === selected.value) || null
+            : null;
+          onChange?.(nextValue, raw);
+        }}
         disabled={disabled}
       >
-        {includeBlank && <option value="">No kicker</option>}
+        {includeBlank && <option value="">{blankLabel}</option>}
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

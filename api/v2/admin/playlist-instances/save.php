@@ -42,6 +42,9 @@ $displaySubtitle = trim((string)($payload['display_subtitle'] ?? ''));
 $introLayout = trim((string)($payload['intro_layout'] ?? 'default'));
 $ctaContextKey = trim((string)($payload['cta_context_key'] ?? ''));
 $audience = trim((string)($payload['audience'] ?? ''));
+$playerExperienceId = isset($payload['player_experience_id']) && $payload['player_experience_id'] !== ''
+    ? (int)$payload['player_experience_id']
+    : null;
 $ctaOverrides = $payload['cta_overrides'] ?? null;
 if ($ctaContextKey === '') {
     $ctaContextKey = 'default';
@@ -120,7 +123,8 @@ try {
         isset($payload['is_active']) ? (bool)$payload['is_active'] : true,
         isset($payload['created_from_instance']) && $payload['created_from_instance'] !== '' ? (int)$payload['created_from_instance'] : null,
         isset($payload['kicker_id']) && $payload['kicker_id'] !== '' ? (int)$payload['kicker_id'] : null,
-        $slug !== '' ? $slug : null
+        $slug !== '' ? $slug : null,
+        $playerExperienceId
     );
 
     $instance = $repo->save($instance);

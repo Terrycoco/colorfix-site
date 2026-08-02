@@ -28,6 +28,7 @@ const Player = forwardRef(function Player({
   galleryName = "",
   galleryDescription = "",
   onPalettePromptClick,
+  showSlidePalettePrompt = true,
 }, ref) {
   const allItems = useMemo(() => (Array.isArray(slides) ? slides : []), [slides]);
 
@@ -326,7 +327,7 @@ function startPlayback(nextMode, nextIndex = 0) {
     : null;
   const IntroRenderer = isIntro ? getIntroLayout(introLayoutKey) : null;
   const isStarrable = isItemStarrable(currentItem);
-  const showPalettePrompt = playbackState === "playing" && isSavedPaletteEligibleItem(currentItem) && imageLoaded && fadeReady;
+  const showPalettePrompt = Boolean(showSlidePalettePrompt) && playbackState === "playing" && isSavedPaletteEligibleItem(currentItem) && imageLoaded && fadeReady;
   const currentKey = getItemKey(currentItem);
   const isLiked = currentKey ? likedSet.has(currentKey) : false;
   const galleryJsonLd = useMemo(

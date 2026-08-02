@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER, SHARE_FOLDER } from "@helpers/config";
 import { DEFAULT_AUDIENCE_OPTIONS, fetchAudienceOptions } from "@helpers/audienceOptions";
+import { buildSmsShareUrl, canUseNativeShare } from "@helpers/shareUrls";
 import KickerDropdown from "@components/KickerDropdown";
 import EmailShareModal from "@components/EmailShareModal/EmailShareModal";
 import "./admin-playlist-instances.css";
@@ -12,6 +13,7 @@ const SAVE_URL = `${API_FOLDER}/v2/admin/playlist-instances/save.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/playlist-instances/delete.php`;
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
+const PLAYER_EXPERIENCES_URL = `${API_FOLDER}/v2/admin/player-experiences/list.php`;
 const EMAIL_TEMPLATES_URL = `${API_FOLDER}/v2/admin/email-templates.php`;
 const SEND_EMAIL_URL = `${API_FOLDER}/v2/admin/playlist-instances/send-email.php`;
 
@@ -30,6 +32,7 @@ const emptyInstance = {
   intro_image_url: "",
   demo_enabled: false,
   audience: "any",
+  player_experience_id: "",
   cta_context_key: "default",
   cta_overrides: {},
   share_enabled: true,
@@ -83,6 +86,7 @@ export default function AdminPlaylistInstancesPage() {
   const [items, setItems] = useState([]);
   const [playlists, setPlaylists] = useState([]);
   const [ctaLibrary, setCtaLibrary] = useState([]);
+  const [playerExperiences, setPlayerExperiences] = useState([]);
   const [audienceOptions, setAudienceOptions] = useState(DEFAULT_AUDIENCE_OPTIONS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -145,6 +149,7 @@ export default function AdminPlaylistInstancesPage() {
   useEffect(() => {
     loadAudienceOptions();
     fetchPlaylists();
+    fetchPlayerExperiences();
     fetchCtas();
     fetchEmailTemplates();
   }, []);
@@ -195,6 +200,19 @@ export default function AdminPlaylistInstancesPage() {
       setCtaLibrary(data.items || []);
     } catch (err) {
       setError(err?.message || "Failed to load CTAs");
+    }
+  }
+
+  async function fetchPlayerExperiences() {
+    try {
+      const res = await fetch(`${PLAYER_EXPERIENCES_URL}?_=${Date.now()}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load player experiences");
+      setPlayerExperiences((data.items || []).filter((item) => Number(item.is_active) === 1));
+    } catch (err) {
+      setError(err?.message || "Failed to load player experiences");
     }
   }
 
@@ -272,6 +290,7 @@ export default function AdminPlaylistInstancesPage() {
         ...emptyInstance,
         ...data.item,
         audience: data.item?.audience || "any",
+        player_experience_id: data.item?.player_experience_id ? String(data.item.player_experience_id) : "",
         cta_context_key: data.item?.cta_context_key || "default",
         share_enabled: coerceBoolean(data.item?.share_enabled),
         skip_intro_on_replay: coerceBoolean(data.item?.skip_intro_on_replay),
@@ -461,15 +480,14 @@ export default function AdminPlaylistInstancesPage() {
     const id = activeId;
     if (!id) return;
     const url = buildShareUrl(id);
-    if (navigator.share) {
+    if (canUseNativeShare()) {
       navigator.share({ title: "ColorFix Playlist", url }).catch(() => {});
       return;
     }
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(url).catch(() => {});
     }
-    const body = encodeURIComponent(url);
-    window.location.href = `sms:&body=${body}`;
+    window.location.href = buildSmsShareUrl(url);
   }
 
   function handleCopyLink() {
@@ -611,12 +629,10 @@ export default function AdminPlaylistInstancesPage() {
     setSaveStatus("");
     const saveTargetId = form.playlist_instance_id ? Number(form.playlist_instance_id) : null;
     try {
-      if (missingArticleIds.length > 0) {
-        throw new Error("Article CTA requires an Article ID.");
-      }
       const payload = {
         ...form,
         playlist_id: Number(form.playlist_id) || 0,
+        player_experience_id: form.player_experience_id === "" ? null : Number(form.player_experience_id),
         allow_slug_edit: !slugLocked,
         demo_enabled: Boolean(form.demo_enabled),
         cta_overrides: form.cta_overrides || {},
@@ -749,6 +765,14 @@ export default function AdminPlaylistInstancesPage() {
     }));
   }, [playlists]);
 
+  const playerExperienceOptions = useMemo(() => {
+    return playerExperiences.map((row) => ({
+      id: Number(row.player_experience_id),
+      label: `${row.name || row.experience_key} (${row.experience_key})`,
+      detail: `${row.slide_flag} / ${row.palette_viewer_key}`,
+    }));
+  }, [playerExperiences]);
+
 
   const overrideMeta = useMemo(() => {
     const raw = form.cta_overrides || {};
@@ -847,14 +871,6 @@ export default function AdminPlaylistInstancesPage() {
         <div className="panel-header">
           <div className="panel-title">Playlist Instances</div>
           <div className="header-actions">
-            <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
-              <option value="all">All audiences</option>
-              {audienceOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
             <button type="button" className="primary-btn" onClick={handleNew}>
               New Instance
             </button>
@@ -1174,43 +1190,23 @@ export default function AdminPlaylistInstancesPage() {
           </div>
         </div>
 
-        <div className="instance-section cta-section">
-          <div className="section-title">CTA Settings</div>
-          <div className="cta-controls">
-            <label className="cta-context">
-              Audience
+        <div className="instance-section">
+          <div className="section-title">Player Experience</div>
+          <div className="form-grid">
+            <label>
+              Player Experience
               <select
-                value={form.audience || "any"}
-                onChange={(e) => updateForm("audience", e.target.value)}
+                value={form.player_experience_id || ""}
+                onChange={(e) => updateForm("player_experience_id", e.target.value)}
               >
-                {audienceOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
+                <option value="">Legacy / Not Assigned</option>
+                {playerExperienceOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label} - {opt.detail}
                   </option>
                 ))}
               </select>
             </label>
-          </div>
-
-          <div className="cta-picker-trigger">
-            <button type="button" className="primary-btn" onClick={() => setCtaPickerOpen(true)}>
-              CTAs
-            </button>
-            <span className="cta-picker-note">Add/remove CTAs for this instance</span>
-          </div>
-
-          <div className="cta-group-list">
-            {selectedCtas.length === 0 && (
-              <div className="cta-empty">No CTAs selected for this instance.</div>
-            )}
-            {selectedCtas.map((cta) => (
-              <div key={cta.cta_id} className="cta-item">
-                <div className="cta-item-head">
-                  <div className="cta-item-title">{cta.label}</div>
-                  <div className="cta-item-meta">{cta.type_label}</div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
 

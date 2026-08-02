@@ -190,6 +190,117 @@ class PdoSavedPaletteRepository
         return (string)$row['display_text'];
     }
 
+    public function getViewerContentForPalette(int $savedPaletteId): array
+    {
+        if ($savedPaletteId <= 0 || !$this->tableExists('saved_palette_viewer_content')) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT vc.saved_palette_viewer_content_id,
+                    vc.saved_palette_id,
+                    vc.saved_palette_set_id,
+                    vc.template_key,
+                    vc.kicker_text,
+                    vc.title,
+                    vc.intro,
+                    vc.notes,
+                    vc.cta_label,
+                    vc.playlist_url,
+                    vc.is_active,
+                    vc.created_at,
+                    vc.updated_at
+               FROM saved_palette_viewer_content vc
+              WHERE vc.saved_palette_id = :id
+           ORDER BY vc.saved_palette_set_id ASC, vc.template_key ASC"
+        );
+        $stmt->execute([':id' => $savedPaletteId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function getViewerContentForSet(int $savedPaletteId, int $setId, string $templateKey): ?array
+    {
+        if ($savedPaletteId <= 0 || $setId <= 0 || !$this->tableExists('saved_palette_viewer_content')) {
+            return null;
+        }
+
+        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
+        $stmt = $this->pdo->prepare(
+            "SELECT vc.saved_palette_viewer_content_id,
+                    vc.saved_palette_id,
+                    vc.saved_palette_set_id,
+                    vc.template_key,
+                    vc.kicker_text,
+                    vc.title,
+                    vc.intro,
+                    vc.notes,
+                    vc.cta_label,
+                    vc.playlist_url,
+                    vc.is_active,
+                    vc.created_at,
+                    vc.updated_at
+               FROM saved_palette_viewer_content vc
+              WHERE vc.saved_palette_id = :palette_id
+                AND vc.saved_palette_set_id = :set_id
+                AND vc.template_key = :template_key
+              LIMIT 1"
+        );
+        $stmt->execute([
+            ':palette_id' => $savedPaletteId,
+            ':set_id' => $setId,
+            ':template_key' => $templateKey,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    public function upsertViewerContent(int $savedPaletteId, int $setId, string $templateKey, array $fields): array
+    {
+        if ($savedPaletteId <= 0) {
+            throw new \InvalidArgumentException('saved_palette_id required');
+        }
+        if ($setId <= 0) {
+            throw new \InvalidArgumentException('saved_palette_set_id required');
+        }
+        if (!$this->tableExists('saved_palette_viewer_content')) {
+            throw new \RuntimeException('saved_palette_viewer_content table missing');
+        }
+
+        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
+        $isActive = array_key_exists('is_active', $fields) ? (int)(bool)$fields['is_active'] : 1;
+
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO saved_palette_viewer_content
+                (saved_palette_id, saved_palette_set_id, template_key, kicker_text, title, intro, notes, cta_label, playlist_url, is_active, created_at, updated_at)
+             VALUES
+                (:palette_id, :set_id, :template_key, :kicker_text, :title, :intro, :notes, :cta_label, :playlist_url, :is_active, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+                saved_palette_id = VALUES(saved_palette_id),
+                kicker_text = VALUES(kicker_text),
+                title = VALUES(title),
+                intro = VALUES(intro),
+                notes = VALUES(notes),
+                cta_label = VALUES(cta_label),
+                playlist_url = VALUES(playlist_url),
+                is_active = VALUES(is_active),
+                updated_at = NOW()"
+        );
+        $stmt->execute([
+            ':palette_id' => $savedPaletteId,
+            ':set_id' => $setId,
+            ':template_key' => $templateKey,
+            ':kicker_text' => $fields['kicker_text'] ?? null,
+            ':title' => $fields['title'] ?? null,
+            ':intro' => $fields['intro'] ?? null,
+            ':notes' => $fields['notes'] ?? null,
+            ':cta_label' => $fields['cta_label'] ?? null,
+            ':playlist_url' => $fields['playlist_url'] ?? null,
+            ':is_active' => $isActive,
+        ]);
+
+        return $this->getViewerContentForSet($savedPaletteId, $setId, $templateKey) ?? [];
+    }
+
     public function getFullPaletteByHash(string $hash): ?array
     {
         return $this->getFullPaletteByHashAndSet($hash, null);
@@ -1071,6 +1182,7 @@ class PdoSavedPaletteRepository
             'members' => $members,
             'photos'  => $photos,
             'sets'    => $this->getSetsForPalette($id),
+            'viewer_content' => $this->getViewerContentForPalette($id),
         ];
     }
 
@@ -1497,5 +1609,11 @@ class PdoSavedPaletteRepository
         );
         $stmt->execute([':palette_id' => $savedPaletteId]);
         return (int)$this->pdo->lastInsertId();
+    }
+
+    private function normalizeViewerTemplateKey(string $value): string
+    {
+        $value = strtolower(trim($value));
+        return in_array($value, ['full_palette', 'concept'], true) ? $value : 'full_palette';
     }
 }

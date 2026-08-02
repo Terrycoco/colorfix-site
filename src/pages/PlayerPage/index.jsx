@@ -784,6 +784,7 @@ const visibleCTAs = useMemo(
           startIndex={data?.start_index ?? 0}
           playlistInstanceId={data?.playlist_instance_id || playlistId}
           hideStars={Boolean(data?.hide_stars)}
+          showSlidePalettePrompt={data?.show_slide_palette_prompt !== false}
           galleryName={data?.page_h1 || data?.display_title || data?.title || ""}
           galleryDescription={data?.project_summary || data?.share_description || ""}
           onAbort={handleExit}
