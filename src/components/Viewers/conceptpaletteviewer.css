@@ -1,0 +1,120 @@
+.apv-shell--concept {
+  color: #171717;
+}
+
+.apv-shell--concept .apv-notes {
+  max-width: 38rem;
+  margin: 0;
+  color: #585d65;
+  font-size: 18px;
+  line-height: 1.52;
+  white-space: pre-line;
+}
+
+.apv-concept-section {
+  width: 100%;
+  margin: 0 0 28px;
+}
+
+.apv-concept-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.apv-section-label {
+  margin: 0 0 10px;
+  color: #7f8b9c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.apv-concept-scope-note {
+  max-width: 40ch;
+  margin: 18px auto 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-align: center;
+  color: #7f8998;
+}
+
+.apv-concept-cta {
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 26px;
+  border-top: 1px solid #d8dde4;
+}
+
+.apv-concept-cta-copy {
+  margin: 0 0 16px;
+  color: #30343a;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.apv-concept-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.apv-concept-primary,
+.apv-concept-secondary {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 20px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.apv-concept-primary {
+  border: 1px solid #171717;
+  background: #171717;
+  color: #fff;
+}
+
+.apv-concept-primary:hover,
+.apv-concept-primary:focus-visible {
+  background: #000;
+  border-color: #000;
+  transform: translateY(-1px);
+}
+
+.apv-concept-secondary {
+  border: 1px solid #b9c0ca;
+  background: transparent;
+  color: #25282d;
+}
+
+.apv-concept-secondary:hover,
+.apv-concept-secondary:focus-visible {
+  background: #eef1f4;
+  border-color: #929ba8;
+  transform: translateY(-1px);
+}
+
+.apv-concept-primary:focus-visible,
+.apv-concept-secondary:focus-visible {
+  outline: 3px solid rgba(255, 122, 0, 0.3);
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .apv-shell--concept .apv-notes {
+    font-size: 17px;
+  }
+}

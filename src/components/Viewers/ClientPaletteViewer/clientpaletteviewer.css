@@ -1,0 +1,143 @@
+.apv-shell--client {
+  color: #171717;
+}
+
+
+
+.cpv-project-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cpv-concept-title {
+  margin-top: 8px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.cpv-description {
+  font-size: 15px;
+}
+
+.cpv-project-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  color: #5c6472;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cpv-project-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cpv-meta-label,
+.cpv-spec-label {
+  font-weight: 600;
+  color: #3f4650;
+}
+
+.cpv-entry {
+  gap: 10px;
+}
+
+.cpv-assignment {
+  padding-top: 9px;
+  border-top: 1px solid #edf0f2;
+  display: grid;
+  gap: 3px;
+}
+
+.cpv-spec-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: #5c6472;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.cpv-empty {
+  padding: 14px;
+  border: 1px dashed #d1d5db;
+  border-radius: 10px;
+  color: #6b7280;
+  background: #fff;
+}
+
+.cpv-owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.cpv-action {
+  min-height: 42px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cpv-action--secondary {
+  color: #171717;
+  background: transparent;
+  border: 1px solid #aeb4bb;
+}
+
+.cpv-action--primary {
+  color: #fff;
+  background: #111;
+  border: 1px solid #111;
+}
+
+.cpv-action[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+
+.cpv-section-heading {
+  margin: 4px 0 0 12px;
+  color: #4f5965;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .cpv-owner-actions {
+    flex-direction: column;
+  }
+
+  .cpv-action {
+    width: 100%;
+  }
+
+  .cpv-content {
+    align-items: stretch;
+  }
+
+  .cpv-content > .apv-column {
+    width: 100%;
+  }
+}

@@ -41,7 +41,7 @@ const PaletteSwatch = ({ color }) => {
           }`}
         </div>
         <div className="ps-swatch-code-abbr">
-          {`${color.brand} • ${color.code} • H: ${
+          {`${color.brand_name || color.brand} • ${color.code} • H: ${
             typeof color.hcl_h === 'number' ? color.hcl_h.toFixed(0) : '–'
           }`}
         </div>

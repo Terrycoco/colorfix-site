@@ -210,7 +210,7 @@ final class PaletteViewerTokenService
     private function normalizePaletteViewerKey(string $value): string
     {
         $value = strtolower(trim($value));
-        return in_array($value, ['full_palette', 'concept', 'none'], true) ? $value : 'full_palette';
+        return in_array($value, ['full_palette', 'concept', 'client', 'painter', 'none'], true) ? $value : 'full_palette';
     }
 
     private function base64UrlEncode(string $value): string

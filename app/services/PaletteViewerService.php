@@ -62,7 +62,7 @@ class PaletteViewerService
             return $this->buildSavedConceptPalettePayload($full, $hash);
         }
 
-        return $this->buildSavedFullPalettePayload($full, $hash, 'full_palette');
+        return $this->buildSavedFullPalettePayload($full, $hash, $paletteViewerKey);
     }
 
     private function buildSavedConceptPalettePayload(?array $full, string $hash): array
@@ -191,7 +191,7 @@ class PaletteViewerService
     private function normalizePaletteViewerKey(string $value): string
     {
         $value = strtolower(trim($value));
-        return in_array($value, ['full_palette', 'concept', 'none'], true) ? $value : 'full_palette';
+        return in_array($value, ['full_palette', 'concept', 'client', 'painter', 'none'], true) ? $value : 'full_palette';
     }
 
     /**

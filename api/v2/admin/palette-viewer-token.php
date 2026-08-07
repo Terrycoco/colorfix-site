@@ -31,7 +31,7 @@ try {
     $paletteId = isset($payload['palette_id']) ? (int)$payload['palette_id'] : 0;
     $setId = isset($payload['set_id']) ? (int)$payload['set_id'] : 0;
     $templateKey = strtolower(trim((string)($payload['template_key'] ?? 'full_palette')));
-    if (!in_array($templateKey, ['full_palette', 'concept'], true)) {
+    if (!in_array($templateKey, ['full_palette', 'concept', 'client', 'painter'], true)) {
         $templateKey = 'full_palette';
     }
 

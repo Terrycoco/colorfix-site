@@ -25,7 +25,7 @@ final class PdoPropertyRepository
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= " ORDER BY p.updated_at DESC, p.id DESC LIMIT {$limit}";
+        $sql .= " ORDER BY p.name ASC, p.id ASC LIMIT {$limit}";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -56,7 +56,7 @@ final class PdoPropertyRepository
             )
         ");
         $stmt->execute([
-            ':address_id' => (int)$data['address_id'],
+            ':address_id' => isset($data['address_id']) && (int)$data['address_id'] > 0 ? (int)$data['address_id'] : null,
             ':client_id' => isset($data['client_id']) ? (int)$data['client_id'] : null,
             ':name' => $data['name'] ?? null,
             ':notes' => $data['notes'] ?? null,
@@ -101,9 +101,17 @@ final class PdoPropertyRepository
                     a.state,
                     a.postal_code,
                     a.country_code,
-                    c.name AS client_name
+                    c.name AS client_name,
+                    c.first_name AS client_first_name,
+                    c.last_name AS client_last_name,
+                    c.email AS client_email,
+                    (
+                        SELECT COUNT(*)
+                        FROM projects prj
+                        WHERE prj.property_id = p.id
+                    ) AS project_count
                 FROM properties p
-                INNER JOIN addresses a ON a.id = p.address_id
+                LEFT JOIN addresses a ON a.id = p.address_id
                 LEFT JOIN clients c ON c.id = p.client_id";
     }
 }

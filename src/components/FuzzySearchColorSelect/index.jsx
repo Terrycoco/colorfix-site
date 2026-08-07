@@ -318,7 +318,7 @@ function pick(color) {
           }}
         >
           {selectedColor
-            ? `${selectedColor.name} (${selectedColor.brand})`
+            ? `${selectedColor.name} (${selectedColor.brand_name || selectedColor.brand})`
             : "Tap to choose a color"}
         </button>
       ) : (
@@ -425,7 +425,7 @@ function pick(color) {
                 }}
               />
               <span className="color-name">{c.name}</span>
-              <span className="color-brand">({c.brand})</span>
+              <span className="color-brand">({c.brand_name || c.brand})</span>
             </li>
           ))}
         </ul>
@@ -472,7 +472,7 @@ function pick(color) {
                       }}
                     />
                     <span className="sheet-name">{c.name}</span>
-                    <span className="sheet-brand">{c.brand}</span>
+                    <span className="sheet-brand">{c.brand_name || c.brand}</span>
                   </button>
                 ))}
               </div>

@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import ConceptPaletteViewer from "@components/ConceptPaletteViewer";
-import PaletteViewer from "@components/PaletteViewer";
+import {
+  ClientViewerPage,
+  ConceptViewerPage,
+  PainterViewerPage,
+  PaletteViewerPage,
+} from "@pages/Viewers";
 import "./saved-palette-share.css";
+
+const viewerPages = {
+  full_palette: PaletteViewerPage,
+  concept: ConceptViewerPage,
+  client: ClientViewerPage,
+  painter: PainterViewerPage,
+};
 
 export default function SavedPaletteSharePage() {
   const { hash, token } = useParams();
@@ -17,6 +28,10 @@ export default function SavedPaletteSharePage() {
     if (typeof window === "undefined") return "";
     const params = new URLSearchParams(window.location.search);
     return params.get("set_id") || "";
+  }, []);
+  const viewerReturnPath = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return `${window.location.pathname}${window.location.search}${window.location.hash}`;
   }, []);
   const backLabel = returnTo.startsWith("/p/") || returnTo.startsWith("/playlist/")
     ? "Back to Playlist"
@@ -73,10 +88,10 @@ export default function SavedPaletteSharePage() {
 
   const meta = state.data?.meta || null;
   const swatches = state.data?.swatches || [];
-  const playlistUrl = meta?.playlist_url || "";
+  const playlistUrl = appendViewerReturnToPlaylistUrl(meta?.playlist_url || "", viewerReturnPath);
   const playlistCtaLabel = meta?.cta_label || "View Playlist";
-  const isConcept = meta?.palette_viewer_key === "concept";
-  const ViewerComponent = isConcept ? ConceptPaletteViewer : PaletteViewer;
+  const viewerKey = meta?.palette_viewer_key || "full_palette";
+  const ViewerComponent = viewerPages[viewerKey] || PaletteViewerPage;
 
   return (
     <ViewerComponent
@@ -110,7 +125,7 @@ export default function SavedPaletteSharePage() {
       showLogo={true}
       showShare={true}
       playlistUrl={playlistUrl}
-      footer={!isConcept && playlistUrl ? (
+      footer={viewerKey === "full_palette" && playlistUrl ? (
         <button
           type="button"
           className="apv-btn apv-btn--ghost apv-back-to-playlist"
@@ -123,4 +138,28 @@ export default function SavedPaletteSharePage() {
       ) : null}
     />
   );
+}
+
+function appendViewerReturnToPlaylistUrl(rawUrl, returnPath) {
+  const url = String(rawUrl || "").trim();
+  const safeReturnPath = normalizeViewerReturnPath(returnPath);
+  if (!url || !safeReturnPath || typeof window === "undefined") return url;
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.set("return_to", safeReturnPath);
+    if (parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.toString();
+  } catch {
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}return_to=${encodeURIComponent(safeReturnPath)}`;
+  }
+}
+
+function normalizeViewerReturnPath(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "";
+  return trimmed;
 }

@@ -6,56 +6,54 @@ header('Content-Type: application/json; charset=UTF-8');
 
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
+require_once __DIR__ . '/../project-workflow/_helpers.php';
 
-use App\Repos\PdoLegacyProjectRepository;
-
-function respond(array $payload, int $status = 200): void {
-    http_response_code($status);
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    respond(['ok' => false, 'error' => 'POST only'], 405);
-}
+use App\Repos\PdoProjectRepository;
+use App\Repos\PdoProjectTypeRepository;
+use App\Repos\PdoPropertyRepository;
 
 try {
-    $raw = file_get_contents('php://input');
-    $data = json_decode($raw ?: '', true);
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        workflow_respond(['ok' => false, 'error' => 'POST only'], 405);
+    }
+
+    $data = json_decode(file_get_contents('php://input') ?: '', true);
     if (!is_array($data)) {
-        respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
+        workflow_respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
     }
 
     $id = isset($data['id']) ? (int)$data['id'] : 0;
-    $slug = trim((string)($data['slug'] ?? ''));
-    $title = trim((string)($data['title'] ?? ''));
-    $projectType = trim((string)($data['project_type'] ?? ''));
-    $status = trim((string)($data['status'] ?? 'draft'));
-    $summary = isset($data['summary']) ? (string)$data['summary'] : null;
-    $notes = isset($data['notes']) ? (string)$data['notes'] : null;
-    $clientName = trim((string)($data['client_name'] ?? ''));
+    $name = workflow_optional_string($data['name'] ?? null);
+    $propertyId = isset($data['property_id']) ? (int)$data['property_id'] : 0;
+    $projectTypeId = isset($data['project_type_id']) ? (int)$data['project_type_id'] : 0;
+    $experienceKey = workflow_validate_experience_key($data['experience_key'] ?? 'concept');
 
-    if ($slug === '' || $title === '' || $projectType === '') {
-        respond(['ok' => false, 'error' => 'slug, title, and project_type are required'], 400);
+    if ($name === null) {
+        workflow_respond(['ok' => false, 'error' => 'Project name required'], 400);
+    }
+    if ($propertyId <= 0 || !(new PdoPropertyRepository($pdo))->findById($propertyId)) {
+        workflow_respond(['ok' => false, 'error' => 'Property required'], 400);
+    }
+    if ($projectTypeId <= 0 || !(new PdoProjectTypeRepository($pdo))->findById($projectTypeId)) {
+        workflow_respond(['ok' => false, 'error' => 'Project type required'], 400);
     }
 
-    $repo = new PdoLegacyProjectRepository($pdo);
+    $repo = new PdoProjectRepository($pdo);
     $payload = [
-        'slug' => $slug,
-        'title' => $title,
-        'project_type' => $projectType,
-        'status' => $status,
-        'summary' => $summary !== '' ? $summary : null,
-        'notes' => $notes !== '' ? $notes : null,
-        'client_name' => $clientName !== '' ? $clientName : null,
+        'property_id' => $propertyId,
+        'project_type_id' => $projectTypeId,
+        'name' => $name,
+        'status' => workflow_optional_string($data['status'] ?? null) ?? 'prospect',
+        'experience_key' => $experienceKey,
+        'notes' => workflow_optional_string($data['notes'] ?? null),
     ];
 
     if ($id > 0) {
         $repo->update($id, $payload);
-        respond(['ok' => true, 'id' => $id]);
+        workflow_respond(['ok' => true, 'id' => $id]);
     }
 
-    respond(['ok' => true, 'id' => $repo->insert($payload)]);
+    workflow_respond(['ok' => true, 'id' => $repo->create($payload)]);
 } catch (Throwable $e) {
-    respond(['ok' => false, 'error' => $e->getMessage()], 500);
+    workflow_respond(['ok' => false, 'error' => $e->getMessage()], 500);
 }

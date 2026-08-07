@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import LogoAnimated from "@components/LogoAnimated";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
-import "./appliedpaletteviewer.css";
+import "../appliedpaletteviewer.css";
 
 export default function PaletteViewer({
   meta,

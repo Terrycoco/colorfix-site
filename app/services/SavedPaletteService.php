@@ -352,7 +352,7 @@ class SavedPaletteService
         }
 
         $templateKey = strtolower(trim((string)($payload['template_key'] ?? 'full_palette')));
-        if (!in_array($templateKey, ['full_palette', 'concept'], true)) {
+        if (!in_array($templateKey, ['full_palette', 'concept', 'client', 'painter'], true)) {
             $templateKey = 'full_palette';
         }
 
@@ -429,7 +429,7 @@ class SavedPaletteService
     }
     /**
      * Normalize color_ids into the shape expected by addMembers():
-     *  - always an array of ['color_id' => int, 'order_index' => int, 'role' => ?string]
+     *  - always an array of ['color_id' => int, 'order_index' => int, 'role' => ?string, 'sheen' => ?string, 'note' => ?string]
      */
     private function normalizeMembers(array $colorIds): array
     {
@@ -449,6 +449,8 @@ class SavedPaletteService
                 'color_id'    => (int)$cid,
                 'order_index' => $order++,
                 'role'        => null,
+                'sheen'       => null,
+                'note'        => null,
             ];
         }
             if (!empty($normalized)) {
@@ -472,10 +474,26 @@ class SavedPaletteService
                     $role = null;
                 }
             }
+            $sheen = null;
+            if (array_key_exists('sheen', $item)) {
+                $sheen = is_string($item['sheen']) ? trim($item['sheen']) : null;
+                if ($sheen === '') {
+                    $sheen = null;
+                }
+            }
+            $note = null;
+            if (array_key_exists('note', $item)) {
+                $note = is_string($item['note']) ? trim($item['note']) : null;
+                if ($note === '') {
+                    $note = null;
+                }
+            }
             $normalized[] = [
                 'color_id'    => (int)$item['color_id'],
                 'order_index' => isset($item['order_index']) ? (int)$item['order_index'] : $order,
                 'role'        => $role,
+                'sheen'       => $sheen,
+                'note'        => $note,
             ];
             $order++;
         }

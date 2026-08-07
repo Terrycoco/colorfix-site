@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import LogoAnimated from "@components/LogoAnimated";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
-import "./conceptpaletteviewer.css";
+import "../appliedpaletteviewer.css";
+import "../conceptpaletteviewer.css";
 
 export default function ConceptPaletteViewer({
   meta,
@@ -18,7 +19,7 @@ export default function ConceptPaletteViewer({
   shareText = "Here's a ColorFix design concept I wanted to share with you.",
   shareUrl,
   playlistUrl = "",
-  contactUrl = "",
+
 }) {
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [expandedPhoto, setExpandedPhoto] = useState(null);
@@ -34,6 +35,7 @@ export default function ConceptPaletteViewer({
   });
 
   const kicker = meta?.kicker_text || "";
+  const displayKicker = kicker ? `${kicker} Concept` : "Concept";
   const title = formatTitle(meta?.title || "Design Concept");
   const intro = meta?.intro || "";
   const notes = meta?.notes || "";
@@ -48,7 +50,7 @@ export default function ConceptPaletteViewer({
 
   const resolvedPlaylistUrl = playlistUrl || meta?.playlist_url || "";
   const resolvedPlaylistLabel = meta?.cta_label || "Watch the Transformation";
-  const resolvedContactUrl = contactUrl || meta?.contact_url || "";
+
 
   const seoTitle = kicker
     ? `${kicker} – ${title} | ColorFix`
@@ -266,7 +268,7 @@ export default function ConceptPaletteViewer({
   };
 
   return (
-    <div className={`apv-shell ${adminMode ? "apv-shell--admin" : ""}`}>
+    <div className={`apv-shell apv-shell--concept ${adminMode ? "apv-shell--admin" : ""}`}>
       <button
         className="apv-exit"
         onClick={handleExit}
@@ -361,8 +363,8 @@ export default function ConceptPaletteViewer({
         )}
 
         <div className="apv-column apv-column--details">
-          <div className="apv-info">
-            {kicker && <div className="apv-kicker">{kicker}</div>}
+          <div className="apv-info cpv-summary">
+            <div className="apv-kicker">{displayKicker}</div>
 
             <h1>{title}</h1>
 
@@ -380,30 +382,30 @@ export default function ConceptPaletteViewer({
               </section>
             )}
 
-{(resolvedPlaylistUrl || resolvedContactUrl) && (
+{resolvedPlaylistUrl && (
   <div className="apv-concept-cta">
-    {resolvedContactUrl && (
-      <a
-        className="apv-concept-primary"
-        href={resolvedContactUrl}
+    <div className="apv-concept-actions">
+      <button
+        type="button"
+        className="apv-concept-primary apv-concept-primary--placeholder"
+        aria-disabled="true"
+        tabIndex={-1}
       >
         Discuss Next Steps
-      </a>
-    )}
+      </button>
 
-    <p className="apv-concept-scope-note">
-      Final paint colors, sheens, placement specifications, and contractor
-      support are included in the Implementation Package.
-    </p>
-
-    {resolvedPlaylistUrl && (
       <a
         className="apv-concept-secondary"
         href={resolvedPlaylistUrl}
       >
         Replay the Transformation
       </a>
-    )}
+    </div>
+
+    <p className="apv-concept-scope-note">
+      Final paint colors, sheens, placement specifications, and contractor
+      support are included in the Implementation Package.
+    </p>
   </div>
 )}
           </div>

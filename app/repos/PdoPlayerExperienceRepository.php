@@ -9,7 +9,7 @@ use PDO;
 final class PdoPlayerExperienceRepository
 {
     private const SLIDE_FLAGS = ['site', 'yt', 'pin', 'prospect', 'client'];
-    private const PALETTE_VIEWER_KEYS = ['full_palette', 'concept', 'none'];
+    private const PALETTE_VIEWER_KEYS = ['full_palette', 'concept', 'client', 'painter', 'none'];
 
     public function __construct(
         private PDO $pdo
@@ -60,6 +60,44 @@ final class PdoPlayerExperienceRepository
              LIMIT 1"
         );
         $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return null;
+        }
+
+        return new PlayerExperience(
+            (int)$row['player_experience_id'],
+            (string)$row['experience_key'],
+            (string)$row['name'],
+            (string)$row['slide_flag'],
+            (string)$row['palette_viewer_key'],
+            (int)$row['cta_page_id'],
+            (bool)$row['is_active']
+        );
+    }
+
+    public function getByExperienceKey(string $experienceKey): ?PlayerExperience
+    {
+        $experienceKey = strtolower(trim($experienceKey));
+        if ($experienceKey === '') {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                player_experience_id,
+                experience_key,
+                name,
+                slide_flag,
+                palette_viewer_key,
+                cta_page_id,
+                is_active
+             FROM player_experiences
+             WHERE experience_key = :experience_key
+             LIMIT 1"
+        );
+        $stmt->execute(['experience_key' => $experienceKey]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {

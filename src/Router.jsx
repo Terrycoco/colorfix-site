@@ -30,6 +30,7 @@ const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
 const PlaylistColorSearchPage = lazy(() => import('@pages/PlaylistColorSearchPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
+const ClientViewerTestPage = lazy(() => import('@pages/Viewers/ClientViewerTestPage'));
 const ArticlePage = lazy(() => import('@pages/ArticlePage'));
 const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
 
@@ -57,6 +58,10 @@ function AppRouter() {
         <Route
           path="pv/:token"
           element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
+        />
+        <Route
+          path="test/client-viewer"
+          element={renderWithSuspense(ClientViewerTestPage, 'Loading client viewer test…')}
         />
         <Route
           path="watch"

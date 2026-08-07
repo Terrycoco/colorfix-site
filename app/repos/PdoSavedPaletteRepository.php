@@ -1151,7 +1151,7 @@ class PdoSavedPaletteRepository
     /**
      * Bulk insert members for a palette.
      *
-     * $members is an array of ['color_id' => int, 'order_index' => int, 'role' => ?string].
+     * $members is an array of ['color_id' => int, 'order_index' => int, 'role' => ?string, 'sheen' => ?string, 'note' => ?string].
      */
     public function addMembers(int $savedPaletteId, array $members): void
     {
@@ -1161,9 +1161,9 @@ class PdoSavedPaletteRepository
 
         $sql = "
             INSERT INTO saved_palette_members
-                (saved_palette_id, color_id, role_name, order_index, created_at)
+                (saved_palette_id, color_id, role_name, sheen, note, order_index, created_at)
             VALUES
-                (:saved_palette_id, :color_id, :role_name, :order_index, NOW())
+                (:saved_palette_id, :color_id, :role_name, :sheen, :note, :order_index, NOW())
         ";
 
         $stmt = $this->pdo->prepare($sql);
@@ -1177,6 +1177,8 @@ class PdoSavedPaletteRepository
                 ':saved_palette_id' => $savedPaletteId,
                 ':color_id'         => (int) $m['color_id'],
                 ':role_name'        => isset($m['role']) && $m['role'] !== '' ? (string) $m['role'] : null,
+                ':sheen'            => isset($m['sheen']) && $m['sheen'] !== '' ? (string) $m['sheen'] : null,
+                ':note'             => isset($m['note']) && $m['note'] !== '' ? (string) $m['note'] : null,
                 ':order_index'      => isset($m['order_index']) ? (int) $m['order_index'] : 0,
             ]);
         }
@@ -1221,6 +1223,8 @@ class PdoSavedPaletteRepository
                    m.saved_palette_id,
                    m.color_id,
                    m.role_name AS role,
+                   m.sheen,
+                   m.note,
                    m.order_index,
                    c.name       AS color_name,
                    c.brand      AS color_brand,
@@ -1696,6 +1700,6 @@ class PdoSavedPaletteRepository
     private function normalizeViewerTemplateKey(string $value): string
     {
         $value = strtolower(trim($value));
-        return in_array($value, ['full_palette', 'concept'], true) ? $value : 'full_palette';
+        return in_array($value, ['full_palette', 'concept', 'client', 'painter'], true) ? $value : 'full_palette';
     }
 }

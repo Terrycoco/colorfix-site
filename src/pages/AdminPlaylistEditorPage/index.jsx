@@ -1240,51 +1240,70 @@ export default function AdminPlaylistEditorPage() {
                   <option value="cut">cut</option>
                 </select>
               </label>
-              <div className="item-cell item-venues">
-                Venue
-                <div className="item-venue-toggles">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.site !== false}
-                      onChange={(e) => updateItem(index, "site", e.target.checked)}
-                    />
-                    Player
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.yt !== false}
-                      onChange={(e) => updateItem(index, "yt", e.target.checked)}
-                    />
-                    YT
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.prospect !== false}
-                      onChange={(e) => updateItem(index, "prospect", e.target.checked)}
-                    />
-                    Prospect
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.client !== false}
-                      onChange={(e) => updateItem(index, "client", e.target.checked)}
-                    />
-                    Client
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.pin !== false}
-                      onChange={(e) => updateItem(index, "pin", e.target.checked)}
-                    />
-                    Pin
-                  </label>
-                </div>
-              </div>
+
+
+
+       <div className="item-cell item-venues">
+  <div className="venue-group">
+    <span className="venue-group-label">Player Experience:</span>
+
+    <div className="item-venue-toggles">
+      <label>
+        <input
+          type="checkbox"
+          checked={item.site !== false}
+          onChange={(e) => updateItem(index, "site", e.target.checked)}
+        />
+        Public (full)
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          checked={item.prospect !== false}
+          onChange={(e) => updateItem(index, "prospect", e.target.checked)}
+        />
+        Concept (partial)
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          checked={item.client !== false}
+          onChange={(e) => updateItem(index, "client", e.target.checked)}
+        />
+        Client (full)
+      </label>
+    </div>
+  </div>
+
+  <div className="venue-group">
+    <span className="venue-group-label">Publisher:</span>
+
+    <div className="item-venue-toggles">
+      <label>
+        <input
+          type="checkbox"
+          checked={item.pin !== false}
+          onChange={(e) => updateItem(index, "pin", e.target.checked)}
+        />
+        Pin
+      </label>
+
+      <label>
+        <input
+          type="checkbox"
+          checked={item.yt !== false}
+          onChange={(e) => updateItem(index, "yt", e.target.checked)}
+        />
+        YT
+      </label>
+    </div>
+  </div>
+</div>
+
+
+
               <div className="item-actions">
                 <div className="item-move">
                   <button type="button" onClick={() => moveItem(index, -1)}>↑</button>

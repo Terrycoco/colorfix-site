@@ -141,6 +141,11 @@
   font-weight: 700;
 }
 
+.admin-menu__item--placeholder {
+  color: #737373;
+  cursor: default;
+}
+
 .admin-menu__item.admin-menu__back {
   width: 100%;
   text-align: left;
@@ -149,6 +154,6 @@
   cursor: pointer;
 }
 
-.admin-menu__item:hover {
+.admin-menu__item:hover:not(.admin-menu__item--placeholder) {
   background: rgba(0, 0, 0, 0.06);
 }

@@ -32,15 +32,15 @@ final class ProjectService
     public function createProperty(array $input): array
     {
         $addressId = (int)($input['address_id'] ?? 0);
-        if ($addressId <= 0 || !$this->addresses->findById($addressId)) {
+        if ($addressId > 0 && !$this->addresses->findById($addressId)) {
             throw new InvalidArgumentException('valid address_id required');
         }
 
         $clientId = isset($input['client_id']) && (int)$input['client_id'] > 0 ? (int)$input['client_id'] : null;
         $id = $this->properties->create([
-            'address_id' => $addressId,
+            'address_id' => $addressId > 0 ? $addressId : null,
             'client_id' => $clientId,
-            'name' => $this->optionalString($input['name'] ?? null),
+            'name' => $this->requiredString($input['name'] ?? null, 'name'),
             'notes' => $this->optionalString($input['notes'] ?? null),
         ]);
 
@@ -64,11 +64,13 @@ final class ProjectService
         }
 
         $status = $this->normalizeStatus($input['status'] ?? 'prospect');
+        $experienceKey = $this->normalizeExperienceKey($input['experience_key'] ?? 'concept');
         $id = $this->projects->create([
             'property_id' => $propertyId,
             'project_type_id' => $projectTypeId,
             'name' => $this->optionalString($input['name'] ?? null),
             'status' => $status,
+            'experience_key' => $experienceKey,
             'notes' => $this->optionalString($input['notes'] ?? null),
         ]);
 
@@ -112,6 +114,15 @@ final class ProjectService
             throw new InvalidArgumentException('invalid project status');
         }
         return $status;
+    }
+
+    private function normalizeExperienceKey(mixed $value): string
+    {
+        $experienceKey = $this->optionalString($value) ?? 'concept';
+        if (!in_array($experienceKey, ['concept', 'client', 'public', 'painter'], true)) {
+            throw new InvalidArgumentException('invalid project experience_key');
+        }
+        return $experienceKey;
     }
 
     private function requiredString(mixed $value, string $field): string

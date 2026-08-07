@@ -7,7 +7,7 @@ const EXPERIENCE_SAVE_URL = `${API_FOLDER}/v2/admin/player-experiences/save.php`
 const CTA_PAGES_LIST_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 
 const slideFlagOptions = ["site", "yt", "pin", "prospect", "client"];
-const paletteViewerOptions = ["full_palette", "concept", "none"];
+const paletteViewerOptions = ["full_palette", "concept", "client", "painter", "none"];
 
 const emptyExperience = {
   player_experience_id: null,

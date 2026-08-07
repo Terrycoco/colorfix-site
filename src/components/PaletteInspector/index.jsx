@@ -128,6 +128,7 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
           color_id: color.id,
           name: color.name,
           brand: color.brand,
+          brand_name: color.brand_name,
           code: color.code,
           hex6: color.hex6,
         };
@@ -175,7 +176,7 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
             <span className="pi-role-chip" style={{ backgroundColor: `#${color.hex6 || 'ccc'}` }} />
             <div>
               <div className="pi-role-name">{color.name}</div>
-              <div className="pi-role-meta">{color.brand} · {color.code}</div>
+              <div className="pi-role-meta">{color.brand_name || color.brand} · {color.code}</div>
             </div>
           </div>
           <select

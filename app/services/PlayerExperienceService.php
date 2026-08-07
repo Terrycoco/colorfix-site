@@ -20,6 +20,7 @@ class PlayerExperienceService
 {
     /** @var array<string, float> */
     private array $lastTiming = [];
+    private ?string $resolvedProjectExperienceKey = null;
 
     public function __construct(
         protected PDO $pdo
@@ -43,7 +44,18 @@ class PlayerExperienceService
             throw new RuntimeException("Playlist instance not found: {$playlistInstanceId}");
         }
 
-        $experience = $this->resolvePlayerExperience($instance);
+        $experienceSource = 'default_public';
+        $this->resolvedProjectExperienceKey = null;
+        $projectExperience = $this->resolveProjectPlayerExperience((int)$instance->playlistId);
+        if ($projectExperience instanceof PlayerExperience) {
+            $experience = $projectExperience;
+            $experienceSource = 'project';
+        } else {
+            $experience = $this->resolvePlaylistInstancePlayerExperience($instance);
+            if ($experience instanceof PlayerExperience) {
+                $experienceSource = 'playlist_instance';
+            }
+        }
         $experienceBacked = $experience instanceof PlayerExperience;
         $slideFlag = $experienceBacked ? $this->normalizeSlideFlag($experience->slideFlag) : 'site';
 
@@ -173,11 +185,21 @@ class PlayerExperienceService
         ];
         if ($experienceBacked) {
             $plan['player_experience_id'] = $experience->playerExperienceId;
-            $plan['experience_key'] = $experience->experienceKey;
+            $plan['experience_key'] = $experienceSource === 'project' && $this->resolvedProjectExperienceKey !== null
+                ? $this->resolvedProjectExperienceKey
+                : $experience->experienceKey;
+            $plan['player_experience_config_key'] = $experience->experienceKey;
             $plan['experience_name'] = $experience->name;
             $plan['slide_flag'] = $slideFlag;
             $plan['palette_viewer_key'] = $paletteViewerKey;
             $plan['cta_page_id'] = $experience->ctaPageId;
+            $plan['experience_source'] = $experienceSource;
+        } else {
+            $plan['experience_key'] = 'public';
+            $plan['experience_name'] = 'Public';
+            $plan['slide_flag'] = $slideFlag;
+            $plan['palette_viewer_key'] = $paletteViewerKey;
+            $plan['experience_source'] = 'default_public';
         }
 
         return $plan;
@@ -205,20 +227,58 @@ class PlayerExperienceService
         return $flat;
     }
 
-    private function resolvePlayerExperience(PlaylistInstance $instance): ?PlayerExperience
+    private function resolvePlaylistInstancePlayerExperience(PlaylistInstance $instance): ?PlayerExperience
     {
         $id = (int)($instance->playerExperienceId ?? 0);
+        $repo = new PdoPlayerExperienceRepository($this->pdo);
         if ($id <= 0) {
+            return $this->validateResolvedExperience($repo->getByExperienceKey('public'), 'default Public experience');
+        }
+        $experience = $repo->getById($id);
+        return $this->validateResolvedExperience($experience, "referenced experience {$id}");
+    }
+
+    private function resolveProjectPlayerExperience(int $playlistId): ?PlayerExperience
+    {
+        if ($playlistId <= 0 || !$this->tableExists('project_playlists') || !$this->columnExists('projects', 'experience_key')) {
             return null;
         }
 
+        $stmt = $this->pdo->prepare(
+            "SELECT p.experience_key
+             FROM project_playlists pp
+             JOIN projects p
+               ON p.id = pp.project_id
+             WHERE pp.playlist_id = :playlist_id
+             ORDER BY pp.updated_at DESC, pp.project_playlist_id DESC
+             LIMIT 1"
+        );
+        $stmt->execute(['playlist_id' => $playlistId]);
+        $experienceKey = strtolower(trim((string)($stmt->fetchColumn() ?: '')));
+        if ($experienceKey === '') {
+            return null;
+        }
+        $this->resolvedProjectExperienceKey = $experienceKey;
+
         $repo = new PdoPlayerExperienceRepository($this->pdo);
-        $experience = $repo->getById($id);
+        $experience = $repo->getByExperienceKey($experienceKey);
+        if (!$experience instanceof PlayerExperience && $experienceKey === 'concept') {
+            $experience = $repo->getByExperienceKey('prospect');
+        }
+
+        return $this->validateResolvedExperience($experience, "project experience '{$experienceKey}'");
+    }
+
+    private function validateResolvedExperience(?PlayerExperience $experience, string $label): ?PlayerExperience
+    {
         if (!$experience instanceof PlayerExperience) {
-            throw new DomainException("Player experience configuration error: referenced experience {$id} was not found.");
+            if ($label === 'default Public experience') {
+                return null;
+            }
+            throw new DomainException("Player experience configuration error: {$label} was not found.");
         }
         if (!$experience->isActive) {
-            throw new DomainException("Player experience configuration error: referenced experience {$id} is inactive.");
+            throw new DomainException("Player experience configuration error: {$label} is inactive.");
         }
 
         $this->normalizeSlideFlag($experience->slideFlag);
@@ -243,6 +303,34 @@ class PlayerExperienceService
         }
         return strtolower(trim($experience->experienceKey)) !== 'prospect'
             && strtolower(trim($experience->slideFlag)) !== 'prospect';
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*)
+             FROM INFORMATION_SCHEMA.TABLES
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = :table"
+        );
+        $stmt->execute(['table' => $table]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*)
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = :table
+               AND COLUMN_NAME = :column"
+        );
+        $stmt->execute([
+            'table' => $table,
+            'column' => $column,
+        ]);
+        return (int)$stmt->fetchColumn() > 0;
     }
 
     private function normalizeStartIndex(?int $start, int $count): int
@@ -466,6 +554,14 @@ class PlayerExperienceService
                 $paletteViewerKey,
                 $playlistInstanceId
             );
+            if (in_array($paletteViewerKey, ['concept', 'client'], true)) {
+                $item->painter_palette_viewer_url = $tokenService->createSavedPaletteUrl(
+                    $paletteHash,
+                    $setId > 0 ? $setId : null,
+                    'painter',
+                    $playlistInstanceId
+                );
+            }
         }
     }
 

@@ -182,7 +182,10 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   const apId = targetItem.ap_id;
   const paletteHash = targetItem.palette_hash;
   const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
-  const paletteViewerUrl = targetItem.palette_viewer_url || "";
+  const requestedViewer = String(cta?.params?.viewer || cta?.params?.viewer_key || cta?.params?.palette_viewer_key || "").toLowerCase();
+  const paletteViewerUrl = requestedViewer === "painter"
+    ? targetItem.painter_palette_viewer_url || targetItem.palette_viewer_url || ""
+    : targetItem.palette_viewer_url || "";
   if (!paletteHash && !savedPaletteSetId) return;
   const params = new URLSearchParams();
   if (cta?.params?.add_cta_group !== undefined) {
@@ -211,6 +214,24 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
   }
   const target = cta?.params?.target || "_self";
   window.open(url, target, "noopener");
+}
+
+function runToReservedViewer({ navigate, cta, returnTo }) {
+  const url = normalizeInternalReturnPath(returnTo);
+  if (!url) return;
+  if (navigate && shouldNavigateInPlayerShell(url)) {
+    navigate(url);
+    return;
+  }
+  const target = cta?.params?.target || "_self";
+  window.open(url, target, "noopener");
+}
+
+function normalizeInternalReturnPath(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "";
+  return trimmed;
 }
 
 function shouldNavigateInPlayerShell(url) {
@@ -280,6 +301,7 @@ export function buildCtaHandlers({
     see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
     to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
     to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
+    to_reserved_viewer: (cta) => runToReservedViewer({ navigate, cta, returnTo }),
     exit: () => handleExit?.(),
   };
 }

@@ -442,13 +442,29 @@
 
 .item-venues {
   grid-column: 6 / span 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.venue-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.venue-group-label {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .item-venue-toggles {
-  min-height: 31px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 31px;
 }
 
 .item-venue-toggles label {
@@ -457,6 +473,7 @@
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .item-venue-toggles input {

@@ -90,6 +90,7 @@ function memberToSwatch(member) {
     id: member?.color_id,
     name: member?.color_name ?? "",
     brand: member?.color_brand ?? "",
+    brand_name: member?.color_brand_name ?? member?.color_brand ?? "",
     code: member?.color_code ?? "",
     hex,
     hcl_h: member?.color_hcl_h ?? 0,
@@ -138,12 +139,15 @@ function collapseMembersByColor(members = []) {
         color_code: member?.color_code || member?.color?.code || "",
         color_hex6: member?.color_hex6 || (member?.color?.hex || "").replace(/^#/, ""),
         color_brand: member?.color_brand || member?.color?.brand || "",
+        color_brand_name: member?.color_brand_name || member?.color?.brand_name || member?.color_brand || member?.color?.brand || "",
         color_hcl_h: member?.color_hcl_h ?? member?.color?.hcl_h ?? 0,
         color_hcl_c: member?.color_hcl_c ?? member?.color?.hcl_c ?? 0,
         color_hcl_l: member?.color_hcl_l ?? member?.color?.hcl_l ?? 0,
         color_chip_num: member?.color_chip_num ?? member?.color?.chip_num ?? "",
         color_cluster_id: member?.color_cluster_id ?? member?.color?.cluster_id ?? 0,
         roles: [],
+        sheens: [],
+        notes: [],
       });
       order.push(key);
     }
@@ -159,6 +163,16 @@ function collapseMembersByColor(members = []) {
         group.roles.push(role);
       }
     });
+
+    const sheen = String(member?.sheen || "").trim();
+    if (sheen && !group.sheens.includes(sheen)) {
+      group.sheens.push(sheen);
+    }
+
+    const note = String(member?.note || "").trim();
+    if (note && !group.notes.includes(note)) {
+      group.notes.push(note);
+    }
   });
 
   return order.map((key, index) => {
@@ -176,6 +190,8 @@ function collapseMembersByColor(members = []) {
       color_chip_num: group.color_chip_num,
       color_cluster_id: group.color_cluster_id,
       role: group.roles.join(", "),
+      sheen: group.sheens.join(", "),
+      note: group.notes.join("\n"),
     };
   });
 }
@@ -544,6 +560,8 @@ export default function AdminSavedPalettesPage() {
                     <span className="asp-swatch-name">{member.color_name || "—"}</span>
                     <span className="asp-swatch-code">{member.color_code || member.color_id}</span>
                     {member.role && <span className="asp-swatch-role">{member.role}</span>}
+                    {member.sheen && <span className="asp-swatch-sheen">{member.sheen}</span>}
+                    {member.note && <span className="asp-swatch-note">{member.note}</span>}
                   </div>
                 </div>
               ))}

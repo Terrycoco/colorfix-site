@@ -27,6 +27,21 @@ const BRAND_CHOICES = [
   { code: "fb", label: "Farrow & Ball" },
 ];
 
+const SHEEN_CHOICES = [
+  "",
+  "Flat",
+  "Velvet",
+  "Matte",
+  "Eggshell",
+  "Satin/Lo-Sheen",
+  "Semi-Gloss",
+  "Gloss",
+  "High-Gloss",
+  "Other",
+];
+
+const NOTE_ICON = "\u270e";
+
 const emptyEditForm = {
   palette_id: null,
   brand: "",
@@ -45,6 +60,7 @@ function memberToSwatch(member) {
     id: member?.color_id,
     name: member?.color_name ?? "",
     brand: member?.color_brand ?? "",
+    brand_name: member?.color_brand_name ?? member?.color_brand ?? "",
     code: member?.color_code ?? "",
     hex,
     hcl_h: member?.color_hcl_h ?? 0,
@@ -72,12 +88,15 @@ function collapseMembersByColor(members = []) {
         color_code: member?.color_code || member?.color?.code || "",
         color_hex6: member?.color_hex6 || (member?.color?.hex || "").replace(/^#/, ""),
         color_brand: member?.color_brand || member?.color?.brand || "",
+        color_brand_name: member?.color_brand_name || member?.color?.brand_name || member?.color_brand || member?.color?.brand || "",
         color_hcl_h: member?.color_hcl_h ?? member?.color?.hcl_h ?? 0,
         color_hcl_c: member?.color_hcl_c ?? member?.color?.hcl_c ?? 0,
         color_hcl_l: member?.color_hcl_l ?? member?.color?.hcl_l ?? 0,
         color_chip_num: member?.color_chip_num ?? member?.color?.chip_num ?? "",
         color_cluster_id: member?.color_cluster_id ?? member?.color?.cluster_id ?? 0,
         roles: [],
+        sheens: [],
+        notes: [],
       });
       order.push(key);
     }
@@ -93,6 +112,16 @@ function collapseMembersByColor(members = []) {
         group.roles.push(role);
       }
     });
+
+    const sheen = String(member?.sheen || "").trim();
+    if (sheen && !group.sheens.includes(sheen)) {
+      group.sheens.push(sheen);
+    }
+
+    const note = String(member?.note || "").trim();
+    if (note && !group.notes.includes(note)) {
+      group.notes.push(note);
+    }
   });
 
   return order.map((key, index) => {
@@ -110,6 +139,8 @@ function collapseMembersByColor(members = []) {
       color_chip_num: group.color_chip_num,
       color_cluster_id: group.color_cluster_id,
       role: group.roles.join(", "),
+      sheen: group.sheens[0] || "",
+      note: group.notes.join("\n"),
     };
   });
 }
@@ -134,6 +165,8 @@ function normalizePalette(palette) {
       key: member.id ?? `${member.color_id}-${index}`,
       color: memberToSwatch(member),
       role: member.role || "",
+      sheen: member.sheen || "",
+      note: member.note || "",
     })),
     photos: (palette.photos || []).map((photo, index) => ({
       id: photo.id,
@@ -216,6 +249,7 @@ export default function SavedPaletteEditorModal({
   const [createNewGroup, setCreateNewGroup] = useState(false);
   const [fullAttachMode, setFullAttachMode] = useState("replace");
   const [attachChoiceOpen, setAttachChoiceOpen] = useState(false);
+  const [noteEditorIndex, setNoteEditorIndex] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -432,12 +466,12 @@ export default function SavedPaletteEditorModal({
   }
 
   function handleAddMember() {
-    setEditMembers((prev) => [...prev, { key: `new-${Date.now()}`, color: null, role: "" }]);
+    setEditMembers((prev) => [...prev, { key: `new-${Date.now()}`, color: null, role: "", sheen: "", note: "" }]);
   }
 
   function handleAddMemberWithColor(color) {
     if (!color?.id) return;
-    setEditMembers((prev) => [...prev, { key: `new-${Date.now()}`, color, role: "" }]);
+    setEditMembers((prev) => [...prev, { key: `new-${Date.now()}`, color, role: "", sheen: "", note: "" }]);
   }
 
   function handleEditMemberColor(index, color) {
@@ -446,6 +480,14 @@ export default function SavedPaletteEditorModal({
 
   function handleEditMemberRole(index, role) {
     setEditMembers((prev) => prev.map((row, idx) => (idx === index ? { ...row, role } : row)));
+  }
+
+  function handleEditMemberSheen(index, sheen) {
+    setEditMembers((prev) => prev.map((row, idx) => (idx === index ? { ...row, sheen } : row)));
+  }
+
+  function handleEditMemberNote(index, note) {
+    setEditMembers((prev) => prev.map((row, idx) => (idx === index ? { ...row, note } : row)));
   }
 
   function handleRemoveMember(index) {
@@ -696,10 +738,14 @@ export default function SavedPaletteEditorModal({
             const colorId = Number(row?.color?.id || row?.color?.color_id || 0);
             if (!colorId) return null;
             const role = row?.role?.trim() || null;
+            const sheen = row?.sheen?.trim() || null;
+            const note = row?.note?.trim() || null;
             return {
               color_id: colorId,
               order_index: index,
               role,
+              sheen,
+              note,
               color_name: row?.color?.name || "",
               color_code: row?.color?.code || "",
               color_hex6: (row?.color?.hex || "").replace(/^#/, ""),
@@ -716,6 +762,8 @@ export default function SavedPaletteEditorModal({
         color_id: row.color_id,
         order_index: index,
         role: row.role || null,
+        sheen: row.sheen || null,
+        note: row.note || null,
       }));
 
       if (!members.length) {
@@ -1427,6 +1475,26 @@ export default function SavedPaletteEditorModal({
                     value={row.role}
                     onChange={(e) => handleEditMemberRole(index, e.target.value)}
                   />
+                  <select
+                    value={row.sheen || ""}
+                    onChange={(e) => handleEditMemberSheen(index, e.target.value)}
+                  >
+                    <option value="">Sheen (optional)</option>
+                    {SHEEN_CHOICES.filter(Boolean).map((sheen) => (
+                      <option key={sheen} value={sheen}>
+                        {sheen}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className={`asp-note-btn${row.note ? " has-note" : ""}`}
+                    onClick={() => setNoteEditorIndex(index)}
+                    title={row.note ? "Edit painter note" : "Add painter note"}
+                    aria-label={row.note ? "Edit painter note" : "Add painter note"}
+                  >
+                    {NOTE_ICON}
+                  </button>
                   <button type="button" className="ghost" onClick={() => handleRemoveMember(index)}>
                     ✕
                   </button>
@@ -1435,6 +1503,29 @@ export default function SavedPaletteEditorModal({
               {!editMembers.length && <div className="asp-member-empty">No colors yet.</div>}
             </div>
           </div>
+
+          {noteEditorIndex !== null && editMembers[noteEditorIndex] ? (
+            <div className="asp-note-overlay" role="dialog" aria-modal="true">
+              <div className="asp-note-dialog">
+                <h3>Painter Note</h3>
+                <p>{editMembers[noteEditorIndex]?.color?.name || "Palette color"}</p>
+                <textarea
+                  rows={5}
+                  value={editMembers[noteEditorIndex]?.note || ""}
+                  onChange={(event) => handleEditMemberNote(noteEditorIndex, event.target.value)}
+                  placeholder="Additional placement instructions for the painter"
+                />
+                <div className="asp-note-actions">
+                  <button type="button" className="ghost" onClick={() => handleEditMemberNote(noteEditorIndex, "")}>
+                    Clear
+                  </button>
+                  <button type="button" onClick={() => setNoteEditorIndex(null)}>
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <label>
             Nickname (for me)

@@ -121,7 +121,7 @@ export default function EditableSwatch({
         {showName && (
           <span className="ed-swatch__name">
             {(value && value.name) || "Choose color"}
-            {value && value.code ? ` · ${value.brand}` : ""}
+            {value && value.code ? ` · ${value.brand_name || value.brand || ""}` : ""}
           </span>
         )}
         <span className="ed-swatch__caret" aria-hidden="true">▾</span>

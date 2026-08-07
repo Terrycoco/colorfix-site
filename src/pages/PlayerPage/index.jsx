@@ -334,6 +334,15 @@ export default function PlayerPage() {
         allow_internal_tracking: true,
       });
     }
+    if (!emittedOnclick && key === "to_reserved_viewer") {
+      trackUserEvent({
+        event_type: "palette_click",
+        playlist_instance_id: Number(data?.playlist_instance_id || 0),
+        playlist_id: Number(data?.playlist_id || 0) || null,
+        cta_id: Number(cta?.cta_id || 0) || null,
+        allow_internal_tracking: true,
+      });
+    }
     ctaHandlers[key]?.(cta);
   }
 

@@ -32,7 +32,8 @@ class PlaylistItem
         public ?string $alt_tag = null,
         public ?string $palette_title = null,
         public ?int $playlist_item_id = null,
-        public ?string $palette_viewer_url = null
+        public ?string $palette_viewer_url = null,
+        public ?string $painter_palette_viewer_url = null
     ) {
     }
 }

@@ -21,6 +21,7 @@ export default function PlaylistThumbsPage() {
   const psiParam = searchParams.get("psi") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
+  const viewerParam = (searchParams.get("viewer") ?? "").toLowerCase();
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
   const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
 
@@ -110,6 +111,7 @@ export default function PlaylistThumbsPage() {
         palette_hash: paletteHash,
         saved_palette_set_id: savedPaletteSetId,
         palette_viewer_url: item?.palette_viewer_url || "",
+        painter_palette_viewer_url: item?.painter_palette_viewer_url || "",
         title: formatTitle(paletteTitle),
         image_url: item?.image_url || "",
         is_liked: apId ? likedSet.has(String(apId)) : false,
@@ -203,8 +205,11 @@ export default function PlaylistThumbsPage() {
                 params.set("set_id", String(palette.saved_palette_set_id));
               }
               const qs = params.toString();
-              const href = palette.palette_viewer_url
-                ? appendParams(palette.palette_viewer_url, Object.fromEntries(params.entries()))
+              const selectedViewerUrl = viewerParam === "painter" && palette.painter_palette_viewer_url
+                ? palette.painter_palette_viewer_url
+                : palette.palette_viewer_url;
+              const href = selectedViewerUrl
+                ? appendParams(selectedViewerUrl, Object.fromEntries(params.entries()))
                 : palette.palette_hash
                   ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
                   : "";

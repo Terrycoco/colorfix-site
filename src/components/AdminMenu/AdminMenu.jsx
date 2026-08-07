@@ -142,7 +142,7 @@ export default function AdminMenu() {
   if (!admin || !isAdminEntry) return null;
 
   const activeGroupIndex = adminMenuItems.findIndex((group) =>
-    group.items.some((item) => isPathMatch(currentPath, item.href))
+    group.items.some((item) => item.href && isPathMatch(currentPath, item.href))
   );
 
   function toggleMenu(e) {
@@ -232,25 +232,39 @@ export default function AdminMenu() {
                     onMouseEnter={cancelHoverClose}
                     onMouseLeave={scheduleHoverClose}
                   >
-                    {group.items.map((item) => (
-                      <a
-                        key={item.href}
-                        href={item.href}
-                        className={`admin-menu__item${isPathMatch(currentPath, item.href) ? " is-active" : ""}`}
-                        onClick={() => {
-                          if (item.adminExitPath) {
-                            setAdminExitPath(item.adminExitPath);
-                          }
-                          setOpen(false);
-                          setHovered(null);
-                        }}
-                      >
-                        <span>{item.label}</span>
-                        {useInboxBadge && item.href === "/admin/clients" && unreadSiteNotes > 0 ? (
-                          <span className="admin-menu__badge">{unreadSiteNotes}</span>
-                        ) : null}
-                      </a>
-                    ))}
+                    {group.items.map((item) => {
+                      if (!item.href) {
+                        return (
+                          <span
+                            key={item.label}
+                            className="admin-menu__item admin-menu__item--placeholder"
+                            title="Placeholder"
+                          >
+                            <span>{item.label}</span>
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <a
+                          key={item.href}
+                          href={item.href}
+                          className={`admin-menu__item${isPathMatch(currentPath, item.href) ? " is-active" : ""}`}
+                          onClick={() => {
+                            if (item.adminExitPath) {
+                              setAdminExitPath(item.adminExitPath);
+                            }
+                            setOpen(false);
+                            setHovered(null);
+                          }}
+                        >
+                          <span>{item.label}</span>
+                          {useInboxBadge && item.href === "/admin/clients" && unreadSiteNotes > 0 ? (
+                            <span className="admin-menu__badge">{unreadSiteNotes}</span>
+                          ) : null}
+                        </a>
+                      );
+                    })}
                   </div>
                 )}
               </div>
