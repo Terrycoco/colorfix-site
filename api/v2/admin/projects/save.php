@@ -26,7 +26,7 @@ try {
     $name = workflow_optional_string($data['name'] ?? null);
     $propertyId = isset($data['property_id']) ? (int)$data['property_id'] : 0;
     $projectTypeId = isset($data['project_type_id']) ? (int)$data['project_type_id'] : 0;
-    $experienceKey = workflow_validate_experience_key($data['experience_key'] ?? 'concept');
+    $currentRelease = workflow_validate_current_release($data['current_release'] ?? '1');
 
     if ($name === null) {
         workflow_respond(['ok' => false, 'error' => 'Project name required'], 400);
@@ -44,8 +44,9 @@ try {
         'project_type_id' => $projectTypeId,
         'name' => $name,
         'status' => workflow_optional_string($data['status'] ?? null) ?? 'prospect',
-        'experience_key' => $experienceKey,
+        'current_release' => $currentRelease,
         'notes' => workflow_optional_string($data['notes'] ?? null),
+        'project_painter_note' => workflow_optional_string($data['project_painter_note'] ?? null),
     ];
 
     if ($id > 0) {

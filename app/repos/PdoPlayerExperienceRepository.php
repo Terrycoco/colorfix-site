@@ -8,7 +8,7 @@ use PDO;
 
 final class PdoPlayerExperienceRepository
 {
-    private const SLIDE_FLAGS = ['site', 'yt', 'pin', 'prospect', 'client'];
+    private const SLIDE_FLAGS = ['site', 'yt', 'pin', 'concept', 'client'];
     private const PALETTE_VIEWER_KEYS = ['full_palette', 'concept', 'client', 'painter', 'none'];
 
     public function __construct(

@@ -221,6 +221,13 @@ export default function AdminCtaPagesPage() {
     setSelectedPageItemId("");
   }
 
+  function removeCtaAtIndex(indexToRemove) {
+    setItems((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setSelectedPageItemId("");
+    setStatus("");
+    setError("");
+  }
+
   function moveSelected(delta) {
     const ctaId = Number(selectedPageItemId) || 0;
     if (!ctaId) return;
@@ -240,6 +247,7 @@ export default function AdminCtaPagesPage() {
   const availableCtas = useMemo(() => {
     const term = query.trim().toLowerCase();
     return ctas.filter((cta) => {
+      if (!cta.is_active) return false;
       if (selectedCtaIds.has(Number(cta.cta_id))) return false;
       if (!term) return true;
       const haystack = `${cta.label || ""} ${cta.type_label || ""} ${cta.type_action_key || ""} ${cta.onclick || ""}`.toLowerCase();
@@ -398,15 +406,33 @@ export default function AdminCtaPagesPage() {
                 {loadingItems && <div className="cta-pages-empty">Loading page CTAs...</div>}
                 {!loadingItems && items.length === 0 && <div className="cta-pages-empty">No CTAs assigned yet.</div>}
                 {!loadingItems && items.map((cta, index) => (
-                  <button
+                  <div
                     key={`${cta.cta_id}-${index}`}
+                    role="button"
+                    tabIndex={0}
                     type="button"
                     className={`cta-picker-row ${Number(selectedPageItemId) === Number(cta.cta_id) ? "is-active" : ""}`}
                     onClick={() => setSelectedPageItemId(String(cta.cta_id))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedPageItemId(String(cta.cta_id));
+                      }
+                    }}
                   >
-                    <span className="cta-picker-title">{index + 1}. {cta.label}</span>
+                    <span className="cta-picker-title">{index + 1}. {cta.label}{!cta.is_active ? " (inactive)" : ""}</span>
                     <span className="cta-picker-meta">#{cta.cta_id} - {ctaMeta(cta)}</span>
-                  </button>
+                    <button
+                      type="button"
+                      className="cta-page-remove-btn"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeCtaAtIndex(index);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>

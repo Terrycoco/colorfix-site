@@ -8,6 +8,7 @@ use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
+use App\Repos\PdoProjectRepository;
 use App\Entities\Playlist;
 use App\Entities\PlaylistItem;
 use App\Entities\PlaylistInstance;
@@ -21,6 +22,8 @@ class PlayerExperienceService
     /** @var array<string, float> */
     private array $lastTiming = [];
     private ?string $resolvedProjectExperienceKey = null;
+    private ?int $resolvedProjectId = null;
+    private ?string $resolvedProjectCurrentRelease = null;
 
     public function __construct(
         protected PDO $pdo
@@ -46,6 +49,8 @@ class PlayerExperienceService
 
         $experienceSource = 'default_public';
         $this->resolvedProjectExperienceKey = null;
+        $this->resolvedProjectId = null;
+        $this->resolvedProjectCurrentRelease = null;
         $projectExperience = $this->resolveProjectPlayerExperience((int)$instance->playlistId);
         if ($projectExperience instanceof PlayerExperience) {
             $experience = $projectExperience;
@@ -74,6 +79,18 @@ class PlayerExperienceService
         // 3. Flatten playlist items
         $itemsStartedAt = microtime(true);
         $items = $this->flattenItems($playlist);
+        if (
+            $experienceSource === 'project'
+            && $this->resolvedProjectId !== null
+            && $this->resolvedProjectExperienceKey !== null
+            && $this->resolvedProjectCurrentRelease !== null
+        ) {
+            $items = $this->filterProjectItemsForRelease(
+                $items,
+                $this->resolvedProjectExperienceKey,
+                $this->resolvedProjectCurrentRelease
+            );
+        }
         $this->hydrateItemImages($items);
         $paletteViewerKey = $experienceBacked ? $experience->paletteViewerKey : 'full_palette';
         $showSlidePalettePrompt = $experienceBacked
@@ -205,6 +222,121 @@ class PlayerExperienceService
         return $plan;
     }
 
+    public function buildPlaybackPlanFromProjectExperience(
+        int $projectId,
+        string $experienceKey,
+        ?string $sourceKey = null,
+        ?int $start = null,
+        ?array $startTarget = null
+    ): array {
+        $startedAt = microtime(true);
+        $experienceKey = strtolower(trim($experienceKey));
+        if (!in_array($experienceKey, ['public', 'concept', 'client', 'painter'], true)) {
+            throw new DomainException("Player experience configuration error: unsupported experience_key '{$experienceKey}'.");
+        }
+
+        $projectRepo = new PdoProjectRepository($this->pdo);
+        $project = $projectRepo->findById($projectId);
+        if (!$project) {
+            throw new RuntimeException("Project not found: {$projectId}");
+        }
+        $currentRelease = $this->loadProjectCurrentRelease($projectId);
+        $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
+
+        $projectPlaylists = $projectRepo->listProjectPlaylists($projectId);
+        $playlistId = (int)($projectPlaylists[0]['playlist_id'] ?? 0);
+        if ($playlistId <= 0) {
+            throw new RuntimeException("Project {$projectId} has no attached playlist");
+        }
+
+        $experience = $this->resolveExperienceByKey($experienceKey, "project reservation experience '{$experienceKey}'");
+        $slideFlag = $this->normalizeSlideFlag($experience->slideFlag);
+
+        $playlistStartedAt = microtime(true);
+        $playlistRepo = new PdoPlaylistRepository($this->pdo);
+        $playlist = $playlistRepo->getById((string)$playlistId, $slideFlag);
+        $this->markTiming('load_playlist', $playlistStartedAt);
+        if (!$playlist instanceof Playlist) {
+            throw new RuntimeException("Playlist {$playlistId} not found for project {$projectId}");
+        }
+
+        $itemsStartedAt = microtime(true);
+        $items = $this->flattenItems($playlist);
+        $items = $this->filterProjectItemsForRelease($items, $experienceKey, $currentRelease);
+        $colorPlanIds = $this->collectColorPlanIds($items);
+        $this->hydrateItemImages($items);
+        $paletteViewerKey = $experience->paletteViewerKey;
+        $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
+        $this->hydratePaletteViewerUrls($items, $paletteViewerKey, 0);
+        $this->markTiming('hydrate_items', $itemsStartedAt);
+        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
+        $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
+
+        $ctaStartedAt = microtime(true);
+        $ctaRepo = new PdoCtaRepository($this->pdo);
+        $ctas = $ctaRepo->getByGroupId($experience->ctaPageId);
+        if (!empty($ctas)) {
+            $ctas = $this->hydrateArticleCtas($ctas);
+        }
+        $this->markTiming('load_ctas', $ctaStartedAt);
+
+        $thumbsEnabled = $experienceKey !== 'painter' && count($colorPlanIds) > 1;
+        $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
+
+        $displayTitle = trim((string)($project['name'] ?? '')) ?: $playlist->title;
+        $pageH1 = $this->firstNonEmpty([
+            $playlist->meta['headline'] ?? null,
+            $displayTitle,
+            $playlist->title,
+        ]);
+        $projectSummary = $this->firstNonEmpty([
+            $playlist->meta['dek'] ?? null,
+            $playlist->meta['meta_description'] ?? null,
+        ]);
+
+        return [
+            'playlist_instance_id' => null,
+            'playlist_id' => $playlist->playlist_id,
+            'project_id' => $projectId,
+            'current_release' => $currentRelease,
+            'release_is_final' => $currentRelease === 'FINAL',
+            'color_plan_ids' => $colorPlanIds,
+            'title' => $playlist->title,
+            'display_title' => $displayTitle,
+            'slug' => null,
+            'page_h1' => $pageH1,
+            'project_summary' => $projectSummary,
+            'type' => $playlist->type,
+            'total_items' => count($items),
+            'start_index' => $startIndex,
+            'start_target' => $this->startTargetSummary($startTarget, $startIndex),
+            'items' => $items,
+            'ctas' => $ctas,
+            'cta_context_key' => null,
+            'audience' => $experienceKey,
+            'palette_viewer_cta_group_id' => null,
+            'show_slide_palette_prompt' => $showSlidePalettePrompt,
+            'thumbs_enabled' => $thumbsEnabled,
+            'demo_enabled' => false,
+            'share_enabled' => false,
+            'share_title' => $displayTitle,
+            'share_description' => $projectSummary,
+            'share_image_url' => $resolvedShareImageUrl,
+            'skip_intro_on_replay' => false,
+            'hide_stars' => false,
+            'playlist_instance_set_ids' => [],
+            'player_experience_id' => $experience->playerExperienceId,
+            'experience_key' => $experienceKey,
+            'player_experience_config_key' => $experience->experienceKey,
+            'experience_name' => $experience->name,
+            'slide_flag' => $slideFlag,
+            'palette_viewer_key' => $paletteViewerKey,
+            'cta_page_id' => $experience->ctaPageId,
+            'experience_source' => 'project_reservation',
+            'source_key' => $sourceKey,
+        ];
+    }
+
     /**
      * @return array<string, float>
      */
@@ -238,6 +370,17 @@ class PlayerExperienceService
         return $this->validateResolvedExperience($experience, "referenced experience {$id}");
     }
 
+    private function resolveExperienceByKey(string $experienceKey, string $label): PlayerExperience
+    {
+        $repo = new PdoPlayerExperienceRepository($this->pdo);
+        $experience = $repo->getByExperienceKey($experienceKey);
+        $resolved = $this->validateResolvedExperience($experience, $label);
+        if (!$resolved instanceof PlayerExperience) {
+            throw new DomainException("Player experience configuration error: {$label} was not found.");
+        }
+        return $resolved;
+    }
+
     private function resolveProjectPlayerExperience(int $playlistId): ?PlayerExperience
     {
         if ($playlistId <= 0 || !$this->tableExists('project_playlists') || !$this->columnExists('projects', 'experience_key')) {
@@ -245,7 +388,10 @@ class PlayerExperienceService
         }
 
         $stmt = $this->pdo->prepare(
-            "SELECT p.experience_key
+            "SELECT
+                p.id AS project_id,
+                p.experience_key,
+                p.current_release
              FROM project_playlists pp
              JOIN projects p
                ON p.id = pp.project_id
@@ -254,19 +400,127 @@ class PlayerExperienceService
              LIMIT 1"
         );
         $stmt->execute(['playlist_id' => $playlistId]);
-        $experienceKey = strtolower(trim((string)($stmt->fetchColumn() ?: '')));
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $experienceKey = strtolower(trim((string)($row['experience_key'] ?? '')));
         if ($experienceKey === '') {
             return null;
         }
+        $currentRelease = $this->normalizeProjectCurrentRelease((string)($row['current_release'] ?? '1'));
         $this->resolvedProjectExperienceKey = $experienceKey;
+        $this->resolvedProjectId = isset($row['project_id']) ? (int)$row['project_id'] : null;
+        $this->resolvedProjectCurrentRelease = $currentRelease;
+        $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
 
         $repo = new PdoPlayerExperienceRepository($this->pdo);
         $experience = $repo->getByExperienceKey($experienceKey);
-        if (!$experience instanceof PlayerExperience && $experienceKey === 'concept') {
-            $experience = $repo->getByExperienceKey('prospect');
-        }
+  
 
         return $this->validateResolvedExperience($experience, "project experience '{$experienceKey}'");
+    }
+
+    private function loadProjectCurrentRelease(int $projectId): string
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT current_release
+             FROM projects
+             WHERE id = :project_id
+             LIMIT 1"
+        );
+        $stmt->execute(['project_id' => $projectId]);
+        $value = $stmt->fetchColumn();
+        if ($value === false) {
+            throw new RuntimeException("Project not found while resolving current release: {$projectId}");
+        }
+        return $this->normalizeProjectCurrentRelease((string)$value);
+    }
+
+    private function normalizeProjectCurrentRelease(string $value): string
+    {
+        $value = strtoupper(trim($value));
+        if ($value === 'FINAL') {
+            return 'FINAL';
+        }
+        if ($value === '' || !ctype_digit($value) || (int)$value < 1) {
+            throw new DomainException(
+                "Project release configuration error: current_release must be a positive version number or FINAL."
+            );
+        }
+        return (string)max(1, (int)$value);
+    }
+
+    private function assertProjectExperienceAllowedForRelease(string $experienceKey, string $currentRelease): void
+    {
+        $experienceKey = strtolower(trim($experienceKey));
+        if ($experienceKey === 'painter' && $currentRelease !== 'FINAL') {
+            throw new DomainException(
+                "Painter experience is unavailable until the project's current release is FINAL."
+            );
+        }
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     * @return PlaylistItem[]
+     */
+    private function filterProjectItemsForRelease(
+        array $items,
+        string $experienceKey,
+        string $currentRelease
+    ): array {
+        $experienceKey = strtolower(trim($experienceKey));
+        $currentRelease = $this->normalizeProjectCurrentRelease($currentRelease);
+
+        if (in_array($experienceKey, ['public', 'concept'], true)) {
+            return array_values($items);
+        }
+
+        if ($experienceKey === 'painter') {
+            $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
+        }
+
+        if (!in_array($experienceKey, ['client', 'painter'], true)) {
+            return array_values($items);
+        }
+
+        if ($currentRelease === 'FINAL') {
+            return array_values(array_filter(
+                $items,
+                static fn($item): bool => $item instanceof PlaylistItem && !empty($item->is_final)
+            ));
+        }
+
+        $version = (int)$currentRelease;
+        return array_values(array_filter(
+            $items,
+            static function ($item) use ($version): bool {
+                if (!$item instanceof PlaylistItem) {
+                    return false;
+                }
+                $itemVersion = max(1, (int)($item->version_number ?? 1));
+                return $itemVersion <= $version;
+            }
+        ));
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     * @return int[]
+     */
+    private function collectColorPlanIds(array $items): array
+    {
+        $seen = [];
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) {
+                continue;
+            }
+            $colorPlanId = (int)($item->color_plan_id ?? 0);
+            if ($colorPlanId > 0) {
+                $seen[$colorPlanId] = true;
+            }
+        }
+        $ids = array_keys($seen);
+        sort($ids, SORT_NUMERIC);
+        return array_values(array_map('intval', $ids));
     }
 
     private function validateResolvedExperience(?PlayerExperience $experience, string $label): ?PlayerExperience
@@ -289,7 +543,10 @@ class PlayerExperienceService
     private function normalizeSlideFlag(string $slideFlag): string
     {
         $value = strtolower(trim($slideFlag));
-        $allowed = ['site', 'yt', 'pin', 'prospect', 'client'];
+        if (in_array($value, ['public', 'full_palette'], true)) {
+            return 'site';
+        }
+        $allowed = ['site', 'yt', 'pin',  'concept', 'client'];
         if (!in_array($value, $allowed, true)) {
             throw new DomainException("Player experience configuration error: unsupported slide_flag '{$slideFlag}'.");
         }
@@ -301,8 +558,8 @@ class PlayerExperienceService
         if (strtolower(trim($experience->paletteViewerKey)) === 'none') {
             return false;
         }
-        return strtolower(trim($experience->experienceKey)) !== 'prospect'
-            && strtolower(trim($experience->slideFlag)) !== 'prospect';
+        return strtolower(trim($experience->experienceKey)) !== 'concept'
+            && strtolower(trim($experience->slideFlag)) !== 'concept';
     }
 
     private function tableExists(string $table): bool

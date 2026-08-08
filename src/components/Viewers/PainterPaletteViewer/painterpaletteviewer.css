@@ -51,6 +51,20 @@
   gap: 10px;
 }
 
+.apv-shell--painter .cpv-entry + .cpv-entry {
+  position: relative;
+  border-top: 0;
+}
+
+.apv-shell--painter .cpv-entry + .cpv-entry::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 68px;
+  width: min(calc(100% - 84px), 50vw);
+  border-top: 1px solid #b8c0cc;
+}
+
 .cpv-assignment {
   padding-top: 9px;
   border-top: 1px solid #edf0f2;
@@ -162,6 +176,95 @@
   padding-top: 4px;
 }
 
+.ppv-plan-list {
+  display: grid;
+  gap: 22px;
+}
+
+.ppv-plan-section {
+  display: grid;
+  gap: 10px;
+}
+
+.ppv-plan-header {
+  display: block;
+}
+
+.ppv-plan-header h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.ppv-area-note {
+  max-width: 760px;
+  margin-top: 0;
+}
+
+.ppv-plan-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.ppv-plan-specs {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding-top: 18px;
+}
+
+.ppv-plan-specs::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 96px;
+  border-top: 1px solid #aeb7c3;
+}
+
+.ppv-plan-section:first-child .ppv-plan-specs {
+  padding-top: 0;
+}
+
+.ppv-plan-section:first-child .ppv-plan-specs::before {
+  display: none;
+}
+
+.ppv-plan-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-top: 18px;
+}
+
+.ppv-plan-photo {
+  width: 96px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ppv-plan-photo img {
+  width: 96px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #e5e7eb;
+}
+
+.ppv-plan-photo:focus-visible {
+  outline: 2px solid #172033;
+  outline-offset: 3px;
+}
+
 
 @media (max-width: 720px) {
   .cpv-owner-actions {
@@ -186,5 +289,34 @@
 
   .ppv-photo-column {
     order: 2;
+  }
+
+  .ppv-plan-body {
+    grid-template-columns: 1fr;
+  }
+
+  .ppv-plan-specs {
+    order: 2;
+    padding-top: 0;
+  }
+
+  .ppv-plan-specs::before {
+    display: none;
+  }
+
+  .ppv-plan-photos {
+    order: 1;
+    display: flex;
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+
+  .ppv-plan-photo,
+  .ppv-plan-photo img {
+    width: 82px;
+  }
+
+  .ppv-plan-photo img {
+    height: 62px;
   }
 }

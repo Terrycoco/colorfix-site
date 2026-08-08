@@ -16,7 +16,9 @@ const PROPERTY_SAVE_URL = `${API_FOLDER}/v2/admin/properties/save.php`;
 const PROPERTY_ADDRESS_SAVE_URL = `${API_FOLDER}/v2/admin/properties/address-save.php`;
 const PLAYLIST_ATTACH_URL = `${API_FOLDER}/v2/admin/projects/playlist-attach.php`;
 const PLAYLIST_REMOVE_URL = `${API_FOLDER}/v2/admin/projects/playlist-remove.php`;
+const PROJECT_RESERVATION_TOKENS_URL = `${API_FOLDER}/v2/admin/projects/reservation-tokens.php`;
 const PLAYLISTS_LIST_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
+const PLAYLIST_GET_URL = `${API_FOLDER}/v2/admin/playlists/get.php`;
 const OPTIONS_URL = `${API_FOLDER}/v2/admin/projects/options.php`;
 const COLOR_PLAN_LIST_URL = `${API_FOLDER}/v2/admin/project-color-plans/list.php`;
 const COLOR_PLAN_GET_URL = `${API_FOLDER}/v2/admin/project-color-plans/get.php`;
@@ -26,6 +28,7 @@ const COLOR_PLAN_DELETE_URL = `${API_FOLDER}/v2/admin/project-color-plans/delete
 const COLOR_PLAN_MEMBERS_SAVE_URL = `${API_FOLDER}/v2/admin/project-color-plans/members-save.php`;
 const COLOR_PLAN_VIEWER_GET_URL = `${API_FOLDER}/v2/admin/project-color-plans/viewer-get.php`;
 const COLOR_PLAN_VIEWER_SAVE_URL = `${API_FOLDER}/v2/admin/project-color-plans/viewer-save.php`;
+const COLOR_PLAN_PROJECT_SPECS_URL = `${API_FOLDER}/v2/admin/project-color-plans/project-specs.php`;
 
 const sheenOptions = ["", "Flat", "Velvet", "Matte", "Eggshell", "Satin/Lo-Sheen", "Semi-Gloss", "Gloss", "High-Gloss", "Other"];
 const viewerPhotoTypeOptions = ["FULL", "BEFORE", "INSET"];
@@ -35,7 +38,7 @@ const viewerTabs = ["concept", "client", "painter"];
 const emptyViewerForms = {
   concept: { title: "", challenge: "", design_direction: "" },
   client: { scheme_title: "", final_design_description: "" },
-  painter: { scheme_title: "", overall_painter_note: "" },
+  painter: { overall_painter_note: "" },
 };
 
 const emptyViewerPhotos = {
@@ -56,8 +59,9 @@ const emptyProject = {
   name: "",
   property_id: "",
   project_type_id: "",
-  experience_key: "concept",
+  current_release: "1",
   notes: "",
+  project_painter_note: "",
 };
 
 const emptyProperty = {
@@ -110,6 +114,16 @@ function clientDisplayName(client) {
   return client?.name || client?.email || `Client #${client?.id || ""}`;
 }
 
+async function copyText(value) {
+  const text = String(value || "");
+  if (!text) return;
+  if (!navigator.clipboard?.writeText) {
+    window.prompt("Copy link", text);
+    return;
+  }
+  await navigator.clipboard.writeText(text);
+}
+
 function sortClientsByName(items) {
   return [...items].sort((a, b) => clientDisplayName(a).localeCompare(clientDisplayName(b), undefined, { sensitivity: "base" }));
 }
@@ -156,8 +170,10 @@ export default function AdminProjectsPage() {
   const [showInlineProperty, setShowInlineProperty] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [projectReservationTokens, setProjectReservationTokens] = useState({});
   const [playlistOptions, setPlaylistOptions] = useState([]);
   const [playlistAttachId, setPlaylistAttachId] = useState("");
+  const [releaseVersionOptions, setReleaseVersionOptions] = useState([1]);
   const [activeTab, setActiveTab] = useState("overview");
   const [colorPlans, setColorPlans] = useState([]);
   const [selectedColorPlanId, setSelectedColorPlanId] = useState("");
@@ -171,8 +187,9 @@ export default function AdminProjectsPage() {
   const [viewerPhotoPickerOpen, setViewerPhotoPickerOpen] = useState(false);
   const [viewerPhotoPickerTarget, setViewerPhotoPickerTarget] = useState("concept");
   const [viewerPreviewKey, setViewerPreviewKey] = useState("");
+  const [painterPreviewPlans, setPainterPreviewPlans] = useState([]);
   const [loadingColorPlan, setLoadingColorPlan] = useState(false);
-  const [filters, setFilters] = useState({ q: "", experience_key: "", project_type_id: "" });
+  const [filters, setFilters] = useState({ q: "", project_type_id: "" });
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -214,6 +231,60 @@ export default function AdminProjectsPage() {
     setPlaylistOptions(Array.isArray(data.items) ? data.items : []);
   }, []);
 
+  const loadProjectReservationTokens = useCallback(async (projectId) => {
+    if (!projectId) {
+      setProjectReservationTokens({});
+      return;
+    }
+    const res = await fetch(`${PROJECT_RESERVATION_TOKENS_URL}?project_id=${encodeURIComponent(projectId)}&_=${Date.now()}`, {
+      credentials: "include",
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+    const data = JSON.parse(text);
+    if (!data?.ok) throw new Error(data?.error || "Failed to load reservation tokens");
+    setProjectReservationTokens(data.items || {});
+  }, []);
+
+  const loadReleaseVersionOptions = useCallback(async (projectPlaylists = []) => {
+    const playlistIds = Array.from(new Set(
+      (Array.isArray(projectPlaylists) ? projectPlaylists : [])
+        .map((row) => Number(row?.playlist_id || 0))
+        .filter((id) => id > 0)
+    ));
+
+    const versions = new Set([1]);
+    if (playlistIds.length) {
+      const results = await Promise.all(
+        playlistIds.map(async (playlistId) => {
+          try {
+            const res = await fetch(`${PLAYLIST_GET_URL}?playlist_id=${encodeURIComponent(playlistId)}&_=${Date.now()}`, {
+              credentials: "include",
+            });
+            const text = await res.text();
+            if (!res.ok) return [];
+            const data = JSON.parse(text);
+            if (!data?.ok) return [];
+            return Array.isArray(data.items) ? data.items : [];
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      results.flat().forEach((item) => {
+        const version = Number(item?.version_number || 0);
+        if (Number.isInteger(version) && version > 0) {
+          versions.add(version);
+        }
+      });
+    }
+
+    const next = Array.from(versions).sort((a, b) => a - b);
+    setReleaseVersionOptions(next);
+    return next;
+  }, []);
+
   const loadProject = useCallback(async (id) => {
     if (!id) return;
     projectModeRef.current = "detail";
@@ -231,11 +302,15 @@ export default function AdminProjectsPage() {
         name: data.project.name || "",
         property_id: data.project.property_id || "",
         project_type_id: data.project.project_type_id || "",
-        experience_key: data.project.experience_key || "concept",
+        current_release: String(data.project.current_release || "1").toUpperCase(),
         notes: data.project.notes || "",
+        project_painter_note: data.project.project_painter_note || "",
       });
       setPhotos(Array.isArray(data.photos) ? data.photos : []);
-      setPlaylists(Array.isArray(data.playlists) ? data.playlists : []);
+      const nextPlaylists = Array.isArray(data.playlists) ? data.playlists : [];
+      setPlaylists(nextPlaylists);
+      await loadReleaseVersionOptions(nextPlaylists);
+      await loadProjectReservationTokens(data.project.id);
       setPlaylistAttachId("");
       setColorPlans([]);
       setSelectedColorPlanId("");
@@ -254,7 +329,7 @@ export default function AdminProjectsPage() {
     } finally {
       setLoadingDetail(false);
     }
-  }, []);
+  }, [loadProjectReservationTokens, loadReleaseVersionOptions]);
 
   const loadColorPlan = useCallback(async (planId, projectId = selectedProjectId) => {
     if (!planId || !projectId) return;
@@ -340,6 +415,8 @@ export default function AdminProjectsPage() {
     });
     setPhotos([]);
     setPlaylists([]);
+    setReleaseVersionOptions([1]);
+    setProjectReservationTokens({});
     setColorPlans([]);
     setSelectedColorPlanId("");
     setColorPlanForm(emptyColorPlan);
@@ -350,6 +427,7 @@ export default function AdminProjectsPage() {
     setViewerPhotos(emptyViewerPhotos);
     setViewerPhotoPickerOpen(false);
     setViewerPreviewKey("");
+    setPainterPreviewPlans([]);
     setShowProjectForm(true);
     setShowInlineProperty(false);
     setNewPropertyForm(emptyProperty);
@@ -359,6 +437,38 @@ export default function AdminProjectsPage() {
     setError("");
   }, []);
 
+  async function generateProjectReservationToken(experienceKey, regenerate = false) {
+    if (!projectForm.id) {
+      setError("Save the project before generating reservation tokens.");
+      return;
+    }
+    setSaving(true);
+    setStatus("");
+    setError("");
+    try {
+      const res = await fetch(PROJECT_RESERVATION_TOKENS_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: projectForm.id,
+          experience_key: experienceKey,
+          regenerate,
+        }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      const data = JSON.parse(text);
+      if (!data?.ok) throw new Error(data?.error || "Failed to generate reservation token");
+      setProjectReservationTokens(data.items || {});
+      setStatus(`${experienceLabel(experienceKey)} token ${data.reservation?.reused ? "loaded" : "generated"}.`);
+    } catch (err) {
+      setError(err?.message || "Failed to generate reservation token");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const loadProjects = useCallback(async (preferredId = null) => {
     setLoadingList(true);
     setError("");
@@ -367,7 +477,6 @@ export default function AdminProjectsPage() {
       await loadPlaylistOptions();
       const params = new URLSearchParams();
       if (filters.q.trim()) params.set("q", filters.q.trim());
-      if (filters.experience_key) params.set("experience_key", filters.experience_key);
       if (filters.project_type_id) params.set("project_type_id", filters.project_type_id);
       params.set("_", String(Date.now()));
       const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -409,7 +518,7 @@ export default function AdminProjectsPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [filters.experience_key, filters.project_type_id, filters.q, loadOptions, loadPlaylistOptions, loadProject, startNewProject]);
+  }, [filters.project_type_id, filters.q, loadOptions, loadPlaylistOptions, loadProject, startNewProject]);
 
   useEffect(() => {
     void loadProjects();
@@ -484,6 +593,7 @@ export default function AdminProjectsPage() {
         project_type_id: Number(projectForm.project_type_id || 0),
         name: projectForm.name.trim(),
         notes: projectForm.notes.trim(),
+        project_painter_note: (projectForm.project_painter_note || "").trim(),
       };
       const res = await fetch(SAVE_URL, {
         method: "POST",
@@ -507,24 +617,38 @@ export default function AdminProjectsPage() {
     }
   }
 
-  async function updateExperience(value) {
-    updateProjectForm("experience_key", value);
-    if (!projectForm.id) return;
+  async function updateCurrentRelease(value) {
+    const normalized = String(value || "").trim().toUpperCase();
+    const allowed = new Set([
+      ...releaseVersionOptions.map((version) => String(version)),
+      "FINAL",
+    ]);
+    if (!allowed.has(normalized)) {
+      setError(`Choose an existing version (${releaseVersionOptions.join(", ")}) or FINAL.`);
+      return false;
+    }
+
+    updateProjectForm("current_release", normalized);
+    if (!projectForm.id) return true;
+
     setSaving(true);
+    setStatus("");
     setError("");
     try {
       const res = await fetch(SAVE_URL, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...projectForm, experience_key: value }),
+        body: JSON.stringify({ ...projectForm, current_release: normalized }),
       });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to update experience");
-      setStatus("Player Experience updated.");
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to update current version");
+      setStatus(`Current Version set to ${normalized}.`);
       await loadProjects(projectForm.id);
+      return true;
     } catch (err) {
-      setError(err?.message || "Failed to update experience");
+      setError(err?.message || "Failed to update current version");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -713,6 +837,7 @@ export default function AdminProjectsPage() {
       setViewerForms(emptyViewerForms);
       setViewerPhotos(emptyViewerPhotos);
       setViewerPreviewKey("");
+      setPainterPreviewPlans([]);
       await loadColorPlans(projectForm.id, null);
     } catch (err) {
       setError(err?.message || "Failed to delete Color Plan");
@@ -956,7 +1081,6 @@ export default function AdminProjectsPage() {
         nextTarget.final_design_description = sourceForm.design_direction || sourceForm.final_design_description || "";
       }
       if (fromKey === "client" && toKey === "painter") {
-        nextTarget.scheme_title = sourceForm.scheme_title || sourceForm.title || colorPlanForm.scheme_title || colorPlanForm.nickname || "";
         nextTarget.overall_painter_note = sourceForm.final_design_description || sourceForm.design_direction || "";
       }
       return {
@@ -983,6 +1107,26 @@ export default function AdminProjectsPage() {
     setStatus("");
     setError("");
     try {
+      if (viewerKey === "painter" && projectForm.id) {
+        const projectRes = await fetch(SAVE_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...projectForm,
+            property_id: Number(projectForm.property_id || 0),
+            project_type_id: Number(projectForm.project_type_id || 0),
+            name: String(projectForm.name || "").trim(),
+            notes: String(projectForm.notes || "").trim(),
+            project_painter_note: String(projectForm.project_painter_note || "").trim(),
+          }),
+        });
+        const projectText = await projectRes.text();
+        if (!projectRes.ok) throw new Error(`HTTP ${projectRes.status}: ${projectText.slice(0, 200)}`);
+        const projectData = JSON.parse(projectText);
+        if (!projectData?.ok) throw new Error(projectData?.error || "Failed to save project painter note");
+      }
+
       const res = await fetch(COLOR_PLAN_VIEWER_SAVE_URL, {
         method: "POST",
         credentials: "include",
@@ -1014,10 +1158,31 @@ export default function AdminProjectsPage() {
     }
   }
 
+  async function fetchProjectPainterSpecs() {
+    if (!projectForm.id) return [];
+    const params = new URLSearchParams();
+    params.set("project_id", String(projectForm.id));
+    params.set("_", String(Date.now()));
+    const res = await fetch(`${COLOR_PLAN_PROJECT_SPECS_URL}?${params.toString()}`, { credentials: "include" });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+    const data = JSON.parse(text);
+    if (!data?.ok) throw new Error(data?.error || "Failed to load project paint specs");
+    return Array.isArray(data.items) ? data.items : [];
+  }
+
   async function previewViewer(viewerKey) {
     const targetKey = viewerKey || activeViewerTab;
     const saved = await saveViewerSetup(targetKey);
     if (saved) {
+      if (targetKey === "painter") {
+        try {
+          setPainterPreviewPlans(await fetchProjectPainterSpecs());
+        } catch (err) {
+          setError(err?.message || "Failed to load project paint specs");
+          return;
+        }
+      }
       setViewerPreviewKey(targetKey);
     }
   }
@@ -1042,15 +1207,6 @@ export default function AdminProjectsPage() {
             value={filters.q}
             onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
           />
-          <select
-            value={filters.experience_key}
-            onChange={(event) => setFilters((prev) => ({ ...prev, experience_key: event.target.value }))}
-          >
-            <option value="">All experiences</option>
-            {experienceOptions.map((item) => (
-              <option key={item.key} value={item.key}>{item.label}</option>
-            ))}
-          </select>
           <select
             value={filters.project_type_id}
             onChange={(event) => setFilters((prev) => ({ ...prev, project_type_id: event.target.value }))}
@@ -1083,7 +1239,7 @@ export default function AdminProjectsPage() {
                 <span>{project.client_name || "No client assigned"}</span>
               </span>
               <span className="admin-projects__project-slug">
-                {project.project_type_name || "Project type"} | {experienceLabel(project.experience_key)}
+                {project.project_type_name || "Project type"} | Version {String(project.current_release || "1").toUpperCase()}
               </span>
               <span className="admin-projects__counts">{currentPlaylistLabel(project)}</span>
             </button>
@@ -1101,6 +1257,7 @@ export default function AdminProjectsPage() {
             clients={clients}
             properties={properties}
             projectTypes={projectTypes}
+            releaseVersionOptions={releaseVersionOptions}
             saving={saving}
             showInlineProperty={showInlineProperty}
             newPropertyForm={newPropertyForm}
@@ -1138,14 +1295,12 @@ export default function AdminProjectsPage() {
                     </div>
                   </div>
                   <div className="admin-projects__actions">
-                    <label className="admin-projects__experience-control">
-                      <span>Player Experience</span>
-                      <select value={projectForm.experience_key} onChange={(event) => updateExperience(event.target.value)} disabled={saving}>
-                        {experienceOptions.map((item) => (
-                          <option key={item.key} value={item.key}>{item.label}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <CurrentReleaseControl
+                      value={projectForm.current_release || "1"}
+                      versionOptions={releaseVersionOptions}
+                      disabled={saving}
+                      onCommit={updateCurrentRelease}
+                    />
                     <button type="button" className="admin-projects__btn" onClick={editCurrentProject}>
                       Edit
                     </button>
@@ -1173,16 +1328,18 @@ export default function AdminProjectsPage() {
                 />
 
                 {activeTab === "overview" ? (
-                  <Overview project={selectedProject} />
+                  <Overview project={{ ...selectedProject, current_release: projectForm.current_release || "1" }} />
                 ) : activeTab === "playlist" ? (
                   <PlaylistsSection
                     playlists={playlists}
                     playlistOptions={playlistOptions}
                     playlistAttachId={playlistAttachId}
+                    reservationTokens={projectReservationTokens}
                     saving={saving}
                     onPlaylistAttachIdChange={setPlaylistAttachId}
                     onAttachPlaylist={attachPlaylist}
                     onRemovePlaylist={removePlaylist}
+                    onGenerateReservationToken={generateProjectReservationToken}
                   />
                 ) : activeTab === "color plans" ? (
                   <ColorPlansSection
@@ -1224,6 +1381,8 @@ export default function AdminProjectsPage() {
                     onRemovePhoto={removeViewerPhoto}
                     onMovePhoto={moveViewerPhoto}
                     onCopyPhotos={copyViewerPhotos}
+                    projectPainterNote={projectForm.project_painter_note || ""}
+                    onProjectPainterNoteChange={(value) => updateProjectForm("project_painter_note", value)}
                     onSaveViewer={saveViewerSetup}
                     onPreviewViewer={previewViewer}
                     saving={saving}
@@ -1262,7 +1421,9 @@ export default function AdminProjectsPage() {
       <ViewerPreviewModal
         open={!!viewerPreviewKey}
         viewerKey={viewerPreviewKey || activeViewerTab}
-        project={selectedProject}
+        project={{ ...(selectedProject || {}), project_painter_note: projectForm.project_painter_note || "" }}
+        reservationTokens={projectReservationTokens}
+        projectPainterPlans={painterPreviewPlans}
         plan={selectedWorkingColorPlan}
         form={viewerForms[viewerPreviewKey || activeViewerTab] || {}}
         photos={viewerPhotos[viewerPreviewKey || activeViewerTab] || []}
@@ -1278,6 +1439,7 @@ function ProjectForm({
   clients,
   properties,
   projectTypes,
+  releaseVersionOptions,
   saving,
   showInlineProperty,
   newPropertyForm,
@@ -1315,14 +1477,15 @@ function ProjectForm({
             ))}
           </select>
         </label>
-        <label>
-          <span>Player Experience</span>
-          <select value={form.experience_key} onChange={(event) => onChange("experience_key", event.target.value)}>
-            {experienceOptions.map((item) => (
-              <option key={item.key} value={item.key}>{item.label}</option>
-            ))}
-          </select>
-        </label>
+        <CurrentReleaseControl
+          value={form.current_release || "1"}
+          versionOptions={releaseVersionOptions}
+          disabled={saving}
+          onCommit={(value) => {
+            onChange("current_release", value);
+            return true;
+          }}
+        />
         <label>
           <span>Property</span>
           <select value={form.property_id || ""} onChange={(event) => onChange("property_id", event.target.value)} disabled={showInlineProperty}>
@@ -1385,7 +1548,7 @@ function Overview({ project }) {
     <div className="admin-projects__overview-grid">
       <Field label="Project name" value={project.name} />
       <Field label="Project type" value={project.project_type_name} />
-      <Field label="Player Experience" value={experienceLabel(project.experience_key)} />
+      <Field label="Current Version" value={String(project.current_release || "1").toUpperCase()} />
       <Field label="Property" value={project.property_name || "No property"} />
       <Field label="Client" value={project.client_name || "No client assigned"} />
       <Field label="Address" value={addressLine(project.address)} />
@@ -1393,6 +1556,64 @@ function Overview({ project }) {
       <Field label="Updated" value={formatDate(project.updated_at)} />
       <Field label="Notes" value={project.notes || "No notes"} wide />
     </div>
+  );
+}
+
+function CurrentReleaseControl({ value, versionOptions = [], disabled = false, onCommit }) {
+  const [draft, setDraft] = useState(String(value || "1").toUpperCase());
+  const listId = "project-current-release-options";
+  const options = useMemo(() => {
+    const numeric = Array.from(new Set(
+      (Array.isArray(versionOptions) ? versionOptions : [])
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item) && item > 0)
+    )).sort((a, b) => a - b);
+    return [...numeric.map(String), "FINAL"];
+  }, [versionOptions]);
+
+  useEffect(() => {
+    setDraft(String(value || "1").toUpperCase());
+  }, [value]);
+
+  async function commit() {
+    const normalized = String(draft || "").trim().toUpperCase();
+    if (!options.includes(normalized)) {
+      setDraft(String(value || "1").toUpperCase());
+      return;
+    }
+    const accepted = await onCommit?.(normalized);
+    if (accepted === false) {
+      setDraft(String(value || "1").toUpperCase());
+    } else {
+      setDraft(normalized);
+    }
+  }
+
+  return (
+    <label className="admin-projects__experience-control">
+      <span>Current Version</span>
+      <input
+        type="text"
+        list={listId}
+        value={draft}
+        disabled={disabled}
+        autoComplete="off"
+        onChange={(event) => setDraft(event.target.value.toUpperCase())}
+        onBlur={() => void commit()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            void commit();
+          }
+        }}
+        aria-label="Current Version"
+      />
+      <datalist id={listId}>
+        {options.map((option) => (
+          <option key={option} value={option} />
+        ))}
+      </datalist>
+    </label>
   );
 }
 
@@ -1411,7 +1632,7 @@ function WorkingOnSelector({ plans, selectedPlanId, loading, onSelectPlan }) {
       <label>
         <span>Working on:</span>
         <select value={selectedPlanId || ""} onChange={(event) => onSelectPlan(event.target.value)} disabled={loading || plans.length === 0}>
-          <option value="">{plans.length ? "Choose Color Plan / Room" : "No Color Plans yet"}</option>
+          <option value="">{plans.length ? "Choose Color Plan / Area" : "No Color Plans yet"}</option>
           {plans.map((plan) => (
             <option key={plan.id} value={plan.id}>{colorPlanLabel(plan)}</option>
           ))}
@@ -1444,10 +1665,12 @@ function PlaylistsSection({
   playlists,
   playlistOptions,
   playlistAttachId,
+  reservationTokens,
   saving,
   onPlaylistAttachIdChange,
   onAttachPlaylist,
   onRemovePlaylist,
+  onGenerateReservationToken,
 }) {
   return (
     <div className="admin-projects__section-stack">
@@ -1493,6 +1716,51 @@ function PlaylistsSection({
           </span>
         </div>
       ))}
+      <div className="admin-projects__reservation-panel">
+        <div className="admin-projects__reservation-header">
+          <strong>Reservation/Test Links</strong>
+          <small>Project Experience tokens for PES testing</small>
+        </div>
+        <div className="admin-projects__reservation-list">
+          {experienceOptions.map((experience) => {
+            const row = reservationTokens?.[experience.key] || {};
+            const reservation = row.reservation || null;
+            const url = reservation?.public_url || "";
+            return (
+              <div key={experience.key} className="admin-projects__reservation-row">
+                <span>
+                  <strong>{experience.label}</strong>
+                  <small>{reservation ? `Token #${reservation.id}` : "No active token"}</small>
+                </span>
+                <button
+                  type="button"
+                  className="admin-projects__btn"
+                  onClick={() => onGenerateReservationToken(experience.key, Boolean(reservation))}
+                  disabled={saving}
+                >
+                  {reservation ? "Regenerate Token" : "Generate Token"}
+                </button>
+                <button
+                  type="button"
+                  className="admin-projects__btn"
+                  onClick={() => copyText(url)}
+                  disabled={!url}
+                >
+                  Copy Link
+                </button>
+                <button
+                  type="button"
+                  className="admin-projects__btn admin-projects__btn--primary"
+                  onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+                  disabled={!url}
+                >
+                  Open/Test
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1524,7 +1792,7 @@ function ColorPlansSection({
   return (
     <div className="admin-projects__section-stack admin-projects__color-plans">
       <div className="admin-projects__context-line">
-        <span>Selected room</span>
+        <span>Selected area</span>
         <strong>{colorPlanLabel(workingPlan) || "No Color Plan selected"}</strong>
       </div>
       <div className="admin-projects__attach-row">
@@ -1604,6 +1872,8 @@ function ProjectViewersSection({
   onRemovePhoto,
   onMovePhoto,
   onCopyPhotos,
+  projectPainterNote,
+  onProjectPainterNoteChange,
   onSaveViewer,
   onPreviewViewer,
   saving,
@@ -1627,7 +1897,7 @@ function ProjectViewersSection({
       </div>
 
       <div className="admin-projects__viewer-top-actions">
-        <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={onSaveViewer} disabled={saving || !workingPlan}>
+        <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={() => onSaveViewer(activeViewerTab)} disabled={saving || !workingPlan}>
           {saving ? "Saving..." : "Save Viewer"}
         </button>
         <button type="button" className="admin-projects__btn" onClick={() => onPreviewViewer(activeViewerTab)} disabled={saving || !workingPlan}>
@@ -1646,7 +1916,7 @@ function ProjectViewersSection({
       </div>
 
       {!workingPlan ? (
-        <div className="admin-projects__empty">Create or select a Color Plan before setting up room-specific viewers.</div>
+        <div className="admin-projects__empty">Create or select a Color Plan before setting up area-specific viewers.</div>
       ) : (
         <ViewerWorkbench
           viewerKey={activeViewerTab}
@@ -1661,6 +1931,8 @@ function ProjectViewersSection({
           onRemovePhoto={onRemovePhoto}
           onMovePhoto={onMovePhoto}
           onCopyPhotos={onCopyPhotos}
+          projectPainterNote={projectPainterNote}
+          onProjectPainterNoteChange={onProjectPainterNoteChange}
           onSaveViewer={onSaveViewer}
           onPreviewViewer={onPreviewViewer}
           saving={saving}
@@ -1680,6 +1952,8 @@ function ViewerWorkbench({
   onRemovePhoto,
   onMovePhoto,
   onCopyPhotos,
+  projectPainterNote,
+  onProjectPainterNoteChange,
   onSaveViewer,
   onPreviewViewer,
   saving,
@@ -1687,8 +1961,14 @@ function ViewerWorkbench({
   return (
     <div className="admin-projects__viewer-workbench">
       <section className="admin-projects__viewer-section">
-        <h3>COPY</h3>
-        <ViewerCopyFields viewerKey={viewerKey} form={form} onFormChange={onFormChange} />
+        <h3>{viewerKey === "painter" ? "NOTES" : "COPY"}</h3>
+        <ViewerCopyFields
+          viewerKey={viewerKey}
+          form={form}
+          projectPainterNote={projectPainterNote}
+          onProjectPainterNoteChange={onProjectPainterNoteChange}
+          onFormChange={onFormChange}
+        />
       </section>
 
       <section className="admin-projects__viewer-section">
@@ -1712,25 +1992,26 @@ function ViewerWorkbench({
       <section className="admin-projects__viewer-section">
         <h3>PREVIEW / DELIVERY</h3>
         <div className="admin-projects__delivery-row">
-          <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={onSaveViewer} disabled={saving}>
+          <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={() => onSaveViewer(viewerKey)} disabled={saving}>
             {saving ? "Saving..." : "Save Viewer"}
           </button>
           <button type="button" className="admin-projects__btn" onClick={() => onPreviewViewer(viewerKey)} disabled={saving}>
             {saving ? "Saving..." : "Preview Viewer"}
           </button>
-          <span>Share URL: <strong>Not reserved yet</strong></span>
         </div>
       </section>
     </div>
   );
 }
 
-function ViewerPreviewModal({ open, viewerKey, project, plan, form, photos, members, onClose }) {
+function ViewerPreviewModal({ open, viewerKey, project, reservationTokens, projectPainterPlans, plan, form, photos, members, onClose }) {
   if (!open) return null;
 
   const previewProps = buildViewerPreviewProps({
     viewerKey,
     project,
+    reservationTokens,
+    projectPainterPlans,
     plan,
     form,
     photos,
@@ -1764,7 +2045,7 @@ function ViewerPreviewModal({ open, viewerKey, project, plan, form, photos, memb
   );
 }
 
-function buildViewerPreviewProps({ viewerKey, project, plan, form, photos, members, onClose }) {
+function buildViewerPreviewProps({ viewerKey, project, reservationTokens, projectPainterPlans, plan, form, photos, members, onClose }) {
   const photoMeta = viewerPhotoMeta(photos);
   const schemeTitle = viewerKey === "client" || viewerKey === "painter"
     ? (form?.scheme_title || plan?.scheme_title || plan?.nickname || plan?.area_name || "Color Plan")
@@ -1818,14 +2099,26 @@ function buildViewerPreviewProps({ viewerKey, project, plan, form, photos, membe
   }
 
   if (viewerKey === "painter") {
+    const painterPlans = buildPainterPlanPreviewRows({
+      plans: projectPainterPlans,
+      currentPlan: plan,
+      currentForm: form,
+      currentMembers: members,
+      currentPhotos: photos,
+    });
     return {
       ...commonProps,
       meta: {
         ...commonMeta,
-        notes: form?.overall_painter_note || "",
+        title: project?.name || commonMeta.title,
+        display_title: project?.name || commonMeta.display_title,
+        notes: project?.project_painter_note || "",
       },
       painterView: projectView,
       swatches: viewerSwatches(members),
+      plans: painterPlans,
+      playlistUrl: reservationTokens?.painter?.reservation?.public_url || "",
+      playlistLabel: "Watch Playlist",
     };
   }
 
@@ -1840,6 +2133,58 @@ function buildViewerPreviewProps({ viewerKey, project, plan, form, photos, membe
     },
     showLogo: false,
   };
+}
+
+function buildPainterPlanPreviewRows({ plans, currentPlan, currentForm, currentMembers, currentPhotos }) {
+  const rows = (Array.isArray(plans) ? plans : []).map((plan) => {
+    const painterViewer = plan.painter_viewer || {};
+    const painterForm = painterViewer.form || {};
+    return {
+      id: Number(plan.id || 0) || null,
+      title: plan.area_name || plan.nickname || plan.scheme_title || `Color Plan #${plan.id}`,
+      schemeTitle: painterForm.scheme_title || plan.scheme_title || plan.nickname || plan.area_name || "",
+      paletteType: plan.palette_type || "",
+      issuedLabel: plan.issued_at ? formatDate(plan.issued_at) : "",
+      painterNote: painterForm.overall_painter_note || "",
+      photos: painterViewerPhotos(painterViewer.photos || []),
+      swatches: viewerSwatches(plan.members || []),
+    };
+  });
+
+  const currentId = Number(currentPlan?.id || 0);
+  if (currentId > 0) {
+    const index = rows.findIndex((row) => Number(row.id) === currentId);
+    const currentRow = {
+      id: currentId,
+      title: currentPlan.area_name || currentPlan.nickname || currentPlan.scheme_title || `Color Plan #${currentId}`,
+      schemeTitle: currentForm?.scheme_title || currentPlan.scheme_title || currentPlan.nickname || currentPlan.area_name || "",
+      paletteType: currentPlan.palette_type || "",
+      issuedLabel: currentPlan.issued_at ? formatDate(currentPlan.issued_at) : "",
+      painterNote: currentForm?.overall_painter_note || "",
+      photos: painterViewerPhotos(currentPhotos || []),
+      swatches: viewerSwatches(currentMembers),
+    };
+    if (index >= 0) {
+      rows[index] = currentRow;
+    } else {
+      rows.push(currentRow);
+    }
+  }
+
+  return rows.filter((row) => row.swatches.length > 0 || row.schemeTitle || row.title);
+}
+
+function painterViewerPhotos(photos) {
+  return (Array.isArray(photos) ? photos : [])
+    .filter((row) => String(row.photo_type || "").toUpperCase() !== "BEFORE")
+    .map((row) => ({
+      ...row,
+      url: buildImageUrl(row.rel_path || row.image_url || ""),
+      alt_text: row.photo_title || row.photo_type || "Project photo",
+      type: row.photo_type || "FULL",
+      role: row.photo_type || "FULL",
+    }))
+    .filter((row) => row.url);
 }
 
 function viewerPhotoMeta(photos) {
@@ -1885,7 +2230,7 @@ function viewerKeyLabel(key) {
   return "Concept";
 }
 
-function ViewerCopyFields({ viewerKey, form, onFormChange }) {
+function ViewerCopyFields({ viewerKey, form, projectPainterNote, onProjectPainterNoteChange, onFormChange }) {
   if (viewerKey === "client") {
     return (
       <div className="admin-projects__form-grid admin-projects__viewer-copy-grid">
@@ -1904,12 +2249,16 @@ function ViewerCopyFields({ viewerKey, form, onFormChange }) {
   if (viewerKey === "painter") {
     return (
       <div className="admin-projects__form-grid admin-projects__viewer-copy-grid">
-        <label>
-          <span>Painter Title</span>
-          <input value={form.scheme_title || ""} onChange={(event) => onFormChange(viewerKey, "scheme_title", event.target.value)} />
+        <label className="admin-projects__wide">
+          <span>Painter Project Note:</span>
+          <textarea
+            rows={3}
+            value={projectPainterNote || ""}
+            onChange={(event) => onProjectPainterNoteChange(event.target.value)}
+          />
         </label>
         <label className="admin-projects__wide">
-          <span>Overall Painter Note</span>
+          <span>Painter Area Note:</span>
           <textarea rows={4} value={form.overall_painter_note || ""} onChange={(event) => onFormChange(viewerKey, "overall_painter_note", event.target.value)} />
         </label>
       </div>

@@ -10,13 +10,14 @@ import "./painterpaletteviewer.css";
  *
  * {
  *   address,
- *   schemeTitle,
+ *   projectName,
  *   issuedLabel
  * }
  */
 export default function PainterPaletteViewer({
   meta,
   painterView = {},
+  plans = [],
   swatches = [],
   adminMode = false,
   showBackButton = true,
@@ -29,6 +30,7 @@ export default function PainterPaletteViewer({
   shareText = "Here are the ColorFix painter specifications.",
   shareUrl,
   playlistUrl = "",
+  playlistLabel = "Watch Playlist",
 }) {
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [expandedPhoto, setExpandedPhoto] = useState(null);
@@ -43,39 +45,41 @@ export default function PainterPaletteViewer({
     success: "",
   });
 
-  const colorGroups = useMemo(() => groupEntriesByColor(swatches), [swatches]);
+  const painterPlans = useMemo(() => normalizePainterPlans(plans, swatches), [plans, swatches]);
+  const allEntries = useMemo(() => painterPlans.flatMap((plan) => plan.swatches || []), [painterPlans]);
 
   const fallbackTitle = formatTitle(meta?.title || "ColorFix Palette");
   const address = painterView.address || "";
-  const schemeTitle = formatTitle(painterView.schemeTitle || fallbackTitle);
+  const projectTitle = formatTitle(painterView.projectName || meta?.display_title || fallbackTitle);
   const issuedLabel = painterView.issuedLabel || "";
   const overallNote = meta?.notes || painterView.overallPainterNote || "";
+  const hasPlanPayload = Array.isArray(plans) && plans.length > 0;
 
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
-  const photoAlt = meta?.photo_alt || schemeTitle || "Final palette rendering";
+  const photoAlt = meta?.photo_alt || projectTitle || "Final palette rendering";
   const ogImageUrl = meta?.og_image_url || photoUrl;
 
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
 
-  const seoTitle = `${schemeTitle} | ColorFix`;
+  const seoTitle = `${projectTitle} Painter Specification Sheet | ColorFix`;
   const seoDescription = address || shareText;
 
   const showExteriorNote =
     (paletteType === "exterior" || paletteType === "hoa") &&
-    colorGroups.some((group) => group.int_only);
+    allEntries.some((entry) => entry.int_only);
 
   const exteriorNoteBrandText = useMemo(() => {
-    const brands = colorGroups
-      .filter((group) => group.int_only)
-      .map((group) => group.brand_name || group.brand)
+    const brands = allEntries
+      .filter((entry) => entry.int_only)
+      .map((entry) => entry.brand_name || entry.brand)
       .filter(Boolean);
     const uniqueBrands = Array.from(new Set(brands));
     if (uniqueBrands.length === 1) return uniqueBrands[0];
     return "paint brand";
-  }, [colorGroups]);
+  }, [allEntries]);
 
   const handleBack = () => {
     if (onBack) {
@@ -292,9 +296,9 @@ export default function PainterPaletteViewer({
       <div className="apv-content cpv-content ppv-content">
         <div className="apv-column apv-column--details ppv-details">
           <div className="apv-info cpv-summary">
-            <div className="apv-kicker">Painter Specifications</div>
+            <div className="apv-kicker">Painter Specification Sheet</div>
 
-            <h1>{schemeTitle}</h1>
+            <h1>{projectTitle}</h1>
 
             {overallNote && (
               <div className="ppv-note ppv-overall-note">
@@ -304,73 +308,58 @@ export default function PainterPaletteViewer({
             )}
           </div>
 
-          {colorGroups.length > 0 ? (
-            <div className="apv-entries">
-              <div className="cpv-section-heading">
-                Color Application Details
-              </div>
-
-              {colorGroups.map((group) => (
-                <article className="apv-entry cpv-entry" key={group.key}>
-                  <div className="apv-color">
-                    <span
-                      className="apv-swatch"
-                      style={{
-                        backgroundColor: group.hex6 ? `#${group.hex6}` : "#ccc",
-                      }}
-                      aria-hidden="true"
-                    />
-
-                    <div className="apv-color-meta">
-                      <div className="apv-name">
-                        {group.name || `Color #${group.id}`}
-                        {group.code ? `, ${group.code}` : ""}
-                        {showExteriorNote && group.int_only && (
-                          <span
-                            className="apv-int-only"
-                            aria-label="Not recommended for exteriors"
-                          >
-                            *
-                          </span>
-                        )}
-                      </div>
-
-                      {(group.brand_name || group.brand) && (
-                        <div className="apv-brand">
-                          {group.brand_name || group.brand}
-                        </div>
-                      )}
-                    </div>
+          {painterPlans.length > 0 ? (
+            <div className="ppv-plan-list">
+              {painterPlans.map((plan, planIndex) => (
+                <section className="ppv-plan-section" key={plan.key || plan.id || planIndex}>
+                  <div className="ppv-plan-header">
+                    <h2>{plan.title || `Area ${planIndex + 1}`}</h2>
                   </div>
 
-                  {group.assignments.map((assignment, index) => (
-                    <div
-                      className="cpv-assignment ppv-assignment"
-                      key={`${group.key}-${index}`}
-                    >
-                      {assignment.role && (
-                        <div className="cpv-spec-line">
-                          <span className="cpv-spec-label">Placement:</span>
-                          <span>{assignment.role}</span>
-                        </div>
-                      )}
-
-                      {assignment.sheen && (
-                        <div className="cpv-spec-line">
-                          <span className="cpv-spec-label">Sheen:</span>
-                          <span>{assignment.sheen}</span>
-                        </div>
-                      )}
-
-                      {assignment.note && (
-                        <div className="ppv-note">
+                  <div className="ppv-plan-body">
+                    <div className="ppv-plan-specs">
+                      {plan.painterNote && (
+                        <div className="ppv-note ppv-area-note">
                           <span className="cpv-spec-label">Note:</span>
-                          <span>{assignment.note}</span>
+                          <span>{plan.painterNote}</span>
                         </div>
+                      )}
+
+                      {plan.groups.length > 0 ? (
+                        <div className="apv-entries">
+                          {plan.groups.map((group) => (
+                            <PainterColorEntry
+                              key={group.key}
+                              group={group}
+                              showExteriorNote={showExteriorNote}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="cpv-empty">No color specifications have been added for this area yet.</div>
                       )}
                     </div>
-                  ))}
-                </article>
+
+                    {plan.photos.length > 0 && (
+                      <div className="ppv-plan-photos" aria-label={`${plan.title || "Area"} photos`}>
+                        {plan.photos.map((photo, photoIndex) => (
+                          <button
+                            type="button"
+                            className="ppv-plan-photo"
+                            key={`${photo.url}-${photoIndex}`}
+                            onClick={() => openPhoto(photo.url, photo.alt_text || plan.title)}
+                          >
+                            <img
+                              src={photo.url}
+                              alt={photo.alt_text || plan.title || "Project photo"}
+                              loading="lazy"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
               ))}
             </div>
           ) : (
@@ -404,13 +393,13 @@ export default function PainterPaletteViewer({
           {playlistUrl && (
             <div className="cpv-owner-actions ppv-actions">
               <a className="cpv-action cpv-action--secondary" href={playlistUrl}>
-                View Final Transformation
+                {playlistLabel}
               </a>
             </div>
           )}
         </div>
 
-        {photoUrl && (
+        {photoUrl && !hasPlanPayload && (
           <div className="apv-column apv-column--photo ppv-photo-column">
             <div
               className="apv-photo-wrap"
@@ -553,6 +542,71 @@ export default function PainterPaletteViewer({
   );
 }
 
+function PainterColorEntry({ group, showExteriorNote }) {
+  return (
+    <article className="apv-entry cpv-entry">
+      <div className="apv-color">
+        <span
+          className="apv-swatch"
+          style={{
+            backgroundColor: group.hex6 ? `#${group.hex6}` : "#ccc",
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="apv-color-meta">
+          <div className="apv-name">
+            {group.name || `Color #${group.id}`}
+            {group.code ? `, ${group.code}` : ""}
+            {showExteriorNote && group.int_only && (
+              <span
+                className="apv-int-only"
+                aria-label="Not recommended for exteriors"
+              >
+                *
+              </span>
+            )}
+          </div>
+
+          {(group.brand_name || group.brand) && (
+            <div className="apv-brand">
+              {group.brand_name || group.brand}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {group.assignments.map((assignment, index) => (
+        <div
+          className="cpv-assignment ppv-assignment"
+          key={`${group.key}-${index}`}
+        >
+          {assignment.role && (
+            <div className="cpv-spec-line">
+              <span className="cpv-spec-label">Placement:</span>
+              <span>{assignment.role}</span>
+            </div>
+          )}
+
+          {assignment.sheen && (
+            <div className="cpv-spec-line">
+              <span className="cpv-spec-label">Sheen:</span>
+              <span>{assignment.sheen}</span>
+            </div>
+          )}
+
+          {assignment.note && (
+            <div className="ppv-note">
+              <span className="cpv-spec-label">Note:</span>
+              <span>{assignment.note}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </article>
+  );
+}
+
 function formatTitle(value) {
   return String(value || "").replace(/\s*--\s*/g, " — ");
 }
@@ -563,7 +617,7 @@ function isBeforePhoto(photo) {
   if (photo.is_before === true || photo.isBefore === true) return true;
 
   const label = String(
-    photo.caption || photo.role || photo.type || photo.kind || "",
+    photo.caption || photo.role || photo.type || photo.photo_type || photo.kind || "",
   ).trim().toLowerCase();
 
   return label === "before" || label.startsWith("before ");
@@ -593,4 +647,54 @@ function groupEntriesByColor(entries) {
       int_only: Boolean(entry.int_only),
     };
   });
+}
+
+function normalizePainterPlans(plans, fallbackSwatches) {
+  const sourcePlans = Array.isArray(plans) ? plans : [];
+  if (sourcePlans.length > 0) {
+    return sourcePlans.map((plan, index) => {
+      const title = formatTitle(
+        plan.title
+          || plan.area_name
+          || plan.nickname
+          || plan.schemeTitle
+          || plan.scheme_title
+          || `Area ${index + 1}`
+      );
+      const swatchRows = Array.isArray(plan.swatches) ? plan.swatches : [];
+      const photos = (Array.isArray(plan.photos) ? plan.photos : [])
+        .filter((photo) => !isBeforePhoto(photo))
+        .map((photo) => ({
+          ...photo,
+          url: typeof photo === "string" ? photo : photo.url,
+          alt_text: typeof photo === "string" ? title : photo.alt_text || photo.photo_title || title,
+          type: typeof photo === "string" ? "" : photo.type || photo.photo_type || "",
+        }))
+        .filter((photo) => photo.url);
+      return {
+        key: plan.key || plan.id || `${title}-${index}`,
+        id: plan.id || null,
+        title,
+        schemeTitle: formatTitle(plan.schemeTitle || plan.scheme_title || ""),
+        painterNote: plan.painterNote || plan.painter_note || plan.overall_painter_note || "",
+        photos,
+        groups: groupEntriesByColor(swatchRows),
+        swatches: swatchRows,
+      };
+    });
+  }
+
+  const swatchRows = Array.isArray(fallbackSwatches) ? fallbackSwatches : [];
+  return swatchRows.length > 0
+    ? [{
+        key: "single-room",
+        id: null,
+        title: "",
+        schemeTitle: "",
+        painterNote: "",
+        photos: [],
+        groups: groupEntriesByColor(swatchRows),
+        swatches: swatchRows,
+      }]
+    : [];
 }

@@ -4,6 +4,7 @@ import { API_FOLDER } from "@helpers/config";
 import PhotoPickerModal from "@components/PhotoPickerModal";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import PermissionStatus from "@components/PermissionStatus";
+import ColorPlanPickerModal from "@components/ColorPlanPickerModal";
 import { makePhotoRef, parsePhotoRef } from "@helpers/assetImage";
 import fetchColorDetail from "@data/fetchColorDetail";
 import "./admin-playlist-editor.css";
@@ -60,9 +61,12 @@ const emptyItem = {
   is_share_image: false,
   site: true,
   yt: true,
-  prospect: true,
+  concept: true,
   client: true,
   pin: true,
+  color_plan_id: "",
+  version_number: 1,
+  is_final: false,
   analyzer_role: "ignore",
   finder_start: "auto",
   is_active: true,
@@ -219,6 +223,7 @@ export default function AdminPlaylistEditorPage() {
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [hueWheelEditorIndex, setHueWheelEditorIndex] = useState(null);
+  const [colorPlanPickerIndex, setColorPlanPickerIndex] = useState(null);
 
   const makeClientItemKey = useCallback(
     () => `pli-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -378,9 +383,12 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: item.site === null || item.site == null ? true : Boolean(Number(item.site)),
           yt: item.yt === null || item.yt == null ? true : Boolean(Number(item.yt)),
-          prospect: item.prospect === null || item.prospect == null ? true : Boolean(Number(item.prospect)),
+          concept: item.concept === null || item.concept == null ? true : Boolean(Number(item.concept)),
           client: item.client === null || item.client == null ? true : Boolean(Number(item.client)),
           pin: item.pin === null || item.pin == null ? true : Boolean(Number(item.pin)),
+          color_plan_id: item.color_plan_id ?? "",
+          version_number: Math.max(1, Number(item.version_number || 1)),
+          is_final: Boolean(Number(item.is_final || 0)),
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
             ? String(item.analyzer_role || "").toLowerCase()
             : "ignore",
@@ -540,7 +548,7 @@ export default function AdminPlaylistEditorPage() {
             nextItem.subtitle = nextItem.subtitle || "by Terry";
             nextItem.site = true;
             nextItem.yt = true;
-            nextItem.prospect = true;
+            nextItem.concept = true;
             nextItem.client = true;
             nextItem.pin = false;
             nextItem.analyzer_role = "single";
@@ -678,7 +686,7 @@ export default function AdminPlaylistEditorPage() {
         star: ["hue-wheel", "brand-bumper"].includes(type) ? false : emptyItem.star,
         site: type === "brand-bumper" ? true : emptyItem.site,
         yt: type === "brand-bumper" ? true : emptyItem.yt,
-        prospect: type === "brand-bumper" ? true : emptyItem.prospect,
+        concept: type === "brand-bumper" ? true : emptyItem.concept,
         client: type === "brand-bumper" ? true : emptyItem.client,
         pin: type === "brand-bumper" ? false : emptyItem.pin,
         analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
@@ -814,7 +822,7 @@ export default function AdminPlaylistEditorPage() {
           is_share_image: Boolean(item.is_share_image),
           site: Boolean(item.site),
           yt: Boolean(item.yt),
-          prospect: item.prospect !== false,
+          concept: item.concept !== false,
           client: item.client !== false,
           pin: item.pin !== false,
           analyzer_role: ANALYZER_ROLES.includes(String(item.analyzer_role || "").toLowerCase())
@@ -1241,7 +1249,36 @@ export default function AdminPlaylistEditorPage() {
                 </select>
               </label>
 
+              <div className="item-cell">
+                <span>Color Plan ID</span>
+                <button
+                  type="button"
+                  className="color-plan-id-trigger"
+                  onClick={() => setColorPlanPickerIndex(index)}
+                  title="Choose Color Plan"
+                >
+                  {item.color_plan_id || "—"}
+                </button>
+              </div>
 
+              <label className="item-cell">
+                Version
+                <input
+                  type="number"
+                  min="1"
+                  value={item.version_number}
+                  onChange={(e) => updateItem(index, "version_number", e.target.value)}
+                />
+              </label>
+
+              <label className="item-cell checkbox-row">
+                <input
+                  type="checkbox"
+                  checked={Boolean(item.is_final)}
+                  onChange={(e) => updateItem(index, "is_final", e.target.checked)}
+                />
+                Final
+              </label>
 
        <div className="item-cell item-venues">
   <div className="venue-group">
@@ -1260,8 +1297,8 @@ export default function AdminPlaylistEditorPage() {
       <label>
         <input
           type="checkbox"
-          checked={item.prospect !== false}
-          onChange={(e) => updateItem(index, "prospect", e.target.checked)}
+          checked={item.concept !== false}
+          onChange={(e) => updateItem(index, "concept", e.target.checked)}
         />
         Concept (partial)
       </label>
@@ -1446,6 +1483,21 @@ export default function AdminPlaylistEditorPage() {
 
       {saveStatus && <div className="panel-status success">{saveStatus}</div>}
       {saveError && <div className="panel-status error">{saveError}</div>}
+
+      <ColorPlanPickerModal
+        open={colorPlanPickerIndex != null}
+        currentPlanId={
+          colorPlanPickerIndex != null
+            ? items[colorPlanPickerIndex]?.color_plan_id || null
+            : null
+        }
+        onClose={() => setColorPlanPickerIndex(null)}
+        onSave={({ colorPlanId }) => {
+          if (colorPlanPickerIndex == null) return;
+          updateItem(colorPlanPickerIndex, "color_plan_id", String(colorPlanId));
+          setColorPlanPickerIndex(null);
+        }}
+      />
 
       <PhotoPickerModal
         open={photoPickerIndex != null}

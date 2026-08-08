@@ -86,7 +86,9 @@ function workflow_project_payload(array $row): array
         'project_type_slug' => (string)($row['project_type_slug'] ?? ''),
         'status' => (string)($row['status'] ?? ''),
         'experience_key' => (string)($row['experience_key'] ?? 'concept'),
+        'current_release' => strtoupper(trim((string)($row['current_release'] ?? '1'))) ?: '1',
         'notes' => (string)($row['notes'] ?? ''),
+        'project_painter_note' => (string)($row['project_painter_note'] ?? ''),
         'address' => workflow_address_from_row($row),
         'current_playlist' => isset($row['current_playlist_id']) && $row['current_playlist_id'] !== null ? [
             'playlist_id' => (int)$row['current_playlist_id'],
@@ -106,4 +108,17 @@ function workflow_validate_experience_key(mixed $value): string
         throw new InvalidArgumentException('Invalid player experience');
     }
     return $experienceKey;
+}
+
+
+function workflow_validate_current_release(mixed $value): string
+{
+    $release = strtoupper(trim((string)($value ?? '1')));
+    if ($release === 'FINAL') {
+        return 'FINAL';
+    }
+    if (!preg_match('/^[1-9]\d*$/', $release)) {
+        throw new InvalidArgumentException('Invalid current version');
+    }
+    return (string)((int)$release);
 }

@@ -10,6 +10,14 @@ use PDO;
 
 class PdoPlaylistRepository
 {
+    private const SLIDE_FLAGS = [
+        'site',
+        'client',
+        'concept',
+        'yt',
+        'pin',
+    ];
+
     public function __construct(
         private PDO $pdo
     ) {}
@@ -440,14 +448,19 @@ class PdoPlaylistRepository
         $excludeSelect = $this->getExcludeFromThumbsSelect();
         $photoSelect = $this->getPhotoLibraryIdSelect();
         $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
+        $colorPlanSelect = $this->hasPlaylistItemColumn('color_plan_id')
+            ? 'color_plan_id'
+            : 'NULL AS color_plan_id';
         $shareImageSelect = $this->getIsShareImageSelect();
         $siteSelect = $this->getPlaylistItemFlagSelect('site');
         $ytSelect = $this->getPlaylistItemFlagSelect('yt');
-        $prospectSelect = $this->getPlaylistItemFlagSelect('prospect');
+        $conceptSelect = $this->getPlaylistItemFlagSelect('concept');
         $clientSelect = $this->getPlaylistItemFlagSelect('client');
         $pinSelect = $this->getPlaylistItemFlagSelect('pin');
         $analyzerRoleSelect = $this->hasPlaylistItemColumn('analyzer_role') ? 'analyzer_role' : "'ignore' AS analyzer_role";
         $finderStartSelect = $this->hasPlaylistItemColumn('finder_start') ? 'finder_start' : "'auto' AS finder_start";
+        $versionNumberSelect = $this->hasPlaylistItemColumn('version_number') ? 'version_number' : '1 AS version_number';
+        $isFinalSelect = $this->hasPlaylistItemColumn('is_final') ? 'is_final' : '0 AS is_final';
         $sql = <<<SQL
             SELECT
               playlist_item_id,
@@ -458,6 +471,7 @@ class PdoPlaylistRepository
               image_url,
               {$photoSelect},
               {$savedPaletteSetSelect},
+              {$colorPlanSelect},
               title,
               subtitle,
               subtitle_2,
@@ -472,11 +486,13 @@ class PdoPlaylistRepository
               {$shareImageSelect},
               {$siteSelect},
               {$ytSelect},
-              {$prospectSelect},
+              {$conceptSelect},
               {$clientSelect},
               {$pinSelect},
               {$analyzerRoleSelect},
               {$finderStartSelect},
+              {$versionNumberSelect},
+              {$isFinalSelect},
               is_active
             FROM playlist_items
             WHERE playlist_id = :playlist_id
@@ -498,14 +514,17 @@ class PdoPlaylistRepository
         $hasExcludeFromThumbs = $this->hasPlaylistItemColumn('exclude_from_thumbs');
         $hasPhotoLibraryId = $this->hasPlaylistItemColumn('photo_library_id');
         $hasSavedPaletteSetId = $this->hasPlaylistItemColumn('saved_palette_set_id');
+        $hasColorPlanId = $this->hasPlaylistItemColumn('color_plan_id');
         $hasIsShareImage = $this->hasPlaylistItemColumn('is_share_image');
         $hasSite = $this->hasPlaylistItemColumn('site');
         $hasYt = $this->hasPlaylistItemColumn('yt');
-        $hasProspect = $this->hasPlaylistItemColumn('prospect');
+        $hasConcept = $this->hasPlaylistItemColumn('concept');
         $hasClient = $this->hasPlaylistItemColumn('client');
         $hasPin = $this->hasPlaylistItemColumn('pin');
         $hasAnalyzerRole = $this->hasPlaylistItemColumn('analyzer_role');
         $hasFinderStart = $this->hasPlaylistItemColumn('finder_start');
+        $hasVersionNumber = $this->hasPlaylistItemColumn('version_number');
+        $hasIsFinal = $this->hasPlaylistItemColumn('is_final');
 
         $selectedShareIndex = null;
         foreach ($items as $idx => $candidate) {
@@ -538,6 +557,7 @@ class PdoPlaylistRepository
                 'image_url' => $item['image_url'] ?? null,
                 'photo_library_id' => isset($item['photo_library_id']) && $item['photo_library_id'] !== '' ? (int)$item['photo_library_id'] : null,
                 'saved_palette_set_id' => isset($item['saved_palette_set_id']) && $item['saved_palette_set_id'] !== '' ? (int)$item['saved_palette_set_id'] : null,
+                'color_plan_id' => isset($item['color_plan_id']) && $item['color_plan_id'] !== '' ? (int)$item['color_plan_id'] : null,
                 'title' => $item['title'] ?? null,
                 'subtitle' => $item['subtitle'] ?? null,
                 'subtitle_2' => $item['subtitle_2'] ?? null,
@@ -550,14 +570,22 @@ class PdoPlaylistRepository
                 'duration_ms' => isset($item['duration_ms']) && $item['duration_ms'] !== '' ? (int)$item['duration_ms'] : null,
                 'is_active' => isset($item['is_active']) ? (int)(bool)$item['is_active'] : 1,
             ];
+
+            if ($hasVersionNumber) {
+                $data['version_number'] = max(1, (int)($item['version_number'] ?? 1));
+            }
+            if ($hasIsFinal) {
+                $data['is_final'] = !empty($item['is_final']) ? 1 : 0;
+            }
+
             if ($hasSite) {
                 $data['site'] = array_key_exists('site', $item) ? (int)(bool)$item['site'] : 1;
             }
             if ($hasYt) {
                 $data['yt'] = array_key_exists('yt', $item) ? (int)(bool)$item['yt'] : 1;
             }
-            if ($hasProspect) {
-                $data['prospect'] = array_key_exists('prospect', $item) ? (int)(bool)$item['prospect'] : 1;
+            if ($hasConcept) {
+                $data['concept'] = array_key_exists('concept', $item) ? (int)(bool)$item['concept'] : 1;
             }
             if ($hasClient) {
                 $data['client'] = array_key_exists('client', $item) ? (int)(bool)$item['client'] : 1;
@@ -590,6 +618,7 @@ class PdoPlaylistRepository
                 'image_url',
                 'photo_library_id',
                 'saved_palette_set_id',
+                'color_plan_id',
                 'title',
                 'subtitle',
                 'subtitle_2',
@@ -604,11 +633,13 @@ class PdoPlaylistRepository
                 'is_share_image',
                 'site',
                 'yt',
-                'prospect',
+                'concept',
                 'client',
                 'pin',
                 'analyzer_role',
                 'finder_start',
+                'version_number',
+                'is_final',
             ];
             if (!$hasPhotoLibraryId) {
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'photo_library_id'));
@@ -617,6 +648,10 @@ class PdoPlaylistRepository
             if (!$hasSavedPaletteSetId) {
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'saved_palette_set_id'));
                 unset($data['saved_palette_set_id']);
+            }
+            if (!$hasColorPlanId) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'color_plan_id'));
+                unset($data['color_plan_id']);
             }
             if (!$hasIsShareImage) {
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'is_share_image'));
@@ -630,9 +665,9 @@ class PdoPlaylistRepository
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'yt'));
                 unset($data['yt']);
             }
-            if (!$hasProspect) {
-                $columns = array_values(array_filter($columns, fn($col) => $col !== 'prospect'));
-                unset($data['prospect']);
+            if (!$hasConcept) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'concept'));
+                unset($data['concept']);
             }
             if (!$hasClient) {
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'client'));
@@ -649,6 +684,14 @@ class PdoPlaylistRepository
             if (!$hasFinderStart) {
                 $columns = array_values(array_filter($columns, fn($col) => $col !== 'finder_start'));
                 unset($data['finder_start']);
+            }
+            if (!$hasVersionNumber) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'version_number'));
+                unset($data['version_number']);
+            }
+            if (!$hasIsFinal) {
+                $columns = array_values(array_filter($columns, fn($col) => $col !== 'is_final'));
+                unset($data['is_final']);
             }
             if (!$hasExcludeFromThumbs) {
                 unset($data['exclude_from_thumbs']);
@@ -710,20 +753,24 @@ class PdoPlaylistRepository
         $excludeSelect = $this->getExcludeFromThumbsSelect();
         $photoSelect = $this->getPhotoLibraryIdSelect();
         $savedPaletteSetSelect = $this->getSavedPaletteSetIdSelect();
+        $colorPlanSelect = $this->hasPlaylistItemColumn('color_plan_id')
+            ? 'color_plan_id'
+            : 'NULL AS color_plan_id';
         $shareImageSelect = $this->getIsShareImageSelect();
         $siteSelect = $this->getPlaylistItemFlagSelect('site');
         $ytSelect = $this->getPlaylistItemFlagSelect('yt');
-        $prospectSelect = $this->getPlaylistItemFlagSelect('prospect');
+        $conceptSelect = $this->getPlaylistItemFlagSelect('concept');
         $clientSelect = $this->getPlaylistItemFlagSelect('client');
         $pinSelect = $this->getPlaylistItemFlagSelect('pin');
         $analyzerRoleSelect = $this->hasPlaylistItemColumn('analyzer_role') ? 'analyzer_role' : "'ignore' AS analyzer_role";
-        $venueColumn = match ($venue) {
-            'yt' => 'yt',
-            'pin' => 'pin',
-            'prospect' => 'prospect',
-            'client' => 'client',
-            default => 'site',
-        };
+        $versionNumberSelect = $this->hasPlaylistItemColumn('version_number') ? 'version_number' : '1 AS version_number';
+        $isFinalSelect = $this->hasPlaylistItemColumn('is_final') ? 'is_final' : '0 AS is_final';
+        $venueColumn = strtolower(trim($venue));
+        if (!in_array($venueColumn, self::SLIDE_FLAGS, true)) {
+            throw new \DomainException(
+                "Unsupported playlist slide flag: {$venueColumn}"
+            );
+        }
         $venueWhere = $this->hasPlaylistItemColumn($venueColumn) ? "\n              AND {$venueColumn} = 1" : '';
         $sql = <<<SQL
             SELECT
@@ -735,6 +782,7 @@ class PdoPlaylistRepository
                 image_url,
                 {$photoSelect},
                 {$savedPaletteSetSelect},
+                {$colorPlanSelect},
                 title,
                 subtitle,
                 body,
@@ -748,10 +796,12 @@ class PdoPlaylistRepository
                 {$shareImageSelect},
                 {$siteSelect},
                 {$ytSelect},
-                {$prospectSelect},
+                {$conceptSelect},
                 {$clientSelect},
                 {$pinSelect},
-                {$analyzerRoleSelect}
+                {$analyzerRoleSelect},
+                {$versionNumberSelect},
+                {$isFinalSelect}
             FROM playlist_items
             WHERE playlist_id = :playlist_id
               AND is_active = 1
@@ -794,13 +844,18 @@ class PdoPlaylistRepository
                 isset($row['is_share_image']) ? (bool)$row['is_share_image'] : null,
                 isset($row['site']) ? (bool)$row['site'] : true,
                 isset($row['yt']) ? (bool)$row['yt'] : true,
-                isset($row['prospect']) ? (bool)$row['prospect'] : true,
+                isset($row['concept']) ? (bool)$row['concept'] : true,
                 isset($row['client']) ? (bool)$row['client'] : true,
                 isset($row['pin']) ? (bool)$row['pin'] : true,
                 $row['analyzer_role'] ?? 'ignore',
                 null,
                 null,
-                isset($row['playlist_item_id']) ? (int)$row['playlist_item_id'] : null
+                isset($row['playlist_item_id']) ? (int)$row['playlist_item_id'] : null,
+                null,
+                null,
+                isset($row['version_number']) ? max(1, (int)$row['version_number']) : 1,
+                isset($row['is_final']) ? (bool)$row['is_final'] : false,
+                isset($row['color_plan_id']) && $row['color_plan_id'] !== null ? (int)$row['color_plan_id'] : null
             );
         }
 

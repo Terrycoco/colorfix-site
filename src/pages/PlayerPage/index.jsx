@@ -27,6 +27,7 @@ export default function PlayerPage() {
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const sourceParam = searchParams.get("src") ?? "";
+  const reservationTokenParam = searchParams.get("reservation_token") ?? searchParams.get("token") ?? "";
   const includePrivateParam = searchParams.get("include_private") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
   const closeOnExitParam = (searchParams.get("close") ?? "") === "1";
@@ -85,14 +86,16 @@ export default function PlayerPage() {
   }, [data, demoParam, location.pathname, navigate, searchParams, thumbParam, ctaAudience]);
 
   useEffect(() => {
-    if (!playlistId) {
+    if (!playlistId && !reservationTokenParam) {
       setError("Playlist unavailable");
       setErrorCode("playlist_unavailable");
       setLoading(false);
       return;
     }
     const params = new URLSearchParams();
-    if (isNumericId(playlistId)) {
+    if (reservationTokenParam) {
+      params.set("reservation_token", reservationTokenParam);
+    } else if (isNumericId(playlistId)) {
       params.set("playlist_instance_id", playlistId);
     } else {
       params.set("playlist_slug", playlistId);
@@ -104,6 +107,7 @@ export default function PlayerPage() {
     if (photoIdParam !== "") params.set("photo_id", photoIdParam);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
+    if (returnTo !== "") params.set("return_to", returnTo);
     if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
     if (freshParam !== "") params.set("fresh", freshParam);
     if (reloadParam !== "") params.set("_", reloadParam);
@@ -133,7 +137,7 @@ export default function PlayerPage() {
     return () => {
       cancelled = true;
     };
-  }, [playlistId, startParamValue, offsetParam, positionParam, slideIdParam, photoIdParam, addCtaGroup, ctaAudience, debugTimingParam, freshParam, reloadParam]);
+  }, [playlistId, reservationTokenParam, startParamValue, offsetParam, positionParam, slideIdParam, photoIdParam, addCtaGroup, ctaAudience, returnTo, debugTimingParam, freshParam, reloadParam]);
 
   useEffect(() => {
     if (!data?.playlist_instance_id) return;
@@ -248,6 +252,7 @@ export default function PlayerPage() {
       thumb: thumbsEnabled,
       demo: demoEnabled,
       returnTo,
+      reservationToken: reservationTokenParam,
     })
   ), [
     data,
@@ -261,6 +266,7 @@ export default function PlayerPage() {
     data?.thumbs_enabled,
     data?.demo_enabled,
     returnTo,
+    reservationTokenParam,
   ]);
 
   const paletteTargets = useMemo(() => getPaletteTargets(data), [data]);

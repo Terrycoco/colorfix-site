@@ -137,6 +137,92 @@ final class PdoProjectColorPlanRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function listForProjectWithMembers(int $projectId): array
+    {
+        $plans = $this->listForProject($projectId);
+        if (!$plans) {
+            return [];
+        }
+
+        $planIds = array_map(static fn(array $plan): int => (int)$plan['id'], $plans);
+        $placeholders = implode(',', array_fill(0, count($planIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                m.*,
+                c.name AS color_name,
+                c.code AS color_code,
+                c.brand AS color_brand,
+                c.brand_name AS color_brand_name,
+                c.hex6,
+                c.r,
+                c.g,
+                c.b,
+                c.hcl_l
+             FROM project_color_plan_members m
+             INNER JOIN swatch_view c
+               ON c.id = m.color_id
+             WHERE m.project_color_plan_id IN ({$placeholders})
+             ORDER BY m.project_color_plan_id ASC, m.order_index ASC, m.id ASC"
+        );
+        $stmt->execute($planIds);
+
+        $membersByPlan = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $member) {
+            $membersByPlan[(int)$member['project_color_plan_id']][] = $member;
+        }
+
+        $viewerStmt = $this->pdo->prepare(
+            "SELECT *
+               FROM project_color_plan_viewers
+              WHERE viewer_key = 'painter'
+                AND project_color_plan_id IN ({$placeholders})
+              ORDER BY project_color_plan_id ASC, id ASC"
+        );
+        $viewerStmt->execute($planIds);
+
+        $viewersByPlan = [];
+        $viewerIds = [];
+        foreach ($viewerStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $viewer) {
+            $planId = (int)$viewer['project_color_plan_id'];
+            $viewersByPlan[$planId] = [
+                'row' => $viewer,
+                'photos' => [],
+            ];
+            $viewerIds[] = (int)$viewer['id'];
+        }
+
+        if ($viewerIds) {
+            $viewerPlaceholders = implode(',', array_fill(0, count($viewerIds), '?'));
+            $photoStmt = $this->pdo->prepare(
+                "SELECT p.*,
+                        pl.title AS photo_title,
+                        pl.updated_at AS photo_updated_at
+                   FROM project_color_plan_viewer_photos p
+                   LEFT JOIN photo_library pl
+                     ON pl.photo_library_id = p.photo_library_id
+                  WHERE p.project_color_plan_viewer_id IN ({$viewerPlaceholders})
+                  ORDER BY p.project_color_plan_viewer_id ASC, p.order_index ASC, p.id ASC"
+            );
+            $photoStmt->execute($viewerIds);
+            $viewerIdToPlanId = [];
+            foreach ($viewersByPlan as $planId => $viewer) {
+                $viewerIdToPlanId[(int)$viewer['row']['id']] = $planId;
+            }
+            foreach ($photoStmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $photo) {
+                $planId = $viewerIdToPlanId[(int)$photo['project_color_plan_viewer_id']] ?? null;
+                if ($planId !== null) {
+                    $viewersByPlan[$planId]['photos'][] = $photo;
+                }
+            }
+        }
+
+        return array_map(static function (array $plan) use ($membersByPlan, $viewersByPlan): array {
+            $plan['members'] = $membersByPlan[(int)$plan['id']] ?? [];
+            $plan['painter_viewer'] = $viewersByPlan[(int)$plan['id']] ?? null;
+            return $plan;
+        }, $plans);
+    }
+
     public function saveMembers(int $planId, array $rows, array $deleteIds): void
     {
         $this->pdo->beginTransaction();

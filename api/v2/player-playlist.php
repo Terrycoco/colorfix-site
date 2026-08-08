@@ -19,7 +19,11 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 
 use App\Services\PlayerExperienceService;
+use App\Services\UrlReservationService;
+use App\Services\UrlReservations\UrlReservationRegistryFactory;
 use App\Repos\PdoPlaylistInstanceRepository;
+use App\Repos\PdoUrlReservationRepository;
+use App\Repos\PdoUrlReservationResourceRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -33,6 +37,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 $playlistInstanceId = (int)($_GET['playlist_instance_id'] ?? 0);
 $playlistSlug = trim((string)($_GET['playlist_slug'] ?? $_GET['slug'] ?? ''));
+$reservationToken = trim((string)($_GET['reservation_token'] ?? $_GET['token'] ?? ''));
+$returnTo = trim((string)($_GET['return_to'] ?? ''));
 $start = isset($_GET['start']) ? (int)$_GET['start'] : null;
 $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
 $position = null;
@@ -59,15 +65,58 @@ $mode = trim((string)($_GET['mode'] ?? ''));
 $addGroupId = isset($_GET['add_cta_group']) ? (int)$_GET['add_cta_group'] : null;
 $debugTiming = isset($_GET['debug_timing']) && (string)$_GET['debug_timing'] !== '0';
 
-if ($playlistInstanceId <= 0 && $playlistSlug === '') {
+if ($playlistInstanceId <= 0 && $playlistSlug === '' && $reservationToken === '') {
     respond([
         'ok' => false,
-        'error' => 'playlist_instance_id or playlist_slug required',
+        'error' => 'playlist_instance_id, playlist_slug, or reservation_token required',
         'code' => 'playlist_unavailable',
     ], 400);
 }
 
 try {
+    if ($reservationToken !== '') {
+        $reservationService = new UrlReservationService(
+            new PdoUrlReservationRepository($pdo),
+            UrlReservationRegistryFactory::create(new PdoUrlReservationResourceRepository($pdo))
+        );
+        $reserved = $reservationService->resolveReservation($reservationToken);
+        $reservation = is_array($reserved['reservation'] ?? null) ? $reserved['reservation'] : [];
+        $resolution = is_array($reserved['resolution'] ?? null) ? $reserved['resolution'] : [];
+        if (($reservation['type_key'] ?? '') !== 'project_experience') {
+            throw new RuntimeException('Playlist unavailable');
+        }
+        $projectId = (int)($resolution['project_id'] ?? $resolution['destination']['project_id'] ?? 0);
+        $experienceKey = strtolower(trim((string)($resolution['experience_key'] ?? $reservation['experience_key'] ?? '')));
+        if ($projectId <= 0 || $experienceKey === '') {
+            throw new RuntimeException('Playlist unavailable');
+        }
+
+        $service = new PlayerExperienceService($pdo);
+        $plan = $service->buildPlaybackPlanFromProjectExperience($projectId, $experienceKey, $reservation['source_key'] ?? null, $start, [
+            'offset' => $offset,
+            'position' => $position,
+            'playlist_item_id' => $playlistItemId,
+            'photo_library_id' => $photoLibraryId,
+        ]);
+        $plan['reservation_id'] = (int)($reservation['id'] ?? 0);
+        $plan['reservation_token'] = $reservationToken;
+        if ($returnTo !== '' && str_starts_with($returnTo, '/') && !str_starts_with($returnTo, '//')) {
+            $plan['reserved_viewer_url'] = $returnTo;
+            $plan['originating_reserved_viewer_url'] = $returnTo;
+        }
+        $plan['originating_reserved_url'] = '/t/' . rawurlencode($reservationToken);
+        $plan['reserved_playlist_url'] = '/t/' . rawurlencode($reservationToken);
+
+        $payload = [
+            'ok' => true,
+            'data' => $plan,
+        ];
+        if ($debugTiming) {
+            $payload['timing_ms'] = $service->getLastTiming();
+        }
+        respond($payload);
+    }
+
     if ($playlistInstanceId <= 0 && $playlistSlug !== '') {
         $repo = new PdoPlaylistInstanceRepository($pdo);
         $playlistInstanceId = $repo->findIdBySlug($playlistSlug) ?? 0;

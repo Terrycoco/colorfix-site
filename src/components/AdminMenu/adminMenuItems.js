@@ -77,6 +77,7 @@ export const adminMenuItems = [
       { label: "Analytics", href: "/admin/asset-analytics" },
       { label: "Ideas / To-Dos", href: "/admin/ideas" },
       { label: "Photo Audit", href: "/admin/photo-library-tools" },
+      { label: "URL Reservations", href: "/admin/url-reservations" },
     ],
   },
 ];

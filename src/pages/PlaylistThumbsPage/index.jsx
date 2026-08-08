@@ -22,17 +22,22 @@ export default function PlaylistThumbsPage() {
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const viewerParam = (searchParams.get("viewer") ?? "").toLowerCase();
+  const reservationToken = searchParams.get("reservation_token") ?? searchParams.get("token") ?? "";
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
   const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
 
   useEffect(() => {
-    if (!playlistId) {
-      setError("Missing playlist instance id");
+    if (!playlistId && !reservationToken) {
+      setError("Missing playlist");
       setLoading(false);
       return;
     }
     const params = new URLSearchParams();
-    params.set("playlist_instance_id", playlistId);
+    if (reservationToken) {
+      params.set("reservation_token", reservationToken);
+    } else {
+      params.set("playlist_instance_id", playlistId);
+    }
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     params.set("_", String(Date.now()));
     setLoading(true);
@@ -46,7 +51,17 @@ export default function PlaylistThumbsPage() {
         if (!payload?.ok || !payload?.data) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
-        setTitle(formatTitle(payload.data?.title || payload.data?.display_title || "Playlist Palettes"));
+        const projectTitle = payload.data?.display_title || payload.data?.title || "Project";
+        const experienceKey = String(payload.data?.experience_key || "").toLowerCase();
+
+        const suffix =
+          experienceKey === "concept"
+            ? "Concept"
+            : experienceKey === "client"
+              ? "Final Plan"
+              : "";
+
+        setTitle(formatTitle(`${projectTitle}${suffix ? ` — ${suffix}` : ""}`));
         setItems(payload.data?.items || []);
         setPaletteViewerCtaGroupId(payload.data?.palette_viewer_cta_group_id ? String(payload.data.palette_viewer_cta_group_id) : "");
       })
@@ -54,10 +69,10 @@ export default function PlaylistThumbsPage() {
         setError(err?.message || "Failed to load playlist");
       })
       .finally(() => setLoading(false));
-  }, [playlistId, addCtaGroup]);
+  }, [playlistId, addCtaGroup, reservationToken]);
 
   useEffect(() => {
-    if (!playlistId) return;
+    if (!playlistId || reservationToken) return;
     recordLastPlaylistInstanceId(playlistId);
     setLastPlaylistInstanceId(String(playlistId));
   }, [playlistId]);

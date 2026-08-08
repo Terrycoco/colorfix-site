@@ -101,7 +101,7 @@ function runArticleLink({ navigate, cta }) {
 function runPlaylistLink({ navigate, cta, source }) {
   const params = cta?.params || {};
   const playlistInstanceId = params.playlist_instance_id || params.playlistInstanceId || cta?.data?.playlist_instance_id;
-  const rawUrl = params.url || buildPlayerPath({
+  const rawUrl = params.url || cta?.data?.reserved_playlist_url || buildPlayerPath({
     ...cta?.data,
     playlist_instance_id: playlistInstanceId,
   });
@@ -137,17 +137,17 @@ function appendParams(url, params) {
   }
 }
 
-function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }) {
-  if (!data?.playlist_instance_id) return;
+function runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef, reservationToken }) {
+  if (!data?.playlist_instance_id && !reservationToken) return;
   if (thumb) {
-    runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo });
+    runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, reservationToken });
     return;
   }
   runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef });
 }
 
-function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }) {
-  if (!data?.playlist_instance_id) return;
+function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, reservationToken }) {
+  if (!data?.playlist_instance_id && !reservationToken) return;
   const params = new URLSearchParams();
   if (cta?.params?.mode) params.set("mode", cta.params.mode);
   if (cta?.params?.add_cta_group !== undefined) {
@@ -159,8 +159,12 @@ function runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, retur
   if (thumb) params.set("thumb", "1");
   if (demo) params.set("demo", "1");
   if (returnTo) params.set("return_to", returnTo);
+  if (reservationToken) params.set("reservation_token", reservationToken);
+
+  const routeId = reservationToken ? "reserved" : data.playlist_instance_id;
   const query = params.toString();
-  const url = `/playlist-thumbs/${data.playlist_instance_id}${query ? `?${query}` : ""}`;
+  const url = `/playlist-thumbs/${encodeURIComponent(String(routeId))}${query ? `?${query}` : ""}`;
+
   if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
@@ -217,8 +221,19 @@ function runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, retu
 }
 
 function runToReservedViewer({ navigate, cta, returnTo }) {
-  const url = normalizeInternalReturnPath(returnTo);
-  if (!url) return;
+  const url = normalizeInternalReturnPath(
+    cta?.params?.return_to
+      || cta?.params?.returnTo
+      || cta?.data?.reserved_viewer_url
+      || cta?.data?.originating_reserved_viewer_url
+      || returnTo
+  );
+  if (!url) {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    }
+    return;
+  }
   if (navigate && shouldNavigateInPlayerShell(url)) {
     navigate(url);
     return;
@@ -266,6 +281,7 @@ export function buildCtaHandlers({
   thumb,
   demo,
   returnTo,
+  reservationToken,
   shareSource = "share",
 } = {}) {
   const replayStartIndex = data?.skip_intro_on_replay ? firstNonIntroIndex : 0;
@@ -294,14 +310,62 @@ export function buildCtaHandlers({
     share: () => runShare({ data, shareFolder, shareSource }),
     copy_link: () => runCopyLink({ data, shareFolder, shareSource }),
     share_playlist: () => runShare({ data, shareFolder, shareSource }),
-    navigate: (cta) => runNavigate({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } }, psi, thumb, demo }),
+    navigate: (cta) => runNavigate({
+      navigate,
+      cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } },
+      psi,
+      thumb,
+      demo,
+    }),
     article_link: (cta) => runArticleLink({ navigate, cta }),
-    playlist_link: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } } }),
-    watch_next: (cta) => runPlaylistLink({ navigate, cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } }, source: "watch_next" }),
-    see_colors_used: (cta) => runSeeColorsUsed({ navigate, cta, data, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
-    to_thumbs: (cta) => runToThumbs({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo }),
-    to_palette: (cta) => runToPalette({ navigate, data, cta, ctaAudience, psi, thumb, demo, returnTo, playerRef }),
-    to_reserved_viewer: (cta) => runToReservedViewer({ navigate, cta, returnTo }),
+    playlist_link: (cta) => runPlaylistLink({
+      navigate,
+      cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } },
+    }),
+    watch_next: (cta) => runPlaylistLink({
+      navigate,
+      cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } },
+      source: "watch_next",
+    }),
+    see_colors_used: (cta) => runSeeColorsUsed({
+      navigate,
+      cta,
+      data,
+      ctaAudience,
+      psi,
+      thumb,
+      demo,
+      returnTo,
+      playerRef,
+      reservationToken,
+    }),
+    to_thumbs: (cta) => runToThumbs({
+      navigate,
+      data,
+      cta,
+      ctaAudience,
+      psi,
+      thumb,
+      demo,
+      returnTo,
+      reservationToken,
+    }),
+    to_palette: (cta) => runToPalette({
+      navigate,
+      data,
+      cta,
+      ctaAudience,
+      psi,
+      thumb,
+      demo,
+      returnTo,
+      playerRef,
+    }),
+    to_reserved_viewer: (cta) => runToReservedViewer({
+      navigate,
+      cta: { ...cta, data: { ...(data || {}), ...(cta?.data || {}) } },
+      returnTo,
+    }),
     exit: () => handleExit?.(),
   };
 }

@@ -65,14 +65,18 @@ final class PdoProjectRepository
                 name,
                 status,
                 experience_key,
-                notes
+                current_release,
+                notes,
+                project_painter_note
             ) VALUES (
                 :property_id,
                 :project_type_id,
                 :name,
                 :status,
                 :experience_key,
-                :notes
+                :current_release,
+                :notes,
+                :project_painter_note
             )
         ");
         $stmt->execute([
@@ -81,7 +85,9 @@ final class PdoProjectRepository
             ':name' => $data['name'] ?? null,
             ':status' => $data['status'] ?? 'prospect',
             ':experience_key' => $data['experience_key'] ?? 'concept',
+            ':current_release' => $data['current_release'] ?? '1',
             ':notes' => $data['notes'] ?? null,
+            ':project_painter_note' => $data['project_painter_note'] ?? null,
         ]);
 
         return (int)$this->pdo->lastInsertId();
@@ -93,7 +99,7 @@ final class PdoProjectRepository
             return;
         }
 
-        $allowed = ['property_id', 'project_type_id', 'name', 'status', 'experience_key', 'notes'];
+        $allowed = ['property_id', 'project_type_id', 'name', 'status', 'experience_key', 'current_release', 'notes', 'project_painter_note'];
         $set = [];
         $params = [':id' => $id];
         foreach ($fields as $key => $value) {
@@ -204,7 +210,9 @@ final class PdoProjectRepository
                     p.name,
                     p.status,
                     p.experience_key,
+                    p.current_release,
                     p.notes,
+                    p.project_painter_note,
                     p.created_at,
                     p.updated_at,
                     pt.name AS project_type_name,

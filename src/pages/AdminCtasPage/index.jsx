@@ -249,6 +249,45 @@ export default function AdminCtasPage() {
     }
   }
 
+  async function deactivateCta() {
+    if (!ctaForm.cta_id) return;
+    const label = ctaForm.label || `CTA #${ctaForm.cta_id}`;
+    if (!window.confirm(`Deactivate "${label}"?\n\nIt will stop appearing as an available active CTA. Existing CTA Page assignments can still be removed from CTA Pages.`)) {
+      return;
+    }
+    setStatus("");
+    setError("");
+    try {
+      const payload = {
+        ...ctaForm,
+        cta_type_id: Number(ctaForm.cta_type_id) || 0,
+        is_active: false,
+      };
+      const res = await fetch(CTAS_SAVE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data?.ok) {
+        const fallback = text ? text.slice(0, 200) : "Failed to deactivate CTA";
+        throw new Error(data?.error || fallback);
+      }
+      setStatus(`CTA deactivated (#${ctaForm.cta_id})`);
+      setCtaForm((prev) => ({ ...prev, is_active: false }));
+      fetchCtas();
+    } catch (err) {
+      setError(err?.message || "Failed to deactivate CTA");
+    }
+  }
+
   const typeOptions = useMemo(
     () =>
       types.map((row) => ({
@@ -367,6 +406,7 @@ export default function AdminCtasPage() {
                 <div className="row-title">{cta.label}</div>
                 <div className="row-meta">
                   #{cta.cta_id} • {cta.type_label || "Unknown type"}
+                  {!toBool(cta.is_active) ? " • inactive" : ""}
                   {cta.onclick ? ` • onclick: ${cta.onclick}` : ""}
                   {(() => {
                     const note = parseParams(cta.params).note;
@@ -638,6 +678,9 @@ export default function AdminCtasPage() {
             </button>
             <button type="button" className="secondary-btn" onClick={saveCtaAsNew} disabled={!canSaveCta}>
               Save As New
+            </button>
+            <button type="button" className="danger-btn danger-btn--small" onClick={deactivateCta} disabled={!ctaForm.cta_id || !ctaForm.is_active}>
+              Deactivate CTA
             </button>
           </div>
           {ctaErrors.length > 0 && (

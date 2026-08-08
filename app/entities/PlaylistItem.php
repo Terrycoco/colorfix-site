@@ -25,7 +25,7 @@ class PlaylistItem
         public ?bool $is_share_image = null,
         public ?bool $site = null,
         public ?bool $yt = null,
-        public ?bool $prospect = null,
+        public ?bool $concept = null,
         public ?bool $client = null,
         public ?bool $pin = null,
         public ?string $analyzer_role = null,
@@ -33,7 +33,10 @@ class PlaylistItem
         public ?string $palette_title = null,
         public ?int $playlist_item_id = null,
         public ?string $palette_viewer_url = null,
-        public ?string $painter_palette_viewer_url = null
+        public ?string $painter_palette_viewer_url = null,
+        public int $version_number = 1,
+        public bool $is_final = false,
+        public ?int $color_plan_id = null
     ) {
     }
 }

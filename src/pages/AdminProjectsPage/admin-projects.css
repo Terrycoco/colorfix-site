@@ -436,6 +436,51 @@
   flex-wrap: wrap;
 }
 
+.admin-projects__reservation-panel {
+  border-top: 1px solid #d9e1ec;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.admin-projects__reservation-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.admin-projects__reservation-header strong {
+  font-size: 14px;
+}
+
+.admin-projects__reservation-header small,
+.admin-projects__reservation-row small {
+  color: #60708b;
+  font-size: 12px;
+}
+
+.admin-projects__reservation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-projects__reservation-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: start;
+  border-bottom: 1px solid #dfe6f0;
+  padding: 8px 0;
+}
+
+.admin-projects__reservation-row > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .admin-projects__play-btn {
   border: 1px solid #0b1b3a;
   border-radius: 4px;
@@ -613,7 +658,7 @@
 .admin-projects__swatch {
   width: 34px;
   height: 34px;
-  border: 1px solid #cfd8e6;
+  border: 1px solid #9aa8ba;
   border-radius: 2px;
 }
 
