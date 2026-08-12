@@ -8,6 +8,7 @@ const CTA_PAGES_LIST_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 
 const slideFlagOptions = ["site", "yt", "pin", "prospect", "client"];
 const paletteViewerOptions = ["full_palette", "concept", "client", "painter", "none"];
+const defaultRexParentOptions = ["public", "site", "pinterest", "concept", "client", "painter"];
 
 const emptyExperience = {
   player_experience_id: null,
@@ -15,6 +16,7 @@ const emptyExperience = {
   experience_key: "",
   slide_flag: "site",
   palette_viewer_key: "full_palette",
+  rex_parent_experience_key: "",
   cta_page_id: "",
   is_active: true,
   sort_order: 0,
@@ -27,6 +29,7 @@ function normalizeExperience(row) {
     experience_key: row?.experience_key || "",
     slide_flag: row?.slide_flag || "site",
     palette_viewer_key: row?.palette_viewer_key || "full_palette",
+    rex_parent_experience_key: row?.rex_parent_experience_key || row?.experience_key || "",
     cta_page_id: row?.cta_page_id ? Number(row.cta_page_id) : "",
     cta_page_label: row?.cta_page_label || "",
     cta_page_key: row?.cta_page_key || "",
@@ -94,6 +97,15 @@ export default function AdminPlayerExperiencesPage() {
     return map;
   }, [ctaPages]);
 
+  const rexParentOptions = useMemo(() => {
+    const keys = new Set(defaultRexParentOptions);
+    experiences.forEach((row) => {
+      if (row.experience_key) keys.add(row.experience_key);
+      if (row.rex_parent_experience_key) keys.add(row.rex_parent_experience_key);
+    });
+    return Array.from(keys).sort((a, b) => a.localeCompare(b));
+  }, [experiences]);
+
   function openNew() {
     setForm(emptyExperience);
     setStatus("");
@@ -112,7 +124,11 @@ export default function AdminPlayerExperiencesPage() {
     setForm((prev) => {
       const next = { ...prev, [field]: value };
       if (field === "name" && !prev.player_experience_id && (!prev.experience_key || prev.experience_key === slugify(prev.name))) {
-        next.experience_key = slugify(value);
+        const nextKey = slugify(value);
+        next.experience_key = nextKey;
+        if (!prev.rex_parent_experience_key || prev.rex_parent_experience_key === prev.experience_key) {
+          next.rex_parent_experience_key = nextKey;
+        }
       }
       return next;
     });
@@ -132,12 +148,14 @@ export default function AdminPlayerExperiencesPage() {
         player_experience_id: form.player_experience_id ? Number(form.player_experience_id) : null,
         name: form.name.trim(),
         experience_key: form.experience_key.trim(),
+        rex_parent_experience_key: form.rex_parent_experience_key.trim(),
         cta_page_id: Number(form.cta_page_id) || 0,
         sort_order: Number(form.sort_order) || 0,
         is_active: Boolean(form.is_active),
       };
       if (!payload.name) throw new Error("Name is required.");
       if (!payload.experience_key) throw new Error("Experience key is required.");
+      if (!payload.rex_parent_experience_key) throw new Error("REX parent experience key is required.");
       if (!payload.cta_page_id) throw new Error("CTA Page is required.");
 
       const res = await fetch(EXPERIENCE_SAVE_URL, {
@@ -185,6 +203,7 @@ export default function AdminPlayerExperiencesPage() {
                 <th>Experience key</th>
                 <th>Slide flag</th>
                 <th>Palette viewer</th>
+                <th>REX parent</th>
                 <th>CTA Page</th>
                 <th>Active</th>
                 <th>Sort order</th>
@@ -201,6 +220,7 @@ export default function AdminPlayerExperiencesPage() {
                     <td><code>{row.experience_key}</code></td>
                     <td><code>{row.slide_flag}</code></td>
                     <td><code>{row.palette_viewer_key}</code></td>
+                    <td><code>{row.rex_parent_experience_key || "-"}</code></td>
                     <td>{ctaLabel}</td>
                     <td>{row.is_active ? "Yes" : "No"}</td>
                     <td>{row.sort_order}</td>
@@ -214,7 +234,7 @@ export default function AdminPlayerExperiencesPage() {
               })}
               {!experiences.length && (
                 <tr>
-                  <td colSpan={8} className="pe-empty">No player experiences found.</td>
+                  <td colSpan={9} className="pe-empty">No player experiences found.</td>
                 </tr>
               )}
             </tbody>
@@ -263,6 +283,19 @@ export default function AdminPlayerExperiencesPage() {
                 Palette viewer
                 <select value={form.palette_viewer_key} onChange={(event) => updateForm("palette_viewer_key", event.target.value)}>
                   {paletteViewerOptions.map((value) => (
+                    <option key={value} value={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                REX parent experience
+                <select
+                  value={form.rex_parent_experience_key}
+                  onChange={(event) => updateForm("rex_parent_experience_key", event.target.value)}
+                >
+                  <option value="">Choose REX parent...</option>
+                  {rexParentOptions.map((value) => (
                     <option key={value} value={value}>{value}</option>
                   ))}
                 </select>

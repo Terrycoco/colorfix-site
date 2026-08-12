@@ -24,6 +24,7 @@ final class PdoPlayerExperienceRepository
                 pe.name,
                 pe.slide_flag,
                 pe.palette_viewer_key,
+                pe.rex_parent_experience_key,
                 pe.cta_page_id,
                 pe.is_active,
                 pe.sort_order,
@@ -53,6 +54,7 @@ final class PdoPlayerExperienceRepository
                 name,
                 slide_flag,
                 palette_viewer_key,
+                rex_parent_experience_key,
                 cta_page_id,
                 is_active
              FROM player_experiences
@@ -72,6 +74,7 @@ final class PdoPlayerExperienceRepository
             (string)$row['name'],
             (string)$row['slide_flag'],
             (string)$row['palette_viewer_key'],
+            (string)($row['rex_parent_experience_key'] ?? $row['experience_key']),
             (int)$row['cta_page_id'],
             (bool)$row['is_active']
         );
@@ -91,6 +94,7 @@ final class PdoPlayerExperienceRepository
                 name,
                 slide_flag,
                 palette_viewer_key,
+                rex_parent_experience_key,
                 cta_page_id,
                 is_active
              FROM player_experiences
@@ -110,6 +114,7 @@ final class PdoPlayerExperienceRepository
             (string)$row['name'],
             (string)$row['slide_flag'],
             (string)$row['palette_viewer_key'],
+            (string)($row['rex_parent_experience_key'] ?? $row['experience_key']),
             (int)$row['cta_page_id'],
             (bool)$row['is_active']
         );
@@ -122,6 +127,7 @@ final class PdoPlayerExperienceRepository
         $name = trim((string)($payload['name'] ?? ''));
         $slideFlag = strtolower(trim((string)($payload['slide_flag'] ?? '')));
         $paletteViewerKey = strtolower(trim((string)($payload['palette_viewer_key'] ?? '')));
+        $rexParentExperienceKey = $this->normalizeKey((string)($payload['rex_parent_experience_key'] ?? ''));
         $ctaPageId = isset($payload['cta_page_id']) ? (int)$payload['cta_page_id'] : 0;
         $isActive = isset($payload['is_active']) ? (int)(bool)$payload['is_active'] : 1;
         $sortOrder = isset($payload['sort_order']) ? max(0, (int)$payload['sort_order']) : 0;
@@ -138,6 +144,9 @@ final class PdoPlayerExperienceRepository
         if (!in_array($paletteViewerKey, self::PALETTE_VIEWER_KEYS, true)) {
             throw new \InvalidArgumentException('Invalid palette viewer key');
         }
+        if ($rexParentExperienceKey === '') {
+            throw new \InvalidArgumentException('REX parent experience key required');
+        }
         if (!$this->ctaPageExists($ctaPageId)) {
             throw new \InvalidArgumentException('CTA Page required');
         }
@@ -149,6 +158,7 @@ final class PdoPlayerExperienceRepository
                         name = :name,
                         slide_flag = :slide_flag,
                         palette_viewer_key = :palette_viewer_key,
+                        rex_parent_experience_key = :rex_parent_experience_key,
                         cta_page_id = :cta_page_id,
                         is_active = :is_active,
                         sort_order = :sort_order
@@ -160,6 +170,7 @@ final class PdoPlayerExperienceRepository
                 'name' => $name,
                 'slide_flag' => $slideFlag,
                 'palette_viewer_key' => $paletteViewerKey,
+                'rex_parent_experience_key' => $rexParentExperienceKey,
                 'cta_page_id' => $ctaPageId,
                 'is_active' => $isActive,
                 'sort_order' => $sortOrder,
@@ -169,15 +180,16 @@ final class PdoPlayerExperienceRepository
 
         $stmt = $this->pdo->prepare(
             "INSERT INTO player_experiences
-                (experience_key, name, slide_flag, palette_viewer_key, cta_page_id, is_active, sort_order)
+                (experience_key, name, slide_flag, palette_viewer_key, rex_parent_experience_key, cta_page_id, is_active, sort_order)
              VALUES
-                (:experience_key, :name, :slide_flag, :palette_viewer_key, :cta_page_id, :is_active, :sort_order)"
+                (:experience_key, :name, :slide_flag, :palette_viewer_key, :rex_parent_experience_key, :cta_page_id, :is_active, :sort_order)"
         );
         $stmt->execute([
             'experience_key' => $experienceKey,
             'name' => $name,
             'slide_flag' => $slideFlag,
             'palette_viewer_key' => $paletteViewerKey,
+            'rex_parent_experience_key' => $rexParentExperienceKey,
             'cta_page_id' => $ctaPageId,
             'is_active' => $isActive,
             'sort_order' => $sortOrder,

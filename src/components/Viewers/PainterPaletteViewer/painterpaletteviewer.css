@@ -172,6 +172,18 @@
   padding-top: 4px;
 }
 
+.ppv-not-final-warning {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #991b1b;
+  background: #fee2e2;
+  color: #7f1d1d;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .ppv-actions {
   padding-top: 4px;
 }

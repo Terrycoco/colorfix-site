@@ -54,6 +54,7 @@ export default function PainterPaletteViewer({
   const issuedLabel = painterView.issuedLabel || "";
   const overallNote = meta?.notes || painterView.overallPainterNote || "";
   const hasPlanPayload = Array.isArray(plans) && plans.length > 0;
+  const notFinalWarning = String(meta?.not_final_warning || painterView.notFinalWarning || "").trim();
 
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
@@ -296,6 +297,12 @@ export default function PainterPaletteViewer({
       <div className="apv-content cpv-content ppv-content">
         <div className="apv-column apv-column--details ppv-details">
           <div className="apv-info cpv-summary">
+            {notFinalWarning && (
+              <div className="ppv-not-final-warning">
+                {notFinalWarning}
+              </div>
+            )}
+
             <div className="apv-kicker">Painter Specification Sheet</div>
 
             <h1>{projectTitle}</h1>

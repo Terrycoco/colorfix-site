@@ -96,6 +96,11 @@ function workflow_project_payload(array $row): array
             'slug' => (string)($row['current_playlist_slug'] ?? ''),
             'updated_at' => $row['current_playlist_updated_at'] ?? null,
         ] : null,
+        'rex' => array_values(array_filter(
+            array_map('intval', explode(',', (string)($row['rex_ids'] ?? ''))),
+            static fn(int $id): bool => $id > 0
+        )),
+
         'created_at' => $row['created_at'] ?? null,
         'updated_at' => $row['updated_at'] ?? null,
     ];

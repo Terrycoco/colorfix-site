@@ -56,6 +56,17 @@ final class PdoProjectRepository
         return $row ?: null;
     }
 
+    public function getCurrentRelease(int $id): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT current_release FROM projects WHERE id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (string)$value;
+    }
+
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare("
@@ -204,49 +215,78 @@ final class PdoProjectRepository
     private function selectSql(): string
     {
         return "SELECT
-                    p.id,
-                    p.property_id,
-                    p.project_type_id,
-                    p.name,
-                    p.status,
-                    p.experience_key,
-                    p.current_release,
-                    p.notes,
-                    p.project_painter_note,
-                    p.created_at,
-                    p.updated_at,
-                    pt.name AS project_type_name,
-                    pt.slug AS project_type_slug,
-                    pr.name AS property_name,
-                    pr.address_id,
-                    pr.client_id,
-                    c.name AS client_name,
-                    c.first_name AS client_first_name,
-                    c.last_name AS client_last_name,
-                    c.email AS client_email,
-                    a.street_1,
-                    a.street_2,
-                    a.city,
-                    a.state,
-                    a.postal_code,
-                    a.country_code,
-                    cp_link.playlist_id AS current_playlist_id,
-                    cp.title AS current_playlist_title,
-                    cp.slug AS current_playlist_slug,
-                    cp_link.updated_at AS current_playlist_updated_at
-                FROM projects p
-                INNER JOIN properties pr ON pr.id = p.property_id
-                LEFT JOIN clients c ON c.id = pr.client_id
-                LEFT JOIN addresses a ON a.id = pr.address_id
-                INNER JOIN project_types pt ON pt.id = p.project_type_id
-                LEFT JOIN project_playlists cp_link
-                  ON cp_link.project_playlist_id = (
-                    SELECT pp2.project_playlist_id
-                    FROM project_playlists pp2
-                    WHERE pp2.project_id = p.id
-                    ORDER BY pp2.updated_at DESC, pp2.project_playlist_id DESC
-                    LIMIT 1
-                  )
-                LEFT JOIN playlists cp ON cp.playlist_id = cp_link.playlist_id";
+            p.id,
+            p.property_id,
+            p.project_type_id,
+            p.name,
+            p.status,
+            p.experience_key,
+            p.current_release,
+            p.notes,
+            p.project_painter_note,
+            p.created_at,
+            p.updated_at,
+            pt.name AS project_type_name,
+            pt.slug AS project_type_slug,
+            pr.name AS property_name,
+            pr.address_id,
+            pr.client_id,
+            c.name AS client_name,
+            c.first_name AS client_first_name,
+            c.last_name AS client_last_name,
+            c.email AS client_email,
+            a.street_1,
+            a.street_2,
+            a.city,
+            a.state,
+            a.postal_code,
+            a.country_code,
+
+            cp_link.playlist_id AS current_playlist_id,
+            cp.title AS current_playlist_title,
+            cp.slug AS current_playlist_slug,
+            cp_link.updated_at AS current_playlist_updated_at,
+
+            (
+                SELECT GROUP_CONCAT(
+                    DISTINCT rr.id
+                    ORDER BY rr.id
+                    SEPARATOR ','
+                )
+                FROM project_playlists rex_pp
+                INNER JOIN rex_reservations rr
+                    ON rr.resource_type = 'playlist'
+                   AND rr.resource_id = rex_pp.playlist_id
+                WHERE rex_pp.project_id = p.id
+                  AND rr.resolver_key = 'playlist_experience'
+                  AND rr.status = 'active'
+                  AND rr.revoked_at IS NULL
+            ) AS rex_ids
+
+        FROM projects p
+
+        INNER JOIN properties pr
+            ON pr.id = p.property_id
+
+        LEFT JOIN clients c
+            ON c.id = pr.client_id
+
+        LEFT JOIN addresses a
+            ON a.id = pr.address_id
+
+        INNER JOIN project_types pt
+            ON pt.id = p.project_type_id
+
+        LEFT JOIN project_playlists cp_link
+            ON cp_link.project_playlist_id = (
+                SELECT pp2.project_playlist_id
+                FROM project_playlists pp2
+                WHERE pp2.project_id = p.id
+                ORDER BY pp2.updated_at DESC, pp2.project_playlist_id DESC
+                LIMIT 1
+            )
+
+        LEFT JOIN playlists cp
+            ON cp.playlist_id = cp_link.playlist_id";
     }
 }

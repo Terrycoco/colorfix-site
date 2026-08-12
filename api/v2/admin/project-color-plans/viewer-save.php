@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 require_once __DIR__ . '/_helpers.php';
 
 use App\Repos\PdoProjectColorPlanRepository;
+use App\Services\ProjectViewerRexService;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -46,7 +47,28 @@ try {
         ];
     }, $photos));
 
-    workflow_respond(['ok' => true]);
+    $rexPayload = null;
+    $rexWarning = null;
+    try {
+        $rexPayload = (new ProjectViewerRexService($pdo))->ensureColorPlanViewer(
+            $planId,
+            $viewerKey
+        );
+    } catch (Throwable $rexError) {
+        $rexWarning = $rexError->getMessage();
+    }
+
+    $response = [
+        'ok' => true,
+        'rex' => $rexPayload,
+    ];
+    if ($rexWarning !== null && trim($rexWarning) !== '') {
+        $response['rex_warning'] = $rexWarning;
+    } elseif (is_array($rexPayload) && !empty($rexPayload['relationship']['warning'])) {
+        $response['rex_warning'] = $rexPayload['relationship']['warning'];
+    }
+
+    workflow_respond($response);
 } catch (Throwable $e) {
     workflow_respond(['ok' => false, 'error' => $e->getMessage()], 500);
 }

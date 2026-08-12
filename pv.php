@@ -7,6 +7,7 @@ require __DIR__ . '/api/db.php';
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoSavedPaletteRepository;
+use App\Repos\PdoProjectColorPlanRepository;
 use App\Services\PaletteViewerService;
 use App\Services\PaletteViewerTokenService;
 use App\Services\PhotoRenderingService;
@@ -56,18 +57,25 @@ try {
     if ($code !== '') {
         $tokenService = new PaletteViewerTokenService($pdo);
         $payload = $tokenService->decode($code);
-        $hash = trim((string)($payload['hash'] ?? ''));
-        $setId = isset($payload['set_id']) ? (int)$payload['set_id'] : null;
         $viewerKey = (string)($payload['palette_viewer_key'] ?? 'full_palette');
 
         $savedRepo = new PdoSavedPaletteRepository($pdo);
         $photoRepo = new PdoPhotoRepository($pdo);
         $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
+        $projectColorPlanRepo = new PdoProjectColorPlanRepository($pdo);
         $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
-        $viewerSvc = new PaletteViewerService($savedRepo, $renderSvc, $playlistInstanceRepo);
-        $data = $viewerSvc->getSaved($hash, $setId && $setId > 0 ? $setId : null, $viewerKey);
-        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
+        $viewerSvc = new PaletteViewerService($savedRepo, $renderSvc, $playlistInstanceRepo, $projectColorPlanRepo);
 
+        if (($payload['source'] ?? 'saved') === 'project_color_plan') {
+            $colorPlanId = (int)($payload['color_plan_id'] ?? 0);
+            $data = $viewerSvc->getProjectColorPlan($colorPlanId, $viewerKey);
+        } else {
+            $hash = trim((string)($payload['hash'] ?? ''));
+            $setId = isset($payload['set_id']) ? (int)$payload['set_id'] : null;
+            $data = $viewerSvc->getSaved($hash, $setId && $setId > 0 ? $setId : null, $viewerKey);
+        }
+
+        $meta = is_array($data['meta'] ?? null) ? $data['meta'] : [];
         $displayTitle = pv_first_text([
             $meta['display_title'] ?? null,
             $meta['title'] ?? null,

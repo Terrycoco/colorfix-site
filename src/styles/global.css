@@ -30,6 +30,7 @@
   --board-scroller-height: 40px;
   --search-item-background: #DDE2E2; /* etched glass */
   --search-item-background-hover: #BEDCDD; /* birds egg */
+  --highlight-cyan: #BEDCDD; /* birds egg */
   --sticky-palette-bar-height: 70px;
   --board-scroller-z-index: 12000;
   --modals-z-index: 5000;

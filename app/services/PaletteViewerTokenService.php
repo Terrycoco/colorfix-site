@@ -38,10 +38,29 @@ final class PaletteViewerTokenService
             'iat' => time(),
         ];
 
-        $token = $this->encode($payload);
-        $shortCode = $this->createShortCode($token, $payload);
+        return $this->createUrlFromPayload($payload);
+    }
 
-        return '/pv/' . rawurlencode($shortCode ?: $token);
+    public function createProjectColorPlanUrl(
+        int $colorPlanId,
+        string $paletteViewerKey,
+        ?string $reservationToken = null
+    ): string {
+        if ($colorPlanId <= 0) {
+            throw new InvalidArgumentException('project color plan id required');
+        }
+
+        $reservationToken = trim((string)$reservationToken);
+        $payload = [
+            'v' => 1,
+            'source' => 'project_color_plan',
+            'color_plan_id' => $colorPlanId,
+            'palette_viewer_key' => $this->normalizePaletteViewerKey($paletteViewerKey),
+            'reservation_token' => $reservationToken !== '' ? $reservationToken : null,
+            'iat' => time(),
+        ];
+
+        return $this->createUrlFromPayload($payload);
     }
 
     /**
@@ -79,17 +98,36 @@ final class PaletteViewerTokenService
             throw new InvalidArgumentException('invalid palette viewer token payload');
         }
 
-        if (($payload['source'] ?? '') !== 'saved') {
+        $source = trim((string)($payload['source'] ?? ''));
+        if (!in_array($source, ['saved', 'project_color_plan'], true)) {
             throw new InvalidArgumentException('invalid palette viewer token source');
         }
-        if (trim((string)($payload['hash'] ?? '')) === '') {
-            throw new InvalidArgumentException('invalid palette viewer token palette');
+
+        if ($source === 'saved') {
+            if (trim((string)($payload['hash'] ?? '')) === '') {
+                throw new InvalidArgumentException('invalid palette viewer token palette');
+            }
+        } else {
+            if ((int)($payload['color_plan_id'] ?? 0) <= 0) {
+                throw new InvalidArgumentException('invalid project color plan token');
+            }
         }
+
         $payload['palette_viewer_key'] = $this->normalizePaletteViewerKey(
             (string)($payload['palette_viewer_key'] ?? 'full_palette')
         );
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function createUrlFromPayload(array $payload): string
+    {
+        $token = $this->encode($payload);
+        $shortCode = $this->createShortCode($token, $payload);
+        return '/pv/' . rawurlencode($shortCode ?: $token);
     }
 
     /**

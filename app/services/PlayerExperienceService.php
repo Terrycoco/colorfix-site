@@ -24,6 +24,7 @@ class PlayerExperienceService
     private ?string $resolvedProjectExperienceKey = null;
     private ?int $resolvedProjectId = null;
     private ?string $resolvedProjectCurrentRelease = null;
+    private ?ProjectReleaseSelectionService $projectReleaseSelection = null;
 
     public function __construct(
         protected PDO $pdo
@@ -222,13 +223,57 @@ class PlayerExperienceService
         return $plan;
     }
 
-    public function buildPlaybackPlanFromProjectExperience(
-        int $projectId,
-        string $experienceKey,
-        ?string $sourceKey = null,
-        ?int $start = null,
-        ?array $startTarget = null
-    ): array {
+public function buildPlaybackPlanFromPlaylistExperience(
+    int $playlistId,
+    string $experienceKey,
+    ?string $sourceKey = null,
+    ?int $start = null,
+    ?array $startTarget = null,
+    ?string $reservationToken = null
+): array {
+    if ($playlistId <= 0) {
+        throw new RuntimeException('Valid playlist ID required.');
+    }
+
+    $stmt = $this->pdo->prepare(
+        "SELECT project_id
+         FROM project_playlists
+         WHERE playlist_id = :playlist_id
+         ORDER BY updated_at DESC, project_playlist_id DESC
+         LIMIT 1"
+    );
+    $stmt->execute([':playlist_id' => $playlistId]);
+
+    $projectId = (int)($stmt->fetchColumn() ?: 0);
+
+    if ($projectId <= 0) {
+        throw new RuntimeException(
+            "Playlist {$playlistId} is not attached to a project"
+        );
+    }
+
+    return $this->buildPlaybackPlanFromProjectExperience(
+        $projectId,
+        $experienceKey,
+        $sourceKey,
+        $start,
+        $startTarget,
+        $reservationToken,
+        $playlistId
+    );
+}
+
+
+
+public function buildPlaybackPlanFromProjectExperience(
+    int $projectId,
+    string $experienceKey,
+    ?string $sourceKey = null,
+    ?int $start = null,
+    ?array $startTarget = null,
+    ?string $reservationToken = null,
+    ?int $playlistId = null
+): array {
         $startedAt = microtime(true);
         $experienceKey = strtolower(trim($experienceKey));
         if (!in_array($experienceKey, ['public', 'concept', 'client', 'painter'], true)) {
@@ -244,9 +289,24 @@ class PlayerExperienceService
         $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
 
         $projectPlaylists = $projectRepo->listProjectPlaylists($projectId);
-        $playlistId = (int)($projectPlaylists[0]['playlist_id'] ?? 0);
+
+        if ($playlistId === null || $playlistId <= 0) {
+            $playlistId = (int)($projectPlaylists[0]['playlist_id'] ?? 0);
+        }
+
         if ($playlistId <= 0) {
             throw new RuntimeException("Project {$projectId} has no attached playlist");
+        }
+
+        $attachedPlaylistIds = array_map(
+            static fn(array $row): int => (int)($row['playlist_id'] ?? 0),
+            $projectPlaylists
+        );
+
+        if (!in_array($playlistId, $attachedPlaylistIds, true)) {
+            throw new RuntimeException(
+                "Playlist {$playlistId} is not attached to project {$projectId}"
+            );
         }
 
         $experience = $this->resolveExperienceByKey($experienceKey, "project reservation experience '{$experienceKey}'");
@@ -264,10 +324,11 @@ class PlayerExperienceService
         $items = $this->flattenItems($playlist);
         $items = $this->filterProjectItemsForRelease($items, $experienceKey, $currentRelease);
         $colorPlanIds = $this->collectColorPlanIds($items);
+        $colorPlans = $this->loadProjectColorPlans($projectId, $colorPlanIds);
         $this->hydrateItemImages($items);
         $paletteViewerKey = $experience->paletteViewerKey;
         $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
-        $this->hydratePaletteViewerUrls($items, $paletteViewerKey, 0);
+        $this->hydrateProjectColorPlanViewerUrls($items, $paletteViewerKey, $reservationToken);
         $this->markTiming('hydrate_items', $itemsStartedAt);
         $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
         $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
@@ -301,6 +362,7 @@ class PlayerExperienceService
             'current_release' => $currentRelease,
             'release_is_final' => $currentRelease === 'FINAL',
             'color_plan_ids' => $colorPlanIds,
+            'color_plans' => $colorPlans,
             'title' => $playlist->title,
             'display_title' => $displayTitle,
             'slug' => null,
@@ -420,42 +482,17 @@ class PlayerExperienceService
 
     private function loadProjectCurrentRelease(int $projectId): string
     {
-        $stmt = $this->pdo->prepare(
-            "SELECT current_release
-             FROM projects
-             WHERE id = :project_id
-             LIMIT 1"
-        );
-        $stmt->execute(['project_id' => $projectId]);
-        $value = $stmt->fetchColumn();
-        if ($value === false) {
-            throw new RuntimeException("Project not found while resolving current release: {$projectId}");
-        }
-        return $this->normalizeProjectCurrentRelease((string)$value);
+        return $this->projectReleaseSelection()->currentReleaseForProject($projectId);
     }
 
     private function normalizeProjectCurrentRelease(string $value): string
     {
-        $value = strtoupper(trim($value));
-        if ($value === 'FINAL') {
-            return 'FINAL';
-        }
-        if ($value === '' || !ctype_digit($value) || (int)$value < 1) {
-            throw new DomainException(
-                "Project release configuration error: current_release must be a positive version number or FINAL."
-            );
-        }
-        return (string)max(1, (int)$value);
+        return $this->projectReleaseSelection()->normalizeCurrentRelease($value);
     }
 
     private function assertProjectExperienceAllowedForRelease(string $experienceKey, string $currentRelease): void
     {
-        $experienceKey = strtolower(trim($experienceKey));
-        if ($experienceKey === 'painter' && $currentRelease !== 'FINAL') {
-            throw new DomainException(
-                "Painter experience is unavailable until the project's current release is FINAL."
-            );
-        }
+        $this->projectReleaseSelection()->assertExperienceAllowed($experienceKey, $currentRelease);
     }
 
     /**
@@ -467,39 +504,11 @@ class PlayerExperienceService
         string $experienceKey,
         string $currentRelease
     ): array {
-        $experienceKey = strtolower(trim($experienceKey));
-        $currentRelease = $this->normalizeProjectCurrentRelease($currentRelease);
-
-        if (in_array($experienceKey, ['public', 'concept'], true)) {
-            return array_values($items);
-        }
-
-        if ($experienceKey === 'painter') {
-            $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
-        }
-
-        if (!in_array($experienceKey, ['client', 'painter'], true)) {
-            return array_values($items);
-        }
-
-        if ($currentRelease === 'FINAL') {
-            return array_values(array_filter(
-                $items,
-                static fn($item): bool => $item instanceof PlaylistItem && !empty($item->is_final)
-            ));
-        }
-
-        $version = (int)$currentRelease;
-        return array_values(array_filter(
+        return $this->projectReleaseSelection()->filterItemsForRelease(
             $items,
-            static function ($item) use ($version): bool {
-                if (!$item instanceof PlaylistItem) {
-                    return false;
-                }
-                $itemVersion = max(1, (int)($item->version_number ?? 1));
-                return $itemVersion <= $version;
-            }
-        ));
+            $experienceKey,
+            $currentRelease
+        );
     }
 
     /**
@@ -508,19 +517,58 @@ class PlayerExperienceService
      */
     private function collectColorPlanIds(array $items): array
     {
-        $seen = [];
-        foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) {
-                continue;
-            }
-            $colorPlanId = (int)($item->color_plan_id ?? 0);
-            if ($colorPlanId > 0) {
-                $seen[$colorPlanId] = true;
-            }
+        return $this->projectReleaseSelection()->collectColorPlanIds($items);
+    }
+
+    private function projectReleaseSelection(): ProjectReleaseSelectionService
+    {
+        if (!$this->projectReleaseSelection instanceof ProjectReleaseSelectionService) {
+            $this->projectReleaseSelection = new ProjectReleaseSelectionService(
+                new PdoProjectRepository($this->pdo)
+            );
         }
-        $ids = array_keys($seen);
-        sort($ids, SORT_NUMERIC);
-        return array_values(array_map('intval', $ids));
+
+        return $this->projectReleaseSelection;
+    }
+
+    /**
+     * @param int[] $colorPlanIds
+     * @return array<int, array{id:int,project_id:int,nickname:string,area_name:string,scheme_title:string}>
+     */
+    private function loadProjectColorPlans(int $projectId, array $colorPlanIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $colorPlanIds))));
+        if ($projectId <= 0 || !$ids) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $params = array_merge([$projectId], $ids);
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                id,
+                project_id,
+                nickname,
+                area_name,
+                scheme_title
+             FROM project_color_plans
+             WHERE project_id = ?
+               AND id IN ({$placeholders})"
+        );
+        $stmt->execute($params);
+
+        $rows = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $rows[] = [
+                'id' => (int)$row['id'],
+                'project_id' => (int)$row['project_id'],
+                'nickname' => trim((string)($row['nickname'] ?? '')),
+                'area_name' => trim((string)($row['area_name'] ?? '')),
+                'scheme_title' => trim((string)($row['scheme_title'] ?? '')),
+            ];
+        }
+
+        return $rows;
     }
 
     private function validateResolvedExperience(?PlayerExperience $experience, string $label): ?PlayerExperience
@@ -817,6 +865,41 @@ class PlayerExperienceService
                     $setId > 0 ? $setId : null,
                     'painter',
                     $playlistInstanceId
+                );
+            }
+        }
+    }
+
+    /**
+     * @param PlaylistItem[] $items
+     */
+    private function hydrateProjectColorPlanViewerUrls(
+        array $items,
+        string $paletteViewerKey,
+        ?string $reservationToken = null
+    ): void {
+        $paletteViewerKey = strtolower(trim($paletteViewerKey));
+        if ($paletteViewerKey === 'none') {
+            return;
+        }
+
+        $tokenService = new PaletteViewerTokenService($this->pdo);
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) continue;
+            $colorPlanId = (int)($item->color_plan_id ?? 0);
+            if ($colorPlanId <= 0) continue;
+
+            $item->palette_viewer_url = $tokenService->createProjectColorPlanUrl(
+                $colorPlanId,
+                $paletteViewerKey,
+                $reservationToken
+            );
+
+            if (in_array($paletteViewerKey, ['concept', 'client'], true)) {
+                $item->painter_palette_viewer_url = $tokenService->createProjectColorPlanUrl(
+                    $colorPlanId,
+                    'painter',
+                    $reservationToken
                 );
             }
         }

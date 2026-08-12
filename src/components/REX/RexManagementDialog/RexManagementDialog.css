@@ -1,0 +1,249 @@
+.rex-management {
+  display: grid;
+  gap: 12px;
+  color: #182235;
+  font-size: 13px;
+}
+
+.rex-management__toolbar,
+.rex-management__editor-head,
+.rex-management__editor-actions,
+.rex-management__row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rex-management__muted,
+.rex-management__empty,
+.rex-management__token,
+.rex-management__row-meta,
+.rex-management__readonly {
+  color: #647084;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rex-management__empty {
+  border-top: 1px solid #dfe5ee;
+  padding: 12px 0;
+}
+
+.rex-management__error {
+  border: 1px solid #efb7b7;
+  background: #fff5f5;
+  color: #a32929;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.rex-management__primary,
+.rex-management__row-actions button,
+.rex-management__link-btn {
+  border: 1px solid #cfd8e6;
+  border-radius: 4px;
+  background: #fff;
+  color: #152033;
+  padding: 6px 9px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.rex-management__primary {
+  border-color: #0b1b3a;
+  background: #0b1b3a;
+  color: #fff;
+}
+
+.rex-management__primary:disabled,
+.rex-management__row-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rex-management__link-btn {
+  border: 0;
+  padding-left: 0;
+  padding-right: 0;
+  color: #4c5f7a;
+}
+
+.rex-management__danger {
+  border-color: #c63c3c !important;
+  color: #b43131 !important;
+}
+
+.rex-management__editor {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #dfe5ee;
+  border-bottom: 1px solid #dfe5ee;
+  padding: 10px 0 12px;
+}
+
+.rex-management__editor-head strong {
+  font-size: 14px;
+}
+
+.rex-management__readonly {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rex-management__form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.rex-management__form-grid--project {
+  grid-template-columns: minmax(180px, 260px) minmax(180px, 260px);
+}
+
+.rex-management__form-grid label {
+  display: grid;
+  gap: 5px;
+  color: #56647a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rex-management__form-grid input,
+.rex-management__form-grid select,
+.rex-management__form-grid textarea {
+  width: 100%;
+  border: 1px solid #cfd8e6;
+  border-radius: 4px;
+  background: #fff;
+  color: #152033;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.rex-management__form-grid select {
+  background-color: #f3f6fa;
+}
+
+.rex-management__form-grid textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.rex-management__wide {
+  grid-column: 1 / -1;
+}
+
+.rex-management__advanced-toggle {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: #536176;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rex-management__advanced-panel {
+  border-top: 1px solid #e3e8f0;
+  padding-top: 9px;
+}
+
+.rex-management__list {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.rex-management__card {
+  border: 1px solid #d8e0eb;
+  border-radius: 6px;
+  background: #fff;
+  padding: 12px;
+}
+
+.rex-management__card-main {
+  min-width: 0;
+}
+
+.rex-management__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rex-management__card-head strong {
+  color: #182235;
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.rex-management__card-meta,
+.rex-management__destination {
+  display: flex;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  margin-top: 7px;
+  color: #647084;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.rex-management__destination {
+  border-top: 1px solid #e5ebf3;
+  padding-top: 8px;
+}
+
+.rex-management__row-title span:first-child {
+  color: #647084;
+  font-size: 12px;
+}
+
+.rex-management__row-title strong {
+  font-size: 14px;
+}
+
+.rex-management__status {
+  border: 1px solid #b8c4d4;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.rex-management__status.is-active {
+  border-color: #83b794;
+  color: #23633a;
+}
+
+.rex-management__status.is-revoked {
+  border-color: #d0a0a0;
+  color: #8a3030;
+}
+
+.rex-management__token {
+  margin-top: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .rex-management__form-grid,
+  .rex-management__row {
+    grid-template-columns: 1fr;
+  }
+
+  .rex-management__row-actions {
+    justify-content: flex-start;
+  }
+}

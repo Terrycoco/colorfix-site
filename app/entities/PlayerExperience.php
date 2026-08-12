@@ -11,6 +11,7 @@ final class PlayerExperience
         public string $name,
         public string $slideFlag,
         public string $paletteViewerKey,
+        public string $rexParentExperienceKey,
         public int $ctaPageId,
         public bool $isActive
     ) {}

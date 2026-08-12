@@ -32,6 +32,7 @@ const PlaylistColorSearchPage = lazy(() => import('@pages/PlaylistColorSearchPag
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
 const ProjectPainterSpecsPage = lazy(() => import('@pages/ProjectPainterSpecsPage'));
 const ClientViewerTestPage = lazy(() => import('@pages/Viewers/ClientViewerTestPage'));
+const RexManagementDialogTestPage = lazy(() => import('@pages/REX/RexManagementDialogTestPage'));
 const ArticlePage = lazy(() => import('@pages/ArticlePage'));
 const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
 
@@ -61,12 +62,20 @@ function AppRouter() {
           element={renderWithSuspense(SavedPaletteSharePage, 'Loading saved palette…')}
         />
         <Route
+          path="t/:token"
+          element={renderWithSuspense(SavedPaletteSharePage, 'Loading viewer…')}
+        />
+        <Route
           path="project-painter-specs"
           element={renderWithSuspense(ProjectPainterSpecsPage, 'Loading painter specs…')}
         />
         <Route
           path="test/client-viewer"
           element={renderWithSuspense(ClientViewerTestPage, 'Loading client viewer test…')}
+        />
+        <Route
+          path="test/rex-management"
+          element={renderWithSuspense(RexManagementDialogTestPage, 'Loading REX dialog test…')}
         />
         <Route
           path="watch"

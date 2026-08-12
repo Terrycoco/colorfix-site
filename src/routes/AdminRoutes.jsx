@@ -51,6 +51,7 @@ const AdminPinterestPublisherPage = lazy(() => import('@pages/AdminPinterestPubl
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminUrlReservationsPage = lazy(() => import('@pages/AdminUrlReservationsPage'));
+const AdminRexConversionPage = lazy(() => import('@pages/AdminRexConversionPage'));
 const AdminPhotoLibraryPage = lazy(() => import('@pages/AdminPhotoLibraryPage'));
 const AdminPhotoLibraryToolsPage = lazy(() => import('@pages/AdminPhotoLibraryToolsPage'));
 const AdminFileLockerPage = lazy(() => import('@pages/AdminFileLockerPage'));
@@ -143,6 +144,7 @@ export default function AdminRoutes() {
         <Route path="pinterest-publisher" element={renderWithSuspense(AdminPinterestPublisherPage, 'Loading Pinterest publisher...')} />
         <Route path="user-events" element={renderWithSuspense(AdminUserEventsPage, 'Loading view counts...')} />
         <Route path="url-reservations" element={renderWithSuspense(AdminUrlReservationsPage, 'Loading URL reservations...')} />
+        <Route path="rex-conversion" element={renderWithSuspense(AdminRexConversionPage, 'Loading REX conversion...')} />
         <Route path="qr-sheets" element={renderWithSuspense(AdminQrSheetsPage, 'Loading QR sheets...')} />
         <Route path="photo-library" element={renderWithSuspense(AdminPhotoLibraryPage, 'Loading photo library...')} />
         <Route path="photo-library-tools" element={renderWithSuspense(AdminPhotoLibraryToolsPage, 'Loading photo library tools...')} />

@@ -1,0 +1,24 @@
+.fetch-rex-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid #111827;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fetch-rex-button:hover:not(:disabled) {
+  background: #1f2937;
+}
+
+.fetch-rex-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

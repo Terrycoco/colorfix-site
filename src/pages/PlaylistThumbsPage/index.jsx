@@ -10,6 +10,8 @@ export default function PlaylistThumbsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [items, setItems] = useState([]);
+  const [projectColorPlans, setProjectColorPlans] = useState([]);
+  const [isProjectExperience, setIsProjectExperience] = useState(false);
   const [title, setTitle] = useState("");
   const [paletteViewerCtaGroupId, setPaletteViewerCtaGroupId] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +65,8 @@ export default function PlaylistThumbsPage() {
 
         setTitle(formatTitle(`${projectTitle}${suffix ? ` — ${suffix}` : ""}`));
         setItems(payload.data?.items || []);
+        setIsProjectExperience(String(payload.data?.experience_source || "") === "project_reservation");
+        setProjectColorPlans(Array.isArray(payload.data?.color_plans) ? payload.data.color_plans : []);
         setPaletteViewerCtaGroupId(payload.data?.palette_viewer_cta_group_id ? String(payload.data.palette_viewer_cta_group_id) : "");
       })
       .catch((err) => {
@@ -99,15 +103,49 @@ export default function PlaylistThumbsPage() {
   const palettes = useMemo(() => {
     const seen = new Set();
     const list = [];
+    const colorPlanById = new Map(
+      (Array.isArray(projectColorPlans) ? projectColorPlans : []).map((plan) => [Number(plan.id), plan])
+    );
+
     for (const item of items || []) {
       const type = (item?.type || "normal").toLowerCase();
       const attachedType = (item?.saved_palette_photo_type || "").toLowerCase();
       if (type === "intro" || type === "before" || type === "text" || type === "non-palette") continue;
       if (attachedType === "before") continue;
       if (item?.exclude_from_thumbs) continue;
+
       const apId = item?.ap_id ?? null;
       const paletteHash = item?.palette_hash ?? null;
       const savedPaletteSetId = Number(item?.saved_palette_set_id || 0) || null;
+      const colorPlanId = Number(item?.color_plan_id || 0) || null;
+
+      if (isProjectExperience) {
+        if (!colorPlanId) continue;
+        const key = `color-plan:${colorPlanId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const plan = colorPlanById.get(colorPlanId) || null;
+        const planTitle =
+          plan?.scheme_title ||
+          plan?.area_name ||
+          plan?.nickname ||
+          `Color Plan ${colorPlanId}`;
+
+        list.push({
+          color_plan_id: colorPlanId,
+          ap_id: apId,
+          palette_hash: paletteHash,
+          saved_palette_set_id: savedPaletteSetId,
+          palette_viewer_url: item?.palette_viewer_url || "",
+          painter_palette_viewer_url: item?.painter_palette_viewer_url || "",
+          title: formatTitle(planTitle),
+          image_url: item?.image_url || "",
+          is_liked: apId ? likedSet.has(String(apId)) : false,
+        });
+        continue;
+      }
+
       if (!apId && !paletteHash && !savedPaletteSetId) continue;
       const key = paletteHash
         ? `saved:${paletteHash}:${savedPaletteSetId || "default"}`
@@ -116,11 +154,13 @@ export default function PlaylistThumbsPage() {
           : `applied:${apId}`;
       if (seen.has(key)) continue;
       seen.add(key);
+
       const paletteTitle =
         item?.palette_title ||
         item?.saved_palette_title ||
         item?.palette_name ||
         (paletteHash ? "ColorFix Palette" : `Palette ${apId}`);
+
       list.push({
         ap_id: apId,
         palette_hash: paletteHash,
@@ -132,8 +172,9 @@ export default function PlaylistThumbsPage() {
         is_liked: apId ? likedSet.has(String(apId)) : false,
       });
     }
+
     return list;
-  }, [items, likedSet]);
+  }, [items, likedSet, isProjectExperience, projectColorPlans]);
 
   const [thumbUrlByKey, setThumbUrlByKey] = useState({});
   const shouldShowBackToPlaylist =
@@ -142,9 +183,11 @@ export default function PlaylistThumbsPage() {
   useEffect(() => {
     let cancelled = false;
     palettes.forEach((palette) => {
-      const key = palette.palette_hash
-        ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
-        : `applied:${palette.ap_id}`;
+      const key = palette.color_plan_id
+        ? `color-plan:${palette.color_plan_id}`
+        : palette.palette_hash
+          ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+          : `applied:${palette.ap_id}`;
       const value = palette.image_url || "";
       if (!isAssetRef(value)) return;
       const assetId = extractAssetId(value);
@@ -195,9 +238,11 @@ export default function PlaylistThumbsPage() {
         <div className="playlist-thumbs__grid-wrap">
           <div className="playlist-thumbs__grid">
             {palettes.map((palette) => {
-              const cardKey = palette.palette_hash
-                ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
-                : `applied:${palette.ap_id}`;
+              const cardKey = palette.color_plan_id
+                ? `color-plan:${palette.color_plan_id}`
+                : palette.palette_hash
+                  ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+                  : `applied:${palette.ap_id}`;
               const parsed = parsePhotoRef(palette.image_url);
               const resolvedUrl = parsed.url
                 ? parsed.url
