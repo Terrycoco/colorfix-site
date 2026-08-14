@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { photoThumbUrl } from "@helpers/imageThumb";
 import { toFastPlayerPath } from "@helpers/playerUrls";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-color-search.css";
 
@@ -12,6 +13,7 @@ export default function PlaylistColorSearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialFamily = searchParams.get("family") || searchParams.get("q") || "";
+  const sourceParam = searchParams.get("src") ?? "";
   const [activeFamily, setActiveFamily] = useState(initialFamily);
   const [items, setItems] = useState([]);
   const [meta, setMeta] = useState({ count: 0, limit: 80 });
@@ -38,6 +40,7 @@ export default function PlaylistColorSearchPage() {
       limit: "120",
       _: String(Date.now()),
     });
+    applySourceToParams(params, sourceParam);
     setLoading(true);
     setError("");
     fetch(`${API_URL}?${params.toString()}`, {
@@ -73,7 +76,7 @@ export default function PlaylistColorSearchPage() {
       });
 
     return () => controller.abort();
-  }, [activeFamily]);
+  }, [activeFamily, sourceParam]);
 
   const resultTitle = useMemo(() => {
     const family = activeFamily.trim();
@@ -85,16 +88,17 @@ export default function PlaylistColorSearchPage() {
     const params = new URLSearchParams(searchParams);
     params.set("family", family);
     params.delete("q");
+    applySourceToParams(params, sourceParam);
     setSearchParams(params);
   };
 
   const handleExit = () => {
     const safeReturn = resolveReturnTo(searchParams.get("return_to") || "");
     if (safeReturn) {
-      navigate(safeReturn);
+      navigate(withSourceParam(safeReturn, sourceParam));
       return;
     }
-    navigate("/picker");
+    navigate(withSourceParam("/picker", sourceParam));
   };
 
   return (
@@ -145,7 +149,7 @@ export default function PlaylistColorSearchPage() {
             <div className="playlist-thumbs__grid">
               {items.map((item) => {
                 const imageUrl = photoThumbUrl(item.photo_library_id, 520, 72, item.photo_url) || item.photo_url || "";
-                const href = toFastPlayerPath(item.player_url || "");
+                const href = withSourceParam(toFastPlayerPath(item.player_url || ""), sourceParam);
                 return (
                   <Link
                     key={`${item.playlist_instance_id}-${item.playlist_item_id}`}

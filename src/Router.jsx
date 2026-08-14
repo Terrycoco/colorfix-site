@@ -30,6 +30,7 @@ const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
 const PlaylistPickerPage = lazy(() => import('@pages/PlaylistPickerPage'));
 const PlaylistColorSearchPage = lazy(() => import('@pages/PlaylistColorSearchPage'));
 const SavedPaletteSharePage = lazy(() => import('@pages/SavedPaletteSharePage'));
+const RexPublicPage = lazy(() => import('@pages/REX/RexPublicPage'));
 const ProjectPainterSpecsPage = lazy(() => import('@pages/ProjectPainterSpecsPage'));
 const ClientViewerTestPage = lazy(() => import('@pages/Viewers/ClientViewerTestPage'));
 const RexManagementDialogTestPage = lazy(() => import('@pages/REX/RexManagementDialogTestPage'));
@@ -63,7 +64,7 @@ function AppRouter() {
         />
         <Route
           path="t/:token"
-          element={renderWithSuspense(SavedPaletteSharePage, 'Loading viewer…')}
+          element={renderWithSuspense(RexPublicPage, 'Loading ColorFix link…')}
         />
         <Route
           path="project-painter-specs"

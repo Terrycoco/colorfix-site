@@ -21,10 +21,19 @@ final class PdoPaletteViewerPhotoRepository
         }
 
         $stmt = $this->pdo->prepare(
-            'SELECT *
-               FROM palette_viewer_photos
-              WHERE palette_viewer_id = :palette_viewer_id
-              ORDER BY order_index ASC, palette_viewer_photo_id ASC'
+            "SELECT pvp.*,
+                    COALESCE(NULLIF(pl.rel_path, ''), pvp.rel_path) AS resolved_rel_path,
+                    COALESCE(
+                        NULLIF(pvp.alt_text, ''),
+                        NULLIF(pl.ai_alt_text, ''),
+                        NULLIF(pl.alt_text, '')
+                    ) AS resolved_alt_text,
+                    COALESCE(pl.updated_at, pvp.updated_at) AS resolved_updated_at
+               FROM palette_viewer_photos pvp
+               LEFT JOIN photo_library pl
+                 ON pl.photo_library_id = pvp.photo_library_id
+              WHERE pvp.palette_viewer_id = :palette_viewer_id
+              ORDER BY pvp.order_index ASC, pvp.palette_viewer_photo_id ASC"
         );
         $stmt->execute([':palette_viewer_id' => $paletteViewerId]);
 
@@ -34,6 +43,44 @@ final class PdoPaletteViewerPhotoRepository
         );
     }
 
+    /**
+     * @param int[] $paletteViewerIds
+     * @return array<int, int>
+     */
+    public function countsByViewerIds(array $paletteViewerIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $paletteViewerIds))));
+        if (!$ids) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach ($ids as $index => $id) {
+            $key = ':id' . $index;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT palette_viewer_id, COUNT(*) AS photo_count
+               FROM palette_viewer_photos
+              WHERE palette_viewer_id IN (' . implode(',', $placeholders) . ')
+              GROUP BY palette_viewer_id'
+        );
+        foreach ($params as $key => $id) {
+            $stmt->bindValue($key, $id, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $counts[(int)$row['palette_viewer_id']] = (int)$row['photo_count'];
+        }
+
+        return $counts;
+    }
+
     public function findById(int $paletteViewerPhotoId): ?PaletteViewerPhoto
     {
         if ($paletteViewerPhotoId <= 0) {
@@ -41,10 +88,19 @@ final class PdoPaletteViewerPhotoRepository
         }
 
         $stmt = $this->pdo->prepare(
-            'SELECT *
-               FROM palette_viewer_photos
-              WHERE palette_viewer_photo_id = :palette_viewer_photo_id
-              LIMIT 1'
+            "SELECT pvp.*,
+                    COALESCE(NULLIF(pl.rel_path, ''), pvp.rel_path) AS resolved_rel_path,
+                    COALESCE(
+                        NULLIF(pvp.alt_text, ''),
+                        NULLIF(pl.ai_alt_text, ''),
+                        NULLIF(pl.alt_text, '')
+                    ) AS resolved_alt_text,
+                    COALESCE(pl.updated_at, pvp.updated_at) AS resolved_updated_at
+               FROM palette_viewer_photos pvp
+               LEFT JOIN photo_library pl
+                 ON pl.photo_library_id = pvp.photo_library_id
+              WHERE pvp.palette_viewer_photo_id = :palette_viewer_photo_id
+              LIMIT 1"
         );
         $stmt->execute([':palette_viewer_photo_id' => $paletteViewerPhotoId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,8 +111,10 @@ final class PdoPaletteViewerPhotoRepository
     public function create(array $data): PaletteViewerPhoto
     {
         $paletteViewerId = (int)($data['palette_viewer_id'] ?? 0);
+        $photoLibraryId = $this->optionalPositiveInt($data['photo_library_id'] ?? null);
         $photoType = $this->normalizeKey((string)($data['photo_type'] ?? ''));
         $triggerMode = $this->normalizeKey((string)($data['trigger_mode'] ?? 'any'));
+        $relPath = $photoLibraryId !== null ? null : $this->nullableText($data['rel_path'] ?? null);
 
         if ($paletteViewerId <= 0) {
             throw new InvalidArgumentException('palette_viewer_id required');
@@ -97,8 +155,8 @@ final class PdoPaletteViewerPhotoRepository
         );
         $stmt->execute([
             ':palette_viewer_id' => $paletteViewerId,
-            ':photo_library_id' => $this->optionalPositiveInt($data['photo_library_id'] ?? null),
-            ':rel_path' => $this->nullableText($data['rel_path'] ?? null),
+            ':photo_library_id' => $photoLibraryId,
+            ':rel_path' => $relPath,
             ':photo_type' => $photoType,
             ':trigger_mode' => $triggerMode,
             ':trigger_color_id' => $this->optionalPositiveInt($data['trigger_color_id'] ?? null),
@@ -117,8 +175,10 @@ final class PdoPaletteViewerPhotoRepository
         }
 
         $paletteViewerId = (int)($data['palette_viewer_id'] ?? 0);
+        $photoLibraryId = $this->optionalPositiveInt($data['photo_library_id'] ?? null);
         $photoType = $this->normalizeKey((string)($data['photo_type'] ?? ''));
         $triggerMode = $this->normalizeKey((string)($data['trigger_mode'] ?? 'any'));
+        $relPath = $photoLibraryId !== null ? null : $this->nullableText($data['rel_path'] ?? null);
 
         if ($paletteViewerId <= 0) {
             throw new InvalidArgumentException('palette_viewer_id required');
@@ -147,8 +207,8 @@ final class PdoPaletteViewerPhotoRepository
         $stmt->execute([
             ':palette_viewer_photo_id' => $paletteViewerPhotoId,
             ':palette_viewer_id' => $paletteViewerId,
-            ':photo_library_id' => $this->optionalPositiveInt($data['photo_library_id'] ?? null),
-            ':rel_path' => $this->nullableText($data['rel_path'] ?? null),
+            ':photo_library_id' => $photoLibraryId,
+            ':rel_path' => $relPath,
             ':photo_type' => $photoType,
             ':trigger_mode' => $triggerMode,
             ':trigger_color_id' => $this->optionalPositiveInt($data['trigger_color_id'] ?? null),
@@ -228,20 +288,23 @@ final class PdoPaletteViewerPhotoRepository
 
     private function rowToPaletteViewerPhoto(array $row): PaletteViewerPhoto
     {
+        $relPath = $this->nullableText($row['resolved_rel_path'] ?? $row['rel_path'] ?? null);
+        $updatedAt = $this->nullableText($row['resolved_updated_at'] ?? $row['updated_at'] ?? null);
+
         return new PaletteViewerPhoto(
             paletteViewerPhotoId: (int)$row['palette_viewer_photo_id'],
             paletteViewerId: (int)$row['palette_viewer_id'],
             photoLibraryId: isset($row['photo_library_id']) && $row['photo_library_id'] !== null
                 ? (int)$row['photo_library_id']
                 : null,
-            relPath: $this->nullableText($row['rel_path'] ?? null),
+            relPath: $relPath !== null ? $this->appendCacheBuster($relPath, $updatedAt) : null,
             photoType: (string)$row['photo_type'],
             triggerMode: (string)$row['trigger_mode'],
             triggerColorId: isset($row['trigger_color_id']) && $row['trigger_color_id'] !== null
                 ? (int)$row['trigger_color_id']
                 : null,
             caption: $this->nullableText($row['caption'] ?? null),
-            altText: $this->nullableText($row['alt_text'] ?? null),
+            altText: $this->nullableText($row['resolved_alt_text'] ?? $row['alt_text'] ?? null),
             orderIndex: (int)$row['order_index'],
             createdAt: (string)$row['created_at'],
             updatedAt: $this->nullableText($row['updated_at'] ?? null)
@@ -269,5 +332,22 @@ final class PdoPaletteViewerPhotoRepository
     {
         $text = trim((string)($value ?? ''));
         return $text === '' ? null : $text;
+    }
+
+    private function appendCacheBuster(string $url, ?string $updatedAt): string
+    {
+        $url = trim($url);
+        $updatedAt = trim((string)($updatedAt ?? ''));
+        if ($url === '' || $updatedAt === '' || str_contains($url, '?v=') || str_contains($url, '&v=')) {
+            return $url;
+        }
+
+        $stamp = strtotime($updatedAt);
+        if ($stamp === false || $stamp <= 0) {
+            return $url;
+        }
+
+        $sep = str_contains($url, '?') ? '&' : '?';
+        return $url . $sep . 'v=' . $stamp;
     }
 }

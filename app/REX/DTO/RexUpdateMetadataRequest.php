@@ -8,6 +8,5 @@ final readonly class RexUpdateMetadataRequest
     public function __construct(
         public int $reservationId,
         public string $label,
-        public ?string $sourceKey = null,
     ) {}
 }

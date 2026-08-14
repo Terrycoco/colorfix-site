@@ -339,9 +339,45 @@
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.apv-btn--viewer-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: #fff;
+  color: #101828;
+  font-weight: 800;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.apv-btn--viewer-cta:hover {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.apv-btn--viewer-cta-home {
+  gap: 8px;
+}
+
+.apv-colorfix-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  color: #050505;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.apv-colorfix-wordmark__fix {
+  color: #00a8ad;
 }
 
 .apv-btn--share {

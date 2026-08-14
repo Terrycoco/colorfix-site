@@ -56,16 +56,10 @@ try {
         if (!isset($grouped[$playlistId])) {
             $grouped[$playlistId] = [
                 'rex' => [],
-                'sources' => [],
             ];
         }
 
         $grouped[$playlistId]['rex'][] = (int)$reservation->id;
-
-        $source = trim((string)($reservation->sourceKey ?? ''));
-        if ($source !== '') {
-            $grouped[$playlistId]['sources'][$source] = true;
-        }
     }
 
     $items = [];
@@ -83,15 +77,11 @@ try {
         )));
         sort($reservationIds, SORT_NUMERIC);
 
-        $sources = array_keys($rexData['sources']);
-        sort($sources, SORT_NATURAL | SORT_FLAG_CASE);
-
         $items[] = [
             'playlist_id' => (int)$playlist['playlist_id'],
             'title' => (string)($playlist['title'] ?? ''),
             'type' => (string)($playlist['type'] ?? ''),
             'rex' => $reservationIds,
-            'sources' => $sources,
         ];
     }
 

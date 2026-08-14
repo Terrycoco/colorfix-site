@@ -8,6 +8,7 @@ import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { getPaletteTargets } from "@helpers/playerPaletteItems";
 import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import { isHireTerryCta, trackCtaOnclickEvent, trackUserEvent } from "@helpers/userEvents";
 import colorfixLogoUrl from "../../assets/brand/colorfix_lightbg.png";
 import './playerpage.css';
@@ -15,7 +16,7 @@ import './playerpage.css';
 const PLAYER_CLOSE_ON_EXIT_KEY = "cf.player.close_on_exit.v1";
 
 export default function PlayerPage() {
-  const { playlistId, start } = useParams();
+  const { playlistId, start, token: routeToken } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,7 +28,9 @@ export default function PlayerPage() {
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const sourceParam = searchParams.get("src") ?? "";
-  const reservationTokenParam = searchParams.get("reservation_token") ?? searchParams.get("token") ?? "";
+  const reservationTokenParam = location.pathname.startsWith("/t/") && routeToken
+    ? routeToken
+    : searchParams.get("reservation_token") ?? searchParams.get("token") ?? "";
   const includePrivateParam = searchParams.get("include_private") ?? "";
   const endParam = (searchParams.get("end") ?? "") === "1";
   const closeOnExitParam = (searchParams.get("close") ?? "") === "1";
@@ -68,7 +71,9 @@ export default function PlayerPage() {
     if (!data) return;
     const params = new URLSearchParams(searchParams);
     let changed = false;
-    if (data?.thumbs_enabled && !thumbParam) {
+    // Legacy playlist-instance URLs used ?thumb=1 as navigation state.
+    // REX playlist URLs must stay canonical: /t/<token>.
+    if (data?.thumbs_enabled && !thumbParam && !location.pathname.startsWith("/t/")) {
       params.set("thumb", "1");
       changed = true;
     }
@@ -76,7 +81,7 @@ export default function PlayerPage() {
       params.set("demo", "1");
       changed = true;
     }
-    if (data?.audience && !ctaAudience) {
+    if (data?.audience && !ctaAudience && !location.pathname.startsWith("/t/")) {
       params.set("aud", data.audience);
       changed = true;
     }
@@ -108,6 +113,7 @@ export default function PlayerPage() {
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (returnTo !== "") params.set("return_to", returnTo);
+    applySourceToParams(params, sourceParam);
     if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
     if (freshParam !== "") params.set("fresh", freshParam);
     if (reloadParam !== "") params.set("_", reloadParam);
@@ -137,7 +143,7 @@ export default function PlayerPage() {
     return () => {
       cancelled = true;
     };
-  }, [playlistId, reservationTokenParam, startParamValue, offsetParam, positionParam, slideIdParam, photoIdParam, addCtaGroup, ctaAudience, returnTo, debugTimingParam, freshParam, reloadParam]);
+  }, [playlistId, reservationTokenParam, startParamValue, offsetParam, positionParam, slideIdParam, photoIdParam, addCtaGroup, ctaAudience, returnTo, sourceParam, debugTimingParam, freshParam, reloadParam]);
 
   useEffect(() => {
     if (!data?.playlist_instance_id) return;
@@ -201,20 +207,20 @@ export default function PlayerPage() {
       return;
     }
     if (returnTo) {
-      exitToPath(returnTo);
+      exitToPath(withSourceParam(returnTo, sourceParam));
       return;
     }
     if (adminExitPath) {
       const target = adminExitPath;
       clearAdminExitPath();
-      window.location.href = target;
+      window.location.href = withSourceParam(target, sourceParam);
       return;
     }
     exitToPath("/");
   }
 
   function exitToPath(path) {
-    const target = resolveReturnTo(path) || "/";
+    const target = withSourceParam(resolveReturnTo(path) || "/", sourceParam);
     if (isFastPlayerShell && !target.startsWith("/p/")) {
       window.location.href = target;
       return;
@@ -272,7 +278,7 @@ export default function PlayerPage() {
   const paletteTargets = useMemo(() => getPaletteTargets(data), [data]);
 
   const paletteCount = paletteTargets.length;
-
+  const isRexPlaylist = Boolean(reservationTokenParam);
   function isCtaVisible(cta) {
     if (!cta) return false;
     if (cta.enabled === false) return false;
@@ -286,8 +292,10 @@ export default function PlayerPage() {
         }
         return true;
       case "to_thumbs":
+        if (isRexPlaylist) return true;
         return paletteCount > 1;
       case "to_palette":
+        if (isRexPlaylist) return true;
         return paletteCount === 1;
 
       // future examples (not active yet):
@@ -384,7 +392,7 @@ export default function PlayerPage() {
 
 const ctas = useMemo(() => {
   const raw = data?.ctas || [];
-  return raw.map((cta, index) => {
+  const mapped = raw.map((cta, index) => {
     let parsedParams = {};
     if (typeof cta?.params === "string" && cta.params.trim() !== "") {
       try {
@@ -420,7 +428,15 @@ const ctas = useMemo(() => {
       params: parsedParams,
     };
   });
-}, [data?.ctas, psiParam, thumbsEnabled, demoEnabled, ctaAudience]);
+
+  return mapped;
+}, [
+  data?.ctas,
+  psiParam,
+  thumbsEnabled,
+  demoEnabled,
+  ctaAudience,
+]);
 
 useEffect(() => {
   const fromPicker = returnTo.startsWith("/picker");
@@ -488,7 +504,7 @@ function buildSlideReturnTo({ data, playlistId, item, location, searchParams, is
     params.set("slide_id", String(slideId));
   }
   const query = params.toString();
-  return `${basePath}${query ? `?${query}` : ""}`;
+  return withSourceParam(`${basePath}${query ? `?${query}` : ""}`);
 }
 
 function readPlayerCloseOnExit() {
@@ -584,7 +600,7 @@ function resolveEnabled(baseEnabled, params, psiParam, thumbParam, demoParam, au
 
 const visibleCTAs = useMemo(
   () => ctas.filter(isCtaVisible),
-  [ctas, likedCount]
+  [ctas, likedCount, isRexPlaylist, paletteCount, data?.hide_stars]
 );
 
   const baseVisibleCTAs = useMemo(

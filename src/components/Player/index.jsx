@@ -11,6 +11,7 @@ import {
   withImageRefresh,
 } from "@helpers/assetImage";
 import { isPaletteEligibleItem } from "@helpers/playerPaletteItems";
+import { withSourceParam } from "@helpers/sourceParam";
 import "./player.css";
 
 const DEFAULT_TITLE_DELAY_MS = 120;
@@ -85,7 +86,7 @@ function queueFadeReady(img, stageEl) {
       if (window.history.length > 1) {
         window.history.back();
       } else {
-        window.location.href = "/";
+        window.location.href = withSourceParam("/");
       }
     }
   }

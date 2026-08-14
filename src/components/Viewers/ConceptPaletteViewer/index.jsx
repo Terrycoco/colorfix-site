@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import LogoAnimated from "@components/LogoAnimated";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
+import { withSourceParam } from "@helpers/sourceParam";
+import ViewerCtaButton from "../ViewerCtaButton";
 import "../appliedpaletteviewer.css";
 import "../conceptpaletteviewer.css";
 
@@ -48,8 +50,10 @@ export default function ConceptPaletteViewer({
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
 
-  const resolvedPlaylistUrl = playlistUrl || meta?.playlist_url || "";
+  const resolvedPlaylistUrl = withSourceParam(playlistUrl || meta?.playlist_url || "");
   const resolvedPlaylistLabel = meta?.cta_label || "Watch the Transformation";
+  const viewerCtaLabel = meta?.viewer_cta_label || "";
+  const viewerCtaUrl = meta?.viewer_cta_url || "";
 
 
   const seoTitle = kicker
@@ -71,7 +75,7 @@ export default function ConceptPaletteViewer({
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = withSourceParam("/");
     }
   };
 
@@ -82,7 +86,7 @@ export default function ConceptPaletteViewer({
     }
 
     if (typeof window !== "undefined") {
-      window.location.href = "/";
+      window.location.href = withSourceParam("/");
     }
   };
 
@@ -288,7 +292,7 @@ export default function ConceptPaletteViewer({
               <button
                 className="apv-logo-button"
                 onClick={() => {
-                  window.location.href = "/";
+                  window.location.href = withSourceParam("/");
                 }}
               >
                 <LogoAnimated />
@@ -425,11 +429,12 @@ export default function ConceptPaletteViewer({
         </div>
       )}
 
-      {(footer || showShare) && (
+      {(footer || showShare || viewerCtaUrl) && (
         <div className="apv-footer">
           {footer}
 
           <div className="apv-footer-actions">
+            <ViewerCtaButton label={viewerCtaLabel} url={viewerCtaUrl} />
             {showShare && (
               <button
                 type="button"

@@ -15,6 +15,11 @@ import "./AdminRexConversionPage.css";
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
 const INSTANCES_URL = `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
 const REX_PLAYLISTS_URL = `${API_FOLDER}/v2/admin/rex/playlist-summary.php`;
+const REX_PREVIEW_URL = `${API_FOLDER}/v2/admin/rex/preview.php`;
+const REX_CREATE_URL = `${API_FOLDER}/v2/admin/rex/create.php`;
+const REX_CREATE_ALIAS_URL = `${API_FOLDER}/v2/admin/rex/create-alias.php`;
+const REX_LINK_VIEWERS_URL = `${API_FOLDER}/v2/admin/rex/link-playlist-viewers.php`;
+const REX_PLAYLIST_URL = `${API_FOLDER}/v2/admin/rex/playlist-url.php`;
 
 async function readJsonResponse(response, fallbackMessage) {
   const text = await response.text();
@@ -57,7 +62,6 @@ function migrationRequest(instance, playlistMap) {
 
   return {
     label: instanceName || `${playlistTitle} — migrated PI #${instance?.playlist_instance_id || ""}`,
-    sourceKey: "",
     resolverKey: "playlist_experience",
     resourceType: "playlist",
     resourceId: playlistId,
@@ -66,6 +70,7 @@ function migrationRequest(instance, playlistMap) {
     },
     alias: slug,
     adminNote: migrationAdminNote(instance),
+    reuseExisting: true,
   };
 }
 
@@ -105,6 +110,15 @@ export default function AdminRexConversionPage() {
     title: "",
   });
   const [notePopover, setNotePopover] = useState(null);
+  const [batch, setBatch] = useState({
+    running: false,
+    total: 0,
+    done: 0,
+    created: 0,
+    failed: 0,
+  });
+  const [linkingViewers, setLinkingViewers] = useState(false);
+  const [rexPreviewUrls, setRexPreviewUrls] = useState({});
 
   const playlistMap = useMemo(() => {
     const map = new Map();
@@ -145,21 +159,58 @@ export default function AdminRexConversionPage() {
     return sort.direction === "asc" ? "ascending" : "descending";
   }
 
-  const selectVisibleInstance = useCallback(
-    (index) => {
-      const instance = sortedInstances[index];
+  const scrollInstanceIntoView = useCallback((instanceId, block = "center") => {
+    if (!instanceId) return;
+
+    requestAnimationFrame(() => {
+      gridRef.current
+        ?.querySelector(`[data-instance-id="${instanceId}"]`)
+        ?.scrollIntoView({ block, behavior: "smooth" });
+    });
+  }, []);
+
+  const selectInstance = useCallback(
+    (instance, { scroll = true, block = "center" } = {}) => {
       const instanceId = Number(instance?.playlist_instance_id || 0);
+      const playlistId = Number(instance?.playlist_id || 0);
       if (!instanceId) return;
 
       setSelectedInstanceId(instanceId);
+      if (playlistId > 0) {
+        setSelectedPlaylistId(playlistId);
+      }
 
-      requestAnimationFrame(() => {
-        gridRef.current
-          ?.querySelector(`[data-instance-id="${instanceId}"]`)
-          ?.scrollIntoView({ block: "nearest" });
-      });
+      if (scroll) {
+        scrollInstanceIntoView(instanceId, block);
+      }
     },
-    [sortedInstances]
+    [scrollInstanceIntoView]
+  );
+
+  const selectPlaylist = useCallback(
+    (playlistId) => {
+      const normalizedPlaylistId = Number(playlistId || 0);
+      setSelectedPlaylistId(normalizedPlaylistId || null);
+
+      if (normalizedPlaylistId <= 0) return;
+
+      const matchingInstance = sortedInstances.find(
+        (instance) => Number(instance?.playlist_id || 0) === normalizedPlaylistId
+      );
+
+      if (matchingInstance) {
+        selectInstance(matchingInstance, { scroll: true, block: "center" });
+      }
+    },
+    [selectInstance, sortedInstances]
+  );
+
+  const selectVisibleInstance = useCallback(
+    (index) => {
+      const instance = sortedInstances[index];
+      selectInstance(instance, { scroll: true, block: "nearest" });
+    },
+    [selectInstance, sortedInstances]
   );
 
   const handleInstanceGridKeyDown = useCallback(
@@ -230,6 +281,26 @@ export default function AdminRexConversionPage() {
     setNotePopover(null);
   }, [sort.direction, sort.key]);
 
+  useEffect(() => {
+    if (!selectedPlaylistId || !sortedInstances.length) return;
+
+    const selectedInstance = sortedInstances.find(
+      (instance) => Number(instance?.playlist_instance_id || 0) === Number(selectedInstanceId || 0)
+    );
+
+    if (selectedInstance && Number(selectedInstance?.playlist_id || 0) === Number(selectedPlaylistId)) {
+      return;
+    }
+
+    const matchingInstance = sortedInstances.find(
+      (instance) => Number(instance?.playlist_id || 0) === Number(selectedPlaylistId)
+    );
+
+    if (matchingInstance) {
+      selectInstance(matchingInstance, { scroll: true, block: "center" });
+    }
+  }, [selectInstance, selectedInstanceId, selectedPlaylistId, sortedInstances]);
+
   const loadRexPlaylists = useCallback(async () => {
     const data = await readJsonResponse(
       await fetch(`${REX_PLAYLISTS_URL}?_=${Date.now()}`, {
@@ -287,9 +358,63 @@ export default function AdminRexConversionPage() {
     void loadPage();
   }, [loadPage]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRexPreviewUrls() {
+      const playlistIds = Array.from(new Set(
+        instances
+          .map((instance) => Number(instance?.playlist_id || 0))
+          .filter((playlistId) => playlistId > 0)
+      ));
+
+      if (!playlistIds.length) {
+        setRexPreviewUrls({});
+        return;
+      }
+
+      const urlByPlaylistId = {};
+
+      await Promise.all(
+        playlistIds.map(async (playlistId) => {
+          try {
+            const data = await readJsonResponse(
+              await fetch(
+                `${REX_PLAYLIST_URL}?playlist_id=${encodeURIComponent(playlistId)}&_=${Date.now()}`,
+                { credentials: "include" }
+              ),
+              "Failed to load REX playlist URL"
+            );
+            urlByPlaylistId[playlistId] = data?.item?.public_url || "";
+          } catch {
+            urlByPlaylistId[playlistId] = "";
+          }
+        })
+      );
+
+      if (!cancelled) {
+        const next = {};
+        instances.forEach((instance) => {
+          const instanceId = Number(instance?.playlist_instance_id || 0);
+          const playlistId = Number(instance?.playlist_id || 0);
+          if (instanceId > 0) {
+            next[instanceId] = urlByPlaylistId[playlistId] || "";
+          }
+        });
+        setRexPreviewUrls(next);
+      }
+    }
+
+    void loadRexPreviewUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [instances]);
+
   async function handleRexCreated(instance, result) {
     setStatus(
-      `REX #${result.reservationId} created for Playlist #${instance.playlist_id}.`
+      `REX #${result.reservationId} ${result?.reused ? "reused" : "created"} for Playlist #${instance.playlist_id}.`
     );
     setError("");
 
@@ -298,6 +423,182 @@ export default function AdminRexConversionPage() {
       setSelectedPlaylistId(Number(instance.playlist_id));
     } catch (err) {
       setError(err?.message || "REX was created, but the playlist summary could not refresh.");
+    }
+  }
+
+  async function createRexFromRequest(request) {
+    const context =
+      request?.context && typeof request.context === "object" && !Array.isArray(request.context)
+        ? request.context
+        : {};
+    const resourceId = Number(request?.resourceId || 0);
+
+    await readJsonResponse(
+      await fetch(REX_PREVIEW_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resolver_key: String(request?.resolverKey || "").trim(),
+          resource_type: String(request?.resourceType || "").trim(),
+          resource_id: resourceId,
+          context,
+        }),
+      }),
+      "Failed to preview REX destination"
+    );
+
+    const createData = await readJsonResponse(
+      await fetch(REX_CREATE_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: String(request?.label || "").trim(),
+          resolver_key: String(request?.resolverKey || "").trim(),
+          resource_type: String(request?.resourceType || "").trim(),
+          resource_id: resourceId,
+          context,
+          admin_note: String(request?.adminNote || "").trim() || null,
+          reuse_existing: Boolean(request?.reuseExisting),
+        }),
+      }),
+      "Failed to create REX reservation"
+    );
+
+    const reservation = createData.item || null;
+    const alias = String(request?.alias || "").trim();
+
+    if (alias && reservation?.id && !createData.reused) {
+      await readJsonResponse(
+        await fetch(REX_CREATE_ALIAS_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reservation_id: Number(reservation.id),
+            alias,
+          }),
+        }),
+        "Failed to create REX alias"
+      );
+    }
+
+    return {
+      reservation,
+      reused: Boolean(createData.reused),
+    };
+  }
+
+  async function fetchAllRex() {
+    if (batch.running) return;
+
+    const queue = sortedInstances.filter((instance) => Number(instance?.playlist_id || 0) > 0);
+    if (!queue.length) {
+      setStatus("No playlist instances are eligible for REX conversion.");
+      setError("");
+      return;
+    }
+
+    setBatch({
+      running: true,
+      total: queue.length,
+      done: 0,
+      created: 0,
+      failed: 0,
+    });
+    setStatus(`Starting REX conversion for ${queue.length} playlist instance${queue.length === 1 ? "" : "s"}...`);
+    setError("");
+
+    const failures = [];
+    let created = 0;
+
+    for (let index = 0; index < queue.length; index += 1) {
+      const instance = queue[index];
+      const instanceId = Number(instance?.playlist_instance_id || 0);
+      setSelectedInstanceId(instanceId);
+      setStatus(`Fetching REX ${index + 1} of ${queue.length}: PI #${instanceId}`);
+
+      try {
+        const result = await createRexFromRequest(migrationRequest(instance, playlistMap));
+        if (!result?.reused) {
+          created += 1;
+        }
+      } catch (err) {
+        failures.push({
+          instanceId,
+          message: err?.message || "Unknown REX conversion error",
+        });
+      }
+
+      setBatch({
+        running: true,
+        total: queue.length,
+        done: index + 1,
+        created,
+        failed: failures.length,
+      });
+    }
+
+    setBatch((current) => ({ ...current, running: false }));
+
+    try {
+      await loadRexPlaylists();
+    } catch (err) {
+      failures.push({
+        instanceId: null,
+        message: err?.message || "REX conversion finished, but the summary could not refresh.",
+      });
+    }
+
+    if (failures.length) {
+      setStatus(`REX conversion finished: ${created} created, ${failures.length} failed.`);
+      setError(
+        failures
+          .slice(0, 5)
+          .map((failure) => `${failure.instanceId ? `PI #${failure.instanceId}` : "Refresh"}: ${failure.message}`)
+          .join(" | ")
+      );
+    } else {
+      setStatus(`REX conversion finished: ${created} created, 0 failed.`);
+      setError("");
+    }
+  }
+
+  async function linkPlaylistViewers() {
+    if (linkingViewers || batch.running) return;
+
+    setLinkingViewers(true);
+    setError("");
+    setStatus("Linking playlist REX reservations to palette viewer REX reservations...");
+
+    try {
+      const data = await readJsonResponse(
+        await fetch(REX_LINK_VIEWERS_URL, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }),
+        "Failed to link playlist viewers"
+      );
+      const result = data.result || {};
+      setStatus(
+        `Viewer links finished: ${result.created_count || 0} created, ${result.existing_count || 0} already existed, ${result.skipped_count || 0} skipped.`
+      );
+      if (Number(result.skipped_count || 0) > 0 && Array.isArray(result.skipped)) {
+        setError(
+          result.skipped
+            .slice(0, 5)
+            .map((row) => `PI #${row.playlist_item_id || "?"}: ${row.reason}`)
+            .join(" | ")
+        );
+      }
+    } catch (err) {
+      setError(err?.message || "Failed to link playlist viewers");
+      setStatus("");
+    } finally {
+      setLinkingViewers(false);
     }
   }
 
@@ -340,7 +641,7 @@ export default function AdminRexConversionPage() {
                         count,
                         label: `${count} active REX reservation${count === 1 ? "" : "s"}`,
                       }}
-                      onSelect={() => setSelectedPlaylistId(playlist.playlist_id)}
+                      onSelect={() => selectPlaylist(playlist.playlist_id)}
                       onStatusClick={() => {
                         if (!ids.length) return;
 
@@ -369,6 +670,27 @@ export default function AdminRexConversionPage() {
                   Legacy Playlist Instances are migration clues only. Fetch REX creates
                   reservations on the underlying Playlist.
                 </p>
+              </div>
+              <div className="admin-rex-conversion__header-actions">
+                <button
+                  type="button"
+                  onClick={() => void fetchAllRex()}
+                  disabled={loading || batch.running || linkingViewers || sortedInstances.length === 0}
+                >
+                  {batch.running ? "Fetching..." : "Fetch All"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void linkPlaylistViewers()}
+                  disabled={loading || batch.running || linkingViewers}
+                >
+                  {linkingViewers ? "Linking..." : "Link Viewers"}
+                </button>
+                {batch.total > 0 ? (
+                  <span>
+                    {batch.done}/{batch.total} done · {batch.created} created · {batch.failed} failed
+                  </span>
+                ) : null}
               </div>
             </div>
 
@@ -427,7 +749,10 @@ export default function AdminRexConversionPage() {
                           Slug
                         </button>
                       </th>
-                      <th aria-label="Review" />
+                      <th className="admin-rex-conversion__preview-heading">
+                        <span>OLD</span>
+                        <span>NEW</span>
+                      </th>
                       <th aria-label="Action" />
                     </tr>
                   </thead>
@@ -445,7 +770,7 @@ export default function AdminRexConversionPage() {
                           data-instance-id={instanceId}
                           className={isSelected ? "is-selected" : ""}
                           onClick={() => {
-                            setSelectedInstanceId(instanceId);
+                            selectInstance(instance, { scroll: false });
                             gridRef.current?.focus({ preventScroll: true });
                           }}
                         >
@@ -499,13 +824,35 @@ export default function AdminRexConversionPage() {
                             >
                               ▶
                             </a>
+                            {rexPreviewUrls[instanceId] ? (
+                              <a
+                                className="admin-rex-conversion__play"
+                                href={rexPreviewUrls[instanceId]}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label={`Play REX ${
+                                  instance.instance_name || `PI #${instance.playlist_instance_id}`
+                                }`}
+                                title="Play REX playlist"
+                              >
+                                ▶
+                              </a>
+                            ) : (
+                              <span
+                                className="admin-rex-conversion__play admin-rex-conversion__play--disabled"
+                                aria-label="No REX playlist URL"
+                                title="No REX playlist URL"
+                              >
+                                ▶
+                              </span>
+                            )}
                           </td>
 
                           <td className="admin-rex-conversion__action">
                             <FetchRexButton
                               request={migrationRequest(instance, playlistMap)}
                               buttonLabel="Fetch"
-                              disabled={playlistId <= 0}
+                              disabled={playlistId <= 0 || batch.running}
                               onCreated={(result) => void handleRexCreated(instance, result)}
                             />
                           </td>

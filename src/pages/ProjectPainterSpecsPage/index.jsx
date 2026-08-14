@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import PainterPaletteViewer from "@components/Viewers/PainterPaletteViewer";
 import { buildImageUrl } from "@helpers/assetImage";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "../SavedPaletteSharePage/saved-palette-share.css";
 
 export default function ProjectPainterSpecsPage() {
@@ -24,6 +25,7 @@ export default function ProjectPainterSpecsPage() {
     const controller = new AbortController();
     setState({ loading: true, error: "", data: null });
     const params = new URLSearchParams({ reservation_token: token });
+    applySourceToParams(params);
     fetch(`/api/v2/project-painter-specs.php?${params.toString()}`, {
       signal: controller.signal,
     })
@@ -60,11 +62,10 @@ export default function ProjectPainterSpecsPage() {
   const project = state.data?.project || {};
   const projectTitle = project.name || "Painter Specification Sheet";
   const plans = buildPainterPlans(state.data?.plans || []);
-  const playlistUrl = appendParams("/p/reserved", {
-    reservation_token: token,
+  const playlistUrl = withSourceParam(appendParams(`/t/${encodeURIComponent(token)}`, {
     fresh: "1",
-    return_to: currentPath,
-  });
+    return_to: withSourceParam(currentPath),
+  }));
 
   return (
     <PainterPaletteViewer

@@ -95,4 +95,23 @@ interface RexReservationRepositoryInterface
     public function reactivate(int $reservationId): RexReservation;
 
     public function tokenExists(string $token): bool;
+
+    /**
+     * @param int[] $resourceIds
+     * @return array<int, RexReservation[]>
+     */
+    public function findActiveByResourceIds(
+        string $resolverKey,
+        string $resourceType,
+        array $resourceIds,
+    ): array;
+
+    public function findActiveByResourceIdsAndExperience(
+        string $resolverKey,
+        string $resourceType,
+        array $resourceIds,
+        string $experienceKey,
+    ): array;
+
+
 }

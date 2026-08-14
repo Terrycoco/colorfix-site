@@ -3,7 +3,7 @@
   --admin-layout-border-soft: #e9edf1;
   --admin-layout-text: #1f2933;
   --admin-layout-muted: #6b7280;
-  --admin-layout-selected: #eef4f7;
+  --admin-layout-selected: var(--highlight-cyan, #BEDCDD);
   --admin-layout-hover: #f7f9fa;
   --admin-layout-dot: #2f8f4e;
   --admin-layout-bg: #ffffff;
@@ -12,6 +12,7 @@
 .admin-master-detail {
   --admin-list-width: 320px;
 
+  flex: 1;
   display: grid;
   grid-template-columns: minmax(0, var(--admin-list-width)) 11px minmax(0, 1fr);
   width: 100%;

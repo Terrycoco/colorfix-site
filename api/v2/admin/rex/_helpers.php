@@ -64,7 +64,6 @@ function rex_admin_reservation_payload(RexReservation $reservation): array
         'token' => $reservation->token,
         'label' => $reservation->label,
         'admin_note' => $reservation->adminNote,
-        'source_key' => $reservation->sourceKey,
         'resolver_key' => $reservation->resolverKey,
         'resource_type' => $reservation->resourceType,
         'resource_id' => $reservation->resourceId,

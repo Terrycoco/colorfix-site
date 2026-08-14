@@ -6,6 +6,7 @@ const LIST_URL = `${API_FOLDER}/v2/admin/kickers/list.php`;
 
 export default function KickerDropdown({
   value = "",
+  textValue = "",
   onChange,
   blankLabel = "No kicker",
   includeBlank = true,
@@ -41,10 +42,18 @@ export default function KickerDropdown({
     [kickers]
   );
 
+  const resolvedValue =
+    value ||
+    (
+      textValue
+        ? options.find((opt) => opt.label.replace(/ \(inactive\)$/, "") === textValue)?.value || ""
+        : ""
+    );
+
   return (
     <div className="kicker-dropdown">
       <select
-        value={value ?? ""}
+        value={resolvedValue ?? ""}
         onChange={(e) => {
           const nextValue = e.target.value === "" ? null : e.target.value;
           const selected = options.find((opt) => opt.value === e.target.value) || null;

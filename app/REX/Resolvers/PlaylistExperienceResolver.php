@@ -58,11 +58,12 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             : null;
 
         $service = new PlayerExperienceService($this->pdo);
+        $sourceAttribution = $this->cleanSourceAttribution($request->requestMetadata['src'] ?? null);
 
         $plan = $service->buildPlaybackPlanFromPlaylistExperience(
             $playlistId,
             $experienceKey,
-            $request->sourceKey,
+            $sourceAttribution,
             $start,
             $startTarget,
             $request->reservation->token
@@ -92,6 +93,12 @@ final class PlaylistExperienceResolver implements RexResolverInterface
                 'timing_ms' => $service->getLastTiming(),
             ],
         );
+    }
+
+    private function cleanSourceAttribution(mixed $value): ?string
+    {
+        $source = strtolower(trim((string)$value));
+        return preg_match('/^[a-z0-9_-]{1,80}$/', $source) ? $source : null;
     }
 
     public function describe(

@@ -1,0 +1,14 @@
+.rex-public-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #fff;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rex-public-page--error {
+  color: #991b1b;
+}

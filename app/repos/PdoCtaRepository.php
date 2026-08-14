@@ -39,6 +39,25 @@ SQL;
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function findGroupByKey(string $key): ?array
+    {
+        $key = strtolower(trim($key));
+        if ($key === '') {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT id, `key`, label, description
+               FROM cta_groups
+              WHERE `key` = :key
+              LIMIT 1'
+        );
+        $stmt->execute(['key' => $key]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
     public function getByIds(array $ctaIds): array
     {
         $ids = array_values(array_unique(array_filter(array_map('intval', $ctaIds))));

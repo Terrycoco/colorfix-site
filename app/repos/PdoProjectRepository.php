@@ -212,6 +212,25 @@ final class PdoProjectRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function findMostRecentProjectIdByPlaylistId(int $playlistId): ?int
+    {
+        if ($playlistId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT project_id
+             FROM project_playlists
+             WHERE playlist_id = :playlist_id
+             ORDER BY updated_at DESC, project_playlist_id DESC
+             LIMIT 1"
+        );
+        $stmt->execute([':playlist_id' => $playlistId]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false ? null : (int)$value;
+    }
+
     private function selectSql(): string
     {
         return "SELECT

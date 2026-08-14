@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
+import { withSourceParam } from "@helpers/sourceParam";
 import "./article-page.css";
 
 const GET_URL = `${API_FOLDER}/v2/articles/get.php`;
@@ -42,7 +43,7 @@ export default function ArticlePage() {
   const playlistInstanceId = searchParams.get("playlist_instance_id") ?? "";
   const playlistTitle = searchParams.get("playlist_title") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
-  const playlistUrl = returnToParam || (playlistInstanceId ? `/p/${playlistInstanceId}` : "");
+  const playlistUrl = withSourceParam(returnToParam || (playlistInstanceId ? `/p/${playlistInstanceId}` : ""));
 
   useEffect(() => {
     let active = true;
@@ -123,7 +124,7 @@ export default function ArticlePage() {
     const params = cta?.params || {};
     if (key === "playlist_link") {
       const pid = params.playlist_instance_id || params.playlistInstanceId;
-      const url = params.url || (pid ? `/playlist/${pid}` : "");
+      const url = withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
       if (url) {
         if (url.startsWith("/")) navigate(url);
         else window.location.href = url;
@@ -132,7 +133,7 @@ export default function ArticlePage() {
     }
     if (key === "article_link") {
       const aid = params.article_id || params.articleId;
-      const url = params.url || (aid ? `/articles/${aid}` : "");
+      const url = withSourceParam(params.url || (aid ? `/articles/${aid}` : ""));
       if (url) {
         if (url.startsWith("/")) navigate(url);
         else window.location.href = url;
@@ -140,7 +141,7 @@ export default function ArticlePage() {
       return;
     }
     if (key === "navigate") {
-      const url = params.url || "";
+      const url = withSourceParam(params.url || "");
       if (!url) return;
       if (url.startsWith("/")) {
         navigate(url);
@@ -150,15 +151,16 @@ export default function ArticlePage() {
       return;
     }
     if (params.url) {
-      if (params.url.startsWith("/")) navigate(params.url);
-      else window.location.href = params.url;
+      const url = withSourceParam(params.url);
+      if (url.startsWith("/")) navigate(url);
+      else window.location.href = url;
     }
   }
 
   function resolvePlaylistLink(cta) {
     const params = cta?.params || {};
     const pid = params.playlist_instance_id || params.playlistInstanceId;
-    return params.url || (pid ? `/playlist/${pid}` : "");
+    return withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
   }
 
   function resolvePlaylistLabel(cta) {
@@ -272,11 +274,11 @@ export default function ArticlePage() {
             const href = resolvePlaylistLink(cta);
             if (!href) return null;
             return (
-              <a key={cta.cta_id} className="article-media-cta" href={href} onClick={(e) => {
-                if (!href.startsWith("/")) return;
-                e.preventDefault();
-                handleCtaClick(cta);
-              }}>
+                <a
+                    key={cta.cta_id}
+                    className="article-media-cta"
+                    href={href}
+                  >
                 <div className="article-media-cta__media" aria-hidden="true">
                   <span className="article-media-cta__play" />
                 </div>

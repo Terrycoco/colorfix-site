@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Repos\PdoArticleRepository;
 use App\Repos\PdoCtaRepository;
+use App\REX\Repos\PdoRexReservationRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -34,6 +35,7 @@ $isAdmin = $adminOverride
 
 try {
     $repo = new PdoArticleRepository($pdo);
+    $rexRepo = new PdoRexReservationRepository($pdo);
     $article = $repo->getArticleById($id);
     if (!$article) {
         respond(['ok' => false, 'error' => 'Not found'], 404);
@@ -114,6 +116,24 @@ try {
                     if (is_array($parsed)) $base = $parsed;
                 }
                 $merged = array_merge($base, $overrides[$key]);
+                $playlistId = isset($merged['playlist_id'])
+                    ? (int)$merged['playlist_id']
+                    : 0;
+
+                if ($playlistId > 0) {
+                    $reservations = $rexRepo->findActiveByResourceIdsAndExperience(
+                        'playlist_experience',
+                        'playlist',
+                        [$playlistId],
+                        'public'
+                    );
+
+                    $reservation = $reservations[$playlistId] ?? null;
+
+                    if ($reservation !== null) {
+                        $merged['url'] = '/t/' . $reservation->token;
+                    }
+                }
                 $cta['params'] = json_encode($merged, JSON_UNESCAPED_SLASHES);
                 $ctas[$idx] = $cta;
             }

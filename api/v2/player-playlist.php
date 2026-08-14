@@ -113,6 +113,7 @@ try {
 
         $result = $resolver->resolveToken($reservationToken, [
             'entry_point' => 'player-playlist',
+            'src' => $_GET['src'] ?? null,
             'start' => $start,
             'start_target' => [
                 'offset' => $offset,

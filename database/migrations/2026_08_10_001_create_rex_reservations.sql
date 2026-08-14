@@ -2,7 +2,6 @@ CREATE TABLE IF NOT EXISTS rex_reservations (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   token VARCHAR(96) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   label VARCHAR(255) NOT NULL,
-  source_key VARCHAR(80) NULL,
   resolver_key VARCHAR(120) NOT NULL,
   resource_type VARCHAR(120) NOT NULL,
   resource_id BIGINT UNSIGNED NOT NULL,
@@ -15,7 +14,6 @@ CREATE TABLE IF NOT EXISTS rex_reservations (
   UNIQUE KEY uq_rex_reservations_token (token),
   KEY idx_rex_reservations_resource (resource_type, resource_id),
   KEY idx_rex_reservations_resolver (resolver_key),
-  KEY idx_rex_reservations_source (source_key),
   KEY idx_rex_reservations_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

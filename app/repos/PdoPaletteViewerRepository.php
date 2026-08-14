@@ -32,6 +32,28 @@ final class PdoPaletteViewerRepository
     /**
      * @return PaletteViewer[]
      */
+    public function listAll(int $limit = 1000): array
+    {
+        $limit = max(1, min(5000, $limit));
+
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM palette_viewers
+              ORDER BY updated_at DESC, palette_viewer_id DESC
+              LIMIT :limit'
+        );
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map(
+            fn(array $row): PaletteViewer => $this->rowToPaletteViewer($row),
+            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
+        );
+    }
+
+    /**
+     * @return PaletteViewer[]
+     */
     public function findBySavedPaletteId(int $savedPaletteId): array
     {
         if ($savedPaletteId <= 0) {
@@ -52,6 +74,53 @@ final class PdoPaletteViewerRepository
             fn(array $row): PaletteViewer => $this->rowToPaletteViewer($row),
             $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
         );
+    }
+
+    /**
+     * @param int[] $savedPaletteIds
+     * @return array<int, PaletteViewer[]>
+     */
+    public function findActivePublicBySavedPaletteIds(array $savedPaletteIds): array
+    {
+        $savedPaletteIds = array_values(array_unique(array_filter(
+            array_map('intval', $savedPaletteIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if ($savedPaletteIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [
+            ':format' => 'public',
+            ':is_active' => 1,
+        ];
+
+        foreach ($savedPaletteIds as $index => $savedPaletteId) {
+            $placeholder = ':saved_palette_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $savedPaletteId;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM palette_viewers
+              WHERE is_active = :is_active
+                AND format = :format
+                AND saved_palette_id IN (' . implode(', ', $placeholders) . ')
+              ORDER BY saved_palette_id ASC, palette_viewer_id ASC'
+        );
+        $stmt->execute($params);
+
+        $grouped = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $viewer = $this->rowToPaletteViewer($row);
+            $grouped[$viewer->savedPaletteId] ??= [];
+            $grouped[$viewer->savedPaletteId][] = $viewer;
+        }
+
+        return $grouped;
     }
 
     public function create(array $data): PaletteViewer

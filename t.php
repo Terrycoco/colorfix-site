@@ -21,21 +21,6 @@ function t_not_found(): void
     exit;
 }
 
-function t_safe_return_to(): string
-{
-    $returnTo = trim((string)($_GET['return_to'] ?? ''));
-
-    if (
-        $returnTo !== ''
-        && str_starts_with($returnTo, '/')
-        && !str_starts_with($returnTo, '//')
-    ) {
-        return $returnTo;
-    }
-
-    return '';
-}
-
 $token = trim((string)($_GET['token'] ?? ''));
 
 if ($token === '') {
@@ -60,6 +45,8 @@ try {
     $result = $resolver->resolveToken($token, [
         'entry_point' => 't',
         'request_uri' => (string)($_SERVER['REQUEST_URI'] ?? ''),
+        'return_to' => trim((string)($_GET['return_to'] ?? '')),
+        'origin_playlist' => trim((string)($_GET['origin_playlist'] ?? '')),
         'ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
         'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
     ]);
@@ -89,24 +76,14 @@ if (
     $result->behavior === RexResolutionBehavior::RENDER
     && $result->resolverKey === 'playlist_experience'
 ) {
-    $params = [
-        'reservation_token' => $token,
-        'fresh' => '1',
-    ];
-
-    $returnTo = t_safe_return_to();
-    if ($returnTo !== '') {
-        $params['return_to'] = $returnTo;
+    $indexPath = __DIR__ . '/index.html';
+    $html = is_file($indexPath) ? (string)file_get_contents($indexPath) : '';
+    if ($html === '') {
+        t_not_found();
     }
 
-    $target = '/p/reserved?' . http_build_query(
-        $params,
-        '',
-        '&',
-        PHP_QUERY_RFC3986
-    );
-
-    header('Location: ' . $target, true, 302);
+    header('Content-Type: text/html; charset=utf-8');
+    echo $html;
     exit;
 }
 

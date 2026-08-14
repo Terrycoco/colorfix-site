@@ -480,8 +480,9 @@ async function fetchFrontPagePlaylistInsert(signal) {
         photo_url: item.photo_url || '',
         photo_library_id: item.photo_library_id || null,
         player_url: item.player_url || (item.playlist_instance_id ? `/playlist/${item.playlist_instance_id}` : ''),
+        rex_url: item.rex_url || '',
       }))
-      .filter((item) => item.player_url);
+      .filter((item) => item.rex_url || item.player_url);
 
     if (!items.length) return null;
 

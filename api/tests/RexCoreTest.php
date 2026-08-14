@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../autoload.php';
+
 use App\REX\Contracts\RexReservationRepositoryInterface;
 use App\REX\Contracts\RexResolverInterface;
 use App\REX\DTO\RexAlias;
@@ -39,7 +41,6 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
             token: $token,
             label: $request->label,
             adminNote: $request->adminNote,
-            sourceKey: $request->sourceKey,
             resolverKey: $request->resolverKey,
             resourceType: $request->resourceType,
             resourceId: $request->resourceId,
@@ -241,7 +242,6 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
             token: $this->reservation->token,
             label: $this->reservation->label,
             adminNote: $this->reservation->adminNote,
-            sourceKey: $this->reservation->sourceKey,
             resolverKey: $request->resolverKey,
             resourceType: $request->resourceType,
             resourceId: $request->resourceId,
@@ -266,7 +266,6 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
             token: $this->reservation->token,
             label: $request->label,
             adminNote: $this->reservation->adminNote,
-            sourceKey: $request->sourceKey,
             resolverKey: $this->reservation->resolverKey,
             resourceType: $this->reservation->resourceType,
             resourceId: $this->reservation->resourceId,
@@ -291,7 +290,6 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
             token: $this->reservation->token,
             label: $this->reservation->label,
             adminNote: $this->reservation->adminNote,
-            sourceKey: $this->reservation->sourceKey,
             resolverKey: $this->reservation->resolverKey,
             resourceType: $this->reservation->resourceType,
             resourceId: $this->reservation->resourceId,
@@ -316,7 +314,6 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
             token: $this->reservation->token,
             label: $this->reservation->label,
             adminNote: $this->reservation->adminNote,
-            sourceKey: $this->reservation->sourceKey,
             resolverKey: $this->reservation->resolverKey,
             resourceType: $this->reservation->resourceType,
             resourceId: $this->reservation->resourceId,
@@ -333,6 +330,31 @@ final class RexCoreTestRepository implements RexReservationRepositoryInterface
     public function tokenExists(string $token): bool
     {
         return in_array($token, $this->existingTokens, true);
+    }
+
+    public function findActiveByResourceIds(
+        string $resolverKey,
+        string $resourceType,
+        array $resourceIds,
+    ): array {
+        $resourceIdSet = array_flip(array_map('intval', $resourceIds));
+        $grouped = [];
+
+        foreach ($this->reservations as $reservation) {
+            if (
+                $reservation->status !== RexReserver::STATUS_ACTIVE
+                || $reservation->resolverKey !== $resolverKey
+                || $reservation->resourceType !== $resourceType
+                || !isset($resourceIdSet[$reservation->resourceId])
+            ) {
+                continue;
+            }
+
+            $grouped[$reservation->resourceId] ??= [];
+            $grouped[$reservation->resourceId][] = $reservation;
+        }
+
+        return $grouped;
     }
 }
 
@@ -408,7 +430,6 @@ test('rex reserver creates typed reservation with context', function () {
         resolverKey: 'test_resolver',
         resourceType: 'project',
         resourceId: 42,
-        sourceKey: 'qr',
         context: ['experience_key' => 'concept'],
     ));
 
@@ -550,7 +571,6 @@ test('rex pdo search finds reservations by alias and identifiers without duplica
             token TEXT NOT NULL,
             label TEXT NOT NULL,
             admin_note TEXT NULL,
-            source_key TEXT NULL,
             resolver_key TEXT NOT NULL,
             resource_type TEXT NOT NULL,
             resource_id INTEGER NOT NULL,
@@ -572,9 +592,9 @@ test('rex pdo search finds reservations by alias and identifiers without duplica
     );
     $pdo->exec(
         "INSERT INTO rex_reservations
-            (id, token, label, source_key, resolver_key, resource_type, resource_id, context_json, status, created_at)
+            (id, token, label, resolver_key, resource_type, resource_id, context_json, status, created_at)
          VALUES
-            (77, 'abcTokenFragment123', 'Kitchen Project', 'email', 'project_experience', 'project', 555, '{\"experience_key\":\"client\"}', 'active', '2026-08-10 00:00:00')"
+            (77, 'abcTokenFragment123', 'Kitchen Project', 'project_experience', 'project', 555, '{\"experience_key\":\"client\"}', 'active', '2026-08-10 00:00:00')"
     );
     $pdo->exec(
         "INSERT INTO rex_aliases
@@ -586,7 +606,7 @@ test('rex pdo search finds reservations by alias and identifiers without duplica
 
     $repo = new PdoRexReservationRepository($pdo);
 
-    foreach (['TokenFragment', 'mojdeh-kitchen', '77', '555', 'Kitchen', 'email', 'project', 'project_experience'] as $query) {
+    foreach (['TokenFragment', 'mojdeh-kitchen', '77', '555', 'Kitchen', 'project', 'project_experience'] as $query) {
         $rows = $repo->search(new RexReservationSearchCriteria(query: $query));
         assert_equals(1, count($rows), "search failed for {$query}");
         assert_equals(77, $rows[0]->id, "search returned wrong reservation for {$query}");
@@ -602,7 +622,6 @@ test('rex pdo findByResource returns empty array for object with no reservations
             token TEXT NOT NULL,
             label TEXT NOT NULL,
             admin_note TEXT NULL,
-            source_key TEXT NULL,
             resolver_key TEXT NOT NULL,
             resource_type TEXT NOT NULL,
             resource_id INTEGER NOT NULL,
@@ -640,7 +659,6 @@ test('rex repository metadata and destination updates preserve token', function 
     $repo->updateMetadata(new RexUpdateMetadataRequest(
         reservationId: $reservation->id,
         label: 'Updated',
-        sourceKey: 'email',
     ));
     $updated = $repo->updateDestination(new RexUpdateDestinationRequest(
         reservationId: $reservation->id,
@@ -652,7 +670,6 @@ test('rex repository metadata and destination updates preserve token', function 
 
     assert_equals($token, $updated->token);
     assert_equals('Updated', $updated->label);
-    assert_equals('email', $updated->sourceKey);
     assert_equals('new_resolver', $updated->resolverKey);
     assert_equals('playlist', $updated->resourceType);
     assert_equals(22, $updated->resourceId);
@@ -684,7 +701,6 @@ test('rex relationship service creates removes and formats generic reservation l
         token: 'parentToken',
         label: 'Parent',
         adminNote: null,
-        sourceKey: null,
         resolverKey: 'resolver',
         resourceType: 'generic',
         resourceId: 1,
@@ -699,7 +715,6 @@ test('rex relationship service creates removes and formats generic reservation l
         token: 'childToken',
         label: 'Child',
         adminNote: null,
-        sourceKey: null,
         resolverKey: 'resolver',
         resourceType: 'generic',
         resourceId: 2,
@@ -737,7 +752,6 @@ test('rex relationship service rejects invalid generic relationship requests', f
         token: 'parentToken',
         label: 'Parent',
         adminNote: null,
-        sourceKey: null,
         resolverKey: 'resolver',
         resourceType: 'generic',
         resourceId: 1,
@@ -752,7 +766,6 @@ test('rex relationship service rejects invalid generic relationship requests', f
         token: 'childToken',
         label: 'Child',
         adminNote: null,
-        sourceKey: null,
         resolverKey: 'resolver',
         resourceType: 'generic',
         resourceId: 2,
@@ -800,7 +813,6 @@ test('rex pdo relationship lookup returns child and parent reservations in link 
             token TEXT NOT NULL,
             label TEXT NOT NULL,
             admin_note TEXT NULL,
-            source_key TEXT NULL,
             resolver_key TEXT NOT NULL,
             resource_type TEXT NOT NULL,
             resource_id INTEGER NOT NULL,

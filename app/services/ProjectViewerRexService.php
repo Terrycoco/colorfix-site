@@ -179,7 +179,6 @@ final class ProjectViewerRexService
                 'matches' => array_map(
                     fn(RexReservation $reservation): array => [
                         'id' => $reservation->id,
-                        'source_key' => $reservation->sourceKey,
                     ],
                     $matches
                 ),

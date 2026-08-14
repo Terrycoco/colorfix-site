@@ -408,6 +408,75 @@ class PdoPlaylistRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSavedPaletteReferencesByPlaylist(?int $playlistId = null): array
+    {
+        $hasSavedPaletteSetId = $this->hasPlaylistItemColumn('saved_palette_set_id');
+        $hasPaletteHash = $this->hasPlaylistItemColumn('palette_hash');
+
+        if (!$hasSavedPaletteSetId && !$hasPaletteHash) {
+            return [];
+        }
+
+        $setJoin = $hasSavedPaletteSetId
+            ? 'LEFT JOIN saved_palette_sets sps ON sps.id = pi.saved_palette_set_id'
+            : '';
+        $hashJoin = $hasPaletteHash
+            ? 'LEFT JOIN saved_palettes sph ON sph.palette_hash = pi.palette_hash'
+            : '';
+        $setIdSelect = $hasSavedPaletteSetId ? 'pi.saved_palette_set_id' : 'NULL AS saved_palette_set_id';
+        $savedPaletteIdSelect = $hasSavedPaletteSetId && $hasPaletteHash
+            ? 'COALESCE(sps.saved_palette_id, sph.id) AS saved_palette_id'
+            : ($hasSavedPaletteSetId ? 'sps.saved_palette_id AS saved_palette_id' : 'sph.id AS saved_palette_id');
+        $setOrHashWhere = [];
+        if ($hasSavedPaletteSetId) {
+            $setOrHashWhere[] = '(pi.saved_palette_set_id IS NOT NULL AND pi.saved_palette_set_id > 0 AND sps.saved_palette_id IS NOT NULL)';
+        }
+        if ($hasPaletteHash) {
+            $setOrHashWhere[] = "(pi.palette_hash IS NOT NULL AND pi.palette_hash <> '' AND sph.id IS NOT NULL)";
+        }
+        $referenceWhere = $this->implodeSqlOr($setOrHashWhere);
+
+        $sql = <<<SQL
+            SELECT
+                pi.playlist_item_id,
+                pi.playlist_id,
+                pi.order_index,
+                {$setIdSelect},
+                {$savedPaletteIdSelect}
+            FROM playlist_items pi
+            {$setJoin}
+            {$hashJoin}
+            WHERE pi.is_active = 1
+              AND (
+                {$referenceWhere}
+              )
+            SQL;
+
+        $params = [];
+        if ($playlistId !== null && $playlistId > 0) {
+            $sql .= "\n              AND pi.playlist_id = :playlist_id";
+            $params['playlist_id'] = $playlistId;
+        }
+
+        $sql .= "\n            ORDER BY pi.playlist_id ASC, pi.order_index ASC, pi.playlist_item_id ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * @param string[] $parts
+     */
+    private function implodeSqlOr(array $parts): string
+    {
+        return $parts ? implode("\n                OR ", $parts) : '0 = 1';
+    }
+
     public function updateItemImageReference(int $playlistItemId, string $imageUrl, ?int $photoLibraryId): void
     {
         if ($playlistItemId <= 0) {

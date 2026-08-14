@@ -7,8 +7,7 @@ Host example:
 ```jsx
 <FetchRexButton
   request={{
-    label: "Exterior Makeovers Vol 1 — QR",
-    sourceKey: "qr",
+    label: "Exterior Makeovers Vol 1 — Public",
     resolverKey: "playlist_experience",
     resourceType: "playlist",
     resourceId: 12,

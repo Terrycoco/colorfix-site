@@ -75,7 +75,6 @@ final class RexResolver
             resourceType: $reservation->resourceType,
             resourceId: $reservation->resourceId,
             context: $reservation->context,
-            sourceKey: $reservation->sourceKey,
             requestMetadata: $requestMetadata,
         ));
     }

@@ -26,7 +26,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
                 token,
                 label,
                 admin_note,
-                source_key,
                 resolver_key,
                 resource_type,
                 resource_id,
@@ -39,7 +38,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
                 :token,
                 :label,
                 :admin_note,
-                :source_key,
                 :resolver_key,
                 :resource_type,
                 :resource_id,
@@ -54,7 +52,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
             ':token' => $token,
             ':label' => trim($request->label),
             ':admin_note' => $this->nullableTrim($request->adminNote),
-            ':source_key' => $this->nullableTrim($request->sourceKey),
             ':resolver_key' => trim($request->resolverKey),
             ':resource_type' => trim($request->resourceType),
             ':resource_id' => $request->resourceId,
@@ -115,7 +112,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
             $where[] = "(
                 r.label LIKE :query
                 OR r.token LIKE :query
-                OR r.source_key LIKE :query
                 OR r.resource_type LIKE :query
                 OR r.resolver_key LIKE :query
                 OR a.alias LIKE :query
@@ -136,10 +132,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         if ($criteria->resourceId !== null) {
             $where[] = 'r.resource_id = :resource_id';
             $params[':resource_id'] = $criteria->resourceId;
-        }
-        if ($criteria->sourceKey !== null && trim($criteria->sourceKey) !== '') {
-            $where[] = 'r.source_key = :source_key';
-            $params[':source_key'] = trim($criteria->sourceKey);
         }
         if ($criteria->status !== null && trim($criteria->status) !== '') {
             $where[] = 'r.status = :status';
@@ -391,14 +383,12 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         $stmt = $this->pdo->prepare(
             "UPDATE rex_reservations
                 SET label = :label,
-                    source_key = :source_key,
                     updated_at = NOW()
               WHERE id = :id"
         );
         $stmt->execute([
             ':id' => $request->reservationId,
             ':label' => trim($request->label),
-            ':source_key' => $this->nullableTrim($request->sourceKey),
         ]);
 
         return $this->requireReservation($request->reservationId);
@@ -487,6 +477,121 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         return (bool)$stmt->fetchColumn();
     }
 
+    public function findActiveByResourceIds(
+        string $resolverKey,
+        string $resourceType,
+        array $resourceIds,
+    ): array {
+        $resolverKey = trim($resolverKey);
+        $resourceType = trim($resourceType);
+        $resourceIds = array_values(array_unique(array_filter(
+            array_map('intval', $resourceIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if ($resolverKey === '' || $resourceType === '' || $resourceIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [
+            ':resolver_key' => $resolverKey,
+            ':resource_type' => $resourceType,
+            ':status' => 'active',
+        ];
+
+        foreach ($resourceIds as $index => $resourceId) {
+            $placeholder = ':resource_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $resourceId;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+               FROM rex_reservations
+              WHERE resolver_key = :resolver_key
+                AND resource_type = :resource_type
+                AND status = :status
+                AND resource_id IN (' . implode(', ', $placeholders) . ')
+              ORDER BY resource_id ASC, id ASC'
+        );
+        $stmt->execute($params);
+
+        $grouped = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $reservation = $this->rowToReservation($row);
+            $grouped[$reservation->resourceId] ??= [];
+            $grouped[$reservation->resourceId][] = $reservation;
+        }
+
+        return $grouped;
+    }
+
+    public function findActiveByResourceIdsAndExperience(
+        string $resolverKey,
+        string $resourceType,
+        array $resourceIds,
+        string $experienceKey,
+    ): array {
+        $resolverKey = trim($resolverKey);
+        $resourceType = trim($resourceType);
+        $experienceKey = trim($experienceKey);
+
+        $resourceIds = array_values(array_unique(array_filter(
+            array_map('intval', $resourceIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if (
+            $resolverKey === ''
+            || $resourceType === ''
+            || $experienceKey === ''
+            || $resourceIds === []
+        ) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [
+            ':resolver_key' => $resolverKey,
+            ':resource_type' => $resourceType,
+            ':status' => 'active',
+            ':experience_key' => $experienceKey,
+        ];
+
+        foreach ($resourceIds as $index => $resourceId) {
+            $placeholder = ':resource_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $resourceId;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+            FROM rex_reservations
+            WHERE resolver_key = :resolver_key
+                AND resource_type = :resource_type
+                AND status = :status
+                AND JSON_UNQUOTE(JSON_EXTRACT(context_json, \'$.experience_key\')) = :experience_key
+                AND resource_id IN (' . implode(', ', $placeholders) . ')
+            ORDER BY resource_id ASC, id ASC'
+        );
+
+        $stmt->execute($params);
+
+        $reservations = [];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $reservation = $this->rowToReservation($row);
+
+            if (!isset($reservations[$reservation->resourceId])) {
+                $reservations[$reservation->resourceId] = $reservation;
+            }
+        }
+
+        return $reservations;
+    }
+
+
     private function requireReservation(int $reservationId): RexReservation
     {
         $reservation = $this->findById($reservationId);
@@ -518,7 +623,6 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
             adminNote: $row['admin_note'] !== null
     ? (string)$row['admin_note']
     : null,
-            sourceKey: $row['source_key'] !== null ? (string)$row['source_key'] : null,
             resolverKey: (string)$row['resolver_key'],
             resourceType: (string)$row['resource_type'],
             resourceId: (int)$row['resource_id'],

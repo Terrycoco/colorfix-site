@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
 
 header('Content-Type: application/json; charset=utf-8');
@@ -16,6 +18,7 @@ require_once __DIR__ . '/../../db.php';
 
 use App\Repos\PdoPlaylistInstanceSetRepository;
 use App\Repos\PdoPlaylistInstanceSetItemRepository;
+use App\REX\Repos\PdoRexReservationRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);
@@ -45,6 +48,10 @@ header(
 );
 
 $setRepo = new PdoPlaylistInstanceSetRepository($pdo);
+$rexRepo = new PdoRexReservationRepository($pdo);
+
+
+
 $set = null;
 if ($id > 0) {
     $set = $setRepo->getById($id);
@@ -60,6 +67,8 @@ if (!$set) {
 $itemRepo = new PdoPlaylistInstanceSetItemRepository($pdo);
 $items = $itemRepo->listBySetId((int)$set->id);
 $markTiming('load_items');
+
+
 
 $photoIds = [];
 $targetSetIds = [];
@@ -244,17 +253,28 @@ if ($playlistIds) {
 }
 $markTiming('load_instances_by_playlist');
 
-$rows = array_values(array_filter(array_map(static function ($item) use ($photoUrlById, $fallbackPhotoByPlaylistId, $targetSetMetaById, $slugByPlaylistInstanceId, $displaySubtitleByPlaylistInstanceId, $isPublicByPlaylistInstanceId, $instanceByPlaylistId) {
+
+$publicRexByPlaylistId = $rexRepo->findActiveByResourceIdsAndExperience(
+    'playlist_experience',
+    'playlist',
+    array_keys($playlistIds),
+    'public'
+);
+
+$rows = array_values(array_filter(array_map(static function ($item) use ($photoUrlById, $fallbackPhotoByPlaylistId, $targetSetMetaById, $slugByPlaylistInstanceId, $displaySubtitleByPlaylistInstanceId, $isPublicByPlaylistInstanceId, $instanceByPlaylistId,$publicRexByPlaylistId) {
     $targetSetMeta = ($item->itemType === 'set' && $item->targetSetId)
         ? ($targetSetMetaById[(int)$item->targetSetId] ?? null)
         : null;
     $playlistId = $item->playlistId !== null ? (int)$item->playlistId : null;
+    $publicRex = ($item->itemType === 'playlist' && $playlistId !== null)
+    ? ($publicRexByPlaylistId[$playlistId] ?? null)
+    : null;
     $resolvedInstance = ($item->itemType === 'playlist' && $playlistId !== null)
         ? ($instanceByPlaylistId[$playlistId] ?? null)
         : null;
-    if ($item->itemType === 'playlist' && $resolvedInstance === null) {
-        return null;
-    }
+ if ($item->itemType === 'playlist' && $publicRex === null) {
+    return null;
+}
     $playlistInstanceId = $resolvedInstance
         ? (int)$resolvedInstance['playlist_instance_id']
         : ($item->playlistInstanceId !== null ? (int)$item->playlistInstanceId : null);
@@ -278,6 +298,9 @@ $rows = array_values(array_filter(array_map(static function ($item) use ($photoU
     return [
         'id' => $item->id,
         'playlist_instance_id' => $playlistInstanceId,
+        'rex_url' => $publicRex !== null
+            ? '/t/' . $publicRex->token
+            : null,
         'playlist_slug' => $slug !== '' ? $slug : null,
         'player_url' => $playlistInstanceId !== null
             ? '/playlist/' . ($slug !== '' ? $slug : (string)$playlistInstanceId)

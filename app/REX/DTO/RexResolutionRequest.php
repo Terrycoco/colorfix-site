@@ -12,7 +12,6 @@ final readonly class RexResolutionRequest
         public string $resourceType,
         public int $resourceId,
         public array $context,
-        public ?string $sourceKey = null,
         public array $requestMetadata = [],
     ) {}
 }

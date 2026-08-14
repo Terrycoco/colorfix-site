@@ -417,9 +417,7 @@ export default function ColorDetailPage() {
       <div className="detail-trigger-gallery__grid">
         {triggerPhotos.map((item) => {
           const key = `${item.palette_hash || item.palette_id}-${item.saved_palette_set_id || 'default'}-${item.photo_type}-${item.photo_url}`;
-          const href = item.palette_hash
-            ? `/palette/${item.palette_hash}/share`
-            : undefined;
+          const href = item.rex_url || undefined;
           const imageUrl = photoThumbUrl(item.photo_library_id, 520, 72) || item.photo_url;
 
           const content = (

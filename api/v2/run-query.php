@@ -12,6 +12,9 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php'; // $pdo
 require_once __DIR__ . '/../functions/filter-helpers.php'; // buildWhereClauseFromFilters()
 
+use App\REX\Repos\PdoRexReservationRepository;
+use App\Repos\PdoPaletteViewerRepository;
+
 // ---- tiny helpers -----------------------------------------------------------
 $logFile = dirname(__DIR__, 1) . '/run-query-error.log';
 $log = static function(string $msg) use ($logFile): void {
@@ -57,6 +60,9 @@ function normalizeQueryForOuterOrder(string $sql): array {
 
 // ---- body -------------------------------------------------------------------
 try {
+  $rexRepo = new PdoRexReservationRepository($pdo);
+  $paletteViewerRepo = new PdoPaletteViewerRepository($pdo);
+
   $raw  = file_get_contents('php://input') ?: '';
   $data = json_decode($raw, true);
   if (!is_array($data)) $data = [];
@@ -367,6 +373,65 @@ try {
       }
     }
 
+    // Resolve each saved palette to its active public Palette Viewer,
+    // then resolve that Palette Viewer to its canonical active REX reservation.
+    // Important: REX palette_viewer resource_id is palette_viewers.palette_viewer_id,
+    // not saved_palette_set_id and not saved_palette_viewer_content_id.
+    $savedPaletteIdsForViewerRex = [];
+    foreach ($pictureByColor as $entry) {
+      $savedPaletteId = (int)($entry['palette']['id'] ?? 0);
+      if ($savedPaletteId > 0) {
+        $savedPaletteIdsForViewerRex[$savedPaletteId] = true;
+      }
+    }
+    foreach ($zoomByColor as $entry) {
+      $savedPaletteId = (int)($entry['palette']['id'] ?? 0);
+      if ($savedPaletteId > 0) {
+        $savedPaletteIdsForViewerRex[$savedPaletteId] = true;
+      }
+    }
+
+    $viewerRexUrlBySavedPaletteId = [];
+    if ($savedPaletteIdsForViewerRex) {
+      $publicViewersBySavedPaletteId = $paletteViewerRepo->findActivePublicBySavedPaletteIds(
+        array_keys($savedPaletteIdsForViewerRex)
+      );
+
+      $paletteViewerIdBySavedPaletteId = [];
+      $paletteViewerIds = [];
+
+      foreach ($publicViewersBySavedPaletteId as $savedPaletteId => $viewers) {
+        $viewer = $viewers[0] ?? null;
+        if ($viewer === null) {
+          continue;
+        }
+
+        $paletteViewerId = (int)$viewer->paletteViewerId;
+        if ($paletteViewerId <= 0) {
+          continue;
+        }
+
+        $paletteViewerIdBySavedPaletteId[(int)$savedPaletteId] = $paletteViewerId;
+        $paletteViewerIds[$paletteViewerId] = true;
+      }
+
+      if ($paletteViewerIds) {
+        $rexByPaletteViewerId = $rexRepo->findActiveByResourceIds(
+          'viewer',
+          'palette_viewer',
+          array_keys($paletteViewerIds)
+        );
+
+        foreach ($paletteViewerIdBySavedPaletteId as $savedPaletteId => $paletteViewerId) {
+          $reservations = $rexByPaletteViewerId[$paletteViewerId] ?? [];
+          $reservation = $reservations[0] ?? null;
+          if ($reservation !== null) {
+            $viewerRexUrlBySavedPaletteId[$savedPaletteId] = '/t/' . $reservation->token;
+          }
+        }
+      }
+    }
+
     if ($pictureByColor || $zoomByColor) {
       $withPictures = [];
       $usedPhotoKeys = [];
@@ -395,6 +460,7 @@ try {
                 'saved_palette_id' => ($palette['kind'] ?? '') === 'saved' ? ($palette['id'] ?? null) : null,
                 'palette_hash' => $palette['hash'] ?? null,
                 'saved_palette_set_id' => $palette['set_id'] ?? ($photo['saved_palette_set_id'] ?? null),
+                'rex_url' => $viewerRexUrlBySavedPaletteId[(int)($palette['id'] ?? 0)] ?? null,
                 'palette_name' => $palette['nickname'] ?? null,
                 'palette_brand' => $palette['brand'] ?? null,
                 'source_color_id' => $cid,
@@ -426,6 +492,7 @@ try {
                 'saved_palette_id' => ($zpalette['kind'] ?? '') === 'saved' ? ($zpalette['id'] ?? null) : null,
                 'palette_hash' => $zpalette['hash'] ?? null,
                 'saved_palette_set_id' => $zpalette['set_id'] ?? ($zphoto['saved_palette_set_id'] ?? null),
+                'rex_url' => $viewerRexUrlBySavedPaletteId[(int)($zpalette['id'] ?? 0)] ?? null,
                 'palette_name' => $zpalette['nickname'] ?? null,
                 'palette_brand' => $zpalette['brand'] ?? null,
                 'source_color_id' => $cid,

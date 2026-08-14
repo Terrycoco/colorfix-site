@@ -4,7 +4,7 @@ const PictureSwatchItem = ({ item }) => {
   const brand = item?.palette_brand ? String(item.palette_brand).toUpperCase() : "";
   const name = item?.palette_name || "Saved Palette";
   const meta = brand ? brand : (item?.palette_id ? `Palette #${item.palette_id}` : "");
-  const to = buildPaletteViewerUrl(item);
+  const to = item?.rex_url || buildPaletteViewerUrl(item);
   const markerId = `photo-${item?.photo_library_id || item?.photo_id || item?.id || item?.palette_id || ""}`;
   const handleClick = to || !item?.photo_url ? undefined : () => {
     window.location.href = item.photo_url;

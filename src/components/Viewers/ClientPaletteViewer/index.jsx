@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
+import { withSourceParam } from "@helpers/sourceParam";
+import ViewerCtaButton from "../ViewerCtaButton";
 import "../appliedpaletteviewer.css";
 import "./clientpaletteviewer.css";
 
@@ -59,6 +61,8 @@ export default function ClientPaletteViewer({
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
   const photoAlt = meta?.photo_alt || schemeTitle || "Final palette rendering";
   const ogImageUrl = meta?.og_image_url || photoUrl;
+  const viewerCtaLabel = meta?.viewer_cta_label || "";
+  const viewerCtaUrl = meta?.viewer_cta_url || "";
 
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
@@ -90,7 +94,7 @@ export default function ClientPaletteViewer({
         window.history.back();
         return;
       }
-      window.location.href = "/";
+      window.location.href = withSourceParam("/");
     }
   };
 
@@ -100,7 +104,7 @@ export default function ClientPaletteViewer({
       return;
     }
     if (typeof window !== "undefined") {
-      window.location.href = "/";
+      window.location.href = withSourceParam("/");
     }
   };
 
@@ -444,7 +448,7 @@ export default function ClientPaletteViewer({
           {(playlistUrl || showPainterAction) && (
             <div className="cpv-owner-actions">
               {playlistUrl && (
-                <a className="cpv-action cpv-action--secondary" href={playlistUrl}>
+                <a className="cpv-action cpv-action--secondary" href={withSourceParam(playlistUrl)}>
                   Replay Final Transformation
                 </a>
               )}
@@ -477,10 +481,11 @@ export default function ClientPaletteViewer({
         </div>
       )}
 
-      {(footer || showShare) && (
+      {(footer || showShare || viewerCtaUrl) && (
         <div className="apv-footer">
           {footer}
           <div className="apv-footer-actions">
+            <ViewerCtaButton label={viewerCtaLabel} url={viewerCtaUrl} />
             {showShare && (
               <button type="button" className="apv-btn apv-btn--share" onClick={handleShare}>
                 Share

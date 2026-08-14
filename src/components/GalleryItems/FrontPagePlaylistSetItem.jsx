@@ -13,9 +13,9 @@ const FrontPagePlaylistSetItem = ({ item }) => {
           const imageSrc = photoThumbUrl(tile.photo_library_id, 480, 72, tile.photo_url) || tile.photo_url;
           return (
           <a
-            key={tile.id || tile.player_url}
+            key={tile.id || tile.rex_url || tile.player_url}
             className="front-page-playlist-set-item__tile"
-            href={appendSourceTag(toFastPlayerPath(tile.player_url), 'site')}
+            href={appendSourceTag(tile.rex_url || toFastPlayerPath(tile.player_url), 'site')}
           >
             <div className="front-page-playlist-set-item__image">
               {imageSrc ? (

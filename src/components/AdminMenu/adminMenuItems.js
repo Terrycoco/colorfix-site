@@ -34,6 +34,7 @@ export const adminMenuItems = [
     label: "Palettes",
     items: [
       { label: "Saved Palettes", href: "/admin/saved-palettes" },
+      { label: "Palette Viewers", href: "/admin/palette-viewers" },
       { label: "Palette Viewer Setup", href: "/admin/palette-photos" },
     ],
   },

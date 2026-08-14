@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
 import PhotoPickerModal from "@components/PhotoPickerModal";
+import PlaylistPicker from "@components/PlaylistPicker";
 import "./admin-articles.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/articles/list.php`;
@@ -1067,7 +1068,7 @@ export default function AdminArticlesPage() {
                   const labelValue = overrides.label || cta.label || "";
                   const titleValue = overrides.title || baseParams.title || "";
                   const subtitleValue = overrides.subtitle || baseParams.subtitle || baseParams.dek || "";
-                  const playlistValue = overrides.playlist_instance_id || baseParams.playlist_instance_id || "";
+                 const playlistValue = overrides.playlist_id || baseParams.playlist_id || "";
                   return (
                     <div key={`ov-${cta.cta_id}`} className="admin-articles__cta-override">
                       <div className="admin-articles__cta-override-title">Playlist Link Overrides</div>
@@ -1095,15 +1096,12 @@ export default function AdminArticlesPage() {
                           onChange={(e) => updateCtaOverride(cta.cta_id, "subtitle", e.target.value)}
                         />
                       </label>
-                      <label>
-                        Playlist Instance ID
-                        <input
-                          type="number"
-                          value={playlistValue}
-                          onChange={(e) => updateCtaOverride(cta.cta_id, "playlist_instance_id", e.target.value)}
-                          required
-                        />
-                      </label>
+                      <PlaylistPicker
+                        value={playlistValue}
+                        onChange={(playlistId) =>
+                          updateCtaOverride(cta.cta_id, "playlist_id", playlistId)
+                        }
+                      />
                     </div>
                   );
                 })}

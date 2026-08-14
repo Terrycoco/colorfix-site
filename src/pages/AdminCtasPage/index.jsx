@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import ModalDialog from "@components/ModalDialog";
 import "./admin-ctas.css";
+import PlaylistPicker from "@components/PlaylistPicker";
 
 const TYPES_LIST_URL = `${API_FOLDER}/v2/admin/cta-types/list.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
@@ -314,7 +315,7 @@ export default function AdminCtasPage() {
       case "article_link":
         return 'Example: {"article_id":123,"title":"Gray But Not Boring","dek":"Soft neutrals..."}';
       case "playlist_link":
-        return 'Example: {"playlist_instance_id":123,"title":"My Playlist"}';
+           return 'Example: {"playlist_id":123,"title":"My Playlist"}';
       case "watch_next":
         return 'Example: {"playlist_instance_set_id":3,"subtitle":"More like this"}';
       case "see_colors_used":
@@ -340,7 +341,8 @@ export default function AdminCtasPage() {
   const articleIdValue = (ctaParams.article_id || ctaParams.articleId || "").toString();
   const articleTitleValue = (ctaParams.title || "").toString();
   const articleDekValue = (ctaParams.dek || ctaParams.subtitle || "").toString();
-  const playlistInstanceValue = (ctaParams.playlist_instance_id || ctaParams.playlistInstanceId || "").toString();
+  const playlistValue = (ctaParams.playlist_id || "").toString();
+  
   const playlistSetValue = (ctaParams.playlist_instance_set_id || ctaParams.set_id || "").toString();
   const watchNextSubtitleValue = (ctaParams.subtitle || ctaParams.dek || "").toString();
   const noteValue = (ctaParams.note || "").toString();
@@ -559,28 +561,35 @@ export default function AdminCtasPage() {
                 </label>
               </>
             )}
+
             {selectedActionKey === "playlist_link" && (
               <>
-                <label>
-                  Playlist instance ID
-                  <input
-                    type="number"
-                    value={playlistInstanceValue}
-                    onChange={(e) =>
-                      updateCtaForm("params", updateParamsString(ctaForm.params, "playlist_instance_id", e.target.value))
-                    }
-                  />
-                </label>
+                <PlaylistPicker
+                  value={playlistValue}
+                  onChange={(playlistId) =>
+                    updateCtaForm(
+                      "params",
+                      updateParamsString(ctaForm.params, "playlist_id", playlistId)
+                    )
+                  }
+                />
+
                 <label className="full-width">
                   Playlist title (optional)
                   <input
                     type="text"
                     value={(ctaParams.title || "").toString()}
-                    onChange={(e) => updateCtaForm("params", updateParamsString(ctaForm.params, "title", e.target.value))}
+                    onChange={(e) =>
+                      updateCtaForm(
+                        "params",
+                        updateParamsString(ctaForm.params, "title", e.target.value)
+                      )
+                    }
                   />
                 </label>
               </>
             )}
+
             {selectedActionKey === "watch_next" && (
               <>
                 <label>

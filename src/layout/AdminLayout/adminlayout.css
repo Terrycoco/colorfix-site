@@ -4,9 +4,26 @@
   /* edge-to-edge for admin */
   padding-left: 0 !important;
   padding-right: 0 !important;
+  padding-top: 0;
+  padding-bottom: 0;
   --gutter-x: 0;        /* if you reference this var elsewhere */
   --cap: 100vw;         /* optional: let admin content span full width */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: calc(100dvh - var(--navbar-height, 4rem));
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* (optional) avoid horizontal scroll if other ancestors add padding */
 html, body { overflow-x: hidden; }
+
+@media (max-width: 720px) {
+  .admin-layout.layout--no-gutters {
+    display: block;
+    height: auto;
+    min-height: calc(100dvh - var(--navbar-height, 4rem));
+    overflow: visible;
+  }
+}

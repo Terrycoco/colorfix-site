@@ -62,6 +62,7 @@ try {
                 $registry
             ))->resolveToken($token, [
                 'entry_point' => 'palette-viewer',
+                'src' => $_GET['src'] ?? null,
                 'request_uri' => (string)($_SERVER['REQUEST_URI'] ?? ''),
                 'ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
                 'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),

@@ -36,13 +36,18 @@ final class ViewerResolver implements RexResolverInterface
             $request->resourceId,
             $request->context
         );
-        $makeoverUrl = $this->parentMakeoverUrl($request->reservation);
+        $viewerCta = $this->viewerCta($request);
+        $makeoverUrl = $viewerCta['url'] !== '/'
+            ? $viewerCta['url']
+            : null;
 
         $viewer = $this->viewers->resolve(
             $request->resourceType,
             $request->resourceId,
             $request->context,
-            $makeoverUrl
+            $makeoverUrl,
+            $viewerCta['label'],
+            $viewerCta['url']
         );
 
         return new RexResolutionResult(
@@ -55,6 +60,8 @@ final class ViewerResolver implements RexResolverInterface
                 'viewer' => $viewer,
                 'viewer_format' => $format,
                 'makeover_url' => $makeoverUrl,
+                'viewer_cta_label' => $viewerCta['label'],
+                'viewer_cta_url' => $viewerCta['url'],
             ],
             analyticsMetadata: [
                 'reservation_id' => $request->reservation->id,
@@ -87,6 +94,43 @@ final class ViewerResolver implements RexResolverInterface
         );
     }
 
+    /**
+     * Decide the viewer's standalone CTA without adding domain rules to REX.
+     *
+     * Precedence:
+     * 1. trusted REX request metadata from the current request
+     * 2. any linked parent reservation
+     * 3. the ColorFix home page
+     *
+     * @return array{label:string,url:string}
+     */
+    private function viewerCta(RexResolutionRequest $request): array
+    {
+        $originPlaylist = $this->validInternalRexPath(
+            $request->requestMetadata['origin_playlist'] ?? ''
+        );
+
+        if ($originPlaylist !== null) {
+            return [
+                'label' => 'Watch the Complete Makeover',
+                'url' => $originPlaylist,
+            ];
+        }
+
+        $parentUrl = $this->parentMakeoverUrl($request->reservation);
+        if ($parentUrl !== null) {
+            return [
+                'label' => 'Watch the Complete Makeover',
+                'url' => $parentUrl,
+            ];
+        }
+
+        return [
+            'label' => 'See More on ColorFix',
+            'url' => '/',
+        ];
+    }
+
     private function parentMakeoverUrl(RexReservation $reservation): ?string
     {
         if ($reservation->id <= 0) {
@@ -94,10 +138,30 @@ final class ViewerResolver implements RexResolverInterface
         }
 
         $parents = $this->relationships->parents($reservation->id, 'viewer');
-        $parent = $parents[0] ?? null;
+        foreach ($parents as $parent) {
+            if (!$parent instanceof RexReservation) {
+                continue;
+            }
 
-        return $parent instanceof RexReservation
-            ? $this->relationships->publicUrl($parent)
-            : null;
+            $url = $this->validInternalRexPath(
+                $this->relationships->publicUrl($parent)
+            );
+
+            if ($url !== null) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    private function validInternalRexPath(mixed $value): ?string
+    {
+        $path = trim((string)$value);
+        if ($path === '' || !str_starts_with($path, '/t/') || str_starts_with($path, '//')) {
+            return null;
+        }
+
+        return $path;
     }
 }

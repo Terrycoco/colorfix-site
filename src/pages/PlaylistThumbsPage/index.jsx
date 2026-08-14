@@ -3,6 +3,7 @@ import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpe
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import "./playlist-thumbs.css";
 import { getLastPlaylistInstanceId, recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 
 export default function PlaylistThumbsPage() {
   const { playlistId } = useParams();
@@ -12,6 +13,9 @@ export default function PlaylistThumbsPage() {
   const [items, setItems] = useState([]);
   const [projectColorPlans, setProjectColorPlans] = useState([]);
   const [isProjectExperience, setIsProjectExperience] = useState(false);
+  const [viewerRexUrls, setViewerRexUrls] = useState([]);
+  const [viewerRexTargets, setViewerRexTargets] = useState([]);
+  const [viewerRexUrlByPaletteHash, setViewerRexUrlByPaletteHash] = useState({});
   const [title, setTitle] = useState("");
   const [paletteViewerCtaGroupId, setPaletteViewerCtaGroupId] = useState("");
   const [error, setError] = useState("");
@@ -25,6 +29,12 @@ export default function PlaylistThumbsPage() {
   const demoParam = searchParams.get("demo") ?? "";
   const viewerParam = (searchParams.get("viewer") ?? "").toLowerCase();
   const reservationToken = searchParams.get("reservation_token") ?? searchParams.get("token") ?? "";
+  const returnToParam = searchParams.get("return_to") ?? "";
+  const originPlaylistParam = searchParams.get("origin_playlist") ?? "";
+  const rexPlaylistUrl = reservationToken
+    ? withSourceParam(`/t/${encodeURIComponent(String(reservationToken))}`)
+    : "";
+  const originPlaylistUrl = withSourceParam(normalizeInternalRexPath(originPlaylistParam) || rexPlaylistUrl);
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
   const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
 
@@ -41,6 +51,7 @@ export default function PlaylistThumbsPage() {
       params.set("playlist_instance_id", playlistId);
     }
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
+    applySourceToParams(params);
     params.set("_", String(Date.now()));
     setLoading(true);
     setError("");
@@ -65,6 +76,14 @@ export default function PlaylistThumbsPage() {
 
         setTitle(formatTitle(`${projectTitle}${suffix ? ` — ${suffix}` : ""}`));
         setItems(payload.data?.items || []);
+        setViewerRexUrls(Array.isArray(payload.data?.viewer_rex_urls) ? payload.data.viewer_rex_urls : []);
+        setViewerRexTargets(Array.isArray(payload.data?.viewer_rex_targets) ? payload.data.viewer_rex_targets : []);
+        setViewerRexUrlByPaletteHash(
+          payload.data?.viewer_rex_url_by_palette_hash &&
+            typeof payload.data.viewer_rex_url_by_palette_hash === "object"
+            ? payload.data.viewer_rex_url_by_palette_hash
+            : {}
+        );
         setIsProjectExperience(String(payload.data?.experience_source || "") === "project_reservation");
         setProjectColorPlans(Array.isArray(payload.data?.color_plans) ? payload.data.color_plans : []);
         setPaletteViewerCtaGroupId(payload.data?.palette_viewer_cta_group_id ? String(payload.data.palette_viewer_cta_group_id) : "");
@@ -101,6 +120,29 @@ export default function PlaylistThumbsPage() {
   }, [playlistId]);
 
   const palettes = useMemo(() => {
+    if (reservationToken) {
+      return (Array.isArray(viewerRexTargets) ? viewerRexTargets : [])
+        .map((target, index) => {
+          const viewerUrl = normalizeInternalRexPath(target?.palette_viewer_url || target?.url || "");
+          if (!viewerUrl) return null;
+          const paletteHash = target?.palette_hash ? String(target.palette_hash) : "";
+          const paletteViewerId = Number(target?.palette_viewer_id || 0) || null;
+          const savedPaletteId = Number(target?.saved_palette_id || 0) || null;
+          return {
+            palette_viewer_id: paletteViewerId,
+            saved_palette_id: savedPaletteId,
+            palette_hash: paletteHash,
+            saved_palette_set_id: null,
+            palette_viewer_url: viewerUrl,
+            painter_palette_viewer_url: "",
+            title: formatTitle(target?.title || `Viewer ${index + 1}`),
+            image_url: target?.image_url || "",
+            is_liked: false,
+          };
+        })
+        .filter(Boolean);
+    }
+
     const seen = new Set();
     const list = [];
     const colorPlanById = new Map(
@@ -174,11 +216,12 @@ export default function PlaylistThumbsPage() {
     }
 
     return list;
-  }, [items, likedSet, isProjectExperience, projectColorPlans]);
+  }, [items, likedSet, isProjectExperience, projectColorPlans, reservationToken, viewerRexTargets]);
 
   const [thumbUrlByKey, setThumbUrlByKey] = useState({});
-  const shouldShowBackToPlaylist =
-    Boolean(lastPlaylistInstanceId) && Boolean(playlistId) && String(lastPlaylistInstanceId) === String(playlistId);
+  const shouldShowBackToPlaylist = reservationToken
+    ? Boolean(rexPlaylistUrl)
+    : Boolean(lastPlaylistInstanceId) && Boolean(playlistId) && String(lastPlaylistInstanceId) === String(playlistId);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,12 +248,16 @@ export default function PlaylistThumbsPage() {
   if (error) return <div className="playlist-thumbs__status error">{error}</div>;
 
   const handleBackToPlaylist = () => {
+    if (reservationToken && rexPlaylistUrl) {
+      navigate(withSourceParam(rexPlaylistUrl));
+      return;
+    }
     const targetId = lastPlaylistInstanceId || playlistId;
     if (!targetId) return;
-    navigate(`/p/${targetId}`);
+    navigate(withSourceParam(`/p/${targetId}`));
   };
   const handleExit = () => {
-    navigate("/");
+    navigate(withSourceParam("/"));
   };
 
   return (
@@ -237,11 +284,15 @@ export default function PlaylistThumbsPage() {
         )}
         <div className="playlist-thumbs__grid-wrap">
           <div className="playlist-thumbs__grid">
-            {palettes.map((palette) => {
+            {palettes.map((palette, index) => {
               const cardKey = palette.color_plan_id
                 ? `color-plan:${palette.color_plan_id}`
+                : palette.palette_viewer_id
+                  ? `palette-viewer:${palette.palette_viewer_id}`
                 : palette.palette_hash
                   ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+                  : palette.saved_palette_id
+                    ? `saved-palette:${palette.saved_palette_id}`
                   : `applied:${palette.ap_id}`;
               const parsed = parsePhotoRef(palette.image_url);
               const resolvedUrl = parsed.url
@@ -250,36 +301,43 @@ export default function PlaylistThumbsPage() {
                 ? thumbUrlByKey[cardKey] || ""
                 : palette.image_url;
               const params = new URLSearchParams();
-              if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
-              else if (paletteViewerCtaGroupId !== "") params.set("add_cta_group", paletteViewerCtaGroupId);
-              if (ctaAudience !== "") params.set("aud", ctaAudience);
-              if (psiParam !== "") params.set("psi", psiParam);
-              if (thumbParam !== "") params.set("thumb", thumbParam);
-              if (demoParam !== "") params.set("demo", demoParam);
-              const returnTo = buildReturnTo(location.pathname, location.search);
-              if (returnTo) params.set("return_to", returnTo);
-              if (resolvedUrl) {
-                params.set("photo_url", resolvedUrl);
-              }
-              if (palette.saved_palette_set_id) {
-                params.set("set_id", String(palette.saved_palette_set_id));
+              if (reservationToken) {
+                const returnTo = withSourceParam(buildReturnTo(location.pathname, location.search));
+                if (returnTo) params.set("return_to", returnTo);
+                if (originPlaylistUrl) params.set("origin_playlist", withSourceParam(originPlaylistUrl));
+              } else {
+                if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
+                else if (paletteViewerCtaGroupId !== "") params.set("add_cta_group", paletteViewerCtaGroupId);
+                if (ctaAudience !== "") params.set("aud", ctaAudience);
+                if (psiParam !== "") params.set("psi", psiParam);
+                if (thumbParam !== "") params.set("thumb", thumbParam);
+                if (demoParam !== "") params.set("demo", demoParam);
+                const returnTo = withSourceParam(buildReturnTo(location.pathname, location.search));
+                if (returnTo) params.set("return_to", returnTo);
+                if (resolvedUrl) {
+                  params.set("photo_url", resolvedUrl);
+                }
+                if (palette.saved_palette_set_id) {
+                  params.set("set_id", String(palette.saved_palette_set_id));
+                }
               }
               const qs = params.toString();
-              const selectedViewerUrl = viewerParam === "painter" && palette.painter_palette_viewer_url
+              const explicitViewerUrl = viewerParam === "painter" && palette.painter_palette_viewer_url
                 ? palette.painter_palette_viewer_url
                 : palette.palette_viewer_url;
+              const rexHashViewerUrl = reservationToken && palette.palette_hash
+                ? normalizeInternalRexPath(viewerRexUrlByPaletteHash[palette.palette_hash]) || ""
+                : "";
+              const selectedViewerUrl = reservationToken
+                ? normalizeInternalRexPath(explicitViewerUrl) || rexHashViewerUrl || normalizeInternalRexPath(viewerRexUrls[index]) || ""
+                : explicitViewerUrl;
               const href = selectedViewerUrl
-                ? appendParams(selectedViewerUrl, Object.fromEntries(params.entries()))
-                : palette.palette_hash
-                  ? `/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`
+                  ? withSourceParam(appendParams(selectedViewerUrl, Object.fromEntries(params.entries())))
+                  : !reservationToken && palette.palette_hash
+                  ? withSourceParam(`/palette/${palette.palette_hash}/share${qs ? `?${qs}` : ""}`)
                   : "";
-              if (!href) return null;
-              return (
-                <a
-                  key={cardKey}
-                  className="playlist-thumbs__card"
-                  href={href}
-                >
+              const cardContent = (
+                <>
                   <div className="playlist-thumbs__image">
                     {resolvedUrl ? (
                       <img src={resolvedUrl} alt={palette.title} loading="lazy" />
@@ -302,6 +360,27 @@ export default function PlaylistThumbsPage() {
                       </span>
                     )}
                   </div>
+                </>
+              );
+              if (!href) {
+                return (
+                  <div
+                    key={cardKey}
+                    className="playlist-thumbs__card playlist-thumbs__card--disabled"
+                    aria-disabled="true"
+                    title="No REX viewer is linked to this palette yet"
+                  >
+                    {cardContent}
+                  </div>
+                );
+              }
+              return (
+                <a
+                  key={cardKey}
+                  className="playlist-thumbs__card"
+                  href={href}
+                >
+                  {cardContent}
                 </a>
               );
             })}
@@ -349,4 +428,11 @@ function buildReturnTo(pathname, search) {
   params.delete("return_to");
   const qs = params.toString();
   return `${pathname}${qs ? `?${qs}` : ""}`;
+}
+
+function normalizeInternalRexPath(value) {
+  const path = String(value || "").trim();
+  if (!path || !path.startsWith("/t/") || path.startsWith("//")) return "";
+
+  return path;
 }

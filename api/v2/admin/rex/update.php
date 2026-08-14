@@ -29,7 +29,6 @@ try {
     $repo->updateMetadata(new RexUpdateMetadataRequest(
         reservationId: $id,
         label: rex_admin_required_string($data['label'] ?? null, 'Label'),
-        sourceKey: rex_admin_optional_string($data['source_key'] ?? null),
     ));
     $reservation = $repo->updateDestination(new RexUpdateDestinationRequest(
         reservationId: $id,

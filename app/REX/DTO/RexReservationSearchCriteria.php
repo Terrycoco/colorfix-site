@@ -10,7 +10,6 @@ final readonly class RexReservationSearchCriteria
         public ?string $resolverKey = null,
         public ?string $resourceType = null,
         public ?int $resourceId = null,
-        public ?string $sourceKey = null,
         public ?string $status = null,
         public int $limit = 200,
     ) {}

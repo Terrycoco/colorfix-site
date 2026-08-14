@@ -9,7 +9,6 @@ const CREATE_ALIAS_URL = `${API_FOLDER}/v2/admin/rex/create-alias.php`;
 
 const EMPTY_FORM = {
   label: "",
-  sourceKey: "",
   resolverKey: "",
   resourceType: "",
   resourceId: "",
@@ -26,7 +25,6 @@ function normalizeRequest(request) {
 
   return {
     label: String(request?.label ?? ""),
-    sourceKey: String(request?.sourceKey ?? ""),
     resolverKey: String(request?.resolverKey ?? ""),
     resourceType: String(request?.resourceType ?? ""),
     resourceId:
@@ -201,12 +199,12 @@ export default function RexReservationDialog({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             label: String(form.label).trim(),
-            source_key: String(form.sourceKey).trim() || null,
             resolver_key: String(form.resolverKey).trim(),
             resource_type: String(form.resourceType).trim(),
             resource_id: Number(form.resourceId),
             context,
             admin_note: String(form.adminNote).trim() || null,
+            reuse_existing: Boolean(request?.reuseExisting),
           }),
         })
       );
@@ -220,7 +218,7 @@ export default function RexReservationDialog({
       let aliasItem = null;
       const alias = String(form.alias || "").trim();
 
-      if (alias !== "") {
+      if (alias !== "" && !createData.reused) {
         const aliasData = await readJsonResponse(
           await fetch(CREATE_ALIAS_URL, {
             method: "POST",
@@ -241,6 +239,7 @@ export default function RexReservationDialog({
         token: String(reservation.token),
         reservation,
         alias: aliasItem,
+        reused: Boolean(createData.reused),
       };
 
       setCreated(result);
@@ -270,11 +269,6 @@ export default function RexReservationDialog({
             <label className="rex-reservation-dialog__wide">
               <span>Label</span>
               <input type="text" value={form.label} disabled={creating || Boolean(created)} onChange={(e) => updateField("label", e.target.value)} />
-            </label>
-
-            <label>
-              <span>Source Key</span>
-              <input type="text" value={form.sourceKey} disabled={creating || Boolean(created)} onChange={(e) => updateField("sourceKey", e.target.value)} placeholder="site, qr, pinterest…" />
             </label>
 
             <label>
@@ -344,7 +338,9 @@ export default function RexReservationDialog({
 
         {created ? (
           <div className="rex-reservation-dialog__created">
-            <div className="rex-reservation-dialog__created-title">REX reservation #{created.reservationId} created</div>
+            <div className="rex-reservation-dialog__created-title">
+              REX reservation #{created.reservationId} {created.reused ? "reused" : "created"}
+            </div>
             <div className="rex-reservation-dialog__token">{created.token}</div>
             {created.alias?.alias ? <div className="rex-reservation-dialog__created-meta">Alias: {created.alias.alias}</div> : null}
           </div>

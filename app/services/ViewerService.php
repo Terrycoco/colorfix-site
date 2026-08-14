@@ -55,7 +55,9 @@ final class ViewerService
         string $resourceType,
         int $resourceId,
         array $context,
-        ?string $makeoverUrl = null
+        ?string $makeoverUrl = null,
+        ?string $viewerCtaLabel = null,
+        ?string $viewerCtaUrl = null
     ): array {
         $resourceType = $this->normalizeResourceType($resourceType);
         $format = $this->viewerFormatForResource($resourceType, $resourceId, $context);
@@ -75,7 +77,9 @@ final class ViewerService
                 $resourceId,
                 $format,
                 null,
-                $makeoverUrl
+                $makeoverUrl,
+                $viewerCtaLabel,
+                $viewerCtaUrl
             );
         }
 
@@ -89,7 +93,9 @@ final class ViewerService
                 $resourceId,
                 $viewerFormat,
                 null,
-                $makeoverUrl
+                $makeoverUrl,
+                $viewerCtaLabel,
+                $viewerCtaUrl
             );
         }
 
@@ -115,7 +121,9 @@ final class ViewerService
             $resourceId,
             $format,
             $currentRelease,
-            $makeoverUrl
+            $makeoverUrl,
+            $viewerCtaLabel,
+            $viewerCtaUrl
         );
     }
 
@@ -405,7 +413,9 @@ final class ViewerService
         int $resourceId,
         string $format,
         ?string $currentRelease,
-        ?string $makeoverUrl
+        ?string $makeoverUrl,
+        ?string $viewerCtaLabel = null,
+        ?string $viewerCtaUrl = null
     ): array {
         if (!is_array($payload['meta'] ?? null)) {
             $payload['meta'] = [];
@@ -423,6 +433,10 @@ final class ViewerService
         if ($makeoverUrl !== null && $makeoverUrl !== '') {
             $payload['meta']['makeover_url'] = $makeoverUrl;
             $payload['meta']['watch_complete_makeover_url'] = $makeoverUrl;
+        }
+        if ($viewerCtaLabel !== null && $viewerCtaLabel !== '' && $viewerCtaUrl !== null && $viewerCtaUrl !== '') {
+            $payload['meta']['viewer_cta_label'] = $viewerCtaLabel;
+            $payload['meta']['viewer_cta_url'] = $viewerCtaUrl;
         }
 
         return $payload;

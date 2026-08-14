@@ -9,6 +9,11 @@ use App\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
 use App\Repos\PdoProjectRepository;
+use App\Repos\PdoPaletteViewerRepository;
+use App\Repos\PdoPaletteViewerPhotoRepository;
+use App\Repos\PdoSavedPaletteRepository;
+use App\REX\Repos\PdoRexReservationRepository;
+use App\REX\Services\RexReservationRelationships;
 use App\Entities\Playlist;
 use App\Entities\PlaylistItem;
 use App\Entities\PlaylistInstance;
@@ -226,7 +231,7 @@ class PlayerExperienceService
 public function buildPlaybackPlanFromPlaylistExperience(
     int $playlistId,
     string $experienceKey,
-    ?string $sourceKey = null,
+    ?string $sourceAttribution = null,
     ?int $start = null,
     ?array $startTarget = null,
     ?string $reservationToken = null
@@ -235,16 +240,20 @@ public function buildPlaybackPlanFromPlaylistExperience(
         throw new RuntimeException('Valid playlist ID required.');
     }
 
-    $stmt = $this->pdo->prepare(
-        "SELECT project_id
-         FROM project_playlists
-         WHERE playlist_id = :playlist_id
-         ORDER BY updated_at DESC, project_playlist_id DESC
-         LIMIT 1"
-    );
-    $stmt->execute([':playlist_id' => $playlistId]);
+    $experienceKey = strtolower(trim($experienceKey));
 
-    $projectId = (int)($stmt->fetchColumn() ?: 0);
+    if ($experienceKey === 'public') {
+        return $this->buildPublicPlaybackPlanFromPlaylistExperience(
+            $playlistId,
+            $sourceAttribution,
+            $start,
+            $startTarget,
+            $reservationToken
+        );
+    }
+
+    $projectRepo = new PdoProjectRepository($this->pdo);
+    $projectId = (int)($projectRepo->findMostRecentProjectIdByPlaylistId($playlistId) ?? 0);
 
     if ($projectId <= 0) {
         throw new RuntimeException(
@@ -255,7 +264,7 @@ public function buildPlaybackPlanFromPlaylistExperience(
     return $this->buildPlaybackPlanFromProjectExperience(
         $projectId,
         $experienceKey,
-        $sourceKey,
+        $sourceAttribution,
         $start,
         $startTarget,
         $reservationToken,
@@ -263,12 +272,332 @@ public function buildPlaybackPlanFromPlaylistExperience(
     );
 }
 
+private function buildPublicPlaybackPlanFromPlaylistExperience(
+    int $playlistId,
+    ?string $sourceAttribution = null,
+    ?int $start = null,
+    ?array $startTarget = null,
+    ?string $reservationToken = null
+): array {
+    $startedAt = microtime(true);
+    $experience = $this->resolveExperienceByKey('public', "playlist reservation experience 'public'");
+    $slideFlag = $this->normalizeSlideFlag($experience->slideFlag);
+
+    $playlistStartedAt = microtime(true);
+    $playlistRepo = new PdoPlaylistRepository($this->pdo);
+    $playlist = $playlistRepo->getById((string)$playlistId, $slideFlag);
+    $this->markTiming('load_playlist', $playlistStartedAt);
+
+    if (!$playlist instanceof Playlist) {
+        throw new RuntimeException("Playlist {$playlistId} not found for public REX reservation");
+    }
+
+    $itemsStartedAt = microtime(true);
+    $items = $this->flattenItems($playlist);
+    $this->hydrateItemImages($items);
+    $paletteViewerKey = $experience->paletteViewerKey;
+    $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
+
+    $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken);
+    $viewerRexCount = $viewerRex['count'];
+    if ($viewerRexCount === 0) {
+        $showSlidePalettePrompt = false;
+    }
+
+    $this->markTiming('hydrate_items', $itemsStartedAt);
+
+    $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
+    $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
+
+    $colorsUsedUrl = $viewerRexCount === 1
+        ? (string)($viewerRex['urls'][0] ?? '')
+        : ($viewerRexCount > 1 ? '/playlist-thumbs/' . rawurlencode((string)$playlist->playlist_id) : '');
+    $colorsUsedDestination = $viewerRexCount === 1
+        ? 'viewer'
+        : ($viewerRexCount > 1 ? 'thumbs' : 'none');
+    $thumbsEnabled = $viewerRexCount > 1;
+
+    $ctaStartedAt = microtime(true);
+    $ctaRepo = new PdoCtaRepository($this->pdo);
+    $ctaPageId = $this->resolvePublicRexCtaPageId($ctaRepo, $experience->ctaPageId);
+    $ctas = $this->selectPublicRexCtas(
+        $ctaRepo->getByGroupId($ctaPageId),
+        $colorsUsedDestination
+    );
+    if (!empty($ctas)) {
+        $ctas = $this->hydrateArticleCtas($ctas);
+    }
+    $this->markTiming('load_ctas', $ctaStartedAt);
+
+    $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
+
+    $displayTitle = $playlist->title;
+    $pageH1 = $this->firstNonEmpty([
+        $playlist->meta['headline'] ?? null,
+        $displayTitle,
+    ]);
+    $projectSummary = $this->firstNonEmpty([
+        $playlist->meta['dek'] ?? null,
+        $playlist->meta['meta_description'] ?? null,
+    ]);
+
+    return [
+        'playlist_instance_id' => null,
+        'playlist_id' => $playlist->playlist_id,
+        'project_id' => null,
+        'title' => $playlist->title,
+        'display_title' => $displayTitle,
+        'slug' => null,
+        'page_h1' => $pageH1,
+        'project_summary' => $projectSummary,
+        'type' => $playlist->type,
+        'total_items' => count($items),
+        'start_index' => $startIndex,
+        'start_target' => $this->startTargetSummary($startTarget, $startIndex),
+        'items' => $items,
+        'ctas' => $ctas,
+        'cta_context_key' => null,
+        'audience' => 'public',
+        'palette_viewer_cta_group_id' => null,
+        'show_slide_palette_prompt' => $showSlidePalettePrompt,
+        'thumbs_enabled' => $thumbsEnabled,
+        'demo_enabled' => false,
+        'share_enabled' => false,
+        'share_title' => $displayTitle,
+        'share_description' => $projectSummary,
+        'share_image_url' => $resolvedShareImageUrl,
+        'skip_intro_on_replay' => false,
+        'hide_stars' => false,
+        'playlist_instance_set_ids' => [],
+        'player_experience_id' => $experience->playerExperienceId,
+        'experience_key' => 'public',
+        'player_experience_config_key' => $experience->experienceKey,
+        'experience_name' => $experience->name,
+        'slide_flag' => $slideFlag,
+        'palette_viewer_key' => $paletteViewerKey,
+        'cta_page_id' => $ctaPageId,
+        'experience_source' => 'playlist_rex_public',
+        'src' => $sourceAttribution,
+        'reservation_token' => $reservationToken,
+        'viewer_rex_count' => $viewerRexCount,
+        'viewer_rex_urls' => $viewerRex['urls'],
+        'viewer_rex_targets' => $viewerRex['targets'],
+        'viewer_rex_url_by_palette_hash' => $viewerRex['url_by_palette_hash'],
+        'colors_used_destination' => $colorsUsedDestination,
+        'colors_used_url' => $colorsUsedUrl,
+    ];
+}
+
+private function resolvePublicRexCtaPageId(PdoCtaRepository $ctaRepo, int $fallbackCtaPageId): int
+{
+    foreach (['public', 'default'] as $key) {
+        $group = $ctaRepo->findGroupByKey($key);
+        $groupId = (int)($group['id'] ?? 0);
+        if ($groupId > 0) {
+            return $groupId;
+        }
+    }
+
+    return $fallbackCtaPageId;
+}
+
+/**
+ * REX playlists send the exact end-screen CTA set the player should render.
+ *
+ * The public/default CTA page may contain both one-viewer and many-viewer
+ * "colors used" actions. PES owns the reservation context, so it chooses the
+ * single correct action before the payload reaches the player.
+ *
+ * @param array<int, array<string, mixed>> $ctas
+ * @return array<int, array<string, mixed>>
+ */
+private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination): array
+{
+    $destination = strtolower(trim($colorsUsedDestination));
+    $colorActions = ['see_colors_used', 'to_palette', 'to_thumbs'];
+    $preferredColorAction = match ($destination) {
+        'viewer' => 'to_palette',
+        'thumbs' => 'to_thumbs',
+        default => '',
+    };
+
+    $fallbackColorIndex = null;
+    $preferredColorIndex = null;
+
+    foreach ($ctas as $index => $cta) {
+        $action = strtolower(trim((string)($cta['action_key'] ?? $cta['key'] ?? $cta['action'] ?? '')));
+        if (!in_array($action, $colorActions, true)) {
+            continue;
+        }
+        if ($action === $preferredColorAction && $preferredColorIndex === null) {
+            $preferredColorIndex = $index;
+        }
+        if ($action === 'see_colors_used' && $fallbackColorIndex === null) {
+            $fallbackColorIndex = $index;
+        }
+    }
+
+    $keepColorIndex = $preferredColorIndex ?? $fallbackColorIndex;
+
+    $filtered = [];
+    foreach ($ctas as $index => $cta) {
+        $action = strtolower(trim((string)($cta['action_key'] ?? $cta['key'] ?? $cta['action'] ?? '')));
+        if (in_array($action, $colorActions, true)) {
+            if ($keepColorIndex === null || $index !== $keepColorIndex) {
+                continue;
+            }
+        }
+        $filtered[] = $cta;
+    }
+
+    return $filtered;
+}
+
+/**
+ * Hydrate public playlist items from explicit Playlist REX -> Viewer REX relationships.
+ *
+ * @param PlaylistItem[] $items
+ * @return array{count:int,urls:string[],targets:array<int,array<string,mixed>>,url_by_palette_hash:array<string,string>}
+ */
+private function hydratePublicRexViewerUrls(array $items, ?string $reservationToken): array
+{
+    $reservationToken = trim((string)$reservationToken);
+    if ($reservationToken === '') {
+        return ['count' => 0, 'urls' => [], 'targets' => [], 'url_by_palette_hash' => []];
+    }
+
+    $rexRepo = new PdoRexReservationRepository($this->pdo);
+    $playlistReservation = $rexRepo->findByToken($reservationToken);
+    if (!$playlistReservation || strtolower(trim($playlistReservation->status)) !== 'active') {
+        return ['count' => 0, 'urls' => [], 'targets' => [], 'url_by_palette_hash' => []];
+    }
+
+    $relationships = new RexReservationRelationships($rexRepo);
+    $viewerRepo = new PdoPaletteViewerRepository($this->pdo);
+    $viewerPhotoRepo = new PdoPaletteViewerPhotoRepository($this->pdo);
+    $savedPaletteRepo = new PdoSavedPaletteRepository($this->pdo);
+
+    $urlByPaletteHash = [];
+    $urls = [];
+    $targets = [];
+    $imageUrlByPaletteHash = [];
+
+    foreach ($items as $item) {
+        if (!$item instanceof PlaylistItem) {
+            continue;
+        }
+        if (!$this->isPaletteViewerEligibleItem($item)) {
+            continue;
+        }
+
+        $paletteHash = trim((string)($item->palette_hash ?? ''));
+        if ($paletteHash === '') {
+            continue;
+        }
+
+        $itemImageUrl = $this->normalizeShareImageUrl((string)($item->image_url ?? '')) ?? '';
+        if ($itemImageUrl === '') {
+            continue;
+        }
+
+        $photoType = strtolower(trim((string)($item->saved_palette_photo_type ?? '')));
+        if (!isset($imageUrlByPaletteHash[$paletteHash]) || $photoType === 'full') {
+            $imageUrlByPaletteHash[$paletteHash] = $itemImageUrl;
+        }
+    }
+
+    foreach ($relationships->children($playlistReservation->id, 'viewer') as $viewerReservation) {
+        if (strtolower(trim($viewerReservation->status)) !== 'active') {
+            continue;
+        }
+        if (strtolower(trim($viewerReservation->resolverKey)) !== 'viewer') {
+            continue;
+        }
+        if (strtolower(trim($viewerReservation->resourceType)) !== 'palette_viewer') {
+            continue;
+        }
+
+        $paletteViewer = $viewerRepo->findById($viewerReservation->resourceId);
+        if (!$paletteViewer || !$paletteViewer->isActive) {
+            continue;
+        }
+
+        $viewerUrl = $relationships->publicUrl($viewerReservation);
+        $urls[] = $viewerUrl;
+
+        $savedPalette = $savedPaletteRepo->getSavedPaletteById($paletteViewer->savedPaletteId);
+        $paletteHash = trim((string)($savedPalette['palette_hash'] ?? ''));
+        $title = $this->firstNonEmpty([
+            $paletteViewer->title,
+            $savedPalette['display_title'] ?? null,
+            $savedPalette['nickname'] ?? null,
+            $savedPalette['name'] ?? null,
+            'ColorFix Palette',
+        ]);
+        $imageUrl = '';
+        foreach ($viewerPhotoRepo->findByViewerId($paletteViewer->paletteViewerId) as $photo) {
+            $relPath = trim((string)($photo->relPath ?? ''));
+            if ($relPath === '') {
+                continue;
+            }
+            if ($imageUrl === '' || strtolower($photo->photoType) === 'full') {
+                $imageUrl = $relPath;
+            }
+            if (strtolower($photo->photoType) === 'full') {
+                break;
+            }
+        }
+        if ($paletteHash !== '' && !empty($imageUrlByPaletteHash[$paletteHash])) {
+            $imageUrl = $imageUrlByPaletteHash[$paletteHash];
+        }
+
+        if ($paletteHash !== '') {
+            $urlByPaletteHash[$paletteHash] = $viewerUrl;
+        }
+        $targets[] = [
+            'palette_viewer_id' => $paletteViewer->paletteViewerId,
+            'saved_palette_id' => $paletteViewer->savedPaletteId,
+            'palette_hash' => $paletteHash,
+            'palette_viewer_url' => $viewerUrl,
+            'painter_palette_viewer_url' => null,
+            'title' => $title,
+            'image_url' => $imageUrl,
+        ];
+    }
+
+    $urls = array_values(array_unique($urls));
+
+    foreach ($items as $item) {
+        if (!$item instanceof PlaylistItem) {
+            continue;
+        }
+        if (!$this->isPaletteViewerEligibleItem($item)) {
+            continue;
+        }
+
+        $paletteHash = trim((string)($item->palette_hash ?? ''));
+        if ($paletteHash === '' || !isset($urlByPaletteHash[$paletteHash])) {
+            continue;
+        }
+
+        $item->palette_viewer_url = $urlByPaletteHash[$paletteHash];
+        $item->painter_palette_viewer_url = null;
+    }
+
+    return [
+        'count' => count($urls),
+        'urls' => $urls,
+        'targets' => $targets,
+        'url_by_palette_hash' => $urlByPaletteHash,
+    ];
+}
+
 
 
 public function buildPlaybackPlanFromProjectExperience(
     int $projectId,
     string $experienceKey,
-    ?string $sourceKey = null,
+    ?string $sourceAttribution = null,
     ?int $start = null,
     ?array $startTarget = null,
     ?string $reservationToken = null,
@@ -395,7 +724,7 @@ public function buildPlaybackPlanFromProjectExperience(
             'palette_viewer_key' => $paletteViewerKey,
             'cta_page_id' => $experience->ctaPageId,
             'experience_source' => 'project_reservation',
-            'source_key' => $sourceKey,
+            'src' => $sourceAttribution,
         ];
     }
 

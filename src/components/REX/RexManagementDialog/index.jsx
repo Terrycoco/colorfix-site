@@ -151,9 +151,6 @@ export default function RexManagementDialog({
                     <div className="rex-management__card-meta">
                       <span>Reservation #{item.id}</span>
                       <span>
-                        Source: {item.source_key || "—"}
-                      </span>
-                      <span>
                         Resolver: {item.resolver_key || "—"}
                       </span>
                     </div>

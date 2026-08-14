@@ -6,6 +6,7 @@ import {
   PainterViewerPage,
   PaletteViewerPage,
 } from "@pages/Viewers";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "./saved-palette-share.css";
 
 const viewerPages = {
@@ -22,7 +23,7 @@ export default function SavedPaletteSharePage() {
     if (typeof window === "undefined") return "/";
     const params = new URLSearchParams(window.location.search);
     const value = params.get("return_to") || "";
-    return value.startsWith("/") ? value : "/";
+    return withSourceParam(value.startsWith("/") ? value : "/");
   }, []);
   const setId = useMemo(() => {
     if (typeof window === "undefined") return "";
@@ -53,6 +54,7 @@ export default function SavedPaletteSharePage() {
     if (!token && Number(setId || 0) > 0) {
       params.set("set_id", String(Number(setId)));
     }
+    applySourceToParams(params);
     fetch(`/api/v2/palette-viewer.php?${params.toString()}`, {
       signal: controller.signal,
     })
@@ -88,7 +90,7 @@ export default function SavedPaletteSharePage() {
 
   const meta = state.data?.meta || null;
   const swatches = state.data?.swatches || [];
-  const playlistUrl = appendViewerReturnToPlaylistUrl(meta?.playlist_url || "", viewerReturnPath);
+  const playlistUrl = withSourceParam(appendViewerReturnToPlaylistUrl(meta?.playlist_url || "", viewerReturnPath));
   const playlistCtaLabel = meta?.cta_label || "View Playlist";
   const viewerKey = meta?.palette_viewer_key || "full_palette";
   const ViewerComponent = viewerPages[viewerKey] || PaletteViewerPage;
@@ -103,22 +105,22 @@ export default function SavedPaletteSharePage() {
       onBack={() => {
         if (typeof window !== "undefined") {
           if (returnTo !== "/") {
-            window.location.href = returnTo;
+            window.location.href = withSourceParam(returnTo);
           } else if (window.history.length > 1) {
             window.history.back();
           } else {
-            window.location.href = "/";
+            window.location.href = withSourceParam("/");
           }
         }
       }}
       onExit={() => {
         if (typeof window !== "undefined") {
           if (returnTo !== "/") {
-            window.location.href = returnTo;
+            window.location.href = withSourceParam(returnTo);
           } else if (window.history.length > 1) {
             window.history.back();
           } else {
-            window.location.href = "/";
+            window.location.href = withSourceParam("/");
           }
         }
       }}
@@ -130,7 +132,7 @@ export default function SavedPaletteSharePage() {
           type="button"
           className="apv-btn apv-btn--ghost apv-back-to-playlist"
           onClick={() => {
-            window.location.href = playlistUrl;
+            window.location.href = withSourceParam(playlistUrl);
           }}
         >
           {playlistCtaLabel}

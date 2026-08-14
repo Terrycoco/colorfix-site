@@ -32,6 +32,7 @@ const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
 const AdminRolesMasksPage = lazy(() => import('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
+const AdminPaletteViewersPage = lazy(() => import('@pages/AdminPaletteViewersPage'));
 const AdminPalettePhotosPage = lazy(() => import('@pages/AdminPalettePhotosPage'));
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
@@ -123,6 +124,7 @@ export default function AdminRoutes() {
         <Route path="roles-masks" element={renderWithSuspense(AdminRolesMasksPage, 'Loading admin roles/masks...')} />
         <Route path="supercats" element={renderWithSuspense(AdminSupercatsPage, 'Loading supercats...')} />
         <Route path="saved-palettes" element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes...')} />
+        <Route path="palette-viewers" element={renderWithSuspense(AdminPaletteViewersPage, 'Loading palette viewers...')} />
         <Route path="palette-photos" element={renderWithSuspense(AdminPalettePhotosPage, 'Loading palette photos...')} />
         <Route path="kickers" element={renderWithSuspense(AdminKickersPage, 'Loading kickers...')} />
         <Route path="ideas" element={renderWithSuspense(AdminIdeasPage, 'Loading ideas...')} />

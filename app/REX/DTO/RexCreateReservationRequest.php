@@ -10,7 +10,6 @@ final readonly class RexCreateReservationRequest
         public string $resolverKey,
         public string $resourceType,
         public int $resourceId,
-        public ?string $sourceKey = null,
         public ?string $adminNote = null,
         public array $context = [],
         public string $status = 'active',

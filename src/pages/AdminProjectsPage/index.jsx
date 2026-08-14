@@ -820,7 +820,6 @@ export default function AdminProjectsPage() {
           resolver_key: "playlist_experience",
           resource_type: "playlist",
           resource_id: playlistId,
-          source_key: null,
           context: {
             experience_key: experienceKey,
           },
@@ -1162,7 +1161,7 @@ export default function AdminProjectsPage() {
     const localSourcePhotos = viewerPhotos[fromKey] || [];
     let sourceForm = localSourceForm;
     let sourcePhotos = localSourcePhotos;
-    let sourceKeyUsed = fromKey;
+    let copySourceUsed = fromKey;
 
     if (localSourcePhotos.length === 0 || !hasViewerCopyText(fromKey, toKey, localSourceForm)) {
       try {
@@ -1170,7 +1169,7 @@ export default function AdminProjectsPage() {
         sourceForm = mergeViewerSourceForm(setup?.forms?.[fromKey], localSourceForm);
         sourcePhotos = localSourcePhotos.length ? localSourcePhotos : (setup?.photos?.[fromKey] || []);
         if (fromKey === "client" && toKey === "painter" && sourcePhotos.length === 0) {
-          sourceKeyUsed = "concept";
+          copySourceUsed = "concept";
           sourcePhotos = setup?.photos?.concept || [];
           sourceForm = mergeViewerSourceForm(setup?.forms?.concept, sourceForm);
         }
@@ -1207,7 +1206,7 @@ export default function AdminProjectsPage() {
       [toKey]: copiedPhotos,
     }));
 
-    setStatus(`Copied ${viewerKeyLabel(sourceKeyUsed)} title/copy and ${copiedPhotos.length} photo${copiedPhotos.length === 1 ? "" : "s"} to ${viewerKeyLabel(toKey)}.`);
+    setStatus(`Copied ${viewerKeyLabel(copySourceUsed)} title/copy and ${copiedPhotos.length} photo${copiedPhotos.length === 1 ? "" : "s"} to ${viewerKeyLabel(toKey)}.`);
   }
 
   async function saveViewerSetup(viewerKeyOverride = activeViewerTab) {

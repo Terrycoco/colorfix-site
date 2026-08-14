@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { useAppState } from "@context/AppStateContext";
 import { photoThumbUrl } from "@helpers/imageThumb";
 import { toFastPlayerPath } from "@helpers/playerUrls";
+import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-picker.css";
 
@@ -47,6 +48,7 @@ export default function PlaylistPickerPage() {
     }
     if (ctaAudience) params.set("aud", ctaAudience);
     if (adminExitPath || includePrivateParam === "1") params.set("include_private", "1");
+    applySourceToParams(params, sourceParam);
     fetchPlaylistSet(`${SET_URL}?${params.toString()}`)
       .then((payload) => {
         if (!payload?.ok || !payload?.set) {
@@ -61,13 +63,14 @@ export default function PlaylistPickerPage() {
         setError(err?.message || "Failed to load playlist set");
       })
       .finally(() => setLoading(false));
-  }, [setId, ctaAudience, adminExitPath, includePrivateParam, setVersionParam]);
+  }, [setId, ctaAudience, adminExitPath, includePrivateParam, setVersionParam, sourceParam]);
 
   const tiles = useMemo(() => {
     return (items || []).map((item) => ({
       id: item.id,
       playlist_instance_id: item.playlist_instance_id,
       player_url: item.player_url || "",
+      rex_url: item.rex_url || "",
       item_type: item.item_type || "instance",
       target_set_id: item.target_set_id,
       target_set_version: item.target_set_version || "",
@@ -79,7 +82,7 @@ export default function PlaylistPickerPage() {
   }, [items]);
 
   const buildPlaylistUrl = (tile) => {
-    const playlistPath = tile?.player_url || `/playlist/${tile?.playlist_instance_id || ""}`;
+    const playlistPath = tile?.rex_url || tile?.player_url || `/playlist/${tile?.playlist_instance_id || ""}`;
     const params = new URLSearchParams();
     const effectiveSetVersion = setVersionParam || currentSetVersion;
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
@@ -87,13 +90,18 @@ export default function PlaylistPickerPage() {
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
     if (effectiveSetVersion !== "") params.set("set_v", effectiveSetVersion);
-    if (sourceParam !== "") params.set("src", sourceParam);
+    applySourceToParams(params, sourceParam);
     if (closeParam === "1") params.set("close", "1");
     if (setId) params.set("psi", String(setId));
-    const returnTo = buildReturnTo(location, searchParams);
+    const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
-    return toFastPlayerPath(`${playlistPath}${qs ? `?${qs}` : ""}`);
+    const targetUrl = `${playlistPath}${qs ? `?${qs}` : ""}`;
+
+    return withSourceParam(
+      tile?.rex_url ? targetUrl : toFastPlayerPath(targetUrl),
+      sourceParam
+    );
   };
 
   const buildSetUrl = (tile) => {
@@ -104,13 +112,13 @@ export default function PlaylistPickerPage() {
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
-    if (sourceParam !== "") params.set("src", sourceParam);
+    applySourceToParams(params, sourceParam);
     if (tile?.target_set_version) params.set("set_v", tile.target_set_version);
-    const returnTo = buildReturnTo(location, searchParams);
+    const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     params.set("psi", String(targetSetId));
     const qs = params.toString();
-    return `/picker${qs ? `?${qs}` : ""}`;
+    return withSourceParam(`/picker${qs ? `?${qs}` : ""}`, sourceParam);
   };
 
   const buildColorSearchUrl = () => {
@@ -118,35 +126,35 @@ export default function PlaylistPickerPage() {
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
-    if (sourceParam !== "") params.set("src", sourceParam);
+    applySourceToParams(params, sourceParam);
     if (setId) params.set("psi", String(setId));
-    const returnTo = buildReturnTo(location, searchParams);
+    const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
-    return `/playlist-color-search${qs ? `?${qs}` : ""}`;
+    return withSourceParam(`/playlist-color-search${qs ? `?${qs}` : ""}`, sourceParam);
   };
 
   const handleBackToPrevious = () => {
     const safeReturn = resolveReturnTo(searchParams.get("return_to") ?? "");
     if (safeReturn) {
-      navigate(safeReturn);
+      navigate(withSourceParam(safeReturn, sourceParam));
       return;
     }
     if (window.history.length > 1) {
       navigate(-1);
       return;
     }
-    navigate("/");
+    navigate(withSourceParam("/", sourceParam));
   };
 
   const handleExit = () => {
     if (adminExitPath) {
       const target = adminExitPath;
       clearAdminExitPath();
-      window.location.href = target;
+      window.location.href = withSourceParam(target, sourceParam);
       return;
     }
-    navigate("/");
+    navigate(withSourceParam("/", sourceParam));
   };
 
   if (loading) return <div className="playlist-thumbs__status">Loading…</div>;

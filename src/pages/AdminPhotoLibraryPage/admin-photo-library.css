@@ -1,6 +1,13 @@
 .admin-photo-library {
-  padding: 28px 32px 64px;
+  box-sizing: border-box;
+  height: calc(100vh - 72px);
+  min-height: 0;
+  overflow: hidden;
+  padding: 22px 32px 24px;
   color: #1b2433;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .admin-photo-library__header h1 {
@@ -9,19 +16,31 @@
 }
 
 .admin-photo-library__header p {
-  margin: 0 0 24px;
+  margin: 0;
   color: #6a778b;
 }
 
 .admin-photo-library__section {
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
 .admin-photo-library__search-strip {
-  margin-bottom: 16px;
+  flex: 0 0 auto;
 }
 
-.admin-photo-library__search-strip,
+.admin-photo-library__results-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.admin-photo-library__results-panel .admin-photo-library__empty,
+.admin-photo-library__results-panel .admin-photo-library__loading {
+  flex: 0 0 auto;
+}
+
 .admin-photo-library__results-panel {
   border: 1px solid #d6deea;
   border-radius: 16px;
@@ -30,6 +49,7 @@
 }
 
 .admin-photo-library__accordion {
+  flex: 0 0 auto;
   border: 1px solid #dbe3f0;
   border-radius: 18px;
   background: #fff;
@@ -73,6 +93,8 @@
 }
 
 .admin-photo-library__accordion-panel {
+  max-height: min(56vh, 620px);
+  overflow: auto;
   padding: 18px;
 }
 
@@ -441,10 +463,14 @@
 }
 
 .admin-photo-library__table-wrap {
+  flex: 1 1 auto;
   overflow: auto;
+  max-height: none;
+  min-height: 0;
   border: 1px solid #e4e9f3;
   border-radius: 14px;
   background: #fff;
+  -webkit-overflow-scrolling: touch;
 }
 
 .admin-photo-library__table {
@@ -476,7 +502,11 @@
 }
 
 .admin-photo-library__table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   text-align: left;
+  background: #f4f7fb;
   color: #6a778b;
   font-weight: 600;
   font-size: 12px;
@@ -745,7 +775,13 @@
 
 @media (max-width: 720px) {
   .admin-photo-library {
-    padding: 18px 14px 40px;
+    height: calc(100vh - 72px);
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .admin-photo-library__header h1 {
+    font-size: 28px;
   }
 
   .admin-photo-library__accordion-toggle {
@@ -835,5 +871,9 @@
 
   .admin-photo-library__table td:nth-child(3) {
     width: auto;
+  }
+
+  .admin-photo-library__table-wrap {
+    max-height: none;
   }
 }
