@@ -75,7 +75,7 @@ export const adminMenuItems = [
   {
     label: "Tools",
     items: [
-      { label: "Analytics", href: "/admin/asset-analytics" },
+      { label: "Analytics", href: "/admin/analytics" },
       { label: "Ideas / To-Dos", href: "/admin/ideas" },
       { label: "REX Conversion", href: "/admin/rex-conversion" },
       { label: "Photo Audit", href: "/admin/photo-library-tools" },

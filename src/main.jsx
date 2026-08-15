@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppStateProvider } from '@context/AppStateContext.jsx';
 import AppRouter from './Router.jsx'; // this contains <App />
-
+import AnalyticsProvider from './Analytics/AnalyticsProvider.jsx';
 
 import '@styles/global.css';    // optional
 import '@styles/reset.css';     // optional
@@ -11,7 +11,11 @@ import '@styles/named.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <AppStateProvider> <AppRouter /></AppStateProvider>
+   <AppStateProvider>
+  <AnalyticsProvider>
+    <AppRouter />
+  </AnalyticsProvider>
+</AppStateProvider>
    
   </StrictMode>
 )

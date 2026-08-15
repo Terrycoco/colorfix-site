@@ -12,12 +12,12 @@
 .admin-master-detail {
   --admin-list-width: 320px;
 
-  flex: 1;
   display: grid;
   grid-template-columns: minmax(0, var(--admin-list-width)) 11px minmax(0, 1fr);
   width: 100%;
+  height: calc(100dvh - var(--navbar-height, 4rem));
   min-height: 0;
-  height: 100%;
+  overflow: hidden;
   background: var(--admin-layout-bg);
   color: var(--admin-layout-text);
 }
@@ -26,6 +26,7 @@
 .admin-master-detail__detail {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -117,13 +118,15 @@
 .admin-list-pane__body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .admin-detail-pane {
   height: 100%;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px 18px 24px;
   background: var(--admin-layout-bg);
 }
@@ -262,10 +265,116 @@
   line-height: 1.45;
 }
 
+.admin-data-grid-wrap {
+  position: relative;
+  overflow: auto;
+  width: 100%;
+}
+
+.admin-data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.admin-data-grid th,
+.admin-data-grid td {
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--admin-layout-border-soft);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-data-grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7f8fa;
+  color: var(--admin-layout-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin-data-grid tbody tr {
+  cursor: pointer;
+}
+
+.admin-data-grid tbody tr:hover {
+  background: var(--admin-layout-hover);
+}
+
+.admin-data-grid tbody tr.is-selected,
+.admin-data-grid tbody tr.is-selected:hover {
+  background: var(--admin-layout-selected);
+}
+
+.admin-data-grid th button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-data-grid th button:hover {
+  color: var(--admin-layout-text);
+}
+
+.admin-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--admin-layout-border);
+}
+
+.admin-detail-header__title {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.admin-detail-header__description {
+  margin: 0;
+  max-width: 760px;
+  color: var(--admin-layout-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-detail-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .admin-detail-header {
+    display: block;
+    padding: 14px;
+  }
+
+  .admin-detail-header__actions {
+    margin-top: 10px;
+  }
+}
+
+
 @media (max-width: 720px) {
   .admin-master-detail {
     display: block;
     height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .admin-master-detail__splitter {
@@ -274,11 +383,13 @@
 
   .admin-master-detail__list,
   .admin-master-detail__detail {
+    height: auto;
     overflow: visible;
   }
 
   .admin-list-pane,
   .admin-detail-pane {
     height: auto;
+    overflow: visible;
   }
 }

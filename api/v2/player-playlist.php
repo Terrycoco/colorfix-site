@@ -141,6 +141,14 @@ try {
 
         $plan['reservation_id'] = $reservation->id;
         $plan['reservation_token'] = $reservationToken;
+        $plan['rex'] = [
+            'reservation_id' => $reservation->id,
+            'token' => $reservation->token,
+            'resolver_key' => $reservation->resolverKey,
+            'resource_type' => $reservation->resourceType,
+            'resource_id' => $reservation->resourceId,
+            'context' => $reservation->context,
+        ];
 
         if (
             $returnTo !== ''

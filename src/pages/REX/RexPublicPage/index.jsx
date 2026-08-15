@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import AnalyticsProvider from "@Analytics/AnalyticsProvider";
 import PlayerPage from "@pages/PlayerPage";
 import SavedPaletteSharePage from "@pages/SavedPaletteSharePage";
 import { applySourceToParams } from "@helpers/sourceParam";
@@ -7,7 +8,12 @@ import "../RexPublicPage/rex-public-page.css";
 
 export default function RexPublicPage() {
   const { token = "" } = useParams();
-  const [state, setState] = useState({ loading: true, kind: "", error: "" });
+  const [state, setState] = useState({
+    loading: true,
+    kind: "",
+    error: "",
+    rex: null,
+  });
 
   useEffect(() => {
     if (!token) {
@@ -27,10 +33,15 @@ export default function RexPublicPage() {
     })
       .then(async (response) => {
         const payload = await response.json().catch(() => null);
-        if (response.ok && payload?.ok && payload?.data) {
-          setState({ loading: false, kind: "playlist", error: "" });
-          return;
-        }
+       if (response.ok && payload?.ok && payload?.data) {
+        setState({
+          loading: false,
+          kind: "playlist",
+          error: "",
+          rex: payload.data.rex || null,
+        });
+        return;
+      }
         setState({ loading: false, kind: "viewer", error: "" });
       })
       .catch((error) => {
@@ -46,7 +57,11 @@ export default function RexPublicPage() {
   }
 
   if (state.kind === "playlist") {
-    return <PlayerPage />;
+    return (
+      <AnalyticsProvider rex={state.rex}>
+        <PlayerPage />
+      </AnalyticsProvider>
+    );
   }
 
   if (state.kind === "viewer") {

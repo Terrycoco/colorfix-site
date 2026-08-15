@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useAnalytics } from "@Analytics/useAnalytics"
 import Player from "@components/Player";
 import CTALayout from "@components/cta/CTALayout";
 import PlayerEndScreen from "@components/Player/PlayerEndScreen";
@@ -17,6 +18,7 @@ const PLAYER_CLOSE_ON_EXIT_KEY = "cf.player.close_on_exit.v1";
 
 export default function PlayerPage() {
   const { playlistId, start, token: routeToken } = useParams();
+  const { track } = useAnalytics();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -150,6 +152,8 @@ export default function PlayerPage() {
     recordLastPlaylistInstanceId(data.playlist_instance_id);
   }, [data?.playlist_instance_id]);
 
+
+
   useEffect(() => {
     if (!data) return;
     const title = data?.page_h1 || data?.display_title || data?.title || "ColorFix Playlist";
@@ -188,6 +192,15 @@ export default function PlayerPage() {
       playlist_id: Number(data?.playlist_id || 0) || null,
     });
   }, [data?.playlist_id, data?.playlist_instance_id]);
+
+  //REX/Ana tracking
+  useEffect(() => {
+    if (!data?.rex) return;
+
+    track("playlist_open", {
+      playlist_id: Number(data?.playlist_id || 0) || null,
+    });
+  }, [data?.rex, data?.playlist_id, track]);
 
 
 

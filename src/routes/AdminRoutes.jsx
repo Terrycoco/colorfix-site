@@ -69,6 +69,7 @@ const AdminCtaPagesPage = lazy(() => import('@pages/AdminCtaPagesPage'));
 const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
+ const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalyticsPage'));
 
 function renderWithSuspense(Component, label) {
   return (
@@ -110,7 +111,6 @@ export default function AdminRoutes() {
       <Route path="palette/:id/brands" element={<AdminPublicPage><PaletteTranslationPage /></AdminPublicPage>} />
       <Route path="articles/:id" element={<AdminPublicPage><ArticlePage /></AdminPublicPage>} />
       <Route element={renderWithSuspense(AdminLayout, 'Loading admin shell...')}>
-        <Route path="analysis" element={renderWithSuspense(AnalysisPage, 'Loading analysis...')} />
         <Route path="categories" element={renderWithSuspense(CategoryEditPage, 'Loading categories...')} />
         <Route path="colors" element={renderWithSuspense(AdminColorEditPage, 'Loading colors...')} />
         <Route path="search-presets" element={renderWithSuspense(SearchPresetPage, 'Loading presets...')} />
@@ -172,6 +172,7 @@ export default function AdminRoutes() {
         <Route path="playlists/:playlistId" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists/new" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
+       <Route path="analytics" element={renderWithSuspense(AdminAnalyticsPage, 'Loading analytics...')}/>
       </Route>
     </Routes>
   );

@@ -12,8 +12,8 @@
   flex-direction: column;
   width: 100%;
   height: calc(100dvh - var(--navbar-height, 4rem));
-  min-height: 0;
-  overflow: hidden;
+  min-height: auto;
+  overflow: visible;
 }
 
 /* (optional) avoid horizontal scroll if other ancestors add padding */

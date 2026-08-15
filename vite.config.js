@@ -30,6 +30,8 @@ export default defineConfig({
       '@hooks': path.resolve(__dirname, './src/hooks'),
       '@test': path.resolve(__dirname, './src/test'),
       '@lib': path.resolve(__dirname, './src/lib'),
+      '@Analytics': path.resolve(__dirname, './src/Analytics'),
+
     },
   },
   server: {
