@@ -24,6 +24,7 @@ final class PdoAnalyticsEventRepository implements AnalyticsEventRepositoryInter
         $stmt = $this->pdo->prepare(
             "INSERT INTO analytics_events (
                 event_key,
+                is_test,
                 reservation_id,
                 reservation_token,
                 resolver_key,
@@ -37,6 +38,7 @@ final class PdoAnalyticsEventRepository implements AnalyticsEventRepositoryInter
                 created_at
             ) VALUES (
                 :event_key,
+                :is_test,
                 :reservation_id,
                 :reservation_token,
                 :resolver_key,
@@ -53,6 +55,7 @@ final class PdoAnalyticsEventRepository implements AnalyticsEventRepositoryInter
 
         $stmt->execute([
             ':event_key' => trim($event->eventKey),
+            ':is_test' => $event->isTest ? 1 : 0,
             ':reservation_id' => $event->reservationId,
             ':reservation_token' => $event->reservationToken,
             ':resolver_key' => $event->resolverKey,

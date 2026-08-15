@@ -30,3 +30,19 @@ export function setAdmin(flag) {
     else window.localStorage.removeItem("isTerry");
   } catch {}
 }
+
+export function isAnalyticsTestMode() {
+  try {
+    if (typeof window === "undefined") return false;
+
+    const v = window.localStorage.getItem("analyticsTestMode") || "";
+
+    return (
+      v === "1" ||
+      v.toLowerCase() === "true" ||
+      v.toLowerCase() === "yes"
+    );
+  } catch {
+    return false;
+  }
+}

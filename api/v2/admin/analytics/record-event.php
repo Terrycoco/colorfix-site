@@ -42,6 +42,7 @@ try {
     $eventId = $service->record(
         new AnalyticsEvent(
             eventKey: $eventKey,
+            isTest: !empty($data['is_test']),
             reservationId: isset($data['reservation_id']) ? (int)$data['reservation_id'] : null,
             reservationToken: isset($data['reservation_token']) ? (string)$data['reservation_token'] : null,
             resolverKey: isset($data['resolver_key']) ? (string)$data['resolver_key'] : null,

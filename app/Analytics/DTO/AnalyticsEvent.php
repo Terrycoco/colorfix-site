@@ -7,7 +7,7 @@ final readonly class AnalyticsEvent
 {
     public function __construct(
         public string $eventKey,
-
+        public bool $isTest = false,
         public ?int $reservationId = null,
         public ?string $reservationToken = null,
 

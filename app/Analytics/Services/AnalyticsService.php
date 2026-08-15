@@ -6,12 +6,14 @@ namespace App\Analytics\Services;
 use App\Analytics\Contracts\AnalyticsEventRepositoryInterface;
 use App\Analytics\DTO\AnalyticsEvent;
 use App\Repos\PdoPlaylistRepository;
+use App\Repos\PdoArticleRepository;
 
 final class AnalyticsService
 {
     public function __construct(
         private AnalyticsEventRepositoryInterface $events,
         private ?PdoPlaylistRepository $playlists = null,
+        private ?PdoArticleRepository $articles = null,
     ) {}
 
     public function record(AnalyticsEvent $event): int
@@ -27,6 +29,22 @@ final class AnalyticsService
             $resourceType,
             $eventKey
         );
+
+        if ($resourceType === 'article' && $this->articles !== null) {
+            foreach ($rows as &$row) {
+                $articleId = (int)($row['resource_id'] ?? 0);
+
+                $article = $articleId > 0
+                    ? $this->articles->getArticleById($articleId)
+                    : null;
+
+                $row['title'] = $article['title'] ?? "Article #{$articleId}";
+            }
+
+            unset($row);
+
+            return $rows;
+        }
 
         if ($resourceType !== 'playlist' || $this->playlists === null) {
             return $rows;

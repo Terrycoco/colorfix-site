@@ -78,9 +78,16 @@ export default function ArticlePage() {
     };
   }, [id, searchParams]);
 
-    useEffect(() => {
-      track("page_open");
-    }, [track]);
+  useEffect(() => {
+    track(
+      "article_open",
+      {},
+      {
+        resource_type: "article",
+        resource_id: Number(id),
+      }
+    );
+  }, [id, track]);
 
   const article = payload?.article;
   const hero = payload?.hero;

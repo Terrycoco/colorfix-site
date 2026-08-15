@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 use App\Analytics\Repos\PdoAnalyticsEventRepository;
 use App\Analytics\Services\AnalyticsService;
 use App\Repos\PdoPlaylistRepository;
+use App\Repos\PdoArticleRepository;
 
 function respond(array $payload, int $status = 200): void
 {
@@ -34,7 +35,8 @@ try {
 
     $service = new AnalyticsService(
         new PdoAnalyticsEventRepository($pdo),
-        new PdoPlaylistRepository($pdo)
+        new PdoPlaylistRepository($pdo),
+        new PdoArticleRepository($pdo)
     );
 
     if ($resourceType === 'playlist') {
