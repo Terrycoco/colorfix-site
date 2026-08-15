@@ -37,9 +37,10 @@ function rex_admin_positive_int(mixed $value, string $label): int
 
 function rex_admin_context(mixed $value): array
 {
-    if ($value === null || $value === '') {
+    if ($value === null || $value === '' || $value === []) {
         return [];
     }
+
     if (!is_array($value) || array_is_list($value)) {
         throw new InvalidArgumentException('Context must be a JSON object.');
     }

@@ -10,6 +10,7 @@ use App\REX\Resolvers\PlaylistExperienceResolver;
 use App\REX\Resolvers\RexResolverRegistry;
 use App\REX\Resolvers\ViewerResolver;
 use App\REX\Services\RexResolver;
+use App\REX\Resolvers\RouteResolver;
 
 function t_not_found(): void
 {
@@ -38,6 +39,10 @@ try {
     $registry->register(
         'viewer',
         new ViewerResolver($pdo)
+    );
+    $registry->register(
+        'route',
+        new RouteResolver()
     );
 
     $resolver = new RexResolver($repo, $registry);

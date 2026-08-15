@@ -28,7 +28,6 @@ const FriendsEnterPage = lazy(() => import('@pages/FriendsEnterPage'));
 const MissingChipsPage = lazy(() => import('@pages/MissingChipsPage'));
 const WhitesLrvEditorPage = lazy(() => import('@pages/whitesLrvEditorPage'));
 const AdminUploadPhotoPage = lazy(() => import('@pages/AdminUploadPhotoPage'));
-const AnalysisPage = lazy(() => import('@pages/AnalysisPage'));
 const AdminRolesMasksPage = lazy(() => import('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
@@ -70,6 +69,7 @@ const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
  const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalyticsPage'));
+ const AdminRexPage = lazy(() => import('@pages/AdminRexPage'));
 
 function renderWithSuspense(Component, label) {
   return (
@@ -173,6 +173,7 @@ export default function AdminRoutes() {
         <Route path="playlists/new" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
        <Route path="analytics" element={renderWithSuspense(AdminAnalyticsPage, 'Loading analytics...')}/>
+       <Route path="rex" element={renderWithSuspense(AdminRexPage, 'Loading REX...')}/>
       </Route>
     </Routes>
   );

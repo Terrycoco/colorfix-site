@@ -18,6 +18,7 @@ use App\REX\Resolvers\PlaylistExperienceResolver;
 use App\REX\Resolvers\RexResolverRegistry;
 use App\REX\Resolvers\ViewerResolver;
 use App\REX\Services\RexResolver;
+use App\REX\Resolvers\RouteResolver;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -67,6 +68,11 @@ try {
     $registry->register(
         'viewer',
         new ViewerResolver($pdo)
+    );
+
+    $registry->register(
+        'route',
+        new RouteResolver()
     );
 
     $rexResolver = new RexResolver(

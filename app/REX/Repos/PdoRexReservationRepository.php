@@ -423,52 +423,67 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
     }
 
     public function countActiveByResources(string $resourceType, array $resourceIds): array
-{
-    $resourceType = trim($resourceType);
+    {
+        $resourceType = trim($resourceType);
 
-    $resourceIds = array_values(array_unique(array_filter(
-        array_map('intval', $resourceIds),
-        static fn(int $id): bool => $id > 0
-    )));
+        $resourceIds = array_values(array_unique(array_filter(
+            array_map('intval', $resourceIds),
+            static fn(int $id): bool => $id > 0
+        )));
 
-    if ($resourceType === '' || $resourceIds === []) {
-        return [];
+        if ($resourceType === '' || $resourceIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [
+            ':resource_type' => $resourceType,
+            ':status' => 'active',
+        ];
+
+        foreach ($resourceIds as $index => $resourceId) {
+            $placeholder = ':resource_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $resourceId;
+        }
+
+        $sql = "
+            SELECT
+                resource_id,
+                COUNT(*) AS rex_count
+            FROM rex_reservations
+            WHERE resource_type = :resource_type
+            AND status = :status
+            AND resource_id IN (" . implode(', ', $placeholders) . ")
+            GROUP BY resource_id
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $counts = [];
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $counts[(int)$row['resource_id']] = (int)$row['rex_count'];
+        }
+
+        return $counts;
+    }
+   
+    public function listResourceTypes(): array
+    {
+        $stmt = $this->pdo->query(
+            "SELECT DISTINCT resource_type
+            FROM rex_reservations
+            WHERE resource_type IS NOT NULL
+            AND TRIM(resource_type) <> ''
+            ORDER BY resource_type ASC"
+        );
+
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 
-    $placeholders = [];
-    $params = [
-        ':resource_type' => $resourceType,
-        ':status' => 'active',
-    ];
 
-    foreach ($resourceIds as $index => $resourceId) {
-        $placeholder = ':resource_id_' . $index;
-        $placeholders[] = $placeholder;
-        $params[$placeholder] = $resourceId;
-    }
-
-    $sql = "
-        SELECT
-            resource_id,
-            COUNT(*) AS rex_count
-        FROM rex_reservations
-        WHERE resource_type = :resource_type
-          AND status = :status
-          AND resource_id IN (" . implode(', ', $placeholders) . ")
-        GROUP BY resource_id
-    ";
-
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute($params);
-
-    $counts = [];
-
-    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-        $counts[(int)$row['resource_id']] = (int)$row['rex_count'];
-    }
-
-    return $counts;
-}
 
     public function tokenExists(string $token): bool
     {

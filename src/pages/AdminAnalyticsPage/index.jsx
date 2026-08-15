@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { isAnalyticsTestMode } from "@helpers/authHelper";
 
-
 import {
   AdminDataGrid,
   AdminDetailPane,
@@ -36,7 +35,9 @@ export default function AdminAnalyticsPage() {
         const eventKey =
           resourceType === "article"
             ? "article_open"
-            : "playlist_open";
+            : resourceType === "page"
+              ? "page_open"
+              : "playlist_open";
 
         const params = new URLSearchParams({
           resource_type: resourceType,
@@ -54,7 +55,9 @@ export default function AdminAnalyticsPage() {
         }
 
         if (!active) return;
+
         setItems(Array.isArray(data.items) ? data.items : []);
+
         setResourceTypes(
           Array.isArray(data.resource_types) && data.resource_types.length
             ? data.resource_types
@@ -73,31 +76,32 @@ export default function AdminAnalyticsPage() {
     return () => {
       active = false;
     };
-}, [resourceType]);
+  }, [resourceType]);
 
+  async function deleteTestData() {
+    if (!window.confirm("Delete all analytics test records?")) return;
 
-async function deleteTestData() {
-  if (!window.confirm("Delete all analytics test records?")) return;
+    try {
+      const res = await fetch(DELETE_TESTS_URL, {
+        method: "POST",
+        credentials: "include",
+      });
 
-  try {
-    const res = await fetch(DELETE_TESTS_URL, {
-      method: "POST",
-      credentials: "include",
-    });
+      const data = await res.json();
 
-    const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Failed to delete test data");
+      }
 
-    if (!res.ok || !data?.ok) {
-      throw new Error(data?.error || "Failed to delete test data");
+      window.alert(`Deleted ${data.deleted} test record(s).`);
+      window.location.reload();
+    } catch (err) {
+      window.alert(err?.message || "Failed to delete test data");
     }
-
-    window.alert(`Deleted ${data.deleted} test record(s).`);
-    window.location.reload();
-  } catch (err) {
-    window.alert(err?.message || "Failed to delete test data");
   }
-}
 
+  const simpleOpenResource =
+    resourceType === "article" || resourceType === "page";
 
   return (
     <AdminMasterDetail
@@ -106,7 +110,7 @@ async function deleteTestData() {
       minListWidth={240}
       maxListWidth={420}
       list={
-       <AdminListPane title="Analytics">
+        <AdminListPane title="Analytics">
           <AdminObjectList ariaLabel="Analytics resource types">
             {resourceTypes.map((type) => (
               <AdminObjectListItem
@@ -122,62 +126,68 @@ async function deleteTestData() {
       }
       detail={
         <AdminDetailPane ariaLabel="Analytics results">
-<div className="admin-detail-header">
-  <div>
-    <h1 className="admin-detail-header__title">Analytics</h1>
-    <p className="admin-detail-header__description">
-      Event Counts by Resource
-    </p>
-  </div>
+          <div className="admin-detail-header">
+            <div>
+              <h1 className="admin-detail-header__title">Analytics</h1>
+              <p className="admin-detail-header__description">
+                Event Counts by Resource
+              </p>
+            </div>
 
-  <div className="admin-detail-header__actions">
-    <label
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 7,
-        fontSize: 12,
-        fontWeight: 700,
-      }}
-    >
-      <input
-        type="checkbox"
-        checked={testMode}
-        onChange={(e) => {
-          const enabled = e.target.checked;
+            <div className="admin-detail-header__actions">
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={testMode}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
 
-          if (enabled) {
-            localStorage.setItem("analyticsTestMode", "1");
-          } else {
-            localStorage.removeItem("analyticsTestMode");
-          }
+                    if (enabled) {
+                      localStorage.setItem("analyticsTestMode", "1");
+                    } else {
+                      localStorage.removeItem("analyticsTestMode");
+                    }
 
-          setTestMode(enabled);
-        }}
-      />
-      Test Mode
-    </label>
-    <button
-        type="button"
-        onClick={deleteTestData}
-      >
-        Delete Test Data
-      </button>
-  </div>
-</div>
+                    setTestMode(enabled);
+                  }}
+                />
+                Test Mode
+              </label>
+
+              <button
+                type="button"
+                onClick={deleteTestData}
+              >
+                Delete Test Data
+              </button>
+            </div>
+          </div>
 
           {loading ? (
             <AdminEmptyState title="Loading analytics" />
           ) : error ? (
-            <AdminEmptyState title="Analytics could not load" message={error} />
+            <AdminEmptyState
+              title="Analytics could not load"
+              message={error}
+            />
           ) : items.length === 0 ? (
             <AdminEmptyState title="No analytics yet" />
           ) : (
             <AdminDataGrid ariaLabel={`${resourceType} analytics`}>
               <thead>
-                {resourceType === "article" ? (
+                {simpleOpenResource ? (
                   <tr>
-                    <th>Article</th>
+                    <th>
+                      {resourceType === "page" ? "Page" : "Article"}
+                    </th>
                     <th>Source</th>
                     <th>Opens</th>
                   </tr>
@@ -197,23 +207,34 @@ async function deleteTestData() {
                   const key = `${item.resource_id}-${item.source_key || "direct"}`;
                   const selected = key === selectedKey;
 
-                  return resourceType === "article" ? (
+                  if (simpleOpenResource) {
+                    const fallbackTitle =
+                      resourceType === "page"
+                        ? `Page #${item.resource_id}`
+                        : `Article #${item.resource_id}`;
+
+                    return (
+                      <tr
+                        key={key}
+                        className={selected ? "is-selected" : ""}
+                        onClick={() => setSelectedKey(key)}
+                      >
+                        <td>{item.title || fallbackTitle}</td>
+                        <td>{item.source_key || "Direct"}</td>
+                        <td>{item.event_count}</td>
+                      </tr>
+                    );
+                  }
+
+                  return (
                     <tr
                       key={key}
                       className={selected ? "is-selected" : ""}
                       onClick={() => setSelectedKey(key)}
                     >
-                      <td>{item.title || `Article #${item.resource_id}`}</td>
-                      <td>{item.source_key || "Direct"}</td>
-                      <td>{item.event_count}</td>
-                    </tr>
-                  ) : (
-                    <tr
-                      key={key}
-                      className={selected ? "is-selected" : ""}
-                      onClick={() => setSelectedKey(key)}
-                    >
-                      <td>{item.title || `Playlist #${item.resource_id}`}</td>
+                      <td>
+                        {item.title || `Playlist #${item.resource_id}`}
+                      </td>
                       <td>{item.source_key || "Direct"}</td>
                       <td>{item.opens}</td>
                       <td>{item.watch_more}</td>

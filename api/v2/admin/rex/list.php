@@ -20,6 +20,7 @@ use App\REX\Resolvers\RexResolverRegistry;
 use App\REX\Resolvers\ViewerResolver;
 use App\REX\Services\RexResolver;
 use App\REX\Services\RexReservationRelationships;
+use App\REX\Resolvers\RouteResolver;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
@@ -55,15 +56,19 @@ try {
             'Resource type'
         );
 
-        $resourceId = rex_admin_positive_int(
-            $_GET['resource_id'] ?? null,
-            'Resource ID'
-        );
+        $resourceId = isset($_GET['resource_id']) && $_GET['resource_id'] !== ''
+            ? rex_admin_positive_int(
+                $_GET['resource_id'],
+                'Resource ID'
+            )
+            : null;
 
-        $items = $repo->findByResource(
-            $resourceType,
-            $resourceId,
-            500
+        $items = $repo->search(
+            new \App\REX\DTO\RexReservationSearchCriteria(
+                resourceType: $resourceType,
+                resourceId: $resourceId,
+                limit: 500,
+            )
         );
     }
 
@@ -78,6 +83,11 @@ try {
         new ViewerResolver($pdo)
     );
 
+    $registry->register(
+        'route',
+        new RouteResolver()
+    );
+
     $rexResolver = new RexResolver(
         $repo,
         $registry
@@ -88,24 +98,36 @@ try {
         static function ($reservation) use ($rexResolver, $relationships): array {
             $item = rex_admin_reservation_payload($reservation);
 
-            $descriptor = $rexResolver->describeReservation($reservation);
+            try {
+                $descriptor = $rexResolver->describeReservation($reservation);
 
-            $item['descriptor'] = [
-                'title' => $descriptor->title,
-                'fields' => $descriptor->fields,
-            ];
-            $item['relationships'] = rex_admin_reservation_relationships_payload(
-                $relationships,
-                $reservation
-            );
+                $item['descriptor'] = [
+                    'title' => $descriptor->title,
+                    'fields' => $descriptor->fields,
+                ];
+            } catch (Throwable $e) {
+                $item['descriptor'] = [
+                    'title' => $reservation->label,
+                    'fields' => [],
+                    'error' => $e->getMessage(),
+                ];
+            }
 
             return $item;
         },
         $items
     );
 
+   $resourceTypes = $repo->listResourceTypes();
+
+    if (!in_array('page', $resourceTypes, true)) {
+        $resourceTypes[] = 'page';
+        sort($resourceTypes);
+    }
+
     workflow_respond([
         'ok' => true,
+        'resource_types' => $resourceTypes,
         'items' => $payload,
     ]);
 

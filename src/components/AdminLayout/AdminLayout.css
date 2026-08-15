@@ -123,10 +123,11 @@
 }
 
 .admin-detail-pane {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   padding: 16px 18px 24px;
   background: var(--admin-layout-bg);
 }
@@ -267,6 +268,8 @@
 
 .admin-data-grid-wrap {
   position: relative;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   width: 100%;
 }
@@ -274,7 +277,7 @@
 .admin-data-grid {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
   font-size: 13px;
 }
 

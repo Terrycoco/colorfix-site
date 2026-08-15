@@ -1,6 +1,8 @@
 // src/Router.jsx
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useAnalytics } from '@Analytics/useAnalytics';
 import App from './App.jsx';
 import MainLayout from '@layout/MainLayout';
 import ScrollToTop from '@layout/ScrollToTop';
@@ -118,7 +120,7 @@ function AppRouter() {
           
           {/* USER-FACING PAGES ⤵ wrapped by MainLayout (capped, centered) */}
           <Route element={<MainLayout />}>
-            <Route index element={<Navigate to="/results/4" replace />} />
+            <Route index element={<HomeRedirect />} />
             <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
             <Route path="results/:queryId" element={renderWithSuspense(GalleryPage, 'Loading results…')} />
             <Route path="color/:id" element={renderWithSuspense(ColorDetailPage, 'Loading color…')} />
@@ -147,6 +149,31 @@ function AppRouter() {
     </BrowserRouter>
   );
 }
+
+function HomeRedirect() {
+  const location = useLocation();
+  const { track } = useAnalytics();
+
+  useEffect(() => {
+    track(
+      "page_open",
+      {},
+      {
+        resource_type: "page",
+        resource_id: 1,
+      }
+    );
+  }, [track]);
+
+  return (
+    <Navigate
+      to={`/results/4${location.search || ""}`}
+      replace
+    />
+  );
+}
+
+
 
 function RouteFallback({ label }) {
   return (
