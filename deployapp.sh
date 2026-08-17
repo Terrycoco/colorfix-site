@@ -6,7 +6,7 @@ source "$SCRIPT_DIR/deploy-env.sh"
 echo "🚀 Deploying backend app files via SSH..."
 
 # Configuration
-LOCAL_APP_DIR="app/"
+LOCAL_APP_DIR="$SCRIPT_DIR/app/"
 REMOTE_PATH="public_html/colorfix/app"
 
 # Ensure remote folder exists

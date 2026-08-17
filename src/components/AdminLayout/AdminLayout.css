@@ -13,17 +13,26 @@
   --admin-list-width: 320px;
 
   display: grid;
-  grid-template-columns: minmax(0, var(--admin-list-width)) 11px minmax(0, 1fr);
+  grid-template-columns: var(--admin-list-width) 11px minmax(0, 1fr);
+
+  box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   height: calc(100dvh - var(--navbar-height, 4rem));
+
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
+
   background: var(--admin-layout-bg);
   color: var(--admin-layout-text);
 }
 
 .admin-master-detail__list,
 .admin-master-detail__detail {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -82,7 +91,11 @@
 .admin-list-pane {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   border-right: 0;
   background: var(--admin-layout-bg);
@@ -125,11 +138,20 @@
 .admin-detail-pane {
   display: flex;
   flex-direction: column;
+
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+
+  overflow: auto;
+
   padding: 16px 18px 24px;
   background: var(--admin-layout-bg);
+}
+
+.admin-detail-pane > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-object-list {
@@ -269,9 +291,11 @@
 .admin-data-grid-wrap {
   position: relative;
   flex: 1;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
   width: 100%;
+  max-width: 100%;
+  overflow: auto;
 }
 
 .admin-data-grid {
@@ -360,6 +384,33 @@
   white-space: nowrap;
 }
 
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-field__label {
+  display: block;
+  margin: 0;
+  color: #4b6b8a;
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-field__control {
+  box-sizing: border-box;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+
+
+
+
 @media (max-width: 720px) {
   .admin-detail-header {
     display: block;
@@ -369,10 +420,7 @@
   .admin-detail-header__actions {
     margin-top: 10px;
   }
-}
 
-
-@media (max-width: 720px) {
   .admin-master-detail {
     display: block;
     height: auto;
@@ -395,4 +443,42 @@
     height: auto;
     overflow: visible;
   }
+}
+
+/*
+ * ADMIN DETAIL WORK AREA
+ *
+ * Use this inside AdminDetailPane when the page contains
+ * a large grid/table/editor that needs to remain inside
+ * the visible detail pane.
+ */
+.admin-detail-workarea {
+  display: flex;
+  flex-direction: column;
+
+  flex: 1 1 auto;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: hidden;
+}
+
+
+/*
+ * ADMIN SCROLL REGION
+ *
+ * Generic bounded two-axis scroll area.
+ *
+ * Because this region fills the remaining visible pane,
+ * its horizontal scrollbar remains at the bottom of the
+ * visible work area instead of several screens below.
+ */
+.admin-scroll-region {
+  flex: 1 1 auto;
+
+  min-width: 0;
+  min-height: 0;
+
+  overflow: auto;
 }

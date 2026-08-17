@@ -7,6 +7,7 @@ use App\Analytics\Contracts\AnalyticsEventRepositoryInterface;
 use App\Analytics\DTO\AnalyticsEvent;
 use App\Repos\PdoPlaylistRepository;
 use App\Repos\PdoArticleRepository;
+use App\REX\Resources\RexRouteCatalog;
 
 final class AnalyticsService
 {
@@ -29,6 +30,21 @@ final class AnalyticsService
             $resourceType,
             $eventKey
         );
+
+        if ($resourceType === 'page') {
+            foreach ($rows as &$row) {
+                $pageId = (int)($row['resource_id'] ?? 0);
+                $route = $pageId > 0
+                    ? RexRouteCatalog::get($pageId)
+                    : null;
+
+                $row['title'] = $route['title'] ?? "Page #{$pageId}";
+            }
+
+            unset($row);
+
+            return $rows;
+        }
 
         if ($resourceType === 'article' && $this->articles !== null) {
             foreach ($rows as &$row) {

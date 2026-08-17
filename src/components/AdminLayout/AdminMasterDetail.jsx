@@ -9,7 +9,7 @@ export default function AdminMasterDetail({
   detail,
   storageKey = "admin-master-detail-width",
   defaultListWidth = 320,
-  minListWidth = 240,
+  minListWidth = 50,
   maxListWidth = 520,
   className = "",
 }) {
@@ -37,7 +37,16 @@ export default function AdminMasterDetail({
       const shell = shellRef.current;
       if (!shell) return;
       const rect = shell.getBoundingClientRect();
-      const nextWidth = clamp(event.clientX - rect.left, minListWidth, maxListWidth);
+      const availableMax = Math.max(
+          minListWidth,
+          Math.min(maxListWidth, rect.width - 320)
+      );
+
+      const nextWidth = clamp(
+        event.clientX - rect.left,
+        minListWidth,
+        availableMax
+      );
       setListWidth(nextWidth);
     }
 

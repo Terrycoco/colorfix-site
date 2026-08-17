@@ -3,7 +3,7 @@
     "success": true,
     "variant": "public",
     "build_key": "public_home",
-    "generated_at": "2026-07-16T19:55:13+00:00",
+    "generated_at": "2026-08-16T19:17:42+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -109,10 +109,10 @@
                     "meta_description": "Struggling with exterior paint colors? Learn why your house looks off and how focal points and contrast guide the eye\u2014and fix it fast.",
                     "hero_asset_id": 374,
                     "hero_mobile_asset_id": 375,
-                    "cta_overrides": "{\"14\":{\"label\":\"Slideshow: Where does the eye go?\",\"playlist_instance_id\":\"21\"},\"_cta_ids\":[14]}",
+                    "cta_overrides": "{\"14\":{\"label\":\"Slideshow: Where does the eye go?\",\"playlist_instance_id\":\"21\",\"playlist_id\":22},\"_cta_ids\":[14]}",
                     "featured": 1,
                     "created_at": "2026-03-30 13:03:34",
-                    "updated_at": "2026-04-13 12:32:33",
+                    "updated_at": "2026-08-14 14:30:58",
                     "published_at": "2026-03-30 21:31:05"
                 },
                 "hero": {
@@ -120,14 +120,14 @@
                     "rel_path": "/photos/articles/highlighter-combo/article_highlighter-combo_b942b7663df7.jpg",
                     "title": "highlighter_yellow_combo",
                     "alt_text": "Split-view suburban house exterior with terracotta roof, gray-blue walls, and yellow trim before and after repainting.",
-                    "updated_at": "2026-06-27 05:41:04"
+                    "updated_at": "2026-08-04 15:52:08"
                 },
                 "hero_mobile": {
                     "photo_library_id": 375,
                     "rel_path": "/photos/articles/eye-go/article_eye-go_ff804a2b5c36.jpg",
                     "title": "eye-go highlighter_combo_vert",
                     "alt_text": "Split-view suburban house exterior showing before and after trim color changes, with terracotta roof and desert landscaping.",
-                    "updated_at": "2026-06-27 05:41:04"
+                    "updated_at": "2026-08-04 15:52:13"
                 }
             }
         },

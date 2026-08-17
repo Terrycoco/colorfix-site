@@ -70,6 +70,8 @@ const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
  const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalyticsPage'));
  const AdminRexPage = lazy(() => import('@pages/AdminRexPage'));
+const AdminPubPage = lazy(() => import("@pages/AdminPubPage"));
+
 
 function renderWithSuspense(Component, label) {
   return (
@@ -174,6 +176,7 @@ export default function AdminRoutes() {
         <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
        <Route path="analytics" element={renderWithSuspense(AdminAnalyticsPage, 'Loading analytics...')}/>
        <Route path="rex" element={renderWithSuspense(AdminRexPage, 'Loading REX...')}/>
+        <Route path="pub" element={renderWithSuspense(AdminPubPage, "Loading PUB...")}/>
       </Route>
     </Routes>
   );

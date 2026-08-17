@@ -10,7 +10,7 @@ import { YOUTUBE_VIDEO_TIMING } from './src/remotion/youtubeVideoTiming.js'
 export default defineConfig({
   plugins: [
     adminDevSpaFallback(),
-    localYoutubePreviewApi(),
+    localPubVideoRenderApi(),
     nonBlockingPlayerCss(),
     react(),
     tailwindcss(),
@@ -31,9 +31,9 @@ export default defineConfig({
       '@test': path.resolve(__dirname, './src/test'),
       '@lib': path.resolve(__dirname, './src/lib'),
       '@Analytics': path.resolve(__dirname, './src/Analytics'),
-
-    },
+      '@PUB' : path.resolve(__dirname, './src/PUB'),
   },
+},
   server: {
     port: 5173,
     strictPort: true,
@@ -61,72 +61,178 @@ export default defineConfig({
   },
 })
 
-function localYoutubePreviewApi() {
+function localPubVideoRenderApi() {
   return {
-    name: 'local-youtube-preview-api',
-    configureServer(server) {
-      server.middlewares.use('/api/v2/admin/asset-creators/preview.php', async (req, res, next) => {
-        if (req.method !== 'POST') {
-          res.statusCode = 405;
-          res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-          res.end(JSON.stringify({ ok: false, error: 'POST only' }));
-          return;
-        }
+    name: 'local-pub-video-render-api',
 
-        try {
-          const payload = JSON.parse(await readRequestBody(req) || '{}');
-          const creatorKey = String(payload?.creator_key || payload?.recipe?.creator_key || '').trim();
-          if (creatorKey !== 'youtube.playlist_video') {
-            res.statusCode = 400;
-            res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-            res.end(JSON.stringify({ ok: false, error: `Preview is not wired for creator: ${creatorKey}` }));
+    configureServer(server) {
+      server.middlewares.use(
+        '/api/v2/admin/pub/render-video-local',
+        async (req, res) => {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.setHeader(
+              'Content-Type',
+              'application/json; charset=UTF-8'
+            );
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: 'POST only',
+              })
+            );
             return;
           }
 
-          const root = process.cwd();
-          const previewDir = path.join(root, 'exports', 'youtube-preview', 'current');
-          await fs.mkdir(previewDir, { recursive: true });
-          const recipePath = path.join(previewDir, 'recipe.json');
-          const outputPath = path.join(previewDir, 'preview.mp4');
-          const plan = youtubePlanFromRecipe(payload.recipe || payload.instructions || {});
-          await fs.writeFile(recipePath, JSON.stringify({ plan }, null, 2));
-          await runCommand('node', [
-            path.join(root, 'scripts', 'render-youtube-video.mjs'),
-            `--recipe=${recipePath}`,
-            `--output=${outputPath}`,
-            '--preview=1',
-          ], root);
+          try {
+            const payload = JSON.parse(
+              await readRequestBody(req) || '{}'
+            );
 
-          const stat = await fs.stat(outputPath);
-          res.statusCode = 200;
-          res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-          res.end(JSON.stringify({
-            ok: true,
-            preview: {
-              kind: 'video',
-              preview_type: 'local_video',
-              channel: 'youtube',
-              title: plan.title || 'YouTube Preview',
-              local_path: outputPath,
-              recipe_path: recipePath,
-              open_url: '/exports/youtube-preview/current/preview.mp4',
-              file_size_bytes: stat.size,
-              duration_seconds: durationSeconds(plan),
-              slide_count: plan.items.length,
-              persisted: false,
-              creates_asset_library_row: false,
-              cleanup_policy: 'replace_previous_preview',
-            },
-          }));
-        } catch (error) {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json; charset=UTF-8');
-          res.end(JSON.stringify({ ok: false, error: error?.message || 'Preview failed' }));
+            const creatorKey = String(
+              payload?.creator_key || ''
+            ).trim();
+
+if (!creatorKey) {
+  throw new Error('creator_key required');
+}
+
+let renderPlan =
+  payload?.plan &&
+  typeof payload.plan === 'object'
+    ? payload.plan
+    : null;
+
+/*
+ * Backward compatibility for the existing YouTube creator.
+ *
+ * The old YouTube UI sends a recipe rather than a completed
+ * render plan. Until YouTube Create is migrated into PUB,
+ * convert that recipe here using the existing helper.
+ */
+if (
+  !renderPlan &&
+  creatorKey === 'youtube.playlist_video'
+) {
+  renderPlan = youtubePlanFromRecipe(
+    payload?.recipe ||
+    payload?.instructions ||
+    {}
+  );
+}
+
+if (!renderPlan) {
+  throw new Error(
+    `Render plan required for ${creatorKey}`
+  );
+}
+
+            const root = process.cwd();
+
+            const renderer = localRendererForCreator(
+              creatorKey,
+              root
+            );
+
+            const renderDir = path.join(
+              root,
+              'exports',
+              'pub-video-preview',
+              safePathPart(creatorKey)
+            );
+
+            await fs.mkdir(renderDir, {
+              recursive: true,
+            });
+
+            const propsPath = path.join(
+              renderDir,
+              'props.json'
+            );
+
+            const outputPath = path.join(
+              renderDir,
+              'preview.mp4'
+            );
+
+            await fs.writeFile(
+              propsPath,
+              JSON.stringify(
+                {
+                  plan: renderPlan,
+                },
+                null,
+                2
+              )
+            );
+
+            await runCommand(
+              'node',
+              [
+                renderer.scriptPath,
+                `--recipe=${propsPath}`,
+                `--output=${outputPath}`,
+                '--preview=1',
+              ],
+              root
+            );
+
+            const stat = await fs.stat(outputPath);
+
+            res.statusCode = 200;
+            res.setHeader(
+              'Content-Type',
+              'application/json; charset=UTF-8'
+            );
+
+            res.end(
+              JSON.stringify({
+                ok: true,
+
+                render: {
+                  creator_key: creatorKey,
+                  kind: 'video',
+                  renderer: 'local_remotion',
+
+                  local_path: outputPath,
+                  props_path: propsPath,
+
+                  open_url:
+                    `/exports/pub-video-preview/` +
+                    `${safePathPart(creatorKey)}/preview.mp4`,
+
+                  file_size_bytes: stat.size,
+
+                  persisted: false,
+                  creates_asset: false,
+
+                  cleanup_policy:
+                    'replace_previous_preview',
+                },
+              })
+            );
+          } catch (error) {
+            res.statusCode = 400;
+            res.setHeader(
+              'Content-Type',
+              'application/json; charset=UTF-8'
+            );
+
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error:
+                  error?.message ||
+                  'Local video render failed',
+              })
+            );
+          }
         }
-      });
+      );
     },
   };
 }
+
 
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
@@ -218,6 +324,44 @@ function youtubePlanFromRecipe(recipe) {
       timeline: buildYoutubeTimeline(items),
     },
   };
+}
+
+function localRendererForCreator(creatorKey, root) {
+  const renderers = {
+    'youtube.playlist_video': {
+      scriptPath: path.join(
+        root,
+        'scripts',
+        'render-youtube-video.mjs'
+      ),
+    },
+
+    'pinterest.before_after_video': {
+      scriptPath: path.join(
+        root,
+        'scripts',
+        'render-pinterest-before-after-video.mjs'
+      ),
+    },
+  };
+
+  const renderer = renderers[creatorKey];
+
+  if (!renderer) {
+    throw new Error(
+      `No local video renderer registered for ${creatorKey}`
+    );
+  }
+
+  return renderer;
+}
+
+function safePathPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function musicFromRecipe(recipe) {
