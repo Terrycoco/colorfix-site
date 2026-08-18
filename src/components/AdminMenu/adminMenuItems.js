@@ -79,7 +79,7 @@ export const adminMenuItems = [
       { label: "Ideas / To-Dos", href: "/admin/ideas" },
       { label: "REX Conversion", href: "/admin/rex-conversion" },
       { label: "Photo Audit", href: "/admin/photo-library-tools" },
-      { label: "URL Reservations", href: "/admin/url-reservations" },
+      { label: "Marketing", href: "/admin/marketing" },
     ],
   },
 ];
