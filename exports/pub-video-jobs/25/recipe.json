@@ -1,0 +1,73 @@
+{
+  "composition_id": "colorfix-pinterest-before-after-video",
+  "plan": {
+    "before": {
+      "image_url": "https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base_b5d2e3ad1592.jpg"
+    },
+    "after": {
+      "image_url": "https://colorfix.terrymarr.com/photos/rendered/ap_37_7a892c16555d.jpg"
+    },
+    "search_title": "Cottage Exterior Palette Ideas",
+    "end_slide_text": "See More Transformations",
+    "labels": {
+      "before": "BEFORE",
+      "after": "AFTER"
+    },
+    "video": {
+      "width": 1000,
+      "height": 1500,
+      "fps": 30,
+      "duration_ms": 10500,
+      "duration_in_frames": 315
+    },
+    "timing": {
+      "before_seconds": 1.5,
+      "dissolve_seconds": 2,
+      "after_seconds": 3,
+      "end_screen_seconds": 4,
+      "end_screen_fade_seconds": 0.5,
+      "final_fade_seconds": 0.5,
+      "logo_start_seconds": 0.35,
+      "logo_finish_seconds": 1.5
+    },
+    "style": {
+      "background_color": "#000000",
+      "text_color": "#ffffff",
+      "font_family": "Arial, sans-serif",
+      "main_grid_rows": "130px 700px 100px",
+      "title": {
+        "padding": "10px 60px 12px",
+        "font_size": 48,
+        "font_weight": 700,
+        "line_height": 1.08
+      },
+      "image": {
+        "background_color": "#111",
+        "object_fit": "contain"
+      },
+      "phase_label": {
+        "font_size": 40,
+        "font_weight": 800,
+        "letter_spacing": 5
+      },
+      "end_screen": {
+        "padding": 80
+      },
+      "end_slide_text": {
+        "font_size": 68,
+        "font_weight": 700,
+        "line_height": 1.08
+      },
+      "logo": {
+        "margin_top": 55,
+        "size_px": 94
+      }
+    },
+    "render": {
+      "codec": "h264"
+    }
+  },
+  "render": {
+    "codec": "h264"
+  }
+}

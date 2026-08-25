@@ -54,11 +54,9 @@ export const adminMenuItems = [
   {
     label: "Publishing",
     items: [
-      { label: "Creator", href: "/admin/asset-creators" },
-      { label: "Packager", href: "/admin/packager" },
-      { label: "Scheduler", href: "/admin/scheduler" },
-      { label: "Publisher", href: "/admin/publisher" },
-      { label: "Defaults", href: "/admin/publishing-defaults" },
+      { label: "PUB Admin", href: "/admin/pub" },
+      { label: "PUB Info", href: "/pub-info" },
+      { label: "Privacy Policy", href: "/privacy" },
     ],
   },
   {

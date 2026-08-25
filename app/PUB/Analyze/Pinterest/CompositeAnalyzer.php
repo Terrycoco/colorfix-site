@@ -3,147 +3,465 @@ declare(strict_types=1);
 
 namespace App\PUB\Analyze\Pinterest;
 
+use App\PUB\Analyze\Pinterest\Support\TransformationPairFinder;
+use App\PUB\PubCom\PubComChannel;
+use App\PUB\PubCom\PubComSignal;
+use App\PUB\PubCom\PubComWorkerContract;
+
 /**
  * PINTEREST COMPOSITE ANALYZER
  *
- * Owns ONLY the eligibility/proposal rules for the
- * Pinterest Composite format.
+ * Receives the common Pinterest market source.
  *
- * Shared Before -> After pairing is provided by
- * TransformationPairFinder.
+ * Uses:
+ *   items[]
+ *   linked_pvs[].kicker
+ *   linked_pvs[].intro
+ *   linked_pvs[].photo_palettes[].photo_library_id
  *
- * Input:
- *   Pinterest-eligible playlist items.
- *
- * Output:
- *   Composite AnalysisProposal-shaped arrays.
- *
- * Must NOT:
- *   - define transformation pairing rules
- *   - load playlists from the database
- *   - render files
- *   - package URLs
- *   - queue
- *   - publish
+ * Returns:
+ *   asset_type
+ *   optional search_title
+ *   optional description
+ *   ingredients
  */
-final class CompositeAnalyzer
+final class CompositeAnalyzer implements PubComWorkerContract
 {
+    private ?PubComChannel $pubComChannel = null;
+
+
     public function __construct(
         private ?TransformationPairFinder $pairFinder = null
     ) {}
 
-    public function analyze(array $pinItems): array
+
+    public function connectPubCom(
+        PubComChannel $channel
+    ): void {
+        $this->pubComChannel =
+            $channel;
+    }
+
+
+    public function readiness(): PubComSignal
     {
-        $pairFinder = $this->pairFinder ?? new TransformationPairFinder();
+        return PubComSignal::ready(
+            'Composite Analyzer is ready.',
+            [
+                'worker' =>
+                    self::class,
+            ]
+        );
+    }
 
-        $transformationPairs = $pairFinder->find($pinItems);
 
-        $pairs = [];
+    /**
+     * Inspect the Pinterest market source and confirm that
+     * at least one valid Before / After pair can be formed.
+     */
+    public function preflight(
+        array $source
+    ): PubComSignal {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
+
+
+        $beforeCount =
+            $this->countRole(
+                $pinItems,
+                'before'
+            );
+
+        $afterCount =
+            $this->countRole(
+                $pinItems,
+                'after'
+            );
+
+
+        if ($beforeCount === 0) {
+            return PubComSignal::ineligible(
+                'composite_no_before_slides',
+                'Composite cannot be analyzed because no Pinterest-eligible Before slides were found.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        0,
+
+                    'after_count' =>
+                        $afterCount,
+                ]
+            );
+        }
+
+
+        if ($afterCount === 0) {
+            return PubComSignal::ineligible(
+                'composite_no_after_slides',
+                'Composite cannot be analyzed because no Pinterest-eligible After slides were found.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        $beforeCount,
+
+                    'after_count' =>
+                        0,
+                ]
+            );
+        }
+
+
+        $pairFinder =
+            $this->pairFinder
+            ?? new TransformationPairFinder();
+
+
+        $transformationPairs =
+            $pairFinder->find(
+                $pinItems
+            );
+
+
+        if ($transformationPairs === []) {
+            return PubComSignal::ineligible(
+                'composite_no_transformation_pairs',
+                'Composite cannot be analyzed because no valid Before/After transformation pairs could be formed.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        $beforeCount,
+
+                    'after_count' =>
+                        $afterCount,
+
+                    'pair_count' =>
+                        0,
+                ]
+            );
+        }
+
+
+        return PubComSignal::ready(
+            'Composite assignment is eligible.',
+            [
+                'worker' =>
+                    self::class,
+
+                'pin_item_count' =>
+                    count($pinItems),
+
+                'before_count' =>
+                    $beforeCount,
+
+                'after_count' =>
+                    $afterCount,
+
+                'pair_count' =>
+                    count(
+                        $transformationPairs
+                    ),
+            ]
+        );
+    }
+
+
+    /**
+     * Produce Composite proposals from the Pinterest
+     * market source.
+     */
+    public function analyze(
+        array $source
+    ): array {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
+
+
+        $linkedPVs =
+            is_array(
+                $source['linked_pvs']
+                ?? null
+            )
+                ? $source['linked_pvs']
+                : [];
+
+
+        $pairFinder =
+            $this->pairFinder
+            ?? new TransformationPairFinder();
+
+
+        $transformationPairs =
+            $pairFinder->find(
+                $pinItems
+            );
+
+
         $proposals = [];
 
-        foreach ($transformationPairs as $pair) {
-            $beforeId = (int)($pair['before_playlist_item_id'] ?? 0);
-            $afterId = (int)($pair['after_playlist_item_id'] ?? 0);
 
-            $before = is_array($pair['before_item'] ?? null)
-                ? $pair['before_item']
-                : null;
+        foreach (
+            $transformationPairs
+            as $pair
+        ) {
+            $before =
+                is_array(
+                    $pair['before_item']
+                    ?? null
+                )
+                    ? $pair['before_item']
+                    : null;
 
-            $after = is_array($pair['after_item'] ?? null)
-                ? $pair['after_item']
-                : null;
+
+            $after =
+                is_array(
+                    $pair['after_item']
+                    ?? null
+                )
+                    ? $pair['after_item']
+                    : null;
+
 
             if (
-                $beforeId <= 0
-                || $afterId <= 0
-                || !$before
+                !$before
                 || !$after
             ) {
                 continue;
             }
 
-            /*
-             * Pair data is still returned because the coordinator/UI
-             * currently exposes it for debug/summary purposes.
-             */
-            $pairs[] = [
-                'before_playlist_item_id' => $beforeId,
-                'after_playlist_item_id' => $afterId,
-            ];
 
             /*
-             * Composite-specific proposal.
+             * Base proposal.
+             *
+             * These are the only fields Composite is
+             * allowed to contribute to the outer Box.
              */
-            $proposals[] = [
-                'proposal_key' => "composite-{$beforeId}-{$afterId}",
-                'asset_type' => 'pin_composite',
-                'pin_type' => 'composite',
+            $proposal = [
+                'asset_type' =>
+                    'pin_composite',
 
-                'before_playlist_item_id' => $beforeId,
-                'after_playlist_item_id' => $afterId,
+                'ingredients' => [
+                    'before' =>
+                        $this->sourceItemIngredients(
+                            $before
+                        ),
 
-                'before' => $this->sourceItemPayload($before),
-                'after' => $this->sourceItemPayload($after),
+                    'after' =>
+                        $this->sourceItemIngredients(
+                            $after
+                        ),
+                ],
             ];
+
+
+            /*
+             * Find the linked PV belonging to the
+             * After photo.
+             */
+            $linkedPV =
+                $this->linkedPVForPhoto(
+                    $after,
+                    $linkedPVs
+                );
+
+
+            /*
+             * PV kicker and intro are optional
+             * suggestions for outer Box fields.
+             */
+            if ($linkedPV !== null) {
+                $kicker =
+                    trim(
+                        (string)(
+                            $linkedPV['kicker']
+                            ?? ''
+                        )
+                    );
+
+                $intro =
+                    trim(
+                        (string)(
+                            $linkedPV['intro']
+                            ?? ''
+                        )
+                    );
+
+
+                if ($kicker !== '') {
+                    $proposal['search_title'] =
+                        $kicker;
+                }
+
+
+                if ($intro !== '') {
+                    $proposal['description'] =
+                        $intro;
+                }
+            }
+
+
+            $proposals[] =
+                $proposal;
         }
 
+
         return [
-            'pairs' => $pairs,
-            'proposals' => $proposals,
+            'proposals' =>
+                $proposals,
         ];
     }
 
+
     /**
-     * Composite-specific shaping of an authored playlist item
-     * into the source payload needed by the CREATE stage.
-     *
-     * This is NOT transformation-pairing logic.
+     * Find the first linked PV whose declared photo
+     * mapping contains this PhotoEntity ID.
      */
-    private function sourceItemPayload(array $item): array
-    {
-        return [
-            'playlist_item_id' =>
-                (int)($item['playlist_item_id'] ?? 0),
+    private function linkedPVForPhoto(
+        array $item,
+        array $linkedPVs
+    ): ?array {
+        $photo =
+            is_array(
+                $item['photo']
+                ?? null
+            )
+                ? $item['photo']
+                : [];
 
-            'order_index' =>
-                (float)($item['order_index'] ?? 0),
 
-            'photo_library_id' =>
-                isset($item['photo_library_id'])
-                && $item['photo_library_id'] !== null
-                    ? (int)$item['photo_library_id']
-                    : null,
+        $photoLibraryId =
+            (int)(
+                $photo['photo_library_id']
+                ?? 0
+            );
 
-            'saved_palette_set_id' =>
-                isset($item['saved_palette_set_id'])
-                && $item['saved_palette_set_id'] !== null
-                    ? (int)$item['saved_palette_set_id']
-                    : null,
 
-            'ap_id' =>
-                isset($item['ap_id'])
-                && $item['ap_id'] !== null
-                    ? (int)$item['ap_id']
-                    : null,
+        if ($photoLibraryId <= 0) {
+            return null;
+        }
 
-            'palette_hash' =>
-                trim((string)($item['palette_hash'] ?? '')) ?: null,
 
-            'image_url' =>
-                (string)($item['image_url'] ?? ''),
+        foreach ($linkedPVs as $pv) {
+            if (!is_array($pv)) {
+                continue;
+            }
 
-            'title' =>
-                (string)($item['title'] ?? ''),
 
-            'subtitle' =>
-                (string)($item['subtitle'] ?? ''),
+            $photoPalettes =
+                is_array(
+                    $pv['photo_palettes']
+                    ?? null
+                )
+                    ? $pv['photo_palettes']
+                    : [];
 
-            'item_type' =>
-                (string)($item['item_type'] ?? ''),
 
-            'pin_role' =>
+            foreach ($photoPalettes as $photoPalette) {
+                if (!is_array($photoPalette)) {
+                    continue;
+                }
+
+
+                if (
+                    (int)(
+                        $photoPalette['photo_library_id']
+                        ?? 0
+                    ) === $photoLibraryId
+                ) {
+                    return $pv;
+                }
+            }
+        }
+
+
+        return null;
+    }
+
+
+    private function countRole(
+        array $items,
+        string $role
+    ): int {
+        $role =
+            strtolower(
+                trim(
+                    $role
+                )
+            );
+
+
+        $count = 0;
+
+
+        foreach ($items as $item) {
+            $itemRole =
                 strtolower(
-                    trim((string)($item['analyzer_role'] ?? 'ignore'))
+                    trim(
+                        (string)(
+                            $item['analyzer_role']
+                            ?? 'ignore'
+                        )
+                    )
+                );
+
+
+            if ($itemRole === $role) {
+                $count++;
+            }
+        }
+
+
+        return $count;
+    }
+
+
+    /**
+     * CompositeCreator needs only the prepared
+     * physical source file path.
+     */
+    private function sourceItemIngredients(
+        array $item
+    ): array {
+        $photo =
+            is_array(
+                $item['photo']
+                ?? null
+            )
+                ? $item['photo']
+                : [];
+
+
+        return [
+            'file_path' =>
+                trim(
+                    (string)(
+                        $photo['file_path']
+                        ?? ''
+                    )
                 ),
         ];
     }

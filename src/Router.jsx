@@ -14,6 +14,7 @@ const HireTerryPage = lazy(() => import('@pages/HireTerryPage'));
 const RequestPlaylistPage = lazy(() => import('@pages/HireTerryPage/RequestPlaylistPage'));
 const SendNotePage = lazy(() => import('@pages/SendNotePage'));
 const PrivacyPage = lazy(() => import('@pages/PrivacyPage'));
+const PubInfoPage = lazy(() => import('@pages/PubInfoPage'));
 const LandingPage = lazy(() => import('@pages/LandingPage'));
 const LoginPage = lazy(() => import('@pages/login/LoginPage'));
 const SearchPage = lazy(() => import('@pages/SearchPage'));
@@ -131,6 +132,7 @@ function AppRouter() {
             <Route path="login" element={renderWithSuspense(LoginPage, 'Loading login…')} />
             <Route path="about" element={renderWithSuspense(AboutPage, 'Loading about…')} />
             <Route path="privacy" element={renderWithSuspense(PrivacyPage, 'Loading privacy policy…')} />
+            <Route path="pub-info" element={renderWithSuspense(PubInfoPage, "Loading info page...")} />
             <Route path="s/:slug" element={renderWithSuspense(LandingPage, 'Loading landing page…')} />
             <Route path="send-note" element={renderWithSuspense(SendNotePage, 'Loading note form…')} />
             <Route path="hire-terry" element={renderWithSuspense(HireTerryPage, 'Loading service page…')} />

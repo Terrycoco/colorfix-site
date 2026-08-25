@@ -62,7 +62,14 @@ export default function PrivacyPage() {
 
         <h3>Last Updated</h3>
         <p>June 2026</p>
+
+      <div className="page-home-link">
+  <a href="/">← Return to ColorFix</a>
+</div>
+
       </article>
+
+
     </main>
   );
 }

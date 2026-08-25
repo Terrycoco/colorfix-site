@@ -3,142 +3,556 @@ declare(strict_types=1);
 
 namespace App\PUB\Analyze\Pinterest;
 
+use App\PUB\Analyze\Pinterest\Support\TransformationPairFinder;
+use App\PUB\PubCom\PubComChannel;
+use App\PUB\PubCom\PubComSignal;
+use App\PUB\PubCom\PubComWorkerContract;
+
 /**
- * PINTEREST BEFORE/AFTER VIDEO ANALYZER
+ * PINTEREST BEFORE / AFTER VIDEO ANALYZER
  *
- * Owns ONLY the eligibility/proposal rules for the
- * Pinterest Before/After Video format.
+ * Receives the common Pinterest market source.
+ *
+ * Uses:
+ *   items[]
+ *   linked_pvs[].kicker
+ *   linked_pvs[].intro
+ *   linked_pvs[].photo_palettes[].photo_library_id
+ *
+ * Returns:
+ *   asset_type
+ *   optional search_title
+ *   optional description
+ *   ingredients {
+ *     before.file_path
+ *     before.image_url
+ *     after.file_path
+ *     after.image_url
+ *     search_title
+ *   }
  *
  * Shared Before -> After pairing is provided by
  * TransformationPairFinder.
  *
- * Input:
- *   Pinterest-eligible playlist items.
- *
- * Output:
- *   Before/After Video AnalysisProposal-shaped arrays.
- *
  * One valid transformation pair produces one possible video.
  *
- * IMPORTANT:
- * This analyzer does NOT decide what the video looks like.
- *
- * Timing, transitions, labels, logo treatment, looping,
- * aspect ratio, and animation belong exclusively to:
- *
- *   App\PUB\Create\Pinterest\BeforeAfterVideoCreator
- *
- * Must NOT:
- *   - define transformation pairing rules
- *   - render video
- *   - decide visual treatment
- *   - package URLs
- *   - queue
- *   - publish
+ * This Analyzer selects and prepares source material only.
+ * Video timing, transitions, styling, labels, logo treatment,
+ * and end-screen treatment belong to CREATE.
  */
-final class BeforeAfterVideoAnalyzer
+final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
 {
+    
+        private const DEFAULT_END_SLIDE_TEXT =
+            'See More Transformations';
+
+        private ?PubComChannel $pubComChannel = null;
+
+
     public function __construct(
         private ?TransformationPairFinder $pairFinder = null
     ) {}
 
-    public function analyze(array $pinItems): array
+
+    public function connectPubCom(
+        PubComChannel $channel
+    ): void {
+        $this->pubComChannel =
+            $channel;
+    }
+
+
+    public function readiness(): PubComSignal
     {
-        $pairFinder = $this->pairFinder ?? new TransformationPairFinder();
+        return PubComSignal::ready(
+            'Before/After Video Analyzer is ready.',
+            [
+                'worker' =>
+                    self::class,
+            ]
+        );
+    }
 
-        $transformationPairs = $pairFinder->find($pinItems);
 
-        $proposals = [];
+    /**
+     * Confirm that at least one valid Before / After
+     * transformation pair can be formed from the
+     * Pinterest market source.
+     */
+    public function preflight(
+        array $source
+    ): PubComSignal {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
 
-        foreach ($transformationPairs as $pair) {
-            $beforeId = (int)($pair['before_playlist_item_id'] ?? 0);
-            $afterId = (int)($pair['after_playlist_item_id'] ?? 0);
 
-            $before = is_array($pair['before_item'] ?? null)
-                ? $pair['before_item']
-                : null;
+        $beforeCount =
+            $this->countRole(
+                $pinItems,
+                'before'
+            );
 
-            $after = is_array($pair['after_item'] ?? null)
-                ? $pair['after_item']
-                : null;
+        $afterCount =
+            $this->countRole(
+                $pinItems,
+                'after'
+            );
+
+
+        if ($beforeCount === 0) {
+            return PubComSignal::ineligible(
+                'before_after_video_no_before_slides',
+                'Before/After Video cannot be analyzed because no Pinterest-eligible Before slides were found.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        0,
+
+                    'after_count' =>
+                        $afterCount,
+                ]
+            );
+        }
+
+
+        if ($afterCount === 0) {
+            return PubComSignal::ineligible(
+                'before_after_video_no_after_slides',
+                'Before/After Video cannot be analyzed because no Pinterest-eligible After slides were found.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        $beforeCount,
+
+                    'after_count' =>
+                        0,
+                ]
+            );
+        }
+
+
+        $pairFinder =
+            $this->pairFinder
+            ?? new TransformationPairFinder();
+
+
+        $transformationPairs =
+            $pairFinder->find(
+                $pinItems
+            );
+
+
+        if ($transformationPairs === []) {
+            return PubComSignal::ineligible(
+                'before_after_video_no_transformation_pairs',
+                'Before/After Video cannot be analyzed because no valid Before/After transformation pairs could be formed.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count($pinItems),
+
+                    'before_count' =>
+                        $beforeCount,
+
+                    'after_count' =>
+                        $afterCount,
+
+                    'pair_count' =>
+                        0,
+                ]
+            );
+        }
+
+
+        return PubComSignal::ready(
+            'Before/After Video assignment is eligible.',
+            [
+                'worker' =>
+                    self::class,
+
+                'pin_item_count' =>
+                    count($pinItems),
+
+                'before_count' =>
+                    $beforeCount,
+
+                'after_count' =>
+                    $afterCount,
+
+                'pair_count' =>
+                    count(
+                        $transformationPairs
+                    ),
+            ]
+        );
+    }
+
+
+    /**
+     * Produce one Before/After Video proposal for each
+     * valid transformation pair.
+     */
+    public function analyze(
+        array $source
+    ): array {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
+
+
+        $linkedPVs =
+            is_array(
+                $source['linked_pvs']
+                ?? null
+            )
+                ? $source['linked_pvs']
+                : [];
+
+
+        $pairFinder =
+            $this->pairFinder
+            ?? new TransformationPairFinder();
+
+
+        $transformationPairs =
+            $pairFinder->find(
+                $pinItems
+            );
+
+
+        $proposals =
+            [];
+
+
+        foreach (
+            $transformationPairs
+            as $pair
+        ) {
+            $before =
+                is_array(
+                    $pair['before_item']
+                    ?? null
+                )
+                    ? $pair['before_item']
+                    : null;
+
+
+            $after =
+                is_array(
+                    $pair['after_item']
+                    ?? null
+                )
+                    ? $pair['after_item']
+                    : null;
+
 
             if (
-                $beforeId <= 0
-                || $afterId <= 0
-                || !$before
+                !$before
                 || !$after
             ) {
                 continue;
             }
 
-            $proposals[] = [
-                'proposal_key' => "before-after-video-{$beforeId}-{$afterId}",
 
-                'asset_type' => 'pin_before_after_video',
-                'pin_type' => 'before_after_video',
+            $beforeIngredients =
+                $this->sourceItemIngredients(
+                    $before
+                );
 
-                'before_playlist_item_id' => $beforeId,
-                'after_playlist_item_id' => $afterId,
+            $afterIngredients =
+                $this->sourceItemIngredients(
+                    $after
+                );
 
-                'before' => $this->sourceItemPayload($before),
-                'after' => $this->sourceItemPayload($after),
+
+            if (
+                $beforeIngredients['file_path'] === ''
+                || $beforeIngredients['image_url'] === ''
+                || $afterIngredients['file_path'] === ''
+                || $afterIngredients['image_url'] === ''
+            ) {
+                continue;
+            }
+
+
+            $proposal = [
+                'asset_type' =>
+                    'pin_before_after_video',
+
+                'ingredients' => [
+    'before' =>
+        $beforeIngredients,
+
+    'after' =>
+        $afterIngredients,
+
+    'end_slide_text' =>
+        self::DEFAULT_END_SLIDE_TEXT,
+],
             ];
+
+
+            /*
+             * The After photo identifies the linked PV
+             * whose publishing copy belongs to this pair.
+             */
+            $linkedPV =
+                $this->linkedPVForPhoto(
+                    $after,
+                    $linkedPVs
+                );
+
+
+            if ($linkedPV !== null) {
+                $kicker =
+                    trim(
+                        (string)(
+                            $linkedPV[
+                                'kicker'
+                            ]
+                            ?? ''
+                        )
+                    );
+
+
+                $intro =
+                    trim(
+                        (string)(
+                            $linkedPV[
+                                'intro'
+                            ]
+                            ?? ''
+                        )
+                    );
+
+
+                /*
+                 * The kicker supplies Pinterest search metadata
+                 * and, for this video format, the visible title
+                 * required by the Creator.
+                 */
+                if ($kicker !== '') {
+                    $proposal[
+                        'search_title'
+                    ] =
+                        $kicker;
+
+                    $proposal[
+                        'ingredients'
+                    ][
+                        'search_title'
+                    ] =
+                        $kicker;
+                }
+
+
+                if ($intro !== '') {
+                    $proposal[
+                        'description'
+                    ] =
+                        $intro;
+                }
+            }
+
+
+            $proposals[] =
+                $proposal;
         }
 
+
         return [
-            'proposals' => $proposals,
+            'proposals' =>
+                $proposals,
         ];
     }
 
+
     /**
-     * Shapes the authored playlist item into the source
-     * payload needed later by the Video Creator.
+     * Find the first linked PV whose declared photo
+     * mapping contains this PhotoEntity ID.
      */
-    private function sourceItemPayload(array $item): array
-    {
+    private function linkedPVForPhoto(
+        array $item,
+        array $linkedPVs
+    ): ?array {
+        $photo =
+            is_array(
+                $item['photo']
+                ?? null
+            )
+                ? $item['photo']
+                : [];
+
+
+        $photoLibraryId =
+            (int)(
+                $photo[
+                    'photo_library_id'
+                ]
+                ?? 0
+            );
+
+
+        if ($photoLibraryId <= 0) {
+            return null;
+        }
+
+
+        foreach (
+            $linkedPVs
+            as $pv
+        ) {
+            if (!is_array($pv)) {
+                continue;
+            }
+
+
+            $photoPalettes =
+                is_array(
+                    $pv[
+                        'photo_palettes'
+                    ]
+                    ?? null
+                )
+                    ? $pv[
+                        'photo_palettes'
+                    ]
+                    : [];
+
+
+            foreach (
+                $photoPalettes
+                as $photoPalette
+            ) {
+                if (!is_array($photoPalette)) {
+                    continue;
+                }
+
+
+                if (
+                    (int)(
+                        $photoPalette[
+                            'photo_library_id'
+                        ]
+                        ?? 0
+                    ) ===
+                    $photoLibraryId
+                ) {
+                    return $pv;
+                }
+            }
+        }
+
+
+        return null;
+    }
+
+
+    private function countRole(
+        array $items,
+        string $role
+    ): int {
+        $role =
+            strtolower(
+                trim(
+                    $role
+                )
+            );
+
+
+        $count =
+            0;
+
+
+        foreach (
+            $items
+            as $item
+        ) {
+            $itemRole =
+                strtolower(
+                    trim(
+                        (string)(
+                            $item[
+                                'analyzer_role'
+                            ]
+                            ?? 'ignore'
+                        )
+                    )
+                );
+
+
+            if ($itemRole === $role) {
+                $count++;
+            }
+        }
+
+
+        return $count;
+    }
+
+
+    /**
+     * BeforeAfterVideoCreator needs both:
+     *
+     *   file_path  - local validation / production source
+     *   image_url  - URL passed into the Remotion recipe
+     */
+    private function sourceItemIngredients(
+        array $item
+    ): array {
+        $photo =
+            is_array(
+                $item[
+                    'photo'
+                ]
+                ?? null
+            )
+                ? $item[
+                    'photo'
+                ]
+                : [];
+
+
         return [
-            'playlist_item_id' =>
-                (int)($item['playlist_item_id'] ?? 0),
-
-            'order_index' =>
-                (float)($item['order_index'] ?? 0),
-
-            'photo_library_id' =>
-                isset($item['photo_library_id'])
-                && $item['photo_library_id'] !== null
-                    ? (int)$item['photo_library_id']
-                    : null,
-
-            'saved_palette_set_id' =>
-                isset($item['saved_palette_set_id'])
-                && $item['saved_palette_set_id'] !== null
-                    ? (int)$item['saved_palette_set_id']
-                    : null,
-
-            'ap_id' =>
-                isset($item['ap_id'])
-                && $item['ap_id'] !== null
-                    ? (int)$item['ap_id']
-                    : null,
-
-            'palette_hash' =>
-                trim((string)($item['palette_hash'] ?? '')) ?: null,
+            'file_path' =>
+                trim(
+                    (string)(
+                        $photo[
+                            'file_path'
+                        ]
+                        ?? ''
+                    )
+                ),
 
             'image_url' =>
-                (string)($item['image_url'] ?? ''),
-
-            'title' =>
-                (string)($item['title'] ?? ''),
-
-            'subtitle' =>
-                (string)($item['subtitle'] ?? ''),
-
-            'item_type' =>
-                (string)($item['item_type'] ?? ''),
-
-            'pin_role' =>
-                strtolower(
-                    trim((string)($item['analyzer_role'] ?? 'ignore'))
+                trim(
+                    (string)(
+                        $photo[
+                            'image_url'
+                        ]
+                        ?? ''
+                    )
                 ),
         ];
     }

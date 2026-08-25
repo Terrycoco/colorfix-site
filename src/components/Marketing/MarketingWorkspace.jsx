@@ -2543,6 +2543,32 @@ function MarketingOrder({
               ? "Regenerate"
               : "Generate"}
         </button>
+
+        <button
+          type="button"
+          onClick={
+            onAcceptOrder
+          }
+          disabled={
+            !activeResults.length ||
+            accepted
+          }
+          title={
+            accepted
+              ? "Deliverable accepted"
+              : "Accept deliverable"
+          }
+          aria-label={
+            accepted
+              ? "Deliverable accepted"
+              : "Accept deliverable"
+          }
+          style={
+            orderAcceptButtonStyle
+          }
+        >
+          ✓
+        </button>
       </div>
 
       <div
@@ -2686,30 +2712,14 @@ function MarketingOrder({
         }
       >
         {activeResults.length ? (
-          <>
-            <button
-              type="button"
-              onClick={
-                onRejectOrder
-              }
-            >
-              Reject / Clear
-            </button>
-
-            <button
-              type="button"
-              onClick={
-                onAcceptOrder
-              }
-              disabled={
-                accepted
-              }
-            >
-              {accepted
-                ? "Accepted ✓"
-                : "Accept Deliverable"}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={
+              onRejectOrder
+            }
+          >
+            Reject / Clear
+          </button>
         ) : null}
 
         <div
@@ -3402,6 +3412,20 @@ const orderQuantityStyle = {
   fontSize: 11,
 
   color: "#6b7280",
+};
+
+
+const orderAcceptButtonStyle = {
+  minWidth: 32,
+  width: 32,
+  height: 32,
+
+  padding: 0,
+
+  fontSize: 16,
+  fontWeight: 700,
+
+  lineHeight: 1,
 };
 
 

@@ -21,6 +21,7 @@ use App\Entities\PlayerExperience;
 use DomainException;
 use PDO;
 use RuntimeException;
+use App\PV\PVService;
 
 class PlayerExperienceService
 {
@@ -298,7 +299,8 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     $paletteViewerKey = $experience->paletteViewerKey;
     $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
 
-    $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken);
+    /* $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken); */
+    $viewerRex = $this->buildLinkedPVData($playlistId);
     $viewerRexCount = $viewerRex['count'];
     if ($viewerRexCount === 0) {
         $showSlidePalettePrompt = false;
@@ -382,7 +384,6 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'viewer_rex_count' => $viewerRexCount,
         'viewer_rex_urls' => $viewerRex['urls'],
         'viewer_rex_targets' => $viewerRex['targets'],
-        'viewer_rex_url_by_palette_hash' => $viewerRex['url_by_palette_hash'],
         'colors_used_destination' => $colorsUsedDestination,
         'colors_used_url' => $colorsUsedUrl,
     ];
@@ -452,6 +453,52 @@ private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination)
 
     return $filtered;
 }
+
+
+/** new modern PV call */
+private function getLinkedPVs(int $playlistId): array
+{
+    return (new \App\PV\PVService($this->pdo))
+        ->getLinkedPVs($playlistId);
+}
+
+private function buildLinkedPVData(int $playlistId): array
+{
+    $linkedPVs = $this->getLinkedPVs($playlistId);
+
+    $urls = [];
+    $targets = [];
+
+    foreach ($linkedPVs as $pv) {
+        $url = trim((string)($pv['rex_url'] ?? ''));
+
+        if ($url === '') {
+            continue;
+        }
+
+        $meta = is_array($pv['meta'] ?? null)
+            ? $pv['meta']
+            : [];
+
+        $urls[] = $url;
+
+        $targets[] = [
+            'palette_viewer_id' => (int)($meta['palette_viewer_id'] ?? 0),
+            'palette_viewer_url' => $url,
+            'title' => (string)($meta['display_title'] ?? $meta['title'] ?? ''),
+            'image_url' => (string)($meta['photo_url'] ?? ''),
+        ];
+    }
+
+    return [
+        'count' => count($urls),
+        'urls' => $urls,
+        'targets' => $targets,
+    ];
+}
+
+
+
 
 /**
  * Hydrate public playlist items from explicit Playlist REX -> Viewer REX relationships.

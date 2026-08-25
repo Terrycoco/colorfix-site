@@ -31,7 +31,7 @@ export default function PaletteViewer({
   const [shareStatus, setShareStatus] = useState({ loading: false, error: "", success: "" });
   const colorGroups = useMemo(() => groupEntriesByColor(swatches), [swatches]);
   const title = formatTitle(meta?.title || "ColorFix Palette");
-  const notes = meta?.notes || "";
+  const intro = meta?.intro || "";
   const kicker = meta?.kicker_text || "";
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
@@ -286,7 +286,7 @@ export default function PaletteViewer({
           <div className="apv-info">
             {kicker && <div className="apv-kicker">{kicker}</div>}
             <h1>{title}</h1>
-            {notes && <p className="apv-notes">{notes}</p>}
+            {intro && <p className="apv-notes">{intro}</p>}
           </div>
 
           {swatches.length > 0 && (

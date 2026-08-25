@@ -3,131 +3,686 @@ declare(strict_types=1);
 
 namespace App\PUB\Analyze\Pinterest;
 
+use App\PUB\PubCom\PubComChannel;
+use App\PUB\PubCom\PubComSignal;
+use App\PUB\PubCom\PubComWorkerContract;
+
 /**
- * PINTEREST PALETTE ANALYZER
+ * PINTEREST IDEA + PALETTE ANALYZER
  *
- * Owns ONLY the eligibility/proposal rules for the
- * Pinterest Idea + Palette format.
+ * Receives the common Pinterest market source:
  *
- * Input:
- *   Pinterest-eligible playlist items.
+ *   items[]
+ *   linked_pvs[]
  *
- * Output:
- *   Palette AnalysisProposal-shaped arrays.
+ * For each usable linked PV:
  *
- * A Palette proposal is created from each authored:
- *   - "after" item
- *   - "single" item
+ *   - match a Pinterest-eligible PhotoEntity by photo_library_id
+ *   - raise PV kicker -> search_title
+ *   - raise PV intro -> description
+ *   - give the Creator source.file_path
+ *   - give the Creator search_title
+ *   - give the Creator 1-4 palette colors
  *
- * but ONLY when that item has palette data.
- *
- * Palette eligibility currently means at least one of:
- *   - saved_palette_set_id
- *   - palette_hash
- *   - ap_id
- *
- * Must NOT:
- *   - load playlists from the database
- *   - render files
- *   - package URLs
- *   - queue
- *   - publish
+ * One proposal is created per usable linked PV.
  */
-final class PaletteAnalyzer
+final class PaletteAnalyzer implements PubComWorkerContract
 {
-    public function analyze(array $pinItems): array
-    {
-        $proposals = [];
+    private ?PubComChannel $pubComChannel = null;
 
-        foreach ($pinItems as $item) {
-            $role = $this->role($item);
 
-            if ($role !== 'after' && $role !== 'single') {
-                continue;
-            }
-
-            if (!$this->itemHasPalette($item)) {
-                continue;
-            }
-
-            $itemId = (int)($item['playlist_item_id'] ?? 0);
-
-            if ($itemId <= 0) {
-                continue;
-            }
-
-            $proposals[] = [
-                'proposal_key' => "idea-palette-{$itemId}",
-                'asset_type' => 'pin_idea_palette',
-                'pin_type' => 'idea_palette',
-                'playlist_item_id' => $itemId,
-                'source_item' => $this->sourceItemPayload($item),
-            ];
-        }
-
-        return [
-            'proposals' => $proposals,
-        ];
+    public function connectPubCom(
+        PubComChannel $channel
+    ): void {
+        $this->pubComChannel =
+            $channel;
     }
 
-    private function role(array $item): string
+
+    public function readiness(): PubComSignal
     {
-        return strtolower(
-            trim((string)($item['analyzer_role'] ?? 'ignore'))
+        return PubComSignal::ready(
+            'Idea + Palette Analyzer is ready.',
+            [
+                'worker' =>
+                    self::class,
+            ]
         );
     }
 
-    private function itemHasPalette(array $item): bool
-    {
-        return (int)($item['saved_palette_set_id'] ?? 0) > 0
-            || trim((string)($item['palette_hash'] ?? '')) !== ''
-            || (int)($item['ap_id'] ?? 0) > 0;
+
+    public function preflight(
+        array $source
+    ): PubComSignal {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
+
+
+        $linkedPVs =
+            is_array(
+                $source['linked_pvs']
+                ?? null
+            )
+                ? $source['linked_pvs']
+                : [];
+
+
+        if ($linkedPVs === []) {
+            return PubComSignal::ineligible(
+                'idea_palette_no_viewers',
+                'Idea + Palette cannot be analyzed because no linked Palette Viewers were supplied.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count(
+                            $pinItems
+                        ),
+
+                    'linked_pv_count' =>
+                        0,
+
+                    'usable_pv_count' =>
+                        0,
+                ]
+            );
+        }
+
+
+        $usableCount =
+            0;
+
+        $missingPhotoCount =
+            0;
+
+        $missingPaletteCount =
+            0;
+
+
+        foreach (
+            $linkedPVs
+            as $pv
+        ) {
+            if (!is_array($pv)) {
+                continue;
+            }
+
+
+            $match =
+                $this->usableSourceForPV(
+                    $pv,
+                    $pinItems
+                );
+
+
+            if ($match !== null) {
+                $usableCount++;
+
+                continue;
+            }
+
+
+            if (
+                !$this->pvHasUsablePalette(
+                    $pv
+                )
+            ) {
+                $missingPaletteCount++;
+            }
+
+
+            if (
+                !$this->pvHasUsablePhoto(
+                    $pv,
+                    $pinItems
+                )
+            ) {
+                $missingPhotoCount++;
+            }
+        }
+
+
+        if ($usableCount === 0) {
+            return PubComSignal::ineligible(
+                'idea_palette_no_usable_viewers',
+                'Idea + Palette cannot be analyzed because no linked Palette Viewer has both a usable Pinterest source photo and palette colors.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'pin_item_count' =>
+                        count(
+                            $pinItems
+                        ),
+
+                    'linked_pv_count' =>
+                        count(
+                            $linkedPVs
+                        ),
+
+                    'usable_pv_count' =>
+                        0,
+
+                    'missing_photo_count' =>
+                        $missingPhotoCount,
+
+                    'missing_palette_count' =>
+                        $missingPaletteCount,
+                ]
+            );
+        }
+
+
+        return PubComSignal::ready(
+            'Idea + Palette assignment is eligible.',
+            [
+                'worker' =>
+                    self::class,
+
+                'pin_item_count' =>
+                    count(
+                        $pinItems
+                    ),
+
+                'linked_pv_count' =>
+                    count(
+                        $linkedPVs
+                    ),
+
+                'usable_pv_count' =>
+                    $usableCount,
+
+                'missing_photo_count' =>
+                    $missingPhotoCount,
+
+                'missing_palette_count' =>
+                    $missingPaletteCount,
+            ]
+        );
     }
 
-    private function sourceItemPayload(array $item): array
-    {
+
+    public function analyze(
+        array $source
+    ): array {
+        $pinItems =
+            is_array(
+                $source['items']
+                ?? null
+            )
+                ? $source['items']
+                : [];
+
+
+        $linkedPVs =
+            is_array(
+                $source['linked_pvs']
+                ?? null
+            )
+                ? $source['linked_pvs']
+                : [];
+
+
+        $proposals =
+            [];
+
+
+        foreach (
+            $linkedPVs
+            as $pv
+        ) {
+            if (!is_array($pv)) {
+                continue;
+            }
+
+
+            /*
+             * One usable Pinterest source photo
+             * + its actual PV palette.
+             */
+            $match =
+                $this->usableSourceForPV(
+                    $pv,
+                    $pinItems
+                );
+
+
+            if ($match === null) {
+                continue;
+            }
+
+
+            $proposal = [
+                'asset_type' =>
+                    'pin_idea_palette',
+
+                'ingredients' => [
+                    'source' => [
+                        'file_path' =>
+                            $match[
+                                'file_path'
+                            ],
+                    ],
+
+                    /*
+                     * Actual paint colors required
+                     * by the Palette Creator.
+                     */
+                    'palette_colors' =>
+                        $match[
+                            'palette_colors'
+                        ],
+                ],
+            ];
+
+
+            $kicker =
+                trim(
+                    (string)(
+                        $pv[
+                            'kicker'
+                        ]
+                        ?? ''
+                    )
+                );
+
+
+            $intro =
+                trim(
+                    (string)(
+                        $pv[
+                            'intro'
+                        ]
+                        ?? ''
+                    )
+                );
+
+
+            /*
+             * KICKER SERVES TWO CONSUMERS:
+             *
+             * 1. Box publishing metadata.
+             * 2. Creator text baked into the JPEG.
+             */
+            if ($kicker !== '') {
+                $proposal[
+                    'search_title'
+                ] =
+                    $kicker;
+
+                $proposal[
+                    'ingredients'
+                ][
+                    'search_title'
+                ] =
+                    $kicker;
+            }
+
+
+            /*
+             * DESCRIPTION IS PUBLISHING METADATA.
+             */
+            if ($intro !== '') {
+                $proposal[
+                    'description'
+                ] =
+                    $intro;
+            }
+
+
+            $proposals[] =
+                $proposal;
+        }
+
+
         return [
-            'playlist_item_id' =>
-                (int)($item['playlist_item_id'] ?? 0),
-
-            'order_index' =>
-                (float)($item['order_index'] ?? 0),
-
-            'photo_library_id' =>
-                isset($item['photo_library_id'])
-                && $item['photo_library_id'] !== null
-                    ? (int)$item['photo_library_id']
-                    : null,
-
-            'saved_palette_set_id' =>
-                isset($item['saved_palette_set_id'])
-                && $item['saved_palette_set_id'] !== null
-                    ? (int)$item['saved_palette_set_id']
-                    : null,
-
-            'ap_id' =>
-                isset($item['ap_id'])
-                && $item['ap_id'] !== null
-                    ? (int)$item['ap_id']
-                    : null,
-
-            'palette_hash' =>
-                trim((string)($item['palette_hash'] ?? '')) ?: null,
-
-            'image_url' =>
-                (string)($item['image_url'] ?? ''),
-
-            'title' =>
-                (string)($item['title'] ?? ''),
-
-            'subtitle' =>
-                (string)($item['subtitle'] ?? ''),
-
-            'item_type' =>
-                (string)($item['item_type'] ?? ''),
-
-            'pin_role' =>
-                $this->role($item),
+            'proposals' =>
+                $proposals,
         ];
+    }
+
+
+    /**
+     * Return the first usable photo/palette pair for
+     * one linked PV.
+     *
+     * A PV may contain several photos, but this product
+     * produces one Idea + Palette asset per PV.
+     */
+    private function usableSourceForPV(
+        array $pv,
+        array $pinItems
+    ): ?array {
+        $photoPalettes =
+            is_array(
+                $pv[
+                    'photo_palettes'
+                ]
+                ?? null
+            )
+                ? $pv[
+                    'photo_palettes'
+                ]
+                : [];
+
+
+        foreach (
+            $photoPalettes
+            as $photoPalette
+        ) {
+            if (!is_array($photoPalette)) {
+                continue;
+            }
+
+
+            $photoLibraryId =
+                (int)(
+                    $photoPalette[
+                        'photo_library_id'
+                    ]
+                    ?? 0
+                );
+
+
+            if ($photoLibraryId <= 0) {
+                continue;
+            }
+
+
+            $paletteColors =
+                $this->paletteColors(
+                    $photoPalette[
+                        'hex6s'
+                    ]
+                    ?? []
+                );
+
+
+            if ($paletteColors === []) {
+                continue;
+            }
+
+
+            $item =
+                $this->itemForPhoto(
+                    $photoLibraryId,
+                    $pinItems
+                );
+
+
+            if ($item === null) {
+                continue;
+            }
+
+
+            $filePath =
+                $this->sourceFilePath(
+                    $item
+                );
+
+
+            if ($filePath === '') {
+                continue;
+            }
+
+
+            return [
+                'photo_library_id' =>
+                    $photoLibraryId,
+
+                'file_path' =>
+                    $filePath,
+
+                'palette_colors' =>
+                    $paletteColors,
+            ];
+        }
+
+
+        return null;
+    }
+
+
+    private function itemForPhoto(
+        int $photoLibraryId,
+        array $pinItems
+    ): ?array {
+        foreach (
+            $pinItems
+            as $item
+        ) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+
+            $photo =
+                is_array(
+                    $item[
+                        'photo'
+                    ]
+                    ?? null
+                )
+                    ? $item[
+                        'photo'
+                    ]
+                    : [];
+
+
+            if (
+                (int)(
+                    $photo[
+                        'photo_library_id'
+                    ]
+                    ?? 0
+                ) ===
+                $photoLibraryId
+            ) {
+                return $item;
+            }
+        }
+
+
+        return null;
+    }
+
+
+    private function sourceFilePath(
+        array $item
+    ): string {
+        $photo =
+            is_array(
+                $item[
+                    'photo'
+                ]
+                ?? null
+            )
+                ? $item[
+                    'photo'
+                ]
+                : [];
+
+
+        return trim(
+            (string)(
+                $photo[
+                    'file_path'
+                ]
+                ?? ''
+            )
+        );
+    }
+
+
+    /**
+     * Convert PV hex6 values into the exact shape
+     * declared by the Palette Creator contract.
+     *
+     * Preserve palette order.
+     * Maximum four colors.
+     */
+    private function paletteColors(
+        mixed $hex6s
+    ): array {
+        if (!is_array($hex6s)) {
+            return [];
+        }
+
+
+        $colors =
+            [];
+
+
+        foreach (
+            $hex6s
+            as $hex6
+        ) {
+            $hex =
+                strtoupper(
+                    ltrim(
+                        trim(
+                            (string)$hex6
+                        ),
+                        '#'
+                    )
+                );
+
+
+            if (
+                !preg_match(
+                    '/^[0-9A-F]{6}$/',
+                    $hex
+                )
+            ) {
+                continue;
+            }
+
+
+            $colors[] = [
+                'color_hex6' =>
+                    $hex,
+            ];
+
+
+            if (
+                count($colors) >=
+                4
+            ) {
+                break;
+            }
+        }
+
+
+        return $colors;
+    }
+
+
+    private function pvHasUsablePalette(
+        array $pv
+    ): bool {
+        $photoPalettes =
+            is_array(
+                $pv[
+                    'photo_palettes'
+                ]
+                ?? null
+            )
+                ? $pv[
+                    'photo_palettes'
+                ]
+                : [];
+
+
+        foreach (
+            $photoPalettes
+            as $photoPalette
+        ) {
+            if (
+                is_array($photoPalette)
+                &&
+                $this->paletteColors(
+                    $photoPalette[
+                        'hex6s'
+                    ]
+                    ?? []
+                ) !==
+                []
+            ) {
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+
+
+    private function pvHasUsablePhoto(
+        array $pv,
+        array $pinItems
+    ): bool {
+        $photoPalettes =
+            is_array(
+                $pv[
+                    'photo_palettes'
+                ]
+                ?? null
+            )
+                ? $pv[
+                    'photo_palettes'
+                ]
+                : [];
+
+
+        foreach (
+            $photoPalettes
+            as $photoPalette
+        ) {
+            if (!is_array($photoPalette)) {
+                continue;
+            }
+
+
+            $photoLibraryId =
+                (int)(
+                    $photoPalette[
+                        'photo_library_id'
+                    ]
+                    ?? 0
+                );
+
+
+            if ($photoLibraryId <= 0) {
+                continue;
+            }
+
+
+            $item =
+                $this->itemForPhoto(
+                    $photoLibraryId,
+                    $pinItems
+                );
+
+
+            if (
+                $item !== null
+                &&
+                $this->sourceFilePath(
+                    $item
+                ) !==
+                ''
+            ) {
+                return true;
+            }
+        }
+
+
+        return false;
     }
 }
