@@ -129,6 +129,9 @@ final class PubContract
                 'stage' =>
                     'analyze',
 
+                'referenceRole' =>
+                    'Procurement & Prep',
+
                 'nextStage' =>
                     'create',
 
@@ -995,11 +998,177 @@ final class PubContract
                         'channel' =>
                             'youtube',
 
-                        'requiredIngredients' => [
-                            'source_items',
-                            'search_title',
-                            'description',
-                            'tags',
+                        'createsAssetType' =>
+                            'youtube_video',
+
+                        /*
+                         * SPECIALIST ANALYZER CONTRACT
+                         *
+                         * AnalyzeManager has already culled items[] to yt = 1.
+                         * PlaylistVideoAnalyzer prepares ONE proposal for the
+                         * complete playlist video and returns only the fields
+                         * declared by the YouTube Creator.
+                         */
+                        'analyzer' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'items[]',
+
+                                    'note' =>
+                                        'yt = 1; array order is playlist order',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'item_type',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'photo.file_path',
+
+                                            'required' =>
+                                                false,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'photo.image_url',
+
+                                            'required' =>
+                                                false,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'title',
+
+                                            'required' =>
+                                                false,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'subtitle',
+
+                                            'required' =>
+                                                false,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'body',
+
+                                            'required' =>
+                                                false,
+                                        ],
+                                    ],
+                                ],
+                            ],
+
+                            'requires' => [
+                                [
+                                    'key' =>
+                                        'youtube_slides',
+
+                                    'note' =>
+                                        'at least one yt = 1 slide',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'youtube_slide_content',
+
+                                    'note' =>
+                                        'every yt = 1 slide must contain a usable photo or non-blank title, subtitle, or body; blank slides are rejected as authoring errors',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'asset_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'ingredients',
+
+                                    'type' =>
+                                        'object',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'slides[]',
+
+                                            'type' =>
+                                                'array',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'one ordered prepared slide array for one complete YouTube video; Analyzer guarantees every slide contains item_type plus at least one usable photo or non-blank text field',
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'item_type',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'photo.file_path',
+
+                                                    'required' =>
+                                                        false,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'photo.image_url',
+
+                                                    'required' =>
+                                                        false,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'title',
+
+                                                    'required' =>
+                                                        false,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'subtitle',
+
+                                                    'required' =>
+                                                        false,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'body',
+
+                                                    'required' =>
+                                                        false,
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                     ],
 
@@ -1036,6 +1205,9 @@ final class PubContract
 
                 'stage' =>
                     'create',
+
+                'referenceRole' =>
+                    'Production',
 
                 'nextStage' =>
                     'package',
@@ -1743,9 +1915,193 @@ final class PubContract
                         ],
                     ],
 
+                    /*
+                     * ----------------------------------------------------
+                     * YOUTUBE PLAYLIST VIDEO CREATOR
+                     * ----------------------------------------------------
+                     *
+                     * Creator is the authority for the finished YouTube
+                     * playlist video and therefore declares the exact
+                     * prepared ingredients it requires from ANALYZE.
+                     *
+                     * Current baseline slide ingredients are intentionally
+                     * minimal. item_type is retained because the Creator/
+                     * Recipe uses it for production and timing decisions.
+                     * Photos and text are supplied only when present.
+                     */
                     'youtube_video' => [
+
+                        'label' =>
+                            'YouTube Playlist Video',
+
                         'channel' =>
                             'youtube',
+
+                        'creator' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'ingredients',
+
+                                    'type' =>
+                                        'object',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'slides[]',
+
+                                            'type' =>
+                                                'array',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'ordered prepared YouTube slides; array order is playback order',
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'item_type',
+
+                                                    'required' =>
+                                                        true,
+
+                                                    'note' =>
+                                                        'current source values: palette | non-palette | normal; used by Creator/Recipe for production and timing decisions',
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'photo.file_path',
+
+                                                    'required' =>
+                                                        false,
+
+                                                    'note' =>
+                                                        'optional for all current item_type values; pass when present',
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'photo.image_url',
+
+                                                    'required' =>
+                                                        false,
+
+                                                    'note' =>
+                                                        'optional for all current item_type values; pass when present',
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'title',
+
+                                                    'required' =>
+                                                        false,
+
+                                                    'note' =>
+                                                        'pass when present',
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'subtitle',
+
+                                                    'required' =>
+                                                        false,
+
+                                                    'note' =>
+                                                        'pass when present',
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'body',
+
+                                                    'required' =>
+                                                        false,
+
+                                                    'note' =>
+                                                        'pass when present',
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'file_path',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'url',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'mime_type',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'video/mp4',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'width',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'height',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'duration_ms',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'file_size_bytes',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'checksum',
+
+                                    'required' =>
+                                        true,
+                                ],
+                            ],
+                        ],
                     ],
 
                     'youtube_teaser_pin' => [
@@ -1765,6 +2121,9 @@ final class PubContract
 
                 'stage' =>
                     'package',
+
+                'referenceRole' =>
+                    'Label',
 
                 'nextStage' =>
                     'schedule',
@@ -1814,6 +2173,9 @@ final class PubContract
                 'stage' =>
                     'schedule',
 
+                'referenceRole' =>
+                    'Queue',
+
                 'nextStage' =>
                     'dispatch',
 
@@ -1861,6 +2223,9 @@ final class PubContract
 
                 'stage' =>
                     'dispatch',
+
+                'referenceRole' =>
+                    'Shipping',
 
                 'nextStage' =>
                     null,

@@ -7,7 +7,10 @@ use App\PUB\Create\Pinterest\BeforeAfterVideoCreator;
 use App\PUB\Create\Pinterest\CompositeCreator;
 use App\PUB\Create\Pinterest\IdeaCreator;
 use App\PUB\Create\Pinterest\PaletteCreator;
+use App\PUB\Create\Pinterest\Support\PinterestCreatorTools;
 use App\PUB\Create\Video\PdoVideoJobRepository;
+use App\PUB\Create\Video\VideoWorkerHealthService;
+use App\PUB\Create\YouTube\PlaylistVideoCreator;
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
@@ -15,7 +18,9 @@ use App\PUB\PubCom\PubComManagerContract;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
+use App\PUB\Repos\PdoPubRunRepository;
 use App\PUB\Services\PubRunService;
+use PDO;
 use RuntimeException;
 use Throwable;
 
@@ -65,26 +70,57 @@ use Throwable;
 final class CreateManager implements PubComManagerContract
 {
     private PubErrorReporter $errors;
+    private PdoPubAssetRepository $assets;
+
+    /*
+     * LAZY DEPARTMENT STAFF / EQUIPMENT.
+     *
+     * Nothing below is created merely because CreateManager woke up.
+     * The Manager wakes only the station required by the current order,
+     * and keeps that instance available for the rest of this request/batch.
+     */
+    private array $creators = [];
+    private ?PinterestCreatorTools $pinterestTools = null;
+    private ?PdoVideoJobRepository $videoJobs = null;
+    private ?VideoWorkerHealthService $videoWorkerHealth = null;
+    private ?PubRunService $runService = null;
+    private ?string $publicBaseUrl = null;
 
 
     public function __construct(
-        private PdoPubAssetRepository $assets,
-
-        private CompositeCreator $compositeCreator,
-        private BeforeAfterVideoCreator $beforeAfterVideoCreator,
-        private IdeaCreator $ideaCreator,
-        private PaletteCreator $paletteCreator,
-
-        ?PubErrorReporter $errors = null,
-
-        private ?PdoVideoJobRepository $videoJobs = null,
-        private ?PubRunService $runService = null,
+        private PDO $pdo,
+        private string $projectRoot,
     ) {
+        $this->projectRoot =
+            rtrim(
+                trim(
+                    $this->projectRoot
+                ),
+                DIRECTORY_SEPARATOR
+            );
+
+
+        if ($this->projectRoot === '') {
+            throw new RuntimeException(
+                'Create Manager requires project root.'
+            );
+        }
+
+
+        /*
+         * Every CREATE assignment needs the durable asset/order desk,
+         * so this is Manager infrastructure rather than specialist staff.
+         */
+        $this->assets =
+            new PdoPubAssetRepository(
+                $this->pdo
+            );
+
+
         $this->errors =
-            $errors
-            ?? new PubErrorReporter(
-                dirname(__DIR__)
-                . '/Errors/pub_errors.log'
+            new PubErrorReporter(
+                $this->projectRoot
+                . '/app/PUB/Errors/pub_errors.log'
             );
     }
 
@@ -935,13 +971,11 @@ final class CreateManager implements PubComManagerContract
         ?int $outputFileSizeBytes = null,
         ?string $errorMessage = null
     ): array {
-        if (
-            $this->videoJobs === null
-        ) {
-            throw new RuntimeException(
-                'Create Manager has no video-job repository.'
-            );
-        }
+        /*
+         * The callback itself is the reason this equipment wakes.
+         */
+        $videoJobs =
+            $this->videoJobs();
 
 
         $status =
@@ -969,7 +1003,7 @@ final class CreateManager implements PubComManagerContract
 
 
         $job =
-            $this->videoJobs
+            $videoJobs
                 ->findById(
                     $jobId
                 );
@@ -1072,7 +1106,7 @@ final class CreateManager implements PubComManagerContract
                     );
                 }
 
-                $this->videoJobs
+                $videoJobs
                     ->completeJob(
                         $jobId,
                         $path,
@@ -1085,7 +1119,7 @@ final class CreateManager implements PubComManagerContract
                         (string)$errorMessage
                     );
 
-                $this->videoJobs
+                $videoJobs
                     ->failJob(
                         $jobId,
                         $message !== ''
@@ -1100,7 +1134,7 @@ final class CreateManager implements PubComManagerContract
                     $status,
 
                 'job' =>
-                    $this->videoJobs
+                    $videoJobs
                         ->findById(
                             $jobId
                         ),
@@ -1126,8 +1160,14 @@ final class CreateManager implements PubComManagerContract
 
 
         if (
-            $creatorKey !==
-            'pinterest.before_after_video'
+            !in_array(
+                $creatorKey,
+                [
+                    'pinterest.before_after_video',
+                    'youtube.playlist_video',
+                ],
+                true
+            )
         ) {
             throw new RuntimeException(
                 "CREATE has no asynchronous completion route for creator_key '{$creatorKey}'."
@@ -1141,27 +1181,51 @@ final class CreateManager implements PubComManagerContract
                     (string)$outputRelPath
                 );
 
+
             if ($path === '') {
                 throw new RuntimeException(
-                    'Completed Before/After Video job requires output_rel_path.'
+                    'Completed video job requires output_rel_path.'
                 );
             }
 
 
             /*
-             * WORKER PREPARED IT; MANAGER AUTHORIZES PERMANENCE.
+             * Wake only the Chef who owns the returned job.
              *
-             * The Creator promotes the physical file and returns the
-             * finished asset object. CreateManager then owns the durable
-             * creating -> created transition.
+             * The job's saved props are the exact render plan that
+             * actually went to the oven. YouTube uses that durable plan
+             * to report its dynamic duration accurately.
              */
             $createdAsset =
-                $this->beforeAfterVideoCreator
-                    ->promoteCompletedVideo(
-                        $pubAssetId,
-                        $path,
-                        $outputFileSizeBytes
-                    );
+                match (
+                    $creatorKey
+                ) {
+                    'pinterest.before_after_video' =>
+                        $this->beforeAfterVideoCreator()
+                            ->promoteCompletedVideo(
+                                $pubAssetId,
+                                $path,
+                                $outputFileSizeBytes
+                            ),
+
+                    'youtube.playlist_video' =>
+                        $this->playlistVideoCreator()
+                            ->promoteCompletedVideo(
+                                $pubAssetId,
+                                $path,
+                                is_array(
+                                    $job[
+                                        'props'
+                                    ]
+                                    ?? null
+                                )
+                                    ? $job[
+                                        'props'
+                                    ]
+                                    : [],
+                                $outputFileSizeBytes
+                            ),
+                };
 
 
             $this->assets
@@ -1171,7 +1235,7 @@ final class CreateManager implements PubComManagerContract
                 );
 
 
-            $this->videoJobs
+            $videoJobs
                 ->completeJob(
                     $jobId,
                     $path,
@@ -1183,10 +1247,21 @@ final class CreateManager implements PubComManagerContract
              * Delete the private working copy only after BOTH durable
              * records have been successfully updated.
              */
-            $this->beforeAfterVideoCreator
-                ->discardWorkingFile(
-                    $path
-                );
+            match (
+                $creatorKey
+            ) {
+                'pinterest.before_after_video' =>
+                    $this->beforeAfterVideoCreator()
+                        ->discardWorkingFile(
+                            $path
+                        ),
+
+                'youtube.playlist_video' =>
+                    $this->playlistVideoCreator()
+                        ->discardWorkingFile(
+                            $path
+                        ),
+            };
 
         } else {
             $message =
@@ -1194,26 +1269,41 @@ final class CreateManager implements PubComManagerContract
                     (string)$errorMessage
                 );
 
+
             if ($message === '') {
                 $message =
-                    'Before/After Video rendering failed.';
+                    $creatorKey ===
+                    'youtube.playlist_video'
+                        ? 'YouTube Playlist Video rendering failed.'
+                        : 'Before/After Video rendering failed.';
             }
 
 
-            $this->beforeAfterVideoCreator
-                ->recordVideoFailure(
-                    $pubAssetId,
-                    $message
-                );
+            match (
+                $creatorKey
+            ) {
+                'pinterest.before_after_video' =>
+                    $this->beforeAfterVideoCreator()
+                        ->recordVideoFailure(
+                            $pubAssetId,
+                            $message
+                        ),
+
+                'youtube.playlist_video' =>
+                    $this->playlistVideoCreator()
+                        ->recordVideoFailure(
+                            $pubAssetId,
+                            $message
+                        ),
+            };
 
 
-            $this->videoJobs
+            $videoJobs
                 ->failJob(
                     $jobId,
                     $message
                 );
         }
-
 
         $asset =
             $this->assets
@@ -1226,8 +1316,7 @@ final class CreateManager implements PubComManagerContract
 
 
         if (
-            $this->runService !== null
-            && is_array(
+            is_array(
                 $asset
             )
         ) {
@@ -1241,7 +1330,7 @@ final class CreateManager implements PubComManagerContract
 
             if ($pubRunId > 0) {
                 $runProgress =
-                    $this->runService
+                    $this->runService()
                         ->refreshProgressFromAssets(
                             $pubRunId
                         );
@@ -1254,7 +1343,7 @@ final class CreateManager implements PubComManagerContract
                 $status,
 
             'job' =>
-                $this->videoJobs
+                $videoJobs
                     ->findById(
                         $jobId
                     ),
@@ -1913,26 +2002,90 @@ final class CreateManager implements PubComManagerContract
     private function creatorForAssetType(
         string $assetType
     ): PubComWorkerContract {
-        return match (
-            $assetType
+        $assetType =
+            strtolower(
+                trim(
+                    $assetType
+                )
+            );
+
+
+        if (
+            isset(
+                $this->creators[
+                    $assetType
+                ]
+            )
         ) {
-            'pin_composite' =>
-                $this->compositeCreator,
+            return $this->creators[
+                $assetType
+            ];
+        }
 
-            'pin_before_after_video' =>
-                $this->beforeAfterVideoCreator,
 
-            'pin_idea' =>
-                $this->ideaCreator,
+        /*
+         * WAKE ONLY THE CHEF REQUIRED FOR THIS PRODUCTION LINE.
+         *
+         * The created worker is cached for this Manager/request so a
+         * batch of 35 orders for the same product uses one Chef.
+         */
+        $creator =
+            match (
+                $assetType
+            ) {
+                'pin_composite' =>
+                    new CompositeCreator(
+                        $this->pinterestTools(),
+                        $this->projectRoot,
+                        $this->logoPath()
+                    ),
 
-            'pin_idea_palette' =>
-                $this->paletteCreator,
+                'pin_before_after_video' =>
+                    new BeforeAfterVideoCreator(
+                        $this->assets,
+                        $this->videoJobs(),
+                        $this->videoWorkerHealth(),
+                        $this->projectRoot,
+                        $this->publicBaseUrl()
+                    ),
 
-            default =>
-                throw new RuntimeException(
-                    "CREATE has no Creator registered for asset_type '{$assetType}'."
-                ),
-        };
+                'pin_idea' =>
+                    new IdeaCreator(
+                        $this->pinterestTools(),
+                        $this->projectRoot,
+                        $this->logoPath()
+                    ),
+
+                'pin_idea_palette' =>
+                    new PaletteCreator(
+                        $this->pinterestTools(),
+                        $this->projectRoot,
+                        $this->logoPath()
+                    ),
+
+                'youtube_video' =>
+                    new PlaylistVideoCreator(
+                        $this->assets,
+                        $this->videoJobs(),
+                        $this->videoWorkerHealth(),
+                        $this->projectRoot,
+                        $this->publicBaseUrl()
+                    ),
+
+                default =>
+                    throw new RuntimeException(
+                        "CREATE has no Creator registered for asset_type '{$assetType}'."
+                    ),
+            };
+
+
+        $this->creators[
+            $assetType
+        ] =
+            $creator;
+
+
+        return $creator;
     }
 
 
@@ -2019,46 +2172,20 @@ final class CreateManager implements PubComManagerContract
         string $assetType,
         array $ingredients
     ): array {
-        return match (
-            $assetType
-        ) {
-            'pin_composite' =>
-                $this
-                    ->compositeCreator
-                    ->create(
-                        $pubAssetId,
-                        $ingredients
-                    ),
+        /*
+         * Use the SAME awakened Chef that passed readiness/preflight.
+         * creatorForAssetType() returns the cached worker for this line.
+         */
+        $creator =
+            $this->creatorForAssetType(
+                $assetType
+            );
 
-            'pin_before_after_video' =>
-                $this
-                    ->beforeAfterVideoCreator
-                    ->create(
-                        $pubAssetId,
-                        $ingredients
-                    ),
 
-            'pin_idea' =>
-                $this
-                    ->ideaCreator
-                    ->create(
-                        $pubAssetId,
-                        $ingredients
-                    ),
-
-            'pin_idea_palette' =>
-                $this
-                    ->paletteCreator
-                    ->create(
-                        $pubAssetId,
-                        $ingredients
-                    ),
-
-            default =>
-                throw new RuntimeException(
-                    "CREATE has no Creator registered for asset_type '{$assetType}'."
-                ),
-        };
+        return $creator->create(
+            $pubAssetId,
+            $ingredients
+        );
     }
 
 
@@ -2129,6 +2256,9 @@ final class CreateManager implements PubComManagerContract
             'pin_idea_palette' =>
                 'pinterest',
 
+            'youtube_video' =>
+                'youtube',
+
             default =>
                 throw new RuntimeException(
                     "CREATE cannot determine channel for asset_type '{$assetType}'."
@@ -2158,10 +2288,228 @@ final class CreateManager implements PubComManagerContract
             'pin_idea_palette' =>
                 'pinterest.idea_palette',
 
+            'youtube_video' =>
+                'youtube.playlist_video',
+
             default =>
                 throw new RuntimeException(
                     "CREATE has no Creator registered for asset_type '{$assetType}'."
                 ),
         };
     }
+
+    /**
+     * Shared Pinterest workstation equipment.
+     *
+     * Created only if a Pinterest still-image Chef needs it.
+     */
+    private function pinterestTools(): PinterestCreatorTools
+    {
+        if ($this->pinterestTools === null) {
+            $this->pinterestTools =
+                new PinterestCreatorTools();
+        }
+
+
+        return $this->pinterestTools;
+    }
+
+
+    /**
+     * Shared asynchronous video-job desk.
+     *
+     * Created only if a video Chef or worker callback needs it.
+     */
+    private function videoJobs(): PdoVideoJobRepository
+    {
+        if ($this->videoJobs === null) {
+            $this->videoJobs =
+                new PdoVideoJobRepository(
+                    $this->pdo
+                );
+        }
+
+
+        return $this->videoJobs;
+    }
+
+
+    /**
+     * Shared video-worker health station.
+     *
+     * Created only if a video Chef wakes.
+     */
+    private function videoWorkerHealth(): VideoWorkerHealthService
+    {
+        if ($this->videoWorkerHealth === null) {
+            $this->videoWorkerHealth =
+                new VideoWorkerHealthService(
+                    $this->projectRoot
+                );
+        }
+
+
+        return $this->videoWorkerHealth;
+    }
+
+
+    /**
+     * PUB run administration is needed only when CREATE must
+     * refresh durable run progress (for example after async settlement).
+     */
+    private function runService(): PubRunService
+    {
+        if ($this->runService === null) {
+            $this->runService =
+                new PubRunService(
+                    new PdoPubRunRepository(
+                        $this->pdo
+                    ),
+                    $this->assets
+                );
+        }
+
+
+        return $this->runService;
+    }
+
+
+    /**
+     * Product-independent ColorFix Pinterest logo location.
+     */
+    private function logoPath(): string
+    {
+        return
+            $this->projectRoot
+            . '/brand/'
+            . 'colorfix-pin-logo-compact-right-aligned-transparent.png';
+    }
+
+
+    /**
+     * Determine the public base URL only when a video Chef needs it.
+     */
+    private function publicBaseUrl(): string
+    {
+        if ($this->publicBaseUrl !== null) {
+            return $this->publicBaseUrl;
+        }
+
+
+        $forwardedProto =
+            strtolower(
+                trim(
+                    (string)(
+                        $_SERVER[
+                            'HTTP_X_FORWARDED_PROTO'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if (
+            !in_array(
+                $forwardedProto,
+                [
+                    'http',
+                    'https',
+                ],
+                true
+            )
+        ) {
+            $forwardedProto =
+                !empty(
+                    $_SERVER[
+                        'HTTPS'
+                    ]
+                )
+                &&
+                strtolower(
+                    (string)(
+                        $_SERVER[
+                            'HTTPS'
+                        ]
+                        ?? ''
+                    )
+                ) !== 'off'
+                    ? 'https'
+                    : 'http';
+        }
+
+
+        $host =
+            trim(
+                (string)(
+                    $_SERVER[
+                        'HTTP_HOST'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($host === '') {
+            throw new RuntimeException(
+                'CREATE could not determine the public host.'
+            );
+        }
+
+
+        $this->publicBaseUrl =
+            $forwardedProto
+            . '://'
+            . $host;
+
+
+        return $this->publicBaseUrl;
+    }
+
+
+    /**
+     * Typed access to the lazily awakened Before/After Video Chef
+     * for async completion work.
+     */
+    private function beforeAfterVideoCreator(): BeforeAfterVideoCreator
+    {
+        $creator =
+            $this->creatorForAssetType(
+                'pin_before_after_video'
+            );
+
+
+        if (!$creator instanceof BeforeAfterVideoCreator) {
+            throw new RuntimeException(
+                'CREATE Before/After Video Creator could not be resolved.'
+            );
+        }
+
+
+        return $creator;
+    }
+
+
+    /**
+     * Typed access to the lazily awakened YouTube Playlist Video Chef
+     * for asynchronous completion work.
+     */
+    private function playlistVideoCreator(): PlaylistVideoCreator
+    {
+        $creator =
+            $this->creatorForAssetType(
+                'youtube_video'
+            );
+
+
+        if (!$creator instanceof PlaylistVideoCreator) {
+            throw new RuntimeException(
+                'CREATE YouTube Playlist Video Creator could not be resolved.'
+            );
+        }
+
+
+        return $creator;
+    }
+
 }

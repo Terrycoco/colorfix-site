@@ -8,30 +8,56 @@ use App\PUB\Analyze\Pinterest\CompositeAnalyzer;
 use App\PUB\Analyze\Pinterest\IdeaAnalyzer;
 use App\PUB\Analyze\Pinterest\PaletteAnalyzer;
 use App\PUB\Analyze\Pinterest\YouTubeTeaserAnalyzer;
+use App\PUB\Analyze\Pinterest\Support\PlaylistPaletteResolver;
 use App\PUB\Analyze\Sources\PlaylistSourcePreparer;
 use App\PUB\Analyze\YouTube\PlaylistVideoAnalyzer;
 use App\PUB\Contracts\PubContract;
 use App\PUB\Services\PubRunService;
+use App\PUB\Repos\PdoPubAssetRepository;
+use App\PUB\Repos\PdoPubRunRepository;
+use App\Repos\PdoPlaylistRepository;
+use App\PV\PVService;
+use App\REX\Repos\PdoRexReservationRepository;
+use App\REX\Services\RexReservationRelationships;
+use App\REX\Services\RexReserver;
+use App\REX\Services\RexTokenGenerator;
+use App\Services\ViewerService;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
+use PDO;
 use RuntimeException;
 use Throwable;
 
 final class AnalyzeManager implements PubComManagerContract
 {
-    public function __construct(
-        private PubRunService $runService,
-        private PlaylistSourcePreparer $playlistSourcePreparer,
+    /*
+     * LAZY DEPARTMENT STAFFING
+     *
+     * The endpoint wakes only the Manager.
+     * The Manager creates Procurement, PubRun infrastructure, and the
+     * requested specialist Analyzer only when the assignment reaches
+     * the point where each is actually needed.
+     *
+     * Objects are memoized for this Manager/request so a future
+     * multi-output ANALYZE call can reuse Procurement and any worker
+     * already clocked in during the same batch.
+     */
+    private ?PubRunService $runService = null;
+    private ?PlaylistSourcePreparer $playlistSourcePreparer = null;
 
-        private CompositeAnalyzer $compositeAnalyzer,
-        private BeforeAfterVideoAnalyzer $beforeAfterVideoAnalyzer,
-        private IdeaAnalyzer $ideaAnalyzer,
-        private PaletteAnalyzer $paletteAnalyzer,
-        private PlaylistVideoAnalyzer $youtubeVideoAnalyzer,
-        private YouTubeTeaserAnalyzer $youtubeTeaserAnalyzer,
+    /** @var array<string, PubComWorkerContract> */
+    private array $analyzers = [];
+
+    /** @var array<string, array<string, mixed>> */
+    private array $preparedSources = [];
+
+
+    public function __construct(
+        private PDO $pdo,
+        private string $projectRoot,
     ) {}
 
 
@@ -458,6 +484,7 @@ final class AnalyzeManager implements PubComManagerContract
                             'before_after_video',
                             'idea',
                             'idea_palette',
+                            'youtube_video',
                         ],
                         true
                     )
@@ -586,9 +613,12 @@ final class AnalyzeManager implements PubComManagerContract
         string $runMode,
         int $overwritePubRunId
     ): array {
+        $runService =
+            $this->runService();
+
         if ($runMode === 'check') {
             $existingRun =
-                $this->runService
+                $runService
                     ->findLatestMatching(
                         $sourceType,
                         $sourceId,
@@ -613,7 +643,7 @@ final class AnalyzeManager implements PubComManagerContract
 
 
                 $overwriteStatus =
-                    $this->runService
+                    $runService
                         ->overwriteStatus(
                             $existingRunId
                         );
@@ -632,7 +662,7 @@ final class AnalyzeManager implements PubComManagerContract
                  * EMPTY JOB.
                  */
                 if ($assetCount === 0) {
-                    $this->runService
+                    $runService
                         ->overwrite(
                             $existingRunId,
                             $sourceType,
@@ -723,7 +753,7 @@ final class AnalyzeManager implements PubComManagerContract
 
 
             $overwriteResult =
-                $this->runService
+                $runService
                     ->overwrite(
                         $overwritePubRunId,
                         $sourceType,
@@ -761,7 +791,7 @@ final class AnalyzeManager implements PubComManagerContract
          * OR EXPLICIT NEW.
          */
         $pubRunId =
-            $this->runService
+            $runService
                 ->start(
                     $sourceType,
                     $sourceId,
@@ -796,21 +826,55 @@ final class AnalyzeManager implements PubComManagerContract
         string $sourceType,
         int $sourceId
     ): array {
-        return match (
+        /*
+         * One procurement trip per source per Manager wake.
+         *
+         * Today analyze() receives one output type. If ANALYZE later
+         * accepts several output types in one request, every specialist
+         * can work from this same prepared market haul instead of
+         * reloading the Playlist/PV source for each output.
+         */
+        $cacheKey =
             $sourceType
-        ) {
-            'playlist' =>
-                $this
-                    ->playlistSourcePreparer
-                    ->prepare(
-                        $sourceId
-                    ),
+            . ':'
+            . $sourceId;
 
-            default =>
-                throw new RuntimeException(
-                    "ANALYZE has no source preparer registered for '{$sourceType}'."
-                ),
-        };
+
+        if (isset(
+            $this->preparedSources[
+                $cacheKey
+            ]
+        )) {
+            return $this->preparedSources[
+                $cacheKey
+            ];
+        }
+
+
+        $prepared =
+            match (
+                $sourceType
+            ) {
+                'playlist' =>
+                    $this
+                        ->playlistSourcePreparer()
+                        ->prepare(
+                            $sourceId
+                        ),
+
+                default =>
+                    throw new RuntimeException(
+                        "ANALYZE has no source preparer registered for '{$sourceType}'."
+                    ),
+            };
+
+
+        $this->preparedSources[
+            $cacheKey
+        ] = $prepared;
+
+
+        return $prepared;
     }
 
 
@@ -881,42 +945,23 @@ final class AnalyzeManager implements PubComManagerContract
 
 
         /*
-         * SELECT SPECIALIST.
+         * WAKE SPECIALIST.
+         *
+         * This is the first moment a recipe-specific Analyzer is
+         * needed, so this is where the Manager clocks that worker in.
          */
         $analyzer =
-            match (
+            $this->analyzerForOutput(
                 $outputType
-            ) {
-                'composite' =>
-                    $this->compositeAnalyzer,
-
-                'before_after_video' =>
-                    $this->beforeAfterVideoAnalyzer,
-
-                'idea' =>
-                    $this->ideaAnalyzer,
-
-                'idea_palette' =>
-                    $this->paletteAnalyzer,
-
-                'youtube_video' =>
-                    $this->youtubeVideoAnalyzer,
-
-                'youtube_teaser_pin' =>
-                    $this->youtubeTeaserAnalyzer,
-
-                default =>
-                    throw new RuntimeException(
-                        "ANALYZE has no Analyzer registered for output type '{$outputType}'."
-                    ),
-            };
+            );
 
 
         /*
          * PREFLIGHT INPUT.
          *
          * Migrated Pinterest analyzers receive the complete
-         * Pinterest market source.
+         * Pinterest market source. YouTube Playlist Video receives
+         * the complete YouTube channel market source.
          *
          * Remaining analyzers retain their legacy preflight
          * shape until migrated individually.
@@ -935,7 +980,7 @@ final class AnalyzeManager implements PubComManagerContract
                     $eligibleItems,
 
                 'youtube_video' =>
-                    $source,
+                    $channelSource,
 
                 default =>
                     $source,
@@ -1012,69 +1057,58 @@ final class AnalyzeManager implements PubComManagerContract
         }
 
 
-        $result =
+        $analyzer =
+            $assignment['analyzer']
+            ?? null;
+
+
+        if (
+            !$analyzer instanceof
+            PubComWorkerContract
+        ) {
+            throw new RuntimeException(
+                'ANALYZE authorized assignment has no Analyzer.'
+            );
+        }
+
+
+        /*
+         * The exact SAME worker that passed readiness/preflight now
+         * performs the assignment. No second Analyzer is instantiated.
+         */
+        $analyzeInput =
             match (
                 $outputType
             ) {
-                /*
-                 * MIGRATED PINTEREST ANALYZERS.
-                 *
-                 * Each receives the same complete
-                 * Pinterest market source and chooses
-                 * the recipe-specific material it needs.
-                 */
-                'composite' =>
-                    $this
-                        ->compositeAnalyzer
-                        ->analyze(
-                            $channelSource
-                        ),
-
-                'idea' =>
-                    $this
-                        ->ideaAnalyzer
-                        ->analyze(
-                            $channelSource
-                        ),
-
-                'idea_palette' =>
-                    $this
-                        ->paletteAnalyzer
-                        ->analyze(
-                            $channelSource
-                        ),
-
-                'before_after_video' =>
-                    $this
-                        ->beforeAfterVideoAnalyzer
-                        ->analyze(
-                            $channelSource
-                        ),
-
-
-                /*
-                 * Remaining analyzers stay untouched
-                 * until migrated one by one.
-                 */
+                'composite',
+                'before_after_video',
+                'idea',
+                'idea_palette',
                 'youtube_video' =>
-                    $this
-                        ->youtubeVideoAnalyzer
-                        ->analyze(
-                            $source
-                        ),
+                    $channelSource,
 
                 'youtube_teaser_pin' =>
-                    $this
-                        ->youtubeTeaserAnalyzer
-                        ->analyze(
-                            $eligibleItems
-                        ),
+                    $eligibleItems,
 
                 default =>
-                    throw new RuntimeException(
-                        "ANALYZE has no Analyzer registered for output type '{$outputType}'."
-                    ),
+                    $source,
             };
+
+
+        if (!method_exists(
+            $analyzer,
+            'analyze'
+        )) {
+            throw new RuntimeException(
+                "ANALYZE worker '{$outputType}' has no analyze() method."
+            );
+        }
+
+
+        $result =
+            $analyzer->analyze(
+                $analyzeInput
+            );
 
 
         if (
@@ -1166,6 +1200,146 @@ final class AnalyzeManager implements PubComManagerContract
             'disposition' =>
                 $preflight,
         ];
+    }
+
+
+    /**
+     * Department administrative infrastructure.
+     *
+     * Wakes only if ANALYZE gets far enough to establish/check a job.
+     */
+    private function runService(): PubRunService
+    {
+        if ($this->runService === null) {
+            $this->runService =
+                new PubRunService(
+                    new PdoPubRunRepository(
+                        $this->pdo
+                    ),
+                    new PdoPubAssetRepository(
+                        $this->pdo
+                    )
+                );
+        }
+
+
+        return $this->runService;
+    }
+
+
+    /**
+     * Wake Playlist procurement only when a Playlist source is actually
+     * requested. The same preparer remains available for the rest of the
+     * current Manager/request.
+     */
+    private function playlistSourcePreparer(): PlaylistSourcePreparer
+    {
+        if ($this->playlistSourcePreparer === null) {
+            $this->playlistSourcePreparer =
+                new PlaylistSourcePreparer(
+                    new PdoPlaylistRepository(
+                        $this->pdo
+                    ),
+                    new PVService(
+                        $this->pdo
+                    )
+                );
+        }
+
+
+        return $this->playlistSourcePreparer;
+    }
+
+
+    /**
+     * Wake only the specialist required by the requested output type.
+     *
+     * Workers are cached for this Manager/request. That matters when a
+     * future ANALYZE batch asks the same specialist to handle multiple
+     * assignments: the worker clocks in once for that batch.
+     */
+    private function analyzerForOutput(
+        string $outputType
+    ): PubComWorkerContract {
+        if (isset(
+            $this->analyzers[
+                $outputType
+            ]
+        )) {
+            return $this->analyzers[
+                $outputType
+            ];
+        }
+
+
+        $analyzer =
+            match (
+                $outputType
+            ) {
+                'composite' =>
+                    new CompositeAnalyzer(),
+
+                'before_after_video' =>
+                    new BeforeAfterVideoAnalyzer(),
+
+                'idea' =>
+                    new IdeaAnalyzer(),
+
+                'idea_palette' =>
+                    $this->makePaletteAnalyzer(),
+
+                'youtube_video' =>
+                    new PlaylistVideoAnalyzer(),
+
+                'youtube_teaser_pin' =>
+                    new YouTubeTeaserAnalyzer(),
+
+                default =>
+                    throw new RuntimeException(
+                        "ANALYZE has no Analyzer registered for output type '{$outputType}'."
+                    ),
+            };
+
+
+        $this->analyzers[
+            $outputType
+        ] = $analyzer;
+
+
+        return $analyzer;
+    }
+
+
+    /**
+     * Palette Analyzer has department equipment of its own. Build that
+     * equipment only when this specialist is actually assigned work.
+     */
+    private function makePaletteAnalyzer(): PaletteAnalyzer
+    {
+        $rexRepository =
+            new PdoRexReservationRepository(
+                $this->pdo
+            );
+
+        $playlistPaletteResolver =
+            new PlaylistPaletteResolver(
+                $rexRepository,
+                new RexReservationRelationships(
+                    $rexRepository
+                ),
+                new RexReserver(
+                    $rexRepository,
+                    new RexTokenGenerator()
+                ),
+                new ViewerService(
+                    $this->pdo
+                )
+            );
+
+
+        return new PaletteAnalyzer(
+            $playlistPaletteResolver
+        );
     }
 
 

@@ -38,6 +38,7 @@ export default function PubPipelineReference({
           <StageSection
             key={stageKey}
             title={stageKey.toUpperCase()}
+            role={stage?.referenceRole}
           >
             <StageContractSummary
               contract={stage}
@@ -202,12 +203,19 @@ function SharedBoxFields({
 
 function StageSection({
   title,
+  role,
   children,
 }) {
   return (
     <section style={stageStyle}>
       <div style={stageHeaderStyle}>
-        {title}
+        <span>{title}</span>
+
+        {role && (
+          <span style={stageRoleStyle}>
+            — {role}
+          </span>
+        )}
       </div>
 
       {children}
@@ -248,29 +256,30 @@ function ManagerContract({
 
   return (
     <div style={managerStyle}>
-      <div style={subHeaderStyle}>
+      <div style={managerHeaderStyle}>
         MANAGER
       </div>
 
-      <ContractColumns>
-        <ContractBlock
-          title="INPUT"
-          fields={manager?.input}
-        />
-
-        <ContractBlock
-          title="OUTPUT"
-          fields={manager?.output}
-        />
-
-        {manager?.outputToCreator && (
+      <div style={managerBodyStyle}>
+        <ContractColumns>
           <ContractBlock
-            title="OUTPUT TO CREATOR"
-            fields={manager.outputToCreator}
+            title="INPUT"
+            fields={manager?.input}
           />
-        )}
 
-      </ContractColumns>
+          {manager?.outputToCreator && (
+            <ContractBlock
+              title="OUTPUT TO CREATOR"
+              fields={manager.outputToCreator}
+            />
+          )}
+
+          <ContractBlock
+            title="OUTPUT"
+            fields={manager?.output}
+          />
+        </ContractColumns>
+      </div>
     </div>
   );
 }
@@ -660,11 +669,21 @@ const stageStyle = {
 
 
 const stageHeaderStyle = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 8,
   padding: "8px 10px",
   background: "#0f3051",
   color: "#ffffff",
   fontSize: 15,
   fontWeight: 700,
+};
+
+
+const stageRoleStyle = {
+  fontSize: 12,
+  fontWeight: 500,
+  opacity: 0.88,
 };
 
 
@@ -675,9 +694,25 @@ const stageSummaryStyle = {
 
 
 const managerStyle = {
-  padding: 10,
   borderBottom: "1px solid #d8dde3",
   background: "#fbfcfd",
+};
+
+
+const managerHeaderStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px 8px",
+  borderBottom: "3px solid #4b6b8a",
+  fontSize: 14,
+  fontWeight: 900,
+  color: "#1c325e",
+  letterSpacing: "0.08em",
+};
+
+
+const managerBodyStyle = {
+  padding: 10,
 };
 
 

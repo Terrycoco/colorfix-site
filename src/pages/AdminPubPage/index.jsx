@@ -56,6 +56,9 @@ const PLAYLISTS_URL =
 const ANALYZE_URL =
   `${API_FOLDER}/v2/admin/pub/analyze.php`;
 
+const CREATE_URL =
+  `${API_FOLDER}/v2/admin/pub/create.php`;
+
 const PUB_CONTRACTS_URL =
   `${API_FOLDER}/v2/admin/pub/contracts.php`;
 
@@ -153,7 +156,7 @@ export default function AdminPubPage() {
               )
           );
         },
-        4500
+        6000
       );
 
 
@@ -978,22 +981,37 @@ export default function AdminPubPage() {
       };
 
 
-      const nextProposals =
-        Array.isArray(
-          data.boxes
+const nextProposals =
+  Array.isArray(
+    data.boxes
+  )
+    ? data.boxes
+        .map(
+          (
+            proposal,
+            index
+          ) =>
+            normalizeProposal(
+              proposal,
+              index
+            )
         )
-          ? data.boxes
-              .map(
-                (
-                  proposal,
-                  index
-                ) =>
-                  normalizeProposal(
-                    proposal,
-                    index
-                  )
-              )
-          : [];
+    : [];
+
+
+console.log(
+  "ANALYZE INGREDIENTS:",
+  nextProposals.map(
+    (proposal) => ({
+      asset_type:
+        proposal.asset_type,
+
+      ingredients:
+        proposal.ingredients,
+    })
+  )
+);
+
 
 
       const failed =
@@ -1510,27 +1528,104 @@ export default function AdminPubPage() {
       ]
     );
 
+const handoffFieldNames =
+  useMemo(
+    () =>
+      analyzeManagerOutputFields
+        .map(
+          (field) =>
+            String(
+              field?.key ||
+              ""
+            ).trim()
+        )
+        .filter(
+          Boolean
+        ),
 
-  const handoffFieldNames =
+    [
+      analyzeManagerOutputFields,
+    ]
+  );
+
+
+  /*
+   * Only fields explicitly declared required at the PUB Box
+   * boundary should block the handoff.
+   *
+   * search_title, description, and pingback may legitimately
+   * be blank. Product-specific ingredient validation belongs
+   * to CREATE / the selected Creator.
+   */
+  const requiredHandoffFieldNames =
     useMemo(
-      () =>
-        analyzeManagerOutputFields
-          .map(
-            (field) =>
-              String(
-                field?.key ||
-                ""
-              ).trim()
+      () => {
+        const sharedBoxFields =
+          Array.isArray(
+            pubContracts
+              ?.shared
+              ?.boxFields
           )
-          .filter(
-            Boolean
-          ),
+            ? pubContracts
+                .shared
+                .boxFields
+            : [];
+
+
+        const requiredSharedFields =
+          sharedBoxFields
+            .filter(
+              (field) =>
+                field
+                  ?.requiredAtHandoff ===
+                true
+            )
+            .map(
+              (field) =>
+                String(
+                  field?.key ||
+                  ""
+                ).trim()
+            )
+            .filter(
+              Boolean
+            );
+
+
+        return [
+          ...new Set([
+            ...requiredSharedFields,
+            "ingredients",
+          ]),
+        ];
+      },
 
       [
-        analyzeManagerOutputFields,
+        pubContracts,
       ]
     );
 
+
+  const canSendToCreate =
+    createHandoffBoxes
+      .length >
+      0 &&
+    requiredHandoffFieldNames
+      .length >
+      0 &&
+    createHandoffBoxes
+      .every(
+        (box) =>
+          requiredHandoffFieldNames
+            .every(
+              (key) =>
+                !isEmptyValue(
+                  box[
+                    key
+                  ]
+                )
+            )
+      );
 
   const handoffJobId =
     Number(
@@ -1543,26 +1638,6 @@ export default function AdminPubPage() {
     );
 
 
-  const canSendToCreate =
-    createHandoffBoxes
-      .length >
-      0 &&
-    handoffFieldNames
-      .length >
-      0 &&
-    createHandoffBoxes
-      .every(
-        (box) =>
-          handoffFieldNames
-            .every(
-              (key) =>
-                !isEmptyValue(
-                  box[
-                    key
-                  ]
-                )
-            )
-      );
 
 
   /*
@@ -1570,18 +1645,21 @@ export default function AdminPubPage() {
    * FINAL ANALYZE HANDOFF
    * ========================================================
    *
-   * Still using the existing Create
-   * endpoint and legacy box shape.
+   * CREATE doorbell.
    *
-   * We will replace this bridge after
-   * the new AnalyzeManager endpoint
-   * is installed.
+   * Each selected Analyze Box becomes one NEW CREATE order.
+   * CreateManager owns all interpretation/routing after that.
    */
 
 async function sendToCreate() {
   clearPubStageErrors();
 
   setCreateMessage("");
+
+
+
+
+
 
 
   /*
@@ -1617,7 +1695,7 @@ async function sendToCreate() {
 
       const response =
         await fetch(
-          `${API_FOLDER}/v2/admin/pub/create-assets.php`,
+          CREATE_URL,
           {
             method:
               "POST",
@@ -1632,8 +1710,12 @@ async function sendToCreate() {
 
             body:
               JSON.stringify({
-                boxes:
-                  sealedBoxes,
+                orders:
+                  sealedBoxes.map(
+                    (box) => ({
+                      box,
+                    })
+                  ),
               }),
           }
         );
@@ -3963,6 +4045,7 @@ function collectPubComDispositions(
     const key
     of [
       "created",
+      "queued",
       "failed",
     ]
   ) {

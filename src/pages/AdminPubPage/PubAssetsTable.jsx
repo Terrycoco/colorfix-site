@@ -28,6 +28,9 @@ import {
 const ASSETS_URL =
   `${API_FOLDER}/v2/admin/pub/assets.php`;
 
+const CREATE_URL =
+  `${API_FOLDER}/v2/admin/pub/create.php`;
+
 
 export default function PubAssetsTable() {
   const [
@@ -658,7 +661,7 @@ export default function PubAssetsTable() {
     try {
       const res =
         await fetch(
-          ASSETS_URL,
+          CREATE_URL,
           {
             method:
               "POST",
@@ -672,13 +675,14 @@ export default function PubAssetsTable() {
             },
 
             body:
-              JSON.stringify({
-                action:
-                  "recreate",
-
-                pub_asset_id:
-                  id,
-              }),
+            JSON.stringify({
+              orders: [
+                {
+                  pub_asset_id:
+                    id,
+                },
+              ],
+            }),
           }
         );
 

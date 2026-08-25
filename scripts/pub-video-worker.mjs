@@ -225,14 +225,24 @@ async function processVideoJob(job) {
     job.pub_video_job_id
   );
 
+  const assetId = Number(
+    job.pub_asset_id
+  );
+
   if (!jobId) {
     throw new Error(
       "Video job ID missing."
     );
   }
 
+  if (!assetId) {
+    throw new Error(
+      "PUB asset ID missing."
+    );
+  }
+
   console.log(
-    `\nClaimed PUB video job #${jobId}: ${job.creator_key}`
+    `\nClaimed PUB asset #${assetId}: ${job.creator_key}`
   );
 
   await postJson(
@@ -337,7 +347,7 @@ async function processVideoJob(job) {
     }
 
     console.log(
-      `Uploading PUB video job #${jobId}...`
+      `Uploading PUB asset #${assetId}...`
     );
 
     const uploaded =
@@ -370,7 +380,7 @@ async function processVideoJob(job) {
     );
 
     console.log(
-      `Completed PUB video job #${jobId}`
+      `Completed PUB asset #${assetId}`
     );
 
     console.log(
@@ -383,7 +393,7 @@ async function processVideoJob(job) {
       "Video rendering failed.";
 
     console.error(
-      `PUB video job #${jobId} failed: ${message}`
+      `PUB asset #${assetId} failed: ${message}`
     );
 
     try {
@@ -403,7 +413,7 @@ async function processVideoJob(job) {
 
     } catch (reportError) {
       console.error(
-        `Could not report failure for video job #${jobId}:`,
+        `Could not report failure for PUB asset #${assetId}:`,
         reportError?.message ||
         reportError
       );
