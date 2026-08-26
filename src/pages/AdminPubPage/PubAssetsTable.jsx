@@ -84,6 +84,11 @@ export default function PubAssetsTable() {
   ] = useState({});
 
   const [
+    editIngredientBindings,
+    setEditIngredientBindings,
+  ] = useState([]);
+
+  const [
     savingCopy,
     setSavingCopy,
   ] = useState(false);
@@ -241,6 +246,10 @@ export default function PubAssetsTable() {
         {}
       );
 
+      setEditIngredientBindings(
+        []
+      );
+
       setEditAsset(
         asset
       );
@@ -320,6 +329,17 @@ export default function PubAssetsTable() {
           ? data
               .ingredient_values
           : {}
+      );
+
+
+      setEditIngredientBindings(
+        Array.isArray(
+          data
+            .ingredient_bindings
+        )
+          ? data
+              .ingredient_bindings
+          : []
       );
 
 
@@ -454,6 +474,10 @@ export default function PubAssetsTable() {
 
         setEditIngredientValues(
           {}
+        );
+
+        setEditIngredientBindings(
+          []
         );
       }
 
@@ -933,6 +957,48 @@ export default function PubAssetsTable() {
 
           label:
             "Stage",
+
+          render:
+            (asset) => {
+              const stage =
+                String(
+                  asset
+                    .pipeline_stage ||
+                  ""
+                )
+                  .trim()
+                  .toLowerCase();
+
+              if (!stage) {
+                return "—";
+              }
+
+              return (
+                <span
+                  style={
+                    stage ===
+                      "redo_required"
+                      ? redoRequiredStageStyle
+                      : stage ===
+                          "creating"
+                        ? creatingStageStyle
+                        : stageBadgeStyle
+                  }
+                >
+                  {humanize(
+                    stage
+                  )}
+                </span>
+              );
+            },
+
+          sortValue:
+            (asset) =>
+              String(
+                asset
+                  .pipeline_stage ||
+                ""
+              ),
         },
 
 
@@ -1270,6 +1336,10 @@ export default function PubAssetsTable() {
               editIngredientValues
             }
 
+            ingredientBindings={
+              editIngredientBindings
+            }
+
             asset={{
               ...editAsset,
 
@@ -1299,6 +1369,10 @@ export default function PubAssetsTable() {
               recreateAsset
             }
 
+            onRefreshAssets={
+              loadAssets
+            }
+
             onClose={() => {
               setEditAsset(
                 null
@@ -1306,6 +1380,10 @@ export default function PubAssetsTable() {
 
               setEditIngredientValues(
                 {}
+              );
+
+              setEditIngredientBindings(
+                []
               );
             }}
           />
@@ -1432,6 +1510,58 @@ function humanize(
         character.toUpperCase()
     );
 }
+
+
+const stageBadgeStyle = {
+  display:
+    "inline-block",
+
+  padding:
+    "3px 7px",
+
+  borderRadius:
+    999,
+
+  background:
+    "#eef1f4",
+
+  color:
+    "#465465",
+
+  fontSize:
+    11,
+
+  fontWeight:
+    600,
+
+  lineHeight:
+    1.2,
+};
+
+
+const creatingStageStyle = {
+  ...stageBadgeStyle,
+
+  background:
+    "#e8f1fb",
+
+  color:
+    "#245b88",
+};
+
+
+const redoRequiredStageStyle = {
+  ...stageBadgeStyle,
+
+  background:
+    "#fff1bf",
+
+  color:
+    "#7a5600",
+
+  border:
+    "1px solid #e1c15e",
+};
 
 
 const filterBarStyle = {

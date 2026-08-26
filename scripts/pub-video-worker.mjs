@@ -12,11 +12,6 @@ const BASE_URL = String(
 const POLL_MS = 5000;
 const HEARTBEAT_MS = 5000;
 
-/*
- * Existing secret name retained intentionally.
- * The PUB contract is now "video worker", but changing the
- * environment variable is not required for this refactor.
- */
 const WORKER_SECRET = String(
   process.env.COLORFIX_RENDER_WORKER_SECRET || ""
 ).trim();
@@ -220,112 +215,120 @@ function recipePathFor(job) {
   );
 }
 
+/*
+ * One claimed asset must always end in one of two states:
+ *
+ *   complete
+ *   failed
+ *
+ * Once an asset has been claimed, every remaining operation belongs
+ * inside this failure boundary. That prevents an exception during
+ * validation/setup from leaving the asset stranded in rendering.
+ */
 async function processVideoJob(job) {
   const jobId = Number(
-    job.pub_video_job_id
+    job?.pub_video_job_id || 0
   );
 
   const assetId = Number(
-    job.pub_asset_id
+    job?.pub_asset_id || 0
   );
 
   if (!jobId) {
     throw new Error(
-      "Video job ID missing."
+      "Claimed video work is missing its internal job ID."
     );
   }
 
   if (!assetId) {
     throw new Error(
-      "PUB asset ID missing."
+      "Claimed video work is missing its PUB asset ID."
     );
   }
 
   console.log(
-    `\nClaimed PUB asset #${assetId}: ${job.creator_key}`
+    `\nClaimed PUB asset #${assetId}: ${job?.creator_key || "video"}`
   );
-
-  await postJson(
-    `${BASE_URL}/api/v2/admin/pub/video-jobs/rendering.php`,
-    {
-      pub_video_job_id: jobId,
-    }
-  );
-
-  const recipePath =
-    recipePathFor(job);
-
-  const outputPath =
-    outputPathFor(job);
-
-  const compositionId = String(
-    job?.video_recipe_key || ""
-  ).trim();
-
-  if (!compositionId) {
-    throw new Error(
-      "Video job is missing video_recipe_key / composition id."
-    );
-  }
-
-  if (
-    !job?.props ||
-    typeof job.props !== "object" ||
-    Array.isArray(job.props)
-  ) {
-    throw new Error(
-      "Video job is missing its Creator-owned props."
-    );
-  }
-
-  if (
-    !job.props.render ||
-    typeof job.props.render !== "object" ||
-    Array.isArray(job.props.render)
-  ) {
-    throw new Error(
-      "Video job is missing Creator-owned render instructions."
-    );
-  }
-
-  const codec = String(
-    job.props.render.codec || ""
-  ).trim();
-
-  if (!codec) {
-    throw new Error(
-      "Video job is missing Creator-owned render.codec."
-    );
-  }
-
-  /*
-   * Per-job Remotion recipe.
-   *
-   * The Creator owns every value below.
-   * The worker adds no product defaults and makes no render choices.
-   */
-  fs.writeFileSync(
-    recipePath,
-    JSON.stringify(
-      {
-        composition_id:
-          compositionId,
-
-        plan:
-          job.props,
-
-        render:
-          job.props.render,
-      },
-      null,
-      2
-    )
-  );
-
-  const rendererScript =
-    remotionExecutorPath();
 
   try {
+    await postJson(
+      `${BASE_URL}/api/v2/admin/pub/video-jobs/rendering.php`,
+      {
+        pub_video_job_id: jobId,
+      }
+    );
+
+    const recipePath =
+      recipePathFor(job);
+
+    const outputPath =
+      outputPathFor(job);
+
+    const compositionId = String(
+      job?.video_recipe_key || ""
+    ).trim();
+
+    if (!compositionId) {
+      throw new Error(
+        "Video is missing its renderer composition."
+      );
+    }
+
+    if (
+      !job?.props ||
+      typeof job.props !== "object" ||
+      Array.isArray(job.props)
+    ) {
+      throw new Error(
+        "Video is missing its Creator-owned render plan."
+      );
+    }
+
+    if (
+      !job.props.render ||
+      typeof job.props.render !== "object" ||
+      Array.isArray(job.props.render)
+    ) {
+      throw new Error(
+        "Video is missing Creator-owned render instructions."
+      );
+    }
+
+    const codec = String(
+      job.props.render.codec || ""
+    ).trim();
+
+    if (!codec) {
+      throw new Error(
+        "Video is missing Creator-owned render.codec."
+      );
+    }
+
+    fs.writeFileSync(
+      recipePath,
+      JSON.stringify(
+        {
+          composition_id:
+            compositionId,
+
+          plan:
+            job.props,
+
+          render:
+            job.props.render,
+        },
+        null,
+        2
+      )
+    );
+
+    const rendererScript =
+      remotionExecutorPath();
+
+    console.log(
+      `Rendering PUB asset #${assetId}...`
+    );
+
     await run(
       "node",
       [
@@ -383,19 +386,19 @@ async function processVideoJob(job) {
       `Completed PUB asset #${assetId}`
     );
 
-    console.log(
-      outputPath
-    );
-
   } catch (error) {
     const message =
       error?.message ||
       "Video rendering failed.";
 
     console.error(
-      `PUB asset #${assetId} failed: ${message}`
+      `PUB asset #${assetId} FAILED: ${message}`
     );
 
+    /*
+     * Best effort: once a claimed asset fails, tell PUB immediately
+     * so the job/asset does not remain stuck in rendering.
+     */
     try {
       await postJson(
         `${BASE_URL}/api/v2/admin/pub/video-jobs/complete.php`,
@@ -411,11 +414,16 @@ async function processVideoJob(job) {
         }
       );
 
+      console.error(
+        `PUB asset #${assetId} marked failed. Worker will continue.`
+      );
+
     } catch (reportError) {
       console.error(
-        `Could not report failure for PUB asset #${assetId}:`,
-        reportError?.message ||
-        reportError
+        `PUB asset #${assetId} failure could not be reported to PUB: ${
+          reportError?.message ||
+          reportError
+        }`
       );
     }
   }
@@ -507,8 +515,13 @@ async function main() {
       }
 
     } catch (error) {
+      /*
+       * This is now reserved primarily for claim/poll failures.
+       * Per-asset failures are absorbed and reported inside
+       * processVideoJob(), allowing the worker to continue.
+       */
       console.error(
-        "PUB video worker error:",
+        "PUB video worker polling error:",
         error?.message ||
         error
       );
@@ -522,6 +535,7 @@ async function main() {
 
 main().catch((error) => {
   console.error(
+    "PUB video worker stopped:",
     error?.message ||
     error
   );

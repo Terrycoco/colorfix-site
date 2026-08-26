@@ -2,7 +2,9 @@ import React from "react";
 
 import {
   AbsoluteFill,
+  Audio,
   Img,
+  Sequence,
   interpolate,
   useCurrentFrame,
 } from "remotion";
@@ -10,10 +12,16 @@ import {
 import BrandBumperLogo
   from "./BrandBumperLogo/index.jsx";
 
+import HueWheelVideo
+  from "./HueWheelVideo/index.jsx";
+
 
 const COMPONENTS = {
   brand_bumper_logo:
     BrandBumperLogo,
+
+  hue_wheel:
+    HueWheelVideo,
 };
 
 
@@ -26,12 +34,17 @@ const COMPONENTS = {
  *   image
  *   text
  *   component
+ *   audio
+ *
+ * Specialized visuals are renderer support components registered below.
+ * GenericVideo does not know their product meaning.
  *
  * It does not know BAV, Pinterest, YouTube, BEFORE/AFTER,
- * dissolves, end cards, titles, captions, or product timing.
+ * dissolves, end cards, titles, captions, music defaults,
+ * or product timing.
  *
- * The Creator/Recipe supplies exact layers, frame ranges,
- * positions, styles, and animations.
+ * The Creator/Recipe supplies exact layers, audio entries,
+ * frame ranges, positions, styles, and animations.
  */
 export function GenericVideo({
   plan,
@@ -46,6 +59,13 @@ export function GenericVideo({
       ? plan.layers
       : [];
 
+  const audio =
+    Array.isArray(
+      plan?.audio
+    )
+      ? plan.audio
+      : [];
+
 
   return (
     <AbsoluteFill
@@ -54,6 +74,24 @@ export function GenericVideo({
           "hidden",
       }}
     >
+      {audio.map(
+        (
+          entry,
+          index
+        ) => (
+          <GenericAudio
+            key={
+              entry?.id ||
+              `audio-${index}`
+            }
+
+            entry={
+              entry
+            }
+          />
+        )
+      )}
+
       {layers.map(
         (
           layer,
@@ -76,6 +114,103 @@ export function GenericVideo({
         )
       )}
     </AbsoluteFill>
+  );
+}
+
+
+function GenericAudio({
+  entry,
+}) {
+  if (
+    !entry
+    ||
+    typeof entry !==
+      "object"
+    ||
+    Array.isArray(
+      entry
+    )
+  ) {
+    return null;
+  }
+
+
+  const src =
+    String(
+      entry.src ||
+      ""
+    )
+      .trim();
+
+
+  if (!src) {
+    throw new Error(
+      "Generic video audio entry is missing src."
+    );
+  }
+
+
+  const startFrame =
+    Math.max(
+      0,
+      Math.round(
+        finiteNumber(
+          entry.start_frame,
+          0
+        )
+      )
+    );
+
+  const endFrame =
+    Math.max(
+      startFrame + 1,
+      Math.round(
+        finiteNumber(
+          entry.end_frame,
+          startFrame + 1
+        )
+      )
+    );
+
+  const durationInFrames =
+    endFrame -
+    startFrame;
+
+  const volume =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        finiteNumber(
+          entry.volume,
+          1
+        )
+      )
+    );
+
+
+  return (
+    <Sequence
+      from={
+        startFrame
+      }
+
+      durationInFrames={
+        durationInFrames
+      }
+
+      layout="none"
+    >
+      <Audio
+        src={
+          src
+        }
+
+        volume={
+          volume
+        }
+      />
+    </Sequence>
   );
 }
 
@@ -380,16 +515,6 @@ function applyAnimations(
       );
 
 
-    /*
-     * Keyframe semantics:
-     *
-     *   before start -> leave the current/base value alone
-     *   during range -> interpolate
-     *   after end    -> hold the animation's final value
-     *
-     * This lets a Chef place multiple sequential animations on
-     * the same generic property without the oven inventing behavior.
-     */
     if (frame < startFrame) {
       continue;
     }

@@ -26,6 +26,13 @@ export default function PubPipelineReference({
         ANALYZE → CREATE → PACKAGE → SCHEDULE → DISPATCH
       </div>
 
+      <DefaultsReference
+        defaults={
+          contracts?.defaults ||
+          {}
+        }
+      />
+
       <SharedBoxFields
         fields={sharedBoxFields}
       />
@@ -65,6 +72,132 @@ export default function PubPipelineReference({
         }
       />
     </div>
+  );
+}
+
+
+function DefaultsReference({
+  defaults,
+}) {
+  const assetTypes =
+    defaults?.assetTypes ||
+    {};
+
+  const entries =
+    Object.entries(
+      assetTypes
+    );
+
+  if (!entries.length) {
+    return null;
+  }
+
+  return (
+    <section style={defaultsSectionStyle}>
+      <div style={defaultsHeaderStyle}>
+        DEFAULTS
+      </div>
+
+      <div style={defaultsIntroStyle}>
+        {defaults?.label ||
+          "Default Pantry"}
+        {" — "}
+        raw ANALYZE/procurement fallbacks only.
+        Creators receive the fully prepared ingredient,
+        never the pantry reference.
+      </div>
+
+      <div style={defaultsGridStyle}>
+        {entries.map(
+          ([
+            assetType,
+            ingredients,
+          ]) => (
+            <div
+              key={assetType}
+              style={contractStyle}
+            >
+              <div style={contractHeaderStyle}>
+                {humanize(
+                  assetType
+                )}
+              </div>
+
+              <div style={specialistStyle}>
+                {Object.entries(
+                  ingredients || {}
+                ).map(
+                  ([
+                    ingredientKey,
+                    value,
+                  ]) => (
+                    <div
+                      key={ingredientKey}
+                      style={defaultIngredientStyle}
+                    >
+                      <div style={defaultIngredientNameStyle}>
+                        <code>
+                          {ingredientKey}
+                        </code>
+                      </div>
+
+                      <DefaultValue
+                        value={value}
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
+    </section>
+  );
+}
+
+
+function DefaultValue({
+  value,
+}) {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
+    return (
+      <div style={defaultValueGridStyle}>
+        {Object.entries(value).map(
+          ([
+            key,
+            nestedValue,
+          ]) => (
+            <div
+              key={key}
+              style={defaultValueRowStyle}
+            >
+              <code>
+                {key}
+              </code>
+
+              <span>
+                {formatContractValue(
+                  nestedValue
+                )}
+              </span>
+            </div>
+          )
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <span>
+      {formatContractValue(
+        value
+      )}
+    </span>
   );
 }
 
@@ -488,6 +621,18 @@ function ContractFieldList({
               </span>
             )}
 
+            {field?.defaultFrom && (
+              <span style={defaultFromStyle}>
+                default: {field.defaultFrom}
+              </span>
+            )}
+
+            {field?.requiresAny?.length ? (
+              <span style={requiresAnyStyle}>
+                requires any: {field.requiresAny.join(", ")}
+              </span>
+            ) : null}
+
             {field?.note && (
               <span style={noteStyle}>
                 {field.note}
@@ -502,8 +647,76 @@ function ContractFieldList({
               />
             </div>
           ) : null}
+
+          {field?.itemTypes &&
+          typeof field.itemTypes === "object" ? (
+            <ItemTypeRules
+              itemTypes={
+                field.itemTypes
+              }
+            />
+          ) : null}
         </div>
       ))}
+    </div>
+  );
+}
+
+
+function ItemTypeRules({
+  itemTypes,
+}) {
+  return (
+    <div style={itemTypesStyle}>
+      <div style={itemTypesHeaderStyle}>
+        ITEM-TYPE RULES
+      </div>
+
+      {Object.entries(
+        itemTypes
+      ).map(
+        ([
+          itemType,
+          rule,
+        ]) => (
+          <div
+            key={itemType}
+            style={itemTypeRuleStyle}
+          >
+            <div style={itemTypeIdentityStyle}>
+              <code>
+                {itemType}
+              </code>
+
+              {rule?.photo && (
+                <span style={typeStyle}>
+                  photo: {rule.photo}
+                </span>
+              )}
+
+              {rule?.requiresAny?.length ? (
+                <span style={requiresAnyStyle}>
+                  requires any: {rule.requiresAny.join(", ")}
+                </span>
+              ) : null}
+            </div>
+
+            {rule?.fields?.length ? (
+              <div style={nestedFieldsStyle}>
+                <ContractFieldList
+                  fields={rule.fields}
+                />
+              </div>
+            ) : null}
+
+            {rule?.note ? (
+              <div style={itemTypeNoteStyle}>
+                {rule.note}
+              </div>
+            ) : null}
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -625,6 +838,35 @@ function ReferenceField({
 }
 
 
+function formatContractValue(
+  value
+) {
+  if (value === null) {
+    return "null";
+  }
+
+  if (value === true) {
+    return "true";
+  }
+
+  if (value === false) {
+    return "false";
+  }
+
+  if (
+    typeof value === "object"
+  ) {
+    return JSON.stringify(
+      value
+    );
+  }
+
+  return String(
+    value ?? ""
+  );
+}
+
+
 function humanize(
   value
 ) {
@@ -659,6 +901,119 @@ const pipelineStyle = {
   fontSize: 12,
   fontWeight: 700,
   letterSpacing: "0.03em",
+};
+
+
+const defaultsSectionStyle = {
+  marginBottom: 24,
+  border: "1px solid #d5c48b",
+  background: "#fffdf6",
+};
+
+
+const defaultsHeaderStyle = {
+  padding: "8px 10px",
+  background: "#725918",
+  color: "#ffffff",
+  fontSize: 15,
+  fontWeight: 700,
+};
+
+
+const defaultsIntroStyle = {
+  padding: "9px 10px",
+  borderBottom: "1px solid #e5dcc0",
+  color: "#665522",
+  fontSize: 12,
+};
+
+
+const defaultsGridStyle = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit, minmax(300px, 1fr))",
+  gap: 10,
+  padding: 10,
+};
+
+
+const defaultIngredientStyle = {
+  padding: "7px 8px",
+  border: "1px solid #eee4c5",
+  background: "#ffffff",
+};
+
+
+const defaultIngredientNameStyle = {
+  marginBottom: 5,
+  fontWeight: 800,
+};
+
+
+const defaultValueGridStyle = {
+  display: "grid",
+  gap: 3,
+};
+
+
+const defaultValueRowStyle = {
+  display: "grid",
+  gridTemplateColumns: "minmax(140px, auto) 1fr",
+  gap: 10,
+  fontSize: 12,
+};
+
+
+const defaultFromStyle = {
+  fontSize: 10,
+  fontWeight: 700,
+  color: "#725918",
+};
+
+
+const requiresAnyStyle = {
+  fontSize: 10,
+  fontWeight: 700,
+  color: "#38577a",
+};
+
+
+const itemTypesStyle = {
+  marginTop: 7,
+  marginLeft: 12,
+  borderLeft: "3px solid #c7d5e5",
+  background: "#fbfcfe",
+};
+
+
+const itemTypesHeaderStyle = {
+  padding: "5px 7px",
+  fontSize: 9,
+  fontWeight: 900,
+  color: "#4b6b8a",
+  letterSpacing: "0.08em",
+};
+
+
+const itemTypeRuleStyle = {
+  padding: "6px 7px",
+  borderTop: "1px solid #e5ebf1",
+};
+
+
+const itemTypeIdentityStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 7,
+  alignItems: "baseline",
+  fontWeight: 700,
+};
+
+
+const itemTypeNoteStyle = {
+  marginTop: 5,
+  fontSize: 10,
+  color: "#6b7280",
 };
 
 

@@ -1,0 +1,644 @@
+{
+  "composition_id": "colorfix-generic-video",
+  "plan": {
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration_in_frames": 1569
+    },
+    "render": {
+      "codec": "h264"
+    },
+    "layers": [
+      {
+        "id": "video-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 1569,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 0
+        },
+        "style": {
+          "backgroundColor": "#000000"
+        },
+        "animations": []
+      },
+      {
+        "id": "yt-scene-1-background-photo",
+        "type": "image",
+        "start_frame": 0,
+        "end_frame": 108,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 101
+        },
+        "style": {
+          "opacity": 0.36
+        },
+        "animations": [],
+        "src": "https://colorfix.terrymarr.com/photos/exteriors/cottage/PHO_1L6697/prepared/base_b5d2e3ad1592.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-1-title",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 108,
+        "box": {
+          "x": 154,
+          "y": 456,
+          "width": 1612,
+          "height": 90,
+          "z": 105
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 68,
+          "fontWeight": 600,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 0,
+            "end_frame": 27
+          }
+        ],
+        "text": "Surprising & Charming Cottage Palettes"
+      },
+      {
+        "id": "yt-scene-1-subtitle",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 108,
+        "box": {
+          "x": 154,
+          "y": 568,
+          "width": 1612,
+          "height": 56,
+          "z": 106
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 42,
+          "fontWeight": 400,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 0,
+            "end_frame": 27
+          }
+        ],
+        "text": "Link in the description for all colors used"
+      },
+      {
+        "id": "yt-scene-2-photo",
+        "type": "image",
+        "start_frame": 48,
+        "end_frame": 303,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 121
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 48,
+            "end_frame": 108
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_37_7a892c16555d.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-2-caption",
+        "type": "text",
+        "start_frame": 48,
+        "end_frame": 303,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 125
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 52,
+            "end_frame": 112
+          }
+        ],
+        "text": "Betsy Ross"
+      },
+      {
+        "id": "yt-scene-3-photo",
+        "type": "image",
+        "start_frame": 243,
+        "end_frame": 498,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 141
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 243,
+            "end_frame": 303
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_38_4b5a8b70e49c.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-3-caption",
+        "type": "text",
+        "start_frame": 243,
+        "end_frame": 498,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 145
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 247,
+            "end_frame": 307
+          }
+        ],
+        "text": "Tiffany's Cottage"
+      },
+      {
+        "id": "yt-scene-4-photo",
+        "type": "image",
+        "start_frame": 438,
+        "end_frame": 693,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 161
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 438,
+            "end_frame": 498
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_43_986df3f2a316.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-4-caption",
+        "type": "text",
+        "start_frame": 438,
+        "end_frame": 693,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 165
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 442,
+            "end_frame": 502
+          }
+        ],
+        "text": "Early Bloomer"
+      },
+      {
+        "id": "yt-scene-5-photo",
+        "type": "image",
+        "start_frame": 633,
+        "end_frame": 888,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 181
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 633,
+            "end_frame": 693
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_44_192e3b8d6340.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-5-caption",
+        "type": "text",
+        "start_frame": 633,
+        "end_frame": 888,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 185
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 637,
+            "end_frame": 697
+          }
+        ],
+        "text": "Audrey Hepburn"
+      },
+      {
+        "id": "yt-scene-6-photo",
+        "type": "image",
+        "start_frame": 828,
+        "end_frame": 1083,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 201
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 828,
+            "end_frame": 888
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_54_2d2a3ba0986e.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-6-caption",
+        "type": "text",
+        "start_frame": 828,
+        "end_frame": 1083,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 205
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 832,
+            "end_frame": 892
+          }
+        ],
+        "text": "Maime Eisenhower"
+      },
+      {
+        "id": "yt-scene-7-photo",
+        "type": "image",
+        "start_frame": 1023,
+        "end_frame": 1278,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 221
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1023,
+            "end_frame": 1083
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_39_e2d88fcd187b.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-7-caption",
+        "type": "text",
+        "start_frame": 1023,
+        "end_frame": 1278,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 225
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1027,
+            "end_frame": 1087
+          }
+        ],
+        "text": "The Diva"
+      },
+      {
+        "id": "yt-scene-8-photo",
+        "type": "image",
+        "start_frame": 1218,
+        "end_frame": 1473,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 241
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1218,
+            "end_frame": 1278
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/rendered/ap_53_f4f61ede12a8.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-8-caption",
+        "type": "text",
+        "start_frame": 1218,
+        "end_frame": 1473,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 245
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1222,
+            "end_frame": 1282
+          }
+        ],
+        "text": "My Sun's in the Navy"
+      },
+      {
+        "id": "yt-scene-9-brand",
+        "type": "component",
+        "start_frame": 1413,
+        "end_frame": 1569,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 265
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1413,
+            "end_frame": 1426
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1556,
+            "end_frame": 1568
+          },
+          {
+            "target": "props.signatureProgress",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1436,
+            "end_frame": 1489
+          }
+        ],
+        "component": "brand_bumper_logo",
+        "props": {
+          "signatureProgress": 0,
+          "style": {
+            "--brand-bumper-logo-size": "88px"
+          }
+        }
+      },
+      {
+        "id": "video-final-fade",
+        "type": "rect",
+        "start_frame": 1527,
+        "end_frame": 1569,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 100000
+        },
+        "style": {
+          "backgroundColor": "#000000",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1527,
+            "end_frame": 1568
+          }
+        ]
+      }
+    ],
+    "audio": []
+  },
+  "render": {
+    "codec": "h264"
+  }
+}

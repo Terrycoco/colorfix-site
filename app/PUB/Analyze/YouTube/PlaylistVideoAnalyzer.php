@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\PUB\Analyze\YouTube;
 
+use App\PUB\Analyze\Support\DefaultPantry;
+use App\PUB\Contracts\PubContract;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
@@ -19,6 +21,12 @@ use App\PUB\PubCom\PubComWorkerContract;
  * Current Chef order:
  *
  *   ingredients {
+ *     music {
+ *       file_path
+ *       audio_url
+ *       volume
+ *     }
+ *
  *     slides[] {
  *       item_type
  *       optional photo {
@@ -28,6 +36,9 @@ use App\PUB\PubCom\PubComWorkerContract;
  *       optional title
  *       optional subtitle
  *       optional body
+ *       optional hue_wheel {
+ *         spokes[] { hue, color, optional animation overrides }
+ *       }
  *     }
  *   }
  *
@@ -40,6 +51,13 @@ use App\PUB\PubCom\PubComWorkerContract;
 final class PlaylistVideoAnalyzer implements PubComWorkerContract
 {
     private ?PubComChannel $pubComChannel = null;
+
+    private ?array $preparedMusic = null;
+
+
+    public function __construct(
+        private DefaultPantry $defaultPantry
+    ) {}
 
 
     public function connectPubCom(
@@ -135,6 +153,31 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
             }
 
 
+            if ($itemType === 'hue-wheel') {
+                try {
+                    $this->prepareHueWheelIngredient(
+                        $item
+                    );
+
+                } catch (\RuntimeException $e) {
+                    return PubComSignal::ineligible(
+                        'youtube_playlist_video_invalid_hue_wheel',
+                        'YouTube Playlist Video cannot be analyzed because a hue-wheel slide is invalid.',
+                        [
+                            'worker' =>
+                                self::class,
+
+                            'slide_index' =>
+                                $index,
+
+                            'reason' =>
+                                $e->getMessage(),
+                        ]
+                    );
+                }
+            }
+
+
             $photo =
                 is_array(
                     $item[
@@ -193,6 +236,27 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
         }
 
 
+        try {
+            $this->preparedMusic =
+                $this->prepareMusicIngredient(
+                    $source
+                );
+
+        } catch (\RuntimeException $e) {
+            return PubComSignal::ineligible(
+                'youtube_playlist_video_music_unavailable',
+                'YouTube Playlist Video cannot be analyzed because its required music ingredient could not be prepared.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'reason' =>
+                        $e->getMessage(),
+                ]
+            );
+        }
+
+
         return PubComSignal::ready(
             'YouTube Playlist Video assignment is eligible.',
             [
@@ -229,6 +293,12 @@ public function analyze(
     $slides = [];
 
     $searchTitle = '';
+
+    $music =
+        $this->preparedMusic
+        ?? $this->prepareMusicIngredient(
+            $source
+        );
 
 
     foreach (
@@ -299,6 +369,9 @@ public function analyze(
                     $searchTitle,
 
                 'ingredients' => [
+                    'music' =>
+                        $music,
+
                     'slides' =>
                         $slides,
                 ],
@@ -306,6 +379,133 @@ public function analyze(
         ],
     ];
 }
+
+
+    /**
+     * Prepare the Chef's required music ingredient.
+     *
+     * If source already contains a complete prepared music ingredient,
+     * preserve it. Otherwise use the raw default pantry reference declared
+     * by PubContract and ask the shared ANALYZE pantry to prepare it.
+     */
+    private function prepareMusicIngredient(
+        array $source
+    ): array {
+        $sourceMusic =
+            is_array(
+                $source[
+                    'music'
+                ]
+                ?? null
+            )
+                ? $source[
+                    'music'
+                ]
+                : null;
+
+
+        if (
+            $sourceMusic !== null
+            && $this->isPreparedMusic(
+                $sourceMusic
+            )
+        ) {
+            return $this->normalizePreparedMusic(
+                $sourceMusic
+            );
+        }
+
+
+        $default =
+            PubContract::defaultIngredient(
+                'youtube_video',
+                'music'
+            );
+
+
+        if ($default === null) {
+            throw new \RuntimeException(
+                'YouTube music is required and no default pantry reference is declared.'
+            );
+        }
+
+
+        return $this->defaultPantry
+            ->prepareAudio(
+                $default
+            );
+    }
+
+
+    private function isPreparedMusic(
+        array $music
+    ): bool {
+        return
+            trim(
+                (string)(
+                    $music[
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            ) !== ''
+            &&
+            trim(
+                (string)(
+                    $music[
+                        'audio_url'
+                    ]
+                    ?? ''
+                )
+            ) !== ''
+            &&
+            is_numeric(
+                $music[
+                    'volume'
+                ]
+                ?? null
+            );
+    }
+
+
+    private function normalizePreparedMusic(
+        array $music
+    ): array {
+        $volume =
+            (float)$music[
+                'volume'
+            ];
+
+
+        if (
+            $volume < 0
+            || $volume > 1
+        ) {
+            throw new \RuntimeException(
+                'YouTube prepared music volume must be between 0 and 1.'
+            );
+        }
+
+
+        return [
+            'file_path' =>
+                trim(
+                    (string)$music[
+                        'file_path'
+                    ]
+                ),
+
+            'audio_url' =>
+                trim(
+                    (string)$music[
+                        'audio_url'
+                    ]
+                ),
+
+            'volume' =>
+                $volume,
+        ];
+    }
 
 
     /**
@@ -336,19 +536,77 @@ public function analyze(
     private function prepareSlide(
         array $item
     ): array {
+        $itemType =
+            strtolower(
+                trim(
+                    (string)(
+                        $item[
+                            'item_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
         $prepared = [
             'item_type' =>
-                strtolower(
+                $itemType,
+        ];
+
+
+        /*
+         * Standard house bumper is an instruction only.
+         * Do not leak authored bumper body/title/subtitle into CREATE.
+         */
+        if ($itemType === 'brand-bumper') {
+            return $prepared;
+        }
+
+
+        /*
+         * Hue wheel is also specialized, but unlike the bumper its spokes
+         * are authored content. Parse the source body JSON and hand CREATE
+         * only the exact spoke ingredients it needs.
+         */
+        if ($itemType === 'hue-wheel') {
+            foreach (
+                [
+                    'title',
+                    'subtitle',
+                ]
+                as $field
+            ) {
+                $value =
                     trim(
                         (string)(
                             $item[
-                                'item_type'
+                                $field
                             ]
                             ?? ''
                         )
-                    )
-                ),
-        ];
+                    );
+
+
+                if ($value !== '') {
+                    $prepared[
+                        $field
+                    ] =
+                        $value;
+                }
+            }
+
+
+            $prepared[
+                'hue_wheel'
+            ] =
+                $this->prepareHueWheelIngredient(
+                    $item
+                );
+
+
+            return $prepared;
+        }
 
 
         $photo =
@@ -433,4 +691,262 @@ public function analyze(
 
         return $prepared;
     }
+
+
+    /**
+     * Parse one authored hue-wheel body into the exact Creator ingredient.
+     *
+     * The authored editor stores more presentation settings than YouTube
+     * needs. CREATE owns YouTube wheel size, standard timing, typography,
+     * and default radii through PlaylistVideoRecipe.
+     *
+     * Per-spoke overrides are preserved when the author explicitly set them.
+     */
+    private function prepareHueWheelIngredient(
+        array $item
+    ): array {
+        $body =
+            trim(
+                (string)(
+                    $item[
+                        'body'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($body === '') {
+            throw new \RuntimeException(
+                'Hue-wheel slide has no body JSON.'
+            );
+        }
+
+
+        try {
+            $decoded =
+                json_decode(
+                    $body,
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+
+        } catch (\JsonException $e) {
+            throw new \RuntimeException(
+                'Hue-wheel slide body is not valid JSON.',
+                0,
+                $e
+            );
+        }
+
+
+        if (
+            is_array(
+                $decoded
+            )
+            && array_is_list(
+                $decoded
+            )
+        ) {
+            $rawSpokes =
+                $decoded;
+
+        } elseif (is_array($decoded)) {
+            $rawSpokes =
+                is_array(
+                    $decoded[
+                        'items'
+                    ]
+                    ?? null
+                )
+                    ? $decoded[
+                        'items'
+                    ]
+                    : [];
+
+        } else {
+            $rawSpokes = [];
+        }
+
+
+        if ($rawSpokes === []) {
+            throw new \RuntimeException(
+                'Hue-wheel slide requires at least one spoke.'
+            );
+        }
+
+
+        $spokes = [];
+
+
+        foreach (
+            $rawSpokes
+            as $index => $rawSpoke
+        ) {
+            if (!is_array($rawSpoke)) {
+                throw new \RuntimeException(
+                    "Hue-wheel spoke "
+                    . (
+                        $index + 1
+                    )
+                    . ' is invalid.'
+                );
+            }
+
+
+            if (
+                !array_key_exists(
+                    'hue',
+                    $rawSpoke
+                )
+                || !is_numeric(
+                    $rawSpoke[
+                        'hue'
+                    ]
+                )
+            ) {
+                throw new \RuntimeException(
+                    "Hue-wheel spoke "
+                    . (
+                        $index + 1
+                    )
+                    . ' requires a numeric hue.'
+                );
+            }
+
+
+            $hue =
+                fmod(
+                    (float)$rawSpoke[
+                        'hue'
+                    ],
+                    360.0
+                );
+
+
+            if ($hue < 0) {
+                $hue +=
+                    360.0;
+            }
+
+
+            $color =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $rawSpoke[
+                                'color'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            if (
+                preg_match(
+                    '/^#[0-9A-F]{6}$/',
+                    $color
+                ) !== 1
+            ) {
+                throw new \RuntimeException(
+                    "Hue-wheel spoke "
+                    . (
+                        $index + 1
+                    )
+                    . ' requires a six-digit hex color.'
+                );
+            }
+
+
+            $spoke = [
+                'hue' =>
+                    $hue,
+
+                'color' =>
+                    $color,
+
+                'animate' =>
+                    (
+                        $rawSpoke[
+                            'animate'
+                        ]
+                        ?? true
+                    ) !== false,
+            ];
+
+
+            foreach (
+                [
+                    'delayMs' =>
+                        'delay_ms',
+
+                    'durationMs' =>
+                        'duration_ms',
+
+                    'startRadius' =>
+                        'start_radius',
+
+                    'endRadius' =>
+                        'end_radius',
+                ]
+                as $sourceKey => $ingredientKey
+            ) {
+                if (
+                    !array_key_exists(
+                        $sourceKey,
+                        $rawSpoke
+                    )
+                    || $rawSpoke[
+                        $sourceKey
+                    ] === ''
+                    || $rawSpoke[
+                        $sourceKey
+                    ] === null
+                ) {
+                    continue;
+                }
+
+
+                if (
+                    !is_numeric(
+                        $rawSpoke[
+                            $sourceKey
+                        ]
+                    )
+                    || (float)$rawSpoke[
+                        $sourceKey
+                    ] < 0
+                ) {
+                    throw new \RuntimeException(
+                        "Hue-wheel spoke "
+                        . (
+                            $index + 1
+                        )
+                        . " has invalid {$sourceKey}."
+                    );
+                }
+
+
+                $spoke[
+                    $ingredientKey
+                ] =
+                    (float)$rawSpoke[
+                        $sourceKey
+                    ];
+            }
+
+
+            $spokes[] =
+                $spoke;
+        }
+
+
+        return [
+            'spokes' =>
+                $spokes,
+        ];
+    }
+
 }

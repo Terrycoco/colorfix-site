@@ -771,6 +771,16 @@ public function updateOrder(
 
 
     /*
+     * Keep the exact filed ingredient box so we can tell whether this
+     * edit actually changes anything baked into the physical asset.
+     *
+     * Metadata-only edits must NOT trigger REDO.
+     */
+    $originalIngredients =
+        $ingredients;
+
+
+    /*
      * CONTRACT-DECLARED INGREDIENT REPAIRS.
      *
      * Asset Editor changes Box metadata.
@@ -894,6 +904,53 @@ public function updateOrder(
     }
 
 
+    /*
+     * One invariant:
+     *
+     *   created
+     *     = physical asset matches the current filed ingredients
+     *
+     *   redo_required
+     *     = filed ingredients changed after the current physical asset
+     *
+     * PHP array equality intentionally ignores associative key order,
+     * so harmless JSON/object ordering differences do not trigger REDO.
+     */
+    $ingredientsChanged =
+        $ingredients !=
+        $originalIngredients;
+
+
+    /*
+     * Do not let an already-running render finish later and falsely
+     * mark a newly edited order as created.
+     *
+     * Ingredient edits can be retried as soon as the active CREATE
+     * settles. Metadata-only edits remain allowed while creating.
+     */
+    $currentStage =
+        strtolower(
+            trim(
+                (string)(
+                    $asset[
+                        'pipeline_stage'
+                    ]
+                    ?? ''
+                )
+            )
+        );
+
+
+    if (
+        $ingredientsChanged
+        && $currentStage === 'creating'
+    ) {
+        throw new RuntimeException(
+            'Production ingredients cannot be changed while this asset is creating. Wait for the current render to finish, then edit and redo.'
+        );
+    }
+
+
     $this->pdo
         ->beginTransaction();
 
@@ -948,6 +1005,33 @@ public function updateOrder(
                         'description'
                     ]
                 );
+        }
+
+
+        /*
+         * Any actual ingredient change makes the existing physical
+         * asset stale immediately.
+         *
+         * This state change is committed in the SAME transaction as
+         * the new ingredient box. If the subsequent REDO request never
+         * happens, the asset remains visibly recoverable as
+         * redo_required instead of pretending to be current.
+         */
+        if ($ingredientsChanged) {
+            $assetUpdates[] =
+                "pipeline_stage = 'redo_required'";
+
+            $assetUpdates[] =
+                'error_stage = NULL';
+
+            $assetUpdates[] =
+                'error_code = NULL';
+
+            $assetUpdates[] =
+                'error_message = NULL';
+
+            $assetUpdates[] =
+                'errored_at = NULL';
         }
 
 
@@ -1047,6 +1131,19 @@ public function updateOrder(
                 : $asset[
                     'description'
                 ],
+
+        'pipeline_stage' =>
+            $ingredientsChanged
+                ? 'redo_required'
+                : (string)(
+                    $asset[
+                        'pipeline_stage'
+                    ]
+                    ?? ''
+                ),
+
+        'ingredients_changed' =>
+            $ingredientsChanged,
     ];
 }
 
@@ -1664,6 +1761,7 @@ public function updateOrder(
                     file_path,
                     url,
                     mime_type,
+                    duration_ms,
 
                     created_at,
                     updated_at,

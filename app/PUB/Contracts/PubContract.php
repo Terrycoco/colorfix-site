@@ -18,9 +18,62 @@ namespace App\PUB\Contracts;
  */
 final class PubContract
 {
+    /*
+     * ============================================================
+     * PUB DEFAULT PANTRY SETTINGS
+     * ============================================================
+     *
+     * Human-editable raw pantry selections.
+     *
+     * These values are for ANALYZE/procurement only. A Creator never
+     * receives an Asset Library ID and never looks anything up.
+     *
+     * Set DEFAULT_YOUTUBE_MUSIC_ASSET_LIBRARY_ID to the Asset Library
+     * row that should be used when a new YouTube video has no authored
+     * music selection.
+     */
+    public const DEFAULT_YOUTUBE_MUSIC_ASSET_LIBRARY_ID = 734;
+
+    public const DEFAULT_YOUTUBE_MUSIC_VOLUME = 0.35;
+
+
     public static function all(): array
     {
         return [
+
+            /*
+             * ============================================================
+             * PUB DEFAULTS / DEFAULT PANTRY
+             * ============================================================
+             *
+             * An Analyzer may use a default ONLY when the product contract
+             * explicitly declares that ingredient as defaultable.
+             *
+             * These are raw pantry references, not Creator ingredients.
+             * ANALYZE must resolve them into the complete standard ingredient
+             * shape before handing the Box to CREATE.
+             */
+            'defaults' => [
+
+                'label' =>
+                    'Default Pantry',
+
+                'assetTypes' => [
+
+                    'youtube_video' => [
+
+                        'music' => [
+
+                            'asset_library_id' =>
+                                self::DEFAULT_YOUTUBE_MUSIC_ASSET_LIBRARY_ID,
+
+                            'volume' =>
+                                self::DEFAULT_YOUTUBE_MUSIC_VOLUME,
+                        ],
+                    ],
+                ],
+            ],
+
 
             /*
              * ============================================================
@@ -1008,6 +1061,10 @@ final class PubContract
                          * PlaylistVideoAnalyzer prepares ONE proposal for the
                          * complete playlist video and returns only the fields
                          * declared by the YouTube Creator.
+                         *
+                         * Slide preparation is ITEM-TYPE SPECIFIC. The Sous Chef
+                         * does not pass every source field through just because
+                         * it exists on the authored playlist slide.
                          */
                         'analyzer' => [
 
@@ -1017,7 +1074,7 @@ final class PubContract
                                         'items[]',
 
                                     'note' =>
-                                        'yt = 1; array order is playlist order',
+                                        'yt = 1; array order is playlist order; source may contain more fields than the Creator orders',
 
                                     'fields' => [
                                         [
@@ -1066,6 +1123,9 @@ final class PubContract
 
                                             'required' =>
                                                 false,
+
+                                            'note' =>
+                                                'source field only; pass downstream only for an item type whose Creator contract explicitly asks for it',
                                         ],
                                     ],
                                 ],
@@ -1082,10 +1142,10 @@ final class PubContract
 
                                 [
                                     'key' =>
-                                        'youtube_slide_content',
+                                        'youtube_slide_type_rules',
 
                                     'note' =>
-                                        'every yt = 1 slide must contain a usable photo or non-blank title, subtitle, or body; blank slides are rejected as authoring errors',
+                                        'eligibility is item-type specific; do not apply one universal photo-or-text rule to every slide',
                                 ],
                             ],
 
@@ -1105,6 +1165,49 @@ final class PubContract
                                     'fields' => [
                                         [
                                             'key' =>
+                                                'music',
+
+                                            'type' =>
+                                                'object',
+
+                                            'required' =>
+                                                true,
+
+                                            'defaultFrom' =>
+                                                'defaults.assetTypes.youtube_video.music',
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'file_path',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'audio_url',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'volume',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+                                            ],
+
+                                            'note' =>
+                                                'defaultable ingredient; if source music is missing, Analyzer may use the declared default pantry reference, but must resolve it into this complete standard audio ingredient before handoff; Asset Library ID does not go to CREATE',
+                                        ],
+
+                                        [
+                                            'key' =>
                                                 'slides[]',
 
                                             'type' =>
@@ -1114,7 +1217,7 @@ final class PubContract
                                                 true,
 
                                             'note' =>
-                                                'one ordered prepared slide array for one complete YouTube video; Analyzer guarantees every slide contains item_type plus at least one usable photo or non-blank text field',
+                                                'one ordered prepared slide array for one complete YouTube video; each item is culled to the exact fields ordered by the Creator for that item_type',
 
                                             'fields' => [
                                                 [
@@ -1124,45 +1227,306 @@ final class PubContract
                                                     'required' =>
                                                         true,
                                                 ],
+                                            ],
 
-                                                [
-                                                    'key' =>
-                                                        'photo.file_path',
+                                            'itemTypes' => [
 
-                                                    'required' =>
-                                                        false,
+                                                'intro' => [
+                                                    'photo' =>
+                                                        'optional',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'photo is optional; when supplied it must include both photo.file_path and photo.image_url',
                                                 ],
 
-                                                [
-                                                    'key' =>
-                                                        'photo.image_url',
+                                                'text' => [
+                                                    'photo' =>
+                                                        'optional',
 
-                                                    'required' =>
-                                                        false,
-                                                ],
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
 
-                                                [
-                                                    'key' =>
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'requiresAny' => [
                                                         'title',
-
-                                                    'required' =>
-                                                        false,
-                                                ],
-
-                                                [
-                                                    'key' =>
                                                         'subtitle',
+                                                    ],
 
-                                                    'required' =>
-                                                        false,
+                                                    'note' =>
+                                                        'photo is optional; title and subtitle remain distinct because CREATE gives them different text treatments',
                                                 ],
 
-                                                [
-                                                    'key' =>
-                                                        'body',
+                                                'palette' => [
+                                                    'photo' =>
+                                                        'required',
 
-                                                    'required' =>
-                                                        false,
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'photo required; text optional',
+                                                ],
+
+                                                'non-palette' => [
+                                                    'photo' =>
+                                                        'required',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'photo required; text optional',
+                                                ],
+
+
+                                                'hue-wheel' => [
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'hue_wheel.spokes[]',
+
+                                                            'type' =>
+                                                                'array',
+
+                                                            'required' =>
+                                                                true,
+
+                                                            'fields' => [
+                                                                [
+                                                                    'key' =>
+                                                                        'hue',
+
+                                                                    'required' =>
+                                                                        true,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'color',
+
+                                                                    'required' =>
+                                                                        true,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'animate',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'delay_ms',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'duration_ms',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'start_radius',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'end_radius',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+                                                            ],
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'Sous Chef parses authored hue-wheel body JSON and keeps only renderer-independent spoke ingredients plus slide title/subtitle; spoke labels and wheel-level authored presentation settings are not passed to CREATE',
+                                                ],
+
+                                                'brand-bumper' => [
+                                                    'fields' => [],
+
+                                                    'note' =>
+                                                        'item_type is the complete ingredient for this item: end the video with the standard ColorFix brand bumper; do not pass title, subtitle, body, photo, or authored bumper configuration',
+                                                ],
+
+                                                'normal' => [
+                                                    'photo' =>
+                                                        'optional',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'body',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'requiresAny' => [
+                                                        'photo',
+                                                        'title',
+                                                        'subtitle',
+                                                        'body',
+                                                    ],
+
+                                                    'note' =>
+                                                        'temporary compatibility rule until normal gets its own specifically tuned Chef order',
                                                 ],
                                             ],
                                         ],
@@ -1171,7 +1535,6 @@ final class PubContract
                             ],
                         ],
                     ],
-
 
                     /*
                      * ----------------------------------------------------
@@ -1924,10 +2287,9 @@ final class PubContract
                      * playlist video and therefore declares the exact
                      * prepared ingredients it requires from ANALYZE.
                      *
-                     * Current baseline slide ingredients are intentionally
-                     * minimal. item_type is retained because the Creator/
-                     * Recipe uses it for production and timing decisions.
-                     * Photos and text are supplied only when present.
+                     * The Chef receives ingredients only. Slide requirements
+                     * are item-type specific so the Sous Chef can strip away
+                     * everything the Chef did not order.
                      */
                     'youtube_video' => [
 
@@ -1950,6 +2312,46 @@ final class PubContract
                                     'fields' => [
                                         [
                                             'key' =>
+                                                'music',
+
+                                            'type' =>
+                                                'object',
+
+                                            'required' =>
+                                                true,
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'file_path',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'audio_url',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'volume',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+                                            ],
+
+                                            'note' =>
+                                                'fully prepared audio ingredient; Creator uses it directly and performs no Asset Library lookup',
+                                        ],
+
+                                        [
+                                            'key' =>
                                                 'slides[]',
 
                                             'type' =>
@@ -1959,7 +2361,7 @@ final class PubContract
                                                 true,
 
                                             'note' =>
-                                                'ordered prepared YouTube slides; array order is playback order',
+                                                'ordered prepared YouTube slides; array order is playback order; each item contains only what this Chef requires for its item_type',
 
                                             'fields' => [
                                                 [
@@ -1970,62 +2372,308 @@ final class PubContract
                                                         true,
 
                                                     'note' =>
-                                                        'current source values: palette | non-palette | normal; used by Creator/Recipe for production and timing decisions',
+                                                        'production discriminator used by the Creator to choose the correct treatment',
                                                 ],
+                                            ],
 
-                                                [
-                                                    'key' =>
-                                                        'photo.file_path',
+                                            'itemTypes' => [
 
-                                                    'required' =>
-                                                        false,
+                                                'intro' => [
+                                                    'photo' =>
+                                                        'optional',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
 
                                                     'note' =>
-                                                        'optional for all current item_type values; pass when present',
+                                                        'may be text-only or photo + text; if photo is supplied, both photo.file_path and photo.image_url are required',
                                                 ],
 
-                                                [
-                                                    'key' =>
-                                                        'photo.image_url',
+                                                'text' => [
+                                                    'photo' =>
+                                                        'optional',
 
-                                                    'required' =>
-                                                        false,
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
 
-                                                    'note' =>
-                                                        'optional for all current item_type values; pass when present',
-                                                ],
+                                                            'required' =>
+                                                                false,
+                                                        ],
 
-                                                [
-                                                    'key' =>
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'requiresAny' => [
                                                         'title',
-
-                                                    'required' =>
-                                                        false,
-
-                                                    'note' =>
-                                                        'pass when present',
-                                                ],
-
-                                                [
-                                                    'key' =>
                                                         'subtitle',
-
-                                                    'required' =>
-                                                        false,
+                                                    ],
 
                                                     'note' =>
-                                                        'pass when present',
+                                                        'must contain title or subtitle; photo is optional; title and subtitle use different font treatments',
                                                 ],
 
-                                                [
-                                                    'key' =>
-                                                        'body',
+                                                'palette' => [
+                                                    'photo' =>
+                                                        'required',
 
-                                                    'required' =>
-                                                        false,
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
 
                                                     'note' =>
-                                                        'pass when present',
+                                                        'photo required; title/subtitle optional',
+                                                ],
+
+                                                'non-palette' => [
+                                                    'photo' =>
+                                                        'required',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                true,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'photo required; title/subtitle optional',
+                                                ],
+
+
+                                                'hue-wheel' => [
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'hue_wheel.spokes[]',
+
+                                                            'type' =>
+                                                                'array',
+
+                                                            'required' =>
+                                                                true,
+
+                                                            'fields' => [
+                                                                [
+                                                                    'key' =>
+                                                                        'hue',
+
+                                                                    'required' =>
+                                                                        true,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'color',
+
+                                                                    'required' =>
+                                                                        true,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'animate',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'delay_ms',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'duration_ms',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'start_radius',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+
+                                                                [
+                                                                    'key' =>
+                                                                        'end_radius',
+
+                                                                    'required' =>
+                                                                        false,
+                                                                ],
+                                                            ],
+                                                        ],
+                                                    ],
+
+                                                    'note' =>
+                                                        'Chef receives exact hue/hex spoke ingredients; wheel size, standard radii/timing, typography, and overall slide treatment come from PlaylistVideoRecipe',
+                                                ],
+
+                                                'brand-bumper' => [
+                                                    'fields' => [],
+
+                                                    'note' =>
+                                                        'item_type is the only ingredient: append the standard ColorFix brand bumper; size and all timing are production settings owned by PlaylistVideoRecipe',
+                                                ],
+
+                                                'normal' => [
+                                                    'photo' =>
+                                                        'optional',
+
+                                                    'fields' => [
+                                                        [
+                                                            'key' =>
+                                                                'photo.file_path',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'photo.image_url',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'title',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'subtitle',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+
+                                                        [
+                                                            'key' =>
+                                                                'body',
+
+                                                            'required' =>
+                                                                false,
+                                                        ],
+                                                    ],
+
+                                                    'requiresAny' => [
+                                                        'photo',
+                                                        'title',
+                                                        'subtitle',
+                                                        'body',
+                                                    ],
+
+                                                    'note' =>
+                                                        'temporary compatibility rule until normal gets its own specifically tuned Chef order',
                                                 ],
                                             ],
                                         ],
@@ -2505,6 +3153,70 @@ final class PubContract
                 ],
             ],
         ];
+    }
+
+
+    /**
+     * Return the configured PUB default pantry.
+     */
+    public static function defaults(): array
+    {
+        return self::all()[
+            'defaults'
+        ][
+            'assetTypes'
+        ]
+            ?? [];
+    }
+
+
+    /**
+     * Return one raw default pantry reference.
+     *
+     * The returned value is procurement input for ANALYZE only.
+     * It is not a prepared Creator ingredient.
+     */
+    public static function defaultIngredient(
+        string $assetType,
+        string $ingredient
+    ): ?array {
+        $assetType =
+            strtolower(
+                trim(
+                    $assetType
+                )
+            );
+
+        $ingredient =
+            strtolower(
+                trim(
+                    $ingredient
+                )
+            );
+
+
+        if (
+            $assetType === ''
+            || $ingredient === ''
+        ) {
+            return null;
+        }
+
+
+        $value =
+            self::defaults()[
+                $assetType
+            ][
+                $ingredient
+            ]
+            ?? null;
+
+
+        return is_array(
+            $value
+        )
+            ? $value
+            : null;
     }
 
 

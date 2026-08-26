@@ -9,6 +9,7 @@ use App\PUB\Analyze\Pinterest\IdeaAnalyzer;
 use App\PUB\Analyze\Pinterest\PaletteAnalyzer;
 use App\PUB\Analyze\Pinterest\YouTubeTeaserAnalyzer;
 use App\PUB\Analyze\Pinterest\Support\PlaylistPaletteResolver;
+use App\PUB\Analyze\Support\DefaultPantry;
 use App\PUB\Analyze\Sources\PlaylistSourcePreparer;
 use App\PUB\Analyze\YouTube\PlaylistVideoAnalyzer;
 use App\PUB\Contracts\PubContract;
@@ -47,6 +48,7 @@ final class AnalyzeManager implements PubComManagerContract
      */
     private ?PubRunService $runService = null;
     private ?PlaylistSourcePreparer $playlistSourcePreparer = null;
+    private ?DefaultPantry $defaultPantry = null;
 
     /** @var array<string, PubComWorkerContract> */
     private array $analyzers = [];
@@ -1289,7 +1291,9 @@ final class AnalyzeManager implements PubComManagerContract
                     $this->makePaletteAnalyzer(),
 
                 'youtube_video' =>
-                    new PlaylistVideoAnalyzer(),
+                    new PlaylistVideoAnalyzer(
+                        $this->defaultPantry()
+                    ),
 
                 'youtube_teaser_pin' =>
                     new YouTubeTeaserAnalyzer(),
@@ -1307,6 +1311,30 @@ final class AnalyzeManager implements PubComManagerContract
 
 
         return $analyzer;
+    }
+
+
+    /**
+     * Shared ANALYZE default pantry.
+     *
+     * Wake it only when a specialist actually needs a declared fallback
+     * ingredient. Today that is YouTube music.
+     *
+     * The pantry may resolve Asset Library references. It returns prepared
+     * ingredient shapes; Creators never receive pantry IDs or perform lookups.
+     */
+    private function defaultPantry(): DefaultPantry
+    {
+        if ($this->defaultPantry === null) {
+            $this->defaultPantry =
+                new DefaultPantry(
+                    $this->pdo,
+                    $this->projectRoot
+                );
+        }
+
+
+        return $this->defaultPantry;
     }
 
 

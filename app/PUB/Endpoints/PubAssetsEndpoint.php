@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\PUB\Endpoints;
 
+use App\PUB\Contracts\PubContract;
 use App\PUB\Create\Video\PdoVideoJobRepository;
 use App\PUB\Repos\PdoPubAssetRepository;
 use PDO;
@@ -180,6 +181,22 @@ final class PubAssetsEndpoint
                                 ?? ''
                             ),
                             $ingredients
+                        ),
+
+                    /*
+                     * Metadata fields may also be baked into Creator
+                     * ingredients for some asset types (for example a
+                     * Pinterest search_title). The editor uses these
+                     * bindings to decide whether Save requires REDO.
+                     */
+                    'ingredient_bindings' =>
+                        PubContract::ingredientBindingsForCreatedAssetType(
+                            (string)(
+                                $asset[
+                                    'asset_type'
+                                ]
+                                ?? ''
+                            )
                         ),
                 ]
             );
@@ -367,6 +384,13 @@ final class PubAssetsEndpoint
                 'asset' =>
                     $repo->getById(
                         $pubAssetId
+                    ),
+
+                'redo_required' =>
+                    !empty(
+                        $updated[
+                            'ingredients_changed'
+                        ]
                     ),
 
                 'ingredient_values' =>
@@ -591,7 +615,9 @@ final class PubAssetsEndpoint
                 'end_slide_text',
             ],
 
-            'youtube_video' => [],
+            'youtube_video' => [
+                'music',
+            ],
 
             default => [],
         };

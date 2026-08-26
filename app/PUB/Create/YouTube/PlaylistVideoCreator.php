@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PUB\Create\YouTube;
 
 use App\PUB\Create\Video\PdoVideoJobRepository;
+use App\PUB\Create\Video\Support\VideoLayerBuilder;
 use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComSignal;
@@ -17,54 +18,31 @@ use Throwable;
  *
  * Product Chef for one complete YouTube playlist video.
  *
- * CHEF'S INGREDIENT ORDER:
+ * The Chef receives only the prepared ingredients declared in PubContract.
+ * It uses PlaylistVideoRecipe as a passive reference notebook and mixes one
+ * complete renderer-neutral video blueprint.
  *
- *   ingredients {
- *     slides[] {
- *       item_type
+ * The complete blueprint is then handed to ONE shared video translator.
+ * The Chef never writes Remotion syntax, frame numbers, component registry
+ * names, or Remotion animation target paths.
  *
- *       optional photo {
- *         file_path
- *         image_url
- *       }
- *
- *       optional title
- *       optional subtitle
- *       optional body
- *     }
- *   }
- *
- * Array order is playback order.
- * One ingredient box produces ONE complete YouTube video.
- *
- * This Creator owns production of the YouTube video, but keeps
- * product decisions in PlaylistVideoRecipe.
- *
- * It may use any shared production tools/helpers. It does NOT:
- *   - acquire source ingredients
- *   - inspect the outer PUB Box
- *   - reserve pub_asset_id values
- *   - decide NEW vs REDO
- *   - file or recover orders
- *   - package
- *   - schedule
- *   - publish / dispatch
- *
- * Rendering is asynchronous. The Creator compiles its recipe and
- * submits the finished render plan to the shared pub_video_jobs oven.
+ * Rendering remains asynchronous.
  */
 final class PlaylistVideoCreator implements PubComWorkerContract
 {
     private const CREATOR_KEY =
         'youtube.playlist_video';
 
-private const SUPPORTED_ITEM_TYPES = [
-    'intro',
-    'palette',
-    'non-palette',
-    'normal',
-    'brand-bumper',
-];
+
+    private const SUPPORTED_ITEM_TYPES = [
+        'intro',
+        'text',
+        'palette',
+        'non-palette',
+        'normal',
+        'hue-wheel',
+        'brand-bumper',
+    ];
 
 
     private ?PubComChannel $pubComChannel = null;
@@ -172,8 +150,8 @@ private const SUPPORTED_ITEM_TYPES = [
     /**
      * Defensive inspection of the prepared ingredient box.
      *
-     * ANALYZE is responsible for handing the Chef clean ingredients.
-     * The Chef still verifies that the promised box actually arrived.
+     * ANALYZE is responsible for handing the Chef exactly what it ordered.
+     * The Chef still verifies that the promised ingredients actually arrived.
      */
     public function preflight(
         array $ingredients
@@ -216,11 +194,17 @@ private const SUPPORTED_ITEM_TYPES = [
 
 
     /**
-     * Cook one complete YouTube video and submit the render plan
-     * to the shared asynchronous video oven.
+     * Cook one complete YouTube video.
      *
-     * CreateManager has already assigned pub_asset_id and owns the
-     * durable order/lifecycle surrounding this production request.
+     *  ingredients
+     *      ↓
+     *  complete neutral blueprint
+     *      ↓
+     *  one shared translator pass
+     *      ↓
+     *  renderer-specific job props
+     *      ↓
+     *  asynchronous video oven
      */
     public function create(
         int $pubAssetId,
@@ -253,17 +237,87 @@ private const SUPPORTED_ITEM_TYPES = [
 
 
             $slides =
-                $this->prepareRecipeSlides(
+                $this->prepareSlides(
                     $ingredients[
                         'slides'
                     ]
                 );
 
 
-            $recipe =
-                PlaylistVideoRecipe::plan(
-                    $slides
+            $music =
+                $this->prepareMusic(
+                    $ingredients[
+                        'music'
+                    ]
                 );
+
+
+            /*
+             * CHEF'S FINISHED BATTER.
+             *
+             * This structure is renderer-neutral and uses milliseconds.
+             */
+            $blueprint =
+                $this->buildVideoBlueprint(
+                    $slides,
+                    $music
+                );
+
+
+            /*
+             * ONE TRANSLATION PASS.
+             *
+             * VideoLayerBuilder is the current renderer adapter. It returns:
+             *
+             *   [
+             *     'video_recipe_key' => string,
+             *     'render_plan'      => array,
+             *   ]
+             *
+             * The Chef does not know the renderer's composition name or
+             * internal layer/animation syntax.
+             */
+            $translated =
+                (new VideoLayerBuilder())
+                    ->translate(
+                        blueprint:
+                            $blueprint,
+
+                        fps:
+                            PlaylistVideoRecipe::FPS,
+
+                        codec:
+                            PlaylistVideoRecipe::CODEC
+                    );
+
+
+            $videoRecipeKey =
+                trim(
+                    (string)(
+                        $translated[
+                            'video_recipe_key'
+                        ]
+                        ?? ''
+                    )
+                );
+
+            $renderPlan =
+                $translated[
+                    'render_plan'
+                ]
+                ?? null;
+
+
+            if (
+                $videoRecipeKey === ''
+                || !is_array(
+                    $renderPlan
+                )
+            ) {
+                throw new RuntimeException(
+                    'Video translator did not return a valid renderer recipe key and render plan.'
+                );
+            }
 
 
             $job =
@@ -271,8 +325,8 @@ private const SUPPORTED_ITEM_TYPES = [
                     ->createJob(
                         $pubAssetId,
                         self::CREATOR_KEY,
-                        PlaylistVideoRecipe::COMPOSITION_ID,
-                        $recipe,
+                        $videoRecipeKey,
+                        $renderPlan,
                         PlaylistVideoRecipe::OUTPUT_MIME_TYPE
                     );
 
@@ -309,9 +363,9 @@ private const SUPPORTED_ITEM_TYPES = [
      * Promote the worker's private MP4 into the permanent YouTube
      * PUB asset location.
      *
-     * $renderPlan is the exact plan saved on pub_video_jobs when
-     * this render was queued. Duration is derived from that plan,
-     * not from the current editable order.
+     * $renderPlan is the exact translated plan saved on pub_video_jobs
+     * when this render was queued. Duration is derived from that saved
+     * render plan, not from the current editable order.
      */
     public function promoteCompletedVideo(
         int $pubAssetId,
@@ -653,13 +707,19 @@ private const SUPPORTED_ITEM_TYPES = [
     }
 
 
-    /**
-     * Convert environment-relative prepared image URLs into the
-     * absolute URLs the external/local Remotion worker can load.
-     *
-     * This is operational preparation, not a product decision.
+    /*
+     * ================================================================
+     * CHEF — NEUTRAL BLUEPRINT
+     * ================================================================
      */
-    private function prepareRecipeSlides(
+
+    /**
+     * Convert environment-relative image URLs into absolute URLs the
+     * rendering service can load.
+     *
+     * This is operational preparation, not product layout logic.
+     */
+    private function prepareSlides(
         array $slides
     ): array {
         $prepared = [];
@@ -708,9 +768,1561 @@ private const SUPPORTED_ITEM_TYPES = [
     }
 
 
+    /**
+     * Operational URL preparation only.
+     *
+     * ANALYZE has already supplied the complete standard music ingredient.
+     * The Chef never resolves Asset Library IDs or visits the pantry.
+     */
+    private function prepareMusic(
+        array $music
+    ): array {
+        return [
+            'file_path' =>
+                trim(
+                    (string)(
+                        $music[
+                            'file_path'
+                        ]
+                        ?? ''
+                    )
+                ),
+
+            'audio_url' =>
+                $this->absolutePublicUrl(
+                    (string)(
+                        $music[
+                            'audio_url'
+                        ]
+                        ?? ''
+                    )
+                ),
+
+            'volume' =>
+                (float)(
+                    $music[
+                        'volume'
+                    ]
+                    ?? 0
+                ),
+        ];
+    }
+
+
+    /**
+     * Mix the entire video before anything is handed to the renderer.
+     *
+     * The blueprint contains:
+     *   - milliseconds, never frames
+     *   - renderer-neutral scene types
+     *   - product layout/treatment values from PlaylistVideoRecipe
+     *   - no Remotion component names
+     *   - no React prop paths
+     *   - no Remotion style paths
+     */
+    private function buildVideoBlueprint(
+        array $slides,
+        array $music
+    ): array {
+        $scenes = [];
+        $cursorMs = 0;
+
+
+        foreach (
+            $slides
+            as $index => $slide
+        ) {
+            $itemType =
+                strtolower(
+                    trim(
+                        (string)(
+                            $slide[
+                                'item_type'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            $durationMs =
+                $this->durationMsForSlide(
+                    $slide,
+                    $itemType
+                );
+
+
+            $isBrandBumper =
+                $itemType ===
+                'brand-bumper';
+
+            $isHueWheel =
+                $itemType ===
+                'hue-wheel';
+
+            $isIntro =
+                $itemType ===
+                'intro';
+
+            $isText =
+                $itemType ===
+                'text';
+
+
+            $previousItemType =
+                $index > 0
+                    ? strtolower(
+                        trim(
+                            (string)(
+                                $slides[
+                                    $index - 1
+                                ][
+                                    'item_type'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    )
+                    : '';
+
+
+            $previousIsIntro =
+                $previousItemType ===
+                'intro';
+
+            $previousIsText =
+                $previousItemType ===
+                'text';
+
+
+            /*
+             * THROUGH-BLACK SCENE POLICY.
+             *
+             * These self-contained compositions never collide visually
+             * with neighboring scenes:
+             *
+             *   intro
+             *   text
+             *   hue-wheel
+             *   brand-bumper
+             *
+             * Intro/text also OWN their exit to black, so even an ordinary
+             * photo that follows them must wait until that exit completes.
+             */
+            $currentNeedsCleanEntry =
+                $isBrandBumper
+                || $isHueWheel
+                || $isIntro
+                || $isText;
+
+            $previousOwnsCleanExit =
+                $previousIsIntro
+                || $previousIsText;
+
+            $waitForPreviousExit =
+                $index > 0
+                && (
+                    $currentNeedsCleanEntry
+                    || $previousOwnsCleanExit
+                );
+
+
+            if (
+                $waitForPreviousExit
+                && $scenes !== []
+            ) {
+                $previousSceneIndex =
+                    count(
+                        $scenes
+                    ) - 1;
+
+
+                /*
+                 * If the outgoing scene has its own exit policy, it wins.
+                 * Otherwise the incoming special scene declares how the
+                 * previous ordinary content should fade away.
+                 */
+                $preFadeToBlackMs =
+                    $previousIsIntro
+                        ? PlaylistVideoRecipe::INTRO_FADE_OUT_TO_BLACK_MS
+                        : (
+                            $previousIsText
+                                ? PlaylistVideoRecipe::TEXT_FADE_OUT_TO_BLACK_MS
+                                : (
+                                    $isBrandBumper
+                                        ? PlaylistVideoRecipe::BRAND_BUMPER_PRE_FADE_TO_BLACK_MS
+                                        : (
+                                            $isHueWheel
+                                                ? PlaylistVideoRecipe::HUE_WHEEL_PRE_FADE_TO_BLACK_MS
+                                                : (
+                                                    $isIntro
+                                                        ? PlaylistVideoRecipe::INTRO_PRE_FADE_TO_BLACK_MS
+                                                        : PlaylistVideoRecipe::TEXT_PRE_FADE_TO_BLACK_MS
+                                                )
+                                        )
+                                )
+                        );
+
+
+                $scenes[
+                    $previousSceneIndex
+                ][
+                    'transition_out'
+                ] = [
+                    'type' =>
+                        'fade-to-black',
+
+                    'duration_ms' =>
+                        $preFadeToBlackMs,
+
+                    'to_color' =>
+                        PlaylistVideoRecipe::BACKGROUND_COLOR,
+                ];
+            }
+
+
+            /*
+             * Optional black pause at the boundary.
+             *
+             * Prefer the incoming special scene's hold. When the incoming
+             * scene is ordinary but follows intro/text, use the outgoing
+             * intro/text hold instead.
+             */
+            $blackHoldMs =
+                $isBrandBumper
+                    ? PlaylistVideoRecipe::BRAND_BUMPER_BLACK_HOLD_MS
+                    : (
+                        $isHueWheel
+                            ? PlaylistVideoRecipe::HUE_WHEEL_BLACK_HOLD_MS
+                            : (
+                                $isIntro
+                                    ? PlaylistVideoRecipe::INTRO_BLACK_HOLD_MS
+                                    : (
+                                        $isText
+                                            ? PlaylistVideoRecipe::TEXT_BLACK_HOLD_MS
+                                            : (
+                                                $previousIsIntro
+                                                    ? PlaylistVideoRecipe::INTRO_BLACK_HOLD_MS
+                                                    : (
+                                                        $previousIsText
+                                                            ? PlaylistVideoRecipe::TEXT_BLACK_HOLD_MS
+                                                            : 0
+                                                    )
+                                            )
+                                    )
+                            )
+                    );
+
+
+            $startMs =
+                $index === 0
+                    ? 0
+                    : (
+                        $waitForPreviousExit
+                            ? $cursorMs
+                                + $blackHoldMs
+                            : max(
+                                0,
+                                $cursorMs
+                                - PlaylistVideoRecipe::DISSOLVE_MS
+                            )
+                    );
+
+
+            /*
+             * Intro/text fade in from the black canvas.
+             *
+             * Hue-wheel and bumper own their internal component fade-in.
+             * Ordinary scenes use the standard dissolve; when they follow
+             * intro/text there is no overlap, so that same opacity ramp is
+             * simply a fade up from black.
+             */
+            $transitionIn =
+                $isBrandBumper
+                || $isHueWheel
+                    ? null
+                    : (
+                        $isIntro
+                            ? [
+                                'type' =>
+                                    'dissolve',
+
+                                'duration_ms' =>
+                                    PlaylistVideoRecipe::INTRO_FADE_IN_MS,
+                            ]
+                            : (
+                                $isText
+                                    ? [
+                                        'type' =>
+                                            'dissolve',
+
+                                        'duration_ms' =>
+                                            PlaylistVideoRecipe::TEXT_FADE_IN_MS,
+                                    ]
+                                    : (
+                                        $index === 0
+                                            ? null
+                                            : [
+                                                'type' =>
+                                                    'dissolve',
+
+                                                'duration_ms' =>
+                                                    PlaylistVideoRecipe::DISSOLVE_MS,
+                                            ]
+                                    )
+                            )
+                    );
+
+
+            $scene =
+                match ($itemType) {
+                    'intro' =>
+                        $this->buildIntroScene(
+                            slide:
+                                $slide,
+
+                            slideNumber:
+                                $index + 1,
+
+                            startMs:
+                                $startMs,
+
+                            durationMs:
+                                $durationMs,
+
+                            transitionIn:
+                                $transitionIn
+                        ),
+
+                    'text' =>
+                        $this->buildTextScene(
+                            slide:
+                                $slide,
+
+                            slideNumber:
+                                $index + 1,
+
+                            startMs:
+                                $startMs,
+
+                            durationMs:
+                                $durationMs,
+
+                            transitionIn:
+                                $transitionIn,
+
+                            intro:
+                                false
+                        ),
+
+                    'palette',
+                    'non-palette' =>
+                        $this->buildPhotoScene(
+                            slide:
+                                $slide,
+
+                            slideNumber:
+                                $index + 1,
+
+                            startMs:
+                                $startMs,
+
+                            durationMs:
+                                $durationMs,
+
+                            transitionIn:
+                                $transitionIn
+                        ),
+
+                    'normal' =>
+                        $this->hasPhoto(
+                            $slide
+                        )
+                            ? $this->buildPhotoScene(
+                                slide:
+                                    $slide,
+
+                                slideNumber:
+                                    $index + 1,
+
+                                startMs:
+                                    $startMs,
+
+                                durationMs:
+                                    $durationMs,
+
+                                transitionIn:
+                                    $transitionIn
+                            )
+                            : $this->buildTextScene(
+                                slide:
+                                    $slide,
+
+                                slideNumber:
+                                    $index + 1,
+
+                                startMs:
+                                    $startMs,
+
+                                durationMs:
+                                    $durationMs,
+
+                                transitionIn:
+                                    $transitionIn,
+
+                                intro:
+                                    false
+                            ),
+
+                    'hue-wheel' =>
+                        $this->buildHueWheelScene(
+                            slide:
+                                $slide,
+
+                            slideNumber:
+                                $index + 1,
+
+                            startMs:
+                                $startMs,
+
+                            durationMs:
+                                $durationMs,
+
+                            transitionIn:
+                                $transitionIn
+                        ),
+
+                    'brand-bumper' =>
+                        $this->buildBrandBumperScene(
+                            slideNumber:
+                                $index + 1,
+
+                            startMs:
+                                $startMs,
+
+                            durationMs:
+                                $durationMs,
+
+                            transitionIn:
+                                $transitionIn
+                        ),
+
+                    default =>
+                        throw new RuntimeException(
+                            "YouTube Playlist Video Creator cannot build item_type '{$itemType}'."
+                        ),
+                };
+
+
+            $scenes[] =
+                $scene;
+
+
+            $cursorMs =
+                $startMs
+                + $durationMs;
+        }
+
+
+        if ($cursorMs <= 0) {
+            throw new RuntimeException(
+                'YouTube Playlist Video Creator calculated an invalid blueprint duration.'
+            );
+        }
+
+
+        $endsWithBrandBumper =
+            strtolower(
+                trim(
+                    (string)(
+                        $scenes[
+                            count(
+                                $scenes
+                            ) - 1
+                        ][
+                            'type'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) ===
+            'brand-bumper';
+
+
+        return [
+            'type' =>
+                'video',
+
+            'canvas' => [
+                'width' =>
+                    PlaylistVideoRecipe::WIDTH,
+
+                'height' =>
+                    PlaylistVideoRecipe::HEIGHT,
+
+                'background_color' =>
+                    PlaylistVideoRecipe::BACKGROUND_COLOR,
+            ],
+
+            'duration_ms' =>
+                $cursorMs,
+
+            /*
+             * The house bumper already owns its own fade to black.
+             * Keep the generic whole-video fallback only when there
+             * is no bumper at the end.
+             */
+            'final_fade' =>
+                $endsWithBrandBumper
+                    ? null
+                    : [
+                        'duration_ms' =>
+                            PlaylistVideoRecipe::FINAL_FADE_MS,
+
+                        'to_color' =>
+                            PlaylistVideoRecipe::BACKGROUND_COLOR,
+                    ],
+
+            /*
+             * Neutral audio instruction. VideoLayerBuilder translates
+             * milliseconds into the current renderer's frame vocabulary.
+             */
+            'audio' => [
+                [
+                    'src' =>
+                        $music[
+                            'audio_url'
+                        ],
+
+                    'start_ms' =>
+                        0,
+
+                    'volume' =>
+                        $music[
+                            'volume'
+                        ],
+                ],
+            ],
+
+            'scenes' =>
+                $scenes,
+        ];
+    }
+
+
+    /**
+     * INTRO can be:
+     *   - text only
+     *   - photo + text
+     *   - photo only
+     */
+    private function buildIntroScene(
+        array $slide,
+        int $slideNumber,
+        int $startMs,
+        int $durationMs,
+        ?array $transitionIn
+    ): array {
+        if (
+            $this->hasTitleOrSubtitle(
+                $slide
+            )
+            || trim(
+                (string)(
+                    $slide[
+                        'body'
+                    ]
+                    ?? ''
+                )
+            ) !== ''
+        ) {
+            return $this->buildTextScene(
+                slide:
+                    $slide,
+
+                slideNumber:
+                    $slideNumber,
+
+                startMs:
+                    $startMs,
+
+                durationMs:
+                    $durationMs,
+
+                transitionIn:
+                    $transitionIn,
+
+                intro:
+                    true
+            );
+        }
+
+
+        if (
+            $this->hasPhoto(
+                $slide
+            )
+        ) {
+            return $this->buildPhotoScene(
+                slide:
+                    $slide,
+
+                slideNumber:
+                    $slideNumber,
+
+                startMs:
+                    $startMs,
+
+                durationMs:
+                    $durationMs,
+
+                transitionIn:
+                    $transitionIn
+            );
+        }
+
+
+        throw new RuntimeException(
+            "YouTube intro slide {$slideNumber} has no renderable content."
+        );
+    }
+
+
+    /**
+     * Neutral full-frame photo scene with optional caption copy.
+     */
+    private function buildPhotoScene(
+        array $slide,
+        int $slideNumber,
+        int $startMs,
+        int $durationMs,
+        ?array $transitionIn
+    ): array {
+        $photo =
+            is_array(
+                $slide[
+                    'photo'
+                ]
+                ?? null
+            )
+                ? $slide[
+                    'photo'
+                ]
+                : [];
+
+
+        $imageUrl =
+            trim(
+                (string)(
+                    $photo[
+                        'image_url'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($imageUrl === '') {
+            throw new RuntimeException(
+                "YouTube photo slide {$slideNumber} has no image_url."
+            );
+        }
+
+
+        $title =
+            trim(
+                (string)(
+                    $slide[
+                        'title'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $subtitle =
+            trim(
+                (string)(
+                    $slide[
+                        'subtitle'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $body =
+            trim(
+                (string)(
+                    $slide[
+                        'body'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        $caption =
+            null;
+
+
+        if (
+            $title !== ''
+            || $subtitle !== ''
+            || $body !== ''
+        ) {
+            $caption = [
+                'title' =>
+                    $title,
+
+                'subtitle' =>
+                    $subtitle,
+
+                'body' =>
+                    $body,
+
+                'placement' => [
+                    'left_px' =>
+                        PlaylistVideoRecipe::CAPTION_LEFT,
+
+                    'bottom_px' =>
+                        PlaylistVideoRecipe::CAPTION_BOTTOM,
+
+                    'max_width_px' =>
+                        PlaylistVideoRecipe::CAPTION_MAX_WIDTH,
+
+                    'padding_x_px' =>
+                        PlaylistVideoRecipe::CAPTION_PADDING_X,
+
+                    'padding_y_px' =>
+                        PlaylistVideoRecipe::CAPTION_PADDING_Y,
+                ],
+
+                'background_color' =>
+                    PlaylistVideoRecipe::CAPTION_BACKGROUND,
+
+                'color' =>
+                    PlaylistVideoRecipe::TEXT_COLOR,
+
+                'font_family' =>
+                    PlaylistVideoRecipe::FONT_FAMILY,
+
+                'title_style' => [
+                    'font_size_px' =>
+                        PlaylistVideoRecipe::CAPTION_TITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        PlaylistVideoRecipe::CAPTION_TITLE_FONT_WEIGHT,
+
+                    'line_height' =>
+                        PlaylistVideoRecipe::CAPTION_TITLE_LINE_HEIGHT,
+                ],
+
+                'subtitle_style' => [
+                    'font_size_px' =>
+                        PlaylistVideoRecipe::CAPTION_SUBTITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        PlaylistVideoRecipe::CAPTION_SUBTITLE_FONT_WEIGHT,
+
+                    'line_height' =>
+                        PlaylistVideoRecipe::CAPTION_SUBTITLE_LINE_HEIGHT,
+                ],
+
+                'body_style' => [
+                    'font_size_px' =>
+                        PlaylistVideoRecipe::CAPTION_BODY_FONT_SIZE,
+
+                    'font_weight' =>
+                        PlaylistVideoRecipe::CAPTION_BODY_FONT_WEIGHT,
+
+                    'line_height' =>
+                        PlaylistVideoRecipe::CAPTION_BODY_LINE_HEIGHT,
+                ],
+
+                'delay_ms' =>
+                    PlaylistVideoRecipe::CAPTION_DELAY_MS,
+
+                'fade_ms' =>
+                    PlaylistVideoRecipe::CAPTION_FADE_MS,
+
+                'fade_out_ms' =>
+                    PlaylistVideoRecipe::CAPTION_FADE_OUT_MS,
+
+                'fade_out_end_before_scene_end_ms' =>
+                    PlaylistVideoRecipe::CAPTION_FADE_OUT_END_BEFORE_SCENE_END_MS,
+            ];
+        }
+
+
+        return [
+            'id' =>
+                "yt-scene-{$slideNumber}",
+
+            'type' =>
+                'photo',
+
+            'source_item_type' =>
+                strtolower(
+                    trim(
+                        (string)(
+                            $slide[
+                                'item_type'
+                            ]
+                            ?? ''
+                        )
+                    )
+                ),
+
+            'start_ms' =>
+                $startMs,
+
+            'duration_ms' =>
+                $durationMs,
+
+            'transition_in' =>
+                $transitionIn,
+
+            'background_color' =>
+                PlaylistVideoRecipe::BACKGROUND_COLOR,
+
+            'photo' => [
+                'src' =>
+                    $imageUrl,
+
+                'fit' =>
+                    PlaylistVideoRecipe::PHOTO_OBJECT_FIT,
+            ],
+
+            'caption' =>
+                $caption,
+        ];
+    }
+
+
+    /**
+     * Neutral text-led scene.
+     *
+     * An optional photo is a backdrop, not a separate product type.
+     */
+    private function buildTextScene(
+        array $slide,
+        int $slideNumber,
+        int $startMs,
+        int $durationMs,
+        ?array $transitionIn,
+        bool $intro
+    ): array {
+        $title =
+            trim(
+                (string)(
+                    $slide[
+                        'title'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $subtitle =
+            trim(
+                (string)(
+                    $slide[
+                        'subtitle'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $body =
+            trim(
+                (string)(
+                    $slide[
+                        'body'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if (
+            $title === ''
+            && $subtitle === ''
+            && $body === ''
+        ) {
+            throw new RuntimeException(
+                "YouTube text slide {$slideNumber} has no text."
+            );
+        }
+
+
+        $backgroundPhoto =
+            null;
+
+
+        if (
+            $this->hasPhoto(
+                $slide
+            )
+        ) {
+            $backgroundPhoto = [
+                'src' =>
+                    (string)$slide[
+                        'photo'
+                    ][
+                        'image_url'
+                    ],
+
+                'fit' =>
+                    PlaylistVideoRecipe::PHOTO_OBJECT_FIT,
+
+                'opacity' =>
+                    PlaylistVideoRecipe::INTRO_PHOTO_OPACITY,
+            ];
+        }
+
+
+        return [
+            'id' =>
+                "yt-scene-{$slideNumber}",
+
+            'type' =>
+                'text',
+
+            'source_item_type' =>
+                strtolower(
+                    trim(
+                        (string)(
+                            $slide[
+                                'item_type'
+                            ]
+                            ?? ''
+                        )
+                    )
+                ),
+
+            'variant' =>
+                $intro
+                    ? 'intro'
+                    : 'standard',
+
+            'start_ms' =>
+                $startMs,
+
+            'duration_ms' =>
+                $durationMs,
+
+            'transition_in' =>
+                $transitionIn,
+
+            'background_color' =>
+                PlaylistVideoRecipe::BACKGROUND_COLOR,
+
+            'background_photo' =>
+                $backgroundPhoto,
+
+            'text' => [
+                'title' =>
+                    $title,
+
+                'subtitle' =>
+                    $subtitle,
+
+                'body' =>
+                    $body,
+
+                'color' =>
+                    PlaylistVideoRecipe::TEXT_COLOR,
+
+                'font_family' =>
+                    PlaylistVideoRecipe::FONT_FAMILY,
+
+                'padding_x_px' =>
+                    PlaylistVideoRecipe::TEXT_SCREEN_PADDING_X,
+
+                'padding_y_px' =>
+                    PlaylistVideoRecipe::TEXT_SCREEN_PADDING_Y,
+
+                'align' =>
+                    'center',
+
+                'vertical_align' =>
+                    'center',
+
+                'title_style' => [
+                    'font_size_px' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_TITLE_FONT_SIZE
+                            : PlaylistVideoRecipe::TEXT_TITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_TITLE_FONT_WEIGHT
+                            : PlaylistVideoRecipe::TEXT_TITLE_FONT_WEIGHT,
+                ],
+
+                'subtitle_style' => [
+                    'font_size_px' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_SUBTITLE_FONT_SIZE
+                            : PlaylistVideoRecipe::TEXT_SUBTITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_SUBTITLE_FONT_WEIGHT
+                            : PlaylistVideoRecipe::TEXT_SUBTITLE_FONT_WEIGHT,
+                ],
+
+                'body_style' => [
+                    'font_size_px' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_BODY_FONT_SIZE
+                            : PlaylistVideoRecipe::TEXT_BODY_FONT_SIZE,
+
+                    'font_weight' =>
+                        $intro
+                            ? PlaylistVideoRecipe::INTRO_BODY_FONT_WEIGHT
+                            : PlaylistVideoRecipe::TEXT_BODY_FONT_WEIGHT,
+                ],
+
+                'line_height' =>
+                    $intro
+                        ? PlaylistVideoRecipe::INTRO_LINE_HEIGHT
+                        : PlaylistVideoRecipe::TEXT_LINE_HEIGHT,
+
+                'fade_ms' =>
+                    $intro
+                        ? PlaylistVideoRecipe::INTRO_TEXT_FADE_MS
+                        : PlaylistVideoRecipe::TEXT_FADE_MS,
+            ],
+        ];
+    }
+
+
+    /**
+     * Neutral hue-wheel scene.
+     *
+     * The Chef knows the product treatment, but not React/Remotion.
+     * It passes exact authored hue/hex spokes plus Recipe-owned
+     * presentation and timing values to the renderer-neutral blueprint.
+     */
+    private function buildHueWheelScene(
+        array $slide,
+        int $slideNumber,
+        int $startMs,
+        int $durationMs,
+        ?array $transitionIn
+    ): array {
+        $hueWheel =
+            is_array(
+                $slide[
+                    'hue_wheel'
+                ]
+                ?? null
+            )
+                ? $slide[
+                    'hue_wheel'
+                ]
+                : [];
+
+
+        $sourceSpokes =
+            is_array(
+                $hueWheel[
+                    'spokes'
+                ]
+                ?? null
+            )
+                ? array_values(
+                    $hueWheel[
+                        'spokes'
+                    ]
+                )
+                : [];
+
+
+        if ($sourceSpokes === []) {
+            throw new RuntimeException(
+                "YouTube hue-wheel slide {$slideNumber} has no prepared spokes."
+            );
+        }
+
+
+        $spokes = [];
+
+
+        foreach (
+            $sourceSpokes
+            as $index => $sourceSpoke
+        ) {
+            if (!is_array($sourceSpoke)) {
+                throw new RuntimeException(
+                    "YouTube hue-wheel slide {$slideNumber} spoke "
+                    . (
+                        $index + 1
+                    )
+                    . ' is invalid.'
+                );
+            }
+
+
+            $animate =
+                (
+                    $sourceSpoke[
+                        'animate'
+                    ]
+                    ?? true
+                ) !== false;
+
+
+            $baseDelayMs =
+                array_key_exists(
+                    'delay_ms',
+                    $sourceSpoke
+                )
+                    ? max(
+                        0,
+                        (int)round(
+                            (float)$sourceSpoke[
+                                'delay_ms'
+                            ]
+                        )
+                    )
+                    : PlaylistVideoRecipe::HUE_WHEEL_SPOKE_DELAY_MS;
+
+
+            $spokeDurationMs =
+                array_key_exists(
+                    'duration_ms',
+                    $sourceSpoke
+                )
+                    ? max(
+                        1,
+                        (int)round(
+                            (float)$sourceSpoke[
+                                'duration_ms'
+                            ]
+                        )
+                    )
+                    : PlaylistVideoRecipe::HUE_WHEEL_SPOKE_DURATION_MS;
+
+
+            $spokes[] = [
+                'hue' =>
+                    (float)$sourceSpoke[
+                        'hue'
+                    ],
+
+                'color' =>
+                    (string)$sourceSpoke[
+                        'color'
+                    ],
+
+                'animate' =>
+                    $animate,
+
+                'start_radius' =>
+                    array_key_exists(
+                        'start_radius',
+                        $sourceSpoke
+                    )
+                        ? (float)$sourceSpoke[
+                            'start_radius'
+                        ]
+                        : PlaylistVideoRecipe::HUE_WHEEL_START_RADIUS,
+
+                'end_radius' =>
+                    array_key_exists(
+                        'end_radius',
+                        $sourceSpoke
+                    )
+                        ? (float)$sourceSpoke[
+                            'end_radius'
+                        ]
+                        : PlaylistVideoRecipe::HUE_WHEEL_END_RADIUS,
+
+                /*
+                 * Relative to scene start. Static spokes simply fade in
+                 * with the wheel; animated spokes wait until the wheel/title
+                 * have appeared, then draw sequentially.
+                 */
+                'start_offset_ms' =>
+                    $animate
+                        ? PlaylistVideoRecipe::HUE_WHEEL_FADE_IN_MS
+                            + $baseDelayMs
+                            + (
+                                $index
+                                * PlaylistVideoRecipe::HUE_WHEEL_SPOKE_STAGGER_MS
+                            )
+                        : 0,
+
+                'duration_ms' =>
+                    $animate
+                        ? $spokeDurationMs
+                        : 0,
+            ];
+        }
+
+
+        return [
+            'id' =>
+                "yt-scene-{$slideNumber}",
+
+            'type' =>
+                'hue-wheel',
+
+            'source_item_type' =>
+                'hue-wheel',
+
+            'start_ms' =>
+                $startMs,
+
+            'duration_ms' =>
+                $durationMs,
+
+            'transition_in' =>
+                $transitionIn,
+
+            'background_color' =>
+                PlaylistVideoRecipe::BACKGROUND_COLOR,
+
+            'title' =>
+                trim(
+                    (string)(
+                        $slide[
+                            'title'
+                        ]
+                        ?? ''
+                    )
+                ),
+
+            'subtitle' =>
+                trim(
+                    (string)(
+                        $slide[
+                            'subtitle'
+                        ]
+                        ?? ''
+                    )
+                ),
+
+            'wheel' => [
+                'size_px' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_SIZE_PX,
+
+                'fade_in_ms' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_FADE_IN_MS,
+
+                'spoke_width_px' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_SPOKE_WIDTH_PX,
+
+                'spokes' =>
+                    $spokes,
+            ],
+
+            'text' => [
+                'color' =>
+                    PlaylistVideoRecipe::TEXT_COLOR,
+
+                'font_family' =>
+                    PlaylistVideoRecipe::FONT_FAMILY,
+
+                'max_width_px' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_TEXT_MAX_WIDTH_PX,
+
+                'text_gap_px' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_TEXT_GAP_PX,
+
+                'content_gap_px' =>
+                    PlaylistVideoRecipe::HUE_WHEEL_CONTENT_GAP_PX,
+
+                'title_style' => [
+                    'font_size_px' =>
+                        PlaylistVideoRecipe::HUE_WHEEL_TITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        PlaylistVideoRecipe::HUE_WHEEL_TITLE_FONT_WEIGHT,
+                ],
+
+                'subtitle_style' => [
+                    'font_size_px' =>
+                        PlaylistVideoRecipe::HUE_WHEEL_SUBTITLE_FONT_SIZE,
+
+                    'font_weight' =>
+                        PlaylistVideoRecipe::HUE_WHEEL_SUBTITLE_FONT_WEIGHT,
+                ],
+            ],
+        ];
+    }
+
+
+    /**
+     * STANDARDIZED HOUSE BUMPER.
+     *
+     * The Chef does not draw the logo, parse playlist bumper JSON,
+     * know a React component name, or know signatureProgress.
+     *
+     * It simply places the standardized house-bumper instruction in
+     * the neutral blueprint using product settings from the Recipe.
+     * The translator/helper side owns how today's renderer realizes it.
+     */
+    private function buildBrandBumperScene(
+        int $slideNumber,
+        int $startMs,
+        int $durationMs,
+        ?array $transitionIn
+    ): array {
+        return [
+            'id' =>
+                "yt-scene-{$slideNumber}",
+
+            'type' =>
+                'brand-bumper',
+
+            'start_ms' =>
+                $startMs,
+
+            'duration_ms' =>
+                $durationMs,
+
+            'transition_in' =>
+                $transitionIn,
+
+            'background_color' =>
+                PlaylistVideoRecipe::BACKGROUND_COLOR,
+
+            'brand' => [
+                'key' =>
+                    'colorfix',
+
+                'position' =>
+                    'center',
+
+                'logo_size_px' =>
+                    PlaylistVideoRecipe::BRAND_BUMPER_LOGO_SIZE_PX,
+
+                'fade_in_ms' =>
+                    PlaylistVideoRecipe::BRAND_BUMPER_FADE_IN_MS,
+
+                'fade_out_ms' =>
+                    PlaylistVideoRecipe::BRAND_BUMPER_FADE_OUT_MS,
+
+                'signature' => [
+                    'delay_ms' =>
+                        PlaylistVideoRecipe::BRAND_BUMPER_SIGNATURE_DELAY_MS,
+
+                    'duration_ms' =>
+                        PlaylistVideoRecipe::BRAND_BUMPER_SIGNATURE_DURATION_MS,
+                ],
+            ],
+        ];
+    }
+
+
+    private function durationMsForSlide(
+        array $slide,
+        string $itemType
+    ): int {
+        return match ($itemType) {
+            'intro' =>
+                PlaylistVideoRecipe::INTRO_DURATION_MS,
+
+            'text' =>
+                PlaylistVideoRecipe::TEXT_DURATION_MS,
+
+            'palette' =>
+                $this->photoDurationMs(
+                    $slide,
+                    PlaylistVideoRecipe::PALETTE_PHOTO_DURATION_MS
+                ),
+
+            'non-palette' =>
+                $this->photoDurationMs(
+                    $slide,
+                    PlaylistVideoRecipe::NON_PALETTE_PHOTO_DURATION_MS
+                ),
+
+            'normal' =>
+                $this->hasPhoto(
+                    $slide
+                )
+                    ? $this->photoDurationMs(
+                        $slide,
+                        PlaylistVideoRecipe::NORMAL_PHOTO_DURATION_MS
+                    )
+                    : PlaylistVideoRecipe::TEXT_DURATION_MS,
+
+            'hue-wheel' =>
+                $this->hueWheelDurationMs(
+                    $slide
+                ),
+
+            'brand-bumper' =>
+                PlaylistVideoRecipe::BRAND_BUMPER_DURATION_MS,
+
+            default =>
+                throw new RuntimeException(
+                    "YouTube Playlist Video Creator has no duration for item_type '{$itemType}'."
+                ),
+        };
+    }
+
+
+    /**
+     * Keep ordinary photo timing when there is no caption.
+     *
+     * When a photo carries title/subtitle/body copy, extend the scene
+     * only as much as needed to guarantee the Recipe's full-opacity
+     * reading hold before the caption exits ahead of the next dissolve.
+     */
+    private function photoDurationMs(
+        array $slide,
+        int $baseDurationMs
+    ): int {
+        if (
+            !$this->hasTextContent(
+                $slide
+            )
+        ) {
+            return $baseDurationMs;
+        }
+
+
+        $minimumForReadableCaption =
+            PlaylistVideoRecipe::CAPTION_DELAY_MS
+            + PlaylistVideoRecipe::CAPTION_FADE_MS
+            + PlaylistVideoRecipe::CAPTION_HOLD_MS
+            + PlaylistVideoRecipe::CAPTION_FADE_OUT_MS
+            + PlaylistVideoRecipe::CAPTION_FADE_OUT_END_BEFORE_SCENE_END_MS;
+
+
+        return max(
+            $baseDurationMs,
+            $minimumForReadableCaption
+        );
+    }
+
+
+    /**
+     * Keep the standard hue-wheel duration compact, but never clip
+     * the final animated spoke.
+     */
+    private function hueWheelDurationMs(
+        array $slide
+    ): int {
+        $spokes =
+            is_array(
+                $slide[
+                    'hue_wheel'
+                ][
+                    'spokes'
+                ]
+                ?? null
+            )
+                ? array_values(
+                    $slide[
+                        'hue_wheel'
+                    ][
+                        'spokes'
+                    ]
+                )
+                : [];
+
+
+        $lastAnimationEndMs = 0;
+
+
+        foreach (
+            $spokes
+            as $index => $spoke
+        ) {
+            if (!is_array($spoke)) {
+                continue;
+            }
+
+
+            $animate =
+                (
+                    $spoke[
+                        'animate'
+                    ]
+                    ?? true
+                ) !== false;
+
+
+            if (!$animate) {
+                continue;
+            }
+
+
+            $baseDelayMs =
+                array_key_exists(
+                    'delay_ms',
+                    $spoke
+                )
+                    ? max(
+                        0,
+                        (int)round(
+                            (float)$spoke[
+                                'delay_ms'
+                            ]
+                        )
+                    )
+                    : PlaylistVideoRecipe::HUE_WHEEL_SPOKE_DELAY_MS;
+
+
+            $durationMs =
+                array_key_exists(
+                    'duration_ms',
+                    $spoke
+                )
+                    ? max(
+                        1,
+                        (int)round(
+                            (float)$spoke[
+                                'duration_ms'
+                            ]
+                        )
+                    )
+                    : PlaylistVideoRecipe::HUE_WHEEL_SPOKE_DURATION_MS;
+
+
+            $lastAnimationEndMs =
+                max(
+                    $lastAnimationEndMs,
+                    PlaylistVideoRecipe::HUE_WHEEL_FADE_IN_MS
+                    + $baseDelayMs
+                    + (
+                        $index
+                        * PlaylistVideoRecipe::HUE_WHEEL_SPOKE_STAGGER_MS
+                    )
+                    + $durationMs
+                );
+        }
+
+
+        return max(
+            PlaylistVideoRecipe::HUE_WHEEL_MIN_DURATION_MS,
+            $lastAnimationEndMs
+            + PlaylistVideoRecipe::HUE_WHEEL_HOLD_AFTER_SPOKES_MS
+        );
+    }
+
+
+    /*
+     * ================================================================
+     * CHEF — INGREDIENT CONTRACT DEFENSE
+     * ================================================================
+     */
+
     private function assertCreateIngredients(
         array $ingredients
     ): void {
+        $this->assertMusicIngredient(
+            $ingredients[
+                'music'
+            ]
+            ?? null
+        );
+
+
         if (
             !array_key_exists(
                 'slides',
@@ -794,86 +2406,434 @@ private const SUPPORTED_ITEM_TYPES = [
 
 
             $hasPhoto =
-                false;
+                $this->assertAndDetectPhoto(
+                    $slide,
+                    $slideNumber
+                );
 
 
-            if (
-                array_key_exists(
-                    'photo',
+            $hasTitleOrSubtitle =
+                $this->hasTitleOrSubtitle(
                     $slide
-                )
-                && $slide[
-                    'photo'
-                ] !== null
-            ) {
-                if (
-                    !is_array(
-                        $slide[
-                            'photo'
-                        ]
-                    )
-                ) {
-                    throw new RuntimeException(
-                        "YouTube slide {$slideNumber} photo must be an object/array when supplied."
-                    );
-                }
+                );
 
-
-                $filePath =
-                    trim(
-                        (string)(
-                            $slide[
-                                'photo'
-                            ][
-                                'file_path'
-                            ]
-                            ?? ''
-                        )
-                    );
-
-                $imageUrl =
-                    trim(
-                        (string)(
-                            $slide[
-                                'photo'
-                            ][
-                                'image_url'
-                            ]
-                            ?? ''
-                        )
-                    );
-
-
-                if (
-                    $filePath === ''
-                    || $imageUrl === ''
-                ) {
-                    throw new RuntimeException(
-                        "YouTube slide {$slideNumber} supplied a photo without both file_path and image_url."
-                    );
-                }
-
-
-                $hasPhoto =
-                    true;
-            }
-
-
-            $hasText =
+            $hasAnyText =
                 $this->hasTextContent(
                     $slide
                 );
 
 
-            if (
-                !$hasPhoto
-                && !$hasText
-            ) {
+            match ($itemType) {
+                /*
+                 * Intro may be text-only, photo+text, or photo-only.
+                 */
+                'intro' =>
+                    (
+                        $hasPhoto
+                        || $hasTitleOrSubtitle
+                    )
+                        ? true
+                        : throw new RuntimeException(
+                            "YouTube intro slide {$slideNumber} requires a photo, title, or subtitle."
+                        ),
+
+                /*
+                 * Text must communicate with title and/or subtitle.
+                 * Photo is optional.
+                 */
+                'text' =>
+                    $hasTitleOrSubtitle
+                        ? true
+                        : throw new RuntimeException(
+                            "YouTube text slide {$slideNumber} requires title or subtitle."
+                        ),
+
+                /*
+                 * Photo is the actual ingredient; copy is optional.
+                 */
+                'palette',
+                'non-palette' =>
+                    $hasPhoto
+                        ? true
+                        : throw new RuntimeException(
+                            "YouTube {$itemType} slide {$slideNumber} requires a prepared photo."
+                        ),
+
+                /*
+                 * Hue-wheel requires at least one prepared spoke.
+                 */
+                'hue-wheel' =>
+                    $this->assertHueWheelIngredient(
+                        $slide,
+                        $slideNumber
+                    ),
+
+                /*
+                 * The item_type itself is the complete instruction.
+                 */
+                'brand-bumper' =>
+                    true,
+
+                /*
+                 * Temporary compatibility rule until normal is tuned.
+                 */
+                'normal' =>
+                    (
+                        $hasPhoto
+                        || $hasAnyText
+                    )
+                        ? true
+                        : throw new RuntimeException(
+                            "YouTube normal slide {$slideNumber} requires a photo or text."
+                        ),
+
+                default =>
+                    throw new RuntimeException(
+                        "YouTube slide {$slideNumber} has unsupported item_type '{$itemType}'."
+                    ),
+            };
+        }
+    }
+
+
+    private function assertHueWheelIngredient(
+        array $slide,
+        int $slideNumber
+    ): bool {
+        $hueWheel =
+            is_array(
+                $slide[
+                    'hue_wheel'
+                ]
+                ?? null
+            )
+                ? $slide[
+                    'hue_wheel'
+                ]
+                : null;
+
+
+        if ($hueWheel === null) {
+            throw new RuntimeException(
+                "YouTube hue-wheel slide {$slideNumber} requires hue_wheel."
+            );
+        }
+
+
+        $spokes =
+            is_array(
+                $hueWheel[
+                    'spokes'
+                ]
+                ?? null
+            )
+                ? array_values(
+                    $hueWheel[
+                        'spokes'
+                    ]
+                )
+                : [];
+
+
+        if ($spokes === []) {
+            throw new RuntimeException(
+                "YouTube hue-wheel slide {$slideNumber} requires at least one spoke."
+            );
+        }
+
+
+        foreach (
+            $spokes
+            as $index => $spoke
+        ) {
+            $spokeNumber =
+                $index + 1;
+
+
+            if (!is_array($spoke)) {
                 throw new RuntimeException(
-                    "YouTube slide {$slideNumber} contains no photo or text."
+                    "YouTube hue-wheel slide {$slideNumber} spoke {$spokeNumber} must be an array."
                 );
             }
+
+
+            if (
+                !array_key_exists(
+                    'hue',
+                    $spoke
+                )
+                || !is_numeric(
+                    $spoke[
+                        'hue'
+                    ]
+                )
+            ) {
+                throw new RuntimeException(
+                    "YouTube hue-wheel slide {$slideNumber} spoke {$spokeNumber} requires numeric hue."
+                );
+            }
+
+
+            $color =
+                strtoupper(
+                    trim(
+                        (string)(
+                            $spoke[
+                                'color'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            if (
+                preg_match(
+                    '/^#[0-9A-F]{6}$/',
+                    $color
+                ) !== 1
+            ) {
+                throw new RuntimeException(
+                    "YouTube hue-wheel slide {$slideNumber} spoke {$spokeNumber} requires six-digit hex color."
+                );
+            }
+
+
+            foreach (
+                [
+                    'delay_ms',
+                    'duration_ms',
+                    'start_radius',
+                    'end_radius',
+                ]
+                as $field
+            ) {
+                if (
+                    !array_key_exists(
+                        $field,
+                        $spoke
+                    )
+                ) {
+                    continue;
+                }
+
+
+                if (
+                    !is_numeric(
+                        $spoke[
+                            $field
+                        ]
+                    )
+                    || (float)$spoke[
+                        $field
+                    ] < 0
+                ) {
+                    throw new RuntimeException(
+                        "YouTube hue-wheel slide {$slideNumber} spoke {$spokeNumber} has invalid {$field}."
+                    );
+                }
+            }
         }
+
+
+        return true;
+    }
+
+
+    private function assertMusicIngredient(
+        mixed $music
+    ): void {
+        if (!is_array($music)) {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.music must be an object/array.'
+            );
+        }
+
+
+        $filePath =
+            trim(
+                (string)(
+                    $music[
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $audioUrl =
+            trim(
+                (string)(
+                    $music[
+                        'audio_url'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($filePath === '') {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.music.file_path is required.'
+            );
+        }
+
+
+        if ($audioUrl === '') {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.music.audio_url is required.'
+            );
+        }
+
+
+        if (
+            !is_numeric(
+                $music[
+                    'volume'
+                ]
+                ?? null
+            )
+        ) {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.music.volume must be numeric.'
+            );
+        }
+
+
+        $volume =
+            (float)$music[
+                'volume'
+            ];
+
+
+        if (
+            $volume < 0
+            || $volume > 1
+        ) {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.music.volume must be between 0 and 1.'
+            );
+        }
+    }
+
+
+    private function assertAndDetectPhoto(
+        array $slide,
+        int $slideNumber
+    ): bool {
+        if (
+            !array_key_exists(
+                'photo',
+                $slide
+            )
+            || $slide[
+                'photo'
+            ] === null
+        ) {
+            return false;
+        }
+
+
+        if (
+            !is_array(
+                $slide[
+                    'photo'
+                ]
+            )
+        ) {
+            throw new RuntimeException(
+                "YouTube slide {$slideNumber} photo must be an object/array when supplied."
+            );
+        }
+
+
+        $filePath =
+            trim(
+                (string)(
+                    $slide[
+                        'photo'
+                    ][
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $imageUrl =
+            trim(
+                (string)(
+                    $slide[
+                        'photo'
+                    ][
+                        'image_url'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if (
+            $filePath === ''
+            || $imageUrl === ''
+        ) {
+            throw new RuntimeException(
+                "YouTube slide {$slideNumber} supplied a photo without both file_path and image_url."
+            );
+        }
+
+
+        return true;
+    }
+
+
+    private function hasPhoto(
+        array $slide
+    ): bool {
+        return
+            is_array(
+                $slide[
+                    'photo'
+                ]
+                ?? null
+            )
+            && trim(
+                (string)(
+                    $slide[
+                        'photo'
+                    ][
+                        'image_url'
+                    ]
+                    ?? ''
+                )
+            ) !== '';
+    }
+
+
+    private function hasTitleOrSubtitle(
+        array $slide
+    ): bool {
+        foreach (
+            [
+                'title',
+                'subtitle',
+            ]
+            as $field
+        ) {
+            if (
+                trim(
+                    (string)(
+                        $slide[
+                            $field
+                        ]
+                        ?? ''
+                    )
+                ) !== ''
+            ) {
+                return true;
+            }
+        }
+
+
+        return false;
     }
 
 

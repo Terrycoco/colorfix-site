@@ -1,0 +1,1051 @@
+{
+  "composition_id": "colorfix-generic-video",
+  "plan": {
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration_in_frames": 2646
+    },
+    "render": {
+      "codec": "h264"
+    },
+    "layers": [
+      {
+        "id": "video-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 2646,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 0
+        },
+        "style": {
+          "backgroundColor": "#000000"
+        },
+        "animations": []
+      },
+      {
+        "id": "yt-scene-1-title",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 108,
+        "box": {
+          "x": 154,
+          "y": 456,
+          "width": 1612,
+          "height": 90,
+          "z": 105
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 68,
+          "fontWeight": 600,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 0,
+            "end_frame": 27
+          }
+        ],
+        "text": "Understanding Contrast"
+      },
+      {
+        "id": "yt-scene-1-subtitle",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 108,
+        "box": {
+          "x": 154,
+          "y": 568,
+          "width": 1612,
+          "height": 56,
+          "z": 106
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 42,
+          "fontWeight": 400,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 0,
+            "end_frame": 27
+          }
+        ],
+        "text": "Lesson 3: Hue Contrast"
+      },
+      {
+        "id": "yt-scene-2-hue-wheel",
+        "type": "component",
+        "start_frame": 48,
+        "end_frame": 234,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 125
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 48,
+            "end_frame": 108
+          }
+        ],
+        "component": "hue_wheel",
+        "props": {
+          "sceneStartFrame": 48,
+          "wheelFadeFrames": 13,
+          "size": 520,
+          "spokeWidth": 4.5,
+          "spokes": [
+            {
+              "hue": 129.32,
+              "color": "#5E774A",
+              "animate": true,
+              "start_radius": 0,
+              "end_radius": 136,
+              "start_frame_offset": 25,
+              "duration_frames": 24
+            },
+            {
+              "hue": 233.73,
+              "color": "#607077",
+              "animate": true,
+              "start_radius": 0,
+              "end_radius": 136,
+              "start_frame_offset": 33,
+              "duration_frames": 24
+            },
+            {
+              "hue": 195.51,
+              "color": "#6F8F8E",
+              "animate": true,
+              "start_radius": 0,
+              "end_radius": 136,
+              "start_frame_offset": 41,
+              "duration_frames": 24
+            }
+          ],
+          "title": "",
+          "subtitle": "Colors near to each other on the hue wheel create less visual tension",
+          "textColor": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "textMaxWidth": 1400,
+          "textGap": 12,
+          "contentGap": 28,
+          "titleFontSize": 64,
+          "titleFontWeight": 600,
+          "subtitleFontSize": 38,
+          "subtitleFontWeight": 400
+        }
+      },
+      {
+        "id": "yt-scene-3-hue-wheel",
+        "type": "component",
+        "start_frame": 174,
+        "end_frame": 360,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 145
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 174,
+            "end_frame": 234
+          }
+        ],
+        "component": "hue_wheel",
+        "props": {
+          "sceneStartFrame": 174,
+          "wheelFadeFrames": 13,
+          "size": 520,
+          "spokeWidth": 4.5,
+          "spokes": [
+            {
+              "hue": 185.57,
+              "color": "#799B96",
+              "animate": true,
+              "start_radius": 0,
+              "end_radius": 136,
+              "start_frame_offset": 25,
+              "duration_frames": 24
+            },
+            {
+              "hue": 355,
+              "color": "#A6403A",
+              "animate": true,
+              "start_radius": 0,
+              "end_radius": 136,
+              "start_frame_offset": 33,
+              "duration_frames": 24
+            }
+          ],
+          "title": "",
+          "subtitle": "Colors far apart on the hue wheel create tension and pull focus",
+          "textColor": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "textMaxWidth": 1400,
+          "textGap": 12,
+          "contentGap": 28,
+          "titleFontSize": 64,
+          "titleFontWeight": 600,
+          "subtitleFontSize": 38,
+          "subtitleFontWeight": 400
+        }
+      },
+      {
+        "id": "yt-scene-4-photo",
+        "type": "image",
+        "start_frame": 300,
+        "end_frame": 555,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 161
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 300,
+            "end_frame": 360
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_76309247f62b.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-4-caption",
+        "type": "text",
+        "start_frame": 300,
+        "end_frame": 555,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 165
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 304,
+            "end_frame": 364
+          }
+        ],
+        "text": "Nearby colors create less visual tension"
+      },
+      {
+        "id": "yt-scene-5-photo",
+        "type": "image",
+        "start_frame": 495,
+        "end_frame": 750,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 181
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 495,
+            "end_frame": 555
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_1c9ffa0a47d9.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-5-caption",
+        "type": "text",
+        "start_frame": 495,
+        "end_frame": 750,
+        "box": {
+          "x": 67,
+          "y": 929,
+          "width": 1114,
+          "height": 113,
+          "z": 185
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 499,
+            "end_frame": 559
+          }
+        ],
+        "text": "But even a small amount of color from the opposite site of the wheel demands focus"
+      },
+      {
+        "id": "yt-scene-6-photo",
+        "type": "image",
+        "start_frame": 690,
+        "end_frame": 945,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 201
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 690,
+            "end_frame": 750
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_482be5c37983.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-6-caption",
+        "type": "text",
+        "start_frame": 690,
+        "end_frame": 945,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 205
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 694,
+            "end_frame": 754
+          }
+        ],
+        "text": "The same principle applies to warm palettes"
+      },
+      {
+        "id": "yt-scene-7-photo",
+        "type": "image",
+        "start_frame": 885,
+        "end_frame": 1140,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 221
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 885,
+            "end_frame": 945
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_7052f4ddecdd.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-7-caption",
+        "type": "text",
+        "start_frame": 885,
+        "end_frame": 1140,
+        "box": {
+          "x": 67,
+          "y": 971,
+          "width": 1114,
+          "height": 71,
+          "z": 225
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 889,
+            "end_frame": 949
+          }
+        ],
+        "text": "A small amount of the opposite hue draws the eye"
+      },
+      {
+        "id": "yt-scene-8-title",
+        "type": "text",
+        "start_frame": 1080,
+        "end_frame": 1308,
+        "box": {
+          "x": 154,
+          "y": 456,
+          "width": 1612,
+          "height": 90,
+          "z": 245
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 68,
+          "fontWeight": 600,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1080,
+            "end_frame": 1140
+          }
+        ],
+        "text": "Opposite hue contrast is powerful"
+      },
+      {
+        "id": "yt-scene-8-subtitle",
+        "type": "text",
+        "start_frame": 1080,
+        "end_frame": 1308,
+        "box": {
+          "x": 154,
+          "y": 568,
+          "width": 1612,
+          "height": 56,
+          "z": 246
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 42,
+          "fontWeight": 400,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1080,
+            "end_frame": 1140
+          }
+        ],
+        "text": "But it is easy to overdo..."
+      },
+      {
+        "id": "yt-scene-9-photo",
+        "type": "image",
+        "start_frame": 1248,
+        "end_frame": 1503,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 261
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1248,
+            "end_frame": 1308
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_42d5a428123c.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-9-caption",
+        "type": "text",
+        "start_frame": 1248,
+        "end_frame": 1503,
+        "box": {
+          "x": 67,
+          "y": 929,
+          "width": 1114,
+          "height": 113,
+          "z": 265
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1252,
+            "end_frame": 1312
+          }
+        ],
+        "text": "Trying for Nordic Rustic cottage feel\nBut large areas of opposite hues compete for attention"
+      },
+      {
+        "id": "yt-scene-10-photo",
+        "type": "image",
+        "start_frame": 1443,
+        "end_frame": 1698,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 281
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1443,
+            "end_frame": 1503
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_16e642acb74a.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-10-caption",
+        "type": "text",
+        "start_frame": 1443,
+        "end_frame": 1698,
+        "box": {
+          "x": 67,
+          "y": 929,
+          "width": 1114,
+          "height": 113,
+          "z": 285
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1447,
+            "end_frame": 1507
+          }
+        ],
+        "text": "Let's turn down the chroma on the stucco\nBut red siding still demands attention"
+      },
+      {
+        "id": "yt-scene-11-photo",
+        "type": "image",
+        "start_frame": 1638,
+        "end_frame": 1893,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 301
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1638,
+            "end_frame": 1698
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/progressions/contrast-hue/progression_contrast-hue_261b0a86ec68.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-11-caption",
+        "type": "text",
+        "start_frame": 1638,
+        "end_frame": 1893,
+        "box": {
+          "x": 67,
+          "y": 886,
+          "width": 1114,
+          "height": 156,
+          "z": 305
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1642,
+            "end_frame": 1702
+          }
+        ],
+        "text": "Let's quiet the contrast by putting the siding on the stucco side of the wheel\nCalmer, but no focal point"
+      },
+      {
+        "id": "yt-scene-12-photo",
+        "type": "image",
+        "start_frame": 1833,
+        "end_frame": 2088,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 321
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1833,
+            "end_frame": 1893
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_2488eae7a186.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-12-caption",
+        "type": "text",
+        "start_frame": 1833,
+        "end_frame": 2088,
+        "box": {
+          "x": 67,
+          "y": 929,
+          "width": 1114,
+          "height": 113,
+          "z": 325
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1837,
+            "end_frame": 1897
+          }
+        ],
+        "text": "Let's turn up the contrast on the door\nFocal point now on front door rather than large siding"
+      },
+      {
+        "id": "yt-scene-13-photo",
+        "type": "image",
+        "start_frame": 2028,
+        "end_frame": 2283,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 341
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2028,
+            "end_frame": 2088
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_42d5a428123c.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-13-caption",
+        "type": "text",
+        "start_frame": 2028,
+        "end_frame": 2283,
+        "box": {
+          "x": 67,
+          "y": 929,
+          "width": 1114,
+          "height": 113,
+          "z": 345
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2032,
+            "end_frame": 2092
+          }
+        ],
+        "text": "Before — too much hue contrast\nOpposite hues fight for attention"
+      },
+      {
+        "id": "yt-scene-14-photo",
+        "type": "image",
+        "start_frame": 2223,
+        "end_frame": 2478,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 361
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2223,
+            "end_frame": 2283
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/contrast/article_contrast_2488eae7a186.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-14-caption",
+        "type": "text",
+        "start_frame": 2223,
+        "end_frame": 2478,
+        "box": {
+          "x": 67,
+          "y": 886,
+          "width": 1114,
+          "height": 156,
+          "z": 365
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "padding": "14px 20px",
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 34,
+          "fontWeight": 500,
+          "lineHeight": 1.25,
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2227,
+            "end_frame": 2287
+          }
+        ],
+        "text": "ColorFixed — Rustic Nordic Cottage\nSmall bits of opposite hues direct the eye to the focal point"
+      },
+      {
+        "id": "yt-scene-15-title",
+        "type": "text",
+        "start_frame": 2418,
+        "end_frame": 2646,
+        "box": {
+          "x": 154,
+          "y": 456,
+          "width": 1612,
+          "height": 90,
+          "z": 385
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 68,
+          "fontWeight": 600,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2418,
+            "end_frame": 2478
+          }
+        ],
+        "text": "Opposite hues pull focus"
+      },
+      {
+        "id": "yt-scene-15-subtitle",
+        "type": "text",
+        "start_frame": 2418,
+        "end_frame": 2646,
+        "box": {
+          "x": 154,
+          "y": 568,
+          "width": 1612,
+          "height": 56,
+          "z": 386
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 42,
+          "fontWeight": 400,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2418,
+            "end_frame": 2478
+          }
+        ],
+        "text": "Use them sparingly, and with intention"
+      },
+      {
+        "id": "video-final-fade",
+        "type": "rect",
+        "start_frame": 2604,
+        "end_frame": 2646,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 100000
+        },
+        "style": {
+          "backgroundColor": "#000000",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2604,
+            "end_frame": 2645
+          }
+        ]
+      }
+    ],
+    "audio": [
+      {
+        "src": "https://colorfix.terrymarr.com/photos/assets/audio/epic-violin-cinematic-instrumental-music-283511-7ce36112e8.mp3",
+        "start_frame": 0,
+        "end_frame": 2646,
+        "volume": 0.35
+      }
+    ]
+  },
+  "render": {
+    "codec": "h264"
+  }
+}
