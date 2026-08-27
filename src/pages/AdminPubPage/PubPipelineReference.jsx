@@ -1,3 +1,7 @@
+import {
+  useState,
+} from "react";
+
 export default function PubPipelineReference({
   contracts,
 }) {
@@ -93,11 +97,11 @@ function DefaultsReference({
   }
 
   return (
-    <section style={defaultsSectionStyle}>
-      <div style={defaultsHeaderStyle}>
-        DEFAULTS
-      </div>
-
+    <AccordionSection
+      title="DEFAULTS"
+      sectionStyle={defaultsSectionStyle}
+      headerStyle={defaultsHeaderStyle}
+    >
       <div style={defaultsIntroStyle}>
         {defaults?.label ||
           "Default Pantry"}
@@ -152,7 +156,7 @@ function DefaultsReference({
           )
         )}
       </div>
-    </section>
+    </AccordionSection>
   );
 }
 
@@ -215,11 +219,11 @@ function Repositories({
   }
 
   return (
-    <section style={repositorySectionStyle}>
-      <div style={repositoryHeaderStyle}>
-        REPOSITORIES
-      </div>
-
+    <AccordionSection
+      title="REPOSITORIES"
+      sectionStyle={repositorySectionStyle}
+      headerStyle={repositoryHeaderStyle}
+    >
       <div style={repositoryIntroStyle}>
         Storage / file cabinets — not a pipeline stage
       </div>
@@ -238,7 +242,7 @@ function Repositories({
           )
         )}
       </div>
-    </section>
+    </AccordionSection>
   );
 }
 
@@ -308,11 +312,11 @@ function SharedBoxFields({
   fields,
 }) {
   return (
-    <section style={stageStyle}>
-      <div style={stageHeaderStyle}>
-        PUB-WIDE BOX FIELDS
-      </div>
-
+    <AccordionSection
+      title="PUB-WIDE BOX FIELDS"
+      sectionStyle={stageStyle}
+      headerStyle={stageHeaderStyle}
+    >
       <div style={stageSummaryStyle}>
         <div style={referenceFieldStyle}>
           <div style={referenceLabelStyle}>
@@ -329,6 +333,93 @@ function SharedBoxFields({
       <FieldTable
         fields={fields}
       />
+    </AccordionSection>
+  );
+}
+
+
+function AccordionSection({
+  title,
+  role = "",
+  sectionStyle,
+  headerStyle,
+  children,
+  defaultOpen = false,
+}) {
+  const [
+    open,
+    setOpen,
+  ] = useState(
+    defaultOpen
+  );
+
+
+  return (
+    <section
+      style={
+        sectionStyle
+      }
+    >
+      <button
+        type="button"
+
+        aria-expanded={
+          open
+        }
+
+        onClick={() =>
+          setOpen(
+            (current) =>
+              !current
+          )
+        }
+
+        style={{
+          ...headerStyle,
+          width:
+            "100%",
+          border:
+            0,
+          textAlign:
+            "left",
+          cursor:
+            "pointer",
+        }}
+      >
+        <span
+          style={
+            accordionHeaderContentStyle
+          }
+        >
+          <span
+            style={
+              accordionChevronStyle
+            }
+          >
+            {open
+              ? "▾"
+              : "▸"}
+          </span>
+
+          <span>
+            {title}
+          </span>
+
+          {role ? (
+            <span
+              style={
+                stageRoleStyle
+              }
+            >
+              — {role}
+            </span>
+          ) : null}
+        </span>
+      </button>
+
+      {open
+        ? children
+        : null}
     </section>
   );
 }
@@ -340,19 +431,14 @@ function StageSection({
   children,
 }) {
   return (
-    <section style={stageStyle}>
-      <div style={stageHeaderStyle}>
-        <span>{title}</span>
-
-        {role && (
-          <span style={stageRoleStyle}>
-            — {role}
-          </span>
-        )}
-      </div>
-
+    <AccordionSection
+      title={title}
+      role={role}
+      sectionStyle={stageStyle}
+      headerStyle={stageHeaderStyle}
+    >
       {children}
-    </section>
+    </AccordionSection>
   );
 }
 
@@ -470,6 +556,8 @@ function AssetContract({
   const specialist =
     contract?.analyzer ||
     contract?.creator ||
+    contract?.packager ||
+    contract?.shipper ||
     null;
 
   const specialistLabel =
@@ -477,6 +565,10 @@ function AssetContract({
       ? "ANALYZER"
       : contract?.creator
       ? "CREATOR"
+      : contract?.packager
+      ? "PACKAGER"
+      : contract?.shipper
+      ? "SHIPPER"
       : null;
 
   return (
@@ -543,7 +635,11 @@ function AssetContract({
             )}
 
             <ContractBlock
-              title="OUTPUT"
+              title={
+                specialistLabel === "PACKAGER"
+                  ? "OUTPUT IN PACKAGE"
+                  : "OUTPUT"
+              }
               fields={specialist?.output}
             />
           </ContractColumns>
@@ -1032,6 +1128,33 @@ const stageHeaderStyle = {
   color: "#ffffff",
   fontSize: 15,
   fontWeight: 700,
+};
+
+
+const accordionHeaderContentStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "baseline",
+
+  gap:
+    8,
+};
+
+
+const accordionChevronStyle = {
+  width:
+    14,
+
+  flex:
+    "0 0 14px",
+
+  fontSize:
+    13,
+
+  lineHeight:
+    1,
 };
 
 

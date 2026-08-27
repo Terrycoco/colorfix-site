@@ -31,8 +31,13 @@ const ASSETS_URL =
 const CREATE_URL =
   `${API_FOLDER}/v2/admin/pub/create.php`;
 
+const PACKAGE_URL =
+  `${API_FOLDER}/v2/admin/pub/package.php`;
 
-export default function PubAssetsTable() {
+
+export default function PubAssetsTable({
+  onOpenPackage,
+}) {
   const [
     assets,
     setAssets,
@@ -96,6 +101,11 @@ export default function PubAssetsTable() {
   const [
     recreating,
     setRecreating,
+  ] = useState(false);
+
+  const [
+    sendingToPackaging,
+    setSendingToPackaging,
   ] = useState(false);
 
   const [
@@ -789,6 +799,198 @@ export default function PubAssetsTable() {
 
 
   /*
+   * SEND ONE REVIEWED ASSET TO PACKAGE.
+   *
+   * The editor saves its current values first.
+   * This method then rings the Package doorbell with ONE asset ID.
+   *
+   * On PACKED or PENDING:
+   *   close the editor
+   *   refresh Assets
+   *   move to the Package workbench
+   *
+   * On failure:
+   *   leave the editor open and return the actual reason.
+   */
+  async function sendAssetToPackaging(
+    pubAssetId
+  ) {
+    const id =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!id) {
+      return {
+        ok:
+          false,
+
+        error:
+          "Valid PUB asset ID required.",
+      };
+    }
+
+
+    setSendingToPackaging(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          PACKAGE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  id,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          "Could not send asset to Packaging."
+        );
+      }
+
+
+      const packed =
+        Array.isArray(
+          data.packed
+        )
+          ? data.packed
+          : [];
+
+      const pending =
+        Array.isArray(
+          data.pending
+        )
+          ? data.pending
+          : [];
+
+      const failed =
+        Array.isArray(
+          data.failed
+        )
+          ? data.failed
+          : [];
+
+
+      if (failed.length) {
+        throw new Error(
+          failed[0]
+            ?.error ||
+          "Packaging failed."
+        );
+      }
+
+
+      if (
+        packed.length === 0
+        &&
+        pending.length === 0
+      ) {
+        throw new Error(
+          "Packaging did not accept this asset."
+        );
+      }
+
+
+      /*
+       * Successful department handoff.
+       *
+       * PENDING counts as successful intake: Package owns the asset now,
+       * and its stage_note explains what the specialist is waiting for.
+       */
+      setEditAsset(
+        null
+      );
+
+      setEditIngredientValues(
+        {}
+      );
+
+      setEditIngredientBindings(
+        []
+      );
+
+
+      await loadAssets();
+
+
+      onOpenPackage?.();
+
+
+      return {
+        ok:
+          true,
+
+        status:
+          packed.length
+            ? "packed"
+            : "pending",
+
+        data:
+          data,
+      };
+
+    } catch (err) {
+      const message =
+        err?.message ||
+        "Could not send asset to Packaging.";
+
+
+      setError(
+        message
+      );
+
+
+      return {
+        ok:
+          false,
+
+        error:
+          message,
+      };
+
+    } finally {
+      setSendingToPackaging(
+        false
+      );
+    }
+  }
+
+
+  /*
    * GRID COLUMNS
    */
   const columns =
@@ -1361,12 +1563,20 @@ export default function PubAssetsTable() {
               recreating
             }
 
+            sendingToPackaging={
+              sendingToPackaging
+            }
+
             onSave={
               saveAssetCopy
             }
 
             onRecreate={
               recreateAsset
+            }
+
+            onSendToPackaging={
+              sendAssetToPackaging
             }
 
             onRefreshAssets={
@@ -1410,12 +1620,20 @@ export default function PubAssetsTable() {
               recreating
             }
 
+            sendingToPackaging={
+              sendingToPackaging
+            }
+
             onSave={
               saveAssetCopy
             }
 
             onRecreate={
               recreateAsset
+            }
+
+            onSendToPackaging={
+              sendAssetToPackaging
             }
 
             onClose={() => {

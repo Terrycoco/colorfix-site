@@ -12,8 +12,10 @@ export default function PubAssetCopyEditor({
   asset,
   saving = false,
   recreating = false,
+  sendingToPackaging = false,
   onSave,
   onRecreate,
+  onSendToPackaging,
   onClose,
 }) {
   const [
@@ -31,6 +33,11 @@ export default function PubAssetCopyEditor({
     setSuccessMessage,
   ] = useState("");
 
+  const [
+    actionError,
+    setActionError,
+  ] = useState("");
+
 
   useEffect(() => {
     setTitle(
@@ -46,6 +53,10 @@ export default function PubAssetCopyEditor({
     setSuccessMessage(
       ""
     );
+
+    setActionError(
+      ""
+    );
   }, [
     asset,
   ]);
@@ -58,7 +69,8 @@ export default function PubAssetCopyEditor({
 
   const busy =
     saving ||
-    recreating;
+    recreating ||
+    sendingToPackaging;
 
 
   function currentChanges() {
@@ -81,6 +93,10 @@ export default function PubAssetCopyEditor({
       ""
     );
 
+    setActionError(
+      ""
+    );
+
     const result =
       await onSave?.(
         currentChanges()
@@ -98,6 +114,10 @@ export default function PubAssetCopyEditor({
 
   async function handleRecreate() {
     setSuccessMessage(
+      ""
+    );
+
+    setActionError(
       ""
     );
 
@@ -131,6 +151,54 @@ export default function PubAssetCopyEditor({
     ) {
       setSuccessMessage(
         `Asset #${asset.pub_asset_id} recreated successfully.`
+      );
+    }
+  }
+
+
+  async function handleSendToPackaging() {
+    setSuccessMessage(
+      ""
+    );
+
+    setActionError(
+      ""
+    );
+
+
+    /*
+     * The Package handed off must reflect the latest editor values.
+     * Save first; PackageManager then receives only the durable asset ID.
+     */
+    const saved =
+      await onSave?.(
+        currentChanges()
+      );
+
+
+    if (saved === false) {
+      setActionError(
+        "Could not save this asset before Packaging."
+      );
+
+      return;
+    }
+
+
+    const result =
+      await onSendToPackaging?.(
+        asset.pub_asset_id
+      );
+
+
+    if (
+      result === false
+      ||
+      result?.ok === false
+    ) {
+      setActionError(
+        result?.error ||
+        "Could not send this asset to Packaging."
       );
     }
   }
@@ -284,6 +352,10 @@ export default function PubAssetCopyEditor({
                   setSuccessMessage(
                     ""
                   );
+
+                  setActionError(
+                    ""
+                  );
                 }}
 
                 style={{
@@ -328,6 +400,10 @@ export default function PubAssetCopyEditor({
                   setSuccessMessage(
                     ""
                   );
+
+                  setActionError(
+                    ""
+                  );
                 }}
 
                 style={{
@@ -352,6 +428,19 @@ export default function PubAssetCopyEditor({
               >
                 {
                   successMessage
+                }
+              </div>
+            ) : null}
+
+
+            {actionError ? (
+              <div
+                style={
+                  errorStyle
+                }
+              >
+                {
+                  actionError
                 }
               </div>
             ) : null}
@@ -414,6 +503,25 @@ export default function PubAssetCopyEditor({
             {recreating
               ? "Recreating..."
               : "Redo Asset"}
+          </button>
+
+
+          <button
+            type="button"
+
+            disabled={
+              busy
+            }
+
+            onClick={
+              handleSendToPackaging
+            }
+          >
+            {
+              sendingToPackaging
+                ? "Sending..."
+                : "Send to Packaging"
+            }
           </button>
         </div>
       </form>
@@ -628,6 +736,24 @@ const successStyle = {
 
   background:
     "#f6f8f9",
+
+  fontSize:
+    12,
+};
+
+
+const errorStyle = {
+  padding:
+    "8px 10px",
+
+  border:
+    "1px solid #e2baba",
+
+  background:
+    "#fff7f7",
+
+  color:
+    "#7d2e2e",
 
   fontSize:
     12,

@@ -32,6 +32,10 @@ final class PubComSignal
     public const NOTICE =
         'notice';
 
+
+    public const PENDING =
+        'pending';
+
     public const INELIGIBLE =
         'ineligible';
 
@@ -136,6 +140,35 @@ final class PubComSignal
             $context
         );
     }
+
+    /**
+ * The worker is operational and the assignment
+ * may be valid, but a required dependency does
+ * not exist yet.
+ *
+ * This is not an error and not permanent
+ * ineligibility.
+ *
+ * Example:
+ *
+ *   "Waiting for YouTube thumbnail."
+ *   "Waiting for published YouTube URL."
+ *
+ * The Manager may leave the unit at its current
+ * station and try it again on a later pass.
+ */
+public static function pending(
+    string $code,
+    string $message,
+    array $context = []
+): self {
+    return new self(
+        self::PENDING,
+        $code,
+        $message,
+        $context
+    );
+}
 
 
     public function type(): string

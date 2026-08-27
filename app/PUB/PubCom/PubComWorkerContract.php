@@ -75,6 +75,7 @@ interface PubComWorkerContract
      *   PubComSignal::ready(...)
      *
      *   PubComSignal::ineligible(...)
+     * 
      *
      * @param array<string, mixed> $input
      */

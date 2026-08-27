@@ -32,8 +32,10 @@ export default function PubVideoAssetEditor({
   ingredientBindings = null,
   saving = false,
   recreating = false,
+  sendingToPackaging = false,
   onSave,
   onRecreate,
+  onSendToPackaging,
   onRefreshAssets,
   onClose,
 }) {
@@ -70,6 +72,11 @@ export default function PubVideoAssetEditor({
   const [
     successMessage,
     setSuccessMessage,
+  ] = useState("");
+
+  const [
+    actionError,
+    setActionError,
   ] = useState("");
 
   const [
@@ -190,6 +197,10 @@ export default function PubVideoAssetEditor({
       ""
     );
 
+    setActionError(
+      ""
+    );
+
     setMusicOpen(
       false
     );
@@ -214,7 +225,8 @@ export default function PubVideoAssetEditor({
 
   const busy =
     saving ||
-    recreating;
+    recreating ||
+    sendingToPackaging;
 
 
   const directIngredientChanges =
@@ -313,6 +325,10 @@ export default function PubVideoAssetEditor({
       ""
     );
 
+    setActionError(
+      ""
+    );
+
 
     /*
      * Any actual ingredient diff means the current physical asset
@@ -360,6 +376,10 @@ export default function PubVideoAssetEditor({
     );
 
     setSuccessMessage(
+      ""
+    );
+
+    setActionError(
       ""
     );
 
@@ -420,6 +440,70 @@ export default function PubVideoAssetEditor({
     onClose?.();
 
     await onRefreshAssets?.();
+  }
+
+
+  async function handleSendToPackaging() {
+    setSuccessMessage(
+      ""
+    );
+
+    setActionError(
+      ""
+    );
+
+
+    /*
+     * Do not hand a stale physical video to Package.
+     *
+     * If any current editor value belongs inside the Creator ingredients,
+     * the existing video no longer matches the order and must be REDO first.
+     */
+    if (hasIngredientChanges) {
+      setRedoWarningOpen(
+        true
+      );
+
+      return;
+    }
+
+
+    /*
+     * Metadata-only edits are safe to save immediately before handoff.
+     */
+    const saved =
+      await onSave?.(
+        currentChanges(
+          false
+        )
+      );
+
+
+    if (saved === false) {
+      setActionError(
+        "Could not save this video before Packaging."
+      );
+
+      return;
+    }
+
+
+    const result =
+      await onSendToPackaging?.(
+        asset.pub_asset_id
+      );
+
+
+    if (
+      result === false
+      ||
+      result?.ok === false
+    ) {
+      setActionError(
+        result?.error ||
+        "Could not send this video to Packaging."
+      );
+    }
   }
 
 
@@ -577,6 +661,10 @@ export default function PubVideoAssetEditor({
                   setSuccessMessage(
                     ""
                   );
+
+                  setActionError(
+                    ""
+                  );
                 }}
 
                 style={{
@@ -619,6 +707,10 @@ export default function PubVideoAssetEditor({
                   );
 
                   setSuccessMessage(
+                    ""
+                  );
+
+                  setActionError(
                     ""
                   );
                 }}
@@ -846,6 +938,19 @@ export default function PubVideoAssetEditor({
                 }
               </div>
             ) : null}
+
+
+            {actionError ? (
+              <div
+                style={
+                  actionErrorStyle
+                }
+              >
+                {
+                  actionError
+                }
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -910,6 +1015,25 @@ export default function PubVideoAssetEditor({
               recreating
                 ? "Recreating..."
                 : "Redo Video"
+            }
+          </button>
+
+
+          <button
+            type="button"
+
+            disabled={
+              busy
+            }
+
+            onClick={
+              handleSendToPackaging
+            }
+          >
+            {
+              sendingToPackaging
+                ? "Sending..."
+                : "Send to Packaging"
             }
           </button>
         </div>
@@ -2274,6 +2398,24 @@ const successStyle = {
 
   background:
     "#f6f8f9",
+
+  fontSize:
+    12,
+};
+
+
+const actionErrorStyle = {
+  padding:
+    "8px 10px",
+
+  border:
+    "1px solid #e2baba",
+
+  background:
+    "#fff7f7",
+
+  color:
+    "#7d2e2e",
 
   fontSize:
     12,

@@ -15,6 +15,10 @@ namespace App\PUB\Contracts;
  * ANALYZE prepares asset-specific ingredients.
  * CREATE consumes those ingredients and returns the
  * created physical asset.
+ * PACKAGE consumes durable pub_assets rows and returns
+ * channel/media-specific package arrays.
+ * DISPATCH consumes packed package arrays and returns
+ * shipping receipt arrays.
  */
 final class PubContract
 {
@@ -2764,6 +2768,20 @@ final class PubContract
              * ============================================================
              * STAGE 3 — PACKAGE
              * ============================================================
+             *
+             * PACKAGE starts after the creative asset already exists.
+             *
+             * Downstream routing is based on publishing channel + physical
+             * media type, not the CREATE recipe that produced the asset.
+             *
+             * PackageManager receives durable pub_assets rows currently at
+             * pipeline_stage = packing, chooses the matching Packager, and
+             * persists the Packager's returned PHP array into pub_assets.package.
+             *
+             * A Packager owns product/channel-specific readiness checks.
+             * Missing-but-expected dependencies are reported through PubCom
+             * as PENDING; the row remains in packing and stage_note may explain
+             * what is still missing.
              */
             'package' => [
 
@@ -2771,41 +2789,271 @@ final class PubContract
                     'package',
 
                 'referenceRole' =>
-                    'Label',
+                    'Packing',
 
                 'nextStage' =>
                     'schedule',
 
+                'manager' => [
+
+                    /*
+                     * Manager routing/intake fields.
+                     *
+                     * PackageManager does not inspect product-specific fields.
+                     * It needs only enough durable asset identity to choose the
+                     * correct specialist and persist that specialist's result.
+                     */
+                    'input' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'channel',
+                        ],
+
+                        [
+                            'key' =>
+                                'mime_type',
+                        ],
+
+                        [
+                            'key' =>
+                                'pipeline_stage',
+
+                            'note' =>
+                                'packing',
+                        ],
+                    ],
+
+                    /*
+                     * Successful departmental result.
+                     *
+                     * The specialist returns package{} as a PHP array.
+                     * PackageManager passes it unchanged to the repository,
+                     * which JSON-encodes it and marks the row packed.
+                     */
+                    'output' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'package',
+
+                            'type' =>
+                                'object',
+                        ],
+
+                        [
+                            'key' =>
+                                'pipeline_stage',
+
+                            'note' =>
+                                'packed',
+                        ],
+
+                        [
+                            'key' =>
+                                'stage_note',
+
+                            'required' =>
+                                false,
+
+                            'note' =>
+                                'cleared on successful packing; may explain a PENDING packing dependency while the row remains packing',
+                        ],
+                    ],
+                ],
+
+                /*
+                 * PACKAGE SPECIALIST LINES
+                 *
+                 * These keys describe downstream shipping/media classes,
+                 * not CREATE asset_type values.
+                 */
                 'assetTypes' => [
 
-                    'composite' => [
+                    /*
+                     * ----------------------------------------------------
+                     * PINTEREST IMAGE PACKAGER
+                     * ----------------------------------------------------
+                     *
+                     * Accepts any finished Pinterest image regardless of
+                     * whether CREATE produced a Composite, Idea, Palette,
+                     * or a future Pinterest JPEG/image recipe.
+                     */
+                    'pinterest_image' => [
+
+                        'label' =>
+                            'Pinterest Image',
+
                         'channel' =>
                             'pinterest',
-                    ],
 
-                    'before_after_video' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                        'mimeTypePrefix' =>
+                            'image/',
 
-                    'idea' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                        'packager' => [
 
-                    'idea_palette' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                            /*
+                             * Exact durable pub_assets fields this worker
+                             * reads during preflight()/pack().
+                             */
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'channel',
 
-                    'youtube_video' => [
-                        'channel' =>
-                            'youtube',
-                    ],
+                                    'required' =>
+                                        true,
 
-                    'youtube_teaser_pin' => [
-                        'channel' =>
-                            'pinterest',
+                                    'note' =>
+                                        'must be pinterest',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'mime_type',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'must begin image/',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'finished local image must exist',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'browser-facing asset URL; Packager resolves to an absolute public URL',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'search_title',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.title',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.description',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'pingback',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.link after resolving absolute URL and applying src=pin',
+                                ],
+                            ],
+
+                            /*
+                             * Exact PHP array returned to PackageManager.
+                             *
+                             * The repository serializes this object into
+                             * pub_assets.package. No asset IDs or lookup
+                             * instructions belong inside the package.
+                             */
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'title',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'link',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'absolute destination URL with src=pin',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'media_source',
+
+                                    'type' =>
+                                        'object',
+
+                                    'required' =>
+                                        true,
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'source_type',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'worker-owned constant: image_url',
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'url',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'absolute public image URL Pinterest can fetch',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
                     ],
                 ],
             ],
@@ -2866,6 +3114,21 @@ final class PubContract
              * ============================================================
              * STAGE 5 — DISPATCH
              * ============================================================
+             *
+             * DISPATCH is Shipping.
+             *
+             * ShippingManager receives the asset selected by Schedule,
+             * routes only far enough to choose the correct Shipper, and
+             * persists the Shipper's returned receipt.
+             *
+             * The Shipper is the courier:
+             *   - reads the sealed package
+             *   - supplies its own fixed connection/config/secrets
+             *   - authenticates
+             *   - performs the external API protocol
+             *   - returns the API receipt/result to ShippingManager
+             *
+             * Shipping never edits pub_assets.package.
              */
             'dispatch' => [
 
@@ -2878,36 +3141,206 @@ final class PubContract
                 'nextStage' =>
                     null,
 
+                'manager' => [
+
+                    'input' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'channel',
+                        ],
+
+                        [
+                            'key' =>
+                                'mime_type',
+                        ],
+
+                        [
+                            'key' =>
+                                'package',
+
+                            'type' =>
+                                'object',
+
+                            'required' =>
+                                true,
+                        ],
+                    ],
+
+                    /*
+                     * ShippingManager persists the specialist receipt into
+                     * shipping_receipt, stamps dispatched_at, and moves the
+                     * asset to its terminal shipped stage.
+                     */
+                    'output' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'shipping_receipt',
+
+                            'type' =>
+                                'object',
+                        ],
+
+                        [
+                            'key' =>
+                                'dispatched_at',
+
+                            'note' =>
+                                'manager-owned shipment timestamp used by Schedule history',
+                        ],
+
+                        [
+                            'key' =>
+                                'pipeline_stage',
+
+                            'note' =>
+                                'shipped',
+                        ],
+                    ],
+                ],
+
+                /*
+                 * DISPATCH SPECIALIST LINES
+                 *
+                 * Like PACKAGE, these are channel/media shipping classes,
+                 * not CREATE recipe names.
+                 */
                 'assetTypes' => [
 
-                    'composite' => [
+                    /*
+                     * ----------------------------------------------------
+                     * PINTEREST IMAGE SHIPPER
+                     * ----------------------------------------------------
+                     */
+                    'pinterest_image' => [
+
+                        'label' =>
+                            'Pinterest Image',
+
                         'channel' =>
                             'pinterest',
-                    ],
 
-                    'before_after_video' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                        'mimeTypePrefix' =>
+                            'image/',
 
-                    'idea' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                        'shipper' => [
 
-                    'idea_palette' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
+                            /*
+                             * Exact package supplied by Packing.
+                             *
+                             * Fixed board destination, Pinterest connection,
+                             * OAuth secrets, endpoint configuration, and other
+                             * courier constants belong to the Shipper/config
+                             * and are intentionally NOT package fields.
+                             */
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'package',
 
-                    'youtube_video' => [
-                        'channel' =>
-                            'youtube',
-                    ],
+                                    'type' =>
+                                        'object',
 
-                    'youtube_teaser_pin' => [
-                        'channel' =>
-                            'pinterest',
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'title',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'description',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'link',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'media_source.source_type',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'image_url',
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'media_source.url',
+
+                                            'required' =>
+                                                true,
+                                        ],
+                                    ],
+                                ],
+                            ],
+
+                            /*
+                             * Successful Shipper result returned to
+                             * ShippingManager. The Manager persists this
+                             * object as pub_assets.shipping_receipt and owns
+                             * the dispatched_at / shipped lifecycle stamps.
+                             */
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'external_id',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Pinterest Pin ID',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'external_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Pinterest Pin URL',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'response',
+
+                                    'type' =>
+                                        'object',
+
+                                    'required' =>
+                                        false,
+
+                                    'note' =>
+                                        'Pinterest API response retained as receipt detail when useful',
+                                ],
+                            ],
+                        ],
                     ],
                 ],
             ],
@@ -2923,9 +3356,10 @@ final class PubContract
              * They document the storage-facing field contracts that
              * specialists may rely on when handing durable data to PUB.
              *
-             * Only content / routing fields relevant to PUB handoffs are
-             * listed here. Lifecycle timestamps and error bookkeeping are
-             * intentionally omitted from this reference.
+             * Only storage fields relevant to PUB handoffs are listed here.
+             * Most lifecycle timestamps and error bookkeeping are intentionally
+             * omitted. dispatched_at is retained because Schedule consumes
+             * successful shipment history.
              */
             'repositories' => [
 
@@ -3094,6 +3528,61 @@ final class PubContract
 
                             'type' =>
                                 'varchar(1000)',
+                        ],
+
+                        [
+                            'key' =>
+                                'pipeline_stage',
+
+                            'type' =>
+                                'varchar(50)',
+
+                            'note' =>
+                                'current PUB factory stage/state',
+                        ],
+
+                        [
+                            'key' =>
+                                'stage_note',
+
+                            'type' =>
+                                'varchar(255)',
+
+                            'note' =>
+                                'nullable human-readable note for the current stage; Packing may use it for PENDING dependencies',
+                        ],
+
+                        [
+                            'key' =>
+                                'package',
+
+                            'type' =>
+                                'json',
+
+                            'note' =>
+                                'sealed outbound package produced by PACKAGE and consumed unchanged by Shipping',
+                        ],
+
+                        [
+                            'key' =>
+                                'shipping_receipt',
+
+                            'type' =>
+                                'json',
+
+                            'note' =>
+                                'receipt/result returned by Shipping after successful external dispatch',
+                        ],
+
+                        [
+                            'key' =>
+                                'dispatched_at',
+
+                            'type' =>
+                                'datetime',
+
+                            'note' =>
+                                'successful shipment time; consumed by Schedule history',
                         ],
                     ],
                 ],

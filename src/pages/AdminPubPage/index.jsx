@@ -35,6 +35,12 @@ import PubPipelineReference
 import PubAssetsTable
   from "./PubAssetsTable";
 
+import PubPackageTable
+  from "./PubPackageTable";
+
+import PubDispatchTable
+  from "./PubDispatchTable";
+
 import PubStageErrors
   from "./PubStageErrors";
 
@@ -80,6 +86,72 @@ const PUB_CONTRACTS_URL =
  *
  * and eventually a multi-select.
  */
+
+const PUB_STAGE_KEYS =
+  new Set([
+    "reference",
+    "analyze",
+    "assets",
+    "package",
+    "schedule",
+    "dispatch",
+  ]);
+
+
+function pubStageFromLocation() {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return "analyze";
+  }
+
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const queryStage =
+    String(
+      params.get(
+        "stage"
+      ) ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  if (
+    PUB_STAGE_KEYS.has(
+      queryStage
+    )
+  ) {
+    return queryStage;
+  }
+
+
+  const hashStage =
+    String(
+      window.location.hash ||
+      ""
+    )
+      .replace(
+        /^#/,
+        ""
+      )
+      .trim()
+      .toLowerCase();
+
+
+  return PUB_STAGE_KEYS.has(
+    hashStage
+  )
+    ? hashStage
+    : "analyze";
+}
+
 
 export default function AdminPubPage() {
   const {
@@ -351,10 +423,79 @@ export default function AdminPubPage() {
 
   const [
     stage,
-    setStage,
+    setStageState,
   ] = useState(
-    "analyze"
+    () =>
+      pubStageFromLocation()
   );
+
+
+  /*
+   * Keep the current PUB room in ?stage=.
+   *
+   * OAuth can safely round-trip query parameters through
+   * the server, so Dispatch returns to:
+   *
+   *   /admin/pub?stage=dispatch
+   */
+  function setStage(
+    nextStage
+  ) {
+    const value =
+      String(
+        nextStage ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    const resolved =
+      PUB_STAGE_KEYS.has(
+        value
+      )
+        ? value
+        : "analyze";
+
+
+    setStageState(
+      resolved
+    );
+
+
+    if (
+      typeof window !==
+      "undefined"
+    ) {
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
+
+
+      params.set(
+        "stage",
+        resolved
+      );
+
+
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${window.location.pathname}?${params.toString()}`
+      );
+    }
+  }
+
+
+  /*
+   * Direct stage URLs and OAuth returns must open
+   * the requested PUB room instead of defaulting to Analyze.
+   */
+  useEffect(() => {
+    setStageState(
+      pubStageFromLocation()
+    );
+  }, []);
 
 
   const [
@@ -2111,8 +2252,22 @@ async function sendToCreate() {
                   </div>
                 ) : null}
 
-                <PubAssetsTable />
+                <PubAssetsTable
+                  onOpenPackage={() =>
+                    setStage(
+                      "package"
+                    )
+                  }
+                />
               </>
+
+            ) : stage ===
+            "package" ? (
+              <PubPackageTable />
+   
+            ) : stage === "dispatch" ? (
+              <PubDispatchTable />
+
 
             ) : stage ===
             "analyze" ? (

@@ -941,6 +941,39 @@ public function updateOrder(
         );
 
 
+    /*
+     * A metadata edit does not require CREATE again, but once an asset
+     * has entered PACKING it can make the existing outbound package stale.
+     * Compare normalized values so a no-op Save does not trigger repacking.
+     */
+    $metadataChanged =
+        (
+            array_key_exists(
+                'search_title',
+                $changes
+            )
+            && $this->nullableString(
+                $changes['search_title']
+            ) !== $this->nullableString(
+                $asset['search_title']
+                ?? null
+            )
+        )
+        ||
+        (
+            array_key_exists(
+                'description',
+                $changes
+            )
+            && $this->nullableString(
+                $changes['description']
+            ) !== $this->nullableString(
+                $asset['description']
+                ?? null
+            )
+        );
+
+
     if (
         $ingredientsChanged
         && $currentStage === 'creating'
@@ -1019,6 +1052,12 @@ public function updateOrder(
          */
         if ($ingredientsChanged) {
             $assetUpdates[] =
+                '`package` = NULL';
+
+            $assetUpdates[] =
+                'stage_note = NULL';
+
+            $assetUpdates[] =
                 "pipeline_stage = 'redo_required'";
 
             $assetUpdates[] =
@@ -1035,6 +1074,34 @@ public function updateOrder(
         }
 
 
+        /*
+         * Outside-the-dish metadata does not require REDO.
+         * If Packing has already started, however, the old package
+         * must be discarded and rebuilt from the updated asset row.
+         */
+        if (
+            !$ingredientsChanged
+            && $metadataChanged
+            && in_array(
+                $currentStage,
+                [
+                    'packing',
+                    'packed',
+                ],
+                true
+            )
+        ) {
+            $assetUpdates[] =
+                '`package` = NULL';
+
+            $assetUpdates[] =
+                'stage_note = NULL';
+
+            $assetUpdates[] =
+                "pipeline_stage = 'packing'";
+        }
+
+
         if ($assetUpdates) {
             $sql =
                 'UPDATE pub_assets SET '
@@ -1043,7 +1110,7 @@ public function updateOrder(
                     $assetUpdates
                 )
                 . ' WHERE pub_asset_id = :pub_asset_id'
-                . " AND pipeline_stage NOT IN ('dispatched', 'published')";
+                . " AND pipeline_stage NOT IN ('shipped', 'dispatched', 'published')";
 
 
             $stmt =
@@ -1135,11 +1202,23 @@ public function updateOrder(
         'pipeline_stage' =>
             $ingredientsChanged
                 ? 'redo_required'
-                : (string)(
-                    $asset[
-                        'pipeline_stage'
-                    ]
-                    ?? ''
+                : (
+                    $metadataChanged
+                    && in_array(
+                        $currentStage,
+                        [
+                            'packing',
+                            'packed',
+                        ],
+                        true
+                    )
+                        ? 'packing'
+                        : (string)(
+                            $asset[
+                                'pipeline_stage'
+                            ]
+                            ?? ''
+                        )
                 ),
 
         'ingredients_changed' =>
@@ -1234,6 +1313,7 @@ public function updateOrder(
             in_array(
                 $stage,
                 [
+                    'shipped',
                     'dispatched',
                     'published',
                 ],
@@ -1252,6 +1332,8 @@ public function updateOrder(
                 UPDATE pub_assets
                 SET
                     pipeline_stage = 'creating',
+                    `package` = NULL,
+                    stage_note = NULL,
 
                     error_stage = NULL,
                     error_code = NULL,
@@ -1262,6 +1344,7 @@ public function updateOrder(
                     :pub_asset_id
 
                   AND pipeline_stage NOT IN (
+                      'shipped',
                       'dispatched',
                       'published'
                   )
@@ -1446,6 +1529,9 @@ public function updateOrder(
                     file_size_bytes = :file_size_bytes,
                     checksum = :checksum,
 
+                    `package` = NULL,
+                    stage_note = NULL,
+
                     pipeline_stage = 'created',
                     local_file_status = 'present',
 
@@ -1532,6 +1618,465 @@ public function updateOrder(
     }
 
 
+    /*
+     * ========================================================
+     * ASSET — PACKAGE
+     * ========================================================
+     */
+
+    /**
+     * Move one reviewed in-house asset onto the Packing station.
+     *
+     * Any previous package is deliberately discarded. A package is
+     * only trustworthy while it matches the current asset row.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string
+     * }
+     */
+    public function markPacking(
+        int $pubAssetId
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $asset =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if ($asset === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found."
+            );
+        }
+
+
+        $this->assertEditableStage(
+            $asset
+        );
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if (
+            !in_array(
+                $stage,
+                [
+                    'created',
+                    'packing',
+                    'packed',
+                ],
+                true
+            )
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} is not ready for Packing."
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    pipeline_stage = 'packing',
+                    `package` = NULL,
+                    stage_note = NULL,
+
+                    error_stage = NULL,
+                    error_code = NULL,
+                    error_message = NULL,
+                    errored_at = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage IN (
+                      'created',
+                      'packing',
+                      'packed'
+                  )
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $current =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if (
+            $current === null
+            || strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) !== 'packing'
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} could not be marked packing."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'packing',
+        ];
+    }
+
+
+    /**
+     * Persist the complete outbound package prepared by a Packager.
+     *
+     * The JSON shape is intentionally channel/type specific. The
+     * repository stores it without interpreting its contents.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string
+     * }
+     */
+    public function markPacked(
+        int $pubAssetId,
+        array $package
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        if ($package === []) {
+            throw new RuntimeException(
+                'PUB package cannot be empty.'
+            );
+        }
+
+
+        $packageJson =
+            json_encode(
+                $package,
+                JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+            );
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    `package` = :package,
+                    pipeline_stage = 'packed',
+                    stage_note = NULL,
+
+                    error_stage = NULL,
+                    error_code = NULL,
+                    error_message = NULL,
+                    errored_at = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage = 'packing'
+                SQL
+            );
+
+
+        $stmt->execute([
+            'package' =>
+                $packageJson,
+
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} could not be marked packed."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'packed',
+        ];
+    }
+
+
+    /**
+     * Keep one valid Package assignment at Packing because a required
+     * dependency does not exist yet.
+     *
+     * PENDING is not an error and is not a separate pipeline stage.
+     */
+    public function markPackingPending(
+        int $pubAssetId,
+        string $note
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $note =
+            trim(
+                $note
+            );
+
+
+        if ($note === '') {
+            throw new RuntimeException(
+                'Packing pending note cannot be empty.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    stage_note = :stage_note,
+                    `package` = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage = 'packing'
+                SQL
+            );
+
+
+        $stmt->execute([
+            'stage_note' =>
+                $note,
+
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $current =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if (
+            $current === null
+            || strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) !== 'packing'
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} could not be marked pending in Packing."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'packing',
+
+            'stage_note' =>
+                $note,
+        ];
+    }
+
+
+    /**
+     * Fetch exactly one asset currently assigned to Package.
+     *
+     * This is the single-item equivalent of listPacking().
+     * It deliberately omits package/shipping_receipt JSON.
+     */
+    public function getPackingById(
+        int $pubAssetId
+    ): ?array {
+        if ($pubAssetId <= 0) {
+            return null;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+                    creator_key,
+
+                    source_type,
+                    source_id,
+                    sort_order,
+
+                    pipeline_stage,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    file_path,
+                    url,
+                    mime_type,
+
+                    width,
+                    height,
+                    duration_ms,
+
+                    file_size_bytes,
+                    checksum,
+
+                    created_at,
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage = 'packing'
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        return $row ?: null;
+    }
+
+
+    /**
+     * PackageManager's workbench.
+     *
+     * Deliberately does NOT select package or shipping_receipt JSON.
+     * Rows at this stage are inspected from their durable asset fields;
+     * the Packager creates package JSON only when the box is complete.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPacking(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+                    creator_key,
+
+                    source_type,
+                    source_id,
+                    sort_order,
+
+                    pipeline_stage,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    file_path,
+                    url,
+                    mime_type,
+
+                    width,
+                    height,
+                    duration_ms,
+
+                    file_size_bytes,
+                    checksum,
+
+                    created_at,
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pipeline_stage = 'packing'
+
+                ORDER BY pub_asset_id ASC
+                SQL
+            );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
     public function markError(
         int $pubAssetId,
         string $stage,
@@ -1544,6 +2089,7 @@ public function updateOrder(
                 UPDATE pub_assets
                 SET
                     pipeline_stage = 'error',
+                    stage_note = NULL,
                     error_stage = :error_stage,
                     error_code = :error_code,
                     error_message = :error_message,
@@ -1573,6 +2119,971 @@ public function updateOrder(
             'pub_asset_id' =>
                 $pubAssetId,
         ]);
+    }
+
+
+    /*
+     * ========================================================
+     * PACKAGE — ADMIN
+     * ========================================================
+     */
+
+    /**
+     * Package workbench summary rows.
+     *
+     * Includes:
+     *   packing
+     *   packed
+     *   PACKAGE-stage errors
+     *
+     * The package JSON itself is intentionally omitted.
+     * has_package is enough for the workbench checkmark.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPackageAdmin(
+        ?string $channel = null,
+        ?string $assetType = null
+    ): array {
+        $where = [
+            "("
+            . "pipeline_stage IN ('packing', 'packed')"
+            . " OR (pipeline_stage = 'error' AND error_stage = 'package')"
+            . ")",
+        ];
+
+        $params = [];
+
+
+        $channel =
+            trim(
+                (string)$channel
+            );
+
+        $assetType =
+            trim(
+                (string)$assetType
+            );
+
+
+        if ($channel !== '') {
+            $where[] =
+                'channel = :channel';
+
+            $params[
+                'channel'
+            ] =
+                $channel;
+        }
+
+
+        if ($assetType !== '') {
+            $where[] =
+                'asset_type = :asset_type';
+
+            $params[
+                'asset_type'
+            ] =
+                $assetType;
+        }
+
+
+        $sql = <<<SQL
+            SELECT
+                pub_asset_id,
+                pub_run_id,
+
+                channel,
+                asset_type,
+
+                source_type,
+                source_id,
+
+                pipeline_stage,
+                stage_note,
+
+                search_title,
+
+                error_message,
+
+                CASE
+                    WHEN `package` IS NULL THEN 0
+                    ELSE 1
+                END AS has_package,
+
+                updated_at
+
+            FROM pub_assets
+
+            WHERE
+            SQL;
+
+        $sql .=
+            "\n    "
+            . implode(
+                "\n    AND ",
+                $where
+            );
+
+        $sql .=
+            "\nORDER BY pub_asset_id DESC";
+
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+        $stmt->execute(
+            $params
+        );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
+    /**
+     * One Package drawer detail row.
+     *
+     * Unlike the workbench list, this intentionally includes
+     * the actual package JSON.
+     */
+    public function getPackageAdminById(
+        int $pubAssetId
+    ): ?array {
+        if ($pubAssetId <= 0) {
+            return null;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+
+                    source_type,
+                    source_id,
+
+                    pipeline_stage,
+                    stage_note,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    file_path,
+                    url,
+                    mime_type,
+
+                    width,
+                    height,
+                    duration_ms,
+
+                    error_stage,
+                    error_code,
+                    error_message,
+                    errored_at,
+
+                    `package`,
+
+                    created_at,
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND (
+                      pipeline_stage IN (
+                          'packing',
+                          'packed'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'package'
+                      )
+                  )
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if (!$row) {
+            return null;
+        }
+
+
+        $rawPackage =
+            $row[
+                'package'
+            ]
+            ?? null;
+
+
+        if (
+            is_string(
+                $rawPackage
+            )
+            && trim(
+                $rawPackage
+            ) !== ''
+        ) {
+            $decoded =
+                json_decode(
+                    $rawPackage,
+                    true
+                );
+
+
+            if (
+                json_last_error() ===
+                JSON_ERROR_NONE
+            ) {
+                $row[
+                    'package'
+                ] =
+                    $decoded;
+            }
+        }
+
+
+        return $row;
+    }
+
+
+    public function listPackageChannels(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT channel
+
+                FROM pub_assets
+
+                WHERE channel IS NOT NULL
+                  AND TRIM(channel) <> ''
+
+                  AND (
+                      pipeline_stage IN (
+                          'packing',
+                          'packed'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'package'
+                      )
+                  )
+
+                ORDER BY channel ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
+    public function listPackageAssetTypes(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT asset_type
+
+                FROM pub_assets
+
+                WHERE asset_type IS NOT NULL
+                  AND TRIM(asset_type) <> ''
+
+                  AND (
+                      pipeline_stage IN (
+                          'packing',
+                          'packed'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'package'
+                      )
+                  )
+
+                ORDER BY asset_type ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
+    /*
+     * ========================================================
+     * ASSET — DISPATCH
+     * ========================================================
+     */
+
+    /**
+     * DispatchManager's shipping dock.
+     *
+     * Returns only assets Schedule has already selected by moving
+     * them to pipeline_stage = shipping.
+     *
+     * The sealed package is decoded here because DispatchManager
+     * hands that exact package to the selected Shipper.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listShipping(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+
+                    source_type,
+                    source_id,
+
+                    pipeline_stage,
+                    mime_type,
+
+                    `package`
+
+                FROM pub_assets
+
+                WHERE pipeline_stage = 'shipping'
+
+                ORDER BY pub_asset_id ASC
+                SQL
+            );
+
+
+        $rows =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+
+        return array_map(
+            fn (
+                array $row
+            ): array =>
+                $this->decodePackageRow(
+                    $row
+                ),
+
+            $rows
+        );
+    }
+
+
+    /**
+     * Fetch exactly one asset waiting at the Shipping dock.
+     */
+    public function getShippingById(
+        int $pubAssetId
+    ): ?array {
+        if ($pubAssetId <= 0) {
+            return null;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+
+                    source_type,
+                    source_id,
+
+                    pipeline_stage,
+                    mime_type,
+
+                    `package`
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage = 'shipping'
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if (!$row) {
+            return null;
+        }
+
+
+        return $this->decodePackageRow(
+            $row
+        );
+    }
+
+
+    /**
+     * Persist the receipt returned by a Shipping specialist and
+     * close the PUB lifecycle for this asset.
+     *
+     * The repository does not interpret receipt contents.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string,
+     *   dispatched_at: string|null
+     * }
+     */
+    public function markShipped(
+        int $pubAssetId,
+        array $receipt
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        if ($receipt === []) {
+            throw new RuntimeException(
+                'Shipping receipt cannot be empty.'
+            );
+        }
+
+
+        $receiptJson =
+            json_encode(
+                $receipt,
+                JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+            );
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    shipping_receipt =
+                        :shipping_receipt,
+
+                    pipeline_stage =
+                        'shipped',
+
+                    stage_note =
+                        NULL,
+
+                    dispatched_at =
+                        NOW(),
+
+                    error_stage =
+                        NULL,
+
+                    error_code =
+                        NULL,
+
+                    error_message =
+                        NULL,
+
+                    errored_at =
+                        NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage =
+                    'shipping'
+                SQL
+            );
+
+
+        $stmt->execute([
+            'shipping_receipt' =>
+                $receiptJson,
+
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} could not be marked shipped."
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    dispatched_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $dispatchedAt =
+            $stmt->fetchColumn();
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'shipped',
+
+            'dispatched_at' =>
+                $dispatchedAt !== false
+                    ? (string)$dispatchedAt
+                    : null,
+        ];
+    }
+
+
+    /*
+     * ========================================================
+     * DISPATCH — ADMIN
+     * ========================================================
+     */
+
+    /**
+     * Dispatch workbench summary rows.
+     *
+     * Includes:
+     *   shipping
+     *   shipped
+     *   DISPATCH-stage errors
+     *
+     * Large package/receipt JSON is deliberately omitted here.
+     * The grid only needs checkmarks and receipt result fields.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForDispatchAdmin(
+        ?string $channel = null,
+        ?string $assetType = null
+    ): array {
+        $where = [
+            "("
+            . "pipeline_stage IN ('shipping', 'shipped')"
+            . " OR (pipeline_stage = 'error' AND error_stage = 'dispatch')"
+            . ")",
+        ];
+
+        $params = [];
+
+
+        $channel =
+            trim(
+                (string)$channel
+            );
+
+        $assetType =
+            trim(
+                (string)$assetType
+            );
+
+
+        if ($channel !== '') {
+            $where[] =
+                'channel = :channel';
+
+            $params[
+                'channel'
+            ] =
+                $channel;
+        }
+
+
+        if ($assetType !== '') {
+            $where[] =
+                'asset_type = :asset_type';
+
+            $params[
+                'asset_type'
+            ] =
+                $assetType;
+        }
+
+
+        $sql = <<<SQL
+            SELECT
+                pub_asset_id,
+                pub_run_id,
+
+                channel,
+                asset_type,
+
+                source_type,
+                source_id,
+
+                pipeline_stage,
+                stage_note,
+
+                search_title,
+
+                error_message,
+
+                CASE
+                    WHEN `package` IS NULL THEN 0
+                    ELSE 1
+                END AS has_package,
+
+                CASE
+                    WHEN shipping_receipt IS NULL THEN 0
+                    ELSE 1
+                END AS has_receipt,
+
+                JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        shipping_receipt,
+                        '$.external_id'
+                    )
+                ) AS external_id,
+
+                JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        shipping_receipt,
+                        '$.external_url'
+                    )
+                ) AS external_url,
+
+                dispatched_at,
+                updated_at
+
+            FROM pub_assets
+
+            WHERE
+            SQL;
+
+        $sql .=
+            "\n    "
+            . implode(
+                "\n    AND ",
+                $where
+            );
+
+        $sql .=
+            "\nORDER BY pub_asset_id DESC";
+
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+        $stmt->execute(
+            $params
+        );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
+    /**
+     * One Dispatch drawer detail row.
+     *
+     * This intentionally includes both sides of the dock:
+     *
+     *   package
+     *     exactly what PUB sent
+     *
+     *   shipping_receipt
+     *     exactly what the external channel returned
+     */
+    public function getDispatchAdminById(
+        int $pubAssetId
+    ): ?array {
+        if ($pubAssetId <= 0) {
+            return null;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+
+                    source_type,
+                    source_id,
+
+                    pipeline_stage,
+                    stage_note,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    file_path,
+                    url,
+                    mime_type,
+
+                    error_stage,
+                    error_code,
+                    error_message,
+                    errored_at,
+
+                    `package`,
+                    shipping_receipt,
+
+                    dispatched_at,
+                    created_at,
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND (
+                      pipeline_stage IN (
+                          'shipping',
+                          'shipped'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'dispatch'
+                      )
+                  )
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        if (!$row) {
+            return null;
+        }
+
+
+        foreach (
+            [
+                'package',
+                'shipping_receipt',
+            ]
+            as $jsonField
+        ) {
+            $raw =
+                $row[
+                    $jsonField
+                ]
+                ?? null;
+
+
+            if (
+                is_string(
+                    $raw
+                )
+                && trim(
+                    $raw
+                ) !== ''
+            ) {
+                $decoded =
+                    json_decode(
+                        $raw,
+                        true
+                    );
+
+
+                if (
+                    json_last_error() ===
+                    JSON_ERROR_NONE
+                    && is_array(
+                        $decoded
+                    )
+                ) {
+                    $row[
+                        $jsonField
+                    ] =
+                        $decoded;
+                }
+            }
+        }
+
+
+        return $row;
+    }
+
+
+    public function listDispatchChannels(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT channel
+
+                FROM pub_assets
+
+                WHERE channel IS NOT NULL
+                  AND TRIM(channel) <> ''
+
+                  AND (
+                      pipeline_stage IN (
+                          'shipping',
+                          'shipped'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'dispatch'
+                      )
+                  )
+
+                ORDER BY channel ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
+    public function listDispatchAssetTypes(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT asset_type
+
+                FROM pub_assets
+
+                WHERE asset_type IS NOT NULL
+                  AND TRIM(asset_type) <> ''
+
+                  AND (
+                      pipeline_stage IN (
+                          'shipping',
+                          'shipped'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'dispatch'
+                      )
+                  )
+
+                ORDER BY asset_type ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
     }
 
 
@@ -1642,8 +3153,7 @@ public function updateOrder(
                 error_message,
 
                 updated_at,
-                dispatched_at,
-                published_at
+                dispatched_at
 
             FROM pub_assets
             SQL;
@@ -1765,8 +3275,7 @@ public function updateOrder(
 
                     created_at,
                     updated_at,
-                    dispatched_at,
-                    published_at
+                    dispatched_at
 
                 FROM pub_assets
 
@@ -1916,6 +3425,7 @@ public function updateOrder(
             in_array(
                 $stage,
                 [
+                    'shipped',
                     'dispatched',
                     'published',
                 ],
@@ -1923,9 +3433,71 @@ public function updateOrder(
             )
         ) {
             throw new RuntimeException(
-                'Dispatched or published assets cannot be changed.'
+                'Shipped, dispatched, or published assets cannot be changed.'
             );
         }
+    }
+
+
+    private function decodePackageRow(
+        array $row
+    ): array {
+        $raw =
+            $row[
+                'package'
+            ]
+            ?? null;
+
+
+        if (is_array($raw)) {
+            return $row;
+        }
+
+
+        if (
+            !is_string(
+                $raw
+            )
+            || trim(
+                $raw
+            ) === ''
+        ) {
+            $row[
+                'package'
+            ] =
+                null;
+
+            return $row;
+        }
+
+
+        $decoded =
+            json_decode(
+                $raw,
+                true
+            );
+
+
+        if (
+            json_last_error() !==
+                JSON_ERROR_NONE
+            || !is_array(
+                $decoded
+            )
+        ) {
+            throw new RuntimeException(
+                'PUB asset contains invalid package JSON.'
+            );
+        }
+
+
+        $row[
+            'package'
+        ] =
+            $decoded;
+
+
+        return $row;
     }
 
 
