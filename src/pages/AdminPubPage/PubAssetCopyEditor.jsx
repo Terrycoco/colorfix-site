@@ -38,6 +38,13 @@ export default function PubAssetCopyEditor({
     setActionError,
   ] = useState("");
 
+  const [
+    previewVersion,
+    setPreviewVersion,
+  ] = useState(
+    () => Date.now()
+  );
+
 
   useEffect(() => {
     setTitle(
@@ -149,6 +156,10 @@ export default function PubAssetCopyEditor({
     if (
       recreated !== false
     ) {
+      setPreviewVersion(
+        Date.now()
+      );
+
       setSuccessMessage(
         `Asset #${asset.pub_asset_id} recreated successfully.`
       );
@@ -292,7 +303,10 @@ export default function PubAssetCopyEditor({
             {asset.url ? (
               <img
                 src={
-                  asset.url
+                  versionedPreviewUrl(
+                    asset.url,
+                    previewVersion
+                  )
                 }
 
                 alt=""
@@ -529,6 +543,45 @@ export default function PubAssetCopyEditor({
 
     document.body
   );
+}
+
+
+/**
+ * Append a client-local version token to a durable preview URL.
+ *
+ * This guarantees a fresh browser request even when the backend payload
+ * does not expose updated_at/checksum and REDO keeps the same asset URL.
+ */
+function versionedPreviewUrl(
+  url,
+  version
+) {
+  const value =
+    String(
+      url ||
+      ""
+    )
+      .trim();
+
+
+  if (!value) {
+    return "";
+  }
+
+
+  const separator =
+    value.includes(
+      "?"
+    )
+      ? "&"
+      : "?";
+
+
+  return `${value}${separator}v=${encodeURIComponent(
+    String(
+      version
+    )
+  )}`;
 }
 
 

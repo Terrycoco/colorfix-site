@@ -2644,6 +2644,7 @@ final class VideoLayerBuilder
      *
      * Neutral audio entries may contain:
      *   src, start_ms, duration_ms, volume
+     *   fade_out { start_ms, duration_ms }
      *
      * @return array<int, array<string, mixed>>
      */
@@ -2726,7 +2727,7 @@ final class VideoLayerBuilder
                     );
 
 
-            $translated[] = [
+            $translatedAudio = [
                 'src' =>
                     $src,
 
@@ -2745,6 +2746,107 @@ final class VideoLayerBuilder
                         "blueprint.audio[{$index}].volume"
                     ),
             ];
+
+
+            $fadeOut =
+                is_array(
+                    $audio[
+                        'fade_out'
+                    ]
+                    ?? null
+                )
+                    ? $audio[
+                        'fade_out'
+                    ]
+                    : null;
+
+
+            if ($fadeOut !== null) {
+                $fadeOutStartMs =
+                    $this->nonNegativeInt(
+                        $fadeOut[
+                            'start_ms'
+                        ]
+                        ?? 0,
+                        "blueprint.audio[{$index}].fade_out.start_ms"
+                    );
+
+                $fadeOutDurationMs =
+                    $this->nonNegativeInt(
+                        $fadeOut[
+                            'duration_ms'
+                        ]
+                        ?? 0,
+                        "blueprint.audio[{$index}].fade_out.duration_ms"
+                    );
+
+
+                if ($fadeOutDurationMs > 0) {
+                    /*
+                     * GenericAudio lives inside a Sequence, so these renderer
+                     * fade frames are relative to the audio entry itself.
+                     */
+                    $audioDurationFrames =
+                        max(
+                            1,
+                            $endFrame
+                            - $startFrame
+                        );
+
+                    $absoluteFadeStartFrame =
+                        $this->msToFrames(
+                            $fadeOutStartMs,
+                            $fps
+                        );
+
+                    $absoluteFadeEndFrame =
+                        $this->msToFrames(
+                            $fadeOutStartMs
+                            + $fadeOutDurationMs,
+                            $fps
+                        );
+
+                    $fadeOutStartFrame =
+                        max(
+                            0,
+                            min(
+                                $audioDurationFrames - 1,
+                                $absoluteFadeStartFrame
+                                - $startFrame
+                            )
+                        );
+
+                    $fadeOutEndFrame =
+                        max(
+                            $fadeOutStartFrame,
+                            min(
+                                $audioDurationFrames - 1,
+                                $absoluteFadeEndFrame
+                                - $startFrame
+                            )
+                        );
+
+
+                    if (
+                        $fadeOutEndFrame
+                        > $fadeOutStartFrame
+                    ) {
+                        $translatedAudio[
+                            'fade_out_start_frame'
+                        ] =
+                            $fadeOutStartFrame;
+
+                        $translatedAudio[
+                            'fade_out_end_frame'
+                        ] =
+                            $fadeOutEndFrame;
+                    }
+                }
+            }
+
+
+            $translated[] =
+                $translatedAudio;
         }
 
 

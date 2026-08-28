@@ -5,6 +5,8 @@ namespace App\PUB\Package;
 
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\Package\Pinterest\PinterestImagePackager;
+use App\PUB\Package\Pinterest\PinterestVideoPackager;
+use App\PUB\Package\YouTube\YouTubeVideoPackager;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
@@ -742,6 +744,14 @@ final class PackageManager implements PubComManagerContract
                     new PinterestImagePackager(
                         $this->publicBaseUrl()
                     ),
+
+                'pinterest.video' =>
+                    new PinterestVideoPackager(
+                        $this->publicBaseUrl()
+                    ),
+
+                'youtube.video' =>
+                    new YouTubeVideoPackager(),
 
                 default =>
                     throw new RuntimeException(

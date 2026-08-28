@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace App\PUB\Endpoints;
 
-use App\PUB\Dispatch\ChannelConnectionContract;
+use App\PUB\Dispatch\Auth\ChannelAuthContract;
+use App\PUB\Dispatch\Auth\YouTubeAuthService;
 use App\PUB\Dispatch\Pinterest\PinterestConnectionService;
 use App\PUB\Errors\PubErrorReporter;
 use PDO;
@@ -15,98 +16,58 @@ use Throwable;
  *
  * PUB-facing controller for external channel connections.
  *
- * Current channel:
+ * Current channels:
  *   pinterest
- *
- * Future:
  *   youtube
  *
  * Supported actions:
  *
  *   GET
  *     ?channel=pinterest
+ *     ?channel=youtube
  *     ?channel=pinterest&action=status
+ *     ?channel=youtube&action=status
  *
  *   POST JSON
  *     { "channel": "pinterest", "action": "test" }
+ *     { "channel": "youtube", "action": "test" }
  *     { "channel": "pinterest", "action": "sync" }
  *     { "channel": "pinterest", "action": "disconnect" }
+ *     { "channel": "youtube", "action": "disconnect" }
  *
- * OAuth browser redirects are intentionally handled by separate,
- * tiny public connect/callback doors because those requests have
- * different browser/session behavior.
+ * OAuth browser redirects are handled by separate tiny public doors.
+ * Real OAuth/auth behavior lives under app/PUB/Dispatch/Auth.
  */
 final class ChannelConnectionEndpoint
 {
-    public static function handle(
-        PDO $pdo
-    ): void {
-        if (
-            (
-                $_SERVER[
-                    'REQUEST_METHOD'
-                ]
-                ?? 'GET'
-            ) === 'OPTIONS'
-        ) {
-            self::sendJson(
-                200,
-                [
-                    'ok' => true,
-                ]
-            );
-
+    public static function handle(PDO $pdo): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+            self::sendJson(200, [
+                'ok' => true,
+            ]);
             return;
         }
 
+        $projectRoot = dirname(__DIR__, 3);
 
-        $projectRoot =
-            dirname(
-                __DIR__,
-                3
-            );
-
-        $errors =
-            new PubErrorReporter(
-                $projectRoot
-                . '/app/PUB/Errors/pub_errors.log'
-            );
-
+        $errors = new PubErrorReporter(
+            $projectRoot . '/app/PUB/Errors/pub_errors.log'
+        );
 
         try {
-            $method =
-                strtoupper(
-                    (string)(
-                        $_SERVER[
-                            'REQUEST_METHOD'
-                        ]
-                        ?? 'GET'
-                    )
-                );
-
+            $method = strtoupper(
+                (string)($_SERVER['REQUEST_METHOD'] ?? 'GET')
+            );
 
             if ($method === 'GET') {
-                $channel =
-                    trim(
-                        (string)(
-                            $_GET[
-                                'channel'
-                            ]
-                            ?? 'pinterest'
-                        )
-                    );
+                $channel = trim(
+                    (string)($_GET['channel'] ?? 'pinterest')
+                );
 
-                $action =
-                    strtolower(
-                        trim(
-                            (string)(
-                                $_GET[
-                                    'action'
-                                ]
-                                ?? 'status'
-                            )
-                        )
-                    );
+                $action = strtolower(
+                    trim((string)($_GET['action'] ?? 'status'))
+                );
 
                 if ($action !== 'status') {
                     throw new RuntimeException(
@@ -114,75 +75,37 @@ final class ChannelConnectionEndpoint
                     );
                 }
 
-
-                $connection =
-                    self::connectionFor(
-                        $pdo,
-                        $channel
-                    );
-
-
-                self::sendJson(
-                    200,
-                    [
-                        'ok' =>
-                            true,
-
-                        'channel' =>
-                            $connection
-                                ->channelKey(),
-
-                        'item' =>
-                            $connection
-                                ->status(),
-                    ]
+                $connection = self::connectionFor(
+                    $pdo,
+                    $channel
                 );
+
+                self::sendJson(200, [
+                    'ok' => true,
+                    'channel' => $connection->channelKey(),
+                    'item' => $connection->status(),
+                ]);
 
                 return;
             }
-
 
             if ($method !== 'POST') {
-                self::sendJson(
-                    405,
-                    [
-                        'ok' =>
-                            false,
-
-                        'error' =>
-                            'GET or POST only.',
-                    ]
-                );
-
+                self::sendJson(405, [
+                    'ok' => false,
+                    'error' => 'GET or POST only.',
+                ]);
                 return;
             }
 
+            $data = self::requestJson();
 
-            $data =
-                self::requestJson();
+            $channel = trim(
+                (string)($data['channel'] ?? 'pinterest')
+            );
 
-            $channel =
-                trim(
-                    (string)(
-                        $data[
-                            'channel'
-                        ]
-                        ?? 'pinterest'
-                    )
-                );
-
-            $action =
-                strtolower(
-                    trim(
-                        (string)(
-                            $data[
-                                'action'
-                            ]
-                            ?? ''
-                        )
-                    )
-                );
-
+            $action = strtolower(
+                trim((string)($data['action'] ?? ''))
+            );
 
             if ($action === '') {
                 throw new RuntimeException(
@@ -190,49 +113,27 @@ final class ChannelConnectionEndpoint
                 );
             }
 
-
-            $connection =
-                self::connectionFor(
-                    $pdo,
-                    $channel
-                );
-
+            $connection = self::connectionFor(
+                $pdo,
+                $channel
+            );
 
             switch ($action) {
                 case 'status':
-                    $result =
-                        $connection
-                            ->status();
-
+                    $result = $connection->status();
                     break;
-
 
                 case 'test':
-                    $result =
-                        $connection
-                            ->testConnection();
-
+                    $result = $connection->testConnection();
                     break;
-
 
                 case 'disconnect':
-                    $connection
-                        ->disconnect();
-
-                    $result =
-                        $connection
-                            ->status();
-
+                    $connection->disconnect();
+                    $result = $connection->status();
                     break;
 
-
                 case 'sync':
-                    if (
-                        !method_exists(
-                            $connection,
-                            'syncBoards'
-                        )
-                    ) {
+                    if (!method_exists($connection, 'syncBoards')) {
                         throw new RuntimeException(
                             "Channel '{$channel}' does not support destination sync."
                         );
@@ -244,11 +145,8 @@ final class ChannelConnectionEndpoint
                         'syncBoards',
                     ];
 
-                    $result =
-                        $sync();
-
+                    $result = $sync();
                     break;
-
 
                 default:
                     throw new RuntimeException(
@@ -256,94 +154,50 @@ final class ChannelConnectionEndpoint
                     );
             }
 
-
-            self::sendJson(
-                200,
-                [
-                    'ok' =>
-                        true,
-
-                    'channel' =>
-                        $connection
-                            ->channelKey(),
-
-                    'action' =>
-                        $action,
-
-                    'item' =>
-                        $result,
-                ]
-            );
+            self::sendJson(200, [
+                'ok' => true,
+                'channel' => $connection->channelKey(),
+                'action' => $action,
+                'item' => $result,
+            ]);
 
         } catch (Throwable $e) {
-            $failure =
-                $errors
-                    ->report(
-                        $e,
-                        [
-                            'stage' =>
-                                'dispatch',
-
-                            'code' =>
-                                'channel_connection_failure',
-
-                            'diagnostics' => [
-                                'channel' =>
-                                    $_GET[
-                                        'channel'
-                                    ]
-                                    ?? null,
-
-                                'action' =>
-                                    $_GET[
-                                        'action'
-                                    ]
-                                    ?? null,
-                            ],
-                        ]
-                    );
-
-
-            self::sendJson(
-                500,
+            $failure = $errors->report(
+                $e,
                 [
-                    'ok' =>
-                        false,
-
-                    'error' =>
-                        $failure[
-                            'error'
-                        ]
-                        ?? $e->getMessage(),
-
-                    'code' =>
-                        $failure[
-                            'code'
-                        ]
-                        ?? 'channel_connection_failure',
+                    'stage' => 'dispatch',
+                    'code' => 'channel_connection_failure',
+                    'diagnostics' => [
+                        'channel' => $_GET['channel'] ?? null,
+                        'action' => $_GET['action'] ?? null,
+                    ],
                 ]
             );
+
+            self::sendJson(500, [
+                'ok' => false,
+                'error' => $failure['error'] ?? $e->getMessage(),
+                'code' => $failure['code'] ?? 'channel_connection_failure',
+            ]);
         }
     }
-
 
     private static function connectionFor(
         PDO $pdo,
         string $channel
-    ): ChannelConnectionContract {
-        $channel =
-            strtolower(
-                trim(
-                    $channel
-                )
-            );
+    ): ChannelAuthContract {
+        $channel = strtolower(
+            trim($channel)
+        );
 
-
-        return match (
-            $channel
-        ) {
+        return match ($channel) {
             'pinterest' =>
                 new PinterestConnectionService(
+                    $pdo
+                ),
+
+            'youtube' =>
+                new YouTubeAuthService(
                     $pdo
                 ),
 
@@ -354,31 +208,23 @@ final class ChannelConnectionEndpoint
         };
     }
 
-
     private static function requestJson(): array
     {
-        $raw =
-            file_get_contents(
-                'php://input'
-            );
-
+        $raw = file_get_contents(
+            'php://input'
+        );
 
         if (
             $raw === false
-            || trim(
-                $raw
-            ) === ''
+            || trim($raw) === ''
         ) {
             return [];
         }
 
-
-        $decoded =
-            json_decode(
-                $raw,
-                true
-            );
-
+        $decoded = json_decode(
+            $raw,
+            true
+        );
 
         if (!is_array($decoded)) {
             throw new RuntimeException(
@@ -386,10 +232,8 @@ final class ChannelConnectionEndpoint
             );
         }
 
-
         return $decoded;
     }
-
 
     private static function sendJson(
         int $status,
@@ -399,13 +243,11 @@ final class ChannelConnectionEndpoint
             $status
         );
 
-
         if (!headers_sent()) {
             header(
                 'Content-Type: application/json; charset=UTF-8'
             );
         }
-
 
         echo json_encode(
             $payload,

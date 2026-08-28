@@ -118,103 +118,6 @@ export function GenericVideo({
 }
 
 
-function GenericAudio({
-  entry,
-}) {
-  if (
-    !entry
-    ||
-    typeof entry !==
-      "object"
-    ||
-    Array.isArray(
-      entry
-    )
-  ) {
-    return null;
-  }
-
-
-  const src =
-    String(
-      entry.src ||
-      ""
-    )
-      .trim();
-
-
-  if (!src) {
-    throw new Error(
-      "Generic video audio entry is missing src."
-    );
-  }
-
-
-  const startFrame =
-    Math.max(
-      0,
-      Math.round(
-        finiteNumber(
-          entry.start_frame,
-          0
-        )
-      )
-    );
-
-  const endFrame =
-    Math.max(
-      startFrame + 1,
-      Math.round(
-        finiteNumber(
-          entry.end_frame,
-          startFrame + 1
-        )
-      )
-    );
-
-  const durationInFrames =
-    endFrame -
-    startFrame;
-
-  const volume =
-    Math.max(
-      0,
-      Math.min(
-        1,
-        finiteNumber(
-          entry.volume,
-          1
-        )
-      )
-    );
-
-
-  return (
-    <Sequence
-      from={
-        startFrame
-      }
-
-      durationInFrames={
-        durationInFrames
-      }
-
-      layout="none"
-    >
-      <Audio
-        src={
-          src
-        }
-
-        volume={
-          volume
-        }
-      />
-    </Sequence>
-  );
-}
-
-
 function GenericLayer({
   layer,
   frame,
@@ -683,5 +586,156 @@ function structuredCloneSafe(
     JSON.stringify(
       value
     )
+  );
+}
+
+
+function GenericAudio({
+  entry,
+}) {
+  if (
+    !entry
+    ||
+    typeof entry !==
+      "object"
+    ||
+    Array.isArray(
+      entry
+    )
+  ) {
+    return null;
+  }
+
+
+  const src =
+    String(
+      entry.src ||
+      ""
+    )
+      .trim();
+
+
+  if (!src) {
+    throw new Error(
+      "Generic video audio entry is missing src."
+    );
+  }
+
+
+  const startFrame =
+    Math.max(
+      0,
+      Math.round(
+        finiteNumber(
+          entry.start_frame,
+          0
+        )
+      )
+    );
+
+  const endFrame =
+    Math.max(
+      startFrame + 1,
+      Math.round(
+        finiteNumber(
+          entry.end_frame,
+          startFrame + 1
+        )
+      )
+    );
+
+  const durationInFrames =
+    endFrame -
+    startFrame;
+
+  const volume =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        finiteNumber(
+          entry.volume,
+          1
+        )
+      )
+    );
+
+
+  const fadeOutStartFrame =
+    Math.max(
+      0,
+      Math.min(
+        durationInFrames - 1,
+        Math.round(
+          finiteNumber(
+            entry.fade_out_start_frame,
+            durationInFrames - 1
+          )
+        )
+      )
+    );
+
+  const fadeOutEndFrame =
+    Math.max(
+      fadeOutStartFrame,
+      Math.min(
+        durationInFrames - 1,
+        Math.round(
+          finiteNumber(
+            entry.fade_out_end_frame,
+            fadeOutStartFrame
+          )
+        )
+      )
+    );
+
+  const hasFadeOut =
+    fadeOutEndFrame >
+    fadeOutStartFrame;
+
+
+  return (
+    <Sequence
+      from={
+        startFrame
+      }
+
+      durationInFrames={
+        durationInFrames
+      }
+
+      layout="none"
+    >
+      <Audio
+        src={
+          src
+        }
+
+        volume={
+          hasFadeOut
+            ? (audioFrame) =>
+                volume *
+                interpolate(
+                  audioFrame,
+                  [
+                    fadeOutStartFrame,
+                    fadeOutEndFrame,
+                  ],
+                  [
+                    1,
+                    0,
+                  ],
+                  {
+                    extrapolateLeft:
+                      "clamp",
+
+                    extrapolateRight:
+                      "clamp",
+                  }
+                )
+            : volume
+        }
+      />
+    </Sequence>
   );
 }

@@ -105,6 +105,50 @@ final class PlaylistVideoCreator implements PubComWorkerContract
         }
 
 
+        if (
+            !extension_loaded(
+                'gd'
+            )
+            || !function_exists(
+                'imagecreatetruecolor'
+            )
+            || !function_exists(
+                'imagettftext'
+            )
+            || !function_exists(
+                'imagettfbbox'
+            )
+        ) {
+            return PubComSignal::unavailable(
+                'youtube_thumbnail_gd_unavailable',
+                'YouTube Playlist Video Creator cannot render thumbnail typography because PHP GD/FreeType support is unavailable.',
+                [
+                    'worker' =>
+                        self::class,
+                ]
+            );
+        }
+
+
+        $thumbnailFont =
+            $this->thumbnailFontPath();
+
+
+        if (!is_file($thumbnailFont)) {
+            return PubComSignal::unavailable(
+                'youtube_thumbnail_font_unavailable',
+                'YouTube Playlist Video Creator cannot render thumbnails because the Recipe font file is unavailable.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'font_file' =>
+                        PlaylistVideoRecipe::THUMBNAIL_FONT_FILE,
+                ]
+            );
+        }
+
+
         $workerHealth =
             $this->videoWorkerHealth
                 ->status();
@@ -371,6 +415,7 @@ final class PlaylistVideoCreator implements PubComWorkerContract
         int $pubAssetId,
         string $outputRelPath,
         array $renderPlan,
+        array $cover,
         ?int $reportedFileSizeBytes = null
     ): array {
         if ($pubAssetId <= 0) {
@@ -556,6 +601,19 @@ final class PlaylistVideoCreator implements PubComWorkerContract
             }
 
 
+            /*
+             * The companion thumbnail is another physical output owned by
+             * this Chef. It is created only when the completed MP4 is being
+             * promoted, so CREATE persists both outputs together.
+             */
+            $thumbnail =
+                $this->renderThumbnail(
+                    $pubAssetId,
+                    $cover,
+                    $targetDir
+                );
+
+
             return [
                 'file_path' =>
                     $targetPath,
@@ -564,6 +622,16 @@ final class PlaylistVideoCreator implements PubComWorkerContract
                     '/public/pub_assets/youtube/'
                     . $pubAssetId
                     . '.mp4',
+
+                'thumbnail_file_path' =>
+                    $thumbnail[
+                        'file_path'
+                    ],
+
+                'thumbnail_url' =>
+                    $thumbnail[
+                        'url'
+                    ],
 
                 'mime_type' =>
                     PlaylistVideoRecipe::OUTPUT_MIME_TYPE,
@@ -1249,6 +1317,26 @@ final class PlaylistVideoCreator implements PubComWorkerContract
             'brand-bumper';
 
 
+        /*
+         * MUSIC EXIT.
+         *
+         * Recipe owns how long the fade should last.
+         * Chef owns timing it against this video's actual final duration.
+         */
+        $musicFadeOutMs =
+            min(
+                PlaylistVideoRecipe::MUSIC_FADE_OUT_MS,
+                $cursorMs
+            );
+
+        $musicFadeOutStartMs =
+            max(
+                0,
+                $cursorMs
+                - $musicFadeOutMs
+            );
+
+
         return [
             'type' =>
                 'video',
@@ -1301,6 +1389,14 @@ final class PlaylistVideoCreator implements PubComWorkerContract
                         $music[
                             'volume'
                         ],
+
+                    'fade_out' => [
+                        'start_ms' =>
+                            $musicFadeOutStartMs,
+
+                        'duration_ms' =>
+                            $musicFadeOutMs,
+                    ],
                 ],
             ],
 
@@ -2315,6 +2411,14 @@ final class PlaylistVideoCreator implements PubComWorkerContract
     private function assertCreateIngredients(
         array $ingredients
     ): void {
+        $this->assertCoverIngredient(
+            $ingredients[
+                'cover'
+            ]
+            ?? null
+        );
+
+
         $this->assertMusicIngredient(
             $ingredients[
                 'music'
@@ -2640,6 +2744,76 @@ final class PlaylistVideoCreator implements PubComWorkerContract
     }
 
 
+    private function assertCoverIngredient(
+        mixed $cover
+    ): void {
+        if (!is_array($cover)) {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.cover must be an object/array.'
+            );
+        }
+
+
+        $filePath =
+            trim(
+                (string)(
+                    $cover[
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $imageUrl =
+            trim(
+                (string)(
+                    $cover[
+                        'image_url'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $title =
+            trim(
+                (string)(
+                    $cover[
+                        'title'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($filePath === '') {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.cover.file_path is required.'
+            );
+        }
+
+
+        if ($imageUrl === '') {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.cover.image_url is required.'
+            );
+        }
+
+
+        if ($title === '') {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.cover.title is required.'
+            );
+        }
+
+
+        if (!is_file($filePath)) {
+            throw new RuntimeException(
+                'YouTube Playlist Video cover source file does not exist.'
+            );
+        }
+    }
+
+
     private function assertMusicIngredient(
         mixed $music
     ): void {
@@ -2864,6 +3038,689 @@ final class PlaylistVideoCreator implements PubComWorkerContract
 
 
         return false;
+    }
+
+
+    /**
+     * FIRST-DRAFT YOUTUBE THUMBNAIL
+     *
+     * Full-bleed authored cover photo + direct-over-photo title.
+     * All tweakable thumbnail presentation values live in
+     * PlaylistVideoRecipe.
+     *
+     * @return array{file_path:string,url:string}
+     */
+    private function renderThumbnail(
+        int $pubAssetId,
+        array $cover,
+        string $targetDir
+    ): array {
+        $this->assertCoverIngredient(
+            $cover
+        );
+
+
+        $sourcePath =
+            trim(
+                (string)$cover[
+                    'file_path'
+                ]
+            );
+
+        $title =
+            trim(
+                (string)$cover[
+                    'title'
+                ]
+            );
+
+
+        $canvas =
+            imagecreatetruecolor(
+                PlaylistVideoRecipe::THUMBNAIL_WIDTH,
+                PlaylistVideoRecipe::THUMBNAIL_HEIGHT
+            );
+
+
+        if (!$canvas instanceof \GdImage) {
+            throw new RuntimeException(
+                'Could not create YouTube thumbnail canvas.'
+            );
+        }
+
+
+        try {
+            $this->copyThumbnailImageCover(
+                $canvas,
+                $sourcePath
+            );
+
+
+            imagealphablending(
+                $canvas,
+                true
+            );
+
+
+            /*
+             * Direct-over-photo title treatment.
+             *
+             * No banner or text box. The title sits on the image itself,
+             * with a dark stroke so it remains readable over mixed photos.
+             */
+            $this->drawThumbnailTitle(
+                $canvas,
+                $title,
+                PlaylistVideoRecipe::THUMBNAIL_TITLE_SIDE_PADDING,
+                PlaylistVideoRecipe::THUMBNAIL_WIDTH
+                    - (
+                        PlaylistVideoRecipe::THUMBNAIL_TITLE_SIDE_PADDING
+                        * 2
+                    ),
+                PlaylistVideoRecipe::THUMBNAIL_TITLE_AREA_HEIGHT
+            );
+
+
+            $filePath =
+                rtrim(
+                    $targetDir,
+                    DIRECTORY_SEPARATOR
+                )
+                . '/'
+                . $pubAssetId
+                . '-thumbnail.jpg';
+
+
+            $temporaryPath =
+                $filePath
+                . '.tmp-'
+                . bin2hex(
+                    random_bytes(6)
+                );
+
+
+            if (
+                !imagejpeg(
+                    $canvas,
+                    $temporaryPath,
+                    PlaylistVideoRecipe::THUMBNAIL_JPEG_QUALITY
+                )
+            ) {
+                throw new RuntimeException(
+                    'Could not write YouTube thumbnail JPEG.'
+                );
+            }
+
+
+            $fileSize =
+                filesize(
+                    $temporaryPath
+                );
+
+
+            if (
+                $fileSize === false
+                || $fileSize <= 0
+            ) {
+                @unlink(
+                    $temporaryPath
+                );
+
+                throw new RuntimeException(
+                    'YouTube thumbnail JPEG is empty.'
+                );
+            }
+
+
+            if (
+                !rename(
+                    $temporaryPath,
+                    $filePath
+                )
+            ) {
+                @unlink(
+                    $temporaryPath
+                );
+
+                throw new RuntimeException(
+                    'Could not promote YouTube thumbnail JPEG.'
+                );
+            }
+
+
+            return [
+                'file_path' =>
+                    $filePath,
+
+                'url' =>
+                    '/public/pub_assets/youtube/'
+                    . $pubAssetId
+                    . '-thumbnail.jpg',
+            ];
+
+        } finally {
+            imagedestroy(
+                $canvas
+            );
+        }
+    }
+
+
+    private function copyThumbnailImageCover(
+        \GdImage $canvas,
+        string $sourcePath
+    ): void {
+        $info =
+            getimagesize(
+                $sourcePath
+            );
+
+
+        if (!$info) {
+            throw new RuntimeException(
+                'YouTube thumbnail source image is invalid.'
+            );
+        }
+
+
+        [
+            $sourceWidth,
+            $sourceHeight,
+        ] =
+            $info;
+
+
+        $source =
+            $this->openThumbnailSourceImage(
+                $sourcePath,
+                (string)(
+                    $info[
+                        'mime'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        try {
+            $scale =
+                max(
+                    PlaylistVideoRecipe::THUMBNAIL_WIDTH
+                        / max(
+                            1,
+                            $sourceWidth
+                        ),
+
+                    PlaylistVideoRecipe::THUMBNAIL_HEIGHT
+                        / max(
+                            1,
+                            $sourceHeight
+                        )
+                );
+
+
+            $cropWidth =
+                (int)round(
+                    PlaylistVideoRecipe::THUMBNAIL_WIDTH
+                    / $scale
+                );
+
+            $cropHeight =
+                (int)round(
+                    PlaylistVideoRecipe::THUMBNAIL_HEIGHT
+                    / $scale
+                );
+
+
+            $sourceX =
+                max(
+                    0,
+                    (int)floor(
+                        (
+                            $sourceWidth
+                            - $cropWidth
+                        ) / 2
+                    )
+                );
+
+            $sourceY =
+                max(
+                    0,
+                    (int)floor(
+                        (
+                            $sourceHeight
+                            - $cropHeight
+                        ) / 2
+                    )
+                );
+
+
+            imagecopyresampled(
+                $canvas,
+                $source,
+                0,
+                0,
+                $sourceX,
+                $sourceY,
+                PlaylistVideoRecipe::THUMBNAIL_WIDTH,
+                PlaylistVideoRecipe::THUMBNAIL_HEIGHT,
+                $cropWidth,
+                $cropHeight
+            );
+
+        } finally {
+            imagedestroy(
+                $source
+            );
+        }
+    }
+
+
+    private function openThumbnailSourceImage(
+        string $sourcePath,
+        string $mime
+    ): \GdImage {
+        $source =
+            match (
+                strtolower(
+                    $mime
+                )
+            ) {
+                'image/jpeg' =>
+                    @imagecreatefromjpeg(
+                        $sourcePath
+                    ),
+
+                'image/png' =>
+                    @imagecreatefrompng(
+                        $sourcePath
+                    ),
+
+                'image/webp' =>
+                    function_exists(
+                        'imagecreatefromwebp'
+                    )
+                        ? @imagecreatefromwebp(
+                            $sourcePath
+                        )
+                        : false,
+
+                default =>
+                    @imagecreatefromstring(
+                        (string)@file_get_contents(
+                            $sourcePath
+                        )
+                    ),
+            };
+
+
+        if (!$source instanceof \GdImage) {
+            throw new RuntimeException(
+                'YouTube thumbnail source image type is unsupported.'
+            );
+        }
+
+
+        return $source;
+    }
+
+
+    private function drawThumbnailTitle(
+        \GdImage $canvas,
+        string $title,
+        int $x,
+        int $width,
+        int $height
+    ): void {
+        $font =
+            $this->thumbnailFontPath();
+
+
+        if (!is_file($font)) {
+            throw new RuntimeException(
+                'YouTube thumbnail Recipe font file was not found: '
+                . PlaylistVideoRecipe::THUMBNAIL_FONT_FILE
+            );
+        }
+
+
+        $white =
+            imagecolorallocate(
+                $canvas,
+                255,
+                255,
+                255
+            );
+
+        $black =
+            imagecolorallocate(
+                $canvas,
+                0,
+                0,
+                0
+            );
+
+
+        $fontSize =
+            PlaylistVideoRecipe::THUMBNAIL_TITLE_FONT_SIZE;
+
+
+        do {
+            $lines =
+                $this->wrapThumbnailText(
+                    $title,
+                    $font,
+                    $fontSize,
+                    $width
+                );
+
+            $lineHeight =
+                $fontSize
+                + PlaylistVideoRecipe::THUMBNAIL_LINE_GAP;
+
+
+            $fits =
+                count($lines)
+                    <= PlaylistVideoRecipe::THUMBNAIL_TITLE_MAX_LINES
+                && (
+                    count($lines)
+                    * $lineHeight
+                ) <= $height;
+
+
+            if (
+                $fits
+                || $fontSize
+                    <= PlaylistVideoRecipe::THUMBNAIL_TITLE_MIN_FONT_SIZE
+            ) {
+                break;
+            }
+
+
+            $fontSize -=
+                2;
+
+        } while (true);
+
+
+        if (
+            count($lines)
+            > PlaylistVideoRecipe::THUMBNAIL_TITLE_MAX_LINES
+        ) {
+            $lines =
+                array_slice(
+                    $lines,
+                    0,
+                    PlaylistVideoRecipe::THUMBNAIL_TITLE_MAX_LINES
+                );
+        }
+
+
+        $lineHeight =
+            $fontSize
+            + PlaylistVideoRecipe::THUMBNAIL_LINE_GAP;
+
+
+        /*
+         * One-line titles look stranded when they use the same high
+         * title region as a taller two/three-line block. Use the actual
+         * wrapped line count to choose the Recipe-owned vertical position.
+         */
+        $titleTop =
+            count($lines) === 1
+                ? PlaylistVideoRecipe::THUMBNAIL_TITLE_TOP_SINGLE_LINE
+                : PlaylistVideoRecipe::THUMBNAIL_TITLE_TOP_MULTI_LINE;
+
+
+        $textY =
+            $titleTop
+            + (int)round(
+                (
+                    $height
+                    - (
+                        count($lines)
+                        * $lineHeight
+                    )
+                ) / 2
+            )
+            + $fontSize;
+
+
+        foreach (
+            $lines
+            as $line
+        ) {
+            $box =
+                imagettfbbox(
+                    $fontSize,
+                    0,
+                    $font,
+                    $line
+                );
+
+
+            $textWidth =
+                $box
+                    ? abs(
+                        (int)$box[4]
+                        - (int)$box[0]
+                    )
+                    : 0;
+
+
+            $textX =
+                $x
+                + (int)round(
+                    (
+                        $width
+                        - $textWidth
+                    ) / 2
+                );
+
+
+            /*
+             * Black stroke + white fill, similar to traditional YouTube
+             * thumbnail lettering. Draw the stroke by offsetting the same
+             * glyphs around the final white text.
+             */
+            for (
+                $offsetX =
+                    -PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX;
+                $offsetX <=
+                    PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX;
+                $offsetX++
+            ) {
+                for (
+                    $offsetY =
+                        -PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX;
+                    $offsetY <=
+                        PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX;
+                    $offsetY++
+                ) {
+                    if (
+                        $offsetX === 0
+                        && $offsetY === 0
+                    ) {
+                        continue;
+                    }
+
+
+                    if (
+                        (
+                            $offsetX * $offsetX
+                            + $offsetY * $offsetY
+                        )
+                        >
+                        (
+                            PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX
+                            * PlaylistVideoRecipe::THUMBNAIL_TEXT_STROKE_PX
+                        )
+                    ) {
+                        continue;
+                    }
+
+
+                    imagettftext(
+                        $canvas,
+                        $fontSize,
+                        0,
+                        $textX + $offsetX,
+                        $textY + $offsetY,
+                        $black,
+                        $font,
+                        $line
+                    );
+                }
+            }
+
+
+            imagettftext(
+                $canvas,
+                $fontSize,
+                0,
+                $textX,
+                $textY,
+                $white,
+                $font,
+                $line
+            );
+
+
+            $textY +=
+                $lineHeight;
+        }
+    }
+
+
+    private function wrapThumbnailText(
+        string $text,
+        string $font,
+        int $fontSize,
+        int $maxWidth
+    ): array {
+        /*
+         * Preserve authored line breaks first. Within each authored line,
+         * use the real Poppins/FreeType glyph measurements to decide
+         * whether additional wrapping is necessary.
+         *
+         * This is more reliable than estimating by character count:
+         * "WWW" and "iii" have very different widths even though they
+         * contain the same number of characters.
+         */
+        $authoredLines =
+            preg_split(
+                '/\R/u',
+                trim(
+                    $text
+                )
+            )
+            ?: [];
+
+
+        $lines = [];
+
+
+        foreach (
+            $authoredLines
+            as $authoredLine
+        ) {
+            $authoredLine =
+                trim(
+                    $authoredLine
+                );
+
+
+            if ($authoredLine === '') {
+                continue;
+            }
+
+
+            $words =
+                preg_split(
+                    '/\s+/',
+                    $authoredLine
+                )
+                ?: [];
+
+
+            $line = '';
+
+
+            foreach (
+                $words
+                as $word
+            ) {
+                $test =
+                    trim(
+                        $line
+                        . ' '
+                        . $word
+                    );
+
+
+                $box =
+                    imagettfbbox(
+                        $fontSize,
+                        0,
+                        $font,
+                        $test
+                    );
+
+
+                $testWidth =
+                    $box
+                        ? abs(
+                            (int)$box[4]
+                            - (int)$box[0]
+                        )
+                        : 0;
+
+
+                if (
+                    $line !== ''
+                    && $testWidth > $maxWidth
+                ) {
+                    $lines[] =
+                        $line;
+
+                    $line =
+                        $word;
+
+                } else {
+                    $line =
+                        $test;
+                }
+            }
+
+
+            if ($line !== '') {
+                $lines[] =
+                    $line;
+            }
+        }
+
+
+        return $lines;
+    }
+
+
+    /**
+     * Resolve the exact thumbnail font declared by the YouTube Recipe.
+     *
+     * The Recipe owns the product font choice. The Chef only resolves
+     * that project-relative supply path at runtime.
+     */
+    private function thumbnailFontPath(): string
+    {
+        return rtrim(
+            $this->projectRoot,
+            DIRECTORY_SEPARATOR
+        )
+            . '/'
+            . ltrim(
+                PlaylistVideoRecipe::THUMBNAIL_FONT_FILE,
+                '/\\'
+            );
     }
 
 

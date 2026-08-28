@@ -11,6 +11,7 @@ const BASE_URL = String(
 
 const POLL_MS = 5000;
 const HEARTBEAT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15000;
 
 const WORKER_SECRET = String(
   process.env.COLORFIX_RENDER_WORKER_SECRET || ""
@@ -52,40 +53,81 @@ function run(command, args) {
   });
 }
 
-async function postJson(url, payload = {}) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      ...payload,
-      worker_secret: WORKER_SECRET,
-    }),
-  });
+async function postJson(
+  url,
+  payload = {},
+  timeoutMs = REQUEST_TIMEOUT_MS
+) {
+  const controller =
+    new AbortController();
 
-  const text = await response.text();
-
-  let data;
+  const timer =
+    setTimeout(
+      () => {
+        controller.abort();
+      },
+      timeoutMs
+    );
 
   try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      `Expected JSON from ${url}, got: ${text.slice(0, 200)}`
+    const response =
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...payload,
+          worker_secret: WORKER_SECRET,
+        }),
+        signal:
+          controller.signal,
+      });
+
+    const text =
+      await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Expected JSON from ${url}, got: ${text.slice(0, 200)}`
+      );
+    }
+
+    if (!response.ok || !data?.ok) {
+      throw new Error(
+        data?.error || `Request failed: ${response.status}`
+      );
+    }
+
+    return data;
+
+  } catch (error) {
+    if (
+      error?.name === "AbortError"
+    ) {
+      throw new Error(
+        `Request timed out after ${timeoutMs}ms: ${url}`
+      );
+    }
+
+    throw error;
+
+  } finally {
+    clearTimeout(
+      timer
     );
   }
-
-  if (!response.ok || !data?.ok) {
-    throw new Error(
-      data?.error || `Request failed: ${response.status}`
-    );
-  }
-
-  return data;
 }
 
-async function uploadVideo(jobId, outputPath) {
+async function uploadVideo(
+  jobId,
+  outputPath,
+  timeoutMs = REQUEST_TIMEOUT_MS
+) {
   const form = new FormData();
 
   form.append(
@@ -113,34 +155,67 @@ async function uploadVideo(jobId, outputPath) {
     "output.mp4"
   );
 
-  const response = await fetch(
-    `${BASE_URL}/api/v2/admin/pub/video-jobs/upload.php`,
-    {
-      method: "POST",
-      body: form,
-    }
-  );
+  const controller =
+    new AbortController();
 
-  const text = await response.text();
-
-  let data;
+  const timer =
+    setTimeout(
+      () => {
+        controller.abort();
+      },
+      timeoutMs
+    );
 
   try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(
-      `Expected JSON from upload.php, got: ${text.slice(0, 200)}`
+    const response =
+      await fetch(
+        `${BASE_URL}/api/v2/admin/pub/video-jobs/upload.php`,
+        {
+          method: "POST",
+          body: form,
+          signal:
+            controller.signal,
+        }
+      );
+
+    const text =
+      await response.text();
+
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `Expected JSON from upload.php, got: ${text.slice(0, 200)}`
+      );
+    }
+
+    if (!response.ok || !data?.ok) {
+      throw new Error(
+        data?.error ||
+        `Video upload failed: ${response.status}`
+      );
+    }
+
+    return data.file;
+
+  } catch (error) {
+    if (
+      error?.name === "AbortError"
+    ) {
+      throw new Error(
+        `Video upload timed out after ${timeoutMs}ms.`
+      );
+    }
+
+    throw error;
+
+  } finally {
+    clearTimeout(
+      timer
     );
   }
-
-  if (!response.ok || !data?.ok) {
-    throw new Error(
-      data?.error ||
-      `Video upload failed: ${response.status}`
-    );
-  }
-
-  return data.file;
 }
 
 /*
@@ -398,6 +473,9 @@ async function processVideoJob(job) {
     /*
      * Best effort: once a claimed asset fails, tell PUB immediately
      * so the job/asset does not remain stuck in rendering.
+     *
+     * postJson() is timeout-bounded, so a stalled failure-report cannot
+     * trap the worker inside this recovery path forever.
      */
     try {
       await postJson(
@@ -415,7 +493,7 @@ async function processVideoJob(job) {
       );
 
       console.error(
-        `PUB asset #${assetId} marked failed. Worker will continue.`
+        `PUB asset #${assetId} marked failed.`
       );
 
     } catch (reportError) {
@@ -426,6 +504,10 @@ async function processVideoJob(job) {
         }`
       );
     }
+
+    console.log(
+      `Worker recovered from PUB asset #${assetId}; returning to polling.`
+    );
   }
 }
 
@@ -503,6 +585,10 @@ async function main() {
     `Polling every ${POLL_MS / 1000} seconds.`
   );
 
+  console.log(
+    `HTTP request timeout: ${REQUEST_TIMEOUT_MS / 1000} seconds.`
+  );
+
   while (true) {
     try {
       const job =
@@ -516,7 +602,7 @@ async function main() {
 
     } catch (error) {
       /*
-       * This is now reserved primarily for claim/poll failures.
+       * Claim/poll failures are isolated here.
        * Per-asset failures are absorbed and reported inside
        * processVideoJob(), allowing the worker to continue.
        */

@@ -20,6 +20,9 @@ import PubPackageDrawer
 const PACKAGE_URL =
   `${API_FOLDER}/v2/admin/pub/package.php`;
 
+const DISPATCH_URL =
+  `${API_FOLDER}/v2/admin/pub/dispatch.php`;
+
 
 export default function PubPackageTable() {
   const [
@@ -81,6 +84,17 @@ export default function PubPackageTable() {
     drawerError,
     setDrawerError,
   ] = useState("");
+
+  const [
+    retryingAssetId,
+    setRetryingAssetId,
+  ] = useState(null);
+
+
+  const [
+    sendingAssetId,
+    setSendingAssetId,
+  ] = useState(null);
 
 
   /*
@@ -382,6 +396,273 @@ export default function PubPackageTable() {
     loadDrawerAsset(
       asset.pub_asset_id
     );
+  }
+
+
+  /*
+   * RETRY ONE PACKAGE ERROR
+   *
+   * The existing Package endpoint already treats:
+   *
+   *   POST { pub_asset_id }
+   *
+   * as "hand exactly this asset to Package".
+   *
+   * Repository lifecycle rules decide whether the errored asset is
+   * retryable. The UI does not invent a separate recovery route.
+   */
+  async function retryPackaging(
+    pubAssetId
+  ) {
+    const id =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!id) {
+      return;
+    }
+
+
+    setRetryingAssetId(
+      id
+    );
+
+    setDrawerError(
+      ""
+    );
+
+    setError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          PACKAGE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  id,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          "Could not retry Packaging."
+        );
+      }
+
+
+      const failed =
+        Array.isArray(
+          data.failed
+        )
+          ? data.failed
+          : [];
+
+
+      if (
+        Number(
+          data.failed_count ||
+          0
+        ) > 0
+        ||
+        failed.length > 0
+      ) {
+        throw new Error(
+          failed?.[0]?.error ||
+          "Packaging retry failed."
+        );
+      }
+
+
+      await loadAssets();
+
+
+      /*
+       * loadAssets() normally refreshes an open selected drawer too.
+       * This explicit reload also covers the case where selection state
+       * has not settled yet.
+       */
+      if (drawerOpen) {
+        await loadDrawerAsset(
+          id
+        );
+      }
+
+    } catch (err) {
+      setDrawerError(
+        err?.message ||
+        "Could not retry Packaging."
+      );
+
+    } finally {
+      setRetryingAssetId(
+        null
+      );
+    }
+  }
+
+
+  function openDispatchWorkbench() {
+    if (
+      typeof window ===
+      "undefined"
+    ) {
+      return;
+    }
+
+
+    const url =
+      new URL(
+        window.location.href
+      );
+
+
+    url.searchParams.set(
+      "stage",
+      "dispatch"
+    );
+
+    url.hash =
+      "";
+
+
+    window.location.assign(
+      url.toString()
+    );
+  }
+
+
+  /*
+   * SEND ONE PACKED ASSET NOW
+   *
+   * Manual Send Now and the future Scheduler both use the same
+   * DispatchManager one-box entrypoint:
+   *
+   *   POST { pub_asset_id }
+   *
+   * DispatchManager owns:
+   *
+   *   packed -> shipping -> shipped
+   *
+   * The UI does not move lifecycle stages itself.
+   */
+  async function sendNow(
+    pubAssetId
+  ) {
+    const id =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!id) {
+      return;
+    }
+
+
+    setSendingAssetId(
+      id
+    );
+
+    setDrawerError(
+      ""
+    );
+
+    setError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          DISPATCH_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  id,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.result?.failed?.error ||
+          data?.error ||
+          "Could not send asset."
+        );
+      }
+
+
+      openDispatchWorkbench();
+
+      return;
+
+    } catch (err) {
+      /*
+       * Once Dispatch has attempted to take custody, any durable failure
+       * belongs on the Dispatch workbench, not on a stale Package row.
+       */
+      openDispatchWorkbench();
+
+      return;
+
+    } finally {
+      setSendingAssetId(
+        null
+      );
+    }
   }
 
 
@@ -864,6 +1145,38 @@ export default function PubPackageTable() {
 
         error={
           drawerError
+        }
+
+        retrying={
+          Number(
+            retryingAssetId ||
+            0
+          ) ===
+          Number(
+            drawerAsset
+              ?.pub_asset_id ||
+            0
+          )
+        }
+
+        sending={
+          Number(
+            sendingAssetId ||
+            0
+          ) ===
+          Number(
+            drawerAsset
+              ?.pub_asset_id ||
+            0
+          )
+        }
+
+        onRetry={
+          retryPackaging
+        }
+
+        onSend={
+          sendNow
         }
 
         onClose={() => {

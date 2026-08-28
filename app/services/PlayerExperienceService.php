@@ -83,29 +83,38 @@ class PlayerExperienceService
             );
         }
 
-        // 3. Flatten playlist items
+        // 3. Flatten playlist source items.
+        //
+        // cover-image is authored source material, not a playable slide.
+        // Keep it long enough to resolve the playlist's canonical public
+        // representation, then remove it before Player-specific work.
         $itemsStartedAt = microtime(true);
-        $items = $this->flattenItems($playlist);
+        $sourceItems = $this->flattenItems($playlist);
         if (
             $experienceSource === 'project'
             && $this->resolvedProjectId !== null
             && $this->resolvedProjectExperienceKey !== null
             && $this->resolvedProjectCurrentRelease !== null
         ) {
-            $items = $this->filterProjectItemsForRelease(
-                $items,
+            $sourceItems = $this->filterProjectItemsForRelease(
+                $sourceItems,
                 $this->resolvedProjectExperienceKey,
                 $this->resolvedProjectCurrentRelease
             );
         }
-        $this->hydrateItemImages($items);
+        $this->hydrateItemImages($sourceItems);
+
+        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
+        $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
+
+        $items = $this->filterPlayableItems($sourceItems);
+
         $paletteViewerKey = $experienceBacked ? $experience->paletteViewerKey : 'full_palette';
         $showSlidePalettePrompt = $experienceBacked
             ? $this->shouldShowSlidePalettePrompt($experience)
             : true;
         $this->hydratePaletteViewerUrls($items, $paletteViewerKey, (int)($instance->id ?? 0));
         $this->markTiming('hydrate_items', $itemsStartedAt);
-        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
         $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
 
         // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
@@ -200,7 +209,11 @@ class PlayerExperienceService
             'thumbs_enabled'       => $thumbsEnabled,
             'demo_enabled'         => $instance->demoEnabled,
             'share_enabled'        => $instance->shareEnabled,
-            'share_title'          => $instance->shareTitle,
+            'share_title'          => $this->firstNonEmpty([
+                $instance->shareTitle,
+                $resolvedShareTitle,
+                $displayTitle,
+            ]),
             'share_description'    => $instance->shareDescription,
             'share_image_url'      => $instance->shareImageUrl ?: $resolvedShareImageUrl,
             'skip_intro_on_replay' => $instance->skipIntroOnReplay,
@@ -294,8 +307,14 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     }
 
     $itemsStartedAt = microtime(true);
-    $items = $this->flattenItems($playlist);
-    $this->hydrateItemImages($items);
+    $sourceItems = $this->flattenItems($playlist);
+    $this->hydrateItemImages($sourceItems);
+
+    $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
+    $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
+
+    $items = $this->filterPlayableItems($sourceItems);
+
     $paletteViewerKey = $experience->paletteViewerKey;
     $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
 
@@ -308,7 +327,6 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
 
     $this->markTiming('hydrate_items', $itemsStartedAt);
 
-    $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
     $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
 
     $colorsUsedUrl = $viewerRexCount === 1
@@ -365,7 +383,10 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'thumbs_enabled' => $thumbsEnabled,
         'demo_enabled' => false,
         'share_enabled' => false,
-        'share_title' => $displayTitle,
+        'share_title' => $this->firstNonEmpty([
+            $resolvedShareTitle,
+            $displayTitle,
+        ]),
         'share_description' => $projectSummary,
         'share_image_url' => $resolvedShareImageUrl,
         'skip_intro_on_replay' => false,
@@ -697,16 +718,25 @@ public function buildPlaybackPlanFromProjectExperience(
         }
 
         $itemsStartedAt = microtime(true);
-        $items = $this->flattenItems($playlist);
-        $items = $this->filterProjectItemsForRelease($items, $experienceKey, $currentRelease);
+        $sourceItems = $this->flattenItems($playlist);
+        $sourceItems = $this->filterProjectItemsForRelease(
+            $sourceItems,
+            $experienceKey,
+            $currentRelease
+        );
+        $this->hydrateItemImages($sourceItems);
+
+        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
+        $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
+
+        $items = $this->filterPlayableItems($sourceItems);
+
         $colorPlanIds = $this->collectColorPlanIds($items);
         $colorPlans = $this->loadProjectColorPlans($projectId, $colorPlanIds);
-        $this->hydrateItemImages($items);
         $paletteViewerKey = $experience->paletteViewerKey;
         $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
         $this->hydrateProjectColorPlanViewerUrls($items, $paletteViewerKey, $reservationToken);
         $this->markTiming('hydrate_items', $itemsStartedAt);
-        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($items);
         $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
 
         $ctaStartedAt = microtime(true);
@@ -757,7 +787,10 @@ public function buildPlaybackPlanFromProjectExperience(
             'thumbs_enabled' => $thumbsEnabled,
             'demo_enabled' => false,
             'share_enabled' => false,
-            'share_title' => $displayTitle,
+            'share_title' => $this->firstNonEmpty([
+                $resolvedShareTitle,
+                $displayTitle,
+            ]),
             'share_description' => $projectSummary,
             'share_image_url' => $resolvedShareImageUrl,
             'skip_intro_on_replay' => false,
@@ -1081,28 +1114,119 @@ public function buildPlaybackPlanFromProjectExperience(
     }
 
     /**
+     * Return the playlist's canonical public representation image.
+     *
+     * Preference order:
+     *   1. authored cover-image
+     *   2. legacy explicit is_share_image choice
+     *   3. first available photo
+     *
      * @param PlaylistItem[] $items
      */
     private function resolvePlaylistShareImageUrl(array $items): ?string
     {
-        $chosen = null;
+        $manual = null;
+        $fallback = null;
+
         foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) continue;
-            if (!$this->playlistItemHasImage($item)) continue;
-            if ($item->is_share_image) {
-                $chosen = $item;
-                break;
+            if (!$item instanceof PlaylistItem) {
+                continue;
             }
-            if ($chosen === null) {
-                $chosen = $item;
+
+            if (!$this->playlistItemHasImage($item)) {
+                continue;
+            }
+
+            if ($this->playlistItemType($item) === 'cover-image') {
+                return $this->normalizeShareImageUrl(
+                    (string)($item->image_url ?? '')
+                );
+            }
+
+            if ($manual === null && !empty($item->is_share_image)) {
+                $manual = $item;
+            }
+
+            if ($fallback === null) {
+                $fallback = $item;
             }
         }
+
+        $chosen = $manual ?? $fallback;
 
         if (!$chosen instanceof PlaylistItem) {
             return null;
         }
 
-        return $this->normalizeShareImageUrl((string)($chosen->image_url ?? ''));
+        return $this->normalizeShareImageUrl(
+            (string)($chosen->image_url ?? '')
+        );
+    }
+
+
+    /**
+     * The cover-image title is the authored title for non-playback
+     * representations of this playlist.
+     *
+     * @param PlaylistItem[] $items
+     */
+    private function resolvePlaylistCoverTitle(array $items): string
+    {
+        foreach ($items as $item) {
+            if (!$item instanceof PlaylistItem) {
+                continue;
+            }
+
+            if ($this->playlistItemType($item) !== 'cover-image') {
+                continue;
+            }
+
+            $title = trim(
+                (string)($item->title ?? '')
+            );
+
+            if ($title !== '') {
+                return $title;
+            }
+        }
+
+        return '';
+    }
+
+
+    /**
+     * cover-image belongs to the authored playlist source but never to
+     * the Player timeline.
+     *
+     * @param PlaylistItem[] $items
+     * @return PlaylistItem[]
+     */
+    private function filterPlayableItems(array $items): array
+    {
+        $playable = [];
+
+        foreach ($items as $item) {
+            if (
+                $item instanceof PlaylistItem
+                && $this->playlistItemType($item) === 'cover-image'
+            ) {
+                continue;
+            }
+
+            $playable[] = $item;
+        }
+
+        return array_values($playable);
+    }
+
+
+    private function playlistItemType(PlaylistItem $item): string
+    {
+        return strtolower(
+            trim(
+                (string)($item->type ?? 'normal')
+            )
+        );
     }
 
     private function playlistItemHasImage(PlaylistItem $item): bool
@@ -1284,7 +1408,7 @@ public function buildPlaybackPlanFromProjectExperience(
     private function isPaletteViewerEligibleItem(PlaylistItem $item): bool
     {
         $type = strtolower((string)($item->type ?? 'normal'));
-        if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'non-palette'], true)) {
+        if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'cover-image', 'non-palette'], true)) {
             return false;
         }
         if (!empty($item->exclude_from_thumbs)) return false;
@@ -1562,7 +1686,7 @@ public function buildPlaybackPlanFromProjectExperience(
         $seen = [];
         foreach ($items as $item) {
             $type = strtolower((string)($item->type ?? 'normal'));
-            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'non-palette'], true)) {
+            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'cover-image', 'non-palette'], true)) {
                 continue;
             }
             if (!empty($item->exclude_from_thumbs)) continue;

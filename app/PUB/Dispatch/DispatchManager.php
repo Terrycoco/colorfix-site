@@ -3,9 +3,13 @@ declare(strict_types=1);
 
 namespace App\PUB\Dispatch;
 
+use App\PUB\Dispatch\Auth\PinterestAuthService;
+use App\PUB\Dispatch\Auth\YouTubeAuthService;
 use App\PUB\Dispatch\Pinterest\PinterestImageShipper;
 use App\PUB\Dispatch\Pinterest\PinterestShippingConfig;
 use App\PUB\Dispatch\Pinterest\PinterestVideoShipper;
+use App\PUB\Dispatch\YouTube\YouTubeShippingConfig;
+use App\PUB\Dispatch\YouTube\YouTubeVideoShipper;
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
@@ -25,13 +29,15 @@ use Throwable;
  * DispatchManager knows PUB workflow, not external API anatomy.
  *
  * It:
- *   - receives assets already selected for pipeline_stage=shipping
+ *   - receives one packed asset ID from Manual Send Now or Schedule
+ *   - accepts custody by moving packed -> shipping
  *   - reads only channel + mime_type to choose a shipping line
  *   - wakes only the required Shipper
  *   - hands the sealed package to that specialist unchanged
  *   - interprets PubCom readiness/preflight signals
  *   - persists the returned shipping receipt
  *   - moves successful assets shipping -> shipped
+ *   - moves failed shipments shipping -> error/dispatch
  *   - stamps dispatched_at through the repository
  *   - records unexpected DISPATCH failures centrally
  *
@@ -54,6 +60,9 @@ final class DispatchManager implements PubComManagerContract
     private array $shippers = [];
 
     private ?PinterestShippingConfig $pinterestConfig = null;
+    private ?PinterestAuthService $pinterestAuth = null;
+    private ?YouTubeShippingConfig $youtubeConfig = null;
+    private ?YouTubeAuthService $youtubeAuth = null;
 
 
     public function __construct(
@@ -161,10 +170,13 @@ final class DispatchManager implements PubComManagerContract
 
 
     /**
-     * Ship every asset already selected by Schedule.
+     * Recovery/administrative sweep for assets already in Dispatch custody.
      *
-     * For the current vertical slice, manually setting an asset to
-     * pipeline_stage=shipping simulates Schedule's selection step.
+     * Normal one-box entry is shipOne(pub_asset_id), which accepts a
+     * PACKED asset and owns the packed -> shipping transition.
+     *
+     * Schedule does NOT move rows to shipping. When an asset is due,
+     * Schedule calls shipOne(pub_asset_id), exactly like Manual Send Now.
      *
      * Repository methods expected:
      *
@@ -247,13 +259,23 @@ final class DispatchManager implements PubComManagerContract
 
 
     /**
-     * Ship exactly one selected asset.
+     * Canonical one-box Dispatch entrypoint.
      *
-     * Useful for an admin/manual shipping button and later for
-     * Schedule handing one chosen pub_asset_id into Dispatch.
+     * Both Manual Send Now and Schedule call this exact method.
      *
-     * Repository method expected:
+     * DispatchManager owns custody:
      *
+     *   packed -> shipping
+     *
+     * Once custody is accepted, every outcome must leave shipping:
+     *
+     *   success -> shipped
+     *   failure -> error / dispatch
+     *
+     * Repository methods expected:
+     *
+     *   getById(pub_asset_id)
+     *   markShipping(pub_asset_id)
      *   getShippingById(pub_asset_id)
      */
     public function shipOne(
@@ -266,6 +288,82 @@ final class DispatchManager implements PubComManagerContract
         }
 
 
+        /*
+         * Canonical first attempt:
+         *
+         *   packed -> shipping
+         *
+         * Explicit recovery:
+         *
+         *   error / dispatch -> shipping
+         *
+         * Schedule does not pre-mark anything as shipping. A retry also
+         * comes through this same one-box Dispatch entrypoint.
+         */
+        $candidate =
+            $this->assets
+                ->getById(
+                    $pubAssetId
+                );
+
+
+        if ($candidate === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found."
+            );
+        }
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $candidate[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $errorStage =
+            strtolower(
+                trim(
+                    (string)(
+                        $candidate[
+                            'error_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $isDispatchRetry =
+            $stage === 'error'
+            && $errorStage === 'dispatch';
+
+
+        if (
+            $stage !== 'packed'
+            && !$isDispatchRetry
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} is not ready for Dispatch; expected packed or a Dispatch-stage error."
+            );
+        }
+
+
+        /*
+         * TAKE CUSTODY.
+         *
+         * The Dispatch department, not Schedule, owns this transition.
+         */
+        $this->assets
+            ->markShipping(
+                $pubAssetId
+            );
+
+
         $asset =
             $this->assets
                 ->getShippingById(
@@ -274,8 +372,26 @@ final class DispatchManager implements PubComManagerContract
 
 
         if ($asset === null) {
+            /*
+             * We already accepted custody. Never strand the row at shipping.
+             */
+            try {
+                $this->assets
+                    ->markError(
+                        $pubAssetId,
+                        'dispatch',
+                        'dispatch_failure',
+                        'Dispatch accepted the asset but could not reload it from the Shipping dock.'
+                    );
+            } catch (Throwable) {
+                /*
+                 * Preserve the primary lifecycle failure.
+                 */
+            }
+
+
             throw new RuntimeException(
-                "PUB asset #{$pubAssetId} is not waiting at Shipping."
+                "PUB asset #{$pubAssetId} could not be loaded after entering Shipping."
             );
         }
 
@@ -297,9 +413,193 @@ final class DispatchManager implements PubComManagerContract
                     $result[
                         'shipped'
                     ]
+                )
+                || isset(
+                    $result[
+                        'in_progress'
+                    ]
                 ),
 
             ...$result,
+        ];
+    }
+
+
+    /**
+     * Accept a final delivery receipt from either a synchronous Shipper or
+     * DispatchDesk after an asynchronous driver finishes.
+     *
+     * The caller does not write lifecycle state directly.
+     */
+    public function completeShipment(
+        int $pubAssetId,
+        array $receipt
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Dispatch completion requires a valid pub_asset_id.'
+            );
+        }
+
+
+        if ($receipt === []) {
+            throw new RuntimeException(
+                'Dispatch completion requires a shipping receipt.'
+            );
+        }
+
+
+        return $this->assets
+            ->markShipped(
+                $pubAssetId,
+                $receipt
+            );
+    }
+
+
+    /**
+     * Accept a final failed/timeout report from DispatchDesk.
+     *
+     * A late failure report must never overwrite an asset that already
+     * reached SHIPPED successfully.
+     */
+    public function failShipment(
+        int $pubAssetId,
+        string $code,
+        string $message
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Dispatch failure requires a valid pub_asset_id.'
+            );
+        }
+
+
+        $message =
+            trim(
+                $message
+            );
+
+
+        if ($message === '') {
+            $message =
+                'Dispatch shipment failed.';
+        }
+
+
+        $code =
+            trim(
+                $code
+            );
+
+
+        if ($code === '') {
+            $code =
+                'dispatch_failure';
+        }
+
+
+        $asset =
+            $this->assets
+                ->getById(
+                    $pubAssetId
+                );
+
+
+        if ($asset === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found while settling Dispatch failure."
+            );
+        }
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if ($stage === 'shipped') {
+            return [
+                'pub_asset_id' =>
+                    $pubAssetId,
+
+                'pipeline_stage' =>
+                    'shipped',
+
+                'ignored_late_failure' =>
+                    true,
+            ];
+        }
+
+
+        if (
+            $stage === 'error'
+            && strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'error_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) === 'dispatch'
+        ) {
+            return [
+                'pub_asset_id' =>
+                    $pubAssetId,
+
+                'pipeline_stage' =>
+                    'error',
+
+                'error_stage' =>
+                    'dispatch',
+
+                'already_failed' =>
+                    true,
+            ];
+        }
+
+
+        if ($stage !== 'shipping') {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} is not awaiting a Dispatch result."
+            );
+        }
+
+
+        $this->assets
+            ->markError(
+                $pubAssetId,
+                'dispatch',
+                $code,
+                $message
+            );
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'error',
+
+            'error_stage' =>
+                'dispatch',
+
+            'error_code' =>
+                $code,
+
+            'error_message' =>
+                $message,
         ];
     }
 
@@ -342,6 +642,32 @@ final class DispatchManager implements PubComManagerContract
                     ]
                 )
             ) {
+                $stopped =
+                    $stoppedLines[
+                        $lineKey
+                    ];
+
+
+                $message =
+                    trim(
+                        (string)(
+                            $stopped[
+                                'error'
+                            ]
+                            ?? 'Dispatch shipping line is unavailable.'
+                        )
+                    );
+
+
+                $this->assets
+                    ->markError(
+                        $pubAssetId,
+                        'dispatch',
+                        'dispatch_failure',
+                        $message
+                    );
+
+
                 return [
                     'failed' => [
                         'index' =>
@@ -353,9 +679,7 @@ final class DispatchManager implements PubComManagerContract
                         'line' =>
                             $lineKey,
 
-                        ...$stoppedLines[
-                            $lineKey
-                        ],
+                        ...$stopped,
                     ],
                 ];
             }
@@ -438,6 +762,21 @@ final class DispatchManager implements PubComManagerContract
                 }
 
 
+                /*
+                 * Dispatch already owns the box.
+                 * A failed readiness/preflight gate must not strand it
+                 * at pipeline_stage=shipping.
+                 */
+                $this->assets
+                    ->markError(
+                        $pubAssetId,
+                        'dispatch',
+                        'dispatch_failure',
+                        $signal
+                            ->message()
+                    );
+
+
                 return [
                     'failed' =>
                         $failure,
@@ -454,36 +793,76 @@ final class DispatchManager implements PubComManagerContract
              *
              * DispatchManager does not open or map the package.
              */
-            $receipt =
-                $shipper
-                    ->ship(
-                        $package
-                    );
-
-
-            if (
-                !is_array(
-                    $receipt
-                )
-                || $receipt === []
-            ) {
-                throw new RuntimeException(
-                    'Shipping specialist returned no receipt.'
+            $shipment =
+                DispatchShipmentResult::normalize(
+                    $shipper
+                        ->ship(
+                            $pubAssetId,
+                            $package
+                        )
                 );
-            }
 
 
             /*
-             * Repository owns shipping_receipt/dispatched_at/stage fields.
+             * ASYNCHRONOUS SPECIALIST.
              *
-             * DispatchManager hands the specialist receipt through unchanged.
+             * The Manager does not know HOW the specialist continues the
+             * shipment. It only understands that Dispatch still owns the box
+             * and the final receipt will arrive later through DispatchDesk.
+             */
+            if (
+                $shipment[
+                    'status'
+                ] ===
+                DispatchShipmentResult::IN_PROGRESS
+            ) {
+                return [
+                    'in_progress' => [
+                        'index' =>
+                            $index,
+
+                        'pub_asset_id' =>
+                            $pubAssetId,
+
+                        'line' =>
+                            $lineKey,
+
+                        'state' => [
+                            'pub_asset_id' =>
+                                $pubAssetId,
+
+                            'pipeline_stage' =>
+                                'shipping',
+                        ],
+
+                        'details' =>
+                            $shipment[
+                                'details'
+                            ],
+
+                        'pubcom' =>
+                            $pubComChannel
+                                ->dispositionsAsArray(),
+                    ],
+                ];
+            }
+
+
+            $receipt =
+                $shipment[
+                    'receipt'
+                ];
+
+
+            /*
+             * Manager owns the PUB lifecycle outcome. The repository owns
+             * the physical row write.
              */
             $state =
-                $this->assets
-                    ->markShipped(
-                        $pubAssetId,
-                        $receipt
-                    );
+                $this->completeShipment(
+                    $pubAssetId,
+                    $receipt
+                );
 
 
             return [
@@ -699,6 +1078,17 @@ final class DispatchManager implements PubComManagerContract
         }
 
 
+        if (
+            $channel === 'youtube'
+            && str_starts_with(
+                $mimeType,
+                'video/'
+            )
+        ) {
+            return 'youtube.video';
+        }
+
+
         throw new RuntimeException(
             "DISPATCH has no shipping route for channel '{$channel}' and mime_type '{$mimeType}'."
         );
@@ -733,12 +1123,20 @@ final class DispatchManager implements PubComManagerContract
             ) {
                 'pinterest.image' =>
                     new PinterestImageShipper(
-                        $this->pinterestConfig()
+                        $this->pinterestConfig(),
+                        $this->pinterestAuth()
                     ),
 
                 'pinterest.video' =>
                     new PinterestVideoShipper(
-                        $this->pinterestConfig()
+                        $this->pinterestConfig(),
+                        $this->pinterestAuth()
+                    ),
+
+                'youtube.video' =>
+                    new YouTubeVideoShipper(
+                        $this->youtubeConfig(),
+                        $this->youtubeAuth()
                     ),
 
                 default =>
@@ -772,6 +1170,55 @@ final class DispatchManager implements PubComManagerContract
 
 
         return $this->pinterestConfig;
+    }
+
+
+    private function pinterestAuth(): PinterestAuthService
+    {
+        if (
+            $this->pinterestAuth ===
+            null
+        ) {
+            $this->pinterestAuth =
+                new PinterestAuthService(
+                    $this->pdo
+                );
+        }
+
+
+        return $this->pinterestAuth;
+    }
+
+
+    private function youtubeConfig(): YouTubeShippingConfig
+    {
+        if (
+            $this->youtubeConfig ===
+            null
+        ) {
+            $this->youtubeConfig =
+                new YouTubeShippingConfig();
+        }
+
+
+        return $this->youtubeConfig;
+    }
+
+
+    private function youtubeAuth(): YouTubeAuthService
+    {
+        if (
+            $this->youtubeAuth ===
+            null
+        ) {
+            $this->youtubeAuth =
+                new YouTubeAuthService(
+                    $this->pdo
+                );
+        }
+
+
+        return $this->youtubeAuth;
     }
 
 

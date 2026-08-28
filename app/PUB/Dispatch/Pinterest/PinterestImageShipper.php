@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\PUB\Dispatch\Pinterest;
 
+use App\PUB\Dispatch\Auth\PinterestAuthService;
+use App\PUB\Dispatch\DispatchShipmentResult;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
@@ -47,7 +49,8 @@ final class PinterestImageShipper implements PubComWorkerContract
 
 
     public function __construct(
-        private PinterestShippingConfig $config
+        private PinterestShippingConfig $config,
+        private PinterestAuthService $auth
     ) {}
 
 
@@ -69,8 +72,8 @@ final class PinterestImageShipper implements PubComWorkerContract
     public function readiness(): PubComSignal
     {
         try {
-            $this->config
-                ->accessToken();
+            $this->auth
+                ->validAccessToken();
 
             $this->config
                 ->productionBoardId();
@@ -140,6 +143,7 @@ final class PinterestImageShipper implements PubComWorkerContract
      * station configuration supplied only to Pinterest's request.
      */
     public function ship(
+        int $pubAssetId,
         array $package
     ): array {
         $this->assertPackage(
@@ -214,7 +218,7 @@ final class PinterestImageShipper implements PubComWorkerContract
         }
 
 
-        return [
+        return DispatchShipmentResult::completed([
             'external_id' =>
                 $pinId,
 
@@ -227,7 +231,7 @@ final class PinterestImageShipper implements PubComWorkerContract
 
             'response' =>
                 $response,
-        ];
+        ]);
     }
 
 
@@ -370,8 +374,8 @@ final class PinterestImageShipper implements PubComWorkerContract
 
                 CURLOPT_HTTPHEADER => [
                     'Authorization: Bearer '
-                    . $this->config
-                        ->accessToken(),
+                    . $this->auth
+                        ->validAccessToken(),
 
                     'Content-Type: application/json',
                 ],

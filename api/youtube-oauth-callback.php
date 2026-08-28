@@ -4,14 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/autoload.php';
 require_once __DIR__ . '/db.php';
 
-use App\Repos\PdoPublisherRepository;
-use App\Services\YouTubeOAuthService;
+use App\PUB\Dispatch\Auth\YouTubeAuthService;
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$service = new YouTubeOAuthService(new PdoPublisherRepository($pdo));
+$service = new YouTubeAuthService($pdo);
 
 function youtube_redirect(string $status, string $message = ''): void
 {

@@ -8,6 +8,8 @@ export default function PubDispatchDrawer({
   asset,
   loading = false,
   error = "",
+  retrying = false,
+  onRetry,
   onClose,
 }) {
   const packageValue =
@@ -44,6 +46,24 @@ export default function PubDispatchDrawer({
       ?.pub_asset_id
       ? `Dispatch · Asset #${asset.pub_asset_id}`
       : "Dispatch";
+
+
+  const canRetryShipping =
+    String(
+      asset?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "error"
+    &&
+    String(
+      asset?.error_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "dispatch";
 
 
   return (
@@ -245,6 +265,34 @@ export default function PubDispatchDrawer({
                           "—"
                         }
                       />
+
+                      {canRetryShipping ? (
+                        <div
+                          style={
+                            actionStyle
+                          }
+                        >
+                          <button
+                            type="button"
+
+                            disabled={
+                              retrying
+                            }
+
+                            onClick={() => {
+                              onRetry?.(
+                                asset.pub_asset_id
+                              );
+                            }}
+                          >
+                            {
+                              retrying
+                                ? "Retrying..."
+                                : "Retry Shipping"
+                            }
+                          </button>
+                        </div>
+                      ) : null}
                     </Section>
                   )
                 : null
@@ -584,6 +632,24 @@ const detailValueStyle = {
 
   lineHeight:
     1.4,
+};
+
+
+const actionStyle = {
+  display:
+    "flex",
+
+  justifyContent:
+    "flex-end",
+
+  padding:
+    "10px",
+
+  borderTop:
+    "1px solid #edf0f2",
+
+  background:
+    "#fafbfc",
 };
 
 

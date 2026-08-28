@@ -683,7 +683,7 @@ export default function AdminPlaylistEditorPage() {
         body: type === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : type === "brand-bumper" ? BRAND_BUMPER_BODY_TEMPLATE : emptyItem.body,
         title: type === "brand-bumper" ? "ColorFix" : emptyItem.title,
         subtitle: type === "brand-bumper" ? "by Terry" : emptyItem.subtitle,
-        star: ["hue-wheel", "brand-bumper"].includes(type) ? false : emptyItem.star,
+        star: ["hue-wheel", "brand-bumper", "cover-image"].includes(type) ? false : emptyItem.star,
         site: type === "brand-bumper" ? true : emptyItem.site,
         yt: type === "brand-bumper" ? true : emptyItem.yt,
         concept: type === "brand-bumper" ? true : emptyItem.concept,
@@ -692,6 +692,9 @@ export default function AdminPlaylistEditorPage() {
         analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
         duration_ms: type === "brand-bumper" ? "4200" : emptyItem.duration_ms,
       };
+      if (type === "cover-image") {
+        return [nextItem, ...prev];
+      }
       if (type === "intro") {
         return [nextItem, ...prev];
       }
@@ -1080,6 +1083,7 @@ export default function AdminPlaylistEditorPage() {
           <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
           <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
           <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
+          <button type="button" onClick={() => addItem("cover-image")}>Add Cover Image</button>
         </div>
       </div>
 
@@ -1105,6 +1109,7 @@ export default function AdminPlaylistEditorPage() {
                   <option value="text">text</option>
                   <option value="hue-wheel">hue wheel</option>
                   <option value="brand-bumper">brand bumper</option>
+                  <option value="cover-image">cover image</option>
                   <option value="non-palette">no palette</option>
                 </select>
               </label>
@@ -1476,6 +1481,7 @@ export default function AdminPlaylistEditorPage() {
         <button type="button" onClick={() => addItem("normal")}>Add Slide</button>
         <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
         <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
+        <button type="button" onClick={() => addItem("cover-image")}>Add Cover Image</button>
         <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </button>

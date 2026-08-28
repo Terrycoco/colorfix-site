@@ -670,13 +670,12 @@ final class CreateManager implements PubComManagerContract
                 /*
                  * OFFICIAL ASSET PERSISTENCE.
                  *
-                 * Composite is the first Creator migrated to the
-                 * new contract. The Manager hands the entire asset
-                 * object to the repository untouched and waits for
-                 * confirmation before treating the unit as created.
+                 * The Manager hands the entire finished Creator result
+                 * to the repository untouched. That result may contain
+                 * the primary physical asset plus product-owned companion
+                 * output such as thumbnail_file_path / thumbnail_url.
                  *
-                 * Legacy Creator lines retain their existing
-                 * persistence behavior until migrated individually.
+                 * The repository owns the pub_assets schema mapping.
                  */
                 $persistence =
                     $this->persistFinishedAsset(
@@ -1205,6 +1204,9 @@ final class CreateManager implements PubComManagerContract
                             ->promoteCompletedVideo(
                                 $pubAssetId,
                                 $path,
+                                $this->coverIngredientForAsset(
+                                    $pubAssetId
+                                ),
                                 $outputFileSizeBytes
                             ),
 
@@ -1223,6 +1225,9 @@ final class CreateManager implements PubComManagerContract
                                         'props'
                                     ]
                                     : [],
+                                $this->coverIngredientForAsset(
+                                    $pubAssetId
+                                ),
                                 $outputFileSizeBytes
                             ),
                 };
@@ -2196,8 +2201,8 @@ final class CreateManager implements PubComManagerContract
      * PdoPubAssetRepository owns the pub_assets schema
      * and decides how the supplied asset fields are stored.
      *
-     * Composite, Idea, and Palette are migrated lines. Legacy lines
-     * still persist themselves until migrated individually.
+     * Companion physical output such as a video thumbnail travels
+     * in the same Creator result and is persisted on the same row.
      *
      * @return array<string, mixed>|null
      */
@@ -2487,6 +2492,51 @@ final class CreateManager implements PubComManagerContract
 
 
         return $creator;
+    }
+
+
+    /**
+     * Async video settlement still belongs to the original filed CREATE order.
+     *
+     * The Manager owns that filed order, so it retrieves the exact cover
+     * ingredient and hands it back to the selected Chef. No Chef reaches
+     * into storage looking for missing ingredients.
+     */
+    private function coverIngredientForAsset(
+        int $pubAssetId
+    ): array {
+        $order =
+            $this->assets
+                ->getOrder(
+                    $pubAssetId
+                );
+
+
+        $cover =
+            is_array(
+                $order[
+                    'ingredients'
+                ][
+                    'cover'
+                ]
+                ?? null
+            )
+                ? $order[
+                    'ingredients'
+                ][
+                    'cover'
+                ]
+                : null;
+
+
+        if ($cover === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no filed cover ingredient."
+            );
+        }
+
+
+        return $cover;
     }
 
 

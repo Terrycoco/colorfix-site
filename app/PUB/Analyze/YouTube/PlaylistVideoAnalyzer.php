@@ -21,6 +21,12 @@ use App\PUB\PubCom\PubComWorkerContract;
  * Current Chef order:
  *
  *   ingredients {
+ *     cover {
+ *       file_path
+ *       image_url
+ *       title
+ *     }
+ *
  *     music {
  *       file_path
  *       audio_url
@@ -93,15 +99,65 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
             );
 
 
-        if ($items === []) {
+        $coverItems =
+            $this->coverImageItems(
+                $items
+            );
+
+
+        if (count($coverItems) !== 1) {
+            return PubComSignal::ineligible(
+                'youtube_playlist_video_cover_image_count',
+                'YouTube Playlist Video requires exactly one YouTube-eligible cover-image slide.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'cover_image_count' =>
+                        count($coverItems),
+                ]
+            );
+        }
+
+
+        try {
+            $this->prepareCoverIngredient(
+                $coverItems[0]
+            );
+
+        } catch (\RuntimeException $e) {
+            return PubComSignal::ineligible(
+                'youtube_playlist_video_invalid_cover_image',
+                'YouTube Playlist Video cannot be analyzed because its cover-image slide is incomplete or invalid.',
+                [
+                    'worker' =>
+                        self::class,
+
+                    'reason' =>
+                        $e->getMessage(),
+                ]
+            );
+        }
+
+
+        $playableItems =
+            $this->playableItems(
+                $items
+            );
+
+
+        if ($playableItems === []) {
             return PubComSignal::ineligible(
                 'youtube_playlist_video_no_slides',
-                'YouTube Playlist Video cannot be analyzed because no YouTube-eligible slides were found.',
+                'YouTube Playlist Video cannot be analyzed because no playable YouTube slides were found.',
                 [
                     'worker' =>
                         self::class,
 
                     'youtube_item_count' =>
+                        count($items),
+
+                    'playable_slide_count' =>
                         0,
                 ]
             );
@@ -109,7 +165,7 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
 
 
         foreach (
-            $items
+            $playableItems
             as $index => $item
         ) {
             if (!is_array($item)) {
@@ -264,13 +320,16 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
                     self::class,
 
                 'youtube_item_count' =>
-                    count(
-                        $items
-                    ),
+                    count($items),
+
+                'playable_slide_count' =>
+                    count($playableItems),
+
+                'cover_image_count' =>
+                    1,
             ]
         );
     }
-
 
     /**
      * Prepare the complete ordered slide sequence as ONE proposal.
@@ -290,6 +349,26 @@ public function analyze(
         );
 
 
+    $coverItems =
+        $this->coverImageItems(
+            $items
+        );
+
+
+    if (count($coverItems) !== 1) {
+        return [
+            'proposals' =>
+                [],
+        ];
+    }
+
+
+    $cover =
+        $this->prepareCoverIngredient(
+            $coverItems[0]
+        );
+
+
     $slides = [];
 
     $searchTitle = '';
@@ -302,7 +381,9 @@ public function analyze(
 
 
     foreach (
-        $items
+        $this->playableItems(
+            $items
+        )
         as $item
     ) {
         if (!is_array($item)) {
@@ -369,6 +450,9 @@ public function analyze(
                     $searchTitle,
 
                 'ingredients' => [
+                    'cover' =>
+                        $cover,
+
                     'music' =>
                         $music,
 
@@ -504,6 +588,163 @@ public function analyze(
 
             'volume' =>
                 $volume,
+        ];
+    }
+
+
+    /**
+     * cover-image is authored companion source material.
+     *
+     * It is deliberately not part of slides[] because it never enters
+     * the playable video timeline.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function coverImageItems(
+        array $items
+    ): array {
+        return array_values(
+            array_filter(
+                $items,
+
+                static fn (
+                    mixed $item
+                ): bool =>
+                    is_array($item)
+                    && strtolower(
+                        trim(
+                            (string)(
+                                $item[
+                                    'item_type'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    ) === 'cover-image'
+            )
+        );
+    }
+
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function playableItems(
+        array $items
+    ): array {
+        return array_values(
+            array_filter(
+                $items,
+
+                static fn (
+                    mixed $item
+                ): bool =>
+                    !(
+                        is_array($item)
+                        && strtolower(
+                            trim(
+                                (string)(
+                                    $item[
+                                        'item_type'
+                                    ]
+                                    ?? ''
+                                )
+                            )
+                        ) === 'cover-image'
+                    )
+            )
+        );
+    }
+
+
+    /**
+     * Convert the authored cover-image slide into the exact thumbnail
+     * source ordered by the YouTube Chef.
+     */
+    private function prepareCoverIngredient(
+        array $item
+    ): array {
+        $photo =
+            is_array(
+                $item[
+                    'photo'
+                ]
+                ?? null
+            )
+                ? $item[
+                    'photo'
+                ]
+                : [];
+
+
+        $filePath =
+            trim(
+                (string)(
+                    $photo[
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $imageUrl =
+            trim(
+                (string)(
+                    $photo[
+                        'image_url'
+                    ]
+                    ?? ''
+                )
+            );
+
+        $title =
+            trim(
+                (string)(
+                    $item[
+                        'title'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if ($filePath === '') {
+            throw new \RuntimeException(
+                'YouTube cover-image requires photo.file_path.'
+            );
+        }
+
+
+        if ($imageUrl === '') {
+            throw new \RuntimeException(
+                'YouTube cover-image requires photo.image_url.'
+            );
+        }
+
+
+        if ($title === '') {
+            throw new \RuntimeException(
+                'YouTube cover-image requires title.'
+            );
+        }
+
+
+        if (!is_file($filePath)) {
+            throw new \RuntimeException(
+                'YouTube cover-image source file does not exist.'
+            );
+        }
+
+
+        return [
+            'file_path' =>
+                $filePath,
+
+            'image_url' =>
+                $imageUrl,
+
+            'title' =>
+                $title,
         ];
     }
 

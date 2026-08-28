@@ -172,6 +172,15 @@ final class PlaylistVideoRecipe
      */
     public const FINAL_FADE_MS = 1400;
 
+    /*
+     * Music ending.
+     *
+     * The Chef knows the final video duration and starts reducing the
+     * music this many milliseconds before the video ends so volume reaches
+     * zero on the final frame.
+     */
+    public const MUSIC_FADE_OUT_MS = 3000;
+
 
     /*
      * Standard ColorFix brand bumper.
@@ -201,6 +210,46 @@ final class PlaylistVideoRecipe
     public const BACKGROUND_COLOR = '#000000';
     public const TEXT_COLOR = '#ffffff';
     public const FONT_FAMILY = 'Helvetica, Arial, sans-serif';
+
+
+    /*
+     * YouTube thumbnail typography.
+     *
+     * The Chef resolves this project-relative font file against
+     * projectRoot when rendering the companion thumbnail JPEG.
+     */
+    public const THUMBNAIL_FONT_FILE =
+        'public/fonts/Poppins-Bold.ttf';
+
+    /*
+     * YouTube thumbnail layout and treatment.
+     *
+     * These are product knobs, so they live in the Recipe rather than
+     * inside the Chef.
+     */
+    public const THUMBNAIL_WIDTH = 1280;
+    public const THUMBNAIL_HEIGHT = 720;
+
+    public const THUMBNAIL_TITLE_SIDE_PADDING = 72;
+    public const THUMBNAIL_TITLE_FONT_SIZE = 68;
+    public const THUMBNAIL_TITLE_MIN_FONT_SIZE = 48;
+    public const THUMBNAIL_TITLE_MAX_LINES = 3;
+    public const THUMBNAIL_LINE_GAP = 14;
+
+    /*
+     * Current tuned placement from the visual pass.
+     *
+     * A single-line title needs to sit lower than a taller multi-line
+     * title block. The Chef measures the actual wrapped title and chooses
+     * the appropriate Recipe position.
+     */
+public const THUMBNAIL_TITLE_TOP_SINGLE_LINE = 200;
+public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
+    public const THUMBNAIL_TITLE_AREA_HEIGHT = 250;
+
+    public const THUMBNAIL_TEXT_STROKE_PX = 4;
+    public const THUMBNAIL_JPEG_QUALITY = 90;
+
 
     public const PHOTO_OBJECT_FIT = 'contain';
 

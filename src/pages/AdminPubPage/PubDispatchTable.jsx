@@ -98,9 +98,9 @@ export default function PubDispatchTable() {
   ] = useState("");
 
   const [
-    shipping,
-    setShipping,
-  ] = useState(false);
+    retryingAssetId,
+    setRetryingAssetId,
+  ] = useState(null);
 
 
   /*
@@ -495,6 +495,56 @@ export default function PubDispatchTable() {
   ]);
 
 
+  /*
+   * ASYNC DISPATCH WATCH
+   *
+   * A driver may still be out on the road after this screen mounts.
+   * While any visible asset is SHIPPING, refresh periodically so the
+   * workbench naturally changes to SHIPPED or ERROR when the driver
+   * reports back to DispatchDesk.
+   */
+  useEffect(() => {
+    const hasShipping =
+      assets.some(
+        (asset) =>
+          String(
+            asset?.pipeline_stage ||
+            ""
+          )
+            .trim()
+            .toLowerCase() ===
+          "shipping"
+      );
+
+
+    if (!hasShipping) {
+      return undefined;
+    }
+
+
+    const timer =
+      window.setInterval(
+        () => {
+          loadAssets();
+        },
+        3000
+      );
+
+
+    return () => {
+      window.clearInterval(
+        timer
+      );
+    };
+  }, [
+    assets,
+    channelFilter,
+    typeFilter,
+    drawerOpen,
+    selectedAsset?.pub_asset_id,
+  ]);
+
+
   useEffect(() => {
     loadFilters();
     loadPinterestConnection();
@@ -683,14 +733,22 @@ export default function PubDispatchTable() {
   }
 
 
-  async function shipSelected() {
-    const asset =
-      selectedAsset;
-
+  /*
+   * RETRY ONE DISPATCH ERROR
+   *
+   * First attempt and explicit retry use the same one-box Dispatch
+   * endpoint. DispatchManager owns:
+   *
+   *   error / dispatch -> shipping
+   *
+   * The UI never rewrites lifecycle state itself.
+   */
+  async function retryShipping(
+    pubAssetId
+  ) {
     const id =
       Number(
-        asset
-          ?.pub_asset_id ||
+        pubAssetId ||
         0
       );
 
@@ -700,16 +758,49 @@ export default function PubDispatchTable() {
     }
 
 
-    if (
+    const asset =
+      assets.find(
+        (item) =>
+          Number(
+            item?.pub_asset_id ||
+            0
+          ) === id
+      )
+      ||
+      (
+        Number(
+          drawerAsset?.pub_asset_id ||
+          0
+        ) === id
+          ? drawerAsset
+          : null
+      );
+
+
+    const stage =
       String(
-        asset
-          ?.pipeline_stage ||
+        asset?.pipeline_stage ||
         ""
-      ).toLowerCase() !==
-      "shipping"
+      )
+        .trim()
+        .toLowerCase();
+
+    const errorStage =
+      String(
+        asset?.error_stage ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      stage !== "error"
+      ||
+      errorStage !== "dispatch"
     ) {
       setError(
-        `Asset #${id} is not waiting at Shipping.`
+        `Asset #${id} is not a retryable Dispatch error.`
       );
 
       return;
@@ -718,8 +809,9 @@ export default function PubDispatchTable() {
 
     const ok =
       window.confirm(
-        `Ship asset #${id} to ${humanize(asset.channel)} now?\n\n`
-        + "This creates a real external publication."
+        `Retry shipping asset #${id}?\n\n`
+        + "If the external service accepted part of the previous attempt "
+        + "before the failure was reported, a retry could create a duplicate."
       );
 
 
@@ -728,11 +820,15 @@ export default function PubDispatchTable() {
     }
 
 
-    setShipping(
-      true
+    setRetryingAssetId(
+      id
     );
 
     setError(
+      ""
+    );
+
+    setDrawerError(
       ""
     );
 
@@ -785,14 +881,25 @@ export default function PubDispatchTable() {
             ?.error ||
           data
             ?.error ||
-          `Asset #${id} was not shipped.`
+          `Asset #${id} could not restart Dispatch.`
         );
       }
 
 
-      setStatusMessage(
-        `Asset #${id} shipped successfully.`
-      );
+      if (
+        data
+          ?.result
+          ?.in_progress
+      ) {
+        setStatusMessage(
+          `Asset #${id} is shipping again.`
+        );
+
+      } else {
+        setStatusMessage(
+          `Asset #${id} shipped successfully.`
+        );
+      }
 
 
       await loadAssets();
@@ -806,14 +913,10 @@ export default function PubDispatchTable() {
     } catch (err) {
       setError(
         err?.message ||
-        `Asset #${id} was not shipped.`
+        `Asset #${id} could not restart Dispatch.`
       );
 
 
-      /*
-       * DispatchManager may have moved the row to error.
-       * Refresh so the workbench shows the durable result.
-       */
       await loadAssets();
 
       if (drawerOpen) {
@@ -823,8 +926,8 @@ export default function PubDispatchTable() {
       }
 
     } finally {
-      setShipping(
-        false
+      setRetryingAssetId(
+        null
       );
     }
   }
@@ -1108,7 +1211,7 @@ export default function PubDispatchTable() {
       ?.production ||
     {};
 
-  const canShipSelected =
+  const canRetrySelected =
     Boolean(
       selectedAsset
         ?.pub_asset_id
@@ -1118,10 +1221,29 @@ export default function PubDispatchTable() {
       selectedAsset
         ?.pipeline_stage ||
       ""
-    ).toLowerCase() ===
-      "shipping"
+    )
+      .trim()
+      .toLowerCase() ===
+      "error"
     &&
-    !shipping;
+    String(
+      selectedAsset
+        ?.error_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "dispatch"
+    &&
+    Number(
+      retryingAssetId ||
+      0
+    ) !==
+    Number(
+      selectedAsset
+        ?.pub_asset_id ||
+      0
+    );
 
 
   if (
@@ -1439,18 +1561,29 @@ export default function PubDispatchTable() {
           <button
             type="button"
 
-            onClick={
-              shipSelected
-            }
+            onClick={() => {
+              retryShipping(
+                selectedAsset
+                  ?.pub_asset_id
+              );
+            }}
 
             disabled={
-              !canShipSelected
+              !canRetrySelected
             }
           >
             {
-              shipping
-                ? "Shipping..."
-                : "Ship Selected"
+              Number(
+                retryingAssetId ||
+                0
+              ) ===
+              Number(
+                selectedAsset
+                  ?.pub_asset_id ||
+                0
+              )
+                ? "Retrying..."
+                : "Retry Shipping"
             }
           </button>
 
@@ -1571,6 +1704,22 @@ export default function PubDispatchTable() {
 
         error={
           drawerError
+        }
+
+        retrying={
+          Number(
+            retryingAssetId ||
+            0
+          ) ===
+          Number(
+            drawerAsset
+              ?.pub_asset_id ||
+            0
+          )
+        }
+
+        onRetry={
+          retryShipping
         }
 
         onClose={() =>

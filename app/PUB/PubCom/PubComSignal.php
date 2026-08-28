@@ -214,6 +214,14 @@ public static function pending(
     }
 
 
+    public function isPending(): bool
+    {
+        return
+            $this->type ===
+            self::PENDING;
+    }
+
+
     public function isIneligible(): bool
     {
         return

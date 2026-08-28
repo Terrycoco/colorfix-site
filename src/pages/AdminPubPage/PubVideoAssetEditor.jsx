@@ -18,7 +18,7 @@ const VIDEO_INGREDIENT_FIELDS = {
       key: "end_slide_text",
       label: "End Slide Text",
       type: "textarea",
-      rows: 3,
+      rows: 1,
     },
   ],
 
@@ -88,6 +88,20 @@ export default function PubVideoAssetEditor({
     redoWarningOpen,
     setRedoWarningOpen,
   ] = useState(false);
+
+  /*
+   * Preview cache-buster.
+   *
+   * PUB deliberately reuses the same durable MP4/JPEG URLs across REDO.
+   * Do not depend on updated_at/checksum being present in the admin payload.
+   * A fresh editor mount gets a fresh token, forcing the browser to fetch
+   * the current bytes for both video and thumbnail.
+   */
+  const [
+    previewVersion,
+  ] = useState(
+    () => Date.now()
+  );
 
 
   const assetType =
@@ -610,8 +624,10 @@ export default function PubVideoAssetEditor({
           >
             <PubVideoPlayer
               src={
-                asset.url ||
-                ""
+                versionedPreviewUrl(
+                  asset.url,
+                  previewVersion
+                )
               }
 
               title={
@@ -797,7 +813,9 @@ export default function PubVideoAssetEditor({
                           "100%",
 
                         resize:
-                          "vertical",
+                          field.rows === 1
+                            ? "none"
+                            : "vertical",
 
                         boxSizing:
                           "border-box",
@@ -852,6 +870,42 @@ export default function PubVideoAssetEditor({
                 </label>
               )
             )}
+
+
+            <div>
+              <div
+                style={
+                  thumbnailLabelStyle
+                }
+              >
+                Thumbnail
+              </div>
+
+              {asset.thumbnail_url ? (
+                <img
+                  src={
+                    versionedPreviewUrl(
+                      asset.thumbnail_url,
+                      previewVersion
+                    )
+                  }
+
+                  alt="Video thumbnail"
+
+                  style={
+                    thumbnailPreviewStyle
+                  }
+                />
+              ) : (
+                <div
+                  style={
+                    thumbnailEmptyStyle
+                  }
+                >
+                  No thumbnail yet
+                </div>
+              )}
+            </div>
 
 
             {isYouTubeVideo ? (
@@ -1226,6 +1280,45 @@ export default function PubVideoAssetEditor({
 
     document.body
   );
+}
+
+
+/**
+ * Append a client-local version token to a durable preview URL.
+ *
+ * This guarantees a fresh browser request even when the backend payload
+ * does not expose updated_at/checksum and REDO keeps the same asset URL.
+ */
+function versionedPreviewUrl(
+  url,
+  version
+) {
+  const value =
+    String(
+      url ||
+      ""
+    )
+      .trim();
+
+
+  if (!value) {
+    return "";
+  }
+
+
+  const separator =
+    value.includes(
+      "?"
+    )
+      ? "&"
+      : "?";
+
+
+  return `${value}${separator}v=${encodeURIComponent(
+    String(
+      version
+    )
+  )}`;
 }
 
 
@@ -2299,6 +2392,72 @@ const fieldsStyle = {
 
   minWidth:
     0,
+};
+
+
+const thumbnailLabelStyle = {
+  marginBottom:
+    5,
+
+  fontSize:
+    12,
+
+  fontWeight:
+    700,
+
+  color:
+    "#334155",
+};
+
+
+const thumbnailPreviewStyle = {
+  display:
+    "block",
+
+  width:
+    "100%",
+
+  maxHeight:
+    220,
+
+  objectFit:
+    "contain",
+
+  background:
+    "#f4f5f6",
+
+  border:
+    "1px solid #d8dde3",
+
+  borderRadius:
+    3,
+};
+
+
+const thumbnailEmptyStyle = {
+  minHeight:
+    72,
+
+  display:
+    "grid",
+
+  placeItems:
+    "center",
+
+  background:
+    "#f8fafc",
+
+  border:
+    "1px dashed #cfd5dc",
+
+  borderRadius:
+    3,
+
+  color:
+    "#64748b",
+
+  fontSize:
+    12,
 };
 
 

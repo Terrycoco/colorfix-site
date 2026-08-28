@@ -28,13 +28,21 @@ use Throwable;
  * in-house. Once successfully dispatched, the
  * order may be discarded.
  *
- * Every created asset has exactly two locations:
+ * Every created asset has a primary physical location:
  *
  *   file_path
  *     Full physical server path.
  *
  *   url
  *     Browser-facing URL.
+ *
+ * Video products may also have one durable companion thumbnail:
+ *
+ *   thumbnail_file_path
+ *     Full physical server path for the companion JPEG.
+ *
+ *   thumbnail_url
+ *     Browser-facing URL for that companion JPEG.
  */
 final class PdoPubAssetRepository
 {
@@ -80,6 +88,8 @@ final class PdoPubAssetRepository
 
                 file_path,
                 url,
+                thumbnail_file_path,
+                thumbnail_url,
                 mime_type,
 
                 width,
@@ -108,6 +118,8 @@ final class PdoPubAssetRepository
 
                 :file_path,
                 :url,
+                :thumbnail_file_path,
+                :thumbnail_url,
                 :mime_type,
 
                 :width,
@@ -174,6 +186,18 @@ final class PdoPubAssetRepository
             'url' =>
                 $this->nullableString(
                     $asset['url']
+                    ?? null
+                ),
+
+            'thumbnail_file_path' =>
+                $this->nullableString(
+                    $asset['thumbnail_file_path']
+                    ?? null
+                ),
+
+            'thumbnail_url' =>
+                $this->nullableString(
+                    $asset['thumbnail_url']
                     ?? null
                 ),
 
@@ -1439,6 +1463,8 @@ public function updateOrder(
         $acceptedFields = [
             'file_path',
             'url',
+            'thumbnail_file_path',
+            'thumbnail_url',
             'mime_type',
             'width',
             'height',
@@ -1520,6 +1546,8 @@ public function updateOrder(
                 SET
                     file_path = :file_path,
                     url = :url,
+                    thumbnail_file_path = :thumbnail_file_path,
+                    thumbnail_url = :thumbnail_url,
                     mime_type = :mime_type,
 
                     width = :width,
@@ -1551,6 +1579,18 @@ public function updateOrder(
 
             'url' =>
                 $url,
+
+            'thumbnail_file_path' =>
+                $this->nullableString(
+                    $asset['thumbnail_file_path']
+                    ?? null
+                ),
+
+            'thumbnail_url' =>
+                $this->nullableString(
+                    $asset['thumbnail_url']
+                    ?? null
+                ),
 
             'mime_type' =>
                 $mimeType,
@@ -1676,6 +1716,24 @@ public function updateOrder(
             );
 
 
+        $errorStage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'error_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        $isRetryablePackageError =
+            $stage === 'error'
+            && $errorStage === 'package';
+
+
         if (
             !in_array(
                 $stage,
@@ -1686,6 +1744,7 @@ public function updateOrder(
                 ],
                 true
             )
+            && !$isRetryablePackageError
         ) {
             throw new RuntimeException(
                 "PUB asset #{$pubAssetId} is not ready for Packing."
@@ -1710,10 +1769,17 @@ public function updateOrder(
                 WHERE pub_asset_id =
                     :pub_asset_id
 
-                  AND pipeline_stage IN (
-                      'created',
-                      'packing',
-                      'packed'
+                  AND (
+                      pipeline_stage IN (
+                          'created',
+                          'packing',
+                          'packed'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'package'
+                      )
                   )
                 SQL
             );
@@ -1976,6 +2042,8 @@ public function updateOrder(
 
                     file_path,
                     url,
+                    thumbnail_file_path,
+                    thumbnail_url,
                     mime_type,
 
                     width,
@@ -2050,6 +2118,8 @@ public function updateOrder(
 
                     file_path,
                     url,
+                    thumbnail_file_path,
+                    thumbnail_url,
                     mime_type,
 
                     width,
@@ -2281,6 +2351,8 @@ public function updateOrder(
 
                     file_path,
                     url,
+                    thumbnail_file_path,
+                    thumbnail_url,
                     mime_type,
 
                     width,
@@ -2463,10 +2535,154 @@ public function updateOrder(
      */
 
     /**
+     * Accept one sealed PACKED asset into Dispatch custody.
+     *
+     * DispatchManager owns this lifecycle transition:
+     *
+     *   packed -> shipping
+     *
+     * Schedule never marks an asset shipping. Manual Send Now and
+     * Schedule both call DispatchManager::shipOne(pub_asset_id), and
+     * the Manager asks this repository to persist custody atomically.
+     *
+     * The package is deliberately preserved unchanged.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string
+     * }
+     */
+    public function markShipping(
+        int $pubAssetId
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        /*
+         * Dispatch owns both:
+         *
+         *   packed -> shipping
+         *
+         * and the explicit recovery transition:
+         *
+         *   error / dispatch -> shipping
+         *
+         * The sealed package is preserved unchanged.
+         */
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    pipeline_stage = 'shipping',
+                    stage_note = NULL,
+
+                    error_stage = NULL,
+                    error_code = NULL,
+                    error_message = NULL,
+                    errored_at = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND `package` IS NOT NULL
+
+                  AND (
+                      pipeline_stage = 'packed'
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'dispatch'
+                      )
+                  )
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        if ($stmt->rowCount() !== 1) {
+            $current =
+                $this->getById(
+                    $pubAssetId
+                );
+
+
+            if ($current === null) {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} was not found."
+                );
+            }
+
+
+            $stage =
+                strtolower(
+                    trim(
+                        (string)(
+                            $current[
+                                'pipeline_stage'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+            $errorStage =
+                strtolower(
+                    trim(
+                        (string)(
+                            $current[
+                                'error_stage'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+            $isDispatchRetry =
+                $stage === 'error'
+                && $errorStage === 'dispatch';
+
+
+            if (
+                $stage !== 'packed'
+                && !$isDispatchRetry
+            ) {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} is not ready for Dispatch; expected packed or a Dispatch-stage error."
+                );
+            }
+
+
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no sealed package to ship."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'shipping',
+        ];
+    }
+
+    /**
      * DispatchManager's shipping dock.
      *
-     * Returns only assets Schedule has already selected by moving
-     * them to pipeline_stage = shipping.
+     * Returns assets already accepted into Dispatch custody at
+     * pipeline_stage = shipping. Normal one-box entry is shipOne();
+     * this list primarily supports recovery/administrative sweeps.
      *
      * The sealed package is decoded here because DispatchManager
      * hands that exact package to the selected Shipper.
@@ -2801,6 +3017,8 @@ public function updateOrder(
 
                 search_title,
 
+                error_stage,
+                error_code,
                 error_message,
 
                 CASE
@@ -3264,12 +3482,19 @@ public function updateOrder(
 
                     pipeline_stage,
 
+                    error_stage,
+                    error_code,
+                    error_message,
+                    errored_at,
+
                     search_title,
                     description,
                     pingback,
 
                     file_path,
                     url,
+                    thumbnail_file_path,
+                    thumbnail_url,
                     mime_type,
                     duration_ms,
 

@@ -8,6 +8,10 @@ export default function PubPackageDrawer({
   asset,
   loading = false,
   error = "",
+  retrying = false,
+  sending = false,
+  onRetry,
+  onSend,
   onClose,
 }) {
   const packageValue =
@@ -21,6 +25,36 @@ export default function PubPackageDrawer({
       ?.pub_asset_id
       ? `Package · Asset #${asset.pub_asset_id}`
       : "Package";
+
+
+  const stage =
+    String(
+      asset?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const canRetryPackaging =
+    stage ===
+      "error"
+    &&
+    String(
+      asset?.error_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "package";
+
+
+  const canSendNow =
+    stage ===
+      "packed"
+    &&
+    packageValue !==
+      null;
 
 
   return (
@@ -131,6 +165,34 @@ export default function PubPackageDrawer({
                   "—"
                 }
               />
+
+              {canSendNow ? (
+                <div
+                  style={
+                    actionStyle
+                  }
+                >
+                  <button
+                    type="button"
+
+                    disabled={
+                      sending
+                    }
+
+                    onClick={() => {
+                      onSend?.(
+                        asset.pub_asset_id
+                      );
+                    }}
+                  >
+                    {
+                      sending
+                        ? "Sending..."
+                        : "Send Now"
+                    }
+                  </button>
+                </div>
+              ) : null}
             </Section>
 
 
@@ -175,6 +237,34 @@ export default function PubPackageDrawer({
                           "—"
                         }
                       />
+
+                      {canRetryPackaging ? (
+                        <div
+                          style={
+                            actionStyle
+                          }
+                        >
+                          <button
+                            type="button"
+
+                            disabled={
+                              retrying
+                            }
+
+                            onClick={() => {
+                              onRetry?.(
+                                asset.pub_asset_id
+                              );
+                            }}
+                          >
+                            {
+                              retrying
+                                ? "Retrying..."
+                                : "Retry Packaging"
+                            }
+                          </button>
+                        </div>
+                      ) : null}
                     </Section>
                   )
                 : null
@@ -479,6 +569,24 @@ const detailValueStyle = {
 
   lineHeight:
     1.4,
+};
+
+
+const actionStyle = {
+  display:
+    "flex",
+
+  justifyContent:
+    "flex-end",
+
+  padding:
+    "10px",
+
+  borderTop:
+    "1px solid #edf0f2",
+
+  background:
+    "#fafbfc",
 };
 
 

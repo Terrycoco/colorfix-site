@@ -14,7 +14,8 @@ namespace App\PUB\Contracts;
  *
  * ANALYZE prepares asset-specific ingredients.
  * CREATE consumes those ingredients and returns the
- * created physical asset.
+ * created physical asset plus any product-owned companion output
+ * (for example, a video thumbnail).
  * PACKAGE consumes durable pub_assets rows and returns
  * channel/media-specific package arrays.
  * DISPATCH consumes packed package arrays and returns
@@ -381,6 +382,14 @@ final class PubContract
                                     'ingredientPath' =>
                                         'after.file_path',
                                 ],
+
+                                [
+                                    'label' =>
+                                        'Cover',
+
+                                    'ingredientPath' =>
+                                        'cover.file_path',
+                                ],
                             ],
                         ],
 
@@ -604,6 +613,14 @@ final class PubContract
                                     'key' =>
                                         'valid_transformation_pair',
                                 ],
+
+                                [
+                                    'key' =>
+                                        'cover_image_slide',
+
+                                    'note' =>
+                                        'item_type = cover-image; must contain a usable prepared photo',
+                                ],
                             ],
 
                             'output' => [
@@ -666,6 +683,25 @@ final class PubContract
 
                                             'required' =>
                                                 true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'cover.file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'cover.image_url',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'authored cover-image photo; CREATE turns this into the durable companion JPEG',
                                         ],
 
                                         [
@@ -1078,7 +1114,7 @@ final class PubContract
                                         'items[]',
 
                                     'note' =>
-                                        'yt = 1; array order is playlist order; source may contain more fields than the Creator orders',
+                                        'yt = 1; array order is playlist order; source may contain more fields than the Creator orders; cover-image is companion source material and is not emitted into slides[]',
 
                                     'fields' => [
                                         [
@@ -1151,6 +1187,14 @@ final class PubContract
                                     'note' =>
                                         'eligibility is item-type specific; do not apply one universal photo-or-text rule to every slide',
                                 ],
+
+                                [
+                                    'key' =>
+                                        'cover_image_slide',
+
+                                    'note' =>
+                                        'exactly one usable yt = 1 item_type = cover-image with prepared photo + title; used to create the YouTube thumbnail and excluded from playback slides',
+                                ],
                             ],
 
                             'output' => [
@@ -1167,6 +1211,46 @@ final class PubContract
                                         'object',
 
                                     'fields' => [
+                                        [
+                                            'key' =>
+                                                'cover',
+
+                                            'type' =>
+                                                'object',
+
+                                            'required' =>
+                                                true,
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'file_path',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'image_url',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'title',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+                                            ],
+
+                                            'note' =>
+                                                'prepared cover-image source; photo + authored title become the designed YouTube thumbnail and do not enter the video timeline',
+                                        ],
+
                                         [
                                             'key' =>
                                                 'music',
@@ -1221,7 +1305,7 @@ final class PubContract
                                                 true,
 
                                             'note' =>
-                                                'one ordered prepared slide array for one complete YouTube video; each item is culled to the exact fields ordered by the Creator for that item_type',
+                                                'one ordered prepared slide array for one complete YouTube video; cover-image is excluded; each playable item is culled to the exact fields ordered by the Creator for that item_type',
 
                                             'fields' => [
                                                 [
@@ -1712,6 +1796,28 @@ final class PubContract
 
                         [
                             'key' =>
+                                'thumbnail_file_path',
+
+                            'required' =>
+                                false,
+
+                            'note' =>
+                                'durable companion JPEG written by a video Creator when that product has a thumbnail/cover',
+                        ],
+
+                        [
+                            'key' =>
+                                'thumbnail_url',
+
+                            'required' =>
+                                false,
+
+                            'note' =>
+                                'public URL for the durable companion JPEG',
+                        ],
+
+                        [
+                            'key' =>
                                 'mime_type',
                         ],
 
@@ -1937,6 +2043,25 @@ final class PubContract
 
                                         [
                                             'key' =>
+                                                'cover.file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'cover.image_url',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'authored cover-image photo used by CREATE to produce the companion JPEG',
+                                        ],
+
+                                        [
+                                            'key' =>
                                                 'search_title',
 
                                             'required' =>
@@ -1975,6 +2100,28 @@ final class PubContract
 
                                     'required' =>
                                         true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'durable companion JPEG produced from cover-image source',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'public URL Pinterest later uses as cover_image_url',
                                 ],
 
                                 [
@@ -2314,6 +2461,46 @@ final class PubContract
                                         'object',
 
                                     'fields' => [
+                                        [
+                                            'key' =>
+                                                'cover',
+
+                                            'type' =>
+                                                'object',
+
+                                            'required' =>
+                                                true,
+
+                                            'fields' => [
+                                                [
+                                                    'key' =>
+                                                        'file_path',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'image_url',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+
+                                                [
+                                                    'key' =>
+                                                        'title',
+
+                                                    'required' =>
+                                                        true,
+                                                ],
+                                            ],
+
+                                            'note' =>
+                                                'prepared cover-image source; Creator renders the designed thumbnail JPEG from this photo + title',
+                                        ],
+
                                         [
                                             'key' =>
                                                 'music',
@@ -2704,6 +2891,28 @@ final class PubContract
 
                                 [
                                     'key' =>
+                                        'thumbnail_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'durable designed thumbnail JPEG uploaded separately to YouTube',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'public/browser-facing URL for the same durable thumbnail JPEG',
+                                ],
+
+                                [
+                                    'key' =>
                                         'mime_type',
 
                                     'required' =>
@@ -2877,6 +3086,171 @@ final class PubContract
                  * not CREATE asset_type values.
                  */
                 'assetTypes' => [
+
+                    /*
+                     * ----------------------------------------------------
+                     * PINTEREST VIDEO PACKAGER
+                     * ----------------------------------------------------
+                     *
+                     * Produces one sealed outbound manifest for a finished
+                     * Pinterest video plus its Creator-owned companion cover.
+                     */
+                    'pinterest_video' => [
+
+                        'label' =>
+                            'Pinterest Video',
+
+                        'channel' =>
+                            'pinterest',
+
+                        'mimeTypePrefix' =>
+                            'video/',
+
+                        'packager' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'channel',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'must be pinterest',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'mime_type',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'must begin video/',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'finished local video file uploaded by Shipping',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'durable companion JPEG must exist before packing',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'public companion JPEG URL; Packager resolves to an absolute Pinterest cover_image_url',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'search_title',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.title',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.description',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'pingback',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.link after resolving absolute URL and applying src=pin',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'title',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'link',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'absolute destination URL with src=pin',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'video_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'local MP4 supplied unchanged to Pinterest video Shipping',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'cover_image_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'absolute public companion JPEG URL used when the Pin is created',
+                                ],
+                            ],
+                        ],
+                    ],
+
 
                     /*
                      * ----------------------------------------------------
@@ -3055,6 +3429,141 @@ final class PubContract
                             ],
                         ],
                     ],
+
+                    /*
+                     * ----------------------------------------------------
+                     * YOUTUBE VIDEO PACKAGER
+                     * ----------------------------------------------------
+                     *
+                     * Produces one sealed outbound manifest for a finished
+                     * YouTube video plus its Creator-owned authored thumbnail.
+                     *
+                     * Publication privacy is NOT package data. It is a
+                     * YouTube shipping policy owned by YouTubeShippingConfig.
+                     */
+                    'youtube_video' => [
+
+                        'label' =>
+                            'YouTube Video',
+
+                        'channel' =>
+                            'youtube',
+
+                        'mimeTypePrefix' =>
+                            'video/',
+
+                        'packager' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'channel',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'must be youtube',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'mime_type',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'must begin video/',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'finished local MP4 uploaded by YouTube Shipping',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'durable authored JPEG produced by CREATE and uploaded separately with thumbnails.set',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'search_title',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.title',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'becomes package.description; key is required even when copy is empty',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'title',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'video_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'local MP4 supplied unchanged to YouTube resumable upload Shipping',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'thumbnail_file_path',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'local authored JPEG supplied unchanged to YouTube thumbnails.set Shipping',
+                                ],
+                            ],
+                        ],
+                    ],
+
                 ],
             ],
 
@@ -3075,38 +3584,19 @@ final class PubContract
                 'nextStage' =>
                     'dispatch',
 
-                'assetTypes' => [
-
-                    'composite' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
-
-                    'before_after_video' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
-
-                    'idea' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
-
-                    'idea_palette' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
-
-                    'youtube_video' => [
-                        'channel' =>
-                            'youtube',
-                    ],
-
-                    'youtube_teaser_pin' => [
-                        'channel' =>
-                            'pinterest',
-                    ],
-                ],
+                /*
+                 * Schedule is intentionally product-agnostic.
+                 *
+                 * It will eventually wake itself, determine which channel
+                 * is due, select one eligible packed asset, move that row
+                 * from packed -> shipping, and hand pub_asset_id to Dispatch.
+                 *
+                 * Product/channel dependency rules must already be resolved
+                 * upstream before an asset reaches packed.
+                 *
+                 * The Scheduler itself is not built yet, so no specialist
+                 * assetTypes are declared here.
+                 */
             ],
 
 
@@ -3117,7 +3607,7 @@ final class PubContract
              *
              * DISPATCH is Shipping.
              *
-             * ShippingManager receives the asset selected by Schedule,
+             * DispatchManager receives the asset selected by Schedule,
              * routes only far enough to choose the correct Shipper, and
              * persists the Shipper's returned receipt.
              *
@@ -3126,7 +3616,7 @@ final class PubContract
              *   - supplies its own fixed connection/config/secrets
              *   - authenticates
              *   - performs the external API protocol
-             *   - returns the API receipt/result to ShippingManager
+             *   - returns the API receipt/result to DispatchManager
              *
              * Shipping never edits pub_assets.package.
              */
@@ -3161,6 +3651,14 @@ final class PubContract
 
                         [
                             'key' =>
+                                'pipeline_stage',
+
+                            'note' =>
+                                'shipping',
+                        ],
+
+                        [
+                            'key' =>
                                 'package',
 
                             'type' =>
@@ -3172,7 +3670,7 @@ final class PubContract
                     ],
 
                     /*
-                     * ShippingManager persists the specialist receipt into
+                     * DispatchManager persists the specialist receipt into
                      * shipping_receipt, stamps dispatched_at, and moves the
                      * asset to its terminal shipped stage.
                      */
@@ -3215,6 +3713,120 @@ final class PubContract
                  * not CREATE recipe names.
                  */
                 'assetTypes' => [
+
+                    /*
+                     * ----------------------------------------------------
+                     * PINTEREST VIDEO SHIPPER
+                     * ----------------------------------------------------
+                     */
+                    'pinterest_video' => [
+
+                        'label' =>
+                            'Pinterest Video',
+
+                        'channel' =>
+                            'pinterest',
+
+                        'mimeTypePrefix' =>
+                            'video/',
+
+                        'shipper' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'package',
+
+                                    'type' =>
+                                        'object',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'title',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'description',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'link',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'video_file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'cover_image_url',
+
+                                            'required' =>
+                                                true,
+                                        ],
+                                    ],
+
+                                    'note' =>
+                                        'Shipper registers media, uploads video_file_path using Pinterest transient upload parameters, polls media status to succeeded, then creates the Pin with source_type=video_id and cover_image_url. Transient upload credentials are never persisted.',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'external_id',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Pinterest Pin ID',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'external_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Pinterest Pin URL',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'response',
+
+                                    'type' =>
+                                        'object',
+
+                                    'required' =>
+                                        false,
+
+                                    'note' =>
+                                        'Pinterest create-Pin response retained as receipt detail when useful; transient upload parameters must not be retained',
+                                ],
+                            ],
+                        ],
+                    ],
+
 
                     /*
                      * ----------------------------------------------------
@@ -3299,7 +3911,7 @@ final class PubContract
 
                             /*
                              * Successful Shipper result returned to
-                             * ShippingManager. The Manager persists this
+                             * DispatchManager. The Manager persists this
                              * object as pub_assets.shipping_receipt and owns
                              * the dispatched_at / shipped lifecycle stamps.
                              */
@@ -3342,6 +3954,112 @@ final class PubContract
                             ],
                         ],
                     ],
+
+                    /*
+                     * ----------------------------------------------------
+                     * YOUTUBE VIDEO SHIPPER
+                     * ----------------------------------------------------
+                     */
+                    'youtube_video' => [
+
+                        'label' =>
+                            'YouTube Video',
+
+                        'channel' =>
+                            'youtube',
+
+                        'mimeTypePrefix' =>
+                            'video/',
+
+                        'shipper' => [
+
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'package',
+
+                                    'type' =>
+                                        'object',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'title',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'description',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'video_file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'thumbnail_file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+                                    ],
+
+                                    'note' =>
+                                        'Shipper starts a YouTube resumable videos.insert session, uploads video_file_path, obtains the YouTube video ID, then uploads thumbnail_file_path with thumbnails.set. OAuth tokens, API endpoints, retry policy, and requested privacy status belong to YouTube Auth/Shipping config and are not persisted in the package.',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'external_id',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'YouTube video ID',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'external_url',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'YouTube watch URL',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'response',
+
+                                    'type' =>
+                                        'object',
+
+                                    'required' =>
+                                        false,
+
+                                    'note' =>
+                                        'useful receipt detail such as requested/actual privacy status and thumbnail_set; resumable session URI and OAuth tokens must not be retained',
+                                ],
+                            ],
+                        ],
+                    ],
+
                 ],
             ],
 
@@ -3456,6 +4174,28 @@ final class PubContract
 
                             'type' =>
                                 'varchar(1024)',
+                        ],
+
+                        [
+                            'key' =>
+                                'thumbnail_file_path',
+
+                            'type' =>
+                                'varchar(1024)',
+
+                            'note' =>
+                                'nullable durable companion JPEG path on the same asset row; used by video products that require a cover/thumbnail',
+                        ],
+
+                        [
+                            'key' =>
+                                'thumbnail_url',
+
+                            'type' =>
+                                'varchar(1024)',
+
+                            'note' =>
+                                'nullable public URL for the same companion JPEG',
                         ],
 
                         [

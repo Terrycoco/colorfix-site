@@ -5,8 +5,7 @@ require_once __DIR__ . '/autoload.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/v2/admin/auth.php';
 
-use App\Repos\PdoPublisherRepository;
-use App\Services\YouTubeOAuthService;
+use App\PUB\Dispatch\Auth\YouTubeAuthService;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     http_response_code(405);
@@ -34,7 +33,7 @@ try {
     $_SESSION['youtube_oauth_state_created_at'] = time();
     $_SESSION['youtube_oauth_return_to'] = youtube_safe_return_to((string)($_GET['return'] ?? ''));
 
-    $service = new YouTubeOAuthService(new PdoPublisherRepository($pdo));
+    $service = new YouTubeAuthService($pdo);
     header('Location: ' . $service->authorizationUrl($state), true, 302);
     exit;
 } catch (Throwable $e) {
