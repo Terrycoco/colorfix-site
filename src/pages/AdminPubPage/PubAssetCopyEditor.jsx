@@ -80,6 +80,35 @@ export default function PubAssetCopyEditor({
     sendingToPackaging;
 
 
+  /*
+   * SHIPPED assets are historical records.
+   * They remain viewable, but they are no longer editable/re-creatable.
+   */
+  const pipelineStage =
+    String(
+      asset?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const isShipping =
+    pipelineStage ===
+      "shipping";
+
+  const isShipped =
+    pipelineStage ===
+      "shipped";
+
+  const isDispatchLocked =
+    isShipping ||
+    isShipped;
+
+  const editorLocked =
+    busy ||
+    isDispatchLocked;
+
+
   function currentChanges() {
     return {
       search_title:
@@ -95,6 +124,10 @@ export default function PubAssetCopyEditor({
     event
   ) {
     event.preventDefault();
+
+    if (isDispatchLocked) {
+      return;
+    }
 
     setSuccessMessage(
       ""
@@ -120,6 +153,10 @@ export default function PubAssetCopyEditor({
 
 
   async function handleRecreate() {
+    if (isDispatchLocked) {
+      return;
+    }
+
     setSuccessMessage(
       ""
     );
@@ -168,6 +205,10 @@ export default function PubAssetCopyEditor({
 
 
   async function handleSendToPackaging() {
+    if (isDispatchLocked) {
+      return;
+    }
+
     setSuccessMessage(
       ""
     );
@@ -257,6 +298,20 @@ export default function PubAssetCopyEditor({
               headerRightStyle
             }
           >
+            {isDispatchLocked ? (
+              <div
+                style={
+                  shippedBadgeStyle
+                }
+              >
+                {
+                  isShipping
+                    ? "SHIPPING"
+                    : "SHIPPED"
+                }
+              </div>
+            ) : null}
+
             <div
               style={
                 assetIdStyle
@@ -351,7 +406,7 @@ export default function PubAssetCopyEditor({
                 }
 
                 disabled={
-                  busy
+                  editorLocked
                 }
 
                 onChange={(
@@ -399,7 +454,7 @@ export default function PubAssetCopyEditor({
                 }
 
                 disabled={
-                  busy
+                  editorLocked
                 }
 
                 onChange={(
@@ -486,57 +541,61 @@ export default function PubAssetCopyEditor({
           </button>
 
 
-          <button
-            type="submit"
+          {!isDispatchLocked ? (
+            <>
+              <button
+                type="submit"
 
-            style={
-              quietButtonStyle
-            }
+                style={
+                  quietButtonStyle
+                }
 
-            disabled={
-              busy
-            }
-          >
-            {saving
-              ? "Saving..."
-              : "Save"}
-          </button>
-
-
-          <button
-            type="button"
-
-            disabled={
-              busy
-            }
-
-            onClick={
-              handleRecreate
-            }
-          >
-            {recreating
-              ? "Recreating..."
-              : "Redo Asset"}
-          </button>
+                disabled={
+                  busy
+                }
+              >
+                {saving
+                  ? "Saving..."
+                  : "Save"}
+              </button>
 
 
-          <button
-            type="button"
+              <button
+                type="button"
 
-            disabled={
-              busy
-            }
+                disabled={
+                  busy
+                }
 
-            onClick={
-              handleSendToPackaging
-            }
-          >
-            {
-              sendingToPackaging
-                ? "Sending..."
-                : "Send to Packaging"
-            }
-          </button>
+                onClick={
+                  handleRecreate
+                }
+              >
+                {recreating
+                  ? "Recreating..."
+                  : "Redo Asset"}
+              </button>
+
+
+              <button
+                type="button"
+
+                disabled={
+                  busy
+                }
+
+                onClick={
+                  handleSendToPackaging
+                }
+              >
+                {
+                  sendingToPackaging
+                    ? "Sending..."
+                    : "Send to Packaging"
+                }
+              </button>
+            </>
+          ) : null}
         </div>
       </form>
     </div>,
@@ -729,6 +788,36 @@ const noPreviewStyle = {
 
   color:
     "#6b7280",
+};
+
+
+const shippedBadgeStyle = {
+  padding:
+    "3px 7px",
+
+  border:
+    "1px solid #9bbda7",
+
+  borderRadius:
+    999,
+
+  background:
+    "#eef8f1",
+
+  color:
+    "#2f6b43",
+
+  fontSize:
+    11,
+
+  fontWeight:
+    800,
+
+  letterSpacing:
+    "0.04em",
+
+  whiteSpace:
+    "nowrap",
 };
 
 

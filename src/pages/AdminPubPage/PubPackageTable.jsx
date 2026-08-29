@@ -1,4 +1,4 @@
- import {
+import {
   useEffect,
   useMemo,
   useState,
@@ -7,6 +7,7 @@
 import {
   AdminDataGrid,
   AdminEmptyState,
+  AdminWorkbench,
 } from "@components/AdminLayout";
 
 import {
@@ -24,7 +25,9 @@ const DISPATCH_URL =
   `${API_FOLDER}/v2/admin/pub/dispatch.php`;
 
 
-export default function PubPackageTable() {
+export default function PubPackageTable({
+  onOpenDispatch,
+}) {
   const [
     assets,
     setAssets,
@@ -56,6 +59,16 @@ export default function PubPackageTable() {
   ] = useState(true);
 
   const [
+    processing,
+    setProcessing,
+  ] = useState(false);
+
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
+
+  const [
     error,
     setError,
   ] = useState("");
@@ -84,17 +97,6 @@ export default function PubPackageTable() {
     drawerError,
     setDrawerError,
   ] = useState("");
-
-  const [
-    retryingAssetId,
-    setRetryingAssetId,
-  ] = useState(null);
-
-
-  const [
-    sendingAssetId,
-    setSendingAssetId,
-  ] = useState(null);
 
 
   /*
@@ -256,6 +258,246 @@ export default function PubPackageTable() {
   }
 
 
+  /*
+   * Pack exactly the selected asset.
+   *
+   * PackageEndpoint already supports the single-asset path:
+   *
+   *   POST { "pub_asset_id": 123 }
+   *
+   * That calls PackageManager::sendToPacking() and does NOT
+   * sweep sibling rows already waiting at Packing.
+   */
+  async function packAsset(
+    pubAssetId
+  ) {
+    pubAssetId =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!pubAssetId) {
+      return;
+    }
+
+
+    setProcessing(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          PACKAGE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  pubAssetId,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          `Failed to pack asset #${pubAssetId}.`
+        );
+      }
+
+
+      await loadAssets();
+
+
+      /*
+       * Package has handed this asset to Dispatch.
+       * Move the operator directly to the Dispatch workbench.
+       */
+      onOpenDispatch?.();
+
+    } catch (err) {
+      const message =
+        err?.message ||
+        `Failed to pack asset #${pubAssetId}.`;
+
+
+      /*
+       * PackageManager may already have persisted error/package before
+       * the HTTP request returns failure. Re-read durable state so the
+       * workbench and open drawer never remain visually stuck at
+       * "Packing" after the process has actually failed.
+       */
+      await loadAssets();
+
+
+      if (drawerOpen) {
+        await loadDrawerAsset(
+          pubAssetId
+        );
+      }
+
+
+      setError(
+        message
+      );
+
+    } finally {
+      setProcessing(
+        false
+      );
+    }
+  }
+
+
+  /*
+   * Hand exactly one PACKED asset to Dispatch.
+   *
+   * DispatchManager owns:
+   *
+   *   packed -> shipping
+   *
+   * and the Shipper/driver owns the external delivery work after that.
+   */
+  async function sendAsset(
+    pubAssetId
+  ) {
+    pubAssetId =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!pubAssetId) {
+      return;
+    }
+
+
+    setSending(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setDrawerError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          DISPATCH_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  pubAssetId,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          data?.result
+            ?.failed
+            ?.error ||
+          `Failed to send asset #${pubAssetId} to Dispatch.`
+        );
+      }
+
+
+      /*
+       * The asset has left Package custody. Close the Package drawer
+       * instead of trying to reload a row that no longer belongs here.
+       */
+      setDrawerOpen(
+        false
+      );
+
+      setDrawerAsset(
+        null
+      );
+
+      setSelectedAsset(
+        null
+      );
+
+
+      await loadAssets();
+
+    } catch (err) {
+      const message =
+        err?.message ||
+        `Failed to send asset #${pubAssetId} to Dispatch.`;
+
+
+      setDrawerError(
+        message
+      );
+
+      setError(
+        message
+      );
+
+    } finally {
+      setSending(
+        false
+      );
+    }
+  }
+
+
   useEffect(() => {
     loadAssets();
   }, [
@@ -400,273 +642,6 @@ export default function PubPackageTable() {
 
 
   /*
-   * RETRY ONE PACKAGE ERROR
-   *
-   * The existing Package endpoint already treats:
-   *
-   *   POST { pub_asset_id }
-   *
-   * as "hand exactly this asset to Package".
-   *
-   * Repository lifecycle rules decide whether the errored asset is
-   * retryable. The UI does not invent a separate recovery route.
-   */
-  async function retryPackaging(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        0
-      );
-
-
-    if (!id) {
-      return;
-    }
-
-
-    setRetryingAssetId(
-      id
-    );
-
-    setDrawerError(
-      ""
-    );
-
-    setError(
-      ""
-    );
-
-
-    try {
-      const res =
-        await fetch(
-          PACKAGE_URL,
-          {
-            method:
-              "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                pub_asset_id:
-                  id,
-              }),
-          }
-        );
-
-
-      const data =
-        await res.json();
-
-
-      if (
-        !res.ok
-        ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "Could not retry Packaging."
-        );
-      }
-
-
-      const failed =
-        Array.isArray(
-          data.failed
-        )
-          ? data.failed
-          : [];
-
-
-      if (
-        Number(
-          data.failed_count ||
-          0
-        ) > 0
-        ||
-        failed.length > 0
-      ) {
-        throw new Error(
-          failed?.[0]?.error ||
-          "Packaging retry failed."
-        );
-      }
-
-
-      await loadAssets();
-
-
-      /*
-       * loadAssets() normally refreshes an open selected drawer too.
-       * This explicit reload also covers the case where selection state
-       * has not settled yet.
-       */
-      if (drawerOpen) {
-        await loadDrawerAsset(
-          id
-        );
-      }
-
-    } catch (err) {
-      setDrawerError(
-        err?.message ||
-        "Could not retry Packaging."
-      );
-
-    } finally {
-      setRetryingAssetId(
-        null
-      );
-    }
-  }
-
-
-  function openDispatchWorkbench() {
-    if (
-      typeof window ===
-      "undefined"
-    ) {
-      return;
-    }
-
-
-    const url =
-      new URL(
-        window.location.href
-      );
-
-
-    url.searchParams.set(
-      "stage",
-      "dispatch"
-    );
-
-    url.hash =
-      "";
-
-
-    window.location.assign(
-      url.toString()
-    );
-  }
-
-
-  /*
-   * SEND ONE PACKED ASSET NOW
-   *
-   * Manual Send Now and the future Scheduler both use the same
-   * DispatchManager one-box entrypoint:
-   *
-   *   POST { pub_asset_id }
-   *
-   * DispatchManager owns:
-   *
-   *   packed -> shipping -> shipped
-   *
-   * The UI does not move lifecycle stages itself.
-   */
-  async function sendNow(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        0
-      );
-
-
-    if (!id) {
-      return;
-    }
-
-
-    setSendingAssetId(
-      id
-    );
-
-    setDrawerError(
-      ""
-    );
-
-    setError(
-      ""
-    );
-
-
-    try {
-      const res =
-        await fetch(
-          DISPATCH_URL,
-          {
-            method:
-              "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                pub_asset_id:
-                  id,
-              }),
-          }
-        );
-
-
-      const data =
-        await res.json();
-
-
-      if (
-        !res.ok
-        ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.result?.failed?.error ||
-          data?.error ||
-          "Could not send asset."
-        );
-      }
-
-
-      openDispatchWorkbench();
-
-      return;
-
-    } catch (err) {
-      /*
-       * Once Dispatch has attempted to take custody, any durable failure
-       * belongs on the Dispatch workbench, not on a stale Package row.
-       */
-      openDispatchWorkbench();
-
-      return;
-
-    } finally {
-      setSendingAssetId(
-        null
-      );
-    }
-  }
-
-
-  /*
    * GRID COLUMNS
    */
   const columns =
@@ -804,9 +779,30 @@ export default function PubPackageTable() {
                   }
                 >
                   {
-                    humanize(
-                      stage
+                    (
+                      String(
+                        asset
+                          .error_stage ||
+                        ""
+                      )
+                        .trim()
+                        .toLowerCase() ===
+                      "package"
+                      ||
+                      (
+                        stage ===
+                          "error"
+                        &&
+                        Boolean(
+                          asset
+                            .error_message
+                        )
+                      )
                     )
+                      ? "Package Error"
+                      : humanize(
+                          stage
+                        )
                   }
                 </span>
               );
@@ -914,272 +910,287 @@ export default function PubPackageTable() {
   }
 
 
+  const drawerTitle =
+    drawerAsset
+      ?.pub_asset_id
+      ? `Package · Asset #${drawerAsset.pub_asset_id}`
+      : "Package";
+
+
   return (
     <div
-      style={
-        workbenchShellStyle
-      }
+      className="admin-detail-workarea"
     >
-      <div
-        className="admin-detail-workarea"
-
-        style={
-          workbenchMainStyle
+      <AdminWorkbench
+        header={
+          <>
+            <div
+              style={
+                filterBarStyle
+              }
+            >
+              <label
+                className="admin-field"
+              >
+                <span
+                  className="admin-field__label"
+                >
+                  Channel
+                </span>
+            
+                <select
+                  className="admin-field__control"
+            
+                  value={
+                    channelFilter
+                  }
+            
+                  onChange={(
+                    event
+                  ) =>
+                    setChannelFilter(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                >
+                  <option value="">
+                    All
+                  </option>
+            
+                  {channels.map(
+                    (
+                      channel
+                    ) => (
+                      <option
+                        key={
+                          channel
+                        }
+            
+                        value={
+                          channel
+                        }
+                      >
+                        {
+                          humanize(
+                            channel
+                          )
+                        }
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+            
+            
+              <label
+                className="admin-field"
+              >
+                <span
+                  className="admin-field__label"
+                >
+                  Type
+                </span>
+            
+                <select
+                  className="admin-field__control"
+            
+                  value={
+                    typeFilter
+                  }
+            
+                  onChange={(
+                    event
+                  ) =>
+                    setTypeFilter(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                >
+                  <option value="">
+                    All
+                  </option>
+            
+                  {assetTypes.map(
+                    (
+                      assetType
+                    ) => (
+                      <option
+                        key={
+                          assetType
+                        }
+            
+                        value={
+                          assetType
+                        }
+                      >
+                        {
+                          humanize(
+                            assetType
+                          )
+                        }
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+<button
+                type="button"
+            
+                onClick={
+                  loadAssets
+                }
+            
+                disabled={
+                  loading ||
+                  processing
+                }
+            
+                style={
+                  refreshButtonStyle
+                }
+              >
+                {
+                  loading
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </button>
+            
+            
+              <div
+                style={
+                  countStyle
+                }
+              >
+                {assets.length} asset
+                {
+                  assets.length === 1
+                    ? ""
+                    : "s"
+                }
+              </div>
+            </div>
+          </>
         }
-      >
-        <div
-          style={
-            filterBarStyle
-          }
-        >
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Channel
-            </span>
 
-            <select
-              className="admin-field__control"
+        /*
+         * PACKAGE is a single-grid workbench.
+         * Give AdminWorkbench a zero-height upper section and use the
+         * full lower workspace for the Package grid. AdminWorkbench,
+         * not this table and not PubPackageDrawer, owns drawer geometry.
+         */
+        upperLeft={null}
+        upperRight={null}
+        upperHeight="0px"
 
-              value={
-                channelFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setChannelFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
-            >
-              <option value="">
-                All
-              </option>
-
-              {channels.map(
-                (
-                  channel
-                ) => (
-                  <option
-                    key={
-                      channel
-                    }
-
-                    value={
-                      channel
-                    }
-                  >
-                    {
-                      humanize(
-                        channel
-                      )
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Type
-            </span>
-
-            <select
-              className="admin-field__control"
-
-              value={
-                typeFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setTypeFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
-            >
-              <option value="">
-                All
-              </option>
-
-              {assetTypes.map(
-                (
-                  assetType
-                ) => (
-                  <option
-                    key={
-                      assetType
-                    }
-
-                    value={
-                      assetType
-                    }
-                  >
-                    {
-                      humanize(
-                        assetType
-                      )
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-
-          <button
-            type="button"
-
-            onClick={
-              loadAssets
-            }
-
-            disabled={
-              loading
-            }
-
-            style={
-              refreshButtonStyle
-            }
-          >
-            {
-              loading
-                ? "Refreshing..."
-                : "Refresh"
-            }
-          </button>
-
-
+        lower={
           <div
-            style={
-              countStyle
-            }
+            className="admin-detail-workarea"
+
+            style={{
+              height:
+                "100%",
+            }}
           >
-            {assets.length} asset
-            {
-              assets.length === 1
-                ? ""
-                : "s"
-            }
+            {error ? (
+              <div
+                style={
+                  errorStyle
+                }
+              >
+                {error}
+              </div>
+            ) : null}
+            
+
+            <AdminDataGrid
+              items={
+                assets
+              }
+            
+              columns={
+                columns
+              }
+            
+              getRowKey={(
+                asset
+              ) =>
+                asset
+                  .pub_asset_id
+              }
+            
+              selectedKey={
+                selectedAsset
+                  ?.pub_asset_id ??
+                null
+              }
+            
+              onSelectionChange={
+                selectAsset
+              }
+            
+              onRowDoubleClick={
+                openDrawer
+              }
+            
+              defaultSortKey="pub_asset_id"
+            
+              defaultSortDirection="desc"
+            
+              ariaLabel="PUB Package workbench"
+            />
           </div>
-        </div>
+        }
 
-
-        {error ? (
-          <div
-            style={
-              errorStyle
-            }
-          >
-            {error}
-          </div>
-        ) : null}
-
-
-        <AdminDataGrid
-          items={
-            assets
-          }
-
-          columns={
-            columns
-          }
-
-          getRowKey={(
-            asset
-          ) =>
-            asset
-              .pub_asset_id
-          }
-
-          selectedKey={
-            selectedAsset
-              ?.pub_asset_id ??
-            null
-          }
-
-          onSelectionChange={
-            selectAsset
-          }
-
-          onRowDoubleClick={
-            openDrawer
-          }
-
-          defaultSortKey="pub_asset_id"
-
-          defaultSortDirection="desc"
-
-          ariaLabel="PUB Package workbench"
-        />
-      </div>
-
-
-      <PubPackageDrawer
-        open={
+        drawerOpen={
           drawerOpen
         }
 
-        asset={
-          drawerAsset
+        drawerWidth={
+          440
         }
 
-        loading={
-          drawerLoading
+        drawerTitle={
+          drawerTitle
         }
 
-        error={
-          drawerError
+        drawerContent={
+          <PubPackageDrawer
+            asset={
+              drawerAsset
+            }
+
+            loading={
+              drawerLoading
+            }
+
+            error={
+              drawerError
+            }
+
+            packing={
+              processing
+            }
+
+            sending={
+              sending
+            }
+
+            onPack={
+              packAsset
+            }
+
+            onSend={
+              sendAsset
+            }
+          />
         }
 
-        retrying={
-          Number(
-            retryingAssetId ||
-            0
-          ) ===
-          Number(
-            drawerAsset
-              ?.pub_asset_id ||
-            0
-          )
-        }
-
-        sending={
-          Number(
-            sendingAssetId ||
-            0
-          ) ===
-          Number(
-            drawerAsset
-              ?.pub_asset_id ||
-            0
-          )
-        }
-
-        onRetry={
-          retryPackaging
-        }
-
-        onSend={
-          sendNow
-        }
-
-        onClose={() => {
+        onCloseDrawer={() => {
           setDrawerOpen(
             false
           );
@@ -1240,30 +1251,6 @@ function humanize(
           .toUpperCase()
     );
 }
-
-
-const workbenchShellStyle = {
-  display:
-    "flex",
-
-  width:
-    "100%",
-
-  minWidth:
-    0,
-
-  minHeight:
-    0,
-};
-
-
-const workbenchMainStyle = {
-  flex:
-    1,
-
-  minWidth:
-    0,
-};
 
 
 const stageBadgeStyle = {
@@ -1357,10 +1344,22 @@ const filterBarStyle = {
 };
 
 
-const refreshButtonStyle = {
+const selectedPackButtonStyle = {
   marginLeft:
     "auto",
 
+  marginBottom:
+    1,
+};
+
+
+const packAllButtonStyle = {
+  marginBottom:
+    1,
+};
+
+
+const refreshButtonStyle = {
   marginBottom:
     1,
 };

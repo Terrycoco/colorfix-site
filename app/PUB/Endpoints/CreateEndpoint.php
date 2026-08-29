@@ -18,7 +18,7 @@ use Throwable;
  *   - accept one CREATE request
  *   - validate that orders were supplied
  *   - wake CreateManager
- *   - hand the Manager the orders
+ *   - hand the Manager the orders and optional duplicate decision
  *   - translate the Manager result back to HTTP/JSON
  *
  * Each order contains EITHER:
@@ -74,6 +74,23 @@ final class CreateEndpoint
             $orders = $data['orders'] ?? null;
 
             /*
+             * Boss decision for an already-returned duplicate warning.
+             *
+             * CREATE Manager remains the authority that interprets it.
+             *
+             *   check   default; warn before any production
+             *   skip    omit exact previously-shipped matches
+             *   include knowingly create them again
+             */
+            $duplicatePolicy =
+                (string)(
+                    $data[
+                        'duplicate_policy'
+                    ]
+                    ?? 'check'
+                );
+
+            /*
              * REQUEST COMPLETENESS ONLY.
              *
              * The endpoint does not interpret individual orders.
@@ -107,8 +124,68 @@ final class CreateEndpoint
             );
 
             $result = $manager->processBatch(
-                array_values($orders)
+                array_values($orders),
+                $duplicatePolicy
             );
+
+
+            /*
+             * EXPECTED BOSS DECISION.
+             *
+             * This is not an exception and must not enter PubErrorReporter.
+             * No Creator has been awakened and no durable CREATE work has
+             * begun when the Manager returns this result.
+             */
+            if (
+                ($result[
+                    'code'
+                ] ?? '') ===
+                'duplicate_warning'
+            ) {
+                self::sendJson(409, [
+                    'ok' =>
+                        false,
+
+                    'code' =>
+                        'duplicate_warning',
+
+                    'order_count' =>
+                        count(
+                            $orders
+                        ),
+
+                    'duplicate_count' =>
+                        (int)(
+                            $result[
+                                'duplicate_count'
+                            ]
+                            ?? 0
+                        ),
+
+                    'duplicates' =>
+                        is_array(
+                            $result[
+                                'duplicates'
+                            ]
+                            ?? null
+                        )
+                            ? array_values(
+                                $result[
+                                    'duplicates'
+                                ]
+                            )
+                            : [],
+
+                    'choices' => [
+                        'skip',
+                        'include',
+                        'cancel',
+                    ],
+                ]);
+
+                return;
+            }
+
 
             $created = is_array($result['created'] ?? null)
                 ? array_values($result['created'])
@@ -128,6 +205,38 @@ final class CreateEndpoint
                 'created_count' => count($created),
                 'queued_count' => count($queued),
                 'failed_count' => count($failed),
+                'duplicate_policy' =>
+                    $result[
+                        'duplicate_policy'
+                    ]
+                    ?? 'check',
+                'duplicate_count' =>
+                    (int)(
+                        $result[
+                            'duplicate_count'
+                        ]
+                        ?? 0
+                    ),
+                'skipped_duplicate_count' =>
+                    (int)(
+                        $result[
+                            'skipped_duplicate_count'
+                        ]
+                        ?? 0
+                    ),
+                'skipped_duplicates' =>
+                    is_array(
+                        $result[
+                            'skipped_duplicates'
+                        ]
+                        ?? null
+                    )
+                        ? array_values(
+                            $result[
+                                'skipped_duplicates'
+                            ]
+                        )
+                        : [],
                 'created' => $created,
                 'queued' => $queued,
                 'failed' => $failed,

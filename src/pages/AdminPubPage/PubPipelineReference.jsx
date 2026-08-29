@@ -51,7 +51,7 @@ export default function PubPipelineReference({
             title={stageKey.toUpperCase()}
             role={stage?.referenceRole}
           >
-            <StageContractSummary
+            <StageStates
               contract={stage}
             />
 
@@ -334,6 +334,183 @@ function SharedBoxFields({
         fields={fields}
       />
     </AccordionSection>
+  );
+}
+
+
+function StateConventionReference({
+  convention,
+}) {
+  const gerund =
+    convention?.gerund ||
+    null;
+
+  const stable =
+    convention?.stable ||
+    null;
+
+  const recoveryInvariant =
+    convention?.recoveryInvariant ||
+    "";
+
+  if (
+    !gerund &&
+    !stable &&
+    !recoveryInvariant
+  ) {
+    return null;
+  }
+
+  return (
+    <AccordionSection
+      title="PUB STATE CONVENTION"
+      sectionStyle={stateConventionSectionStyle}
+      headerStyle={stateConventionHeaderStyle}
+    >
+      <div style={stateConventionIntroStyle}>
+        Pipeline state names are operational promises. A gerund means
+        real work is actively responsible for advancing the row.
+      </div>
+
+      <div style={stateConventionGridStyle}>
+        {gerund ? (
+          <StateConventionCard
+            title="GERUND"
+            state={gerund}
+          />
+        ) : null}
+
+        {stable ? (
+          <StateConventionCard
+            title="STABLE"
+            state={stable}
+          />
+        ) : null}
+      </div>
+
+      {recoveryInvariant ? (
+        <div style={recoveryInvariantStyle}>
+          <strong>
+            Recovery invariant
+          </strong>
+
+          <span>
+            {recoveryInvariant}
+          </span>
+        </div>
+      ) : null}
+    </AccordionSection>
+  );
+}
+
+
+function StateConventionCard({
+  title,
+  state,
+}) {
+  return (
+    <div style={stateConventionCardStyle}>
+      <div style={stateConventionCardTitleStyle}>
+        {title}
+      </div>
+
+      <div style={stateConventionKindStyle}>
+        <code>
+          {state?.kind ||
+            "—"}
+        </code>
+      </div>
+
+      <div style={stateMeaningStyle}>
+        {state?.meaning ||
+          ""}
+      </div>
+
+      {state?.ui ? (
+        <div style={stateUiStyle}>
+          UI: {state.ui}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+function StageStates({
+  contract,
+}) {
+  const states =
+    contract?.states ||
+    {};
+
+  const entries =
+    Object.entries(
+      states
+    );
+
+
+  if (!entries.length) {
+    return null;
+  }
+
+
+  return (
+    <div style={stageStatesStyle}>
+      <div style={stageStatesHeaderStyle}>
+        STATES:
+      </div>
+
+      {entries.map(
+        ([
+          stateKey,
+          state,
+        ]) => (
+          <StateReferenceLine
+            key={stateKey}
+
+            human={
+              humanize(
+                stateKey
+              ).toUpperCase()
+            }
+
+            code={
+              stateKey
+            }
+
+            meaning={
+              state?.meaning ||
+              ""
+            }
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+
+function StateReferenceLine({
+  human,
+  code,
+  meaning,
+}) {
+  return (
+    <div style={stateReferenceLineStyle}>
+      <strong style={stateReferenceHumanStyle}>
+        {human}
+      </strong>
+
+      <code style={stateReferenceCodeStyle}>
+        ({code})
+      </code>
+
+      {meaning ? (
+        <span style={stateReferenceMeaningStyle}>
+          -- {meaning}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -1110,6 +1287,132 @@ const itemTypeNoteStyle = {
   marginTop: 5,
   fontSize: 10,
   color: "#6b7280",
+};
+
+
+const stateConventionSectionStyle = {
+  marginBottom: 24,
+  border: "1px solid #b7c3cf",
+  background: "#fbfcfd",
+};
+
+
+const stateConventionHeaderStyle = {
+  padding: "8px 10px",
+  background: "#465b70",
+  color: "#ffffff",
+  fontSize: 15,
+  fontWeight: 700,
+};
+
+
+const stateConventionIntroStyle = {
+  padding: "9px 10px",
+  borderBottom: "1px solid #d8dde3",
+  color: "#526273",
+  fontSize: 12,
+};
+
+
+const stateConventionGridStyle = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit, minmax(280px, 1fr))",
+  gap: 10,
+  padding: 10,
+};
+
+
+const stateConventionCardStyle = {
+  border: "1px solid #d8dde3",
+  background: "#ffffff",
+  padding: 10,
+};
+
+
+const stateConventionCardTitleStyle = {
+  marginBottom: 5,
+  fontSize: 11,
+  fontWeight: 900,
+  letterSpacing: "0.06em",
+  color: "#1c325e",
+};
+
+
+const stateConventionKindStyle = {
+  marginBottom: 6,
+  fontSize: 11,
+};
+
+
+const stateMeaningStyle = {
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+
+const stateUiStyle = {
+  marginTop: 6,
+  color: "#586675",
+  fontSize: 11,
+};
+
+
+const recoveryInvariantStyle = {
+  display: "grid",
+  gap: 4,
+  margin: "0 10px 10px",
+  padding: "9px 10px",
+  border: "1px solid #d8dde3",
+  background: "#f7f8fa",
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+
+const stageStatesStyle = {
+  padding: "8px 10px",
+  borderBottom: "1px solid #d8dde3",
+  background: "#ffffff",
+};
+
+
+const stageStatesHeaderStyle = {
+  marginBottom: 4,
+  fontSize: 10,
+  fontWeight: 900,
+  color: "#4b6b8a",
+  letterSpacing: "0.08em",
+};
+
+
+const stateReferenceLineStyle = {
+  display: "flex",
+  alignItems: "baseline",
+  flexWrap: "wrap",
+  gap: 6,
+  padding: "2px 0",
+  lineHeight: 1.35,
+};
+
+
+const stateReferenceHumanStyle = {
+  fontSize: 11,
+  fontWeight: 900,
+  color: "#1c325e",
+  letterSpacing: "0.03em",
+};
+
+
+const stateReferenceCodeStyle = {
+  fontSize: 10,
+  color: "#6b7280",
+};
+
+
+const stateReferenceMeaningStyle = {
+  fontSize: 11,
+  color: "#526273",
 };
 
 

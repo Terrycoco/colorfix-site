@@ -2528,6 +2528,160 @@ public function updateOrder(
     }
 
 
+    /**
+     * Permanent production history for duplicate protection.
+     *
+     * CREATE uses this before NEW production begins.
+     *
+     * Only successfully SHIPPED assets participate. The temporary
+     * pub_asset_orders row may already be gone; production_signature
+     * is the permanent fingerprint of the final ingredients that
+     * produced what actually left PUB.
+     *
+     * @return array<int, array{
+     *   pub_asset_id: int,
+     *   production_signature: string
+     * }>
+     */
+    public function listShippedProductionSignatures(
+        string $sourceType,
+        int $sourceId,
+        string $assetType
+    ): array {
+        $sourceType =
+            strtolower(
+                trim(
+                    $sourceType
+                )
+            );
+
+        $assetType =
+            strtolower(
+                trim(
+                    $assetType
+                )
+            );
+
+
+        if ($sourceType === '') {
+            throw new RuntimeException(
+                'Shipped production-signature lookup requires source_type.'
+            );
+        }
+
+        if ($sourceId <= 0) {
+            throw new RuntimeException(
+                'Shipped production-signature lookup requires a valid source_id.'
+            );
+        }
+
+        if ($assetType === '') {
+            throw new RuntimeException(
+                'Shipped production-signature lookup requires asset_type.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    production_signature
+
+                FROM pub_assets
+
+                WHERE source_type =
+                    :source_type
+
+                  AND source_id =
+                    :source_id
+
+                  AND asset_type =
+                    :asset_type
+
+                  AND pipeline_stage =
+                    'shipped'
+
+                  AND production_signature IS NOT NULL
+
+                  AND TRIM(
+                      production_signature
+                  ) <> ''
+
+                ORDER BY pub_asset_id ASC
+                SQL
+            );
+
+
+        $stmt->execute([
+            'source_type' =>
+                $sourceType,
+
+            'source_id' =>
+                $sourceId,
+
+            'asset_type' =>
+                $assetType,
+        ]);
+
+
+        $rows =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+
+        $result = [];
+
+
+        foreach (
+            $rows
+            as $row
+        ) {
+            $signature =
+                strtolower(
+                    trim(
+                        (string)(
+                            $row[
+                                'production_signature'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            /*
+             * Ignore malformed historical values rather than treating
+             * them as valid duplicate evidence.
+             */
+            if (
+                !preg_match(
+                    '/^[a-f0-9]{64}$/',
+                    $signature
+                )
+            ) {
+                continue;
+            }
+
+
+            $result[] = [
+                'pub_asset_id' =>
+                    (int)$row[
+                        'pub_asset_id'
+                    ],
+
+                'production_signature' =>
+                    $signature,
+            ];
+        }
+
+
+        return $result;
+    }
+
+
     /*
      * ========================================================
      * ASSET — DISPATCH
@@ -2932,6 +3086,220 @@ public function updateOrder(
                     ? (string)$dispatchedAt
                     : null,
         ];
+    }
+
+
+    /**
+     * Finalize one successful shipment with its permanent production
+     * signature.
+     *
+     * DispatchManager owns creation of the signature from the FINAL
+     * filed Creator ingredients. The repository only persists the
+     * supplied SHA-256 value.
+     *
+     * This closes the in-house order atomically:
+     *
+     *   shipping
+     *     -> shipped
+     *     -> save shipping receipt
+     *     -> save production_signature
+     *     -> delete pub_asset_orders row
+     *
+     * The temporary ingredient box is therefore discarded only after
+     * the permanent shipped record and signature have been written.
+     *
+     * Existing markShipped() is deliberately retained for the moment so
+     * this repository can be installed before DispatchManager is changed
+     * to use this new finalization path.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string,
+     *   production_signature: string,
+     *   dispatched_at: string|null
+     * }
+     */
+    public function finalizeShipment(
+        int $pubAssetId,
+        array $receipt,
+        string $productionSignature
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        if ($receipt === []) {
+            throw new RuntimeException(
+                'Shipping receipt cannot be empty.'
+            );
+        }
+
+
+        $productionSignature =
+            strtolower(
+                trim(
+                    $productionSignature
+                )
+            );
+
+
+        if (
+            !preg_match(
+                '/^[a-f0-9]{64}$/',
+                $productionSignature
+            )
+        ) {
+            throw new RuntimeException(
+                'Production signature must be a SHA-256 hex value.'
+            );
+        }
+
+
+        $receiptJson =
+            json_encode(
+                $receipt,
+                JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_THROW_ON_ERROR
+            );
+
+
+        $this->pdo
+            ->beginTransaction();
+
+
+        try {
+            $stmt =
+                $this->pdo->prepare(
+                    <<<SQL
+                    UPDATE pub_assets
+                    SET
+                        shipping_receipt =
+                            :shipping_receipt,
+
+                        production_signature =
+                            :production_signature,
+
+                        pipeline_stage =
+                            'shipped',
+
+                        stage_note =
+                            NULL,
+
+                        dispatched_at =
+                            NOW(),
+
+                        error_stage =
+                            NULL,
+
+                        error_code =
+                            NULL,
+
+                        error_message =
+                            NULL,
+
+                        errored_at =
+                            NULL
+
+                    WHERE pub_asset_id =
+                        :pub_asset_id
+
+                      AND pipeline_stage =
+                        'shipping'
+                    SQL
+                );
+
+
+            $stmt->execute([
+                'shipping_receipt' =>
+                    $receiptJson,
+
+                'production_signature' =>
+                    $productionSignature,
+
+                'pub_asset_id' =>
+                    $pubAssetId,
+            ]);
+
+
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} could not be finalized as shipped."
+                );
+            }
+
+
+            /*
+             * The permanent signature now represents the exact Creator
+             * ingredients that produced what left the building. The
+             * temporary kitchen ticket is no longer needed.
+             */
+            $this->deleteOrder(
+                $pubAssetId
+            );
+
+
+            $stmt =
+                $this->pdo->prepare(
+                    <<<SQL
+                    SELECT
+                        dispatched_at
+
+                    FROM pub_assets
+
+                    WHERE pub_asset_id =
+                        :pub_asset_id
+
+                    LIMIT 1
+                    SQL
+                );
+
+
+            $stmt->execute([
+                'pub_asset_id' =>
+                    $pubAssetId,
+            ]);
+
+
+            $dispatchedAt =
+                $stmt->fetchColumn();
+
+
+            $this->pdo
+                ->commit();
+
+
+            return [
+                'pub_asset_id' =>
+                    $pubAssetId,
+
+                'pipeline_stage' =>
+                    'shipped',
+
+                'production_signature' =>
+                    $productionSignature,
+
+                'dispatched_at' =>
+                    $dispatchedAt !== false
+                        ? (string)$dispatchedAt
+                        : null,
+            ];
+
+        } catch (Throwable $e) {
+            if (
+                $this->pdo
+                    ->inTransaction()
+            ) {
+                $this->pdo
+                    ->rollBack();
+            }
+
+
+            throw $e;
+        }
     }
 
 

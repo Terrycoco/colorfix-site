@@ -1,10 +1,4 @@
-import {
-  AdminWorkbenchDrawer,
-} from "@components/AdminLayout";
-
-
 export default function PubPackageDrawer({
-  open,
   asset,
   loading = false,
   error = "",
@@ -12,19 +6,11 @@ export default function PubPackageDrawer({
   sending = false,
   onRetry,
   onSend,
-  onClose,
 }) {
   const packageValue =
     normalizePackage(
       asset?.package
     );
-
-
-  const title =
-    asset
-      ?.pub_asset_id
-      ? `Package · Asset #${asset.pub_asset_id}`
-      : "Package";
 
 
   const stage =
@@ -58,24 +44,7 @@ export default function PubPackageDrawer({
 
 
   return (
-    <AdminWorkbenchDrawer
-      open={
-        open
-      }
-
-      width={
-        440
-      }
-
-      title={
-        title
-      }
-
-      onClose={
-        onClose
-      }
-    >
-      <div
+    <div
         style={
           bodyStyle
         }
@@ -313,7 +282,6 @@ export default function PubPackageDrawer({
           </div>
         )}
       </div>
-    </AdminWorkbenchDrawer>
   );
 }
 

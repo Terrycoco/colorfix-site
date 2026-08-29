@@ -597,6 +597,23 @@ export default function AdminPubPage() {
 
 
   /*
+   * CREATE DUPLICATE GATE.
+   *
+   * CreateManager may stop a NEW batch before production when one or
+   * more final ingredient boxes exactly match something already shipped.
+   *
+   * Keep the exact sealed boxes that triggered the warning so the boss
+   * decision resubmits the same production request unchanged.
+   */
+  const [
+    createDuplicateWarning,
+    setCreateDuplicateWarning,
+  ] = useState(
+    null
+  );
+
+
+  /*
    * ========================================================
    * LOAD PUB CONTRACTS
    * ========================================================
@@ -1792,15 +1809,352 @@ const handoffFieldNames =
    * CreateManager owns all interpretation/routing after that.
    */
 
+async function requestCreate(
+  sealedBoxes,
+  duplicatePolicy =
+    "check"
+) {
+  const response =
+    await fetch(
+      CREATE_URL,
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            orders:
+              sealedBoxes.map(
+                (box) => ({
+                  box,
+                })
+              ),
+
+            duplicate_policy:
+              duplicatePolicy,
+          }),
+      }
+    );
+
+
+  const data =
+    await response
+      .json();
+
+
+  return {
+    response,
+    data,
+  };
+}
+
+
+function acceptCreateResult(
+  data,
+  sealedBoxes
+) {
+  /*
+   * CREATE returns PubCom histories on the individual
+   * created / failed entries. Feed them through the
+   * same page-level receiver.
+   */
+  receivePubCom(
+    data
+  );
+
+
+  const createdCount =
+    Number(
+      data.created_count ||
+      0
+    );
+
+  const queuedCount =
+    Number(
+      data.queued_count ||
+      0
+    );
+
+  const failedCount =
+    Number(
+      data.failed_count ||
+      0
+    );
+
+  const createSummaryParts =
+    [];
+
+
+  if (createdCount > 0) {
+    createSummaryParts.push(
+      `${createdCount} asset${
+        createdCount === 1
+          ? ""
+          : "s"
+      } created`
+    );
+  }
+
+
+  if (queuedCount > 0) {
+    createSummaryParts.push(
+      `${queuedCount} asset${
+        queuedCount === 1
+          ? ""
+          : "s"
+      } queued`
+    );
+  }
+
+
+  if (failedCount > 0) {
+    createSummaryParts.push(
+      `${failedCount} failed`
+    );
+  }
+
+
+  const skippedDuplicateCount =
+    Number(
+      data
+        .skipped_duplicate_count ||
+      0
+    );
+
+
+  if (
+    skippedDuplicateCount >
+    0
+  ) {
+    createSummaryParts.push(
+      `${skippedDuplicateCount} previously shipped skipped`
+    );
+  }
+
+
+  const createSummary =
+    createSummaryParts.length
+      ? createSummaryParts.join(
+          " · "
+        )
+      : "No assets accepted by CREATE.";
+
+
+  setCreateMessage(
+    createSummary
+  );
+
+
+  const createFailures =
+    Array.isArray(
+      data.failed
+    )
+      ? data.failed
+      : [];
+
+
+  const unexpectedCreateFailures =
+    createFailures.filter(
+      (failure) =>
+        !hasOperationalPubCom(
+          failure
+        )
+    );
+
+
+  if (
+    unexpectedCreateFailures.length
+  ) {
+    setPubStageErrors({
+      stage:
+        "create",
+
+      code:
+        "creator_failures",
+
+      message:
+        `${unexpectedCreateFailures.length} asset(s) failed in CREATE.`,
+
+      details:
+        unexpectedCreateFailures,
+    });
+  }
+
+
+  console.log(
+    "CREATE RESULT:",
+    data
+  );
+
+
+  setHandoffOpen(
+    false
+  );
+
+
+  /*
+   * FULL CREATE ACCEPTANCE = ANALYZE WORKBENCH CONSUMED.
+   *
+   * A deliberately skipped duplicate is also a resolved box: the boss
+   * explicitly chose not to manufacture it again.
+   */
+  const acceptedCount =
+    createdCount +
+    queuedCount;
+
+  const resolvedCount =
+    acceptedCount +
+    skippedDuplicateCount;
+
+  const fullCreateSuccess =
+    failedCount ===
+      0 &&
+    resolvedCount >
+      0 &&
+    resolvedCount ===
+      sealedBoxes.length;
+
+
+  if (fullCreateSuccess) {
+    setAnalysis(
+      null
+    );
+
+    setProposals(
+      []
+    );
+
+    setAnalyzeHandoffValues(
+      {}
+    );
+
+    setError(
+      ""
+    );
+
+    clearPubStageErrors();
+
+    setStage(
+      "assets"
+    );
+  }
+}
+
+
+async function submitCreate(
+  sealedBoxes,
+  duplicatePolicy =
+    "check"
+) {
+  setSendingToCreate(
+    true
+  );
+
+
+  try {
+    const {
+      response,
+      data,
+    } =
+      await requestCreate(
+        sealedBoxes,
+        duplicatePolicy
+      );
+
+
+    /*
+     * EXPECTED CREATE GATE.
+     *
+     * This is not a CREATE failure. CreateManager has deliberately
+     * stopped before reserving assets or waking Creators and is asking
+     * the boss how to treat exact previously-shipped matches.
+     */
+    if (
+      response.status ===
+        409 &&
+      data?.code ===
+        "duplicate_warning"
+    ) {
+      setCreateDuplicateWarning({
+        duplicate_count:
+          Number(
+            data
+              ?.duplicate_count ||
+            0
+          ),
+
+        duplicates:
+          Array.isArray(
+            data
+              ?.duplicates
+          )
+            ? data
+                .duplicates
+            : [],
+
+        sealedBoxes,
+      });
+
+      return;
+    }
+
+
+    if (
+      !response.ok ||
+      !data?.ok
+    ) {
+      throw new Error(
+        data?.error ||
+        "CREATE failed."
+      );
+    }
+
+
+    setCreateDuplicateWarning(
+      null
+    );
+
+
+    acceptCreateResult(
+      data,
+      sealedBoxes
+    );
+
+  } catch (err) {
+    setPubStageErrors({
+      stage:
+        "analyze",
+
+      code:
+        "handoff_failed",
+
+      message:
+        err?.message ||
+        "Analyze handoff failed.",
+    });
+
+  } finally {
+    setSendingToCreate(
+      false
+    );
+  }
+}
+
+
 async function sendToCreate() {
   clearPubStageErrors();
 
-  setCreateMessage("");
-
-
-
-
-
+  setCreateMessage(
+    ""
+  );
 
 
   /*
@@ -1824,242 +2178,65 @@ async function sendToCreate() {
   }
 
 
-    setSendingToCreate(
-      true
-    );
+  await submitCreate(
+    createHandoffBoxes,
+    "check"
+  );
+}
 
 
-    try {
-      const sealedBoxes =
-        createHandoffBoxes;
+async function resolveCreateDuplicateWarning(
+  duplicatePolicy
+) {
+  const warning =
+    createDuplicateWarning;
 
 
-      const response =
-        await fetch(
-          CREATE_URL,
-          {
-            method:
-              "POST",
-
-            credentials:
-              "include",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body:
-              JSON.stringify({
-                orders:
-                  sealedBoxes.map(
-                    (box) => ({
-                      box,
-                    })
-                  ),
-              }),
-          }
-        );
-
-
-      const data =
-        await response
-          .json();
-
-
-      if (
-        !response.ok ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "CREATE failed."
-        );
-      }
-
-
-      /*
-       * CREATE returns PubCom histories on the individual
-       * created / failed entries. Feed them through the
-       * same page-level receiver.
-       */
-      receivePubCom(
-        data
-      );
-
-
-      const createdCount =
-        Number(
-          data.created_count ||
-          0
-        );
-
-      const queuedCount =
-        Number(
-          data.queued_count ||
-          0
-        );
-
-      const failedCount =
-        Number(
-          data.failed_count ||
-          0
-        );
-
-      const createSummaryParts =
-        [];
-
-      if (createdCount > 0) {
-        createSummaryParts.push(
-          `${createdCount} asset${
-            createdCount === 1
-              ? ""
-              : "s"
-          } created`
-        );
-      }
-
-      if (queuedCount > 0) {
-        createSummaryParts.push(
-          `${queuedCount} asset${
-            queuedCount === 1
-              ? ""
-              : "s"
-          } queued`
-        );
-      }
-
-      if (failedCount > 0) {
-        createSummaryParts.push(
-          `${failedCount} failed`
-        );
-      }
-
-      const createSummary =
-        createSummaryParts.length
-          ? createSummaryParts.join(
-              " · "
-            )
-          : "No assets accepted by CREATE.";
-
-
-      setCreateMessage(
-        createSummary
-      );
-
-
-      const createFailures =
-        Array.isArray(
-          data.failed
-        )
-          ? data.failed
-          : [];
-
-      const unexpectedCreateFailures =
-        createFailures.filter(
-          (failure) =>
-            !hasOperationalPubCom(
-              failure
-            )
-        );
-
-
-      if (
-        unexpectedCreateFailures.length
-      ) {
-        setPubStageErrors({
-          stage:
-            "create",
-
-          code:
-            "creator_failures",
-
-          message:
-            `${unexpectedCreateFailures.length} asset(s) failed in CREATE.`,
-
-          details:
-            unexpectedCreateFailures,
-        });
-      }
-
-
-      console.log(
-        "CREATE RESULT:",
-        data
-      );
-
-
-      setHandoffOpen(
-        false
-      );
-
-
-      /*
-       * FULL CREATE ACCEPTANCE = ANALYZE WORKBENCH CONSUMED.
-       *
-       * Synchronous work may already be created.
-       * Asynchronous video work may still be queued.
-       *
-       * Either outcome means CREATE accepted the box, so clear
-       * the Analyze workbench and move the operator to Assets.
-       */
-      const acceptedCount =
-        createdCount +
-        queuedCount;
-
-      const fullCreateSuccess =
-        failedCount ===
-          0 &&
-        acceptedCount >
-          0 &&
-        acceptedCount ===
-          sealedBoxes.length;
-
-
-      if (fullCreateSuccess) {
-        setAnalysis(
-          null
-        );
-
-        setProposals(
-          []
-        );
-
-        setAnalyzeHandoffValues(
-          {}
-        );
-
-        setError(
-          ""
-        );
-
-        clearPubStageErrors();
-
-        setStage(
-          "assets"
-        );
-      }
-
-    } catch (err) {
-      setPubStageErrors({
-        stage:
-          "analyze",
-
-        code:
-          "handoff_failed",
-
-        message:
-          err?.message ||
-          "Analyze handoff failed.",
-      });
-
-    } finally {
-      setSendingToCreate(
-        false
-      );
-    }
+  if (!warning) {
+    return;
   }
 
+
+  if (
+    duplicatePolicy ===
+    "cancel"
+  ) {
+    setCreateDuplicateWarning(
+      null
+    );
+
+    return;
+  }
+
+
+  if (
+    duplicatePolicy !==
+      "skip" &&
+    duplicatePolicy !==
+      "include"
+  ) {
+    return;
+  }
+
+
+  /*
+   * Close the decision popup before retrying. If CREATE finds another
+   * warning for any reason, submitCreate() will open a fresh one.
+   */
+  setCreateDuplicateWarning(
+    null
+  );
+
+
+  await submitCreate(
+    Array.isArray(
+      warning.sealedBoxes
+    )
+      ? warning.sealedBoxes
+      : [],
+    duplicatePolicy
+  );
+}
 
 
 
@@ -2263,7 +2440,13 @@ async function sendToCreate() {
 
             ) : stage ===
             "package" ? (
-              <PubPackageTable />
+              <PubPackageTable
+                onOpenDispatch={() =>
+                  setStage(
+                    "dispatch"
+                  )
+                }
+              />
    
             ) : stage === "dispatch" ? (
               <PubDispatchTable />
@@ -2413,6 +2596,42 @@ async function sendToCreate() {
                     current.slice(
                       1
                     )
+                )
+              }
+            />,
+
+            document.body
+          )
+        : null}
+
+
+      {/* CREATE DUPLICATE DECISION */}
+      {createDuplicateWarning
+        ? createPortal(
+            <CreateDuplicatePopup
+              warning={
+                createDuplicateWarning
+              }
+
+              sending={
+                sendingToCreate
+              }
+
+              onSkip={() =>
+                resolveCreateDuplicateWarning(
+                  "skip"
+                )
+              }
+
+              onInclude={() =>
+                resolveCreateDuplicateWarning(
+                  "include"
+                )
+              }
+
+              onCancel={() =>
+                resolveCreateDuplicateWarning(
+                  "cancel"
                 )
               }
             />,
@@ -3120,6 +3339,10 @@ function AnalyzeStage({
             <button
               type="button"
 
+              style={
+                secondaryButtonStyle
+              }
+
               onClick={() => {
                 window.location.href =
                   `/admin/playlists/${playlistId}`;
@@ -3130,6 +3353,10 @@ function AnalyzeStage({
 
             <button
               type="button"
+
+              style={
+                secondaryButtonStyle
+              }
 
               onClick={() => {
                 window.location.href =
@@ -3267,6 +3494,10 @@ function AnalyzeStage({
               <button
                 type="button"
 
+                style={
+                  secondaryButtonStyle
+                }
+
                 onClick={
                   addProposal
                 }
@@ -3277,6 +3508,10 @@ function AnalyzeStage({
 
               <button
                 type="button"
+
+                style={
+                  secondaryButtonStyle
+                }
 
                 onClick={
                   onCallMark
@@ -3584,6 +3819,10 @@ function AnalyzeStage({
                       <td style={bodyCell}>
                         <button
                           type="button"
+
+                          style={
+                            secondaryButtonStyle
+                          }
 
                           onClick={() =>
                             removeProposal(
@@ -4346,6 +4585,304 @@ function hasOperationalPubCom(
 }
 
 
+function CreateDuplicatePopup({
+  warning,
+  sending,
+  onSkip,
+  onInclude,
+  onCancel,
+}) {
+  const duplicates =
+    Array.isArray(
+      warning
+        ?.duplicates
+    )
+      ? warning
+          .duplicates
+      : [];
+
+  const duplicateCount =
+    Number(
+      warning
+        ?.duplicate_count ||
+      duplicates.length ||
+      0
+    );
+
+  const totalBoxes =
+    Array.isArray(
+      warning
+        ?.sealedBoxes
+    )
+      ? warning
+          .sealedBoxes
+          .length
+      : 0;
+
+
+  return (
+    <div
+      role="presentation"
+      style={
+        pubComPopupOverlayStyle
+      }
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-duplicate-popup-title"
+        style={{
+          ...pubComPopupStyle,
+
+          width:
+            "min(620px, 100%)",
+        }}
+      >
+        <div
+          id="create-duplicate-popup-title"
+          style={
+            pubComPopupTitleStyle
+          }
+        >
+          Previously Shipped
+        </div>
+
+
+        <div
+          style={
+            pubComPopupMessageStyle
+          }
+        >
+          PUB found{" "}
+          <strong>
+            {duplicateCount}
+          </strong>{" "}
+          of{" "}
+          <strong>
+            {totalBoxes}
+          </strong>{" "}
+          production order
+          {totalBoxes === 1
+            ? ""
+            : "s"}{" "}
+          that exactly match asset
+          {duplicateCount === 1
+            ? ""
+            : "s"}{" "}
+          already shipped.
+
+          <div
+            style={{
+              marginTop:
+                8,
+
+              fontWeight:
+                600,
+
+              color:
+                "#334155",
+            }}
+          >
+            Nothing has been created yet.
+          </div>
+        </div>
+
+
+        {duplicates.length ? (
+          <div
+            style={{
+              maxHeight:
+                220,
+
+              overflow:
+                "auto",
+
+              marginTop:
+                14,
+
+              border:
+                "1px solid #d8dde3",
+
+              borderRadius:
+                6,
+            }}
+          >
+            {duplicates.map(
+              (
+                duplicate,
+                index
+              ) => {
+                const shippedIds =
+                  Array.isArray(
+                    duplicate
+                      ?.shipped_matches
+                  )
+                    ? duplicate
+                        .shipped_matches
+                        .map(
+                          (match) =>
+                            Number(
+                              match
+                                ?.pub_asset_id ||
+                              0
+                            )
+                        )
+                        .filter(
+                          Boolean
+                        )
+                    : [];
+
+
+                return (
+                  <div
+                    key={
+                      `${
+                        duplicate
+                          ?.order_index ??
+                        index
+                      }-${
+                        duplicate
+                          ?.production_signature ||
+                        ""
+                      }`
+                    }
+
+                    style={{
+                      padding:
+                        "9px 11px",
+
+                      borderBottom:
+                        index <
+                        duplicates.length - 1
+                          ? "1px solid #e9edf1"
+                          : "none",
+
+                      fontSize:
+                        13,
+
+                      lineHeight:
+                        1.4,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight:
+                          700,
+                      }}
+                    >
+                      {
+                        duplicate
+                          ?.search_title ||
+                        humanize(
+                          duplicate
+                            ?.asset_type ||
+                          "asset"
+                        )
+                      }
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop:
+                          2,
+
+                        color:
+                          "#64748b",
+                      }}
+                    >
+                      {humanize(
+                        duplicate
+                          ?.asset_type ||
+                        "asset"
+                      )}
+
+                      {shippedIds.length
+                        ? ` · already shipped as #${shippedIds.join(
+                            ", #"
+                          )}`
+                        : ""}
+                    </div>
+                  </div>
+                );
+              }
+            )}
+          </div>
+        ) : null}
+
+
+        <div
+          style={{
+            ...pubComPopupActionsStyle,
+
+            gap:
+              8,
+
+            flexWrap:
+              "wrap",
+          }}
+        >
+          <button
+            type="button"
+
+            style={
+              secondaryButtonStyle
+            }
+
+            disabled={
+              sending
+            }
+
+            onClick={
+              onCancel
+            }
+          >
+            Cancel
+          </button>
+
+
+          <button
+            type="button"
+
+            style={
+              secondaryButtonStyle
+            }
+
+            disabled={
+              sending
+            }
+
+            onClick={
+              onInclude
+            }
+          >
+            Include Them Again
+          </button>
+
+
+          <button
+            type="button"
+
+            autoFocus
+
+            disabled={
+              sending
+            }
+
+            onClick={
+              onSkip
+            }
+          >
+            {sending
+              ? "Sending..."
+              : "Skip Previously Shipped"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function PubComToast({
   disposition,
 }) {
@@ -4638,6 +5175,21 @@ function humanize(
  * STYLES
  * ========================================================
  */
+const secondaryButtonStyle = {
+  background:
+    "#f7f8fa",
+
+  color:
+    "#334155",
+
+  border:
+    "1px solid #c7d0d9",
+
+  boxShadow:
+    "none",
+};
+
+
 const pubComToastStyle = {
   position:
     "fixed",

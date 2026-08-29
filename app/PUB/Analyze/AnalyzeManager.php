@@ -130,6 +130,16 @@ final class AnalyzeManager implements PubComManagerContract
         string $runMode = 'check',
         int $overwritePubRunId = 0
     ): array {
+        /*
+         * LEGACY CALL-SHAPE COMPATIBILITY.
+         *
+         * The endpoint may still supply runMode / overwritePubRunId for now,
+         * but ANALYZE no longer branches on either value.
+         *
+         * Re-analysis is always allowed and always starts a fresh PUB run.
+         * Historical duplicate detection belongs exclusively at the CREATE
+         * front door via production_signature.
+         */
         $sourceType =
             strtolower(
                 trim(
@@ -143,14 +153,6 @@ final class AnalyzeManager implements PubComManagerContract
                     $outputType
                 )
             );
-
-        $runMode =
-            strtolower(
-                trim(
-                    $runMode
-                )
-            );
-
 
         if ($sourceType === '') {
             throw new RuntimeException(
@@ -170,25 +172,7 @@ final class AnalyzeManager implements PubComManagerContract
             );
         }
 
-        if (
-            !in_array(
-                $runMode,
-                [
-                    'check',
-                    'new',
-                    'overwrite',
-                ],
-                true
-            )
-        ) {
-            throw new RuntimeException(
-                "ANALYZE does not support run mode '{$runMode}'."
-            );
-        }
-
-
         $pubRunId = 0;
-        $job = [];
         $boxes = [];
         $failed = [];
         $pubCom = [];
@@ -301,15 +285,6 @@ final class AnalyzeManager implements PubComManagerContract
                     'pub_run_id' =>
                         0,
 
-                    'run_mode' =>
-                        $runMode,
-
-                    'overwrote_existing_job' =>
-                        false,
-
-                    'deleted_asset_count' =>
-                        0,
-
                     'source_type' =>
                         $sourceType,
 
@@ -332,36 +307,24 @@ final class AnalyzeManager implements PubComManagerContract
 
 
             /*
-             * JOB DECISION.
+             * NEW ANALYSIS RUN.
+             *
+             * ANALYZE does not inspect prior PUB runs or shipped history.
+             * Re-analysis is harmless and may happen repeatedly.
+             *
+             * CREATE owns duplicate manufacturing protection. When these
+             * sealed boxes later reach CREATE, production_signature history
+             * decides whether to warn about an already-shipped product.
              */
-            $job =
-                $this->establishJob(
-                    $sourceType,
-                    $sourceId,
-                    $outputType,
-                    $runMode,
-                    $overwritePubRunId
-                );
-
-
-            if (
-                ($job['code'] ?? '') ===
-                'existing_pub_run'
-            ) {
-                return [
-                    ...$job,
-
-                    'pubcom' =>
-                        $pubCom,
-                ];
-            }
-
-
             $pubRunId =
-                (int)(
-                    $job['pub_run_id']
-                    ?? 0
-                );
+                $this->runService()
+                    ->start(
+                        $sourceType,
+                        $sourceId,
+                        $outputType,
+                        0
+                    );
+
 
             if ($pubRunId <= 0) {
                 throw new RuntimeException(
@@ -565,25 +528,6 @@ final class AnalyzeManager implements PubComManagerContract
             'pub_run_id' =>
                 $pubRunId,
 
-            'run_mode' =>
-                $runMode,
-
-            'overwrote_existing_job' =>
-                (bool)(
-                    $job[
-                        'overwrote_existing_job'
-                    ]
-                    ?? false
-                ),
-
-            'deleted_asset_count' =>
-                (int)(
-                    $job[
-                        'deleted_asset_count'
-                    ]
-                    ?? 0
-                ),
-
             'source_type' =>
                 $sourceType,
 
@@ -601,222 +545,6 @@ final class AnalyzeManager implements PubComManagerContract
 
             'pubcom' =>
                 $pubCom,
-        ];
-    }
-
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function establishJob(
-        string $sourceType,
-        int $sourceId,
-        string $outputType,
-        string $runMode,
-        int $overwritePubRunId
-    ): array {
-        $runService =
-            $this->runService();
-
-        if ($runMode === 'check') {
-            $existingRun =
-                $runService
-                    ->findLatestMatching(
-                        $sourceType,
-                        $sourceId,
-                        $outputType
-                    );
-
-
-            if ($existingRun !== null) {
-                $existingRunId =
-                    (int)(
-                        $existingRun[
-                            'pub_run_id'
-                        ]
-                        ?? 0
-                    );
-
-                if ($existingRunId <= 0) {
-                    throw new RuntimeException(
-                        'Matching PUB run has no valid pub_run_id.'
-                    );
-                }
-
-
-                $overwriteStatus =
-                    $runService
-                        ->overwriteStatus(
-                            $existingRunId
-                        );
-
-
-                $assetCount =
-                    (int)(
-                        $overwriteStatus[
-                            'asset_count'
-                        ]
-                        ?? 0
-                    );
-
-
-                /*
-                 * EMPTY JOB.
-                 */
-                if ($assetCount === 0) {
-                    $runService
-                        ->overwrite(
-                            $existingRunId,
-                            $sourceType,
-                            $sourceId,
-                            $outputType
-                        );
-
-
-                    return [
-                        'code' =>
-                            'job_ready',
-
-                        'pub_run_id' =>
-                            $existingRunId,
-
-                        'run_mode' =>
-                            $runMode,
-
-                        'overwrote_existing_job' =>
-                            false,
-
-                        'deleted_asset_count' =>
-                            0,
-                    ];
-                }
-
-
-                return [
-                    'code' =>
-                        'existing_pub_run',
-
-                    'pub_run_id' =>
-                        $existingRunId,
-
-                    'run_mode' =>
-                        $runMode,
-
-                    'source_type' =>
-                        $sourceType,
-
-                    'source_id' =>
-                        $sourceId,
-
-                    'output_type' =>
-                        $outputType,
-
-                    'existing_run' =>
-                        $existingRun,
-
-                    'can_overwrite' =>
-                        (bool)(
-                            $overwriteStatus[
-                                'can_overwrite'
-                            ]
-                            ?? false
-                        ),
-
-                    'blocking_assets' =>
-                        $overwriteStatus[
-                            'blocking_assets'
-                        ]
-                        ?? [],
-
-                    'asset_count' =>
-                        (int)(
-                            $overwriteStatus[
-                                'asset_count'
-                            ]
-                            ?? 0
-                        ),
-
-                    'boxes' =>
-                        [],
-
-                    'failed' =>
-                        [],
-                ];
-            }
-        }
-
-
-        if ($runMode === 'overwrite') {
-            if ($overwritePubRunId <= 0) {
-                throw new RuntimeException(
-                    'ANALYZE overwrite requires overwrite_pub_run_id.'
-                );
-            }
-
-
-            $overwriteResult =
-                $runService
-                    ->overwrite(
-                        $overwritePubRunId,
-                        $sourceType,
-                        $sourceId,
-                        $outputType
-                    );
-
-
-            return [
-                'code' =>
-                    'job_ready',
-
-                'pub_run_id' =>
-                    $overwritePubRunId,
-
-                'run_mode' =>
-                    $runMode,
-
-                'overwrote_existing_job' =>
-                    true,
-
-                'deleted_asset_count' =>
-                    (int)(
-                        $overwriteResult[
-                            'deleted_asset_count'
-                        ]
-                        ?? 0
-                    ),
-            ];
-        }
-
-
-        /*
-         * CHECK WITH NO EXISTING JOB
-         * OR EXPLICIT NEW.
-         */
-        $pubRunId =
-            $runService
-                ->start(
-                    $sourceType,
-                    $sourceId,
-                    $outputType,
-                    0
-                );
-
-
-        return [
-            'code' =>
-                'job_ready',
-
-            'pub_run_id' =>
-                $pubRunId,
-
-            'run_mode' =>
-                $runMode,
-
-            'overwrote_existing_job' =>
-                false,
-
-            'deleted_asset_count' =>
-                0,
         ];
     }
 
@@ -1208,7 +936,7 @@ final class AnalyzeManager implements PubComManagerContract
     /**
      * Department administrative infrastructure.
      *
-     * Wakes only if ANALYZE gets far enough to establish/check a job.
+     * Wakes only if ANALYZE gets far enough to open a fresh PUB run.
      */
     private function runService(): PubRunService
     {

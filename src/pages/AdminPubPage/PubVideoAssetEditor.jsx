@@ -243,6 +243,38 @@ export default function PubVideoAssetEditor({
     sendingToPackaging;
 
 
+  /*
+   * SHIPPED is terminal historical state.
+   *
+   * Once Dispatch succeeds, the production order is archived/deleted.
+   * This editor may still display the finished asset, but it must not
+   * imply that the historical record can be edited, REDO, or re-packaged.
+   */
+  const pipelineStage =
+    String(
+      asset?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const isShipping =
+    pipelineStage ===
+      "shipping";
+
+  const isShipped =
+    pipelineStage ===
+      "shipped";
+
+  const isDispatchLocked =
+    isShipping ||
+    isShipped;
+
+  const editorLocked =
+    busy ||
+    isDispatchLocked;
+
+
   const directIngredientChanges =
     diffTopLevel(
       originalInsideValues,
@@ -335,6 +367,10 @@ export default function PubVideoAssetEditor({
   ) {
     event.preventDefault();
 
+    if (isDispatchLocked) {
+      return;
+    }
+
     setSuccessMessage(
       ""
     );
@@ -385,6 +421,10 @@ export default function PubVideoAssetEditor({
    *   - the explicit Redo Video button for recipe-only testing
    */
   async function commitAndRedo() {
+    if (isDispatchLocked) {
+      return;
+    }
+
     setRedoWarningOpen(
       false
     );
@@ -458,6 +498,10 @@ export default function PubVideoAssetEditor({
 
 
   async function handleSendToPackaging() {
+    if (isDispatchLocked) {
+      return;
+    }
+
     setSuccessMessage(
       ""
     );
@@ -567,6 +611,20 @@ export default function PubVideoAssetEditor({
               headerRightStyle
             }
           >
+            {isDispatchLocked ? (
+              <div
+                style={
+                  shippedBadgeStyle
+                }
+              >
+                {
+                  isShipping
+                    ? "SHIPPING"
+                    : "SHIPPED"
+                }
+              </div>
+            ) : null}
+
             <div
               style={
                 assetIdStyle
@@ -662,7 +720,7 @@ export default function PubVideoAssetEditor({
                 }
 
                 disabled={
-                  busy
+                  editorLocked
                 }
 
                 onChange={(
@@ -710,7 +768,7 @@ export default function PubVideoAssetEditor({
                 }
 
                 disabled={
-                  busy
+                  editorLocked
                 }
 
                 onChange={(
@@ -782,7 +840,7 @@ export default function PubVideoAssetEditor({
                       }
 
                       disabled={
-                        busy
+                        editorLocked
                       }
 
                       onChange={(
@@ -835,7 +893,7 @@ export default function PubVideoAssetEditor({
                       }
 
                       disabled={
-                        busy
+                        editorLocked
                       }
 
                       onChange={(
@@ -929,48 +987,55 @@ export default function PubVideoAssetEditor({
                     }
                   >
                     {
-                      Number(
-                        insideValues
-                          ?.music
-                          ?.asset_library_id ||
-                        0
-                      ) > 0
-                        ? `Asset #${insideValues.music.asset_library_id} · volume ${formatVolume(
-                            insideValues.music.volume
-                          )}`
-                        : "No music selected"
+                      isShipping
+                        ? "Dispatch in progress"
+                        : isShipped
+                          ? "Production order archived after shipment"
+                        : Number(
+                            insideValues
+                              ?.music
+                              ?.asset_library_id ||
+                            0
+                          ) > 0
+                            ? `Asset #${insideValues.music.asset_library_id} · volume ${formatVolume(
+                                insideValues.music.volume
+                              )}`
+                            : "No music selected"
                     }
                   </div>
                 </div>
 
-                <button
-                  type="button"
+                {!isDispatchLocked ? (
+                  <button
+                    type="button"
 
-                  style={
-                    quietButtonStyle
-                  }
+                    style={
+                      quietButtonStyle
+                    }
 
-                  disabled={
-                    busy
-                  }
+                    disabled={
+                      busy
+                    }
 
-                  onClick={() => {
-                    setMusicOpen(
-                      true
-                    );
+                    onClick={() => {
+                      setMusicOpen(
+                        true
+                      );
 
-                    setSuccessMessage(
-                      ""
-                    );
-                  }}
-                >
-                  ♪ Music
-                </button>
+                      setSuccessMessage(
+                        ""
+                      );
+                    }}
+                  >
+                    ♪ Music
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
 
-            {hasIngredientChanges ? (
+            {!isDispatchLocked &&
+            hasIngredientChanges ? (
               <div
                 style={
                   redoNoticeStyle
@@ -1033,63 +1098,67 @@ export default function PubVideoAssetEditor({
           </button>
 
 
-          <button
-            type="submit"
+          {!isDispatchLocked ? (
+            <>
+              <button
+                type="submit"
 
-            style={
-              quietButtonStyle
-            }
+                style={
+                  quietButtonStyle
+                }
 
-            disabled={
-              busy
-            }
-          >
-            {
-              saving
-                ? "Saving..."
-                : hasIngredientChanges
-                  ? "Save & Redo"
-                  : "Save"
-            }
-          </button>
-
-
-          <button
-            type="button"
-
-            disabled={
-              busy
-            }
-
-            onClick={
-              commitAndRedo
-            }
-          >
-            {
-              recreating
-                ? "Recreating..."
-                : "Redo Video"
-            }
-          </button>
+                disabled={
+                  busy
+                }
+              >
+                {
+                  saving
+                    ? "Saving..."
+                    : hasIngredientChanges
+                      ? "Save & Redo"
+                      : "Save"
+                }
+              </button>
 
 
-          <button
-            type="button"
+              <button
+                type="button"
 
-            disabled={
-              busy
-            }
+                disabled={
+                  busy
+                }
 
-            onClick={
-              handleSendToPackaging
-            }
-          >
-            {
-              sendingToPackaging
-                ? "Sending..."
-                : "Send to Packaging"
-            }
-          </button>
+                onClick={
+                  commitAndRedo
+                }
+              >
+                {
+                  recreating
+                    ? "Recreating..."
+                    : "Redo Video"
+                }
+              </button>
+
+
+              <button
+                type="button"
+
+                disabled={
+                  busy
+                }
+
+                onClick={
+                  handleSendToPackaging
+                }
+              >
+                {
+                  sendingToPackaging
+                    ? "Sending..."
+                    : "Send to Packaging"
+                }
+              </button>
+            </>
+          ) : null}
         </div>
       </form>
 
@@ -1103,7 +1172,7 @@ export default function PubVideoAssetEditor({
           }
 
           disabled={
-            busy
+            editorLocked
           }
 
           onApply={(
@@ -2338,6 +2407,36 @@ const headerRightStyle = {
 
   gap:
     10,
+};
+
+
+const shippedBadgeStyle = {
+  padding:
+    "3px 7px",
+
+  border:
+    "1px solid #9bbda7",
+
+  borderRadius:
+    999,
+
+  background:
+    "#eef8f1",
+
+  color:
+    "#2f6b43",
+
+  fontSize:
+    11,
+
+  fontWeight:
+    800,
+
+  letterSpacing:
+    "0.04em",
+
+  whiteSpace:
+    "nowrap",
 };
 
 

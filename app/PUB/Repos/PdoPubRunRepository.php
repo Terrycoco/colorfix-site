@@ -143,6 +143,7 @@ final class PdoPubRunRepository
                     expected_count,
                     actual_count,
                     failed_count,
+                    log_note,
                     created_at,
                     completed_at
                 FROM pub_runs
@@ -208,6 +209,7 @@ final class PdoPubRunRepository
                     expected_count,
                     actual_count,
                     failed_count,
+                    log_note,
                     created_at,
                     completed_at
                 FROM pub_runs
@@ -275,6 +277,78 @@ final class PdoPubRunRepository
             'pub_run_id' =>
                 $pubRunId,
         ]);
+
+        if ($stmt->rowCount() < 1) {
+            $run =
+                $this->findById(
+                    $pubRunId
+                );
+
+            if ($run === null) {
+                throw new RuntimeException(
+                    "PUB run #{$pubRunId} was not found."
+                );
+            }
+        }
+    }
+
+
+    /**
+     * Append one human-readable history note to the run.
+     *
+     * This is reference-only bookkeeping. Pipeline behavior must never
+     * branch on log_note.
+     */
+    public function appendLogNote(
+        int $pubRunId,
+        string $note
+    ): void {
+        if ($pubRunId <= 0) {
+            throw new RuntimeException(
+                'Invalid PUB run ID.'
+            );
+        }
+
+        $note =
+            trim(
+                $note
+            );
+
+        if ($note === '') {
+            return;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_runs
+                SET log_note =
+                    CASE
+                        WHEN log_note IS NULL
+                          OR TRIM(log_note) = ''
+                            THEN :note_first
+                        ELSE CONCAT(
+                            log_note,
+                            CHAR(10),
+                            :note_append
+                        )
+                    END
+                WHERE pub_run_id = :pub_run_id
+                SQL
+            );
+
+        $stmt->execute([
+            'note_first' =>
+                $note,
+
+            'note_append' =>
+                $note,
+
+            'pub_run_id' =>
+                $pubRunId,
+        ]);
+
 
         if ($stmt->rowCount() < 1) {
             $run =

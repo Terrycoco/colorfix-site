@@ -20,6 +20,7 @@ use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\PUB\Services\PubRunService;
+use App\PUB\Support\ProductionSignature;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -50,6 +51,7 @@ use Throwable;
  * The Manager owns:
  *
  *   - NEW vs REDO interpretation
+ *   - duplicate-production gate for NEW work
  *   - asset reservation
  *   - filed CREATE orders
  *   - Creator assignment
@@ -230,7 +232,8 @@ final class CreateManager implements PubComManagerContract
      * PubCom dispositions for that production unit.
      */
     public function createBatch(
-        array $boxes
+        array $boxes,
+        string $duplicatePolicy = 'check'
     ): array {
         $orders = [];
 
@@ -247,7 +250,8 @@ final class CreateManager implements PubComManagerContract
 
 
         return $this->processBatch(
-            $orders
+            $orders,
+            $duplicatePolicy
         );
     }
 
@@ -268,8 +272,163 @@ final class CreateManager implements PubComManagerContract
      * @param array<int, array<string, mixed>> $orders
      */
     public function processBatch(
-        array $orders
+        array $orders,
+        string $duplicatePolicy = 'check'
     ): array {
+        $duplicatePolicy =
+            strtolower(
+                trim(
+                    $duplicatePolicy
+                )
+            );
+
+
+        if (
+            !in_array(
+                $duplicatePolicy,
+                [
+                    'check',
+                    'skip',
+                    'include',
+                ],
+                true
+            )
+        ) {
+            throw new RuntimeException(
+                "CREATE does not support duplicate policy '{$duplicatePolicy}'."
+            );
+        }
+
+
+        /*
+         * ========================================================
+         * NEW-PRODUCTION DUPLICATE GATE
+         * ========================================================
+         *
+         * This gate runs for the WHOLE incoming batch before:
+         *
+         *   - any Creator is awakened
+         *   - any Creator preflight runs
+         *   - any pub_asset_id is reserved
+         *   - any filed order is created
+         *   - any lifecycle state changes
+         *
+         * REDO orders are intentionally ignored here. REDO remakes an
+         * existing in-house asset; it does not create a second publication.
+         */
+        $duplicateCheck =
+            $this->inspectNewOrderDuplicates(
+                $orders
+            );
+
+
+        $duplicates =
+            $duplicateCheck[
+                'duplicates'
+            ];
+
+
+        if (
+            $duplicates !== []
+            && $duplicatePolicy === 'check'
+        ) {
+            return [
+                'code' =>
+                    'duplicate_warning',
+
+                'duplicate_warning' =>
+                    true,
+
+                'duplicate_count' =>
+                    count(
+                        $duplicates
+                    ),
+
+                'duplicates' =>
+                    $duplicates,
+
+                'duplicate_policy' =>
+                    'check',
+
+                'skipped_duplicate_count' =>
+                    0,
+
+                'created' =>
+                    [],
+
+                'queued' =>
+                    [],
+
+                'failed' =>
+                    [],
+            ];
+        }
+
+
+        $skippedDuplicates = [];
+
+
+        if (
+            $duplicates !== []
+            && $duplicatePolicy === 'skip'
+        ) {
+            $duplicateIndexes = [];
+
+
+            foreach (
+                $duplicates
+                as $duplicate
+            ) {
+                $duplicateIndexes[
+                    (int)$duplicate[
+                        'order_index'
+                    ]
+                ] = true;
+            }
+
+
+            $keptOrders = [];
+
+
+            foreach (
+                $orders
+                as $index => $order
+            ) {
+                if (
+                    isset(
+                        $duplicateIndexes[
+                            (int)$index
+                        ]
+                    )
+                ) {
+                    $skippedDuplicates[] =
+                        $duplicates[
+                            array_search(
+                                (int)$index,
+                                array_column(
+                                    $duplicates,
+                                    'order_index'
+                                ),
+                                true
+                            )
+                        ];
+
+                    continue;
+                }
+
+
+                $keptOrders[] =
+                    $order;
+            }
+
+
+            $orders =
+                array_values(
+                    $keptOrders
+                );
+        }
+
+
         $created = [];
         $queued = [];
         $failed = [];
@@ -942,6 +1101,28 @@ final class CreateManager implements PubComManagerContract
 
 
         return [
+            'code' =>
+                'processed',
+
+            'duplicate_warning' =>
+                false,
+
+            'duplicate_policy' =>
+                $duplicatePolicy,
+
+            'duplicate_count' =>
+                count(
+                    $duplicates
+                ),
+
+            'skipped_duplicate_count' =>
+                count(
+                    $skippedDuplicates
+                ),
+
+            'skipped_duplicates' =>
+                $skippedDuplicates,
+
             'created' =>
                 $created,
 
@@ -950,6 +1131,256 @@ final class CreateManager implements PubComManagerContract
 
             'failed' =>
                 $failed,
+        ];
+    }
+
+
+    /**
+     * Inspect NEW orders for exact production recipes that have already
+     * shipped from the same source as the same asset type.
+     *
+     * This method is deliberately product-blind. Every specialist has
+     * already supplied the complete final ingredients box; CREATE only
+     * fingerprints that sealed production input and compares permanent
+     * production history.
+     *
+     * @param array<int, array<string, mixed>> $orders
+     *
+     * @return array{
+     *   duplicates: array<int, array<string, mixed>>
+     * }
+     */
+    private function inspectNewOrderDuplicates(
+        array $orders
+    ): array {
+        $duplicates = [];
+
+        /*
+         * Reuse one history lookup for every box that shares the same
+         * source + asset type within this Manager wake.
+         *
+         * @var array<string, array<int, array<string, mixed>>>
+         */
+        $historyCache = [];
+
+
+        foreach (
+            $orders
+            as $index => $order
+        ) {
+            if (!is_array($order)) {
+                continue;
+            }
+
+
+            $box =
+                is_array(
+                    $order[
+                        'box'
+                    ]
+                    ?? null
+                )
+                    ? $order[
+                        'box'
+                    ]
+                    : null;
+
+
+            /*
+             * Only NEW work participates.
+             *
+             * Ambiguous box + pub_asset_id orders remain invalid and will
+             * be handled by the existing normal CREATE validation path.
+             */
+            if (
+                $box === null
+                ||
+                (int)(
+                    $order[
+                        'pub_asset_id'
+                    ]
+                    ?? 0
+                ) > 0
+            ) {
+                continue;
+            }
+
+
+            $assetType =
+                strtolower(
+                    trim(
+                        (string)(
+                            $box[
+                                'asset_type'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+            $sourceType =
+                strtolower(
+                    trim(
+                        (string)(
+                            $box[
+                                'source_type'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+            $sourceId =
+                (int)(
+                    $box[
+                        'source_id'
+                    ]
+                    ?? 0
+                );
+
+            $ingredients =
+                $box[
+                    'ingredients'
+                ]
+                ?? null;
+
+
+            /*
+             * Malformed NEW orders are not turned into gate failures here.
+             * The existing per-order CREATE validation remains authoritative.
+             */
+            if (
+                $assetType === ''
+                ||
+                $sourceType === ''
+                ||
+                $sourceId <= 0
+                ||
+                !is_array(
+                    $ingredients
+                )
+            ) {
+                continue;
+            }
+
+
+            $signature =
+                ProductionSignature::fromIngredients(
+                    $ingredients
+                );
+
+
+            $historyKey =
+                $sourceType
+                . ':'
+                . $sourceId
+                . ':'
+                . $assetType;
+
+
+            if (
+                !array_key_exists(
+                    $historyKey,
+                    $historyCache
+                )
+            ) {
+                $historyCache[
+                    $historyKey
+                ] =
+                    $this->assets
+                        ->listShippedProductionSignatures(
+                            $sourceType,
+                            $sourceId,
+                            $assetType
+                        );
+            }
+
+
+            $shippedMatches = [];
+
+
+            foreach (
+                $historyCache[
+                    $historyKey
+                ]
+                as $historical
+            ) {
+                $historicalSignature =
+                    strtolower(
+                        trim(
+                            (string)(
+                                $historical[
+                                    'production_signature'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    );
+
+
+                if (
+                    $historicalSignature !== ''
+                    && hash_equals(
+                        $historicalSignature,
+                        $signature
+                    )
+                ) {
+                    $shippedMatches[] = [
+                        'pub_asset_id' =>
+                            (int)(
+                                $historical[
+                                    'pub_asset_id'
+                                ]
+                                ?? 0
+                            ),
+
+                        'production_signature' =>
+                            $historicalSignature,
+                    ];
+                }
+            }
+
+
+            if ($shippedMatches === []) {
+                continue;
+            }
+
+
+            $duplicates[] = [
+                'order_index' =>
+                    (int)$index,
+
+                'asset_type' =>
+                    $assetType,
+
+                'source_type' =>
+                    $sourceType,
+
+                'source_id' =>
+                    $sourceId,
+
+                'search_title' =>
+                    trim(
+                        (string)(
+                            $box[
+                                'search_title'
+                            ]
+                            ?? ''
+                        )
+                    ),
+
+                'production_signature' =>
+                    $signature,
+
+                'shipped_matches' =>
+                    $shippedMatches,
+            ];
+        }
+
+
+        return [
+            'duplicates' =>
+                $duplicates,
         ];
     }
 

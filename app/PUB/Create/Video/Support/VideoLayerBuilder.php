@@ -1070,8 +1070,40 @@ final class VideoLayerBuilder
                     ),
 
                 style: [
+                    /*
+                     * Caption width is content-driven, capped by the
+                     * Recipe's max width. The generic numeric box remains
+                     * a safe fallback, while these renderer-level CSS
+                     * properties realize the neutral placement intent.
+                     *
+                     * Bottom anchoring is also resolved here so an auto-
+                     * height caption stays exactly the requested distance
+                     * from the bottom regardless of wrapping.
+                     */
                     'display' =>
                         'flex',
+
+                    'width' =>
+                        'fit-content',
+
+                    'maxWidth' =>
+                        min(
+                            $maxWidth,
+                            max(
+                                1,
+                                $width
+                                - $left
+                            )
+                        ),
+
+                    'height' =>
+                        'auto',
+
+                    'top' =>
+                        'auto',
+
+                    'bottom' =>
+                        $bottom,
 
                     'alignItems' =>
                         'center',

@@ -44,7 +44,6 @@ final class PlaylistVideoRecipe
     public const HEIGHT = 1080;
     public const FPS = 30;
 
-
     /*
      * ================================================================
      * TIMING — milliseconds
@@ -180,6 +179,7 @@ final class PlaylistVideoRecipe
      * zero on the final frame.
      */
     public const MUSIC_FADE_OUT_MS = 3000;
+    public const DEFAULT_MUSIC_VOLUME = 0.20;
 
 
     /*
@@ -262,13 +262,17 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
 
     /*
      * Caption placement.
+     *
+     * CAPTION_MAX_WIDTH is a cap, not a fixed banner width.
+     * The rendered caption should hug its content until it reaches
+     * this maximum, then wrap normally.
      */
     public const CAPTION_LEFT = 67;
     public const CAPTION_BOTTOM = 38;
-    public const CAPTION_MAX_WIDTH = 1114;
+    public const CAPTION_MAX_WIDTH = 900;
 
-    public const CAPTION_PADDING_X = 20;
-    public const CAPTION_PADDING_Y = 14;
+    public const CAPTION_PADDING_X = 28;
+    public const CAPTION_PADDING_Y = 16;
 
     public const CAPTION_BACKGROUND =
         'rgba(0, 0, 0, 0.45)';
@@ -280,7 +284,7 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
      * Title/subtitle/body remain separate recipe knobs even while the
      * current generic oven may need to realize them as separate layers.
      */
-    public const CAPTION_TITLE_FONT_SIZE = 34;
+    public const CAPTION_TITLE_FONT_SIZE = 40;
     public const CAPTION_TITLE_FONT_WEIGHT = 500;
     public const CAPTION_TITLE_LINE_HEIGHT = 1.25;
 

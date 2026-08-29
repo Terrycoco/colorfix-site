@@ -17,6 +17,7 @@ use App\PUB\PubCom\PubComManagerContract;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
+use App\PUB\Support\ProductionSignature;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -181,7 +182,7 @@ final class DispatchManager implements PubComManagerContract
      * Repository methods expected:
      *
      *   listShipping()
-     *   markShipped(pub_asset_id, receipt)
+     *   finalizeShipment(pub_asset_id, receipt, production_signature)
      *
      * @return array{
      *   shipped: array<int, array<string, mixed>>,
@@ -449,10 +450,53 @@ final class DispatchManager implements PubComManagerContract
         }
 
 
+        /*
+         * Preserve only a permanent fingerprint of the FINAL Creator
+         * ingredients that produced what actually left the building.
+         *
+         * The full pub_asset_orders row remains an in-house kitchen ticket
+         * and is discarded by finalizeShipment() after the permanent
+         * signature and shipping receipt are safely written.
+         */
+        $order =
+            $this->assets
+                ->getOrder(
+                    $pubAssetId
+                );
+
+
+        if ($order === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no filed CREATE order to fingerprint at shipment."
+            );
+        }
+
+
+        $ingredients =
+            $order[
+                'ingredients'
+            ]
+            ?? null;
+
+
+        if (!is_array($ingredients)) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no valid filed ingredients to fingerprint at shipment."
+            );
+        }
+
+
+        $productionSignature =
+            ProductionSignature::fromIngredients(
+                $ingredients
+            );
+
+
         return $this->assets
-            ->markShipped(
+            ->finalizeShipment(
                 $pubAssetId,
-                $receipt
+                $receipt,
+                $productionSignature
             );
     }
 

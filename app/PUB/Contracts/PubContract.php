@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 namespace App\PUB\Contracts;
+use App\PUB\Create\YouTube\PlaylistVideoRecipe;
 
 /**
  * PUB CONTRACTS
@@ -39,7 +40,7 @@ final class PubContract
      */
     public const DEFAULT_YOUTUBE_MUSIC_ASSET_LIBRARY_ID = 734;
 
-    public const DEFAULT_YOUTUBE_MUSIC_VOLUME = 0.35;
+    public const DEFAULT_YOUTUBE_MUSIC_VOLUME = PlaylistVideoRecipe::DEFAULT_MUSIC_VOLUME;
 
 
     public static function all(): array
@@ -86,6 +87,44 @@ final class PubContract
              * ============================================================
              */
             'shared' => [
+
+                /*
+                 * PUB STATE NAMING CONVENTION
+                 *
+                 * A gerund state means real work is actively happening now.
+                 * It is transient by definition and the responsible runtime
+                 * must eventually advance the row to a stable state.
+                 *
+                 * Never leave a row parked in a gerund state when no worker,
+                 * driver, or manager is still responsible for advancing it.
+                 * Error recovery, normal dependency waits, validation exits,
+                 * failed launches, and repaired rows must resolve to a stable
+                 * state instead. A no-op gerund is a lifecycle bug.
+                 */
+                'stateConvention' => [
+
+                    'gerund' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'Active processing is happening now; please stand by.',
+
+                        'ui' =>
+                            'Treat as transient and poll/refresh more frequently while visible.',
+                    ],
+
+                    'stable' => [
+                        'kind' =>
+                            'waiting_or_complete',
+
+                        'meaning' =>
+                            'No active worker is implied. The row is waiting, recoverable, reviewed, or complete.',
+                    ],
+
+                    'recoveryInvariant' =>
+                        'A gerund state may exist only while a real active process is responsible for advancing it. Recovery must never leave an idle row in a gerund state.',
+                ],
 
                 'boxFields' => [
 
@@ -192,6 +231,25 @@ final class PubContract
 
                 'nextStage' =>
                     'create',
+
+                'states' => [
+
+                    'analyzing' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'in process',
+                    ],
+
+                    'analyzed' => [
+                        'kind' =>
+                            'waiting',
+
+                        'meaning' =>
+                            'ready for review / MARK',
+                    ],
+                ],
 
 
                 /*
@@ -1663,6 +1721,44 @@ final class PubContract
                 'nextStage' =>
                     'package',
 
+                'states' => [
+
+                    'creating' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'in process',
+                    ],
+
+                    'created' => [
+                        'kind' =>
+                            'complete',
+
+                        'meaning' =>
+                            'asset complete',
+                    ],
+
+                    'redo_required' => [
+                        'kind' =>
+                            'waiting',
+
+                        'meaning' =>
+                            'remake needed',
+                    ],
+
+                    'error' => [
+                        'kind' =>
+                            'error',
+
+                        'error_stage' =>
+                            'create',
+
+                        'meaning' =>
+                            'create failed',
+                    ],
+                ],
+
 
                 /*
                  * CREATE MANAGER
@@ -2983,14 +3079,14 @@ final class PubContract
              * Downstream routing is based on publishing channel + physical
              * media type, not the CREATE recipe that produced the asset.
              *
-             * PackageManager receives durable pub_assets rows currently at
-             * pipeline_stage = packing, chooses the matching Packager, and
-             * persists the Packager's returned PHP array into pub_assets.package.
+             * PackageManager moves an eligible durable pub_assets row into
+             * pipeline_stage = packing only while a Packager is actively working,
+             * then persists the Packager's returned PHP array into pub_assets.package.
              *
              * A Packager owns product/channel-specific readiness checks.
              * Missing-but-expected dependencies are reported through PubCom
-             * as PENDING; the row remains in packing and stage_note may explain
-             * what is still missing.
+             * as PENDING; active packing ends and the row moves to package_pending.
+             * stage_note may explain what is still missing.
              */
             'package' => [
 
@@ -3002,6 +3098,53 @@ final class PubContract
 
                 'nextStage' =>
                     'schedule',
+
+                'states' => [
+
+                    'ready_to_pack' => [
+                        'kind' =>
+                            'waiting',
+
+                        'meaning' =>
+                            'waiting to start',
+                    ],
+
+                    'packing' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'in process',
+                    ],
+
+                    'package_pending' => [
+                        'kind' =>
+                            'waiting',
+
+                        'meaning' =>
+                            'waiting on dependency',
+                    ],
+
+                    'packed' => [
+                        'kind' =>
+                            'complete',
+
+                        'meaning' =>
+                            'package complete',
+                    ],
+
+                    'error' => [
+                        'kind' =>
+                            'error',
+
+                        'error_stage' =>
+                            'package',
+
+                        'meaning' =>
+                            'package failed',
+                    ],
+                ],
+
 
                 'manager' => [
 
@@ -3033,7 +3176,7 @@ final class PubContract
                                 'pipeline_stage',
 
                             'note' =>
-                                'packing',
+                                'packing; active processing only',
                         ],
                     ],
 
@@ -3074,7 +3217,7 @@ final class PubContract
                                 false,
 
                             'note' =>
-                                'cleared on successful packing; may explain a PENDING packing dependency while the row remains packing',
+                                'cleared on successful packing; may explain a PENDING dependency while the row is package_pending',
                         ],
                     ],
                 ],
@@ -3584,12 +3727,33 @@ final class PubContract
                 'nextStage' =>
                     'dispatch',
 
+                'states' => [
+
+                    'packed' => [
+                        'kind' =>
+                            'waiting',
+
+                        'meaning' =>
+                            'waiting to schedule',
+                    ],
+
+                    'shipping' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'dispatch in process',
+                    ],
+                ],
+
+
                 /*
                  * Schedule is intentionally product-agnostic.
                  *
                  * It will eventually wake itself, determine which channel
-                 * is due, select one eligible packed asset, move that row
-                 * from packed -> shipping, and hand pub_asset_id to Dispatch.
+                 * is due, select one eligible packed asset, and hand pub_asset_id
+                 * to DispatchManager. DispatchManager owns packed -> shipping
+                 * and must start real shipping work when that gerund is persisted.
                  *
                  * Product/channel dependency rules must already be resolved
                  * upstream before an asset reaches packed.
@@ -3630,6 +3794,37 @@ final class PubContract
 
                 'nextStage' =>
                     null,
+
+                'states' => [
+
+                    'shipping' => [
+                        'kind' =>
+                            'processing',
+
+                        'meaning' =>
+                            'in process',
+                    ],
+
+                    'shipped' => [
+                        'kind' =>
+                            'complete',
+
+                        'meaning' =>
+                            'sent out, receipt posted',
+                    ],
+
+                    'error' => [
+                        'kind' =>
+                            'error',
+
+                        'error_stage' =>
+                            'dispatch',
+
+                        'meaning' =>
+                            'dispatch failed',
+                    ],
+                ],
+
 
                 'manager' => [
 
@@ -4278,7 +4473,7 @@ final class PubContract
                                 'varchar(50)',
 
                             'note' =>
-                                'current PUB factory stage/state',
+                                'current PUB factory stage/state; gerund values are reserved for real active processing and must never be idle parking states',
                         ],
 
                         [
@@ -4289,7 +4484,7 @@ final class PubContract
                                 'varchar(255)',
 
                             'note' =>
-                                'nullable human-readable note for the current stage; Packing may use it for PENDING dependencies',
+                                'nullable human-readable note for the current stage; PACKAGE may use it to explain package_pending dependencies',
                         ],
 
                         [
