@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 namespace App\REX\Endpoints;
+
 use App\REX\DTO\RexReservation;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Resolvers\RexResolverRegistryFactory;
@@ -42,9 +43,7 @@ final class RexRelationshipsEndpoint
             }
 
             $repo = new PdoRexReservationRepository($pdo);
-
             $registry = RexResolverRegistryFactory::build($pdo);
-
             $rexResolver = new RexResolver(
                 $repo,
                 $registry
@@ -61,9 +60,7 @@ final class RexRelationshipsEndpoint
                 static fn(RexReservation $reservation): bool =>
                     strtolower(trim($reservation->resolverKey)) === 'playlist_experience'
                     && strtolower(trim($reservation->status)) === 'active'
-                    && strtolower(trim(
-                        (string)($reservation->context['experience_key'] ?? '')
-                    )) === 'public'
+                    && strtolower(trim((string)($reservation->experienceKey ?? ''))) === 'public'
             ));
 
             usort(
@@ -170,6 +167,7 @@ final class RexRelationshipsEndpoint
                 'title' => $described->title,
                 'fields' => $described->fields,
             ];
+
         } catch (Throwable $e) {
             $descriptor = [
                 'title' => $reservation->label,
@@ -184,6 +182,7 @@ final class RexRelationshipsEndpoint
             'label' => $reservation->label,
             'admin_note' => $reservation->adminNote,
             'resolver_key' => $reservation->resolverKey,
+            'experience_key' => $reservation->experienceKey,
             'resource_type' => $reservation->resourceType,
             'resource_id' => $reservation->resourceId,
             'context' => $reservation->context,

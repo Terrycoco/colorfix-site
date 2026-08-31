@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import AnalyticsProvider from "@Analytics/AnalyticsProvider";
-import PlayerPage from "@pages/PlayerPage";
-import SavedPaletteSharePage from "@pages/SavedPaletteSharePage";
 import { applySourceToParams } from "@helpers/sourceParam";
+import Player from "@RX/Player";
+import PV from "@RX/PV";
 import Thumbs from "@RX/Thumbs";
 import "../RexPublicPage/rex-public-page.css";
 
@@ -12,6 +12,9 @@ const EMPTY_STATE = {
   kind: "",
   error: "",
   rex: null,
+  playbackPlan: null,
+  viewer: null,
+  experienceKey: "",
   collection: null,
 };
 
@@ -22,11 +25,9 @@ export default function RexPublicPage() {
   useEffect(() => {
     if (!token) {
       setState({
+        ...EMPTY_STATE,
         loading: false,
-        kind: "",
         error: "Link not found.",
-        rex: null,
-        collection: null,
       });
       return undefined;
     }
@@ -64,23 +65,41 @@ export default function RexPublicPage() {
         }
 
         if (resolverKey === "playlist_experience") {
+          const playbackPlan = destination.playback_plan || null;
+
+          if (!playbackPlan) {
+            throw new Error(
+              "REX Playlist destination is missing its playback plan."
+            );
+          }
+
           setState({
+            ...EMPTY_STATE,
             loading: false,
             kind: "playlist",
-            error: "",
-            rex: null,
-            collection: null,
+            playbackPlan,
           });
           return;
         }
 
         if (resolverKey === "viewer") {
+          const viewer = destination.viewer || null;
+          const experienceKey = String(
+            destination.experience_key || ""
+          )
+            .trim()
+            .toLowerCase();
+
+          if (!viewer) {
+            throw new Error("REX Viewer destination is missing its viewer.");
+          }
+
           setState({
+            ...EMPTY_STATE,
             loading: false,
             kind: "viewer",
-            error: "",
-            rex: null,
-            collection: null,
+            viewer,
+            experienceKey,
           });
           return;
         }
@@ -89,14 +108,15 @@ export default function RexPublicPage() {
           const collection = destination.collection || null;
 
           if (!collection) {
-            throw new Error("REX Thumbs destination is missing its collection.");
+            throw new Error(
+              "REX Thumbs destination is missing its collection."
+            );
           }
 
           setState({
+            ...EMPTY_STATE,
             loading: false,
             kind: "thumbs",
-            error: "",
-            rex: null,
             collection,
           });
           return;
@@ -108,11 +128,9 @@ export default function RexPublicPage() {
         if (controller.signal.aborted) return;
 
         setState({
+          ...EMPTY_STATE,
           loading: false,
-          kind: "",
           error: error?.message || "Link not found.",
-          rex: null,
-          collection: null,
         });
       });
 
@@ -130,13 +148,18 @@ export default function RexPublicPage() {
   if (state.kind === "playlist") {
     return (
       <AnalyticsProvider rex={state.rex}>
-        <PlayerPage />
+        <Player playbackPlan={state.playbackPlan} />
       </AnalyticsProvider>
     );
   }
 
   if (state.kind === "viewer") {
-    return <SavedPaletteSharePage />;
+    return (
+      <PV
+        viewer={state.viewer}
+        experienceKey={state.experienceKey}
+      />
+    );
   }
 
   if (state.kind === "thumbs") {

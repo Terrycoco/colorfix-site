@@ -79,10 +79,7 @@ try {
             strtolower(
                 trim(
                     (string)(
-                        $reservation
-                            ->context[
-                                'experience_key'
-                            ] ??
+                        $reservation->experienceKey ??
                         ''
                     )
                 )

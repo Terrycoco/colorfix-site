@@ -99,7 +99,7 @@ final class ProjectViewerRexService
                 && $reservation->resourceId === $planId
                 && $reservation->status === RexReserver::STATUS_ACTIVE
                 && $reservation->revokedAt === null
-                && strtolower(trim((string)($reservation->context['format'] ?? ''))) === $viewerKey
+                && strtolower(trim((string)($reservation->experienceKey ?? ''))) === $viewerKey
         ));
 
         if ($matches) {
@@ -249,7 +249,7 @@ final class ProjectViewerRexService
                 && $reservation->resourceId === $playlistId
                 && $reservation->status === RexReserver::STATUS_ACTIVE
                 && $reservation->revokedAt === null
-                && strtolower(trim((string)($reservation->context['experience_key'] ?? ''))) === $viewerKey
+                && strtolower(trim((string)($reservation->experienceKey ?? ''))) === $viewerKey
         ));
 
         usort(

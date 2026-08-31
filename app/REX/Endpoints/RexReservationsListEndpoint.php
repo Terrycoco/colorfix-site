@@ -65,11 +65,17 @@ final class RexReservationsListEndpoint
                         )
                         : null;
 
+                $experienceKey = isset($_GET['experience_key'])
+                    && trim((string)$_GET['experience_key']) !== ''
+                        ? strtolower(trim((string)$_GET['experience_key']))
+                        : null;
+
                 $items = $repo->search(
                     new RexReservationSearchCriteria(
                         resourceType: $storageResourceType,
                         resourceId: $resourceId,
                         limit: 500,
+                        experienceKey: $experienceKey,
                     )
                 );
 
@@ -154,7 +160,8 @@ final class RexReservationsListEndpoint
     }
 
     /**
-     * Preserve the existing admin list payload contract.
+     * Preserve the existing admin list payload contract while exposing
+     * experience_key as first-class reservation data.
      */
     private static function reservationPayload(
         RexReservation $reservation
@@ -165,6 +172,7 @@ final class RexReservationsListEndpoint
             'label' => $reservation->label,
             'admin_note' => $reservation->adminNote,
             'resolver_key' => $reservation->resolverKey,
+            'experience_key' => $reservation->experienceKey,
             'resource_type' => $reservation->resourceType,
             'resource_id' => $reservation->resourceId,
             'context' => $reservation->context,

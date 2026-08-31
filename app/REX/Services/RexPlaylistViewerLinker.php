@@ -26,6 +26,7 @@ final class RexPlaylistViewerLinker
 
         $playlistIds = [];
         $savedPaletteIds = [];
+
         foreach ($references as $reference) {
             $playlistIds[] = (int)($reference['playlist_id'] ?? 0);
             $savedPaletteIds[] = (int)($reference['saved_palette_id'] ?? 0);
@@ -36,9 +37,13 @@ final class RexPlaylistViewerLinker
             'playlist',
             $playlistIds,
         );
-        $viewersBySavedPalette = $this->paletteViewers->findActivePublicBySavedPaletteIds($savedPaletteIds);
+
+        $viewersBySavedPalette = $this->paletteViewers->findActivePublicBySavedPaletteIds(
+            $savedPaletteIds
+        );
 
         $viewerIds = [];
+
         foreach ($viewersBySavedPalette as $viewers) {
             foreach ($viewers as $viewer) {
                 $viewerIds[] = $viewer->paletteViewerId;
@@ -63,48 +68,78 @@ final class RexPlaylistViewerLinker
             $sortOrder = max(0, (int)($reference['order_index'] ?? 0));
 
             if ($playlistId <= 0 || $savedPaletteId <= 0) {
-                $skipped[] = $this->skip($reference, 'missing playlist or saved palette id');
+                $skipped[] = $this->skip(
+                    $reference,
+                    'missing playlist or saved palette id'
+                );
                 continue;
             }
 
-            $parents = $this->canonicalPublicPlaylistParents($playlistReservations[$playlistId] ?? []);
+            $parents = $this->canonicalPublicPlaylistParents(
+                $playlistReservations[$playlistId] ?? []
+            );
+
             if (count($parents) === 0) {
-                $skipped[] = $this->skip($reference, 'missing playlist REX');
+                $skipped[] = $this->skip(
+                    $reference,
+                    'missing playlist REX'
+                );
                 continue;
             }
 
             $viewers = $viewersBySavedPalette[$savedPaletteId] ?? [];
+
             if (count($viewers) !== 1) {
-                $skipped[] = $this->skip($reference, count($viewers) === 0 ? 'missing public palette viewer' : 'multiple public palette viewers');
+                $skipped[] = $this->skip(
+                    $reference,
+                    count($viewers) === 0
+                        ? 'missing public palette viewer'
+                        : 'multiple public palette viewers'
+                );
                 continue;
             }
 
             $viewer = $viewers[0];
             $children = $viewerReservations[$viewer->paletteViewerId] ?? [];
+
             if (count($children) > 1) {
-                $skipped[] = $this->skip($reference, 'multiple viewer REX reservations');
+                $skipped[] = $this->skip(
+                    $reference,
+                    'multiple viewer REX reservations'
+                );
                 continue;
             }
 
-            $child = $children[0] ?? $this->reserver->reserve(new RexCreateReservationRequest(
-                label: $this->viewerLabel($viewer),
-                resolverKey: 'viewer',
-                resourceType: 'palette_viewer',
-                resourceId: $viewer->paletteViewerId,
-                adminNote: 'Auto-created by REX playlist/viewer linker.',
-                context: ['format' => $viewer->format ?: 'public'],
-            ));
+            $child = $children[0] ?? $this->reserver->reserve(
+                new RexCreateReservationRequest(
+                    label: $this->viewerLabel($viewer),
+                    resolverKey: 'viewer',
+                    resourceType: 'palette_viewer',
+                    resourceId: $viewer->paletteViewerId,
+                    adminNote: 'Auto-created by REX playlist/viewer linker.',
+                    context: ['format' => $viewer->format ?: 'public'],
+                )
+            );
+
             $viewerReservations[$viewer->paletteViewerId] = [$child];
 
             foreach ($parents as $parent) {
                 $pairKey = $parent->id . ':' . $child->id;
+
                 if (isset($seenPairs[$pairKey])) {
                     continue;
                 }
+
                 $seenPairs[$pairKey] = true;
 
                 try {
-                    $link = $this->relationships->create($parent->id, $child->id, 'viewer', $sortOrder);
+                    $link = $this->relationships->create(
+                        $parent->id,
+                        $child->id,
+                        'viewer',
+                        $sortOrder
+                    );
+
                     $created[] = [
                         'link_id' => $link->id,
                         'parent_reservation_id' => $parent->id,
@@ -115,6 +150,7 @@ final class RexPlaylistViewerLinker
                         'playlist_item_id' => $playlistItemId,
                         'sort_order' => $sortOrder,
                     ];
+
                 } catch (InvalidArgumentException $e) {
                     if (stripos($e->getMessage(), 'already exists') !== false) {
                         $existing[] = [
@@ -127,7 +163,11 @@ final class RexPlaylistViewerLinker
                         ];
                         continue;
                     }
-                    $skipped[] = $this->skip($reference, $e->getMessage());
+
+                    $skipped[] = $this->skip(
+                        $reference,
+                        $e->getMessage()
+                    );
                 }
             }
         }
@@ -166,20 +206,24 @@ final class RexPlaylistViewerLinker
                 strtolower(trim($reservation->resolverKey)) === 'playlist_experience'
                 && strtolower(trim($reservation->resourceType)) === 'playlist'
                 && strtolower(trim($reservation->status)) === 'active'
-                && strtolower(trim((string)($reservation->context['experience_key'] ?? ''))) === 'public'
+                && strtolower(trim((string)($reservation->experienceKey ?? ''))) === 'public'
         ));
 
         usort(
             $eligible,
-            static fn(RexReservation $a, RexReservation $b): int => $a->id <=> $b->id
+            static fn(RexReservation $a, RexReservation $b): int =>
+                $a->id <=> $b->id
         );
 
-        return isset($eligible[0]) ? [$eligible[0]] : [];
+        return isset($eligible[0])
+            ? [$eligible[0]]
+            : [];
     }
 
     private function viewerLabel(object $viewer): string
     {
         $label = trim((string)($viewer->title ?? ''));
+
         if ($label !== '') {
             return $label;
         }

@@ -18,6 +18,12 @@ use RuntimeException;
 
 final class PlaylistExperienceResolver implements RexResolverInterface
 {
+    private const SUPPORTED_EXPERIENCES = [
+        'public',
+        'concept',
+        'client',
+    ];
+
     public function __construct(
         private PDO $pdo
     ) {}
@@ -33,17 +39,19 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             );
         }
 
-        $experienceKey = strtolower(trim(
-            (string)($request->context['experience_key'] ?? '')
-        ));
+        $experienceKey = $this->reservationExperienceKey(
+            $request->reservation,
+            $request->context,
+        );
 
         if ($experienceKey === '') {
             throw new DomainException(
-                'Playlist Experience reservation requires context.experience_key.'
+                'Playlist Experience reservation requires experience_key.'
             );
         }
 
         $start = null;
+
         if (
             array_key_exists('start', $request->requestMetadata)
             && $request->requestMetadata['start'] !== null
@@ -58,7 +66,10 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             : null;
 
         $service = new PlayerExperienceService($this->pdo);
-        $sourceAttribution = $this->cleanSourceAttribution($request->requestMetadata['src'] ?? null);
+
+        $sourceAttribution = $this->cleanSourceAttribution(
+            $request->requestMetadata['src'] ?? null
+        );
 
         $plan = $service->buildPlaybackPlanFromPlaylistExperience(
             $playlistId,
@@ -95,12 +106,6 @@ final class PlaylistExperienceResolver implements RexResolverInterface
         );
     }
 
-    private function cleanSourceAttribution(mixed $value): ?string
-    {
-        $source = strtolower(trim((string)$value));
-        return preg_match('/^[a-z0-9_-]{1,80}$/', $source) ? $source : null;
-    }
-
     public function describe(
         RexReservation $reservation
     ): RexReservationDescriptor {
@@ -115,9 +120,7 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             );
         }
 
-        $experienceKey = strtolower(trim(
-            (string)($reservation->context['experience_key'] ?? '')
-        ));
+        $experienceKey = $this->reservationExperienceKey($reservation);
 
         $experienceLabel = $experienceKey !== ''
             ? ucfirst($experienceKey)
@@ -181,19 +184,24 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             );
         }
 
+        /*
+         * Preview happens before a reservation row exists, so the proposed
+         * experience still arrives as transient preview input. Once saved,
+         * rex_reservations.experience_key is authoritative.
+         */
         $experienceKey = strtolower(trim(
             (string)($context['experience_key'] ?? '')
         ));
 
         if ($experienceKey === '') {
             throw new DomainException(
-                'Playlist Experience preview requires context.experience_key.'
+                'Playlist Experience preview requires experience_key.'
             );
         }
 
         if (!in_array(
             $experienceKey,
-            ['public', 'concept', 'client', 'painter'],
+            self::SUPPORTED_EXPERIENCES,
             true
         )) {
             throw new DomainException(
@@ -235,4 +243,38 @@ final class PlaylistExperienceResolver implements RexResolverInterface
         );
     }
 
+    private function reservationExperienceKey(
+        RexReservation $reservation,
+        array $legacyContext = [],
+    ): string {
+        $experienceKey = strtolower(trim(
+            (string)($reservation->experienceKey ?? '')
+        ));
+
+        if ($experienceKey !== '') {
+            return $experienceKey;
+        }
+
+        /*
+         * Temporary migration fallback only. Old reservations/callers may
+         * still carry experience_key in context_json until the cleanup is
+         * complete.
+         */
+        $context = $legacyContext !== []
+            ? $legacyContext
+            : $reservation->context;
+
+        return strtolower(trim(
+            (string)($context['experience_key'] ?? '')
+        ));
+    }
+
+    private function cleanSourceAttribution(mixed $value): ?string
+    {
+        $source = strtolower(trim((string)$value));
+
+        return preg_match('/^[a-z0-9_-]{1,80}$/', $source)
+            ? $source
+            : null;
+    }
 }

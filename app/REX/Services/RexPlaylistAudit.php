@@ -401,31 +401,30 @@ final class RexPlaylistAudit
         return $grouped;
     }
 
-    private function canonicalPublicPlaylistRex(int $playlistId): ?RexReservation
-    {
-        $grouped = $this->reservations->findActiveByResourceIds(
-            'playlist_experience',
-            'playlist',
-            [$playlistId],
-        );
+private function canonicalPublicPlaylistRex(int $playlistId): ?RexReservation
+{
+    $grouped = $this->reservations->findActiveByResourceIds(
+        'playlist_experience',
+        'playlist',
+        [$playlistId],
+    );
 
-        $eligible = array_values(array_filter(
-            $grouped[$playlistId] ?? [],
-            static fn(RexReservation $reservation): bool =>
-                strtolower(trim(
-                    (string)($reservation->context['experience_key'] ?? '')
-                )) === 'public'
-        ));
+    $eligible = array_values(array_filter(
+        $grouped[$playlistId] ?? [],
+        static fn(RexReservation $reservation): bool =>
+            strtolower(trim(
+                (string)($reservation->experienceKey ?? '')
+            )) === 'public'
+    ));
 
-        usort(
-            $eligible,
-            static fn(RexReservation $a, RexReservation $b): int =>
-                $a->id <=> $b->id
-        );
+    usort(
+        $eligible,
+        static fn(RexReservation $a, RexReservation $b): int =>
+            $a->id <=> $b->id
+    );
 
-        return $eligible[0] ?? null;
-    }
-
+    return $eligible[0] ?? null;
+}
     /**
      * @param int[] $savedPaletteIds
      * @return array<int, int[]>

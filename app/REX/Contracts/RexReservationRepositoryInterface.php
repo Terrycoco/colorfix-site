@@ -113,13 +113,8 @@ interface RexReservationRepositoryInterface
         string $experienceKey,
     ): array;
 
-
-public function setFallbackRexId(
-    int $reservationId,
-    ?int $fallbackRexId,
-): RexReservation;
-
-
-
-
+    public function setFallbackRexId(
+        int $reservationId,
+        ?int $fallbackRexId,
+    ): RexReservation;
 }

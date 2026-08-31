@@ -12,5 +12,6 @@ final readonly class RexReservationSearchCriteria
         public ?int $resourceId = null,
         public ?string $status = null,
         public int $limit = 200,
+        public ?string $experienceKey = null,
     ) {}
 }

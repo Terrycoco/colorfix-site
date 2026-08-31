@@ -36,7 +36,14 @@ final class ViewerResolver implements RexResolverInterface
             $request->resourceId,
             $request->context
         );
+
+        $experienceKey = $this->reservationExperienceKey(
+            $request->reservation,
+            $format
+        );
+
         $viewerCta = $this->viewerCta($request);
+
         $makeoverUrl = $viewerCta['url'] !== '/'
             ? $viewerCta['url']
             : null;
@@ -58,6 +65,7 @@ final class ViewerResolver implements RexResolverInterface
             shareMetadata: $this->viewers->shareMetadata($viewer),
             destination: [
                 'viewer' => $viewer,
+                'experience_key' => $experienceKey,
                 'viewer_format' => $format,
                 'makeover_url' => $makeoverUrl,
                 'viewer_cta_label' => $viewerCta['label'],
@@ -67,6 +75,7 @@ final class ViewerResolver implements RexResolverInterface
                 'reservation_id' => $request->reservation->id,
                 'resource_type' => $request->resourceType,
                 'resource_id' => $request->resourceId,
+                'experience_key' => $experienceKey,
                 'viewer_format' => $format,
             ],
         );
@@ -95,6 +104,36 @@ final class ViewerResolver implements RexResolverInterface
     }
 
     /**
+     * First-class REX experience identity is authoritative.
+     *
+     * Temporary migration fallback:
+     * existing Viewer reservations may not yet have experience_key populated,
+     * so infer it from the resolved Viewer format until those rows are migrated.
+     */
+    private function reservationExperienceKey(
+        RexReservation $reservation,
+        string $viewerFormat,
+    ): string {
+        $experienceKey = strtolower(trim(
+            (string)($reservation->experienceKey ?? '')
+        ));
+
+        if ($experienceKey !== '') {
+            return $experienceKey;
+        }
+
+        $format = strtolower(trim($viewerFormat));
+
+        return match ($format) {
+            'full_palette', 'public' => 'public',
+            'concept' => 'concept',
+            'client' => 'client',
+            'painter' => 'painter',
+            default => 'public',
+        };
+    }
+
+    /**
      * Decide the viewer's standalone CTA without adding domain rules to REX.
      *
      * Precedence:
@@ -118,6 +157,7 @@ final class ViewerResolver implements RexResolverInterface
         }
 
         $parentUrl = $this->parentMakeoverUrl($request->reservation);
+
         if ($parentUrl !== null) {
             return [
                 'label' => 'Watch the Complete Makeover',
@@ -134,10 +174,16 @@ final class ViewerResolver implements RexResolverInterface
     private function parentMakeoverUrl(RexReservation $reservation): ?string
     {
         if ($reservation->id <= 0) {
-            throw new RuntimeException('Viewer reservation requires a persisted reservation ID.');
+            throw new RuntimeException(
+                'Viewer reservation requires a persisted reservation ID.'
+            );
         }
 
-        $parents = $this->relationships->parents($reservation->id, 'viewer');
+        $parents = $this->relationships->parents(
+            $reservation->id,
+            'viewer'
+        );
+
         foreach ($parents as $parent) {
             if (!$parent instanceof RexReservation) {
                 continue;
@@ -158,7 +204,12 @@ final class ViewerResolver implements RexResolverInterface
     private function validInternalRexPath(mixed $value): ?string
     {
         $path = trim((string)$value);
-        if ($path === '' || !str_starts_with($path, '/t/') || str_starts_with($path, '//')) {
+
+        if (
+            $path === ''
+            || !str_starts_with($path, '/t/')
+            || str_starts_with($path, '//')
+        ) {
             return null;
         }
 

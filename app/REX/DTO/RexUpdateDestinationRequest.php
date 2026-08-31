@@ -11,5 +11,6 @@ final readonly class RexUpdateDestinationRequest
         public string $resourceType,
         public int $resourceId,
         public array $context = [],
+        public ?string $experienceKey = null,
     ) {}
 }

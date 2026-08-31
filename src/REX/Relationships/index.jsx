@@ -15,54 +15,43 @@ import {
 import "../admin-rex.css";
 
 const PLAYLISTS_URL = `${API_FOLDER}/v2/admin/playlists/list.php`;
-const RELATIONSHIPS_URL = `${API_FOLDER}/v2/admin/rex/relationships.php`;
-const PLAYLIST_AUDIT_URL = `${API_FOLDER}/v2/admin/rex/audit-playlist.php`;
-const PLAYLIST_SYNC_URL = `${API_FOLDER}/v2/admin/rex/sync-playlist.php`;
+const EXPERIENCES_URL = `${API_FOLDER}/v2/admin/rex/playlist-experiences.php`;
 
 const OBJECT_TYPES = [
   { key: "playlist", label: "Playlists" },
   { key: "palette_viewer", label: "Viewers" },
-  { key: "thumbs", label: "Thumbs" },
   { key: "article", label: "Articles" },
   { key: "page", label: "Pages" },
 ];
 
+const EXPERIENCE_TABS = [
+  { key: "public", label: "Public" },
+  { key: "concept", label: "Concept" },
+  { key: "client", label: "Client" },
+];
+
 export default function RexRelationshipsPage() {
   const [objectType, setObjectType] = useState("playlist");
-
   const [objects, setObjects] = useState([]);
   const [objectsLoading, setObjectsLoading] = useState(false);
   const [objectsError, setObjectsError] = useState("");
-
   const [selectedObjectId, setSelectedObjectId] = useState(null);
 
-  const [relationshipData, setRelationshipData] = useState(null);
-  const [relationshipLoading, setRelationshipLoading] = useState(false);
-  const [relationshipError, setRelationshipError] = useState("");
-
-  const [auditData, setAuditData] = useState(null);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditError, setAuditError] = useState("");
-
-  const [syncLoading, setSyncLoading] = useState(false);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [activeExperience, setActiveExperience] = useState("public");
+  const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
-  const [syncError, setSyncError] = useState("");
-
-  const [selectedAuditItem, setSelectedAuditItem] = useState(null);
-  const [drawerItem, setDrawerItem] = useState(null);
+  const [selectedChild, setSelectedChild] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     setSelectedObjectId(null);
-    setRelationshipData(null);
-    setRelationshipError("");
-    setAuditData(null);
-    setAuditError("");
+    setData(null);
+    setError("");
     setSyncMessage("");
-    setSyncError("");
-    setSelectedAuditItem(null);
-    setDrawerItem(null);
-    setDrawerOpen(false);
 
     if (objectType !== "playlist") {
       setObjects([]);
@@ -81,35 +70,27 @@ export default function RexRelationshipsPage() {
         const res = await fetch(`${PLAYLISTS_URL}?_=${Date.now()}`, {
           credentials: "include",
         });
+        const payload = await res.json();
 
-        const data = await res.json();
-
-        if (!res.ok || !data?.ok) {
-          throw new Error(data?.error || "Failed to load playlists");
+        if (!res.ok || !payload?.ok) {
+          throw new Error(payload?.error || "Failed to load playlists");
         }
 
         if (!active) return;
 
-        const rows = Array.isArray(data.items) ? [...data.items] : [];
-
+        const rows = Array.isArray(payload.items) ? [...payload.items] : [];
         rows.sort((a, b) => {
-          const aTitle = String(a?.title || "");
-          const bTitle = String(b?.title || "");
-
-          const byTitle = aTitle.localeCompare(bTitle, undefined, {
-            numeric: true,
-            sensitivity: "base",
-          });
-
-          if (byTitle !== 0) return byTitle;
-
-          return Number(a?.playlist_id || 0) - Number(b?.playlist_id || 0);
+          const byTitle = String(a?.title || "").localeCompare(
+            String(b?.title || ""),
+            undefined,
+            { numeric: true, sensitivity: "base" }
+          );
+          return byTitle || Number(a?.playlist_id || 0) - Number(b?.playlist_id || 0);
         });
 
         setObjects(rows);
       } catch (err) {
         if (!active) return;
-
         setObjects([]);
         setObjectsError(err?.message || "Failed to load playlists");
       } finally {
@@ -125,84 +106,90 @@ export default function RexRelationshipsPage() {
   }, [objectType]);
 
   useEffect(() => {
-    setAuditData(null);
-    setAuditError("");
+    setData(null);
+    setError("");
     setSyncMessage("");
-    setSyncError("");
-    setSelectedAuditItem(null);
-    setDrawerItem(null);
+    setActiveExperience("public");
+    setSelectedChild(null);
     setDrawerOpen(false);
+    setCopyStatus("");
 
-    if (objectType !== "playlist" || !selectedObjectId) {
-      setRelationshipData(null);
-      setRelationshipError("");
-      return;
-    }
+    if (objectType !== "playlist" || !selectedObjectId) return;
 
     let active = true;
 
-    async function loadSelectedRelationships() {
-      setRelationshipLoading(true);
-      setRelationshipError("");
+    async function loadExperienceGraph() {
+      setLoading(true);
+      setError("");
 
       try {
-        const data = await fetchRelationships(objectType, selectedObjectId);
-
+        const payload = await fetchInspection(selectedObjectId);
         if (!active) return;
-
-        setRelationshipData(data);
+        setData(payload);
       } catch (err) {
         if (!active) return;
-
-        setRelationshipData(null);
-        setRelationshipError(
-          err?.message || "Failed to load REX relationships"
-        );
+        setError(err?.message || "Failed to load Playlist REX graph");
       } finally {
-        if (active) setRelationshipLoading(false);
+        if (active) setLoading(false);
       }
     }
 
-    loadSelectedRelationships();
+    loadExperienceGraph();
 
     return () => {
       active = false;
     };
   }, [objectType, selectedObjectId]);
 
+  useEffect(() => {
+    setSelectedChild(null);
+    setDrawerOpen(false);
+    setCopyStatus("");
+  }, [activeExperience]);
+
   const selectedObject = useMemo(() => {
-    if (selectedObjectId === null) return null;
-
-    if (objectType === "playlist") {
-      return (
-        objects.find(
-          (item) => Number(item.playlist_id) === Number(selectedObjectId)
-        ) || null
-      );
-    }
-
-    return null;
+    if (objectType !== "playlist" || selectedObjectId === null) return null;
+    return (
+      objects.find(
+        (item) => Number(item.playlist_id) === Number(selectedObjectId)
+      ) || null
+    );
   }, [objectType, objects, selectedObjectId]);
 
   const selectedType = OBJECT_TYPES.find((type) => type.key === objectType);
+  const experience = data?.experiences?.[activeExperience] || null;
+  const children = Array.isArray(experience?.children) ? experience.children : [];
+  const playlistRex = experience?.playlist_rex || null;
+  const playlistRexUrl = playlistRex?.url || "";
+  const thumbsChild = children.find((item) => item.type === "thumbs") || null;
+  const thumbsSummary = !experience?.thumbs_required
+    ? (thumbsChild?.status === "retained" ? "Not required · REX retained" : "Not required")
+    : thumbsChild
+      ? `Required · ${statusLabel(thumbsChild.status)}`
+      : "Required · Missing";
+  const thumbsSummaryStatus = !experience?.thumbs_required
+    ? (thumbsChild?.status || "not_applicable")
+    : (thumbsChild?.status || "missing_rex");
 
-  const auditItems = Array.isArray(auditData?.items)
-    ? auditData.items
-    : [];
-
-  const auditColumns = useMemo(
+  const childColumns = useMemo(
     () => [
       {
-        key: "pv_title",
-        label: "Palette / Viewer",
-        value: (item) =>
-          item.pv_title ||
-          `Saved Palette #${item.saved_palette_id || "—"}`,
+        key: "type",
+        label: "Type",
+        value: (item) => (item.type === "thumbs" ? "Thumbs" : "Viewer"),
       },
       {
-        key: "reference_count",
-        label: "Refs",
-        value: (item) => Number(item.reference_count || 0),
+        key: "title",
+        label: "Title",
+        value: (item) => item.title || "—",
+      },
+      {
+        key: "viewer_format",
+        label: "Experience",
+        value: (item) =>
+          item.type === "thumbs"
+            ? humanize(activeExperience)
+            : humanize(item.viewer_format || activeExperience),
       },
       {
         key: "pv_id",
@@ -211,43 +198,36 @@ export default function RexRelationshipsPage() {
         sortValue: (item) => Number(item.pv_id || 0),
       },
       {
-        key: "color_count",
-        label: "Colors",
-        value: (item) =>
-          item.color_count === null || item.color_count === undefined
-            ? "—"
-            : Number(item.color_count),
-        sortValue: (item) => Number(item.color_count ?? -1),
+        key: "rex",
+        label: "REX",
+        render: (item) =>
+          item.rex ? (
+            <a href={item.rex.url} target="_blank" rel="noreferrer">
+              #{item.rex.id}
+            </a>
+          ) : (
+            "—"
+          ),
+        sortValue: (item) => Number(item.rex?.id || 0),
       },
       {
-        key: "has_photo",
-        label: "Photo",
+        key: "linked",
+        label: "Link",
         value: (item) =>
-          item.has_photo === null || item.has_photo === undefined
-            ? "—"
-            : item.has_photo
-              ? "Yes"
-              : "No",
-      },
-      {
-        key: "viewer_rex_id",
-        label: "Viewer REX",
-        value: (item) =>
-          item.viewer_rex_id ? `#${item.viewer_rex_id}` : "—",
-        sortValue: (item) => Number(item.viewer_rex_id || 0),
+          item.required === false
+            ? "Not required"
+            : item.linked
+              ? "Linked"
+              : "Missing",
       },
       {
         key: "status",
-        label: "Result",
-        render: (item) => {
-          const ready = String(item.status || "") === "ready";
-
-          return (
-            <span style={ready ? readyStyle : issueStyle}>
-              {ready ? "✓ Ready" : `⚠ ${humanize(item.status)}`}
-            </span>
-          );
-        },
+        label: "Status",
+        render: (item) => (
+          <span style={statusStyle(item.status)}>
+            {statusGlyph(item.status)} {statusLabel(item.status)}
+          </span>
+        ),
         sortValue: (item) => String(item.status || ""),
       },
       {
@@ -256,419 +236,41 @@ export default function RexRelationshipsPage() {
         value: (item) => item.message || "—",
       },
     ],
-    []
+    [activeExperience]
   );
 
-  async function runAudit() {
-    if (objectType !== "playlist" || !selectedObjectId) {
-      return;
-    }
+  async function reconcileNow() {
+    if (!selectedObjectId) return;
 
-    setAuditLoading(true);
-    setAuditError("");
+    setSyncing(true);
     setSyncMessage("");
-    setSyncError("");
-    setSelectedAuditItem(null);
-    setDrawerItem(null);
-    setDrawerOpen(false);
+    setError("");
 
     try {
-      const params = new URLSearchParams({
-        playlist_id: String(selectedObjectId),
-        _: String(Date.now()),
-      });
-
-      const res = await fetch(`${PLAYLIST_AUDIT_URL}?${params.toString()}`, {
-        credentials: "include",
-      });
-
-      const payload = await res.json();
-
-      if (!res.ok || !payload?.ok || !payload?.data) {
-        throw new Error(payload?.error || "Playlist REX audit failed");
-      }
-
-      setAuditData(payload.data);
-
-      const refreshedRelationships = await fetchRelationships(
-        objectType,
-        selectedObjectId
-      );
-
-      setRelationshipData(refreshedRelationships);
-      setRelationshipError("");
-    } catch (err) {
-      setAuditData(null);
-      setAuditError(err?.message || "Playlist REX audit failed");
-    } finally {
-      setAuditLoading(false);
-    }
-  }
-
-  async function runSync() {
-    if (objectType !== "playlist" || !selectedObjectId || !auditData) {
-      return;
-    }
-
-    setSyncLoading(true);
-    setSyncMessage("");
-    setSyncError("");
-    setSelectedAuditItem(null);
-    setDrawerItem(null);
-    setDrawerOpen(false);
-
-    try {
-      const res = await fetch(PLAYLIST_SYNC_URL, {
+      const res = await fetch(EXPERIENCES_URL, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          playlist_id: Number(selectedObjectId),
-        }),
+        body: JSON.stringify({ playlist_id: Number(selectedObjectId) }),
       });
-
       const payload = await res.json();
 
-      if (!res.ok || !payload?.ok || !payload?.result) {
-        throw new Error(payload?.error || "REX link sync failed");
+      if (!res.ok || !payload?.ok || !payload?.data) {
+        throw new Error(payload?.error || "REX reconciliation failed");
       }
 
-      const result = payload.result;
-
-      if (result.after) {
-        setAuditData(result.after);
-      }
-
-      setSyncMessage(result.message || "REX links synchronized.");
-
-      const refreshedRelationships = await fetchRelationships(
-        objectType,
-        selectedObjectId
-      );
-
-      setRelationshipData(refreshedRelationships);
-      setRelationshipError("");
+      const refreshedData = await fetchInspection(selectedObjectId);
+      setData(refreshedData);
+      setSyncMessage("REX graph reconciled to the saved Playlist.");
     } catch (err) {
-      setSyncError(err?.message || "REX link sync failed");
+      setError(err?.message || "REX reconciliation failed");
     } finally {
-      setSyncLoading(false);
+      setSyncing(false);
     }
   }
-
-  function selectAuditItem(item) {
-    setSelectedAuditItem(item);
-
-    if (drawerOpen) {
-      setDrawerItem(item);
-    }
-  }
-
-  function openAuditDrawer(item) {
-    setSelectedAuditItem(item);
-    setDrawerItem(item);
-    setDrawerOpen(true);
-  }
-
-  const playlistRex =
-    relationshipData?.has_rex && relationshipData?.reservation
-      ? relationshipData.reservation
-      : null;
-
-  const playlistRexUrl = playlistRex?.token
-    ? `/t/${playlistRex.token}`
-    : "";
-
-  const playlistStatus = playlistStatusLabel(selectedObject);
-
-  if (!selectedObject) {
-    return (
-      <AdminMasterDetail
-        storageKey="admin-rex-relationships-list-width"
-        defaultListWidth={280}
-        minListWidth={240}
-        maxListWidth={420}
-        list={renderObjectList()}
-        detail={
-          <AdminDetailPane ariaLabel="REX relationships">
-            <div className="admin-detail-header">
-              <div>
-                <h1 className="admin-detail-header__title">
-                  REX Relationships
-                </h1>
-
-                <p className="admin-detail-header__description">
-                  Audit and manage REX relationships for ColorFix objects.
-                </p>
-              </div>
-            </div>
-
-            <AdminEmptyState
-              title="Select an object"
-              message="Choose an object on the left."
-            />
-          </AdminDetailPane>
-        }
-      />
-    );
-  }
-
-  return (
-    <AdminMasterDetail
-      storageKey="admin-rex-relationships-list-width"
-      defaultListWidth={280}
-      minListWidth={240}
-      maxListWidth={420}
-      list={renderObjectList()}
-      detail={
-        <AdminDetailPane ariaLabel="REX relationships">
-          <AdminWorkbench
-            header={
-              <div style={headerStyle}>
-                <div>
-                  <h1 style={playlistTitleStyle}>
-                    {selectedObject.title ||
-                      `Playlist #${selectedObject.playlist_id}`}
-                  </h1>
-
-                  <div style={playlistMetaStyle}>
-                    Playlist #{selectedObject.playlist_id}
-                    {playlistStatus ? ` · ${playlistStatus}` : ""}
-                  </div>
-                </div>
-
-                <div style={headerActionsStyle}>
-                  <button
-                    type="button"
-                    disabled={!playlistRexUrl}
-                    onClick={() => {
-                      if (!playlistRexUrl) return;
-                      window.open(playlistRexUrl, "_blank", "noopener,noreferrer");
-                    }}
-                  >
-                    View Playlist
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      window.location.href =
-                        `/admin/playlists/${selectedObject.playlist_id}`;
-                    }}
-                  >
-                    Edit Playlist
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={auditLoading || syncLoading}
-                    onClick={runAudit}
-                  >
-                    {auditLoading ? "Auditing..." : "Audit"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!auditData || auditLoading || syncLoading}
-                    onClick={runSync}
-                  >
-                    {syncLoading ? "Syncing..." : "Sync REX Links"}
-                  </button>
-                </div>
-              </div>
-            }
-
-            upperLeft={
-              <div style={upperPanelStyle}>
-                <div style={sectionLabelStyle}>PLAYLIST REX</div>
-
-                {relationshipLoading ? (
-                  <AdminEmptyState title="Loading Playlist REX" />
-                ) : relationshipError ? (
-                  <AdminEmptyState
-                    title="Playlist REX could not load"
-                    message={relationshipError}
-                  />
-                ) : playlistRex ? (
-                  <div style={rexCardStyle}>
-                    <div>
-                      <strong>
-                        {playlistRex.descriptor?.title ||
-                          playlistRex.label ||
-                          `REX #${playlistRex.id}`}
-                      </strong>
-                    </div>
-
-                    <div>REX #{playlistRex.id}</div>
-                    <div>Status: {playlistRex.status || "—"}</div>
-                    <div>Resolver: {playlistRex.resolver_key || "—"}</div>
-
-                    {playlistRexUrl ? (
-                      <div>
-                        <a
-                          href={playlistRexUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {playlistRexUrl}
-                        </a>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <AdminEmptyState
-                    title="No Public Playlist REX"
-                    message="This playlist does not currently have a canonical active Public REX."
-                  />
-                )}
-              </div>
-            }
-
-            upperRight={
-              <div style={upperPanelStyle}>
-                <div style={sectionLabelStyle}>AUDIT</div>
-
-                {auditError ? (
-                  <AdminEmptyState
-                    title="Audit failed"
-                    message={auditError}
-                  />
-                ) : !auditData ? (
-                  <AdminEmptyState
-                    title="Audit not run"
-                    message="Run Audit to compare the Playlist source against its PV and REX relationships."
-                  />
-                ) : (
-                  <div style={auditSummaryStyle}>
-                    <div>
-                      <strong>
-                        {auditData.summary?.is_clean
-                          ? "✓ Clean"
-                          : "⚠ Issues found"}
-                      </strong>
-                    </div>
-
-                    <div>
-                      {Number(auditData.summary?.palette_count || 0)} palettes
-                    </div>
-
-                    <div>
-                      {Number(auditData.summary?.ready_count || 0)} ready
-                    </div>
-
-                    <div>
-                      {Number(auditData.summary?.issue_count || 0)} issues
-                    </div>
-
-                    <div>
-                      {Number(auditData.summary?.reference_count || 0)} source
-                      references
-                    </div>
-
-                    <div>
-                      Thumbs:{" "}
-                      <span
-                        style={
-                          auditData.thumbs?.status === "ready"
-                            ? readyStyle
-                            : auditData.thumbs?.status === "not_required" ||
-                                auditData.thumbs?.status === "retained"
-                              ? mutedStyle
-                              : issueStyle
-                        }
-                      >
-                        {thumbsAuditLabel(auditData.thumbs)}
-                      </span>
-                    </div>
-
-                    {syncMessage ? (
-                      <div style={readyStyle}>{syncMessage}</div>
-                    ) : null}
-
-                    {syncError ? (
-                      <div style={issueStyle}>{syncError}</div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            }
-
-            upperHeight="190px"
-
-            lower={
-              <div
-                className="admin-detail-workarea"
-                style={{ height: "100%" }}
-              >
-                <div style={resultsHeaderStyle}>
-                  <div style={sectionLabelStyle}>RESULTS</div>
-
-                  {auditData ? (
-                    <div style={resultsCountStyle}>
-                      {auditItems.length} child
-                      {auditItems.length === 1 ? "" : "ren"}
-                    </div>
-                  ) : null}
-                </div>
-
-                {auditLoading && !auditData ? (
-                  <AdminEmptyState title="Auditing Playlist" />
-                ) : auditError ? (
-                  <AdminEmptyState
-                    title="Audit failed"
-                    message={auditError}
-                  />
-                ) : !auditData ? (
-                  <AdminEmptyState
-                    title="Run Audit"
-                    message="Results will show every palette/PV child expected from the current Playlist source."
-                  />
-                ) : auditItems.length === 0 ? (
-                  <AdminEmptyState
-                    title="No palette children"
-                    message="The Playlist audit found no palette references."
-                  />
-                ) : (
-                  <AdminDataGrid
-                    items={auditItems}
-                    columns={auditColumns}
-                    getRowKey={(item) =>
-                      `${item.saved_palette_id}:${item.pv_id || 0}`
-                    }
-                    selectedKey={
-                      selectedAuditItem
-                        ? `${selectedAuditItem.saved_palette_id}:${selectedAuditItem.pv_id || 0}`
-                        : null
-                    }
-                    onSelectionChange={selectAuditItem}
-                    onRowDoubleClick={openAuditDrawer}
-                    defaultSortKey="sort_order"
-                    defaultSortDirection="asc"
-                    ariaLabel="REX Playlist audit results"
-                  />
-                )}
-              </div>
-            }
-
-            drawerOpen={drawerOpen}
-            drawerWidth={440}
-            drawerTitle={
-              drawerItem?.pv_title ||
-              (drawerItem?.saved_palette_id
-                ? `Saved Palette #${drawerItem.saved_palette_id}`
-                : "Audit Result")
-            }
-            drawerContent={<AuditResultDrawer item={drawerItem} />}
-            onCloseDrawer={() => {
-              setDrawerOpen(false);
-            }}
-          />
-        </AdminDetailPane>
-      }
-    />
-  );
 
   function renderObjectList() {
     return (
@@ -678,7 +280,7 @@ export default function RexRelationshipsPage() {
             Object Type
             <select
               value={objectType}
-              onChange={(e) => setObjectType(e.target.value)}
+              onChange={(event) => setObjectType(event.target.value)}
             >
               {OBJECT_TYPES.map((type) => (
                 <option key={type.key} value={type.key}>
@@ -699,19 +301,18 @@ export default function RexRelationshipsPage() {
         ) : objectType !== "playlist" ? (
           <AdminEmptyState
             title={`${selectedType?.label || "Objects"} not wired yet`}
+            message="This workspace is object-first. Playlist experience graphs are wired first."
           />
         ) : objects.length === 0 ? (
           <AdminEmptyState title="No playlists found" />
         ) : (
-          <AdminObjectList ariaLabel={`${objectType} objects`}>
+          <AdminObjectList ariaLabel="Playlist objects">
             {objects.map((item) => (
               <AdminObjectListItem
                 key={item.playlist_id}
                 id={item.playlist_id}
                 title={item.title || `Playlist #${item.playlist_id}`}
-                selected={
-                  Number(selectedObjectId) === Number(item.playlist_id)
-                }
+                selected={Number(selectedObjectId) === Number(item.playlist_id)}
                 onSelect={() => setSelectedObjectId(item.playlist_id)}
               />
             ))}
@@ -720,179 +321,425 @@ export default function RexRelationshipsPage() {
       </AdminListPane>
     );
   }
-}
 
-function AuditResultDrawer({ item }) {
-  if (!item) {
-    return <AdminEmptyState title="No audit result selected" />;
+  if (!selectedObject) {
+    return (
+      <AdminMasterDetail
+        storageKey="admin-rex-relationships-list-width"
+        defaultListWidth={280}
+        minListWidth={240}
+        maxListWidth={420}
+        list={renderObjectList()}
+        detail={
+          <AdminDetailPane ariaLabel="REX object workspace">
+            <div className="admin-detail-header">
+              <div>
+                <h1 className="admin-detail-header__title">REX Objects</h1>
+                <p className="admin-detail-header__description">
+                  Inspect the permanent REX identities and current relationship graph for ColorFix objects.
+                </p>
+              </div>
+            </div>
+            <AdminEmptyState
+              title="Select an object"
+              message="Choose a Playlist on the left."
+            />
+          </AdminDetailPane>
+        }
+      />
+    );
   }
 
-  const ready = String(item.status || "") === "ready";
+  return (
+    <AdminMasterDetail
+      storageKey="admin-rex-relationships-list-width"
+      defaultListWidth={280}
+      minListWidth={240}
+      maxListWidth={420}
+      list={renderObjectList()}
+      detail={
+        <AdminDetailPane ariaLabel="REX object workspace">
+          <AdminWorkbench
+            header={
+              <div style={headerStyle}>
+                <div>
+                  <h1 style={playlistTitleStyle}>
+                    {selectedObject.title || `Playlist #${selectedObject.playlist_id}`}
+                  </h1>
+                  <div style={playlistMetaStyle}>
+                    Playlist #{selectedObject.playlist_id}
+                    {data?.playlist_status ? ` · ${humanize(data.playlist_status)}` : ""}
+                    {experience ? ` · ${humanize(activeExperience)} ${statusLabel(experience.status)}` : ""}
+                  </div>
+                </div>
+
+                <div style={headerActionsStyle}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = `/admin/playlists/${selectedObject.playlist_id}`;
+                    }}
+                  >
+                    Edit Playlist
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={syncing || loading}
+                    onClick={reconcileNow}
+                    title="Normally automatic when the Playlist is saved."
+                  >
+                    {syncing ? "Reconciling..." : "Reconcile REX"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!playlistRexUrl}
+                    onClick={() => {
+                      if (!playlistRexUrl) return;
+                      window.open(playlistRexUrl, "_blank", "noopener,noreferrer");
+                    }}
+                  >
+                    Launch {humanize(activeExperience)}
+                  </button>
+                </div>
+              </div>
+            }
+
+            upperLeft={
+              <div style={upperPanelStyle}>
+                <div style={experienceTabsStyle}>
+                  {EXPERIENCE_TABS.map((tab) => {
+                    const tabData = data?.experiences?.[tab.key];
+                    const selected = activeExperience === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveExperience(tab.key)}
+                        style={experienceTabStyle(selected)}
+                      >
+                        {tab.label}
+                        <span style={tabStatusStyle(tabData?.status)}>
+                          {statusGlyph(tabData?.status)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {loading ? (
+                  <AdminEmptyState title="Loading Playlist experiences" />
+                ) : error ? (
+                  <AdminEmptyState title="REX graph could not load" message={error} />
+                ) : !experience ? (
+                  <AdminEmptyState title="No experience data" />
+                ) : (
+                  <div style={factsGridStyle}>
+                    <Fact label="Experience" value={humanize(activeExperience)} />
+                    <Fact label="Status" value={statusLabel(experience.status)} emphasis={experience.status} />
+                    <Fact label="Slides" value={Number(experience.slide_count || 0)} />
+                    <Fact label="Palettes" value={Number(experience.palette_count || 0)} />
+                    <Fact label="Primary PVs" value={Number(experience.primary_viewer_count || 0)} />
+                    <Fact
+                      label="Thumbs"
+                      value={thumbsSummary}
+                      emphasis={thumbsSummaryStatus}
+                    />
+                  </div>
+                )}
+              </div>
+            }
+
+            upperRight={
+              <div style={upperPanelStyle}>
+                <div style={sectionLabelStyle}>PERMANENT EXPERIENCE REX</div>
+
+                {loading ? (
+                  <AdminEmptyState title="Loading REX" />
+                ) : playlistRex ? (
+                  <div style={rexCardStyle}>
+                    <div>
+                      <strong>{playlistRex.label || `REX #${playlistRex.id}`}</strong>
+                    </div>
+                    <div>REX #{playlistRex.id}</div>
+                    <div>Experience: {humanize(playlistRex.experience_key || activeExperience)}</div>
+                    <div>Status: {humanize(playlistRex.status || "")}</div>
+                    <div>Resolver: {playlistRex.resolver_key || "—"}</div>
+                    <div>
+                      <a href={playlistRex.url} target="_blank" rel="noreferrer">
+                        {playlistRex.url}
+                      </a>
+                    </div>
+                    {syncMessage ? <div style={readyStyle}>{syncMessage}</div> : null}
+                  </div>
+                ) : (
+                  <AdminEmptyState
+                    title="No permanent REX yet"
+                    message={
+                      Number(experience?.slide_count || 0) > 0
+                        ? "This experience exists in the saved Playlist but does not yet have its permanent REX."
+                        : "This experience is not currently used by the Playlist."
+                    }
+                  />
+                )}
+              </div>
+            }
+
+            upperLeftWidth={380}
+            upperHeight="235px"
+
+            lower={
+              <div className="admin-detail-workarea" style={{ height: "100%" }}>
+                <div style={resultsHeaderStyle}>
+                  <div>
+                    <div style={sectionLabelStyle}>EXPECTED CHILD GRAPH</div>
+                    <div style={resultsSubheadStyle}>
+                      Derived from the saved Playlist. Reservations are permanent; these relationships are the mutable layer.
+                    </div>
+                  </div>
+                  <div style={resultsCountStyle}>
+                    {children.length} child{children.length === 1 ? "" : "ren"}
+                  </div>
+                </div>
+
+                {loading ? (
+                  <AdminEmptyState title="Loading child graph" />
+                ) : error ? (
+                  <AdminEmptyState title="REX graph could not load" message={error} />
+                ) : !experience ? (
+                  <AdminEmptyState title="No experience selected" />
+                ) : children.length === 0 ? (
+                  <AdminEmptyState
+                    title="No REX children required"
+                    message="The saved Playlist does not currently require Viewer or Thumbs children for this experience."
+                  />
+                ) : (
+                  <AdminDataGrid
+                    items={children}
+                    columns={childColumns}
+                    getRowKey={(item) => item.row_key}
+                    selectedKey={selectedChild?.row_key ?? null}
+                    onSelectionChange={(item) => {
+                      setSelectedChild(item);
+                      setCopyStatus("");
+                    }}
+                    onRowDoubleClick={(item) => {
+                      setSelectedChild(item);
+                      setCopyStatus("");
+                      setDrawerOpen(true);
+                    }}
+                    defaultSortKey="sort_order"
+                    defaultSortDirection="asc"
+                    ariaLabel={`${humanize(activeExperience)} REX child graph`}
+                  />
+                )}
+              </div>
+            }
+
+            drawerOpen={drawerOpen && Boolean(selectedChild)}
+            drawerWidth={460}
+            drawerTitle={
+              selectedChild?.title ||
+              (selectedChild?.type === "thumbs" ? "Colors Used" : "REX Child")
+            }
+            drawerContent={
+              <RexChildDrawer
+                item={selectedChild}
+                experienceKey={activeExperience}
+                copyStatus={copyStatus}
+                onCopyStatus={setCopyStatus}
+              />
+            }
+            onCloseDrawer={() => {
+              setDrawerOpen(false);
+              setCopyStatus("");
+            }}
+          />
+        </AdminDetailPane>
+      }
+    />
+  );
+}
+
+function RexChildDrawer({
+  item,
+  experienceKey,
+  copyStatus,
+  onCopyStatus,
+}) {
+  if (!item) {
+    return <AdminEmptyState title="No REX child selected" />;
+  }
+
+  const rex = item.rex || null;
+  const fullUrl = rex?.url ? absoluteRexUrl(rex.url) : "";
+  const typeLabel = item.type === "thumbs" ? "Thumbs" : "Viewer";
+
+  async function copyUrl() {
+    if (!fullUrl) return;
+
+    try {
+      await copyTextToClipboard(fullUrl);
+      onCopyStatus("Copied");
+    } catch {
+      onCopyStatus("Copy failed");
+    }
+  }
 
   return (
     <div style={drawerBodyStyle}>
-      <section style={drawerSectionStyle}>
-        <div style={sectionLabelStyle}>RESULT</div>
-
-        <div style={ready ? readyStyle : issueStyle}>
-          {ready ? "✓ Ready" : `⚠ ${humanize(item.status)}`}
-        </div>
-
-        <div style={{ marginTop: 8 }}>{item.message || "—"}</div>
-      </section>
-
-      <section style={drawerSectionStyle}>
-        <div style={sectionLabelStyle}>SOURCE</div>
-
-        <div>Saved Palette #{item.saved_palette_id || "—"}</div>
-        <div>
-          Playlist item IDs:{" "}
-          {Array.isArray(item.playlist_item_ids) &&
-          item.playlist_item_ids.length
-            ? item.playlist_item_ids.join(", ")
-            : "—"}
-        </div>
-        <div>References: {Number(item.reference_count || 0)}</div>
-        <div>Sort order: {Number(item.sort_order || 0)}</div>
-      </section>
-
-      <section style={drawerSectionStyle}>
-        <div style={sectionLabelStyle}>PALETTE VIEWER</div>
-
-        <div>{item.pv_title || "—"}</div>
-        <div>PV: {item.pv_id ? `#${item.pv_id}` : "—"}</div>
-        <div>
-          Colors:{" "}
-          {item.color_count === null || item.color_count === undefined
-            ? "—"
-            : Number(item.color_count)}
-        </div>
-        <div>
-          Photo:{" "}
-          {item.has_photo === null || item.has_photo === undefined
-            ? "—"
-            : item.has_photo
-              ? "Yes"
-              : "No"}
-        </div>
-      </section>
-
-      <section style={drawerSectionStyle}>
-        <div style={sectionLabelStyle}>VIEWER REX</div>
-
-        <div>
-          REX: {item.viewer_rex_id ? `#${item.viewer_rex_id}` : "—"}
-        </div>
-
-        <div>
-          Relationship link:{" "}
-          {item.viewer_link_id ? `#${item.viewer_link_id}` : "—"}
-        </div>
-
-        {item.viewer_rex_url ? (
-          <div>
-            <a
-              href={item.viewer_rex_url}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {item.viewer_rex_url}
-            </a>
-          </div>
-        ) : null}
-      </section>
-
-      <div style={drawerActionsStyle}>
-        {item.viewer_rex_url ? (
-          <button
-            type="button"
-            onClick={() => {
-              window.open(
-                item.viewer_rex_url,
-                "_blank",
-                "noopener,noreferrer"
-              );
-            }}
-          >
-            View Public
-          </button>
-        ) : null}
+      <div style={drawerStickyActionsStyle}>
+        <button
+          type="button"
+          disabled={!fullUrl}
+          onClick={copyUrl}
+        >
+          Copy URL
+        </button>
 
         <button
           type="button"
-          disabled={!item.pv_id}
+          disabled={!fullUrl}
           onClick={() => {
-            if (!item.pv_id) return;
-            window.location.href =
-              `/admin/palette-viewers?pv_id=${item.pv_id}`;
+            if (!fullUrl) return;
+            window.open(fullUrl, "_blank", "noopener,noreferrer");
           }}
         >
-          Open PV Setup
+          Launch
         </button>
+
+        {copyStatus ? (
+          <span style={copyStatus === "Copied" ? readyStyle : issueStyle}>
+            {copyStatus === "Copied" ? "✓ Copied" : "⚠ Copy failed"}
+          </span>
+        ) : null}
       </div>
+
+      <section style={drawerSectionStyle}>
+        <div style={sectionLabelStyle}>REX CHILD</div>
+        <div style={drawerTitleStyle}>{item.title || typeLabel}</div>
+        <div style={statusStyle(item.status)}>
+          {statusGlyph(item.status)} {statusLabel(item.status)}
+        </div>
+        <div style={drawerMessageStyle}>{item.message || "—"}</div>
+      </section>
+
+      <section style={drawerSectionStyle}>
+        <div style={sectionLabelStyle}>RELATIONSHIP</div>
+        <div>Type: {typeLabel}</div>
+        <div>Playlist experience: {humanize(experienceKey)}</div>
+        <div>
+          Child experience:{" "}
+          {item.type === "thumbs"
+            ? humanize(experienceKey)
+            : humanize(item.viewer_format || experienceKey)}
+        </div>
+        <div>
+          Required: {item.required === false ? "No" : "Yes"}
+        </div>
+        <div>
+          Linked: {item.linked ? "Yes" : "No"}
+        </div>
+        <div>
+          Relationship link: {item.link_id ? `#${item.link_id}` : "—"}
+        </div>
+        {item.pv_id ? <div>PV: #{item.pv_id}</div> : null}
+        {item.saved_palette_id ? (
+          <div>Saved Palette: #{item.saved_palette_id}</div>
+        ) : null}
+      </section>
+
+      <section style={drawerSectionStyle}>
+        <div style={sectionLabelStyle}>PERMANENT REX</div>
+
+        {rex ? (
+          <>
+            <div>REX: #{rex.id}</div>
+            <div>Resolver: {rex.resolver_key || "—"}</div>
+            <div>Resource: {rex.resource_type || "—"} #{rex.resource_id || "—"}</div>
+            <div>Experience: {humanize(rex.experience_key || experienceKey)}</div>
+            <div>Status: {humanize(rex.status || "")}</div>
+
+            <div style={urlBlockStyle}>
+              <div style={sectionLabelStyle}>FULL URL</div>
+              <a
+                href={fullUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={fullUrlStyle}
+              >
+                {fullUrl}
+              </a>
+            </div>
+          </>
+        ) : (
+          <div style={issueStyle}>No permanent REX exists for this child.</div>
+        )}
+      </section>
+
     </div>
   );
 }
 
-async function fetchRelationships(resourceType, resourceId) {
+function absoluteRexUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return "";
+
+  try {
+    return new URL(value, window.location.origin).toString();
+  } catch {
+    return value;
+  }
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed");
+  }
+}
+
+function Fact({ label, value, emphasis = "" }) {
+  return (
+    <div style={factStyle}>
+      <div style={factLabelStyle}>{label}</div>
+      <div style={emphasis ? statusStyle(emphasis) : factValueStyle}>{value}</div>
+    </div>
+  );
+}
+
+async function fetchInspection(playlistId) {
   const params = new URLSearchParams({
-    resource_type: String(resourceType),
-    resource_id: String(resourceId),
+    playlist_id: String(playlistId),
     _: String(Date.now()),
   });
 
-  const res = await fetch(`${RELATIONSHIPS_URL}?${params.toString()}`, {
+  const res = await fetch(`${EXPERIENCES_URL}?${params.toString()}`, {
     credentials: "include",
   });
+  const payload = await res.json();
 
-  const data = await res.json();
-
-  if (!res.ok || !data?.ok) {
-    throw new Error(data?.error || "Failed to load REX relationships");
+  if (!res.ok || !payload?.ok || !payload?.data) {
+    throw new Error(payload?.error || "Failed to load Playlist REX graph");
   }
 
-  return data;
-}
-
-function thumbsAuditLabel(thumbs) {
-  if (!thumbs) return "—";
-
-  const status = String(thumbs.status || "");
-
-  if (status === "ready") {
-    return thumbs.thumbs_rex_id
-      ? `Ready · REX #${thumbs.thumbs_rex_id}`
-      : "Ready";
-  }
-
-  if (status === "not_required") {
-    return "Not required";
-  }
-
-  if (status === "retained") {
-    return thumbs.thumbs_rex_id
-      ? `Retained · REX #${thumbs.thumbs_rex_id}`
-      : "Retained";
-  }
-
-  if (status === "missing_thumbs_rex") {
-    return "Missing";
-  }
-
-  return humanize(status);
-}
-
-function playlistStatusLabel(item) {
-  if (!item) return "";
-
-  const raw = String(item.status || "").trim();
-  if (raw) return humanize(raw);
-
-  if (item.is_active !== undefined && item.is_active !== null) {
-    return Number(item.is_active) === 1 ? "Active" : "Inactive";
-  }
-
-  return "";
+  return payload.data;
 }
 
 function humanize(value) {
@@ -901,7 +748,91 @@ function humanize(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function statusLabel(status) {
+  const value = String(status || "").toLowerCase();
+  if (value === "ready") return "Ready";
+  if (value === "retained") return "Retained";
+  if (value === "not_applicable") return "Not used";
+  if (value === "missing_rex") return "Missing REX";
+  if (value === "unlinked") return "Not linked";
+  if (value === "blocked") return "Blocked";
+  if (value === "incomplete") return "Incomplete";
+  if (value === "revoked") return "Revoked";
+  return humanize(value || "Unknown");
+}
+
+function statusGlyph(status) {
+  const value = String(status || "").toLowerCase();
+  if (["ready", "retained"].includes(value)) return "✓";
+  if (value === "not_applicable") return "—";
+  return "⚠";
+}
+
+function statusStyle(status) {
+  const value = String(status || "").toLowerCase();
+  if (["ready", "retained"].includes(value)) return readyStyle;
+  if (value === "not_applicable") return mutedStyle;
+  return issueStyle;
+}
+
+const drawerBodyStyle = {
+  color: "#152033",
+  padding: 16,
+  fontSize: 13,
+  lineHeight: 1.6,
+};
+
+const drawerSectionStyle = {
+  paddingBottom: 16,
+  marginBottom: 16,
+  borderBottom: "1px solid #dfe4ea",
+};
+
+const drawerTitleStyle = {
+  marginTop: 4,
+  marginBottom: 4,
+  fontSize: 18,
+  fontWeight: 700,
+  color: "#152033",
+};
+
+const drawerMessageStyle = {
+  marginTop: 8,
+  color: "#586675",
+};
+
+const urlBlockStyle = {
+  marginTop: 14,
+  padding: 12,
+  background: "#f4f6f8",
+  border: "1px solid #d9e0e7",
+  borderRadius: 4,
+};
+
+const fullUrlStyle = {
+  display: "block",
+  marginTop: 4,
+  color: "#0b5ea8",
+  wordBreak: "break-all",
+  overflowWrap: "anywhere",
+};
+
+const drawerStickyActionsStyle = {
+  position: "sticky",
+  top: 0,
+  zIndex: 2,
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 8,
+  margin: "-16px -16px 16px",
+  padding: "12px 16px",
+  background: "#fff",
+  borderBottom: "1px solid #dfe4ea",
+};
+
 const headerStyle = {
+  color: "#152033",
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
@@ -916,6 +847,7 @@ const headerActionsStyle = {
 };
 
 const playlistTitleStyle = {
+  color: "#152033",
   margin: 0,
   fontSize: 22,
   lineHeight: 1.2,
@@ -928,10 +860,63 @@ const playlistMetaStyle = {
 };
 
 const upperPanelStyle = {
+  color: "#152033",
   height: "100%",
   minHeight: 0,
   padding: "12px 14px",
-  overflow: "auto",
+  boxSizing: "border-box",
+  overflowY: "auto",
+  overflowX: "hidden",
+};
+
+const experienceTabsStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginBottom: 14,
+};
+
+const experienceTabStyle = (selected) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "7px 13px",
+  border: selected ? "1px solid #d86700" : "1px solid #4f5b67",
+  borderRadius: 4,
+  background: selected ? "#f47c00" : "#5f6b78",
+  color: "#fff",
+  fontWeight: selected ? 700 : 600,
+  cursor: "pointer",
+});
+
+const tabStatusStyle = () => ({
+  color: "#fff",
+  fontWeight: 700,
+  fontSize: 11,
+});
+
+const factsGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const factStyle = {
+  minWidth: 0,
+};
+
+const factLabelStyle = {
+  color: "#586675",
+  fontSize: 11,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+const factValueStyle = {
+  color: "#152033",
+  marginTop: 2,
+  fontSize: 14,
+  fontWeight: 600,
 };
 
 const sectionLabelStyle = {
@@ -943,54 +928,42 @@ const sectionLabelStyle = {
 };
 
 const rexCardStyle = {
+  color: "#152033",
   display: "grid",
   gap: 4,
   fontSize: 13,
 };
 
-const auditSummaryStyle = {
-  display: "grid",
-  gap: 5,
-  fontSize: 13,
-};
-
 const resultsHeaderStyle = {
   display: "flex",
-  alignItems: "center",
+  alignItems: "flex-start",
   justifyContent: "space-between",
-  minHeight: 34,
+  gap: 16,
+  minHeight: 48,
+};
+
+const resultsSubheadStyle = {
+  color: "#586675",
+  fontSize: 12,
 };
 
 const resultsCountStyle = {
   color: "#586675",
   fontSize: 12,
+  whiteSpace: "nowrap",
+};
+
+const readyStyle = {
+  color: "#18794e",
+  fontWeight: 600,
+};
+
+const issueStyle = {
+  color: "#a23b2a",
+  fontWeight: 600,
 };
 
 const mutedStyle = {
   color: "#586675",
-  fontWeight: 700,
-};
-
-const readyStyle = {
-  color: "#248451",
-  fontWeight: 700,
-};
-
-const issueStyle = {
-  color: "#9a5c16",
-  fontWeight: 700,
-};
-
-const drawerBodyStyle = {
-  padding: 16,
-};
-
-const drawerSectionStyle = {
-  marginBottom: 22,
-};
-
-const drawerActionsStyle = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
+  fontWeight: 500,
 };
