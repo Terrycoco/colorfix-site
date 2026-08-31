@@ -12,6 +12,7 @@ const BASE_URL = String(
 const POLL_MS = 5000;
 const HEARTBEAT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 15000;
+const VIDEO_UPLOAD_TIMEOUT_MS = 120000;
 
 const WORKER_SECRET = String(
   process.env.COLORFIX_RENDER_WORKER_SECRET || ""
@@ -126,7 +127,7 @@ async function postJson(
 async function uploadVideo(
   jobId,
   outputPath,
-  timeoutMs = REQUEST_TIMEOUT_MS
+  timeoutMs = VIDEO_UPLOAD_TIMEOUT_MS
 ) {
   const form = new FormData();
 
@@ -587,6 +588,10 @@ async function main() {
 
   console.log(
     `HTTP request timeout: ${REQUEST_TIMEOUT_MS / 1000} seconds.`
+  );
+
+  console.log(
+    `Video upload timeout: ${VIDEO_UPLOAD_TIMEOUT_MS / 1000} seconds.`
   );
 
   while (true) {

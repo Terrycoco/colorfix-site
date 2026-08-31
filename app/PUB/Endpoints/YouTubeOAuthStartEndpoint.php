@@ -4,101 +4,110 @@ declare(strict_types=1);
 namespace App\PUB\Endpoints;
 
 use App\PUB\Dispatch\Auth\YouTubeAuthService;
-use App\PUB\Errors\PubErrorReporter;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 /**
  * YOUTUBE OAUTH START ENDPOINT
  *
- * Browser-facing OAuth handoff.
- *
- * Owns only:
- *   - session/state creation
- *   - redirect to Google authorization
- *   - return to PUB on failure
- *
- * Provider credentials and OAuth URL construction live in
- * Dispatch/Auth/YouTubeAuthService.
+ * Creates/stores OAuth state, remembers the safe local return path,
+ * then sends the browser to Google's consent screen.
  */
 final class YouTubeOAuthStartEndpoint
 {
+    private const STATE_SESSION_KEY = 'pub_youtube_oauth_state';
+    private const RETURN_SESSION_KEY = 'pub_youtube_oauth_return';
+    private const DEFAULT_RETURN = '/admin/pub?stage=dispatch';
+
     public static function handle(PDO $pdo): void
     {
-        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
-            http_response_code(405);
-            echo 'GET only.';
-            return;
-        }
-
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            session_start();
-        }
-
-        $projectRoot = dirname(__DIR__, 3);
-
-        $errors = new PubErrorReporter(
-            $projectRoot . '/app/PUB/Errors/pub_errors.log'
-        );
-
         try {
-            $state = bin2hex(random_bytes(32));
+            self::ensureSession();
 
-            $_SESSION['pub_youtube_oauth_state'] = $state;
-            $_SESSION['pub_youtube_oauth_state_created_at'] = time();
-            $_SESSION['pub_youtube_oauth_return'] =
-                '/admin/pub?stage=dispatch';
-
-            $service = new YouTubeAuthService($pdo);
-
-            header(
-                'Location: ' . $service->authorizationUrl($state),
-                true,
-                302
+            $returnPath = self::safeReturnPath(
+                (string)($_GET['return'] ?? self::DEFAULT_RETURN)
             );
 
+            $state = bin2hex(random_bytes(32));
+
+            $_SESSION[self::STATE_SESSION_KEY] = $state;
+            $_SESSION[self::RETURN_SESSION_KEY] = $returnPath;
+
+            $auth = new YouTubeAuthService($pdo);
+            $url = $auth->authorizationUrl($state);
+
+            header('Location: ' . $url, true, 302);
             exit;
 
         } catch (Throwable $e) {
-            $errors->report(
-                $e,
-                [
-                    'stage' => 'dispatch',
-                    'code' => 'youtube_oauth_start_failure',
-                ]
-            );
+            $returnPath = self::DEFAULT_RETURN;
 
-            self::redirectBack(
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $returnPath = self::safeReturnPath(
+                    (string)(
+                        $_SESSION[self::RETURN_SESSION_KEY]
+                        ?? self::DEFAULT_RETURN
+                    )
+                );
+            }
+
+            self::redirectWithResult(
+                $returnPath,
                 'error',
                 $e->getMessage()
             );
         }
     }
 
-    private static function redirectBack(
+    private static function ensureSession(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            return;
+        }
+
+        if (!session_start()) {
+            throw new RuntimeException(
+                'Could not start YouTube OAuth session.'
+            );
+        }
+    }
+
+    private static function safeReturnPath(string $value): string
+    {
+        $value = trim($value);
+
+        if (
+            $value === ''
+            || !str_starts_with($value, '/admin/')
+            || str_starts_with($value, '//')
+        ) {
+            return self::DEFAULT_RETURN;
+        }
+
+        return $value;
+    }
+
+    private static function redirectWithResult(
+        string $returnPath,
         string $status,
-        string $message = ''
-    ): void {
-        unset(
-            $_SESSION['pub_youtube_oauth_state'],
-            $_SESSION['pub_youtube_oauth_state_created_at']
-        );
+        string $message
+    ): never {
+        $separator = str_contains($returnPath, '?') ? '&' : '?';
 
-        $return = '/admin/pub?stage=dispatch';
+        $url = $returnPath
+            . $separator
+            . http_build_query(
+                [
+                    'youtube_auth' => $status,
+                    'message' => $message,
+                ],
+                '',
+                '&',
+                PHP_QUERY_RFC3986
+            );
 
-        $query = http_build_query(
-            [
-                'youtube_auth' => $status,
-                'message' => $message,
-            ]
-        );
-
-        header(
-            'Location: ' . $return . '&' . $query,
-            true,
-            302
-        );
-
+        header('Location: ' . $url, true, 302);
         exit;
     }
 }

@@ -146,17 +146,36 @@ function renderTextCard(title, description, className, url = "") {
 }
 
 function renderStaticFooter(content) {
-  const text = String(content.footer_brand_text || "").trim();
+  const text = String(content.footer_brand_text || "")
+    .trim()
+    .replace(
+      " — home color transformations",
+      " — Home color transformations"
+    );
   if (!text) return "";
-  const url = String(content.footer_url || "").trim();
-  const urlText = String(content.footer_url_text || "").trim();
-  const link = url && urlText
-    ? `<a href="${escapeAttr(url)}">${escapeHtml(urlText)}</a>`
-    : "";
+
   return `
       <footer class="cf-static-home__footer">
         <span>${escapeHtml(text)}</span>
-        ${link}
+
+        <span class="cf-static-home__footer-links">
+          <a href="/privacy">Privacy Policy</a>
+          <span aria-hidden="true">·</span>
+          <a href="/terms">Terms of Service</a>
+          <span aria-hidden="true">·</span>
+          <a
+            class="cf-static-home__youtube"
+            href="https://www.youtube.com/@ColorFixByTerry"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="ColorFix by Terry on YouTube"
+          >
+            <img
+              src="/images/youtube-logo.png"
+              alt="YouTube"
+            >
+          </a>
+        </span>
       </footer>
   `;
 }
@@ -197,7 +216,7 @@ function buildContentFallbacks(buildKey) {
     meta_description: "ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr.",
     robots: "index,follow",
     canonical_url: "https://colorfix.terrymarr.com/",
-    footer_brand_text: "ColorFix by Terry — home color transformations by Terry Marr",
+    footer_brand_text: "ColorFix by Terry — Home color transformations by Terry Marr",
     footer_url: "https://colorfix.terrymarr.com/",
     footer_url_text: "colorfix.terrymarr.com",
   };
@@ -381,6 +400,21 @@ function getStaticCss() {
 }
 .cf-static-home__footer a {
   color: inherit;
+}
+.cf-static-home__footer-links {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.cf-static-home__youtube {
+  align-items: center;
+  display: inline-flex;
+}
+.cf-static-home__youtube img {
+  display: block;
+  height: auto;
+  width: 78px;
 }
 .cf-static-card,
 .cf-static-playlist-set {

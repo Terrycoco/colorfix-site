@@ -171,21 +171,40 @@ export default function AdminPaletteViewersPage() {
     setIsNew(false);
   }, []);
 
-  const loadPage = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      await loadPalettes();
-      const rows = await loadList();
-      if (!selectedId && rows[0]?.viewer?.palette_viewer_id) {
-        await loadDetail(rows[0].viewer.palette_viewer_id);
-      }
-    } catch (err) {
-      setError(err?.message || "Failed to load Palette Viewers");
-    } finally {
-      setLoading(false);
+const loadPage = useCallback(async () => {
+  setLoading(true);
+  setError("");
+
+  try {
+    await loadPalettes();
+
+    const rows = await loadList();
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedPvId = Number(params.get("pv_id") || 0);
+
+    const requestedExists =
+      requestedPvId > 0 &&
+      rows.some(
+        (row) =>
+          Number(row?.viewer?.palette_viewer_id || 0) === requestedPvId
+      );
+
+    if (requestedExists && Number(selectedId) !== requestedPvId) {
+      await loadDetail(requestedPvId);
+    } else if (!selectedId && rows[0]?.viewer?.palette_viewer_id) {
+      await loadDetail(rows[0].viewer.palette_viewer_id);
     }
-  }, [loadDetail, loadList, loadPalettes, selectedId]);
+  } catch (err) {
+    setError(err?.message || "Failed to load Palette Viewers");
+  } finally {
+    setLoading(false);
+  }
+}, [loadDetail, loadList, loadPalettes, selectedId]);
+
+useEffect(() => {
+  loadPage();
+}, [loadPage]);
 
   useEffect(() => {
     loadPage();

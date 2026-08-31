@@ -9,6 +9,7 @@ use App\REX\DTO\RexReservationDescriptor;
 use App\REX\DTO\RexResolutionBehavior;
 use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
+use App\REX\DTO\RexShareMetadata;
 use App\REX\Resources\RexRouteCatalog;
 use RuntimeException;
 
@@ -28,7 +29,11 @@ final class RouteResolver implements RexResolverInterface
             resourceType: $request->resourceType,
             resourceId: $request->resourceId,
             behavior: RexResolutionBehavior::REDIRECT,
-            shareMetadata: [],
+            shareMetadata: new RexShareMetadata(
+    title: null,
+    description: null,
+    imageUrl: null,
+),
             destination: [
                 'path' => $route['path'],
             ],

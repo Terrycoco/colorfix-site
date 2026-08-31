@@ -40,3 +40,28 @@
 
 /* optional: avoid a horizontal scrollbar from the negative margins */
 html, body { overflow-x: hidden; }
+
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.site-footer__links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-footer__links a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.site-footer__youtube img {
+  display: block;
+  width: 92px;
+  height: auto;
+}

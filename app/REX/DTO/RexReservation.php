@@ -18,5 +18,6 @@ final readonly class RexReservation
         public ?string $revokedAt,
         public ?string $createdAt,
         public ?string $updatedAt,
+         public ?int $fallbackRexId = null,
     ) {}
 }

@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace App\PUB\Endpoints;
 
-use App\PUB\Dispatch\Auth\ChannelAuthContract;
 use App\PUB\Dispatch\Auth\YouTubeAuthService;
+use App\PUB\Dispatch\ChannelConnectionContract;
 use App\PUB\Dispatch\Pinterest\PinterestConnectionService;
 use App\PUB\Errors\PubErrorReporter;
 use PDO;
@@ -16,58 +16,32 @@ use Throwable;
  *
  * PUB-facing controller for external channel connections.
  *
- * Current channels:
+ * Supported channels:
  *   pinterest
  *   youtube
  *
- * Supported actions:
- *
- *   GET
- *     ?channel=pinterest
- *     ?channel=youtube
- *     ?channel=pinterest&action=status
- *     ?channel=youtube&action=status
- *
- *   POST JSON
- *     { "channel": "pinterest", "action": "test" }
- *     { "channel": "youtube", "action": "test" }
- *     { "channel": "pinterest", "action": "sync" }
- *     { "channel": "pinterest", "action": "disconnect" }
- *     { "channel": "youtube", "action": "disconnect" }
- *
- * OAuth browser redirects are handled by separate tiny public doors.
- * Real OAuth/auth behavior lives under app/PUB/Dispatch/Auth.
+ * OAuth browser redirects are handled by separate thin public doors.
  */
 final class ChannelConnectionEndpoint
 {
     public static function handle(PDO $pdo): void
     {
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
-            self::sendJson(200, [
-                'ok' => true,
-            ]);
+            self::sendJson(200, ['ok' => true]);
             return;
         }
 
         $projectRoot = dirname(__DIR__, 3);
-
         $errors = new PubErrorReporter(
             $projectRoot . '/app/PUB/Errors/pub_errors.log'
         );
 
         try {
-            $method = strtoupper(
-                (string)($_SERVER['REQUEST_METHOD'] ?? 'GET')
-            );
+            $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
             if ($method === 'GET') {
-                $channel = trim(
-                    (string)($_GET['channel'] ?? 'pinterest')
-                );
-
-                $action = strtolower(
-                    trim((string)($_GET['action'] ?? 'status'))
-                );
+                $channel = trim((string)($_GET['channel'] ?? 'pinterest'));
+                $action = strtolower(trim((string)($_GET['action'] ?? 'status')));
 
                 if ($action !== 'status') {
                     throw new RuntimeException(
@@ -75,17 +49,13 @@ final class ChannelConnectionEndpoint
                     );
                 }
 
-                $connection = self::connectionFor(
-                    $pdo,
-                    $channel
-                );
+                $connection = self::connectionFor($pdo, $channel);
 
                 self::sendJson(200, [
                     'ok' => true,
                     'channel' => $connection->channelKey(),
                     'item' => $connection->status(),
                 ]);
-
                 return;
             }
 
@@ -98,14 +68,8 @@ final class ChannelConnectionEndpoint
             }
 
             $data = self::requestJson();
-
-            $channel = trim(
-                (string)($data['channel'] ?? 'pinterest')
-            );
-
-            $action = strtolower(
-                trim((string)($data['action'] ?? ''))
-            );
+            $channel = trim((string)($data['channel'] ?? 'pinterest'));
+            $action = strtolower(trim((string)($data['action'] ?? '')));
 
             if ($action === '') {
                 throw new RuntimeException(
@@ -113,10 +77,7 @@ final class ChannelConnectionEndpoint
                 );
             }
 
-            $connection = self::connectionFor(
-                $pdo,
-                $channel
-            );
+            $connection = self::connectionFor($pdo, $channel);
 
             switch ($action) {
                 case 'status':
@@ -140,11 +101,7 @@ final class ChannelConnectionEndpoint
                     }
 
                     /** @var callable $sync */
-                    $sync = [
-                        $connection,
-                        'syncBoards',
-                    ];
-
+                    $sync = [$connection, 'syncBoards'];
                     $result = $sync();
                     break;
 
@@ -185,46 +142,28 @@ final class ChannelConnectionEndpoint
     private static function connectionFor(
         PDO $pdo,
         string $channel
-    ): ChannelAuthContract {
-        $channel = strtolower(
-            trim($channel)
-        );
+    ): ChannelConnectionContract {
+        $channel = strtolower(trim($channel));
 
         return match ($channel) {
-            'pinterest' =>
-                new PinterestConnectionService(
-                    $pdo
-                ),
+            'pinterest' => new PinterestConnectionService($pdo),
+            'youtube' => new YouTubeAuthService($pdo),
 
-            'youtube' =>
-                new YouTubeAuthService(
-                    $pdo
-                ),
-
-            default =>
-                throw new RuntimeException(
-                    "PUB has no connection service registered for channel '{$channel}'."
-                ),
+            default => throw new RuntimeException(
+                "PUB has no connection service registered for channel '{$channel}'."
+            ),
         };
     }
 
     private static function requestJson(): array
     {
-        $raw = file_get_contents(
-            'php://input'
-        );
+        $raw = file_get_contents('php://input');
 
-        if (
-            $raw === false
-            || trim($raw) === ''
-        ) {
+        if ($raw === false || trim($raw) === '') {
             return [];
         }
 
-        $decoded = json_decode(
-            $raw,
-            true
-        );
+        $decoded = json_decode($raw, true);
 
         if (!is_array($decoded)) {
             throw new RuntimeException(
@@ -239,20 +178,15 @@ final class ChannelConnectionEndpoint
         int $status,
         array $payload
     ): void {
-        http_response_code(
-            $status
-        );
+        http_response_code($status);
 
         if (!headers_sent()) {
-            header(
-                'Content-Type: application/json; charset=UTF-8'
-            );
+            header('Content-Type: application/json; charset=UTF-8');
         }
 
         echo json_encode(
             $payload,
-            JSON_UNESCAPED_SLASHES
-            | JSON_UNESCAPED_UNICODE
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
         );
     }
 }

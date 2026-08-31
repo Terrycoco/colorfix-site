@@ -31,6 +31,10 @@ const PINTEREST_CONNECT_URL =
   `${API_FOLDER}/v2/admin/pub/pinterest-oauth-start.php`;
 
 
+const YOUTUBE_CONNECT_URL =
+  `${API_FOLDER}/v2/admin/pub/youtube-oauth-start.php`;
+
+
 export default function PubDispatchTable() {
   const [
     assets,
@@ -122,6 +126,21 @@ export default function PubDispatchTable() {
   const [
     connectionAction,
     setConnectionAction,
+  ] = useState("");
+
+  const [
+    youtubeConnection,
+    setYoutubeConnection,
+  ] = useState(null);
+
+  const [
+    youtubeConnectionLoading,
+    setYoutubeConnectionLoading,
+  ] = useState(true);
+
+  const [
+    youtubeConnectionAction,
+    setYoutubeConnectionAction,
   ] = useState("");
 
 
@@ -383,6 +402,65 @@ export default function PubDispatchTable() {
   }
 
 
+  async function loadYoutubeConnection() {
+    setYoutubeConnectionLoading(
+      true
+    );
+
+    try {
+      const params =
+        new URLSearchParams({
+          channel:
+            "youtube",
+
+          _:
+            String(
+              Date.now()
+            ),
+        });
+
+      const res =
+        await fetch(
+          `${CONNECTION_URL}?${params.toString()}`,
+          {
+            credentials:
+              "include",
+          }
+        );
+
+      const data =
+        await res.json();
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          "Failed to load YouTube connection."
+        );
+      }
+
+      setYoutubeConnection(
+        data.item ||
+        null
+      );
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Failed to load YouTube connection."
+      );
+
+    } finally {
+      setYoutubeConnectionLoading(
+        false
+      );
+    }
+  }
+
+
   async function runConnectionAction(
     action
   ) {
@@ -487,6 +565,89 @@ export default function PubDispatchTable() {
   }
 
 
+  async function runYoutubeConnectionAction(
+    action
+  ) {
+    setYoutubeConnectionAction(
+      action
+    );
+
+    setError(
+      ""
+    );
+
+    setStatusMessage(
+      ""
+    );
+
+    try {
+      const res =
+        await fetch(
+          CONNECTION_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                channel:
+                  "youtube",
+
+                action,
+              }),
+          }
+        );
+
+      const data =
+        await res.json();
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          `YouTube ${action} failed.`
+        );
+      }
+
+      if (
+        action ===
+        "test"
+      ) {
+        setStatusMessage(
+          data
+            ?.item
+            ?.message ||
+          "YouTube connection test passed."
+        );
+      }
+
+      await loadYoutubeConnection();
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        `YouTube ${action} failed.`
+      );
+
+    } finally {
+      setYoutubeConnectionAction(
+        ""
+      );
+    }
+  }
+
+
   useEffect(() => {
     loadAssets();
   }, [
@@ -548,20 +709,26 @@ export default function PubDispatchTable() {
   useEffect(() => {
     loadFilters();
     loadPinterestConnection();
+    loadYoutubeConnection();
 
 
     /*
      * OAuth returns to the admin app with the result in the query.
-     * If the operator later clicks Dispatch, surface that result here.
+     * Surface either Pinterest or YouTube status here.
      */
     const params =
       new URLSearchParams(
         window.location.search
       );
 
-    const authStatus =
+    const pinterestAuthStatus =
       params.get(
         "pinterest_auth"
+      );
+
+    const youtubeAuthStatus =
+      params.get(
+        "youtube_auth"
       );
 
     const message =
@@ -570,9 +737,9 @@ export default function PubDispatchTable() {
       );
 
 
-    if (authStatus) {
+    if (pinterestAuthStatus) {
       if (
-        authStatus ===
+        pinterestAuthStatus ===
         "connected"
       ) {
         setStatusMessage(
@@ -583,13 +750,46 @@ export default function PubDispatchTable() {
       } else {
         setError(
           message ||
-          `Pinterest OAuth ${authStatus}.`
+          `Pinterest OAuth ${pinterestAuthStatus}.`
         );
       }
+    }
 
 
+    if (youtubeAuthStatus) {
+      setChannelFilter(
+        "youtube"
+      );
+
+      if (
+        youtubeAuthStatus ===
+        "connected"
+      ) {
+        setStatusMessage(
+          message ||
+          "YouTube connected."
+        );
+
+      } else {
+        setError(
+          message ||
+          `YouTube OAuth ${youtubeAuthStatus}.`
+        );
+      }
+    }
+
+
+    if (
+      pinterestAuthStatus
+      ||
+      youtubeAuthStatus
+    ) {
       params.delete(
         "pinterest_auth"
+      );
+
+      params.delete(
+        "youtube_auth"
       );
 
       params.delete(
@@ -1205,6 +1405,23 @@ export default function PubDispatchTable() {
     pinterestStatus ===
       "connected";
 
+  const youtubeStatus =
+    String(
+      youtubeConnection
+        ?.channel
+        ?.status ||
+      youtubeConnection
+        ?.auth
+        ?.status ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const youtubeConnected =
+    youtubeStatus ===
+      "connected";
+
   const productionBoard =
     pinterestConnection
       ?.destinations
@@ -1274,175 +1491,6 @@ export default function PubDispatchTable() {
           workbenchMainStyle
         }
       >
-        <section
-          style={
-            connectionPanelStyle
-          }
-
-          aria-label="Pinterest connection"
-        >
-          <div
-            style={
-              connectionHeadingStyle
-            }
-          >
-            <div>
-              <div
-                style={
-                  connectionTitleStyle
-                }
-              >
-                Pinterest
-              </div>
-
-              <div
-                style={
-                  connectionMetaStyle
-                }
-              >
-                Connection:{" "}
-                <strong>
-                  {
-                    connectionLoading
-                      ? "Checking..."
-                      : pinterestConnected
-                        ? "Connected ✓"
-                        : "Not connected"
-                  }
-                </strong>
-
-                {" · "}
-
-                Production board:{" "}
-                <strong>
-                  {
-                    productionBoard
-                      ?.board_name ||
-                    "ColorFix Makeovers"
-                  }
-                </strong>
-
-                {
-                  productionBoard
-                    ?.board_id
-                    ? ` · ${productionBoard.board_id}`
-                    : ""
-                }
-              </div>
-            </div>
-
-
-            <div
-              style={
-                connectionActionsStyle
-              }
-            >
-              <button
-                type="button"
-
-                onClick={() =>
-                  runConnectionAction(
-                    "test"
-                  )
-                }
-
-                disabled={
-                  connectionAction !==
-                    ""
-                  ||
-                  !pinterestConnected
-                }
-              >
-                {
-                  connectionAction ===
-                    "test"
-                    ? "Testing..."
-                    : "Test Connection"
-                }
-              </button>
-
-
-              <a
-                href={
-                  `${PINTEREST_CONNECT_URL}?return=${encodeURIComponent("/admin/pub")}`
-                }
-
-                style={
-                  linkButtonStyle
-                }
-              >
-                {
-                  pinterestConnected
-                    ? "Reconnect"
-                    : "Connect"
-                }
-              </a>
-
-
-              <button
-                type="button"
-
-                onClick={() =>
-                  runConnectionAction(
-                    "sync"
-                  )
-                }
-
-                disabled={
-                  connectionAction !==
-                    ""
-                  ||
-                  !pinterestConnected
-                }
-              >
-                {
-                  connectionAction ===
-                    "sync"
-                    ? "Syncing..."
-                    : "Sync Boards"
-                }
-              </button>
-
-
-              <button
-                type="button"
-
-                onClick={
-                  loadPinterestConnection
-                }
-
-                disabled={
-                  connectionLoading
-                }
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-
-
-          {
-            pinterestConnection
-              ?.auth
-              ?.last_auth_error
-              ? (
-                  <div
-                    style={
-                      connectionErrorStyle
-                    }
-                  >
-                    {
-                      pinterestConnection
-                        .auth
-                        .last_auth_error
-                    }
-                  </div>
-                )
-              : null
-          }
-        </section>
-
-
         <div
           style={
             filterBarStyle
@@ -1594,7 +1642,6 @@ export default function PubDispatchTable() {
             onClick={() => {
               loadAssets();
               loadFilters();
-              loadPinterestConnection();
             }}
 
             disabled={
@@ -1607,8 +1654,8 @@ export default function PubDispatchTable() {
           >
             {
               loading
-                ? "Refreshing..."
-                : "Refresh"
+                ? "Refreshing Assets..."
+                : "Refresh Assets"
             }
           </button>
 
@@ -1626,6 +1673,334 @@ export default function PubDispatchTable() {
             }
           </div>
         </div>
+
+
+
+        {channelFilter === "pinterest" ? (
+        <section
+          style={
+            connectionPanelStyle
+          }
+
+          aria-label="Pinterest connection"
+        >
+          <div
+            style={
+              connectionHeadingStyle
+            }
+          >
+            <div>
+              <div
+                style={
+                  connectionTitleStyle
+                }
+              >
+                Pinterest
+              </div>
+
+              <div
+                style={
+                  connectionMetaStyle
+                }
+              >
+                Connection:{" "}
+                <strong>
+                  {
+                    connectionLoading
+                      ? "Checking..."
+                      : pinterestConnected
+                        ? "Connected ✓"
+                        : "Not connected"
+                  }
+                </strong>
+
+                {" · "}
+
+                Production board:{" "}
+                <strong>
+                  {
+                    productionBoard
+                      ?.board_name ||
+                    "ColorFix Makeovers"
+                  }
+                </strong>
+
+                {
+                  productionBoard
+                    ?.board_id
+                    ? ` · ${productionBoard.board_id}`
+                    : ""
+                }
+              </div>
+            </div>
+
+
+            <div
+              style={
+                connectionActionsStyle
+              }
+            >
+              <button
+                type="button"
+
+                onClick={() =>
+                  runConnectionAction(
+                    "test"
+                  )
+                }
+
+                disabled={
+                  connectionAction !==
+                    ""
+                  ||
+                  !pinterestConnected
+                }
+              >
+                {
+                  connectionAction ===
+                    "test"
+                    ? "Testing..."
+                    : "Test Pinterest Connection"
+                }
+              </button>
+
+
+              <a
+                href={
+                  `${PINTEREST_CONNECT_URL}?return=${encodeURIComponent("/admin/pub")}`
+                }
+
+                style={
+                  linkButtonStyle
+                }
+              >
+                {
+                  pinterestConnected
+                    ? "Reconnect Pinterest"
+                    : "Connect Pinterest"
+                }
+              </a>
+
+
+              <button
+                type="button"
+
+                onClick={() =>
+                  runConnectionAction(
+                    "sync"
+                  )
+                }
+
+                disabled={
+                  connectionAction !==
+                    ""
+                  ||
+                  !pinterestConnected
+                }
+              >
+                {
+                  connectionAction ===
+                    "sync"
+                    ? "Syncing..."
+                    : "Sync Pinterest Boards"
+                }
+              </button>
+
+
+              <button
+                type="button"
+
+                onClick={
+                  loadPinterestConnection
+                }
+
+                disabled={
+                  connectionLoading
+                }
+              >
+                Refresh Pinterest
+              </button>
+            </div>
+          </div>
+
+
+          {
+            pinterestConnection
+              ?.auth
+              ?.last_auth_error
+              ? (
+                  <div
+                    style={
+                      connectionErrorStyle
+                    }
+                  >
+                    {
+                      pinterestConnection
+                        .auth
+                        .last_auth_error
+                    }
+                  </div>
+                )
+              : null
+          }
+        </section>
+
+
+        ) : null}
+
+
+        {channelFilter === "youtube" ? (
+          <section
+            style={
+              connectionPanelStyle
+            }
+
+            aria-label="YouTube connection"
+          >
+            <div
+              style={
+                connectionHeadingStyle
+              }
+            >
+              <div>
+                <div
+                  style={
+                    connectionTitleStyle
+                  }
+                >
+                  YouTube
+                </div>
+
+                <div
+                  style={
+                    connectionMetaStyle
+                  }
+                >
+                  Connection:{" "}
+                  <strong>
+                    {
+                      youtubeConnectionLoading
+                        ? "Checking..."
+                        : youtubeConnected
+                          ? "Connected ✓"
+                          : "Not connected"
+                    }
+                  </strong>
+
+                  {Array.isArray(
+                    youtubeConnection
+                      ?.scopes_requested
+                  )
+                    && youtubeConnection
+                      .scopes_requested
+                      .length
+                    ? (
+                        <>
+                          {" · "}
+                          Scope:{" "}
+                          <strong>
+                            {
+                              youtubeConnection
+                                .scopes_requested
+                                .join(", ")
+                            }
+                          </strong>
+                        </>
+                      )
+                    : null}
+                </div>
+              </div>
+
+
+              <div
+                style={
+                  connectionActionsStyle
+                }
+              >
+                <button
+                  type="button"
+
+                  onClick={() =>
+                    runYoutubeConnectionAction(
+                      "test"
+                    )
+                  }
+
+                  disabled={
+                    youtubeConnectionAction !==
+                      ""
+                    ||
+                    !youtubeConnected
+                  }
+                >
+                  {
+                    youtubeConnectionAction ===
+                      "test"
+                      ? "Testing..."
+                      : "Test YouTube Connection"
+                  }
+                </button>
+
+
+                <a
+                  href={
+                    `${YOUTUBE_CONNECT_URL}?return=${encodeURIComponent("/admin/pub?stage=dispatch")}`
+                  }
+
+                  style={
+                    linkButtonStyle
+                  }
+                >
+                  {
+                    youtubeConnected
+                      ? "Reconnect YouTube"
+                      : "Connect YouTube"
+                  }
+                </a>
+
+
+                <button
+                  type="button"
+
+                  onClick={
+                    loadYoutubeConnection
+                  }
+
+                  disabled={
+                    youtubeConnectionLoading
+                  }
+                >
+                  {
+                    youtubeConnectionLoading
+                      ? "Refreshing YouTube..."
+                      : "Refresh YouTube"
+                  }
+                </button>
+              </div>
+            </div>
+
+
+            {
+              youtubeConnection
+                ?.auth
+                ?.last_auth_error
+                ? (
+                    <div
+                      style={
+                        connectionErrorStyle
+                      }
+                    >
+                      {
+                        youtubeConnection
+                          .auth
+                          .last_auth_error
+                      }
+                    </div>
+                  )
+                : null
+            }
+          </section>
+        ) : null}
 
 
         {error ? (
@@ -1860,7 +2235,7 @@ const workbenchMainStyle = {
 
 const connectionPanelStyle = {
   marginTop:
-    14,
+    0,
 
   padding:
     12,

@@ -5,22 +5,27 @@ export default function PrivacyPage() {
     <main className="privacy-page">
       <article className="privacy-policy">
         <h1>ColorFix by Terry Privacy Policy</h1>
+
         <p>
           ColorFix by Terry is a personal color and design website operated by Terry Marr.
         </p>
 
         <h3>Information We Collect</h3>
+
         <p>
           When visitors use ColorFix, we may collect basic usage information, including page
           views, playlist views, referral/source information, and playlist engagement activity.
         </p>
+
         <p>
           If a visitor submits a message through the site, we may collect the name, email
           address, and message they provide.
         </p>
 
         <h3>How We Use Information</h3>
+
         <p>We use this information to:</p>
+
         <ul>
           <li>Respond to visitor messages</li>
           <li>Improve the website</li>
@@ -30,24 +35,86 @@ export default function PrivacyPage() {
         </ul>
 
         <h3>Pinterest Publishing</h3>
+
         <p>
           ColorFix may use Pinterest&apos;s API to publish Pins from generated ColorFix images
           and related ColorFix content to Terry Marr&apos;s Pinterest account.
         </p>
+
         <p>
           ColorFix does not scrape Pinterest, post on behalf of other Pinterest users, or sell
           Pinterest data. Any Pinterest API access is used only to connect ColorFix content with
           Terry Marr&apos;s Pinterest account and publish original ColorFix materials.
         </p>
 
+        <h3>YouTube Publishing and Google API Services</h3>
+
+        <p>
+          ColorFix uses the YouTube Data API to upload ColorFix-owned videos, titles,
+          descriptions, and thumbnails to the ColorFix by Terry YouTube channel. Access to
+          YouTube is authorized through Google OAuth 2.0 and is used only for ColorFix&apos;s
+          own publishing activity.
+        </p>
+
+        <p>
+          ColorFix does not sell, share, or provide third parties with Google user data.
+          ColorFix does not allow outside users to connect their YouTube accounts or publish
+          content through ColorFix PUB.
+        </p>
+
+        <p>
+          Use of information received from Google APIs will adhere to the{" "}
+          <a
+            href="https://developers.google.com/terms/api-services-user-data-policy"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google API Services User Data Policy
+          </a>
+          . Google&apos;s{" "}
+          <a
+            href="https://policies.google.com/privacy"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Privacy Policy
+          </a>{" "}
+          is also available online.
+        </p>
+
+        <p>
+          YouTube access may be revoked at any time through the user&apos;s{" "}
+          <a
+            href="https://myaccount.google.com/permissions"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Google Account permissions
+          </a>
+          . Revoking access prevents ColorFix from making further authenticated YouTube API
+          requests.
+        </p>
+
+        <p>
+          Stored Google OAuth authorization credentials may also be deleted upon request by
+          contacting Terry Marr at{" "}
+          <a href="mailto:terry@terrymarr.com">
+            terry@terrymarr.com
+          </a>
+          .
+        </p>
+
         <h3>Cookies and Analytics</h3>
+
         <p>
           ColorFix may use basic cookies, server logs, or analytics-style tracking to measure
           site usage, referral sources, playlist views, and engagement.
         </p>
 
         <h3>Data Sharing</h3>
+
         <p>ColorFix does not sell personal information.</p>
+
         <p>
           Information may be processed by hosting providers, analytics tools, or connected
           services necessary to operate the website, publish content, maintain the site, or
@@ -55,21 +122,24 @@ export default function PrivacyPage() {
         </p>
 
         <h3>Contact</h3>
+
         <p>
           For privacy questions, contact Terry Marr through the ColorFix contact form or by
-          email at <a href="mailto:terry@terrymarr.com">terry@terrymarr.com</a>.
+          email at{" "}
+          <a href="mailto:terry@terrymarr.com">
+            terry@terrymarr.com
+          </a>
+          .
         </p>
 
         <h3>Last Updated</h3>
-        <p>June 2026</p>
 
-      <div className="page-home-link">
-  <a href="/">← Return to ColorFix</a>
-</div>
+        <p>August 2026</p>
 
+        <div className="page-home-link">
+          <a href="/">← Return to ColorFix</a>
+        </div>
       </article>
-
-
     </main>
   );
 }

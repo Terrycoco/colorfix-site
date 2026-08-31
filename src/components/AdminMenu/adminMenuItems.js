@@ -12,6 +12,16 @@ export const adminMenuItems = [
       { label: "LRV Editor", href: "/admin/lrv-editor" },
     ],
   },
+
+  {
+    label: "REX",
+    items: [
+      { label: "REX Reservations", href: "/admin/rex" },
+      {label: "REX Relationships", href: "/admin/rexrelationships"},
+ 
+    ],
+  },
+
   {
     label: "Library",
     items: [

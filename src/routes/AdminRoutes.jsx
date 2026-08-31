@@ -69,9 +69,14 @@ const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
  const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalyticsPage'));
- const AdminRexPage = lazy(() => import('@pages/AdminRexPage'));
+
+ const RexReservations = lazy(() => import('@REX/Reservations'));
+ const RexRelationships = lazy(() => import("@REX/Relationships"));
+
+
 const AdminPubPage = lazy(() => import("@pages/AdminPubPage"));
 const Marketing = lazy(() => import("@components/Marketing/MarketingWorkspace"));
+
 
 
 function renderWithSuspense(Component, label) {
@@ -176,9 +181,11 @@ export default function AdminRoutes() {
         <Route path="playlists/new" element={renderWithSuspense(AdminPlaylistEditorPage, 'Loading playlist editor...')} />
         <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
        <Route path="analytics" element={renderWithSuspense(AdminAnalyticsPage, 'Loading analytics...')}/>
-       <Route path="rex" element={renderWithSuspense(AdminRexPage, 'Loading REX...')}/>
+  
         <Route path="pub" element={renderWithSuspense(AdminPubPage, "Loading PUB...")}/>
           <Route path="marketing" element={renderWithSuspense(Marketing, "Loading Mark...")}/>
+        <Route path="rex" element={renderWithSuspense(RexReservations, 'Loading REX...')}/>
+          <Route path="rexrelationships" element={renderWithSuspense(RexRelationships, "Loading REX...")}/>  
       </Route>
     </Routes>
   );

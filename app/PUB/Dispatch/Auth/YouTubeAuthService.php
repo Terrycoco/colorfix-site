@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PUB\Dispatch\Auth;
 
 use App\Lib\SecretBox;
+use App\PUB\Dispatch\ChannelConnectionContract;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -25,7 +26,7 @@ use Throwable;
  *
  * Does NOT know how to upload a video, thumbnail, or publish to YouTube.
  */
-final class YouTubeAuthService implements ChannelAuthContract
+final class YouTubeAuthService implements ChannelAuthContract, ChannelConnectionContract
 {
     private PdoPubChannelAuthRepository $authRepo;
     private SecretBox $secretBox;

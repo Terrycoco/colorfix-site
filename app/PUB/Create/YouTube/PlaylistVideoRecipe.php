@@ -44,6 +44,7 @@ final class PlaylistVideoRecipe
     public const HEIGHT = 1080;
     public const FPS = 30;
 
+
     /*
      * ================================================================
      * TIMING — milliseconds
@@ -179,6 +180,7 @@ final class PlaylistVideoRecipe
      * zero on the final frame.
      */
     public const MUSIC_FADE_OUT_MS = 3000;
+
     public const DEFAULT_MUSIC_VOLUME = 0.20;
 
 
@@ -234,7 +236,7 @@ final class PlaylistVideoRecipe
     public const THUMBNAIL_TITLE_FONT_SIZE = 68;
     public const THUMBNAIL_TITLE_MIN_FONT_SIZE = 48;
     public const THUMBNAIL_TITLE_MAX_LINES = 3;
-    public const THUMBNAIL_LINE_GAP = 14;
+    public const THUMBNAIL_LINE_GAP = 24;
 
     /*
      * Current tuned placement from the visual pass.
@@ -284,15 +286,15 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
      * Title/subtitle/body remain separate recipe knobs even while the
      * current generic oven may need to realize them as separate layers.
      */
-    public const CAPTION_TITLE_FONT_SIZE = 40;
-    public const CAPTION_TITLE_FONT_WEIGHT = 500;
+    public const CAPTION_TITLE_FONT_SIZE = 52;
+    public const CAPTION_TITLE_FONT_WEIGHT = 700;
     public const CAPTION_TITLE_LINE_HEIGHT = 1.25;
 
-    public const CAPTION_SUBTITLE_FONT_SIZE = 23;
+    public const CAPTION_SUBTITLE_FONT_SIZE = 36;
     public const CAPTION_SUBTITLE_FONT_WEIGHT = 400;
     public const CAPTION_SUBTITLE_LINE_HEIGHT = 1.30;
 
-    public const CAPTION_BODY_FONT_SIZE = 23;
+    public const CAPTION_BODY_FONT_SIZE = 36;
     public const CAPTION_BODY_FONT_WEIGHT = 400;
     public const CAPTION_BODY_LINE_HEIGHT = 1.35;
 

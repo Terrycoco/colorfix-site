@@ -114,4 +114,12 @@ interface RexReservationRepositoryInterface
     ): array;
 
 
+public function setFallbackRexId(
+    int $reservationId,
+    ?int $fallbackRexId,
+): RexReservation;
+
+
+
+
 }

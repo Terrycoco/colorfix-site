@@ -363,6 +363,14 @@ const GalleryPage = ({ defaultQueryId = null }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meta?.item_type, isSwatch]);
 
+  const isPublicFrontPage =
+    Number(effectiveQueryId) === FRONT_PAGE_QUERY_ID &&
+    isPrebuiltFrontPageRequest(
+      Number(effectiveQueryId),
+      paramObj
+    ) &&
+    getFrontPageVariant() === "public";
+
   const isFrontPageDesktop = Number(effectiveQueryId) === FRONT_PAGE_QUERY_ID && !isMobile;
   const galleryBreakpointCols = isFrontPageDesktop
     ? { default: 3, 1200: 3, 800: 2, 500: 2 }
@@ -447,6 +455,75 @@ const GalleryPage = ({ defaultQueryId = null }) => {
           </div>
         );
       })()}
+
+      {isPublicFrontPage ? (
+        <footer
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+            gap: "8px",
+            margin: "32px auto 0",
+            padding: "0 16px 24px",
+            color: "#4b5563",
+            fontSize: "14px",
+            textAlign: "center",
+          }}
+        >
+          <span>
+            ColorFix by Terry — Home color transformations by Terry Marr
+          </span>
+
+          <span aria-hidden="true">·</span>
+
+          <a
+            href="/privacy"
+            style={{
+              color: "inherit",
+              textDecoration: "underline",
+            }}
+          >
+            Privacy Policy
+          </a>
+
+          <span aria-hidden="true">·</span>
+
+          <a
+            href="/terms"
+            style={{
+              color: "inherit",
+              textDecoration: "underline",
+            }}
+          >
+            Terms of Service
+          </a>
+
+          <span aria-hidden="true">·</span>
+
+          <a
+            href="https://www.youtube.com/@ColorFixByTerry"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="ColorFix by Terry on YouTube"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            <img
+              src="/images/youtube-logo.png"
+              alt="YouTube"
+              style={{
+                display: "block",
+                width: "78px",
+                height: "auto",
+              }}
+            />
+          </a>
+        </footer>
+      ) : null}
+
       {showBackToTop && (
         <button
           type="button"

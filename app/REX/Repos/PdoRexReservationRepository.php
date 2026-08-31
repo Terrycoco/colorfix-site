@@ -394,6 +394,26 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         return $this->requireReservation($request->reservationId);
     }
 
+
+   public function setFallbackRexId(
+    int $reservationId,
+    ?int $fallbackRexId,
+): RexReservation {
+    $stmt = $this->pdo->prepare(
+        "UPDATE rex_reservations
+            SET fallback_rex_id = :fallback_rex_id,
+                updated_at = NOW()
+          WHERE id = :id"
+    );
+
+    $stmt->execute([
+        ':id' => $reservationId,
+        ':fallback_rex_id' => $fallbackRexId,
+    ]);
+
+    return $this->requireReservation($reservationId);
+}
+
     public function revoke(int $reservationId): RexReservation
     {
         $stmt = $this->pdo->prepare(
@@ -645,8 +665,11 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
             status: (string)$row['status'],
             revokedAt: $row['revoked_at'] !== null ? (string)$row['revoked_at'] : null,
             createdAt: $row['created_at'] !== null ? (string)$row['created_at'] : null,
-            updatedAt: $row['updated_at'] !== null ? (string)$row['updated_at'] : null,
-        );
+updatedAt: $row['updated_at'] !== null ? (string)$row['updated_at'] : null,
+fallbackRexId: isset($row['fallback_rex_id']) && $row['fallback_rex_id'] !== null
+    ? (int)$row['fallback_rex_id']
+    : null,
+);
     }
 
     private function rowToAlias(array $row): RexAlias

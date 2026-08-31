@@ -57,17 +57,26 @@ final class RexResolver
             return $resolver->describe($reservation);
         }
 
-    private function resolveReservation(
-        RexReservation $reservation,
-        string $matchedBy,
-        string $lookupValue,
-        array $requestMetadata
-    ): RexResolutionResult {
+private function resolveReservation(
+    RexReservation $reservation,
+    string $matchedBy,
+    string $lookupValue,
+    array $requestMetadata,
+    array $visited = [],
+): RexResolutionResult {
+    if (isset($visited[$reservation->id])) {
+        throw new RuntimeException('REX fallback cycle detected.');
+    }
+
+    $visited[$reservation->id] = true;
+
+    try {
         if ($reservation->status !== RexReserver::STATUS_ACTIVE || $reservation->revokedAt !== null) {
             throw new RuntimeException('REX reservation is not active.');
         }
 
         $resolver = $this->registry->get($reservation->resolverKey);
+
         return $resolver->resolve(new RexResolutionRequest(
             reservation: $reservation,
             matchedBy: $matchedBy,
@@ -77,7 +86,30 @@ final class RexResolver
             context: $reservation->context,
             requestMetadata: $requestMetadata,
         ));
+    } catch (RuntimeException $e) {
+        if ($reservation->fallbackRexId === null) {
+            throw $e;
+        }
+
+        $fallback = $this->reservations->findById($reservation->fallbackRexId);
+
+        if (!$fallback) {
+            throw new RuntimeException(
+                'REX fallback reservation was not found.',
+                0,
+                $e
+            );
+        }
+
+        return $this->resolveReservation(
+            $fallback,
+            $matchedBy,
+            $lookupValue,
+            $requestMetadata,
+            $visited,
+        );
     }
+}
 
     public function previewDescribe(
         string $resolverKey,

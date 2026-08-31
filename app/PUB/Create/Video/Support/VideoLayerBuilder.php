@@ -847,60 +847,331 @@ final class VideoLayerBuilder
                 : [];
 
 
+        $subtitleStyle =
+            is_array(
+                $caption[
+                    'subtitle_style'
+                ]
+                ?? null
+            )
+                ? $caption[
+                    'subtitle_style'
+                ]
+                : [];
+
+
+        $bodyStyle =
+            is_array(
+                $caption[
+                    'body_style'
+                ]
+                ?? null
+            )
+                ? $caption[
+                    'body_style'
+                ]
+                : [];
+
+
         /*
-         * GenericVideo currently has a primitive text layer rather than a
-         * rich-text component. Keep the established first-pass caption
-         * treatment: joined copy in one box, using the title typography.
-         * The neutral blueprint retains the richer distinctions so a future
-         * oven/translator can render them without changing the Chef.
+         * PHOTO CAPTION PIECES
+         *
+         * The Chef already supplied independent title/subtitle/body
+         * typography. Preserve those pieces all the way to the oven.
+         *
+         * Title is intentionally one line. Subtitle/body may wrap.
          */
-        $fontSize =
-            $this->positiveNumber(
-                $titleStyle[
-                    'font_size_px'
-                ]
-                ?? 34,
-                'caption.title_style.font_size_px'
+        $captionPieces = [];
+
+
+        foreach (
+            [
+                'title' => $titleStyle,
+                'subtitle' => $subtitleStyle,
+                'body' => $bodyStyle,
+            ]
+            as $pieceKey => $pieceStyle
+        ) {
+            $pieceText =
+                trim(
+                    (string)(
+                        $caption[
+                            $pieceKey
+                        ]
+                        ?? ''
+                    )
+                );
+
+
+            if ($pieceText === '') {
+                continue;
+            }
+
+
+            $pieceFontSize =
+                $this->positiveNumber(
+                    $pieceStyle[
+                        'font_size_px'
+                    ]
+                    ?? (
+                        $pieceKey === 'title'
+                            ? 34
+                            : 23
+                    ),
+                    "caption.{$pieceKey}_style.font_size_px"
+                );
+
+            $pieceFontWeight =
+                $this->positiveNumber(
+                    $pieceStyle[
+                        'font_weight'
+                    ]
+                    ?? (
+                        $pieceKey === 'title'
+                            ? 600
+                            : 400
+                    ),
+                    "caption.{$pieceKey}_style.font_weight"
+                );
+
+            $pieceLineHeight =
+                $this->positiveNumber(
+                    $pieceStyle[
+                        'line_height'
+                    ]
+                    ?? 1.25,
+                    "caption.{$pieceKey}_style.line_height"
+                );
+
+
+            $captionPieces[] = [
+                'key' =>
+                    $pieceKey,
+
+                'text' =>
+                    $pieceText,
+
+                'font_size' =>
+                    $pieceFontSize,
+
+                'font_weight' =>
+                    $pieceFontWeight,
+
+                'line_height' =>
+                    $pieceLineHeight,
+            ];
+        }
+
+
+        if ($captionPieces === []) {
+            return $layers;
+        }
+
+
+        $captionOuterMaxWidth =
+            min(
+                $maxWidth,
+                max(
+                    1,
+                    $width
+                    - $left
+                )
             );
 
-        $fontWeight =
-            $this->positiveNumber(
-                $titleStyle[
-                    'font_weight'
-                ]
-                ?? 500,
-                'caption.title_style.font_weight'
+        $captionInnerMaxWidth =
+            max(
+                1,
+                $captionOuterMaxWidth
+                - (
+                    $paddingX
+                    * 2
+                )
             );
 
-        $lineHeight =
-            $this->positiveNumber(
-                $titleStyle[
-                    'line_height'
-                ]
-                ?? 1.25,
-                'caption.title_style.line_height'
-            );
 
+        /*
+         * CAPTION STACK MEASUREMENT
+         *
+         * Title/subtitle/body keep independent typography, but they share
+         * ONE backing rectangle whose width is the largest required by any
+         * visible piece. The backing height is only the actual text stack
+         * plus ONE outer padding allowance.
+         *
+         * This avoids:
+         *   - mismatched backing widths
+         *   - double vertical padding between title/subtitle
+         *   - phantom spare lines
+         */
+        $measuredPieces =
+            [];
+
+        $captionContentWidth =
+            1;
+
+
+        /*
+         * Pass 1: find the largest natural piece width, capped by Recipe max.
+         */
+        foreach (
+            $captionPieces
+            as $piece
+        ) {
+            $longestLineChars =
+                1;
+
+
+            foreach (
+                preg_split(
+                    '/\R/u',
+                    (string)$piece[
+                        'text'
+                    ]
+                )
+                    ?: [
+                        (string)$piece[
+                            'text'
+                        ],
+                    ]
+                as $line
+            ) {
+                $longestLineChars =
+                    max(
+                        $longestLineChars,
+                        $this->textLength(
+                            $line
+                        )
+                    );
+            }
+
+
+            $naturalContentWidth =
+                max(
+                    1,
+                    (int)ceil(
+                        $longestLineChars
+                        * (float)$piece[
+                            'font_size'
+                        ]
+                        * 0.56
+                    )
+                );
+
+
+            $captionContentWidth =
+                max(
+                    $captionContentWidth,
+                    min(
+                        $captionInnerMaxWidth,
+                        $naturalContentWidth
+                    )
+                );
+        }
+
+
+        /*
+         * Pass 2: measure each piece at that shared content width.
+         * Title remains one line; subtitle/body may wrap.
+         */
+        $captionTextHeight =
+            0;
+
+        $captionPieceGap =
+            0;
+
+
+        foreach (
+            $captionPieces
+            as $piece
+        ) {
+            $pieceTextHeight =
+                $piece[
+                    'key'
+                ] === 'title'
+                    ? max(
+                        1,
+                        (int)ceil(
+                            (float)$piece[
+                                'font_size'
+                            ]
+                            * (float)$piece[
+                                'line_height'
+                            ]
+                        )
+                    )
+                    : $this->estimatedCaptionHeight(
+                        text:
+                            (string)$piece[
+                                'text'
+                            ],
+
+                        fontSize:
+                            (float)$piece[
+                                'font_size'
+                            ],
+
+                        lineHeight:
+                            (float)$piece[
+                                'line_height'
+                            ],
+
+                        maxWidth:
+                            $captionContentWidth,
+
+                        paddingX:
+                            0,
+
+                        paddingY:
+                            0
+                    );
+
+
+            $piece[
+                'text_height'
+            ] =
+                $pieceTextHeight;
+
+
+            $measuredPieces[] =
+                $piece;
+
+            $captionTextHeight +=
+                $pieceTextHeight;
+        }
+
+
+        $captionTextHeight +=
+            max(
+                0,
+                count(
+                    $measuredPieces
+                )
+                - 1
+            )
+            * $captionPieceGap;
+
+
+        $captionPieces =
+            $measuredPieces;
+
+
+        $captionWidth =
+            min(
+                $captionOuterMaxWidth,
+                $captionContentWidth
+                + (
+                    $paddingX
+                    * 2
+                )
+            );
 
         $captionHeight =
-            $this->estimatedCaptionHeight(
-                text:
-                    $captionText,
-
-                fontSize:
-                    $fontSize,
-
-                lineHeight:
-                    $lineHeight,
-
-                maxWidth:
-                    $maxWidth,
-
-                paddingX:
-                    $paddingX,
-
-                paddingY:
+            max(
+                1,
+                $captionTextHeight
+                + (
                     $paddingY
+                    * 2
+                )
             );
 
 
@@ -1038,14 +1309,17 @@ final class VideoLayerBuilder
         }
 
 
+        /*
+         * ONE SHARED BACKING
+         *
+         * Width is the largest of the visible title/subtitle/body pieces.
+         * Height is the actual text stack plus one outer padding allowance.
+         */
         $layers[] =
-            $tools->textLayer(
+            $tools->rectLayer(
                 id:
                     $sceneId
-                    . '-caption',
-
-                text:
-                    $captionText,
+                    . '-caption-background',
 
                 startFrame:
                     $startFrame,
@@ -1057,63 +1331,12 @@ final class VideoLayerBuilder
                     $tools->box(
                         $left,
                         $captionTop,
-                        min(
-                            $maxWidth,
-                            max(
-                                1,
-                                $width
-                                - $left
-                            )
-                        ),
+                        $captionWidth,
                         $captionHeight,
-                        $zBase + 5
+                        $zBase + 4
                     ),
 
                 style: [
-                    /*
-                     * Caption width is content-driven, capped by the
-                     * Recipe's max width. The generic numeric box remains
-                     * a safe fallback, while these renderer-level CSS
-                     * properties realize the neutral placement intent.
-                     *
-                     * Bottom anchoring is also resolved here so an auto-
-                     * height caption stays exactly the requested distance
-                     * from the bottom regardless of wrapping.
-                     */
-                    'display' =>
-                        'flex',
-
-                    'width' =>
-                        'fit-content',
-
-                    'maxWidth' =>
-                        min(
-                            $maxWidth,
-                            max(
-                                1,
-                                $width
-                                - $left
-                            )
-                        ),
-
-                    'height' =>
-                        'auto',
-
-                    'top' =>
-                        'auto',
-
-                    'bottom' =>
-                        $bottom,
-
-                    'alignItems' =>
-                        'center',
-
-                    'padding' =>
-                        $paddingY
-                        . 'px '
-                        . $paddingX
-                        . 'px',
-
                     'backgroundColor' =>
                         (string)(
                             $caption[
@@ -1122,34 +1345,6 @@ final class VideoLayerBuilder
                             ?? 'rgba(0, 0, 0, 0.45)'
                         ),
 
-                    'color' =>
-                        (string)(
-                            $caption[
-                                'color'
-                            ]
-                            ?? '#ffffff'
-                        ),
-
-                    'fontFamily' =>
-                        (string)(
-                            $caption[
-                                'font_family'
-                            ]
-                            ?? 'Arial, sans-serif'
-                        ),
-
-                    'fontSize' =>
-                        $fontSize,
-
-                    'fontWeight' =>
-                        $fontWeight,
-
-                    'lineHeight' =>
-                        $lineHeight,
-
-                    'whiteSpace' =>
-                        'pre-wrap',
-
                     'opacity' =>
                         0,
                 ],
@@ -1157,6 +1352,127 @@ final class VideoLayerBuilder
                 animations:
                     $captionAnimations
             );
+
+
+        /*
+         * Visible pieces stack tightly inside the one backing.
+         * There is no per-piece vertical padding between title/subtitle.
+         */
+        $pieceTop =
+            $captionTop
+            + $paddingY;
+
+
+        foreach (
+            $captionPieces
+            as $pieceIndex => $piece
+        ) {
+            $pieceTextHeight =
+                (int)$piece[
+                    'text_height'
+                ];
+
+
+            $layers[] =
+                $tools->textLayer(
+                    id:
+                        $sceneId
+                        . '-caption-'
+                        . $piece[
+                            'key'
+                        ],
+
+                    text:
+                        (string)$piece[
+                            'text'
+                        ],
+
+                    startFrame:
+                        $startFrame,
+
+                    endFrame:
+                        $endFrame,
+
+                    box:
+                        $tools->box(
+                            $left
+                            + $paddingX,
+                            $pieceTop,
+                            $captionContentWidth,
+                            $pieceTextHeight,
+                            $zBase
+                            + 5
+                            + $pieceIndex
+                        ),
+
+                    style: [
+                        'display' =>
+                            'flex',
+
+                        'alignItems' =>
+                            'flex-start',
+
+                        'justifyContent' =>
+                            'flex-start',
+
+                        'color' =>
+                            (string)(
+                                $caption[
+                                    'color'
+                                ]
+                                ?? '#ffffff'
+                            ),
+
+                        'fontFamily' =>
+                            (string)(
+                                $caption[
+                                    'font_family'
+                                ]
+                                ?? 'Arial, sans-serif'
+                            ),
+
+                        'fontSize' =>
+                            (float)$piece[
+                                'font_size'
+                            ],
+
+                        'fontWeight' =>
+                            (float)$piece[
+                                'font_weight'
+                            ],
+
+                        'lineHeight' =>
+                            (float)$piece[
+                                'line_height'
+                            ],
+
+                        'whiteSpace' =>
+                            $piece[
+                                'key'
+                            ] === 'title'
+                                ? 'nowrap'
+                                : 'pre-wrap',
+
+                        'overflowWrap' =>
+                            $piece[
+                                'key'
+                            ] === 'title'
+                                ? 'normal'
+                                : 'break-word',
+
+                        'opacity' =>
+                            0,
+                    ],
+
+                    animations:
+                        $captionAnimations
+                );
+
+
+            $pieceTop +=
+                $pieceTextHeight
+                + $captionPieceGap;
+        }
 
 
         return $layers;
