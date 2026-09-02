@@ -14,11 +14,13 @@ export const adminMenuItems = [
   },
 
   {
-    label: "REX",
+    label: "REX / PUB / ANA",
     items: [
-      { label: "REX Reservations", href: "/admin/rex" },
-      {label: "REX Relationships", href: "/admin/rexrelationships"},
- 
+        { label: "REX Reservations", href: "/admin/rex" },
+        { label: "REX Admin", href: "/admin/rexrelationships"},
+        { label: "PUB Admin", href: "/admin/pub" },
+        { label: "ANA Admin", href: "/admin/analytics" },
+   
     ],
   },
 
@@ -53,7 +55,6 @@ export const adminMenuItems = [
     items: [
       { label: "All Playlists", href: "/picker?psi=1", adminExitPath: "/admin/" },
       { label: "Playlists", href: "/admin/playlists" },
-      { label: "Playlist Instances", href: "/admin/playlist-instances" },
       { label: "Sets", href: "/admin/playlist-instance-sets" },
       { label: "Player Experiences", href: "/admin/player-experiences" },
       { label: "Kickers", href: "/admin/kickers" },
@@ -61,31 +62,25 @@ export const adminMenuItems = [
       { label: "CTA Pages", href: "/admin/cta-pages" },
     ],
   },
-  {
-    label: "Publishing",
-    items: [
-      { label: "PUB Admin", href: "/admin/pub" },
-      { label: "PUB Info", href: "/pub-info" },
-      { label: "Privacy Policy", href: "/privacy" },
-    ],
-  },
+ 
   {
     label: "Site",
     items: [
-      { label: "Articles", href: "/admin/articles" },
-      { label: "Gallery Builder", href: "/admin/sql" },
-      { label: "Gallery Items", href: "/admin/items" },
-      { label: "Search Presets", href: "/admin/search-presets" },
-      { label: "Hire Terry", href: "/hire-terry" },
+
+      { label: "Contact Terry", href: "/hire-terry" },
       { label: "QR Sheets", href: "/admin/qr-sheets" },
+      { label: "PUB Info", href: "/pub-info" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Terms", href:"/terms"},
     ],
   },
   {
     label: "Tools",
     items: [
-      { label: "Analytics", href: "/admin/analytics" },
+        { label: "Article Editor", href: "/admin/articles" },
+      { label: "Gallery Builder", href: "/admin/sql" },
+      { label: "Gallery Items", href: "/admin/items" },
       { label: "Ideas / To-Dos", href: "/admin/ideas" },
-      { label: "REX Conversion", href: "/admin/rex-conversion" },
       { label: "Photo Audit", href: "/admin/photo-library-tools" },
       { label: "Marketing", href: "/admin/marketing" },
     ],
