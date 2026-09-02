@@ -1,9 +1,10 @@
 // src/Router.jsx
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import { useEffect } from 'react';
-import { useAnalytics } from '@Analytics/useAnalytics';
 import App from './App.jsx';
+import ANAProvider from "@ANA/ANAProvider";
+import ANATrack from "@ANA/ANATrack";
 import MainLayout from '@layout/MainLayout';
 import ScrollToTop from '@layout/ScrollToTop';
 import PlayerPage from '@pages/PlayerPage';
@@ -53,6 +54,7 @@ function AppRouter() {
 
   return (
     <BrowserRouter basename="/">
+        <ANAProvider>
       <ScrollToTop smooth={true} ignoreWhenHash={true} />
 
       <Routes>
@@ -126,7 +128,7 @@ function AppRouter() {
           <Route element={<MainLayout />}>
             <Route index element={<HomeRedirect />} />
             <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
-            <Route path="results/:queryId" element={renderWithSuspense(GalleryPage, 'Loading results…')} />
+           <Route path="results/:queryId" element={<GalleryRoute />} />
             <Route path="color/:id" element={renderWithSuspense(ColorDetailPage, 'Loading color…')} />
             <Route path="sbs" element={renderWithSuspense(SideBySidePage, 'Loading comparison…')} />
             <Route path="my-palette" element={renderWithSuspense(MyPalettePage, 'Loading palette…')} />
@@ -147,30 +149,21 @@ function AppRouter() {
            <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />
            <Route path="palette/:id/brands" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
            <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />   
-            <Route path="articles/:id" element={renderWithSuspense(ArticlePage, 'Loading article…')} />
-
+          <Route
+              path="articles/:id"
+              element={<ArticleRoute />}
+            />
            
           </Route>
         </Route>
       </Routes>
+      </ANAProvider>
     </BrowserRouter>
   );
 }
 
 function HomeRedirect() {
   const location = useLocation();
-  const { track } = useAnalytics();
-
-  useEffect(() => {
-    track(
-      "page_open",
-      {},
-      {
-        resource_type: "page",
-        resource_id: 1,
-      }
-    );
-  }, [track]);
 
   return (
     <Navigate
@@ -180,7 +173,58 @@ function HomeRedirect() {
   );
 }
 
+function GalleryRoute() {
+  const { queryId } = useParams();
 
+  const gallery = (
+    <Suspense fallback={<RouteFallback label="Loading results…" />}>
+      <GalleryPage />
+    </Suspense>
+  );
+
+  if (Number(queryId) !== 4) {
+    return gallery;
+  }
+
+  return (
+    <ANATrack
+      oncePerSession
+      resource={{
+        resource_type: "page",
+        resource_id: 1,
+      }}
+    >
+      {gallery}
+    </ANATrack>
+  );
+}
+
+function ArticleRoute() {
+  const { id } = useParams();
+
+  const article = (
+    <Suspense fallback={<RouteFallback label="Loading article…" />}>
+      <ArticlePage />
+    </Suspense>
+  );
+
+  const articleId = Number(id);
+
+  if (!Number.isInteger(articleId) || articleId <= 0) {
+    return article;
+  }
+
+  return (
+    <ANATrack
+      resource={{
+        resource_type: "article",
+        resource_id: articleId,
+      }}
+    >
+      {article}
+    </ANATrack>
+  );
+}
 
 function RouteFallback({ label }) {
   return (

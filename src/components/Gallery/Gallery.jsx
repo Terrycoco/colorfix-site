@@ -250,6 +250,22 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
               return ca - cb;                            // softer first
             });
 
+        const isPlaylistRail = (item) =>
+          String(item?.item_type || '').toLowerCase() ===
+          'front-page-playlist-set';
+
+        const playlistRail = sectionItems.find(isPlaylistRail);
+        const normalItems = sectionItems.filter((item) => !isPlaylistRail(item));
+
+        const orderedItems =
+          playlistRail && normalItems.length
+            ? [
+                normalItems[0],
+                playlistRail,
+                ...normalItems.slice(1),
+              ]
+            : sectionItems;
+
         return (
           <React.Fragment key={`section-${slugify(groupName)}-${idx}`}>
             {showHeader && (
@@ -260,16 +276,50 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
                 {groupName}
               </div>
             )}
-            <GalleryGrid
-              key={`grid-${slugify(groupName)}-${idx}`}
-              breakpointCols={breakpointCols}
-            >
-              {sectionItems.map((item) => (
-                <GalleryItem key={item.id || item.query_id || `${Math.random()}-gi`}>
-                  {renderContent(item)}
-                </GalleryItem>
-              ))}
-            </GalleryGrid>
+
+            {playlistRail ? (
+              <div
+                style={{
+                  display: 'flow-root',
+                  width: '100%',
+                  paddingLeft: '0.3rem',
+                  paddingRight: '0.3rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {orderedItems.map((item) => {
+                  const rail = isPlaylistRail(item);
+
+                  return (
+                    <div
+                      key={item.id || item.query_id || `${Math.random()}-gi`}
+                      style={{
+                        float: rail ? 'right' : 'left',
+                        width: '50%',
+                        paddingLeft: '0.3rem',
+                        marginBottom: '0.3rem',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <GalleryItem>
+                        {renderContent(item)}
+                      </GalleryItem>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <GalleryGrid
+                key={`grid-${slugify(groupName)}-${idx}`}
+                breakpointCols={breakpointCols}
+              >
+                {sectionItems.map((item) => (
+                  <GalleryItem key={item.id || item.query_id || `${Math.random()}-gi`}>
+                    {renderContent(item)}
+                  </GalleryItem>
+                ))}
+              </GalleryGrid>
+            )}
           </React.Fragment>
         );
       })}

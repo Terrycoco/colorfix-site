@@ -6,8 +6,8 @@ header('Content-Type: application/json; charset=UTF-8');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Analytics\Repos\PdoAnalyticsEventRepository;
-use App\Analytics\Services\AnalyticsService;
+use App\ANA\Repos\PdoANAReportRepository;
+use App\ANA\Services\ANAReportService;
 use App\Repos\PdoPlaylistRepository;
 use App\Repos\PdoArticleRepository;
 
@@ -33,20 +33,16 @@ try {
         ], 400);
     }
 
-    $service = new AnalyticsService(
-        new PdoAnalyticsEventRepository($pdo),
+    $service = new ANAReportService(
+        new PdoANAReportRepository($pdo),
         new PdoPlaylistRepository($pdo),
         new PdoArticleRepository($pdo)
     );
 
-    if ($resourceType === 'playlist') {
-        $rows = $service->countPlaylistEngagement();
-    } else {
-        $rows = $service->countEventsByResourceType(
-            $resourceType,
-            $eventKey
-        );
-    }
+    $rows = $service->countEventsByResourceType(
+        $resourceType,
+        $eventKey
+    );
 
     $resourceTypes = $service->listResourceTypes();
 
@@ -57,7 +53,7 @@ try {
         'resource_types' => $resourceTypes,
         'items' => $rows,
     ]);
-    
+
 } catch (Throwable $e) {
     respond([
         'ok' => false,

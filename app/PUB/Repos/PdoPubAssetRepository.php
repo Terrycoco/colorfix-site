@@ -3910,7 +3910,8 @@ public function updateOrder(
      * Physical file deletion remains the API's job.
      */
     public function deleteUnsent(
-        int $pubAssetId
+        int $pubAssetId,
+        bool $allowHistoricalDelete = false
     ): void {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -3929,9 +3930,49 @@ public function updateOrder(
             );
         }
 
-        $this->assertEditableStage(
-            $asset
-        );
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        $historicalStage =
+            in_array(
+                $stage,
+                [
+                    'shipped',
+                    'dispatched',
+                    'published',
+                ],
+                true
+            );
+
+
+        if (
+            $historicalStage
+            && !$allowHistoricalDelete
+        ) {
+            throw new RuntimeException(
+                'Shipped, dispatched, or published assets require explicit permanent-delete authorization.'
+            );
+        }
+
+
+        if (
+            !$historicalStage
+        ) {
+            $this->assertEditableStage(
+                $asset
+            );
+        }
+
 
         $this->pdo
             ->beginTransaction();
@@ -3956,9 +3997,14 @@ public function updateOrder(
                     WHERE pub_asset_id =
                         :pub_asset_id
 
-                      AND pipeline_stage NOT IN (
-                          'dispatched',
-                          'published'
+                      AND (
+                          :allow_historical_delete = 1
+
+                          OR pipeline_stage NOT IN (
+                              'shipped',
+                              'dispatched',
+                              'published'
+                          )
                       )
                     SQL
                 );
@@ -3966,6 +4012,11 @@ public function updateOrder(
             $stmt->execute([
                 'pub_asset_id' =>
                     $pubAssetId,
+
+                'allow_historical_delete' =>
+                    $allowHistoricalDelete
+                        ? 1
+                        : 0,
             ]);
 
             if (

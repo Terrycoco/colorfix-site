@@ -1,0 +1,1985 @@
+{
+  "composition_id": "colorfix-generic-video",
+  "plan": {
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration_in_frames": 3681
+    },
+    "render": {
+      "codec": "h264"
+    },
+    "layers": [
+      {
+        "id": "video-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 3681,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 0
+        },
+        "style": {
+          "backgroundColor": "#000000"
+        },
+        "animations": []
+      },
+      {
+        "id": "yt-scene-1-photo",
+        "type": "image",
+        "start_frame": 0,
+        "end_frame": 308,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 101
+        },
+        "style": {
+          "opacity": 1
+        },
+        "animations": [],
+        "src": "https://colorfix.terrymarr.com/photos/progressions/doors-fixed/progression_doors-fixed_b0ce4a262bbe.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-1-caption-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 308,
+        "box": {
+          "x": 67,
+          "y": 945,
+          "width": 231,
+          "height": 97,
+          "z": 104
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 68,
+            "end_frame": 128
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 233,
+            "end_frame": 248
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-1-caption-title",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 308,
+        "box": {
+          "x": 95,
+          "y": 961,
+          "width": 175,
+          "height": 65,
+          "z": 105
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 68,
+            "end_frame": 128
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 233,
+            "end_frame": 248
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-2-photo",
+        "type": "image",
+        "start_frame": 248,
+        "end_frame": 555,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 121
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 248,
+            "end_frame": 308
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/progressions/doors-fixed/progression_doors-fixed_73d86b74eea7.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-2-caption-background",
+        "type": "rect",
+        "start_frame": 248,
+        "end_frame": 555,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 681,
+          "height": 144,
+          "z": 124
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 316,
+            "end_frame": 376
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 480,
+            "end_frame": 495
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-2-caption-title",
+        "type": "text",
+        "start_frame": 248,
+        "end_frame": 555,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 625,
+          "height": 65,
+          "z": 125
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 316,
+            "end_frame": 376
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 480,
+            "end_frame": 495
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-2-caption-subtitle",
+        "type": "text",
+        "start_frame": 248,
+        "end_frame": 555,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 625,
+          "height": 47,
+          "z": 126
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 316,
+            "end_frame": 376
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 480,
+            "end_frame": 495
+          }
+        ],
+        "text": "Crushing on Coral, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-3-photo",
+        "type": "image",
+        "start_frame": 495,
+        "end_frame": 803,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 141
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 495,
+            "end_frame": 555
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_e52e38067549.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-3-caption-background",
+        "type": "rect",
+        "start_frame": 495,
+        "end_frame": 803,
+        "box": {
+          "x": 67,
+          "y": 945,
+          "width": 231,
+          "height": 97,
+          "z": 144
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 563,
+            "end_frame": 623
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 728,
+            "end_frame": 743
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-3-caption-title",
+        "type": "text",
+        "start_frame": 495,
+        "end_frame": 803,
+        "box": {
+          "x": 95,
+          "y": 961,
+          "width": 175,
+          "height": 65,
+          "z": 145
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 563,
+            "end_frame": 623
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 728,
+            "end_frame": 743
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-4-photo",
+        "type": "image",
+        "start_frame": 743,
+        "end_frame": 1050,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 161
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 743,
+            "end_frame": 803
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_ad31f0b907d8.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-4-caption-background",
+        "type": "rect",
+        "start_frame": 743,
+        "end_frame": 1050,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 561,
+          "height": 144,
+          "z": 164
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 811,
+            "end_frame": 871
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 975,
+            "end_frame": 990
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-4-caption-title",
+        "type": "text",
+        "start_frame": 743,
+        "end_frame": 1050,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 505,
+          "height": 65,
+          "z": 165
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 811,
+            "end_frame": 871
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 975,
+            "end_frame": 990
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-4-caption-subtitle",
+        "type": "text",
+        "start_frame": 743,
+        "end_frame": 1050,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 505,
+          "height": 47,
+          "z": 166
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 811,
+            "end_frame": 871
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 975,
+            "end_frame": 990
+          }
+        ],
+        "text": "Jolly Green, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-5-photo",
+        "type": "image",
+        "start_frame": 990,
+        "end_frame": 1298,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 181
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 990,
+            "end_frame": 1050
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_27866d76b563.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-5-caption-background",
+        "type": "rect",
+        "start_frame": 990,
+        "end_frame": 1298,
+        "box": {
+          "x": 67,
+          "y": 945,
+          "width": 231,
+          "height": 97,
+          "z": 184
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1058,
+            "end_frame": 1118
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1223,
+            "end_frame": 1238
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-5-caption-title",
+        "type": "text",
+        "start_frame": 990,
+        "end_frame": 1298,
+        "box": {
+          "x": 95,
+          "y": 961,
+          "width": 175,
+          "height": 65,
+          "z": 185
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1058,
+            "end_frame": 1118
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1223,
+            "end_frame": 1238
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-6-photo",
+        "type": "image",
+        "start_frame": 1238,
+        "end_frame": 1545,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 201
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1238,
+            "end_frame": 1298
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_0b017a4c4eab.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-6-caption-background",
+        "type": "rect",
+        "start_frame": 1238,
+        "end_frame": 1545,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 581,
+          "height": 144,
+          "z": 204
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1306,
+            "end_frame": 1366
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1470,
+            "end_frame": 1485
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-6-caption-title",
+        "type": "text",
+        "start_frame": 1238,
+        "end_frame": 1545,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 525,
+          "height": 65,
+          "z": 205
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1306,
+            "end_frame": 1366
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1470,
+            "end_frame": 1485
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-6-caption-subtitle",
+        "type": "text",
+        "start_frame": 1238,
+        "end_frame": 1545,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 525,
+          "height": 47,
+          "z": 206
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1306,
+            "end_frame": 1366
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1470,
+            "end_frame": 1485
+          }
+        ],
+        "text": "Prairie Clay, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-7-photo",
+        "type": "image",
+        "start_frame": 1485,
+        "end_frame": 1793,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 221
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1485,
+            "end_frame": 1545
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors/article_doors_1bc3fa1247c6.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-7-caption-background",
+        "type": "rect",
+        "start_frame": 1485,
+        "end_frame": 1793,
+        "box": {
+          "x": 67,
+          "y": 945,
+          "width": 231,
+          "height": 97,
+          "z": 224
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1553,
+            "end_frame": 1613
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1718,
+            "end_frame": 1733
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-7-caption-title",
+        "type": "text",
+        "start_frame": 1485,
+        "end_frame": 1793,
+        "box": {
+          "x": 95,
+          "y": 961,
+          "width": 175,
+          "height": 65,
+          "z": 225
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1553,
+            "end_frame": 1613
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1718,
+            "end_frame": 1733
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-8-photo",
+        "type": "image",
+        "start_frame": 1733,
+        "end_frame": 2040,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 241
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1733,
+            "end_frame": 1793
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors/article_doors_4fd23e4b62b5.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-8-caption-background",
+        "type": "rect",
+        "start_frame": 1733,
+        "end_frame": 2040,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 681,
+          "height": 144,
+          "z": 244
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1801,
+            "end_frame": 1861
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1965,
+            "end_frame": 1980
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-8-caption-title",
+        "type": "text",
+        "start_frame": 1733,
+        "end_frame": 2040,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 625,
+          "height": 65,
+          "z": 245
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1801,
+            "end_frame": 1861
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1965,
+            "end_frame": 1980
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-8-caption-subtitle",
+        "type": "text",
+        "start_frame": 1733,
+        "end_frame": 2040,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 625,
+          "height": 47,
+          "z": 246
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1801,
+            "end_frame": 1861
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1965,
+            "end_frame": 1980
+          }
+        ],
+        "text": "Hollywood Starlet, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-9-photo",
+        "type": "image",
+        "start_frame": 1980,
+        "end_frame": 2288,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 261
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1980,
+            "end_frame": 2040
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/progressions/doors-fixed/progression_doors-fixed_7fc6d47f0263.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-9-caption-background",
+        "type": "rect",
+        "start_frame": 1980,
+        "end_frame": 2288,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 621,
+          "height": 144,
+          "z": 264
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2048,
+            "end_frame": 2108
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2213,
+            "end_frame": 2228
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-9-caption-title",
+        "type": "text",
+        "start_frame": 1980,
+        "end_frame": 2288,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 565,
+          "height": 65,
+          "z": 265
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2048,
+            "end_frame": 2108
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2213,
+            "end_frame": 2228
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-9-caption-subtitle",
+        "type": "text",
+        "start_frame": 1980,
+        "end_frame": 2288,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 565,
+          "height": 47,
+          "z": 266
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2048,
+            "end_frame": 2108
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2213,
+            "end_frame": 2228
+          }
+        ],
+        "text": "Can you paint a screen door?"
+      },
+      {
+        "id": "yt-scene-10-photo",
+        "type": "image",
+        "start_frame": 2228,
+        "end_frame": 2535,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 281
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2228,
+            "end_frame": 2288
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/progressions/doors-fixed/progression_doors-fixed_b8273b1155f9.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-10-caption-background",
+        "type": "rect",
+        "start_frame": 2228,
+        "end_frame": 2535,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 697,
+          "height": 144,
+          "z": 284
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2296,
+            "end_frame": 2356
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2460,
+            "end_frame": 2475
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-10-caption-title",
+        "type": "text",
+        "start_frame": 2228,
+        "end_frame": 2535,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 641,
+          "height": 65,
+          "z": 285
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2296,
+            "end_frame": 2356
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2460,
+            "end_frame": 2475
+          }
+        ],
+        "text": "Of Course!  ColorFixed"
+      },
+      {
+        "id": "yt-scene-10-caption-subtitle",
+        "type": "text",
+        "start_frame": 2228,
+        "end_frame": 2535,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 641,
+          "height": 47,
+          "z": 286
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2296,
+            "end_frame": 2356
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2460,
+            "end_frame": 2475
+          }
+        ],
+        "text": "San Gabriel Blue, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-11-photo",
+        "type": "image",
+        "start_frame": 2475,
+        "end_frame": 2783,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 301
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2475,
+            "end_frame": 2535
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_1cb57649eff0.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-11-caption-background",
+        "type": "rect",
+        "start_frame": 2475,
+        "end_frame": 2783,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 460,
+          "height": 144,
+          "z": 304
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2543,
+            "end_frame": 2603
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2708,
+            "end_frame": 2723
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-11-caption-title",
+        "type": "text",
+        "start_frame": 2475,
+        "end_frame": 2783,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 404,
+          "height": 65,
+          "z": 305
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2543,
+            "end_frame": 2603
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2708,
+            "end_frame": 2723
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-11-caption-subtitle",
+        "type": "text",
+        "start_frame": 2475,
+        "end_frame": 2783,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 404,
+          "height": 47,
+          "z": 306
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2543,
+            "end_frame": 2603
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2708,
+            "end_frame": 2723
+          }
+        ],
+        "text": "The stage is set...."
+      },
+      {
+        "id": "yt-scene-12-photo",
+        "type": "image",
+        "start_frame": 2723,
+        "end_frame": 3030,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 321
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2723,
+            "end_frame": 2783
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_8cfe200f4f58.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-12-caption-background",
+        "type": "rect",
+        "start_frame": 2723,
+        "end_frame": 3030,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 581,
+          "height": 144,
+          "z": 324
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2791,
+            "end_frame": 2851
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2955,
+            "end_frame": 2970
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-12-caption-title",
+        "type": "text",
+        "start_frame": 2723,
+        "end_frame": 3030,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 525,
+          "height": 65,
+          "z": 325
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2791,
+            "end_frame": 2851
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2955,
+            "end_frame": 2970
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-12-caption-subtitle",
+        "type": "text",
+        "start_frame": 2723,
+        "end_frame": 3030,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 525,
+          "height": 47,
+          "z": 326
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2791,
+            "end_frame": 2851
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 2955,
+            "end_frame": 2970
+          }
+        ],
+        "text": "Ginger Spice, Dunn Edwards"
+      },
+      {
+        "id": "yt-scene-13-photo",
+        "type": "image",
+        "start_frame": 2970,
+        "end_frame": 3278,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 341
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 2970,
+            "end_frame": 3030
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_0d7936d22bb0.jpeg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-13-caption-background",
+        "type": "rect",
+        "start_frame": 2970,
+        "end_frame": 3278,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 339,
+          "height": 144,
+          "z": 344
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3038,
+            "end_frame": 3098
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3203,
+            "end_frame": 3218
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-13-caption-title",
+        "type": "text",
+        "start_frame": 2970,
+        "end_frame": 3278,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 283,
+          "height": 65,
+          "z": 345
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3038,
+            "end_frame": 3098
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3203,
+            "end_frame": 3218
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-13-caption-subtitle",
+        "type": "text",
+        "start_frame": 2970,
+        "end_frame": 3278,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 283,
+          "height": 47,
+          "z": 346
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3038,
+            "end_frame": 3098
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3203,
+            "end_frame": 3218
+          }
+        ],
+        "text": "Brown on brown"
+      },
+      {
+        "id": "yt-scene-14-photo",
+        "type": "image",
+        "start_frame": 3218,
+        "end_frame": 3525,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 361
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3218,
+            "end_frame": 3278
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/articles/doors-fixed/article_doors-fixed_a11b1b45aa6a.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-14-caption-background",
+        "type": "rect",
+        "start_frame": 3218,
+        "end_frame": 3525,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 540,
+          "height": 144,
+          "z": 364
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3286,
+            "end_frame": 3346
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3450,
+            "end_frame": 3465
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-14-caption-title",
+        "type": "text",
+        "start_frame": 3218,
+        "end_frame": 3525,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 484,
+          "height": 65,
+          "z": 365
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3286,
+            "end_frame": 3346
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3450,
+            "end_frame": 3465
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-14-caption-subtitle",
+        "type": "text",
+        "start_frame": 3218,
+        "end_frame": 3525,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 484,
+          "height": 47,
+          "z": 366
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3286,
+            "end_frame": 3346
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3450,
+            "end_frame": 3465
+          }
+        ],
+        "text": "Deep Ocean, Dunn Edwards"
+      },
+      {
+        "id": "scene-14-exit-fade",
+        "type": "rect",
+        "start_frame": 3465,
+        "end_frame": 3525,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 379
+        },
+        "style": {
+          "backgroundColor": "#000000",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3465,
+            "end_frame": 3524
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-15-brand",
+        "type": "component",
+        "start_frame": 3525,
+        "end_frame": 3681,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 385
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3525,
+            "end_frame": 3538
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 3668,
+            "end_frame": 3680
+          },
+          {
+            "target": "props.signatureProgress",
+            "from": 0,
+            "to": 1,
+            "start_frame": 3548,
+            "end_frame": 3601
+          }
+        ],
+        "component": "brand_bumper_logo",
+        "props": {
+          "signatureProgress": 0,
+          "style": {
+            "--brand-bumper-logo-size": "88px"
+          }
+        }
+      }
+    ],
+    "audio": [
+      {
+        "src": "https://colorfix.terrymarr.com/photos/assets/audio/epic-violin-cinematic-instrumental-music-283511-7ce36112e8.mp3",
+        "start_frame": 0,
+        "end_frame": 3681,
+        "volume": 0.2,
+        "fade_out_start_frame": 3591,
+        "fade_out_end_frame": 3680
+      }
+    ]
+  },
+  "render": {
+    "codec": "h264"
+  }
+}

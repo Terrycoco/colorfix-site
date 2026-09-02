@@ -6,14 +6,18 @@ $BASE = dirname(__DIR__);
 
 // Explicit PSR-4 root + lowercase subdir maps
 $prefixes = [
-  'App\\'         => $BASE . '/app',        // generic
-  'App\\Lib\\'    => $BASE . '/app/lib',    // lowercase dirs
-  'App\\Repos\\'  => $BASE . '/app/repos',
-  'App\\Services\\' => $BASE . '/app/services',
-  'App\\Entities\\' => $BASE . '/app/entities',
-  'App\\Controllers\\' => $BASE . '/app/controllers',
-];
+  'App\\ANA\\'         => $BASE . '/app/ANA',
+  'App\\REX\\'         => $BASE . '/app/REX',
+  'App\\PUB\\'         => $BASE . '/app/PUB',
 
+  'App\\Lib\\'         => $BASE . '/app/lib',
+  'App\\Repos\\'       => $BASE . '/app/repos',
+  'App\\Services\\'    => $BASE . '/app/services',
+  'App\\Entities\\'    => $BASE . '/app/entities',
+  'App\\Controllers\\' => $BASE . '/app/controllers',
+
+  'App\\'              => $BASE . '/app',
+];
 spl_autoload_register(function ($class) use ($prefixes) {
   foreach ($prefixes as $prefix => $dir) {
     $len = strlen($prefix);

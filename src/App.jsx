@@ -7,6 +7,7 @@ import BoardScroller from '@components/BoardScroller';
 import MessagePopup from '@components/MessagePopup';
 import { ensureViewerId } from "./lib/viewer";
 
+
 export default function App() {
   const { boards } = useAppState();
 
@@ -16,6 +17,7 @@ export default function App() {
   }, []);
 
   return (
+   
     <AppLayout>
       <BoardScroller boards={boards} />
       <MessagePopup />
@@ -23,5 +25,6 @@ export default function App() {
       {/* MainLayout/AdminLayout + pages render here via Router */}
       <Outlet />
     </AppLayout>
+ 
   );
 }

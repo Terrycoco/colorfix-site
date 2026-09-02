@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import AnalyticsProvider from "@Analytics/AnalyticsProvider";
-import { applySourceToParams } from "@helpers/sourceParam";
+import ANAProvider, { resolveSessionId } from "@ANA/ANAProvider";
+import ANATrack from "@ANA/ANATrack";
+import { recordANAEvent } from "@ANA/ANAClient";
+import {
+  applySourceToParams,
+  withSourceParam,
+} from "@helpers/sourceParam";
 import Player from "@RX/Player";
 import PV from "@RX/PV";
 import Thumbs from "@RX/Thumbs";
 import "../RexPublicPage/rex-public-page.css";
+
 
 const EMPTY_STATE = {
   loading: true,
@@ -52,7 +58,10 @@ export default function RexPublicPage() {
 
         const resolverKey = payload.data.resolver_key || "";
         const destination = payload.data.destination || {};
+        const rex = payload.data.rex || null;
 
+
+        
         if (resolverKey === "route") {
           const path = String(destination.path || "").trim();
 
@@ -60,7 +69,22 @@ export default function RexPublicPage() {
             throw new Error("REX route destination is missing.");
           }
 
-          window.location.href = path;
+          recordANAEvent({
+            event_key: "visit",
+            reservation_id: rex?.reservation_id ?? null,
+            resolver_key: rex?.resolver_key ?? null,
+            resource_type: rex?.resource_type ?? null,
+            resource_id: rex?.resource_id ?? null,
+            experience_key: rex?.experience_key ?? null,
+            src: new URLSearchParams(window.location.search).get("src") || null,
+            session_id: resolveSessionId(),
+            referrer: document.referrer || null,
+            path,
+            payload: {},
+          }).finally(() => {
+            window.location.href = withSourceParam(path);
+          });
+
           return;
         }
 
@@ -78,6 +102,7 @@ export default function RexPublicPage() {
             loading: false,
             kind: "playlist",
             playbackPlan,
+            rex,
           });
           return;
         }
@@ -100,6 +125,7 @@ export default function RexPublicPage() {
             kind: "viewer",
             viewer,
             experienceKey,
+            rex,
           });
           return;
         }
@@ -118,6 +144,7 @@ export default function RexPublicPage() {
             loading: false,
             kind: "thumbs",
             collection,
+            rex,
           });
           return;
         }
@@ -147,23 +174,35 @@ export default function RexPublicPage() {
 
   if (state.kind === "playlist") {
     return (
-      <AnalyticsProvider rex={state.rex}>
+          <ANAProvider rex={state.rex}>
+            <ANATrack>
         <Player playbackPlan={state.playbackPlan} />
-      </AnalyticsProvider>
+        </ANATrack>
+      </ANAProvider>
     );
   }
 
   if (state.kind === "viewer") {
     return (
+          <ANAProvider rex={state.rex}>
+            <ANATrack>
       <PV
         viewer={state.viewer}
         experienceKey={state.experienceKey}
       />
+      </ANATrack>
+      </ANAProvider>
     );
   }
 
   if (state.kind === "thumbs") {
-    return <Thumbs collection={state.collection} />;
+    return (
+          <ANAProvider rex={state.rex}>
+            <ANATrack>
+    <Thumbs collection={state.collection} />
+    </ANATrack>
+    </ANAProvider>
+    );
   }
 
   return (

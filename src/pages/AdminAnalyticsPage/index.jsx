@@ -32,12 +32,7 @@ export default function AdminAnalyticsPage() {
       setError("");
 
       try {
-        const eventKey =
-          resourceType === "article"
-            ? "article_open"
-            : resourceType === "page"
-              ? "page_open"
-              : "playlist_open";
+         const eventKey = "visit";
 
         const params = new URLSearchParams({
           resource_type: resourceType,
@@ -78,6 +73,30 @@ export default function AdminAnalyticsPage() {
     };
   }, [resourceType]);
 
+
+function formatLastVisit(value) {
+  if (!value) return "—";
+
+  const [datePart, timePart] = value.split(" ");
+  if (!datePart || !timePart) return value;
+
+  const date = new Date(`${datePart}T${timePart}`);
+
+  const dateText = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const timeText = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${dateText} ${timeText}`;
+}
+
+
   async function deleteTestData() {
     if (!window.confirm("Delete all analytics test records?")) return;
 
@@ -100,8 +119,7 @@ export default function AdminAnalyticsPage() {
     }
   }
 
-  const simpleOpenResource =
-    resourceType === "article" || resourceType === "page";
+ 
 
   return (
     <AdminMasterDetail
@@ -183,23 +201,20 @@ export default function AdminAnalyticsPage() {
           ) : (
             <AdminDataGrid ariaLabel={`${resourceType} analytics`}>
               <thead>
-                {simpleOpenResource ? (
-                  <tr>
-                    <th>
-                      {resourceType === "page" ? "Page" : "Article"}
-                    </th>
-                    <th>Source</th>
-                    <th>Opens</th>
-                  </tr>
-                ) : (
-                  <tr>
-                    <th>Playlist</th>
-                    <th>Source</th>
-                    <th>Opens</th>
-                    <th>Watch More</th>
-                    <th>Rate</th>
-                  </tr>
-                )}
+                <tr>
+                  <th>
+                    {resourceType === "page"
+                      ? "Page"
+                      : resourceType === "article"
+                        ? "Article"
+                        : resourceType === "playlist"
+                          ? "Playlist"
+                          : "Resource"}
+                  </th>
+                  <th>Source</th>
+                  <th>Visits</th>
+                  <th>Last Visit</th>
+                </tr>
               </thead>
 
               <tbody>
@@ -207,24 +222,14 @@ export default function AdminAnalyticsPage() {
                   const key = `${item.resource_id}-${item.source_key || "direct"}`;
                   const selected = key === selectedKey;
 
-                  if (simpleOpenResource) {
-                    const fallbackTitle =
-                      resourceType === "page"
-                        ? `Page #${item.resource_id}`
-                        : `Article #${item.resource_id}`;
-
-                    return (
-                      <tr
-                        key={key}
-                        className={selected ? "is-selected" : ""}
-                        onClick={() => setSelectedKey(key)}
-                      >
-                        <td>{item.title || fallbackTitle}</td>
-                        <td>{item.source_key || "Direct"}</td>
-                        <td>{item.event_count}</td>
-                      </tr>
-                    );
-                  }
+                  const fallbackTitle =
+                    resourceType === "page"
+                      ? `Page #${item.resource_id}`
+                      : resourceType === "article"
+                        ? `Article #${item.resource_id}`
+                        : resourceType === "playlist"
+                          ? `Playlist #${item.resource_id}`
+                          : `${resourceType} #${item.resource_id}`;
 
                   return (
                     <tr
@@ -232,13 +237,10 @@ export default function AdminAnalyticsPage() {
                       className={selected ? "is-selected" : ""}
                       onClick={() => setSelectedKey(key)}
                     >
-                      <td>
-                        {item.title || `Playlist #${item.resource_id}`}
-                      </td>
-                      <td>{item.source_key || "Direct"}</td>
-                      <td>{item.opens}</td>
-                      <td>{item.watch_more}</td>
-                      <td>{item.watch_more_rate}%</td>
+                      <td>{item.title || fallbackTitle}</td>
+                    <td>{item.source_key || "Direct"}</td>
+                    <td>{item.event_count}</td>
+                    <td>{formatLastVisit(item.last_visit)}</td>
                     </tr>
                   );
                 })}

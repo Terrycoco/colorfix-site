@@ -42,10 +42,20 @@ final class RexResolveEndpoint
 
             echo json_encode([
                 'ok' => true,
-                'data' => [
-                    'resolver_key' => $result->resolverKey,
-                    'destination' => $result->destination,
-                ],
+            'data' => [
+    'resolver_key' => $result->resolverKey,
+    'destination' => $result->destination,
+
+    'rex' => [
+        'reservation_id' => $result->analyticsMetadata['reservation_id'] ?? null,
+
+        'resolver_key' => $result->resolverKey,
+        'resource_type' => $result->resourceType,
+        'resource_id' => $result->resourceId,
+        'experience_key' => $result->analyticsMetadata['experience_key'] ?? null,
+        'analytics' => $result->analyticsMetadata,
+    ],
+],
             ], JSON_UNESCAPED_SLASHES);
 
         } catch (Throwable $e) {

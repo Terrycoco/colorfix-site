@@ -220,8 +220,11 @@ final class PlaylistVideoRecipe
      * The Chef resolves this project-relative font file against
      * projectRoot when rendering the companion thumbnail JPEG.
      */
-    public const THUMBNAIL_FONT_FILE =
+    /*public const THUMBNAIL_FONT_FILE =
         'public/fonts/Poppins-Bold.ttf';
+*/
+        public const THUMBNAIL_FONT_FILE =
+    'public/fonts/Poppins-SemiBold.ttf';
 
     /*
      * YouTube thumbnail layout and treatment.
@@ -248,6 +251,15 @@ final class PlaylistVideoRecipe
 public const THUMBNAIL_TITLE_TOP_SINGLE_LINE = 200;
 public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
     public const THUMBNAIL_TITLE_AREA_HEIGHT = 250;
+
+    /*
+     * Default thumbnail title color.
+     *
+     * An individual YouTube asset may override this through the saved
+     * Creator ingredient cover.text_color. Older orders that do not carry
+     * an override therefore continue to render with white title text.
+     */
+    public const THUMBNAIL_TEXT_COLOR = '#FFFFFF';
 
     public const THUMBNAIL_TEXT_STROKE_PX = 4;
     public const THUMBNAIL_JPEG_QUALITY = 90;

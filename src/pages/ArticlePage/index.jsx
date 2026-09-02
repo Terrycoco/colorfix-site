@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAnalytics } from "@Analytics/useAnalytics";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
@@ -45,7 +44,6 @@ export default function ArticlePage() {
   const playlistTitle = searchParams.get("playlist_title") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
   const playlistUrl = withSourceParam(returnToParam || (playlistInstanceId ? `/p/${playlistInstanceId}` : ""));
-  const { track } = useAnalytics();
 
   useEffect(() => {
     let active = true;
@@ -78,16 +76,7 @@ export default function ArticlePage() {
     };
   }, [id, searchParams]);
 
-  useEffect(() => {
-    track(
-      "article_open",
-      {},
-      {
-        resource_type: "article",
-        resource_id: Number(id),
-      }
-    );
-  }, [id, track]);
+
 
   const article = payload?.article;
   const hero = payload?.hero;

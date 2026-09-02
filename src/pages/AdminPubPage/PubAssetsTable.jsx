@@ -1,4 +1,3 @@
-
 import {
   useEffect,
   useMemo,
@@ -38,50 +37,32 @@ const PACKAGE_URL =
 export default function PubAssetsTable({
   onOpenPackage,
 }) {
-  const [
-    assets,
-    setAssets,
-  ] = useState([]);
+  const [assets, setAssets] =
+    useState([]);
 
-  const [
-    channels,
-    setChannels,
-  ] = useState([]);
+  const [channels, setChannels] =
+    useState([]);
 
-  const [
-    assetTypes,
-    setAssetTypes,
-  ] = useState([]);
+  const [assetTypes, setAssetTypes] =
+    useState([]);
 
-  const [
-    channelFilter,
-    setChannelFilter,
-  ] = useState("");
+  const [channelFilter, setChannelFilter] =
+    useState("");
 
-  const [
-    typeFilter,
-    setTypeFilter,
-  ] = useState("");
+  const [typeFilter, setTypeFilter] =
+    useState("");
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [
-    error,
-    setError,
-  ] = useState("");
+  const [error, setError] =
+    useState("");
 
-  const [
-    previewAsset,
-    setPreviewAsset,
-  ] = useState(null);
+  const [previewAsset, setPreviewAsset] =
+    useState(null);
 
-  const [
-    editAsset,
-    setEditAsset,
-  ] = useState(null);
+  const [editAsset, setEditAsset] =
+    useState(null);
 
   const [
     editIngredientValues,
@@ -93,15 +74,11 @@ export default function PubAssetsTable({
     setEditIngredientBindings,
   ] = useState([]);
 
-  const [
-    savingCopy,
-    setSavingCopy,
-  ] = useState(false);
+  const [savingCopy, setSavingCopy] =
+    useState(false);
 
-  const [
-    recreating,
-    setRecreating,
-  ] = useState(false);
+  const [recreating, setRecreating] =
+    useState(false);
 
   const [
     sendingToPackaging,
@@ -111,6 +88,28 @@ export default function PubAssetsTable({
   const [
     previewVersion,
     setPreviewVersion,
+  ] = useState(0);
+
+  /*
+   * Historical-delete confirmation.
+   *
+   * A shipped record is intentionally difficult to erase:
+   * open dedicated warning -> check explicit authorization ->
+   * Delete Forever.
+   */
+  const [
+    deleteForeverAsset,
+    setDeleteForeverAsset,
+  ] = useState(null);
+
+  const [
+    deleteForeverAuthorized,
+    setDeleteForeverAuthorized,
+  ] = useState(false);
+
+  const [
+    deletingAssetId,
+    setDeletingAssetId,
   ] = useState(0);
 
 
@@ -209,40 +208,35 @@ export default function PubAssetsTable({
     typeFilter,
   ]);
 
+
   useEffect(() => {
-  const hasCreating =
-    assets.some(
-      (asset) =>
-        asset.pipeline_stage ===
-        "creating"
-    );
+    const hasCreating =
+      assets.some(
+        (asset) =>
+          asset.pipeline_stage ===
+          "creating"
+      );
 
-  if (!hasCreating) {
-    return;
-  }
+    if (!hasCreating) {
+      return;
+    }
 
-  const timer =
-    setInterval(
-      () => {
-        loadAssets();
-      },
-      12000
-    );
+    const timer =
+      setInterval(
+        () => {
+          loadAssets();
+        },
+        12000
+      );
 
-  return () => {
-    clearInterval(timer);
-  };
-}, [assets, loadAssets]);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [assets]);
 
 
   /*
    * OPEN THE CORRECT ASSET EDITOR.
-   *
-   * Static image assets already have everything their editor needs
-   * in the grid row.
-   *
-   * Video assets make one small editor-detail request so we can load
-   * only their explicitly editable inside production ingredients.
    */
   async function openAssetEditor(
     asset
@@ -375,7 +369,7 @@ export default function PubAssetsTable({
   /*
    * DELETE
    */
-  async function deleteAsset(
+  function requestDeleteAsset(
     asset
   ) {
     const id =
@@ -388,29 +382,87 @@ export default function PubAssetsTable({
       return;
     }
 
-    const stage =
-      String(
-        asset?.pipeline_stage ||
-        ""
-      ).toLowerCase();
 
+    const stage =
+      normalizedStage(
+        asset
+      );
+
+
+    /*
+     * Dispatch currently owns this asset. Do not provide an override
+     * until the shipping operation has actually finished.
+     */
     if (
-      stage === "dispatched" ||
-      stage === "published"
+      stage === "shipping"
     ) {
+      setError(
+        "This asset is currently shipping and cannot be deleted."
+      );
+
       return;
     }
+
+
+    if (
+      isHistoricalStage(
+        stage
+      )
+    ) {
+      setDeleteForeverAuthorized(
+        false
+      );
+
+      setDeleteForeverAsset(
+        asset
+      );
+
+      return;
+    }
+
 
     const confirmed =
       window.confirm(
         `Delete PUB asset #${id}?`
       );
 
+
     if (!confirmed) {
       return;
     }
 
-    setError("");
+
+    performDeleteAsset(
+      asset,
+      false
+    );
+  }
+
+
+  async function performDeleteAsset(
+    asset,
+    forceDeleteShipped
+  ) {
+    const id =
+      Number(
+        asset?.pub_asset_id ||
+        0
+      );
+
+
+    if (!id) {
+      return false;
+    }
+
+
+    setDeletingAssetId(
+      id
+    );
+
+    setError(
+      ""
+    );
+
 
     try {
       const res =
@@ -432,12 +484,23 @@ export default function PubAssetsTable({
               JSON.stringify({
                 pub_asset_id:
                   id,
+
+                ...(
+                  forceDeleteShipped
+                    ? {
+                        force_delete_shipped:
+                          true,
+                      }
+                    : {}
+                ),
               }),
           }
         );
 
+
       const data =
         await res.json();
+
 
       if (
         !res.ok ||
@@ -449,6 +512,7 @@ export default function PubAssetsTable({
         );
       }
 
+
       setAssets(
         (current) =>
           current.filter(
@@ -458,6 +522,7 @@ export default function PubAssetsTable({
               ) !== id
           )
       );
+
 
       if (
         Number(
@@ -470,6 +535,7 @@ export default function PubAssetsTable({
           null
         );
       }
+
 
       if (
         Number(
@@ -491,10 +557,37 @@ export default function PubAssetsTable({
         );
       }
 
+
+      if (
+        Number(
+          deleteForeverAsset
+            ?.pub_asset_id ||
+          0
+        ) === id
+      ) {
+        setDeleteForeverAsset(
+          null
+        );
+
+        setDeleteForeverAuthorized(
+          false
+        );
+      }
+
+
+      return true;
+
     } catch (err) {
       setError(
         err?.message ||
         "Could not delete PUB asset."
+      );
+
+      return false;
+
+    } finally {
+      setDeletingAssetId(
+        0
       );
     }
   }
@@ -502,13 +595,6 @@ export default function PubAssetsTable({
 
   /*
    * SAVE COPY.
-   *
-   * Updates:
-   *
-   *   pub_assets
-   *   pub_asset_orders.box_json
-   *
-   * Does NOT recreate the physical asset.
    */
   async function saveAssetCopy(
     changes
@@ -600,9 +686,6 @@ export default function PubAssetsTable({
         };
 
 
-      /*
-       * Update grid immediately.
-       */
       setAssets(
         (current) =>
           current.map(
@@ -620,11 +703,6 @@ export default function PubAssetsTable({
       );
 
 
-      /*
-       * Keep editor open and current.
-       *
-       * Save does not mean Close.
-       */
       setEditAsset(
         (current) =>
           current
@@ -670,45 +748,40 @@ export default function PubAssetsTable({
 
   /*
    * REDO ASSET.
-   *
-   * PubAssetCopyEditor saves first.
-   *
-   * This call sends ONLY the asset ID.
-   * Coordinator fetches the current filed order.
    */
-  async function recreateAsset(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        0
-      );
+async function recreateAsset(
+  pubAssetId
+) {
+  const id =
+    Number(
+      pubAssetId ||
+      0
+    );
 
-    if (!id) {
-      return false;
-    }
+  if (!id) {
+    return false;
+  }
 
-    setRecreating(true);
-    setError("");
+  setRecreating(true);
+  setError("");
 
-    try {
-      const res =
-        await fetch(
-          CREATE_URL,
-          {
-            method:
-              "POST",
+  try {
+    const res =
+      await fetch(
+        CREATE_URL,
+        {
+          method:
+            "POST",
 
-            credentials:
-              "include",
+          credentials:
+            "include",
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-            body:
+          body:
             JSON.stringify({
               orders: [
                 {
@@ -717,100 +790,90 @@ export default function PubAssetsTable({
                 },
               ],
             }),
-          }
-        );
-
-      const data =
-        await res.json();
-
-      if (
-        !res.ok ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "Could not recreate PUB asset."
-        );
-      }
-
-      const updatedAsset =
-        data.asset || null;
-
-
-      /*
-       * Refresh grid row.
-       */
-      if (updatedAsset) {
-        setAssets(
-          (current) =>
-            current.map(
-              (asset) =>
-                Number(
-                  asset
-                    .pub_asset_id
-                ) === id
-                  ? {
-                      ...asset,
-                      ...updatedAsset,
-                    }
-                  : asset
-            )
-        );
-
-        setEditAsset(
-          (current) =>
-            current
-              ? {
-                  ...current,
-                  ...updatedAsset,
-                }
-              : current
-        );
-      }
-
-
-      /*
-       * Force browser to fetch the newly
-       * overwritten physical asset.
-       */
-      setPreviewVersion(
-        Number(
-          data.preview_version ||
-          Date.now()
-        )
+        }
       );
 
-      return true;
+    const data =
+      await res.json();
 
-    } catch (err) {
-      setError(
-        err?.message ||
+    if (
+      !res.ok ||
+      !data?.ok
+    ) {
+      throw new Error(
+        data?.error ||
         "Could not recreate PUB asset."
       );
+    }
 
-      return false;
 
-    } finally {
-      setRecreating(
-        false
+    const failed =
+      Array.isArray(
+        data.failed
+      )
+        ? data.failed
+        : [];
+
+    if (failed.length) {
+      throw new Error(
+        failed[0]
+          ?.error ||
+        failed[0]
+          ?.message ||
+        "CREATE rejected the REDO."
       );
     }
+
+
+    const queued =
+      Array.isArray(
+        data.queued
+      )
+        ? data.queued
+        : [];
+
+    const created =
+      Array.isArray(
+        data.created
+      )
+        ? data.created
+        : [];
+
+
+    if (
+      queued.length === 0 &&
+      created.length === 0
+    ) {
+      throw new Error(
+        "CREATE did not queue the REDO."
+      );
+    }
+
+
+    setPreviewVersion(
+      Date.now()
+    );
+
+    return true;
+
+  } catch (err) {
+    setError(
+      err?.message ||
+      "Could not recreate PUB asset."
+    );
+
+    return false;
+
+  } finally {
+    setRecreating(
+      false
+    );
   }
+}
 
 
   /*
    * SEND ONE REVIEWED ASSET TO PACKAGE.
-   *
-   * The editor saves its current values first.
-   * This method then rings the Package doorbell with ONE asset ID.
-   *
-   * On PACKED or PENDING:
-   *   close the editor
-   *   refresh Assets
-   *   move to the Package workbench
-   *
-   * On failure:
-   *   leave the editor open and return the actual reason.
    */
   async function sendAssetToPackaging(
     pubAssetId
@@ -925,12 +988,6 @@ export default function PubAssetsTable({
       }
 
 
-      /*
-       * Successful department handoff.
-       *
-       * PENDING counts as successful intake: Package owns the asset now,
-       * and its stage_note explains what the specialist is waiting for.
-       */
       setEditAsset(
         null
       );
@@ -996,10 +1053,6 @@ export default function PubAssetsTable({
   const columns =
     useMemo(
       () => [
-
-        /*
-         * COPY EDITOR
-         */
         {
           key:
             "edit",
@@ -1013,17 +1066,16 @@ export default function PubAssetsTable({
           render:
             (asset) => {
               const stage =
-                String(
+                normalizedStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                ).toLowerCase();
+                );
 
               const locked =
                 stage ===
-                  "dispatched" ||
-                stage ===
-                  "published";
+                  "shipping" ||
+                isHistoricalStage(
+                  stage
+                );
 
               if (locked) {
                 return "—";
@@ -1055,7 +1107,6 @@ export default function PubAssetsTable({
               );
             },
         },
-      
 
 
         {
@@ -1163,13 +1214,9 @@ export default function PubAssetsTable({
           render:
             (asset) => {
               const stage =
-                String(
+                normalizedStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
+                );
 
               if (!stage) {
                 return "—";
@@ -1218,6 +1265,7 @@ export default function PubAssetsTable({
               "—",
         },
 
+
         {
           key:
             "updated_at",
@@ -1246,28 +1294,49 @@ export default function PubAssetsTable({
           render:
             (asset) => {
               const stage =
-                String(
+                normalizedStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                ).toLowerCase();
+                );
 
-              const locked =
+              const shipping =
                 stage ===
-                  "dispatched" ||
-                stage ===
-                  "published";
+                  "shipping";
+
+              const deleting =
+                Number(
+                  deletingAssetId
+                ) ===
+                Number(
+                  asset
+                    .pub_asset_id ||
+                  0
+                );
 
               return (
                 <button
                   type="button"
 
                   style={
-                    rowActionButtonStyle
+                    isHistoricalStage(
+                      stage
+                    )
+                      ? historicalDeleteButtonStyle
+                      : rowActionButtonStyle
                   }
 
                   disabled={
-                    locked
+                    shipping ||
+                    deleting
+                  }
+
+                  title={
+                    shipping
+                      ? "Cannot delete while Dispatch is running."
+                      : isHistoricalStage(
+                          stage
+                        )
+                        ? "Permanent historical delete requires confirmation."
+                        : "Delete asset"
                   }
 
                   onClick={(
@@ -1276,24 +1345,27 @@ export default function PubAssetsTable({
                     event
                       .stopPropagation();
 
-                    deleteAsset(
+                    requestDeleteAsset(
                       asset
                     );
                   }}
                 >
-                  Delete
+                  {
+                    deleting
+                      ? "Deleting..."
+                      : "Delete"
+                  }
                 </button>
               );
             },
         },
       ],
-      []
+      [
+        deletingAssetId,
+      ]
     );
 
 
-  /*
-   * PAGE
-   */
   if (
     loading &&
     !assets.length
@@ -1490,7 +1562,6 @@ export default function PubAssetsTable({
       </div>
 
 
-      {/* FULL-SCREEN VIEW */}
       {previewAsset
         ?.url
         ? createPortal(
@@ -1528,7 +1599,6 @@ export default function PubAssetsTable({
         : null}
 
 
-      {/* ASSET EDITOR */}
       {editAsset ? (
         isVideoAsset(
           editAsset
@@ -1545,9 +1615,6 @@ export default function PubAssetsTable({
             asset={{
               ...editAsset,
 
-              /*
-               * Cache-bust video after REDO.
-               */
               url:
                 withVersion(
                   editAsset.url,
@@ -1602,9 +1669,6 @@ export default function PubAssetsTable({
             asset={{
               ...editAsset,
 
-              /*
-               * Cache-bust preview after REDO.
-               */
               url:
                 withVersion(
                   editAsset.url,
@@ -1648,7 +1712,237 @@ export default function PubAssetsTable({
           />
         )
       ) : null}
+
+
+      {deleteForeverAsset
+        ? createPortal(
+            <div
+              style={
+                deleteOverlayStyle
+              }
+
+              onMouseDown={(
+                event
+              ) => {
+                if (
+                  event.target ===
+                    event.currentTarget
+                  &&
+                  !deletingAssetId
+                ) {
+                  setDeleteForeverAsset(
+                    null
+                  );
+
+                  setDeleteForeverAuthorized(
+                    false
+                  );
+                }
+              }}
+            >
+              <div
+                role="dialog"
+
+                aria-modal="true"
+
+                aria-label="Delete shipped asset forever"
+
+                style={
+                  deleteDialogStyle
+                }
+              >
+                <div
+                  style={
+                    deleteHeaderStyle
+                  }
+                >
+                  <strong>
+                    Delete shipped asset forever?
+                  </strong>
+                </div>
+
+
+                <div
+                  style={
+                    deleteBodyStyle
+                  }
+                >
+                  <div
+                    style={
+                      deleteWarningStyle
+                    }
+                  >
+                    PUB has already recorded this asset as{" "}
+                    <strong>
+                      {humanize(
+                        normalizedStage(
+                          deleteForeverAsset
+                        )
+                      )}
+                    </strong>.
+                  </div>
+
+
+                  <div>
+                    Asset #
+                    {
+                      deleteForeverAsset
+                        .pub_asset_id
+                    }
+                    {" · "}
+                    {
+                      deleteForeverAsset
+                        .search_title ||
+                      "Untitled"
+                    }
+                  </div>
+
+
+                  <div>
+                    This deletes the permanent PUB record and its local
+                    creative files. It does <strong>not</strong> delete
+                    anything from YouTube, Pinterest, or another channel.
+                    Only continue when the channel item has already been
+                    removed, or when you deliberately want PUB to forget
+                    this historical shipment.
+                  </div>
+
+
+                  <label
+                    style={
+                      deleteCheckboxStyle
+                    }
+                  >
+                    <input
+                      type="checkbox"
+
+                      checked={
+                        deleteForeverAuthorized
+                      }
+
+                      disabled={
+                        Boolean(
+                          deletingAssetId
+                        )
+                      }
+
+                      onChange={(
+                        event
+                      ) => {
+                        setDeleteForeverAuthorized(
+                          event
+                            .target
+                            .checked
+                        );
+                      }}
+                    />
+
+                    <span>
+                      I understand this permanently deletes this shipped
+                      PUB asset record.
+                    </span>
+                  </label>
+                </div>
+
+
+                <div
+                  style={
+                    deleteFooterStyle
+                  }
+                >
+                  <button
+                    type="button"
+
+                    style={
+                      quietButtonStyle
+                    }
+
+                    disabled={
+                      Boolean(
+                        deletingAssetId
+                      )
+                    }
+
+                    onClick={() => {
+                      setDeleteForeverAsset(
+                        null
+                      );
+
+                      setDeleteForeverAuthorized(
+                        false
+                      );
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+
+                  <button
+                    type="button"
+
+                    style={
+                      deleteForeverButtonStyle
+                    }
+
+                    disabled={
+                      !deleteForeverAuthorized
+                      ||
+                      Boolean(
+                        deletingAssetId
+                      )
+                    }
+
+                    onClick={() => {
+                      performDeleteAsset(
+                        deleteForeverAsset,
+                        true
+                      );
+                    }}
+                  >
+                    {
+                      deletingAssetId
+                        ? "Deleting..."
+                        : "Delete Forever"
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>,
+
+            document.body
+          )
+        : null}
     </>
+  );
+}
+
+
+function normalizedStage(
+  asset
+) {
+  return String(
+    asset?.pipeline_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+
+function isHistoricalStage(
+  stage
+) {
+  return [
+    "shipped",
+    "dispatched",
+    "published",
+  ].includes(
+    String(
+      stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase()
   );
 }
 
@@ -1917,6 +2211,17 @@ const rowActionButtonStyle = {
 };
 
 
+const historicalDeleteButtonStyle = {
+  ...rowActionButtonStyle,
+
+  border:
+    "1px solid #d4a4a4",
+
+  color:
+    "#7d2e2e",
+};
+
+
 const pencilButtonStyle = {
   padding:
     "2px 5px",
@@ -1944,6 +2249,186 @@ const pencilButtonStyle = {
 
   fontWeight:
     400,
+
+  cursor:
+    "pointer",
+};
+
+
+const deleteOverlayStyle = {
+  position:
+    "fixed",
+
+  inset:
+    0,
+
+  zIndex:
+    2147483647,
+
+  display:
+    "grid",
+
+  placeItems:
+    "center",
+
+  padding:
+    30,
+
+  background:
+    "rgba(0, 0, 0, 0.60)",
+};
+
+
+const deleteDialogStyle = {
+  width:
+    "min(560px, 94vw)",
+
+  background:
+    "#ffffff",
+
+  color:
+    "#1f2937",
+
+  border:
+    "1px solid #cfd5dc",
+
+  borderRadius:
+    5,
+
+  boxShadow:
+    "0 18px 50px rgba(0,0,0,0.30)",
+};
+
+
+const deleteHeaderStyle = {
+  padding:
+    "13px 15px",
+
+  borderBottom:
+    "1px solid #d8dde3",
+
+  fontSize:
+    17,
+};
+
+
+const deleteBodyStyle = {
+  display:
+    "flex",
+
+  flexDirection:
+    "column",
+
+  gap:
+    14,
+
+  padding:
+    16,
+
+  fontSize:
+    13,
+
+  lineHeight:
+    1.5,
+};
+
+
+const deleteWarningStyle = {
+  padding:
+    "10px 12px",
+
+  border:
+    "1px solid #e2baba",
+
+  background:
+    "#fff7f7",
+
+  color:
+    "#7d2e2e",
+};
+
+
+const deleteCheckboxStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "flex-start",
+
+  gap:
+    9,
+
+  padding:
+    "11px 12px",
+
+  border:
+    "1px solid #d8dde3",
+
+  background:
+    "#f8fafc",
+
+  cursor:
+    "pointer",
+};
+
+
+const deleteFooterStyle = {
+  display:
+    "flex",
+
+  justifyContent:
+    "flex-end",
+
+  gap:
+    8,
+
+  padding:
+    "11px 12px",
+
+  borderTop:
+    "1px solid #d8dde3",
+};
+
+
+const quietButtonStyle = {
+  padding:
+    "5px 9px",
+
+  border:
+    "1px solid #cfd5dc",
+
+  borderRadius:
+    3,
+
+  background:
+    "#ffffff",
+
+  color:
+    "#334155",
+
+  cursor:
+    "pointer",
+};
+
+
+const deleteForeverButtonStyle = {
+  padding:
+    "5px 10px",
+
+  border:
+    "1px solid #9e2f2f",
+
+  borderRadius:
+    3,
+
+  background:
+    "#b93636",
+
+  color:
+    "#ffffff",
+
+  fontWeight:
+    700,
 
   cursor:
     "pointer",

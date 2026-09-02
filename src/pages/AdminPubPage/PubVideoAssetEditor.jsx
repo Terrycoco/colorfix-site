@@ -10,6 +10,21 @@ import {
 
 import PubVideoPlayer from "./PubVideoPlayer";
 import PubMusicEditor from "./PubMusicEditor";
+import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import { API_FOLDER } from "@helpers/config";
+
+
+const REX_PLAYLIST_EXPERIENCES_URL =
+  `${API_FOLDER}/v2/admin/rex/playlist-experiences.php`;
+
+const COLORFIX_PUBLIC_ORIGIN =
+  "https://colorfix.terrymarr.com";
+
+const COLORFIX_HOME_URL =
+  `${COLORFIX_PUBLIC_ORIGIN}/`;
+
+const DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR =
+  "#FFFFFF";
 
 
 const VIDEO_INGREDIENT_FIELDS = {
@@ -89,6 +104,24 @@ export default function PubVideoAssetEditor({
     setRedoWarningOpen,
   ] = useState(false);
 
+  const [
+    rexLinks,
+    setRexLinks,
+  ] = useState({
+    colorsUsedUrl: "",
+    playlistUrl: "",
+  });
+
+  const [
+    rexLinksLoading,
+    setRexLinksLoading,
+  ] = useState(false);
+
+  const [
+    rexLinksError,
+    setRexLinksError,
+  ] = useState("");
+
   /*
    * Preview cache-buster.
    *
@@ -134,6 +167,84 @@ export default function PubVideoAssetEditor({
   const isYouTubeVideo =
     assetType ===
       "youtube_video";
+
+
+  const sourcePlaylistId =
+    useMemo(
+      () => {
+        const sourceType =
+          String(
+            asset?.source_type ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
+
+        if (
+          sourceType === "playlist"
+          &&
+          Number(
+            asset?.source_id ||
+            0
+          ) > 0
+        ) {
+          return Number(
+            asset.source_id
+          );
+        }
+
+        const candidates = [
+          asset?.playlist_id,
+          asset?.source_playlist_id,
+          ingredientValues?.playlist_id,
+          ingredientValues?.source_playlist_id,
+          ingredientValues?.playlist?.playlist_id,
+        ];
+
+        for (
+          const candidate
+          of candidates
+        ) {
+          const id =
+            Number(
+              candidate ||
+              0
+            );
+
+          if (id > 0) {
+            return id;
+          }
+        }
+
+        return 0;
+      },
+      [
+        asset?.source_type,
+        asset?.source_id,
+        asset?.playlist_id,
+        asset?.source_playlist_id,
+        ingredientValues,
+      ]
+    );
+
+
+  const thumbnailTextColor =
+    normalizeThumbnailTextColor(
+      insideValues
+        ?.cover
+        ?.text_color
+    );
+
+  const thumbnailTextColorPickerValue =
+    useMemo(
+      () =>
+        thumbnailPickerValueFromHex(
+          thumbnailTextColor
+        ),
+      [
+        thumbnailTextColor,
+      ]
+    );
 
 
   /*
@@ -222,6 +333,15 @@ export default function PubVideoAssetEditor({
     setRedoWarningOpen(
       false
     );
+
+    setRexLinks({
+      colorsUsedUrl: "",
+      playlistUrl: "",
+    });
+
+    setRexLinksError(
+      ""
+    );
   }, [
     asset?.pub_asset_id,
     asset?.search_title,
@@ -229,6 +349,139 @@ export default function PubVideoAssetEditor({
     assetType,
     ingredientFields,
     ingredientValues,
+  ]);
+
+
+  useEffect(() => {
+    if (
+      !isYouTubeVideo
+      ||
+      sourcePlaylistId <= 0
+    ) {
+      setRexLinks({
+        colorsUsedUrl: "",
+        playlistUrl: "",
+      });
+
+      setRexLinksError(
+        ""
+      );
+
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function loadRexLinks() {
+      setRexLinksLoading(
+        true
+      );
+
+      setRexLinksError(
+        ""
+      );
+
+      try {
+        const params =
+          new URLSearchParams({
+            playlist_id:
+              String(
+                sourcePlaylistId
+              ),
+
+            _:
+              String(
+                Date.now()
+              ),
+          });
+
+        const response =
+          await fetch(
+            `${REX_PLAYLIST_EXPERIENCES_URL}?${params.toString()}`,
+            {
+              credentials:
+                "include",
+            }
+          );
+
+        const payload =
+          await response.json();
+
+        if (
+          !response.ok
+          ||
+          !payload?.ok
+        ) {
+          throw new Error(
+            payload?.error ||
+            "Could not load REX links."
+          );
+        }
+
+        const publicExperience =
+          payload?.data
+            ?.experiences
+            ?.public ||
+          null;
+
+        const resolved =
+          resolveYouTubeDescriptionRexLinks(
+            publicExperience
+          );
+
+        if (!cancelled) {
+          setRexLinks(
+            resolved
+          );
+
+          if (
+            !resolved.colorsUsedUrl
+            &&
+            Number(
+              publicExperience
+                ?.primary_viewer_count ||
+              0
+            ) > 0
+          ) {
+            setRexLinksError(
+              "Colors Used REX is not ready. Reconcile the Playlist REX graph."
+            );
+          }
+        }
+      } catch (
+        error
+      ) {
+        if (!cancelled) {
+          setRexLinks({
+            colorsUsedUrl: "",
+            playlistUrl: "",
+          });
+
+          setRexLinksError(
+            error?.message ||
+            "Could not load REX links."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setRexLinksLoading(
+            false
+          );
+        }
+      }
+    }
+
+    loadRexLinks();
+
+    return () => {
+      cancelled =
+        true;
+    };
+  }, [
+    isYouTubeVideo,
+    sourcePlaylistId,
+    asset?.pub_asset_id,
   ]);
 
 
@@ -360,6 +613,77 @@ export default function PubVideoAssetEditor({
           : {},
     };
   }
+
+function addYouTubeSource(
+  url
+) {
+  const value =
+    String(
+      url ||
+      ""
+    )
+      .trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      new URL(
+        value,
+        COLORFIX_PUBLIC_ORIGIN
+      );
+
+    parsed.searchParams.set(
+      "src",
+      "yt"
+    );
+
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
+
+
+
+function appendDescriptionLink(
+  label,
+  url
+) {
+  const cleanUrl =
+    addYouTubeSource(
+      url
+    );
+
+  if (
+    !cleanUrl
+    ||
+    editorLocked
+  ) {
+    return;
+  }
+
+  setDescription(
+    (
+      current
+    ) =>
+      appendDescriptionLine(
+        current,
+        `${label}: ${cleanUrl}`
+      )
+  );
+
+  setSuccessMessage(
+    ""
+  );
+
+  setActionError(
+    ""
+  );
+}
 
 
   async function handleSave(
@@ -693,6 +1017,46 @@ export default function PubVideoAssetEditor({
                 "Video preview"
               }
             />
+
+            <div
+              style={
+                thumbnailBlockStyle
+              }
+            >
+              <div
+                style={
+                  thumbnailLabelStyle
+                }
+              >
+                Thumbnail
+              </div>
+
+              {asset.thumbnail_url ? (
+                <img
+                  src={
+                    versionedPreviewUrl(
+                      asset.thumbnail_url,
+                      previewVersion
+                    )
+                  }
+
+                  alt="Video thumbnail"
+
+                  style={
+                    thumbnailPreviewStyle
+                  }
+                />
+              ) : (
+                <div
+                  style={
+                    thumbnailEmptyStyle
+                  }
+                >
+                  No thumbnail yet
+                </div>
+              )}
+
+            </div>
           </div>
 
 
@@ -801,6 +1165,294 @@ export default function PubVideoAssetEditor({
                 }}
               />
             </label>
+
+
+            {isYouTubeVideo ? (
+              <div
+                style={
+                  descriptionHelpersStyle
+                }
+              >
+                <button
+                  type="button"
+
+                  style={
+                    descriptionHelperButtonStyle(
+                      Boolean(
+                        rexLinks.colorsUsedUrl
+                        &&
+                        descriptionHasUrl(
+                          description,
+                          rexLinks.colorsUsedUrl
+                        )
+                      )
+                    )
+                  }
+
+                  disabled={
+                    editorLocked
+                    ||
+                    rexLinksLoading
+                    ||
+                    !rexLinks.colorsUsedUrl
+                    ||
+                    descriptionHasUrl(
+                      description,
+                      rexLinks.colorsUsedUrl
+                    )
+                  }
+
+                  title={
+                    rexLinks.colorsUsedUrl
+                      ? "Append the current Public Colors Used REX URL."
+                      : rexLinksLoading
+                        ? "Loading Colors Used REX..."
+                        : "No ready Colors Used REX for this Playlist."
+                  }
+
+                  onClick={() => {
+                    appendDescriptionLink(
+                      "Colors Used",
+                      rexLinks.colorsUsedUrl
+                    );
+                  }}
+                >
+                  {
+                    rexLinks.colorsUsedUrl
+                    &&
+                    descriptionHasUrl(
+                      description,
+                      rexLinks.colorsUsedUrl
+                    )
+                      ? "✓ Colors Used"
+                      : "+ Colors Used"
+                  }
+                </button>
+
+
+                <button
+                  type="button"
+
+                  style={
+                    descriptionHelperButtonStyle(
+                      Boolean(
+                        rexLinks.playlistUrl
+                        &&
+                        descriptionHasUrl(
+                          description,
+                          rexLinks.playlistUrl
+                        )
+                      )
+                    )
+                  }
+
+                  disabled={
+                    editorLocked
+                    ||
+                    rexLinksLoading
+                    ||
+                    !rexLinks.playlistUrl
+                    ||
+                    descriptionHasUrl(
+                      description,
+                      rexLinks.playlistUrl
+                    )
+                  }
+
+                  title={
+                    rexLinks.playlistUrl
+                      ? "Append this Playlist's permanent Public REX URL."
+                      : rexLinksLoading
+                        ? "Loading Playlist REX..."
+                        : "No Public Playlist REX is ready."
+                  }
+
+                  onClick={() => {
+                    appendDescriptionLink(
+                      "View the Playlist",
+                      rexLinks.playlistUrl
+                    );
+                  }}
+                >
+                  {
+                    rexLinks.playlistUrl
+                    &&
+                    descriptionHasUrl(
+                      description,
+                      rexLinks.playlistUrl
+                    )
+                      ? "✓ Playlist Link"
+                      : "+ Playlist Link"
+                  }
+                </button>
+
+
+                <button
+                  type="button"
+
+                  style={
+                    descriptionHelperButtonStyle(
+                      descriptionHasUrl(
+                        description,
+                        COLORFIX_HOME_URL
+                      )
+                    )
+                  }
+
+                  disabled={
+                    editorLocked
+                    ||
+                    descriptionHasUrl(
+                      description,
+                      COLORFIX_HOME_URL
+                    )
+                  }
+
+                  title="Append the ColorFix home page."
+                  onClick={() => {
+                    appendDescriptionLink(
+                      "More from ColorFix",
+                      COLORFIX_HOME_URL
+                    );
+                  }}
+                >
+                  {
+                    descriptionHasUrl(
+                      description,
+                      COLORFIX_HOME_URL
+                    )
+                      ? "✓ ColorFix Home"
+                      : "+ ColorFix Home"
+                  }
+                </button>
+
+
+                {rexLinksLoading ? (
+                  <span
+                    style={
+                      descriptionHelperNoteStyle
+                    }
+                  >
+                    Loading REX links…
+                  </span>
+                ) : rexLinksError ? (
+                  <span
+                    style={
+                      descriptionHelperErrorStyle
+                    }
+                  >
+                    {
+                      rexLinksError
+                    }
+                  </span>
+                ) : sourcePlaylistId > 0 ? (
+                  <span
+                    style={
+                      descriptionHelperNoteStyle
+                    }
+                  >
+                    Playlist #
+                    {
+                      sourcePlaylistId
+                    }
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
+
+            {isYouTubeVideo ? (
+              <div
+                style={
+                  thumbnailColorEditorRightStyle
+                }
+              >
+                <div
+                  style={
+                    thumbnailColorLabelStyle
+                  }
+                >
+                  Thumbnail Text Color
+                </div>
+
+                <div
+                  style={
+                    thumbnailColorPickerWrapStyle
+                  }
+                >
+                  <FuzzySearchColorSelect
+                    value={
+                      thumbnailTextColorPickerValue
+                    }
+
+                    compact
+
+                    autoFocus={
+                      false
+                    }
+
+                    preventAutoFocus
+
+                    showLabel={
+                      false
+                    }
+
+                    mobileBreakpoint={
+                      0
+                    }
+
+                    onSelect={(
+                      color
+                    ) => {
+                      const nextColor =
+                        color
+                          ? colorObjectToHex(
+                              color
+                            )
+                          : DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
+
+                      setInsideValues(
+                        (
+                          current
+                        ) => ({
+                          ...current,
+
+                          cover: {
+                            ...(
+                              current
+                                ?.cover ||
+                              {}
+                            ),
+
+                            text_color:
+                              normalizeThumbnailTextColor(
+                                nextColor
+                              ),
+                          },
+                        })
+                      );
+
+                      setSuccessMessage(
+                        ""
+                      );
+
+                      setActionError(
+                        ""
+                      );
+                    }}
+                  />
+                </div>
+
+                <div
+                  style={
+                    thumbnailColorHintStyle
+                  }
+                >
+                  Default is white. Choosing another color changes the
+                  thumbnail itself and requires REDO.
+                </div>
+              </div>
+            ) : null}
 
 
             {ingredientFields.map(
@@ -930,41 +1582,6 @@ export default function PubVideoAssetEditor({
             )}
 
 
-            <div>
-              <div
-                style={
-                  thumbnailLabelStyle
-                }
-              >
-                Thumbnail
-              </div>
-
-              {asset.thumbnail_url ? (
-                <img
-                  src={
-                    versionedPreviewUrl(
-                      asset.thumbnail_url,
-                      previewVersion
-                    )
-                  }
-
-                  alt="Video thumbnail"
-
-                  style={
-                    thumbnailPreviewStyle
-                  }
-                />
-              ) : (
-                <div
-                  style={
-                    thumbnailEmptyStyle
-                  }
-                >
-                  No thumbnail yet
-                </div>
-              )}
-            </div>
-
 
             {isYouTubeVideo ? (
               <div
@@ -1005,31 +1622,29 @@ export default function PubVideoAssetEditor({
                   </div>
                 </div>
 
-                {!isDispatchLocked ? (
-                  <button
-                    type="button"
+                <button
+                  type="button"
 
-                    style={
-                      quietButtonStyle
-                    }
+                  style={
+                    quietButtonStyle
+                  }
 
-                    disabled={
-                      busy
-                    }
+                  disabled={
+                    editorLocked
+                  }
 
-                    onClick={() => {
-                      setMusicOpen(
-                        true
-                      );
+                  onClick={() => {
+                    setMusicOpen(
+                      true
+                    );
 
-                      setSuccessMessage(
-                        ""
-                      );
-                    }}
-                  >
-                    ♪ Music
-                  </button>
-                ) : null}
+                    setSuccessMessage(
+                      ""
+                    );
+                  }}
+                >
+                  ♪ Music
+                </button>
               </div>
             ) : null}
 
@@ -1098,67 +1713,63 @@ export default function PubVideoAssetEditor({
           </button>
 
 
-          {!isDispatchLocked ? (
-            <>
-              <button
-                type="submit"
+          <button
+            type="submit"
 
-                style={
-                  quietButtonStyle
-                }
+            style={
+              quietButtonStyle
+            }
 
-                disabled={
-                  busy
-                }
-              >
-                {
-                  saving
-                    ? "Saving..."
-                    : hasIngredientChanges
-                      ? "Save & Redo"
-                      : "Save"
-                }
-              </button>
+            disabled={
+              editorLocked
+            }
+          >
+            {
+              saving
+                ? "Saving..."
+                : hasIngredientChanges
+                  ? "Save & Redo"
+                  : "Save"
+            }
+          </button>
 
 
-              <button
-                type="button"
+          <button
+            type="button"
 
-                disabled={
-                  busy
-                }
+            disabled={
+              editorLocked
+            }
 
-                onClick={
-                  commitAndRedo
-                }
-              >
-                {
-                  recreating
-                    ? "Recreating..."
-                    : "Redo Video"
-                }
-              </button>
+            onClick={
+              commitAndRedo
+            }
+          >
+            {
+              recreating
+                ? "Recreating..."
+                : "Redo Video"
+            }
+          </button>
 
 
-              <button
-                type="button"
+          <button
+            type="button"
 
-                disabled={
-                  busy
-                }
+            disabled={
+              editorLocked
+            }
 
-                onClick={
-                  handleSendToPackaging
-                }
-              >
-                {
-                  sendingToPackaging
-                    ? "Sending..."
-                    : "Send to Packaging"
-                }
-              </button>
-            </>
-          ) : null}
+            onClick={
+              handleSendToPackaging
+            }
+          >
+            {
+              sendingToPackaging
+                ? "Sending..."
+                : "Send to Packaging"
+            }
+          </button>
         </div>
       </form>
 
@@ -1358,6 +1969,214 @@ export default function PubVideoAssetEditor({
  * This guarantees a fresh browser request even when the backend payload
  * does not expose updated_at/checksum and REDO keeps the same asset URL.
  */
+function resolveYouTubeDescriptionRexLinks(
+  publicExperience
+) {
+  if (
+    !publicExperience
+    ||
+    typeof publicExperience !==
+      "object"
+  ) {
+    return {
+      colorsUsedUrl: "",
+      playlistUrl: "",
+    };
+  }
+
+  const playlistRex =
+    publicExperience
+      ?.playlist_rex ||
+    null;
+
+  const playlistUrl =
+    String(
+      playlistRex?.status ||
+      ""
+    )
+      .trim()
+      .toLowerCase() === "active"
+      ? absolutePublicRexUrl(
+          playlistRex?.url
+        )
+      : "";
+
+  const children =
+    Array.isArray(
+      publicExperience
+        ?.children
+    )
+      ? publicExperience.children
+      : [];
+
+  const primaryViewerCount =
+    Number(
+      publicExperience
+        ?.primary_viewer_count ||
+      0
+    );
+
+  let colorsUsedUrl =
+    "";
+
+  if (
+    primaryViewerCount ===
+    1
+  ) {
+    const viewer =
+      children.find(
+        (
+          child
+        ) =>
+          child?.type ===
+            "viewer"
+          &&
+          child?.is_primary ===
+            true
+          &&
+          child?.status ===
+            "ready"
+          &&
+          child?.rex?.url
+      );
+
+    colorsUsedUrl =
+      absolutePublicRexUrl(
+        viewer?.rex?.url
+      );
+  } else if (
+    primaryViewerCount > 1
+  ) {
+    const thumbs =
+      children.find(
+        (
+          child
+        ) =>
+          child?.type ===
+            "thumbs"
+          &&
+          child?.required !==
+            false
+          &&
+          child?.status ===
+            "ready"
+          &&
+          child?.rex?.url
+      );
+
+    colorsUsedUrl =
+      absolutePublicRexUrl(
+        thumbs?.rex?.url
+      );
+  }
+
+  return {
+    colorsUsedUrl:
+      colorsUsedUrl,
+
+    playlistUrl:
+      playlistUrl,
+  };
+}
+
+
+function absolutePublicRexUrl(
+  url
+) {
+  const value =
+    String(
+      url ||
+      ""
+    )
+      .trim();
+
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(
+      value,
+      COLORFIX_PUBLIC_ORIGIN
+    ).toString();
+  } catch {
+    return value;
+  }
+}
+
+
+function descriptionHasUrl(
+  description,
+  url
+) {
+  const target =
+    String(
+      url ||
+      ""
+    )
+      .trim();
+
+  if (!target) {
+    return false;
+  }
+
+  return String(
+    description ||
+    ""
+  )
+    .split(
+      /\s+/
+    )
+    .some(
+      (token) =>
+        token
+          .replace(
+            /[),.;!?]+$/g,
+            ""
+          ) === target
+    );
+}
+
+
+function appendDescriptionLine(
+  description,
+  line
+) {
+  const current =
+    String(
+      description ||
+      ""
+    )
+      .replace(
+        /\s+$/g,
+        ""
+      );
+
+  const nextLine =
+    String(
+      line ||
+      ""
+    )
+      .trim();
+
+  if (!nextLine) {
+    return current;
+  }
+
+  if (
+    current.includes(
+      nextLine
+    )
+  ) {
+    return current;
+  }
+
+  return current
+    ? `${current}\n\n${nextLine}`
+    : nextLine;
+}
+
+
 function versionedPreviewUrl(
   url,
   version
@@ -1424,10 +2243,132 @@ function buildEditableIngredientValues(
         ingredientValues
           ?.music
       );
+
+    /*
+     * Keep only the editable thumbnail override in local Creator state.
+     *
+     * The durable cover ingredient contains the source file/title too,
+     * but this editor must not resend those untouched values. A deep
+     * ingredient patch of cover.text_color is enough.
+     *
+     * Old orders without text_color inherit the Recipe's white default.
+     */
+    next.cover = {
+      text_color:
+        normalizeThumbnailTextColor(
+          ingredientValues
+            ?.cover
+            ?.text_color
+        ),
+    };
   }
 
 
   return next;
+}
+
+
+function normalizeThumbnailTextColor(
+  value
+) {
+  const raw =
+    String(
+      value ||
+      ""
+    )
+      .trim()
+      .toUpperCase();
+
+  if (
+    /^#[0-9A-F]{6}$/.test(
+      raw
+    )
+  ) {
+    return raw;
+  }
+
+  if (
+    /^[0-9A-F]{6}$/.test(
+      raw
+    )
+  ) {
+    return `#${raw}`;
+  }
+
+  return DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
+}
+
+
+function thumbnailPickerValueFromHex(
+  value
+) {
+  const hex =
+    normalizeThumbnailTextColor(
+      value
+    );
+
+  return {
+    id:
+      `thumbnail-text-${hex}`,
+
+    name:
+      hex,
+
+    code:
+      hex,
+
+    hex6:
+      hex.replace(
+        "#",
+        ""
+      ),
+  };
+}
+
+
+function colorObjectToHex(
+  color
+) {
+  const hex6 =
+    String(
+      color
+        ?.hex6 ||
+      ""
+    )
+      .trim()
+      .replace(
+        /^#/,
+        ""
+      );
+
+  if (
+    /^[0-9A-F]{6}$/i.test(
+      hex6
+    )
+  ) {
+    return `#${hex6.toUpperCase()}`;
+  }
+
+  const hex =
+    String(
+      color
+        ?.hex ||
+      ""
+    )
+      .trim();
+
+  if (
+    /^#?[0-9A-F]{6}$/i.test(
+      hex
+    )
+  ) {
+    return `#${hex.replace(
+      "#",
+      ""
+    ).toUpperCase()}`;
+  }
+
+  return DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
 }
 
 
@@ -1636,6 +2577,40 @@ function describeDirectIngredientChanges(
       changes
     )
   ) {
+    if (
+      key === "cover"
+    ) {
+      const beforeColor =
+        normalizeThumbnailTextColor(
+          original
+            ?.cover
+            ?.text_color
+        );
+
+      const afterColor =
+        normalizeThumbnailTextColor(
+          current
+            ?.cover
+            ?.text_color
+        );
+
+      if (
+        beforeColor !==
+        afterColor
+      ) {
+        labels.push(
+          "Thumbnail text color"
+        );
+      } else {
+        labels.push(
+          "Thumbnail"
+        );
+      }
+
+      continue;
+    }
+
+
     if (
       key === "music"
     ) {
@@ -2476,6 +3451,15 @@ const bodyStyle = {
 const playerColumnStyle = {
   minWidth:
     0,
+
+  display:
+    "flex",
+
+  flexDirection:
+    "column",
+
+  gap:
+    14,
 };
 
 
@@ -2491,6 +3475,78 @@ const fieldsStyle = {
 
   minWidth:
     0,
+};
+
+
+const thumbnailBlockStyle = {
+  width:
+    "min(300px, 70%)",
+};
+
+
+const thumbnailColorEditorRightStyle = {
+  display:
+    "flex",
+
+  flexDirection:
+    "column",
+
+  gap:
+    5,
+
+  padding:
+    "10px 12px",
+
+  border:
+    "1px solid #d8dde3",
+
+  borderRadius:
+    4,
+
+  background:
+    "#f8fafc",
+
+  overflow:
+    "visible",
+};
+
+
+const thumbnailColorPickerWrapStyle = {
+  position:
+    "relative",
+
+  zIndex:
+    20,
+
+  width:
+    "100%",
+
+  overflow:
+    "visible",
+};
+
+
+const thumbnailColorLabelStyle = {
+  fontSize:
+    12,
+
+  fontWeight:
+    700,
+
+  color:
+    "#334155",
+};
+
+
+const thumbnailColorHintStyle = {
+  color:
+    "#64748b",
+
+  fontSize:
+    11,
+
+  lineHeight:
+    1.35,
 };
 
 
@@ -2517,7 +3573,7 @@ const thumbnailPreviewStyle = {
     "100%",
 
   maxHeight:
-    220,
+    170,
 
   objectFit:
     "contain",
@@ -2557,6 +3613,72 @@ const thumbnailEmptyStyle = {
 
   fontSize:
     12,
+};
+
+
+const descriptionHelpersStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "center",
+
+  flexWrap:
+    "wrap",
+
+  gap:
+    7,
+
+  marginTop:
+    -6,
+};
+
+
+const descriptionHelperButtonStyle = (
+  added
+) => ({
+  ...quietButtonStyle,
+
+  background:
+    added
+      ? "#eef8f1"
+      : "#f8fafc",
+
+  borderColor:
+    added
+      ? "#9bbda7"
+      : "#cfd5dc",
+
+  color:
+    added
+      ? "#2f6b43"
+      : "#334155",
+
+  fontWeight:
+    added
+      ? 700
+      : 600,
+});
+
+
+const descriptionHelperNoteStyle = {
+  color:
+    "#64748b",
+
+  fontSize:
+    11,
+};
+
+
+const descriptionHelperErrorStyle = {
+  color:
+    "#8a3b32",
+
+  fontSize:
+    11,
+
+  fontWeight:
+    600,
 };
 
 

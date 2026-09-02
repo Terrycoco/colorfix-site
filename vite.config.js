@@ -31,6 +31,7 @@ export default defineConfig({
       '@test': path.resolve(__dirname, './src/test'),
       '@lib': path.resolve(__dirname, './src/lib'),
       '@Analytics': path.resolve(__dirname, './src/Analytics'),
+      '@ANA': path.resolve(__dirname, './src/ANA'),
       '@PUB' : path.resolve(__dirname, './src/PUB'),
       '@REX' : path.resolve(__dirname,'./src/REX' ),
       '@RX' : path.resolve(__dirname, './src/RX'),

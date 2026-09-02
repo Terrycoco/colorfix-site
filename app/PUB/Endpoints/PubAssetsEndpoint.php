@@ -477,16 +477,11 @@ final class PubAssetsEndpoint
             );
 
 
-        if (
-            in_array(
-                $stage,
-                [
-                    'dispatched',
-                    'published',
-                ],
-                true
-            )
-        ) {
+        /*
+         * Never delete an asset while Dispatch is actively working on it.
+         * The historical override exists only after shipping has finished.
+         */
+        if ($stage === 'shipping') {
             self::sendJson(
                 409,
                 [
@@ -494,7 +489,57 @@ final class PubAssetsEndpoint
                         false,
 
                     'error' =>
-                        'Dispatched or published assets cannot be deleted.',
+                        'This asset is currently shipping and cannot be deleted.',
+                ]
+            );
+
+            return;
+        }
+
+
+        $historicalStage =
+            in_array(
+                $stage,
+                [
+                    'shipped',
+                    'dispatched',
+                    'published',
+                ],
+                true
+            );
+
+
+        $forceDeleteShipped =
+            (
+                $body[
+                    'force_delete_shipped'
+                ]
+                ?? false
+            ) === true;
+
+
+        /*
+         * Historical PUB records remain protected by default.
+         *
+         * The admin UI exposes the override only through the explicit
+         * "Delete Forever" checkbox flow. Direct API callers must send
+         * the same boolean deliberately.
+         */
+        if (
+            $historicalStage
+            && !$forceDeleteShipped
+        ) {
+            self::sendJson(
+                409,
+                [
+                    'ok' =>
+                        false,
+
+                    'code' =>
+                        'historical_delete_requires_authorization',
+
+                    'error' =>
+                        'This asset has already been shipped. Check the permanent-delete authorization before deleting it.',
                 ]
             );
 
@@ -538,12 +583,21 @@ final class PubAssetsEndpoint
             $videoJobs
                 ->failActiveJobsForAsset(
                     $pubAssetId,
-                    'PUB asset was deleted before video rendering completed.'
+                    $historicalStage
+                        ? 'Historical PUB asset was permanently deleted by an authorized admin.'
+                        : 'PUB asset was deleted before video rendering completed.'
                 );
         }
 
 
-        $filePath =
+        /*
+         * Remove the physical creative outputs owned by this PUB asset.
+         *
+         * YouTube videos have both an MP4 and a companion thumbnail JPEG.
+         * Do not leave the thumbnail orphaned when a test shipment is
+         * intentionally erased from PUB.
+         */
+        $physicalFiles = [
             trim(
                 (string)(
                     $asset[
@@ -551,19 +605,35 @@ final class PubAssetsEndpoint
                     ]
                     ?? ''
                 )
-            );
+            ),
+
+            trim(
+                (string)(
+                    $asset[
+                        'thumbnail_file_path'
+                    ]
+                    ?? ''
+                )
+            ),
+        ];
 
 
-        if (
-            $filePath !== ''
-            &&
-            is_file(
-                $filePath
+        foreach (
+            array_unique(
+                array_filter(
+                    $physicalFiles,
+                    static fn(string $path): bool =>
+                        $path !== ''
+                )
             )
+            as $physicalFile
         ) {
             if (
-                !unlink(
-                    $filePath
+                is_file(
+                    $physicalFile
+                )
+                && !unlink(
+                    $physicalFile
                 )
             ) {
                 throw new RuntimeException(
@@ -574,7 +644,9 @@ final class PubAssetsEndpoint
 
 
         $repo->deleteUnsent(
-            $pubAssetId
+            $pubAssetId,
+            $historicalStage
+                && $forceDeleteShipped
         );
 
 
@@ -586,6 +658,9 @@ final class PubAssetsEndpoint
 
                 'deleted_pub_asset_id' =>
                     $pubAssetId,
+
+                'historical_delete' =>
+                    $historicalStage,
             ]
         );
     }
@@ -617,6 +692,7 @@ final class PubAssetsEndpoint
 
             'youtube_video' => [
                 'music',
+                'cover.text_color',
             ],
 
             default => [],
@@ -624,6 +700,15 @@ final class PubAssetsEndpoint
     }
 
 
+    /**
+     * Return only editor-authorized Creator ingredients.
+     *
+     * Dotted paths remain nested in the response so React receives:
+     *
+     *   ingredient_values.cover.text_color
+     *
+     * rather than a synthetic flat key.
+     */
     private static function editableIngredientValues(
         string $assetType,
         array $ingredients
@@ -638,18 +723,23 @@ final class PubAssetsEndpoint
             as $path
         ) {
             if (
-                array_key_exists(
-                    $path,
-                    $ingredients
+                !self::nestedPathExists(
+                    $ingredients,
+                    $path
                 )
             ) {
-                $values[
-                    $path
-                ] =
-                    $ingredients[
-                        $path
-                    ];
+                continue;
             }
+
+
+            self::setNestedValue(
+                $values,
+                $path,
+                self::getNestedValue(
+                    $ingredients,
+                    $path
+                )
+            );
         }
 
 
@@ -657,53 +747,359 @@ final class PubAssetsEndpoint
     }
 
 
+    /**
+     * Accept the editor's natural nested JSON while enforcing the exact
+     * authorized ingredient paths.
+     *
+     * Example request:
+     *
+     *   ingredient_changes: {
+     *     cover: {
+     *       text_color: "#168B8A"
+     *     }
+     *   }
+     *
+     * becomes the repository patch:
+     *
+     *   [
+     *     "cover.text_color" => "#168B8A"
+     *   ]
+     *
+     * This is intentionally NOT the same as making "cover" editable:
+     * allowing the whole cover object could overwrite its durable
+     * file_path/image_url/title values.
+     */
     private static function sanitizeEditableIngredientChanges(
         string $assetType,
         array $requested
     ): array {
+        $allowedPaths =
+            self::editableIngredientPaths(
+                $assetType
+            );
+
         $allowed =
             array_flip(
-                self::editableIngredientPaths(
-                    $assetType
-                )
+                $allowedPaths
             );
 
 
         $clean = [];
 
 
+        self::collectEditableIngredientChanges(
+            requested:
+                $requested,
+
+            prefix:
+                '',
+
+            allowed:
+                $allowed,
+
+            clean:
+                $clean,
+
+            assetType:
+                strtolower(
+                    trim(
+                        $assetType
+                    )
+                )
+        );
+
+
+        return $clean;
+    }
+
+
+    /**
+     * Walk nested editor JSON until an authorized path is reached.
+     *
+     * If a whole-object path itself is authorized (currently "music"),
+     * preserve that object as one value. Otherwise recurse so a narrow
+     * authorization such as "cover.text_color" cannot accidentally grant
+     * edit access to the rest of cover.
+     *
+     * @param array<string,int> $allowed
+     * @param array<string,mixed> $clean
+     */
+    private static function collectEditableIngredientChanges(
+        array $requested,
+        string $prefix,
+        array $allowed,
+        array &$clean,
+        string $assetType
+    ): void {
         foreach (
             $requested
-            as $path => $value
+            as $key => $value
         ) {
-            $path =
+            $key =
                 trim(
-                    (string)$path
+                    (string)$key
                 );
 
 
-            if (
-                $path === ''
-                ||
-                !array_key_exists(
-                    $path,
-                    $allowed
-                )
-            ) {
+            if ($key === '') {
                 throw new RuntimeException(
-                    "Ingredient '{$path}' is not editable for asset type '{$assetType}'."
+                    "Ingredient '{$key}' is not editable for asset type '{$assetType}'."
                 );
             }
 
 
-            $clean[
-                $path
-            ] =
-                $value;
+            $path =
+                $prefix === ''
+                    ? $key
+                    : $prefix . '.' . $key;
+
+
+            /*
+             * Exact authorization wins. This is what keeps the existing
+             * "music" object behavior unchanged.
+             */
+            if (
+                array_key_exists(
+                    $path,
+                    $allowed
+                )
+            ) {
+                $clean[
+                    $path
+                ] =
+                    $value;
+
+                continue;
+            }
+
+
+            /*
+             * Recurse only if this path is a parent of at least one
+             * explicitly authorized nested ingredient.
+             */
+            $isAuthorizedParent =
+                false;
+
+            $childPrefix =
+                $path . '.';
+
+
+            foreach (
+                $allowed
+                as $allowedPath => $_
+            ) {
+                if (
+                    str_starts_with(
+                        $allowedPath,
+                        $childPrefix
+                    )
+                ) {
+                    $isAuthorizedParent =
+                        true;
+
+                    break;
+                }
+            }
+
+
+            if (
+                $isAuthorizedParent
+                && is_array(
+                    $value
+                )
+            ) {
+                self::collectEditableIngredientChanges(
+                    requested:
+                        $value,
+
+                    prefix:
+                        $path,
+
+                    allowed:
+                        $allowed,
+
+                    clean:
+                        $clean,
+
+                    assetType:
+                        $assetType
+                );
+
+                continue;
+            }
+
+
+            throw new RuntimeException(
+                "Ingredient '{$path}' is not editable for asset type '{$assetType}'."
+            );
+        }
+    }
+
+
+    private static function nestedPathExists(
+        array $source,
+        string $path
+    ): bool {
+        $parts =
+            array_values(
+                array_filter(
+                    explode(
+                        '.',
+                        $path
+                    ),
+                    static fn(string $part): bool =>
+                        $part !== ''
+                )
+            );
+
+
+        if ($parts === []) {
+            return false;
         }
 
 
-        return $clean;
+        $cursor =
+            $source;
+
+
+        foreach (
+            $parts
+            as $part
+        ) {
+            if (
+                !is_array(
+                    $cursor
+                )
+                || !array_key_exists(
+                    $part,
+                    $cursor
+                )
+            ) {
+                return false;
+            }
+
+
+            $cursor =
+                $cursor[
+                    $part
+                ];
+        }
+
+
+        return true;
+    }
+
+
+    private static function getNestedValue(
+        array $source,
+        string $path
+    ): mixed {
+        $cursor =
+            $source;
+
+
+        foreach (
+            explode(
+                '.',
+                $path
+            )
+            as $part
+        ) {
+            if (
+                !is_array(
+                    $cursor
+                )
+                || !array_key_exists(
+                    $part,
+                    $cursor
+                )
+            ) {
+                return null;
+            }
+
+
+            $cursor =
+                $cursor[
+                    $part
+                ];
+        }
+
+
+        return $cursor;
+    }
+
+
+    private static function setNestedValue(
+        array &$target,
+        string $path,
+        mixed $value
+    ): void {
+        $parts =
+            array_values(
+                array_filter(
+                    explode(
+                        '.',
+                        $path
+                    ),
+                    static fn(string $part): bool =>
+                        $part !== ''
+                )
+            );
+
+
+        if ($parts === []) {
+            return;
+        }
+
+
+        $cursor =
+            &$target;
+
+
+        foreach (
+            $parts
+            as $index => $part
+        ) {
+            $isLast =
+                $index ===
+                count(
+                    $parts
+                ) - 1;
+
+
+            if ($isLast) {
+                $cursor[
+                    $part
+                ] =
+                    $value;
+
+                return;
+            }
+
+
+            if (
+                !isset(
+                    $cursor[
+                        $part
+                    ]
+                )
+                || !is_array(
+                    $cursor[
+                        $part
+                    ]
+                )
+            ) {
+                $cursor[
+                    $part
+                ] = [];
+            }
+
+
+            $cursor =
+                &$cursor[
+                    $part
+                ];
+        }
     }
 
 

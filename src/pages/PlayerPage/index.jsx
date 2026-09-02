@@ -3,6 +3,7 @@ import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import PlayerExperience from "@components/PlayerExperience";
 import { applySourceToParams } from "@helpers/sourceParam";
 import colorfixLogoUrl from "../../assets/brand/colorfix_lightbg.png";
+import ANATrack from "@ANA/ANATrack";
 import "./playerpage.css";
 
 export default function PlayerPage() {
@@ -141,7 +142,23 @@ export default function PlayerPage() {
     );
   }
 
-  return <PlayerExperience data={data} />;
+      const canonicalPlaylistId = Number(data?.playlist_id);
+
+    if (!Number.isInteger(canonicalPlaylistId) || canonicalPlaylistId <= 0) {
+      return <PlayerExperience data={data} />;
+    }
+
+    return (
+      <ANATrack
+        resource={{
+          resource_type: "playlist",
+          resource_id: canonicalPlaylistId,
+          experience_key: data?.experience_key ?? null,
+        }}
+      >
+        <PlayerExperience data={data} />
+      </ANATrack>
+    );
 }
 
 function PlaylistUnavailable() {

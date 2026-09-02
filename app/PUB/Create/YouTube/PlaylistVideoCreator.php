@@ -2806,11 +2806,64 @@ final class PlaylistVideoCreator implements PubComWorkerContract
         }
 
 
+        /*
+         * text_color is optional for backward compatibility.
+         * If absent, the Recipe's default is used.
+         */
+        $this->thumbnailTextColor(
+            $cover
+        );
+
+
         if (!is_file($filePath)) {
             throw new RuntimeException(
                 'YouTube Playlist Video cover source file does not exist.'
             );
         }
+    }
+
+
+    /**
+     * Resolve the saved per-asset thumbnail title color.
+     *
+     * Older orders omit cover.text_color and therefore inherit the
+     * Recipe-owned default.
+     */
+    private function thumbnailTextColor(
+        array $cover
+    ): string {
+        $value =
+            strtoupper(
+                trim(
+                    (string)(
+                        $cover[
+                            'text_color'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if ($value === '') {
+            return
+                PlaylistVideoRecipe::THUMBNAIL_TEXT_COLOR;
+        }
+
+
+        if (
+            preg_match(
+                '/^#[0-9A-F]{6}$/',
+                $value
+            ) !== 1
+        ) {
+            throw new RuntimeException(
+                'YouTube Playlist Video ingredients.cover.text_color must be a six-digit hex color.'
+            );
+        }
+
+
+        return $value;
     }
 
 
@@ -3074,6 +3127,11 @@ final class PlaylistVideoCreator implements PubComWorkerContract
                 ]
             );
 
+        $textColor =
+            $this->thumbnailTextColor(
+                $cover
+            );
+
 
         $canvas =
             imagecreatetruecolor(
@@ -3117,7 +3175,8 @@ final class PlaylistVideoCreator implements PubComWorkerContract
                         PlaylistVideoRecipe::THUMBNAIL_TITLE_SIDE_PADDING
                         * 2
                     ),
-                PlaylistVideoRecipe::THUMBNAIL_TITLE_AREA_HEIGHT
+                PlaylistVideoRecipe::THUMBNAIL_TITLE_AREA_HEIGHT,
+                $textColor
             );
 
 
@@ -3370,7 +3429,8 @@ final class PlaylistVideoCreator implements PubComWorkerContract
         string $title,
         int $x,
         int $width,
-        int $height
+        int $height,
+        string $textColorHex
     ): void {
         $font =
             $this->thumbnailFontPath();
@@ -3384,12 +3444,41 @@ final class PlaylistVideoCreator implements PubComWorkerContract
         }
 
 
-        $white =
+        $textColorHex =
+            strtoupper(
+                ltrim(
+                    trim(
+                        $textColorHex
+                    ),
+                    '#'
+                )
+            );
+
+
+        $titleColor =
             imagecolorallocate(
                 $canvas,
-                255,
-                255,
-                255
+                hexdec(
+                    substr(
+                        $textColorHex,
+                        0,
+                        2
+                    )
+                ),
+                hexdec(
+                    substr(
+                        $textColorHex,
+                        2,
+                        2
+                    )
+                ),
+                hexdec(
+                    substr(
+                        $textColorHex,
+                        4,
+                        2
+                    )
+                )
             );
 
         $black =
@@ -3519,9 +3608,9 @@ final class PlaylistVideoCreator implements PubComWorkerContract
 
 
             /*
-             * Black stroke + white fill, similar to traditional YouTube
+             * Black stroke + chosen fill, similar to traditional YouTube
              * thumbnail lettering. Draw the stroke by offsetting the same
-             * glyphs around the final white text.
+             * glyphs around the final title text.
              */
             for (
                 $offsetX =
@@ -3580,7 +3669,7 @@ final class PlaylistVideoCreator implements PubComWorkerContract
                 0,
                 $textX,
                 $textY,
-                $white,
+                $titleColor,
                 $font,
                 $line
             );

@@ -34,7 +34,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
   const [showSortPeek, setShowSortPeek] = useState(true);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.matchMedia('(max-width: 768px)').matches;
+    return window.matchMedia('(max-width: 1000px)').matches;
   });
   const lastScrollRef = useRef(0);
 
@@ -60,7 +60,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const mq = window.matchMedia('(max-width: 768px)');
+    const mq = window.matchMedia('(max-width: 1000px)');
     const handleChange = (event) => setIsMobile(event.matches);
     setIsMobile(mq.matches);
     mq.addEventListener('change', handleChange);
@@ -375,15 +375,16 @@ const GalleryPage = ({ defaultQueryId = null }) => {
   const galleryBreakpointCols = isFrontPageDesktop
     ? { default: 3, 1200: 3, 800: 2, 500: 2 }
     : undefined;
-  const mergedItems = mergeWithInserts(
-    searchItems,
-    !isFrontPageDesktop && frontPageRailItem
-      ? [...insertItems, frontPageRailItem]
-      : insertItems
-  );
+const mergedItems = mergeWithInserts(
+  searchItems,
+  !isFrontPageDesktop && frontPageRailItem
+    ? [...insertItems, frontPageRailItem]
+    : insertItems
+);
 
   return (
     <div className={`gallery-wrapper${isFrontPageDesktop ? ' gallery-wrapper--front-page-desktop' : ''}`}>
+
       <TopSpacer disabled={isMobile} />
 
       {isSwatch && (
