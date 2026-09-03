@@ -170,7 +170,7 @@ function PlaylistUnavailable() {
         <p>It may have been moved or taken offline.</p>
         <div className="playlist-unavailable__actions">
           <a href="/picker?psi=11">Browse Playlists</a>
-          <a href="/results/4">Go to ColorFix Home</a>
+          <a href="/">Go to ColorFix Home</a>
         </div>
       </section>
     </main>

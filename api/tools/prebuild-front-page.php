@@ -130,7 +130,7 @@ function frontPageBuildContentFallbacks(string $buildKey): array {
 
     return [
         'title' => 'ColorFix by Terry | Home Color Transformations & Paint Palettes',
-        'meta_description' => 'ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr.',
+        'meta_description' => 'ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr',
         'robots' => 'index,follow',
         'canonical_url' => 'https://colorfix.terrymarr.com/',
         'footer_brand_text' => 'ColorFix by Terry — home color transformations by Terry Marr',
@@ -255,7 +255,7 @@ function normalizeFrontPageInserts(array $inserts, int $queryId): array {
         if (strtolower((string)($item['item_type'] ?? '')) !== 'front-blurb') continue;
         $item['title'] = 'ColorFix by Terry';
         $item['subtitle'] = '';
-        $item['body'] = 'Home color transformations, before-and-ColorFixed makeovers, real examples, and paint palettes by Terry Marr.';
+       
     }
     unset($item);
 

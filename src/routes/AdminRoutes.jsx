@@ -4,6 +4,8 @@ import { useAppState } from '@context/AppStateContext.jsx';
 import { isAdmin } from '@helpers/authHelper';
 import '@layout/MainLayout/mainlayout.css';
 
+
+const HomePage = lazy(() => import('@pages/HomePage'));
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
 const LoginPage = lazy(() => import('@pages/login/LoginPage'));
 const GalleryPage = lazy(() => import('@pages/GalleryPage'));
@@ -193,11 +195,9 @@ export default function AdminRoutes() {
 
 function AdminHomePage() {
   return (
-    <main className="main-layout">
-      <Suspense fallback={<RouteFallback label="Loading home..." />}>
-        <GalleryPage defaultQueryId={4} />
-      </Suspense>
-    </main>
+    <Suspense fallback={<RouteFallback label="Loading admin home…" />}>
+      <HomePage />
+    </Suspense>
   );
 }
 

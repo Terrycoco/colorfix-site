@@ -9,8 +9,7 @@ npm run prebuild-front-page
 echo "🏗️  Building site..."
 npm run build
 
-echo "🧱 Injecting prebuilt homepage HTML..."
-npm run prebuild-homepage-html
+
 
 echo "🚀 Uploading front-page cache payloads..."
 deploy_ssh "mkdir -p public_html/colorfix/api/cache"

@@ -10,6 +10,9 @@ import ScrollToTop from '@layout/ScrollToTop';
 import PlayerPage from '@pages/PlayerPage';
 import StandAloneLayout from '@layout/StandAloneLayout';
 
+
+
+const HomePage = lazy(() => import('@pages/HomePage'));
 const AboutPage = lazy(() => import('@pages/AboutPage'));
 const HireTerryPage = lazy(() => import('@pages/HireTerryPage'));
 const RequestPlaylistPage = lazy(() => import('@pages/HireTerryPage/RequestPlaylistPage'));
@@ -126,7 +129,10 @@ function AppRouter() {
           
           {/* USER-FACING PAGES ⤵ wrapped by MainLayout (capped, centered) */}
           <Route element={<MainLayout />}>
-            <Route index element={<HomeRedirect />} />
+            <Route
+              index
+              element={renderWithSuspense(HomePage, 'Loading home…')}
+            />
             <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
            <Route path="results/:queryId" element={<GalleryRoute />} />
             <Route path="color/:id" element={renderWithSuspense(ColorDetailPage, 'Loading color…')} />
@@ -162,28 +168,20 @@ function AppRouter() {
   );
 }
 
-function HomeRedirect() {
-  const location = useLocation();
 
-  return (
-    <Navigate
-      to={`/results/4${location.search || ""}`}
-      replace
-    />
-  );
-}
 
 function GalleryRoute() {
   const { queryId } = useParams();
+  const isHomePage = Number(queryId) === 4;
 
-  const gallery = (
-    <Suspense fallback={<RouteFallback label="Loading results…" />}>
-      <GalleryPage />
+  const page = (
+    <Suspense fallback={<RouteFallback label={isHomePage ? "Loading home…" : "Loading results…"} />}>
+      {isHomePage ? <HomePage /> : <GalleryPage />}
     </Suspense>
   );
 
-  if (Number(queryId) !== 4) {
-    return gallery;
+  if (!isHomePage) {
+    return page;
   }
 
   return (
@@ -194,7 +192,7 @@ function GalleryRoute() {
         resource_id: 1,
       }}
     >
-      {gallery}
+      {page}
     </ANATrack>
   );
 }

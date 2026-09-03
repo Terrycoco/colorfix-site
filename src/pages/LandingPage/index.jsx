@@ -69,7 +69,7 @@ export default function LandingPage() {
           <p>It may have been moved or taken offline.</p>
           <div className="landing-page__unavailable-actions">
             <Link to="/picker?psi=11">Browse Playlists</Link>
-            <Link to="/results/4">Go to ColorFix Home</Link>
+            <Link to="/">Go to ColorFix Home</Link>
           </div>
         </section>
       </main>

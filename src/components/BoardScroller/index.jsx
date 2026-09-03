@@ -32,10 +32,10 @@ const BoardScroller = ({ adminContext = false }) => {
 
 
   const isAdminRoute = adminContext || location.pathname === "/admin" || location.pathname.startsWith("/admin/");
-  const homePath = isAdminRoute ? "/admin/" : "/results/4";
+  const homePath = isAdminRoute ? "/admin/" : "/";
   const isFrontPageRoute =
     location.pathname === "/" ||
-    location.pathname === "/results/4" ||
+    location.pathname === "/" ||
     location.pathname === "/admin/";
   const showPublicBackButton = !isAdminRoute && !isFrontPageRoute;
 

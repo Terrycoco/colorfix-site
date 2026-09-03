@@ -24,7 +24,7 @@ import FrontPagePlaylistSetItem from '../GalleryItems/FrontPagePlaylistSetItem';
 import AutoHideFooter from '@components/AutoHideFooter';
 import './gallery.css';
 
-const renderContent = (item) => {
+export const renderContent = (item) => {
   const key = item.id || item.query_id || `${Math.random()}-${item.item_type || 'itm'}`;
   const type = (item.item_type || '').toLowerCase();
   switch (type) {

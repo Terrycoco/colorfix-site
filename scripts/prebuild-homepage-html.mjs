@@ -213,7 +213,7 @@ function buildContentFallbacks(buildKey) {
   }
   return {
     title: "ColorFix by Terry | Home Color Transformations & Paint Palettes",
-    meta_description: "ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr.",
+    meta_description: "ColorFix by Terry helps homeowners explore color transformations with before-and-ColorFixed makeovers, real examples, paint palettes, and color ideas by Terry Marr",
     robots: "index,follow",
     canonical_url: "https://colorfix.terrymarr.com/",
     footer_brand_text: "ColorFix by Terry — Home color transformations by Terry Marr",
