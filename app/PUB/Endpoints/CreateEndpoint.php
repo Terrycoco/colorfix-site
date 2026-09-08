@@ -12,34 +12,15 @@ use Throwable;
 /**
  * CREATE ENDPOINT
  *
- * Public doorbell for the CREATE department.
+ * Dumb HTTP door for CREATE.
  *
- * This endpoint owns ONLY HTTP/request concerns:
- *   - accept one CREATE request
- *   - validate that orders were supplied
- *   - wake CreateManager
- *   - hand the Manager the orders and optional duplicate decision
- *   - translate the Manager result back to HTTP/JSON
+ * Owns only:
+ *   - HTTP method / JSON validation
+ *   - waking CreateManager
+ *   - passing orders + boss decisions through
+ *   - translating Manager result to HTTP/JSON
  *
- * Each order contains EITHER:
- *
- *   NEW
- *     { "box": { ... } }
- *
- *   REDO
- *     { "pub_asset_id": 123 }
- *
- * CreateManager decides which kind of order it is.
- *
- * It must NOT:
- *   - decide NEW vs REDO
- *   - fetch filed Creator ingredients
- *   - instantiate any Creator
- *   - choose a Creator
- *   - inspect Creator ingredients
- *   - persist finished assets
- *
- * CreateManager owns everything after the doorbell rings.
+ * All CREATE workflow decisions remain in CreateManager.
  */
 final class CreateEndpoint
 {
@@ -53,6 +34,7 @@ final class CreateEndpoint
             return;
         }
 
+
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
             self::sendJson(405, [
                 'ok' => false,
@@ -62,45 +44,39 @@ final class CreateEndpoint
             return;
         }
 
-        $projectRoot = dirname(__DIR__, 3);
 
-        $errorReporter = new PubErrorReporter(
-            $projectRoot . '/app/PUB/Errors/pub_errors.log'
-        );
+        $projectRoot =
+            dirname(
+                __DIR__,
+                3
+            );
+
+
+        $errorReporter =
+            new PubErrorReporter(
+                $projectRoot
+                . '/app/PUB/Errors/pub_errors.log'
+            );
+
 
         try {
-            $data = self::requestJson();
+            $data =
+                self::requestJson();
 
-            $orders = $data['orders'] ?? null;
 
-            /*
-             * Boss decision for an already-returned duplicate warning.
-             *
-             * CREATE Manager remains the authority that interprets it.
-             *
-             *   check   default; warn before any production
-             *   skip    omit exact previously-shipped matches
-             *   include knowingly create them again
-             */
-            $duplicatePolicy =
-                (string)(
-                    $data[
-                        'duplicate_policy'
-                    ]
-                    ?? 'check'
-                );
+            $orders =
+                $data[
+                    'orders'
+                ]
+                ?? null;
 
-            /*
-             * REQUEST COMPLETENESS ONLY.
-             *
-             * The endpoint does not interpret individual orders.
-             * CreateManager owns NEW vs REDO and all CREATE routing.
-             */
+
             if (!is_array($orders)) {
                 throw new RuntimeException(
                     'orders array required.'
                 );
             }
+
 
             if ($orders === []) {
                 throw new RuntimeException(
@@ -108,164 +84,306 @@ final class CreateEndpoint
                 );
             }
 
-            /*
-             * WAKE CREATE MANAGER.
-             *
-             * CreateManager is intentionally created only when a
-             * CREATE request arrives. The Manager is responsible for
-             * waking the one specialist Creator needed for each order.
-             *
-             * The Manager constructor is expected to own lazy staffing;
-             * the endpoint must never construct Creators itself.
-             */
-            $manager = new CreateManager(
-                $pdo,
-                $projectRoot
-            );
-
-            $result = $manager->processBatch(
-                array_values($orders),
-                $duplicatePolicy
-            );
-
 
             /*
-             * EXPECTED BOSS DECISION.
+             * Boss decisions are passed through without interpretation.
              *
-             * This is not an exception and must not enter PubErrorReporter.
-             * No Creator has been awakened and no durable CREATE work has
-             * begun when the Manager returns this result.
+             * Preferred shape:
+             *
+             *   {
+             *     "unshipped": "check" | "replace",
+             *     "shipped":   "check" | "new_version"
+             *   }
+             *
+             * duplicate_policy remains accepted temporarily so the backend
+             * can be deployed before the frontend switch.
              */
+            $existingPolicy =
+                $data[
+                    'existing_policy'
+                ]
+                ?? $data[
+                    'duplicate_policy'
+                ]
+                ?? 'check';
+
+
+            $manager =
+                new CreateManager(
+                    $pdo,
+                    $projectRoot
+                );
+
+
+            $result =
+                $manager->processBatch(
+                    array_values(
+                        $orders
+                    ),
+                    $existingPolicy
+                );
+
+
             if (
-                ($result[
-                    'code'
-                ] ?? '') ===
-                'duplicate_warning'
+                (
+                    $result[
+                        'code'
+                    ]
+                    ?? ''
+                ) ===
+                'existing_asset_warning'
             ) {
-                self::sendJson(409, [
-                    'ok' =>
-                        false,
+                self::sendJson(
+                    409,
+                    [
+                        'ok' =>
+                            false,
 
-                    'code' =>
-                        'duplicate_warning',
+                        'code' =>
+                            'existing_asset_warning',
+
+                        'order_count' =>
+                            count(
+                                $orders
+                            ),
+
+                        'match_count' =>
+                            (int)(
+                                $result[
+                                    'match_count'
+                                ]
+                                ?? 0
+                            ),
+
+                        'unshipped_count' =>
+                            (int)(
+                                $result[
+                                    'unshipped_count'
+                                ]
+                                ?? 0
+                            ),
+
+                        'shipped_count' =>
+                            (int)(
+                                $result[
+                                    'shipped_count'
+                                ]
+                                ?? 0
+                            ),
+
+                        'matches' =>
+                            is_array(
+                                $result[
+                                    'matches'
+                                ]
+                                ?? null
+                            )
+                                ? array_values(
+                                    $result[
+                                        'matches'
+                                    ]
+                                )
+                                : [],
+
+                        'existing_policy' =>
+                            is_array(
+                                $result[
+                                    'existing_policy'
+                                ]
+                                ?? null
+                            )
+                                ? $result[
+                                    'existing_policy'
+                                ]
+                                : [
+                                    'unshipped' =>
+                                        'check',
+
+                                    'shipped' =>
+                                        'check',
+                                ],
+
+                        'choices' => [
+                            'unshipped' => [
+                                'replace',
+                                'cancel',
+                            ],
+
+                            'shipped' => [
+                                'new_version',
+                                'cancel',
+                            ],
+                        ],
+                    ]
+                );
+
+
+                return;
+            }
+
+
+            $created =
+                is_array(
+                    $result[
+                        'created'
+                    ]
+                    ?? null
+                )
+                    ? array_values(
+                        $result[
+                            'created'
+                        ]
+                    )
+                    : [];
+
+
+            $queued =
+                is_array(
+                    $result[
+                        'queued'
+                    ]
+                    ?? null
+                )
+                    ? array_values(
+                        $result[
+                            'queued'
+                        ]
+                    )
+                    : [];
+
+
+            $failed =
+                is_array(
+                    $result[
+                        'failed'
+                    ]
+                    ?? null
+                )
+                    ? array_values(
+                        $result[
+                            'failed'
+                        ]
+                    )
+                    : [];
+
+
+            self::sendJson(
+                200,
+                [
+                    'ok' =>
+                        true,
 
                     'order_count' =>
                         count(
                             $orders
                         ),
 
-                    'duplicate_count' =>
+                    'created_count' =>
+                        count(
+                            $created
+                        ),
+
+                    'queued_count' =>
+                        count(
+                            $queued
+                        ),
+
+                    'failed_count' =>
+                        count(
+                            $failed
+                        ),
+
+                    'existing_policy' =>
+                        is_array(
+                            $result[
+                                'existing_policy'
+                            ]
+                            ?? null
+                        )
+                            ? $result[
+                                'existing_policy'
+                            ]
+                            : [],
+
+                    'existing_match_count' =>
                         (int)(
                             $result[
-                                'duplicate_count'
+                                'existing_match_count'
                             ]
                             ?? 0
                         ),
 
-                    'duplicates' =>
-                        is_array(
+                    'replaced_count' =>
+                        (int)(
                             $result[
-                                'duplicates'
+                                'replaced_count'
                             ]
-                            ?? null
-                        )
-                            ? array_values(
-                                $result[
-                                    'duplicates'
-                                ]
-                            )
-                            : [],
+                            ?? 0
+                        ),
 
-                    'choices' => [
-                        'skip',
-                        'include',
-                        'cancel',
-                    ],
-                ]);
-
-                return;
-            }
-
-
-            $created = is_array($result['created'] ?? null)
-                ? array_values($result['created'])
-                : [];
-
-            $queued = is_array($result['queued'] ?? null)
-                ? array_values($result['queued'])
-                : [];
-
-            $failed = is_array($result['failed'] ?? null)
-                ? array_values($result['failed'])
-                : [];
-
-            self::sendJson(200, [
-                'ok' => true,
-                'order_count' => count($orders),
-                'created_count' => count($created),
-                'queued_count' => count($queued),
-                'failed_count' => count($failed),
-                'duplicate_policy' =>
-                    $result[
-                        'duplicate_policy'
-                    ]
-                    ?? 'check',
-                'duplicate_count' =>
-                    (int)(
-                        $result[
-                            'duplicate_count'
-                        ]
-                        ?? 0
-                    ),
-                'skipped_duplicate_count' =>
-                    (int)(
-                        $result[
-                            'skipped_duplicate_count'
-                        ]
-                        ?? 0
-                    ),
-                'skipped_duplicates' =>
-                    is_array(
-                        $result[
-                            'skipped_duplicates'
-                        ]
-                        ?? null
-                    )
-                        ? array_values(
+                    'new_version_count' =>
+                        (int)(
                             $result[
-                                'skipped_duplicates'
+                                'new_version_count'
                             ]
-                        )
-                        : [],
-                'created' => $created,
-                'queued' => $queued,
-                'failed' => $failed,
-            ]);
+                            ?? 0
+                        ),
 
-        } catch (Throwable $e) {
-            $failure = $errorReporter->report(
-                $e,
-                [
-                    'stage' => 'create',
-                    'code' => 'create_endpoint_failure',
+                    'created' =>
+                        $created,
+
+                    'queued' =>
+                        $queued,
+
+                    'failed' =>
+                        $failed,
                 ]
             );
 
-            self::sendJson(500, [
-                'ok' => false,
-                'error' =>
-                    $failure['error']
-                    ?? $e->getMessage(),
-                'code' =>
-                    $failure['code']
-                    ?? 'create_endpoint_failure',
-                'error_class' =>
-                    get_class($e),
-                'error_file' =>
-                    $e->getFile(),
-                'error_line' =>
-                    $e->getLine(),
-            ]);
+        } catch (Throwable $e) {
+            $failure =
+                $errorReporter->report(
+                    $e,
+                    [
+                        'stage' =>
+                            'create',
+
+                        'code' =>
+                            'create_endpoint_failure',
+                    ]
+                );
+
+
+            self::sendJson(
+                500,
+                [
+                    'ok' =>
+                        false,
+
+                    'error' =>
+                        $failure[
+                            'error'
+                        ]
+                        ?? $e->getMessage(),
+
+                    'code' =>
+                        $failure[
+                            'code'
+                        ]
+                        ?? 'create_endpoint_failure',
+
+                    'error_class' =>
+                        get_class(
+                            $e
+                        ),
+
+                    'error_file' =>
+                        $e->getFile(),
+
+                    'error_line' =>
+                        $e->getLine(),
+                ]
+            );
         }
     }
 
@@ -275,18 +393,26 @@ final class CreateEndpoint
      */
     private static function requestJson(): array
     {
-        $raw = file_get_contents('php://input') ?: '';
+        $raw =
+            file_get_contents(
+                'php://input'
+            )
+            ?: '';
 
-        $data = json_decode(
-            $raw,
-            true
-        );
+
+        $data =
+            json_decode(
+                $raw,
+                true
+            );
+
 
         if (!is_array($data)) {
             throw new RuntimeException(
                 'Valid JSON body required.'
             );
         }
+
 
         return $data;
     }
@@ -296,7 +422,10 @@ final class CreateEndpoint
         int $status,
         array $payload
     ): void {
-        http_response_code($status);
+        http_response_code(
+            $status
+        );
+
 
         if (!headers_sent()) {
             header(
@@ -304,15 +433,19 @@ final class CreateEndpoint
             );
         }
 
-        $json = json_encode(
-            $payload,
-            JSON_UNESCAPED_SLASHES
-        );
+
+        $json =
+            json_encode(
+                $payload,
+                JSON_UNESCAPED_SLASHES
+            );
+
 
         if ($json === false) {
             echo '{"ok":false,"error":"Could not encode PUB response as JSON."}';
             return;
         }
+
 
         echo $json;
     }

@@ -48,6 +48,8 @@ export default function PubVideoAssetEditor({
   saving = false,
   recreating = false,
   sendingToPackaging = false,
+  approvalSaving = false,
+  onSetApproval,
   onSave,
   onRecreate,
   onSendToPackaging,
@@ -528,6 +530,19 @@ export default function PubVideoAssetEditor({
     isDispatchLocked;
 
 
+  const isApproved =
+    Number(
+      asset?.approved ||
+      0
+    ) === 1;
+
+
+  const approvalEditable =
+    pipelineStage ===
+      "created" &&
+    !isDispatchLocked;
+
+
   const directIngredientChanges =
     diffTopLevel(
       originalInsideValues,
@@ -821,8 +836,55 @@ function appendDescriptionLink(
   }
 
 
+  async function handleApprovalChange(
+    event
+  ) {
+    const checked =
+      event
+        .target
+        .checked;
+
+
+    setSuccessMessage(
+      ""
+    );
+
+    setActionError(
+      ""
+    );
+
+
+    const result =
+      await onSetApproval?.(
+        asset,
+        checked
+      );
+
+
+    if (
+      result === false
+      ||
+      result?.ok === false
+    ) {
+      setActionError(
+        result?.error ||
+        "Could not change asset approval."
+      );
+    }
+  }
+
+
   async function handleSendToPackaging() {
     if (isDispatchLocked) {
+      return;
+    }
+
+
+    if (!isApproved) {
+      setActionError(
+        "Approve this asset before sending it to Packaging."
+      );
+
       return;
     }
 
@@ -1694,6 +1756,42 @@ function appendDescriptionLink(
             footerStyle
           }
         >
+          <label
+            style={
+              approvalControlStyle
+            }
+            title={
+              approvalEditable
+                ? isApproved
+                  ? "Uncheck to revoke approval."
+                  : "Approve this asset for Packaging."
+                : "Approval is locked after the asset leaves CREATED."
+            }
+          >
+            <input
+              type="checkbox"
+
+              checked={
+                isApproved
+              }
+
+              disabled={
+                !approvalEditable ||
+                approvalSaving ||
+                busy
+              }
+
+              onChange={
+                handleApprovalChange
+              }
+            />
+
+            <span>
+              Approved
+            </span>
+          </label>
+
+
           <button
             type="button"
 
@@ -1757,7 +1855,15 @@ function appendDescriptionLink(
             type="button"
 
             disabled={
-              editorLocked
+              editorLocked ||
+              approvalSaving ||
+              !isApproved
+            }
+
+            title={
+              isApproved
+                ? "Send this approved asset to Packaging."
+                : "Approve this asset before sending it to Packaging."
             }
 
             onClick={
@@ -3748,6 +3854,33 @@ const redoNoticeStyle = {
 
   fontSize:
     12,
+};
+
+
+const approvalControlStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "center",
+
+  gap:
+    7,
+
+  marginRight:
+    "auto",
+
+  color:
+    "#334155",
+
+  fontSize:
+    12,
+
+  fontWeight:
+    700,
+
+  cursor:
+    "pointer",
 };
 
 

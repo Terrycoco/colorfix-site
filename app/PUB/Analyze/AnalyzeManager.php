@@ -7,8 +7,7 @@ use App\PUB\Analyze\Pinterest\BeforeAfterVideoAnalyzer;
 use App\PUB\Analyze\Pinterest\CompositeAnalyzer;
 use App\PUB\Analyze\Pinterest\IdeaAnalyzer;
 use App\PUB\Analyze\Pinterest\PaletteAnalyzer;
-use App\PUB\Analyze\Pinterest\YouTubeTeaserAnalyzer;
-use App\PUB\Analyze\Pinterest\Support\PlaylistPaletteResolver;
+use App\PUB\Analyze\Pinterest\TeaserAnalyzer;
 use App\PUB\Analyze\Support\DefaultPantry;
 use App\PUB\Analyze\Sources\PlaylistSourcePreparer;
 use App\PUB\Analyze\YouTube\PlaylistVideoAnalyzer;
@@ -18,11 +17,6 @@ use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\Repos\PdoPlaylistRepository;
 use App\PV\PVService;
-use App\REX\Repos\PdoRexReservationRepository;
-use App\REX\Services\RexReservationRelationships;
-use App\REX\Services\RexReserver;
-use App\REX\Services\RexTokenGenerator;
-use App\Services\ViewerService;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
@@ -32,23 +26,27 @@ use PDO;
 use RuntimeException;
 use Throwable;
 
+/**
+ * ANALYZE MANAGER
+ *
+ * One call represents one complete ANALYZE execution against one source.
+ *
+ *   1. Open one pub_run.
+ *   2. Order one neutral Market delivery.
+ *   3. Give that exact delivery to every Analyzer declared by PubContract.
+ *   4. Let each Analyzer perform its own channel/recipe cull.
+ *   5. Collect every proposal into one mixed stack of PUB Boxes.
+ *   6. Stamp every Box with the same pub_run_id.
+ *
+ * The Manager does not filter pin/yt items and does not choose one output
+ * type on behalf of the caller.
+ */
 final class AnalyzeManager implements PubComManagerContract
 {
-    /*
-     * LAZY DEPARTMENT STAFFING
-     *
-     * The endpoint wakes only the Manager.
-     * The Manager creates Procurement, PubRun infrastructure, and the
-     * requested specialist Analyzer only when the assignment reaches
-     * the point where each is actually needed.
-     *
-     * Objects are memoized for this Manager/request so a future
-     * multi-output ANALYZE call can reuse Procurement and any worker
-     * already clocked in during the same batch.
-     */
     private ?PubRunService $runService = null;
     private ?PlaylistSourcePreparer $playlistSourcePreparer = null;
     private ?DefaultPantry $defaultPantry = null;
+    private ?PdoPubAssetRepository $assetRepository = null;
 
     /** @var array<string, PubComWorkerContract> */
     private array $analyzers = [];
@@ -96,6 +94,10 @@ final class AnalyzeManager implements PubComManagerContract
             );
         }
 
+        /*
+         * STOP_LINE now means stop THIS specialist assignment only.
+         * The mixed ANALYZE run continues with the other specialists.
+         */
         if ($signal->isIneligible()) {
             return PubComDisposition::make(
                 $signal,
@@ -121,38 +123,17 @@ final class AnalyzeManager implements PubComManagerContract
 
 
     /**
+     * Run the complete ANALYZE department against one source.
+     *
      * @return array<string, mixed>
      */
     public function analyze(
         string $sourceType,
-        int $sourceId,
-        string $outputType,
-        string $runMode = 'check',
-        int $overwritePubRunId = 0
+        int $sourceId
     ): array {
-        /*
-         * LEGACY CALL-SHAPE COMPATIBILITY.
-         *
-         * The endpoint may still supply runMode / overwritePubRunId for now,
-         * but ANALYZE no longer branches on either value.
-         *
-         * Re-analysis is always allowed and always starts a fresh PUB run.
-         * Historical duplicate detection belongs exclusively at the CREATE
-         * front door via production_signature.
-         */
-        $sourceType =
-            strtolower(
-                trim(
-                    $sourceType
-                )
-            );
-
-        $outputType =
-            strtolower(
-                trim(
-                    $outputType
-                )
-            );
+        $sourceType = strtolower(
+            trim($sourceType)
+        );
 
         if ($sourceType === '') {
             throw new RuntimeException(
@@ -166,37 +147,70 @@ final class AnalyzeManager implements PubComManagerContract
             );
         }
 
-        if ($outputType === '') {
-            throw new RuntimeException(
-                'ANALYZE requires output_type.'
-            );
-        }
-
         $pubRunId = 0;
         $boxes = [];
         $failed = [];
+        $skipped = [];
         $pubCom = [];
-
+        $existingAssetMatches = [];
+        $producedTypes = [];
 
         try {
             /*
-             * CONTRACT FIRST.
+             * ONE RUN = ONE ANALYZE EXECUTION AGAINST THIS SOURCE.
              */
-            $contract =
-                PubContract::effective(
-                    'analyze',
-                    $outputType
+            $pubRunId = $this->runService()
+                ->start(
+                    $sourceType,
+                    $sourceId,
+                    0
                 );
 
-            if ($contract === null) {
+            if ($pubRunId <= 0) {
                 throw new RuntimeException(
-                    "No ANALYZE contract exists for output type '{$outputType}'."
+                    'ANALYZE could not establish a valid pub_run_id.'
                 );
             }
 
+            /*
+             * ONE MORNING MARKET RUN.
+             *
+             * Procurement brings every active item and its authored flags.
+             * This array is held once and handed unchanged to every worker.
+             */
+            $preparedSource = $this->prepareSource(
+                $sourceType,
+                $sourceId
+            );
 
-            $channel =
-                strtolower(
+            $contracts = PubContract::assetTypes(
+                'analyze'
+            );
+
+            if ($contracts === []) {
+                throw new RuntimeException(
+                    'ANALYZE has no specialist contracts registered.'
+                );
+            }
+
+            foreach ($contracts as $outputType => $contract) {
+                if (!is_array($contract)) {
+                    $failed[] = [
+                        'pub_run_id' => $pubRunId,
+                        'output_type' => (string)$outputType,
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'error' => 'ANALYZE specialist contract is invalid.',
+                    ];
+
+                    continue;
+                }
+
+                $outputType = strtolower(
+                    trim((string)$outputType)
+                );
+
+                $channel = strtolower(
                     trim(
                         (string)(
                             $contract['channel']
@@ -205,668 +219,504 @@ final class AnalyzeManager implements PubComManagerContract
                     )
                 );
 
-            if ($channel === '') {
-                throw new RuntimeException(
-                    "ANALYZE contract '{$outputType}' has no dispatch channel."
-                );
-            }
+                if ($outputType === '' || $channel === '') {
+                    $failed[] = [
+                        'pub_run_id' => $pubRunId,
+                        'output_type' => $outputType,
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'error' => 'ANALYZE specialist contract is missing its output key or channel.',
+                    ];
 
-
-            /*
-             * MORNING MARKET RUN.
-             *
-             * PlaylistSourcePreparer gathers the common
-             * PUB source material once.
-             */
-            $preparedSource =
-                $this->prepareSource(
-                    $sourceType,
-                    $sourceId
-                );
-
-
-            /*
-             * PREFLIGHT BEFORE JOB CREATION.
-             */
-            $assignment =
-                $this->prepareOutputAssignment(
-                    $outputType,
-                    $channel,
-                    $preparedSource
-                );
-
-
-            /** @var PubComChannel $pubComChannel */
-            $pubComChannel =
-                $assignment['channel'];
-
-
-            /** @var PubComDisposition $disposition */
-            $disposition =
-                $assignment['disposition'];
-
-
-            $pubCom =
-                $pubComChannel
-                    ->dispositionsAsArray();
-
-
-            if (
-                !$disposition
-                    ->shouldContinue()
-            ) {
-                $failed[] = [
-                    'pub_run_id' =>
-                        null,
-
-                    'asset_type' =>
-                        $outputType,
-
-                    'source_type' =>
-                        $sourceType,
-
-                    'source_id' =>
-                        $sourceId,
-
-                    'error' =>
-                        $disposition
-                            ->signal()
-                            ->message(),
-
-                    'pubcom' =>
-                        $pubCom,
-                ];
-
-
-                return [
-                    'code' =>
-                        'analyze_blocked',
-
-                    'pub_run_id' =>
-                        0,
-
-                    'source_type' =>
-                        $sourceType,
-
-                    'source_id' =>
-                        $sourceId,
-
-                    'output_type' =>
-                        $outputType,
-
-                    'boxes' =>
-                        [],
-
-                    'failed' =>
-                        $failed,
-
-                    'pubcom' =>
-                        $pubCom,
-                ];
-            }
-
-
-            /*
-             * NEW ANALYSIS RUN.
-             *
-             * ANALYZE does not inspect prior PUB runs or shipped history.
-             * Re-analysis is harmless and may happen repeatedly.
-             *
-             * CREATE owns duplicate manufacturing protection. When these
-             * sealed boxes later reach CREATE, production_signature history
-             * decides whether to warn about an already-shipped product.
-             */
-            $pubRunId =
-                $this->runService()
-                    ->start(
-                        $sourceType,
-                        $sourceId,
-                        $outputType,
-                        0
-                    );
-
-
-            if ($pubRunId <= 0) {
-                throw new RuntimeException(
-                    'ANALYZE could not establish a valid pub_run_id.'
-                );
-            }
-
-
-            /*
-             * RUN AUTHORIZED SPECIALIST.
-             *
-             * Analyzer receives raw market material only.
-             * It does NOT receive the outer Box.
-             */
-            $specialist =
-                $this->runAuthorizedAnalyzer(
-                    $outputType,
-                    $preparedSource,
-                    $assignment
-                );
-
-
-            $pubCom =
-                is_array(
-                    $specialist['pubcom']
-                    ?? null
-                )
-                    ? $specialist['pubcom']
-                    : $pubCom;
-
-
-            $proposals =
-                is_array(
-                    $specialist['proposals']
-                    ?? null
-                )
-                    ? $specialist['proposals']
-                    : [];
-
-
-            foreach (
-                $proposals
-                as $proposal
-            ) {
-                if (!is_array($proposal)) {
-                    throw new RuntimeException(
-                        "Analyzer '{$outputType}' returned an invalid proposal."
-                    );
+                    continue;
                 }
 
-
-                /*
-                 * SPECIALIST OWNS THE REAL ASSET TYPE.
-                 */
-                if (
-                    trim(
-                        (string)(
-                            $proposal['asset_type']
-                            ?? ''
-                        )
-                    ) === ''
-                ) {
-                    throw new RuntimeException(
-                        "Analyzer '{$outputType}' returned a proposal with no asset_type."
-                    );
-                }
-
-
-                /*
-                 * MANAGER-OWNED OUTER BOX.
-                 *
-                 * The Analyzer never sees this.
-                 */
-                $box = [
-                    'pub_run_id' =>
-                        $pubRunId,
-
-                    'channel' =>
-                        $channel,
-
-                    'asset_type' =>
-                        '',
-
-                    'source_type' =>
-                        $sourceType,
-
-                    'source_id' =>
-                        $sourceId,
-
-                    'search_title' =>
-                        '',
-
-                    'description' =>
-                        '',
-
-                    'pingback' =>
-                        '',
-
-                    'ingredients' =>
-                        [],
-                ];
-
-
-                /*
-                 * MIGRATED ANALYZERS.
-                 *
-                 * These specialists may contribute ONLY:
-                 *
-                 *   asset_type
-                 *   search_title
-                 *   description
-                 *   ingredients
-                 *
-                 * Remaining analyzers retain their legacy
-                 * proposal shape until migrated individually.
-                 */
-                if (
-                    in_array(
+                try {
+                    /*
+                     * Every specialist receives the SAME complete Market box.
+                     * The Manager performs no channel cull.
+                     */
+                    $assignment = $this->prepareAnalyzerAssignment(
                         $outputType,
-                        [
-                            'composite',
-                            'before_after_video',
-                            'idea',
-                            'idea_palette',
-                            'youtube_video',
-                        ],
-                        true
+                        $preparedSource
+                    );
+
+                    /** @var PubComChannel $pubComChannel */
+                    $pubComChannel = $assignment['channel'];
+
+                    /** @var PubComDisposition $disposition */
+                    $disposition = $assignment['disposition'];
+
+                    $assignmentPubCom = $pubComChannel
+                        ->dispositionsAsArray();
+
+                    $pubCom = [
+                        ...$pubCom,
+                        ...$assignmentPubCom,
+                    ];
+
+                    if (!$disposition->shouldContinue()) {
+                        $skipped[] = [
+                            'pub_run_id' => $pubRunId,
+                            'output_type' => $outputType,
+                            'channel' => $channel,
+                            'source_type' => $sourceType,
+                            'source_id' => $sourceId,
+                            'reason' => $disposition
+                                ->signal()
+                                ->message(),
+                        ];
+
+                        continue;
+                    }
+
+                    $specialist = $this->runAuthorizedAnalyzer(
+                        $outputType,
+                        $preparedSource,
+                        $assignment
+                    );
+
+                    $specialistPubCom = is_array(
+                        $specialist['pubcom']
+                        ?? null
                     )
-                ) {
-                    $proposal =
-                        array_intersect_key(
+                        ? $specialist['pubcom']
+                        : [];
+
+                    /*
+                     * authorizeAnalyzer() already contributed the same
+                     * channel dispositions above. Do not duplicate them here.
+                     */
+
+                    $proposals = is_array(
+                        $specialist['proposals']
+                        ?? null
+                    )
+                        ? $specialist['proposals']
+                        : [];
+
+                    foreach ($proposals as $proposalIndex => $proposal) {
+                        if (!is_array($proposal)) {
+                            $failed[] = [
+                                'pub_run_id' => $pubRunId,
+                                'output_type' => $outputType,
+                                'channel' => $channel,
+                                'source_type' => $sourceType,
+                                'source_id' => $sourceId,
+                                'error' => "Analyzer '{$outputType}' returned an invalid proposal.",
+                            ];
+
+                            continue;
+                        }
+
+                        $assetType = trim(
+                            (string)(
+                                $proposal['asset_type']
+                                ?? ''
+                            )
+                        );
+
+                        if ($assetType === '') {
+                            $failed[] = [
+                                'pub_run_id' => $pubRunId,
+                                'output_type' => $outputType,
+                                'channel' => $channel,
+                                'source_type' => $sourceType,
+                                'source_id' => $sourceId,
+                                'error' => "Analyzer '{$outputType}' returned a proposal with no asset_type.",
+                            ];
+
+                            continue;
+                        }
+
+                        /*
+                         * DURABLE LOGICAL SIBLING ORDER.
+                         *
+                         * Most specialists do not need to author sort_order
+                         * explicitly. Historically the single-output workbench
+                         * supplied proposalIndex + 1 before CREATE, so existing
+                         * durable assets are keyed that way.
+                         *
+                         * Mixed ANALYZE must preserve the same identity here,
+                         * BEFORE predecessor lookup. The index is local to this
+                         * specialist/output, so Composite #1, Idea #1, etc. each
+                         * retain their own sibling sequence.
+                         */
+                        $proposalSortOrder =
+                            isset($proposal['sort_order'])
+                            && $proposal['sort_order'] !== null
+                                ? (int)$proposal['sort_order']
+                                : ((int)$proposalIndex + 1);
+
+                        /*
+                         * Every specialist is now migrated to the standard
+                         * proposal vocabulary. Nothing else may leak into the
+                         * outer PUB Box.
+                         */
+                        $proposal = array_intersect_key(
                             $proposal,
                             array_flip([
                                 'asset_type',
+                                'sort_order',
                                 'search_title',
                                 'description',
                                 'ingredients',
                             ])
                         );
-                }
 
+                        $box = [
+                            'pub_run_id' => $pubRunId,
+                            'channel' => $channel,
+                            'asset_type' => '',
+                            'source_type' => $sourceType,
+                            'source_id' => $sourceId,
+                            'sort_order' => $proposalSortOrder,
+                            'search_title' => '',
+                            'description' => '',
+                            'pingback' => '',
+                            'ingredients' => [],
+                        ];
 
-                /*
-                 * PHP SPREAD MERGE.
-                 *
-                 * Manager owns the Box.
-                 * Specialist simply returns fields whose names
-                 * already match the Box fields it is allowed
-                 * to suggest/fill.
-                 */
-                $boxes[] = [
-                    ...$box,
-                    ...$proposal,
+                        $nextBox = [
+                            ...$box,
+                            ...$proposal,
 
+                            /* Factory identity is always Manager-owned. */
+                            'pub_run_id' => $pubRunId,
+                            'channel' => $channel,
+                            'source_type' => $sourceType,
+                            'source_id' => $sourceId,
+                            'sort_order' => $proposalSortOrder,
+                        ];
+
+                        /*
+                         * LOGICAL PREDECESSOR LOOKUP.
+                         *
+                         * This remains per Box, not per run. Re-analysis
+                         * therefore carries forward the latest durable outside
+                         * copy even though every Analyze click gets a fresh run.
+                         */
+                        $logicalMatch = $this->logicalAssetMatch(
+                            $sourceType,
+                            $sourceId,
+                            (string)$nextBox['asset_type'],
+                            $proposalSortOrder
+                        );
+
+                        if ($logicalMatch !== null) {
+                            $existingAsset = $logicalMatch['existing_asset'];
+
+                            $nextBox['search_title'] =
+                                (string)(
+                                    $existingAsset['search_title']
+                                    ?? ''
+                                );
+
+                            $nextBox['description'] =
+                                (string)(
+                                    $existingAsset['description']
+                                    ?? ''
+                                );
+
+                            $existingAssetMatches[] = [
+                                'output_type' => $outputType,
+                                'order_index' => (int)$proposalIndex,
+                                'existing_state' =>
+                                    $logicalMatch['existing_state'],
+                                'asset_type' =>
+                                    (string)$nextBox['asset_type'],
+                                'source_type' => $sourceType,
+                                'source_id' => $sourceId,
+                                'sort_order' => $proposalSortOrder,
+                                'existing_asset' => $existingAsset,
+                            ];
+                        }
+
+                        $boxes[] = $nextBox;
+                        $producedTypes[$outputType] = true;
+                    }
+
+                } catch (Throwable $e) {
                     /*
-                     * Factory identity is always Manager-owned.
+                     * One broken/ineligible product line must never prevent
+                     * the other specialists from inspecting the delivery.
                      */
-                    'pub_run_id' =>
+                    $failed[] = [
+                        'pub_run_id' => $pubRunId,
+                        'output_type' => $outputType,
+                        'channel' => $channel,
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'error' => $e->getMessage(),
+                    ];
+                }
+            }
+
+            $this->runService()
+                ->setExpectedCount(
+                    $pubRunId,
+                    count($boxes)
+                );
+
+            /*
+             * A whole Analyze execution that produces no Boxes is a failed
+             * run. Zero teaser proposals alone are NOT a failure; Teaser is
+             * optional and the other specialists continue normally.
+             */
+            if ($boxes === []) {
+                $this->runService()
+                    ->complete(
                         $pubRunId,
-
-                    'channel' =>
-                        $channel,
-
-                    'source_type' =>
-                        $sourceType,
-
-                    'source_id' =>
-                        $sourceId,
-                ];
+                        0,
+                        max(1, count($failed))
+                    );
             }
 
         } catch (Throwable $e) {
+            if ($pubRunId > 0) {
+                try {
+                    $this->runService()
+                        ->setExpectedCount(
+                            $pubRunId,
+                            0
+                        );
+
+                    $this->runService()
+                        ->complete(
+                            $pubRunId,
+                            0,
+                            1
+                        );
+
+                } catch (Throwable) {
+                    /* Preserve the original ANALYZE failure. */
+                }
+            }
+
             $failed[] = [
                 'pub_run_id' =>
                     $pubRunId > 0
                         ? $pubRunId
                         : null,
-
-                'asset_type' =>
-                    $outputType,
-
-                'source_type' =>
-                    $sourceType,
-
-                'source_id' =>
-                    $sourceId,
-
-                'error' =>
-                    $e->getMessage(),
-
-                'pubcom' =>
-                    $pubCom,
+                'output_type' => null,
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'error' => $e->getMessage(),
             ];
         }
 
-
         return [
-            'code' =>
-                'analyzed',
-
-            'pub_run_id' =>
-                $pubRunId,
-
-            'source_type' =>
-                $sourceType,
-
-            'source_id' =>
-                $sourceId,
-
-            'output_type' =>
-                $outputType,
-
-            'boxes' =>
-                $boxes,
-
-            'failed' =>
-                $failed,
-
-            'pubcom' =>
-                $pubCom,
+            'code' => 'analyzed',
+            'pub_run_id' => $pubRunId,
+            'source_type' => $sourceType,
+            'source_id' => $sourceId,
+            'output_types' => array_keys($producedTypes),
+            'boxes' => $boxes,
+            'existing_asset_matches' => $existingAssetMatches,
+            'failed' => $failed,
+            'skipped' => $skipped,
+            'pubcom' => $pubCom,
         ];
     }
 
 
     /**
-     * Convert source into canonical PUB market material.
+     * Find the current predecessor for one logical output.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function logicalAssetMatch(
+        string $sourceType,
+        int $sourceId,
+        string $assetType,
+        ?int $sortOrder
+    ): ?array {
+        $history = $this->assetRepository()
+            ->listLogicalAssetHistory(
+                $sourceType,
+                $sourceId,
+                $assetType,
+                $sortOrder
+            );
+
+        if ($history === []) {
+            return null;
+        }
+
+        $inHouse = [];
+        $shipped = [];
+
+        foreach ($history as $historical) {
+            $stage = strtolower(
+                trim(
+                    (string)(
+                        $historical['pipeline_stage']
+                        ?? ''
+                    )
+                )
+            );
+
+            if (in_array(
+                $stage,
+                [
+                    'shipping',
+                    'shipped',
+                    'dispatched',
+                    'published',
+                ],
+                true
+            )) {
+                $shipped[] = $historical;
+            } else {
+                $inHouse[] = $historical;
+            }
+        }
+
+        $existingState = $inHouse !== []
+            ? 'unshipped'
+            : 'shipped';
+
+        $existingAsset = $inHouse !== []
+            ? $inHouse[0]
+            : ($shipped[0] ?? null);
+
+        if (!is_array($existingAsset)) {
+            return null;
+        }
+
+        return [
+            'existing_state' => $existingState,
+            'existing_asset' => [
+                'pub_asset_id' =>
+                    (int)(
+                        $existingAsset['pub_asset_id']
+                        ?? 0
+                    ),
+                'pipeline_stage' =>
+                    (string)(
+                        $existingAsset['pipeline_stage']
+                        ?? ''
+                    ),
+                'search_title' =>
+                    (string)(
+                        $existingAsset['search_title']
+                        ?? ''
+                    ),
+                'description' =>
+                    (string)(
+                        $existingAsset['description']
+                        ?? ''
+                    ),
+            ],
+        ];
+    }
+
+
+    /**
+     * Convert source into canonical PUB Market material.
+     * One procurement trip per source per Manager wake.
      */
     private function prepareSource(
         string $sourceType,
         int $sourceId
     ): array {
-        /*
-         * One procurement trip per source per Manager wake.
-         *
-         * Today analyze() receives one output type. If ANALYZE later
-         * accepts several output types in one request, every specialist
-         * can work from this same prepared market haul instead of
-         * reloading the Playlist/PV source for each output.
-         */
-        $cacheKey =
-            $sourceType
-            . ':'
-            . $sourceId;
+        $cacheKey = $sourceType . ':' . $sourceId;
 
-
-        if (isset(
-            $this->preparedSources[
-                $cacheKey
-            ]
-        )) {
-            return $this->preparedSources[
-                $cacheKey
-            ];
+        if (isset($this->preparedSources[$cacheKey])) {
+            return $this->preparedSources[$cacheKey];
         }
 
+        $prepared = match ($sourceType) {
+            'playlist' =>
+                $this->playlistSourcePreparer()
+                    ->prepare($sourceId),
 
-        $prepared =
-            match (
-                $sourceType
-            ) {
-                'playlist' =>
-                    $this
-                        ->playlistSourcePreparer()
-                        ->prepare(
-                            $sourceId
-                        ),
+            default =>
+                throw new RuntimeException(
+                    "ANALYZE has no source preparer registered for '{$sourceType}'."
+                ),
+        };
 
-                default =>
-                    throw new RuntimeException(
-                        "ANALYZE has no source preparer registered for '{$sourceType}'."
-                    ),
-            };
-
-
-        $this->preparedSources[
-            $cacheKey
-        ] = $prepared;
-
+        $this->preparedSources[$cacheKey] = $prepared;
 
         return $prepared;
     }
 
 
     /**
-     * Select channel market material and specialist.
-     *
-     * Manager filters by CHANNEL.
-     * Analyzer filters by RECIPE.
+     * Wake one specialist and authorize it against the complete, unchanged
+     * Market delivery. Channel and recipe culling belong to the specialist.
      */
-    private function prepareOutputAssignment(
+    private function prepareAnalyzerAssignment(
         string $outputType,
-        string $channel,
         array $source
     ): array {
-        $sourceId =
-            (int)(
-                $source['source_id']
-                ?? 0
-            );
+        $analyzer = $this->analyzerForOutput(
+            $outputType
+        );
 
-
-        $items =
-            is_array(
-                $source['items']
-                ?? null
-            )
-                ? $source['items']
-                : [];
-
-
-        /*
-         * CHANNEL CULL.
-         */
-        $eligibleItems =
-            match (
-                $channel
-            ) {
-                'pinterest' =>
-                    $this->pinterestItems(
-                        $items
-                    ),
-
-                'youtube' =>
-                    $this->youtubeItems(
-                        $items
-                    ),
-
-                default =>
-                    $items,
-            };
-
-
-        /*
-         * CHANNEL MARKET SOURCE.
-         *
-         * Same prepared source, but items[] has been
-         * replaced by the channel-eligible produce.
-         *
-         * linked_pvs[] and other common source material
-         * remain available.
-         */
-        $channelSource = [
-            ...$source,
-
-            'items' =>
-                $eligibleItems,
-        ];
-
-
-        /*
-         * WAKE SPECIALIST.
-         *
-         * This is the first moment a recipe-specific Analyzer is
-         * needed, so this is where the Manager clocks that worker in.
-         */
-        $analyzer =
-            $this->analyzerForOutput(
-                $outputType
-            );
-
-
-        /*
-         * PREFLIGHT INPUT.
-         *
-         * Migrated Pinterest analyzers receive the complete
-         * Pinterest market source. YouTube Playlist Video receives
-         * the complete YouTube channel market source.
-         *
-         * Remaining analyzers retain their legacy preflight
-         * shape until migrated individually.
-         */
-        $preflightInput =
-            match (
-                $outputType
-            ) {
-                'composite',
-                'before_after_video',
-                'idea',
-                'idea_palette' =>
-                    $channelSource,
-
-                'youtube_teaser_pin' =>
-                    $eligibleItems,
-
-                'youtube_video' =>
-                    $channelSource,
-
-                default =>
-                    $source,
-            };
-
-
-        $gate =
-            $this->authorizeAnalyzer(
-                $analyzer,
-                $preflightInput
-            );
-
+        $gate = $this->authorizeAnalyzer(
+            $analyzer,
+            $source
+        );
 
         return [
-            'analyzer' =>
-                $analyzer,
-
-            'source_id' =>
-                $sourceId,
-
-            'eligible_items' =>
-                $eligibleItems,
-
-            'channel_source' =>
-                $channelSource,
-
-            'channel' =>
-                $gate['channel'],
-
-            'disposition' =>
-                $gate['disposition'],
+            'analyzer' => $analyzer,
+            'channel' => $gate['channel'],
+            'disposition' => $gate['disposition'],
         ];
     }
 
 
     /**
-     * Run a specialist that already passed PubCom.
+     * Run the exact worker that passed readiness/preflight.
      */
     private function runAuthorizedAnalyzer(
         string $outputType,
         array $source,
         array $assignment
     ): array {
-        $eligibleItems =
-            is_array(
-                $assignment['eligible_items']
-                ?? null
-            )
-                ? $assignment['eligible_items']
-                : [];
+        $pubComChannel = $assignment['channel'] ?? null;
 
-
-        $channelSource =
-            is_array(
-                $assignment['channel_source']
-                ?? null
-            )
-                ? $assignment['channel_source']
-                : [];
-
-
-        $pubComChannel =
-            $assignment['channel']
-            ?? null;
-
-
-        if (
-            !$pubComChannel instanceof
-            PubComChannel
-        ) {
+        if (!$pubComChannel instanceof PubComChannel) {
             throw new RuntimeException(
                 'ANALYZE authorized assignment has no PubCom channel.'
             );
         }
 
+        $analyzer = $assignment['analyzer'] ?? null;
 
-        $analyzer =
-            $assignment['analyzer']
-            ?? null;
-
-
-        if (
-            !$analyzer instanceof
-            PubComWorkerContract
-        ) {
+        if (!$analyzer instanceof PubComWorkerContract) {
             throw new RuntimeException(
                 'ANALYZE authorized assignment has no Analyzer.'
             );
         }
 
-
-        /*
-         * The exact SAME worker that passed readiness/preflight now
-         * performs the assignment. No second Analyzer is instantiated.
-         */
-        $analyzeInput =
-            match (
-                $outputType
-            ) {
-                'composite',
-                'before_after_video',
-                'idea',
-                'idea_palette',
-                'youtube_video' =>
-                    $channelSource,
-
-                'youtube_teaser_pin' =>
-                    $eligibleItems,
-
-                default =>
-                    $source,
-            };
-
-
-        if (!method_exists(
-            $analyzer,
-            'analyze'
-        )) {
+        if (!method_exists($analyzer, 'analyze')) {
             throw new RuntimeException(
                 "ANALYZE worker '{$outputType}' has no analyze() method."
             );
         }
 
-
-        $result =
-            $analyzer->analyze(
-                $analyzeInput
-            );
-
+        $result = $analyzer->analyze(
+            $source
+        );
 
         if (
             isset($result['proposals'])
-            && is_array(
-                $result['proposals']
-            )
+            && is_array($result['proposals'])
         ) {
-            $proposals =
-                array_values(
-                    $result['proposals']
-                );
-
+            $proposals = array_values(
+                $result['proposals']
+            );
         } else {
-            $proposals =
-                array_values(
-                    $result
-                );
+            $proposals = array_values($result);
         }
 
-
         return [
-            'proposals' =>
-                $proposals,
-
-            'pubcom' =>
-                $pubComChannel
-                    ->dispositionsAsArray(),
+            'proposals' => $proposals,
+            'pubcom' => $pubComChannel
+                ->dispositionsAsArray(),
         ];
     }
 
@@ -878,90 +728,65 @@ final class AnalyzeManager implements PubComManagerContract
         PubComWorkerContract $analyzer,
         array $input
     ): array {
-        $pubComChannel =
-            new PubComChannel(
-                $this
-            );
-
+        $pubComChannel = new PubComChannel(
+            $this
+        );
 
         $analyzer->connectPubCom(
             $pubComChannel
         );
 
+        $readiness = $pubComChannel->report(
+            $analyzer->readiness()
+        );
 
-        /*
-         * CLOCK IN.
-         */
-        $readiness =
-            $pubComChannel->report(
-                $analyzer->readiness()
-            );
-
-
-        if (
-            !$readiness
-                ->shouldContinue()
-        ) {
+        if (!$readiness->shouldContinue()) {
             return [
-                'channel' =>
-                    $pubComChannel,
-
-                'disposition' =>
-                    $readiness,
+                'channel' => $pubComChannel,
+                'disposition' => $readiness,
             ];
         }
 
-
-        /*
-         * INSPECT ASSIGNMENT.
-         */
-        $preflight =
-            $pubComChannel->report(
-                $analyzer->preflight(
-                    $input
-                )
-            );
-
+        $preflight = $pubComChannel->report(
+            $analyzer->preflight(
+                $input
+            )
+        );
 
         return [
-            'channel' =>
-                $pubComChannel,
-
-            'disposition' =>
-                $preflight,
+            'channel' => $pubComChannel,
+            'disposition' => $preflight,
         ];
     }
 
 
-    /**
-     * Department administrative infrastructure.
-     *
-     * Wakes only if ANALYZE gets far enough to open a fresh PUB run.
-     */
+    private function assetRepository(): PdoPubAssetRepository
+    {
+        if ($this->assetRepository === null) {
+            $this->assetRepository = new PdoPubAssetRepository(
+                $this->pdo
+            );
+        }
+
+        return $this->assetRepository;
+    }
+
+
     private function runService(): PubRunService
     {
         if ($this->runService === null) {
-            $this->runService =
-                new PubRunService(
-                    new PdoPubRunRepository(
-                        $this->pdo
-                    ),
-                    new PdoPubAssetRepository(
-                        $this->pdo
-                    )
-                );
+            $this->runService = new PubRunService(
+                new PdoPubRunRepository(
+                    $this->pdo
+                ),
+                $this->assetRepository()
+            );
         }
-
 
         return $this->runService;
     }
 
 
-    /**
-     * Wake Playlist procurement only when a Playlist source is actually
-     * requested. The same preparer remains available for the rest of the
-     * current Manager/request.
-     */
     private function playlistSourcePreparer(): PlaylistSourcePreparer
     {
         if ($this->playlistSourcePreparer === null) {
@@ -976,167 +801,65 @@ final class AnalyzeManager implements PubComManagerContract
                 );
         }
 
-
         return $this->playlistSourcePreparer;
     }
 
 
     /**
-     * Wake only the specialist required by the requested output type.
+     * Analyze-stage specialist registry.
      *
-     * Workers are cached for this Manager/request. That matters when a
-     * future ANALYZE batch asks the same specialist to handle multiple
-     * assignments: the worker clocks in once for that batch.
+     * PubContract decides which output lines are walked; this registry maps
+     * each contract key to the worker implementation for that line.
      */
     private function analyzerForOutput(
         string $outputType
     ): PubComWorkerContract {
-        if (isset(
-            $this->analyzers[
-                $outputType
-            ]
-        )) {
-            return $this->analyzers[
-                $outputType
-            ];
+        if (isset($this->analyzers[$outputType])) {
+            return $this->analyzers[$outputType];
         }
 
+        $analyzer = match ($outputType) {
+            'composite' =>
+                new CompositeAnalyzer(),
 
-        $analyzer =
-            match (
-                $outputType
-            ) {
-                'composite' =>
-                    new CompositeAnalyzer(),
+            'before_after_video' =>
+                new BeforeAfterVideoAnalyzer(),
 
-                'before_after_video' =>
-                    new BeforeAfterVideoAnalyzer(),
+            'idea' =>
+                new IdeaAnalyzer(),
 
-                'idea' =>
-                    new IdeaAnalyzer(),
+            'idea_palette' =>
+                new PaletteAnalyzer(),
 
-                'idea_palette' =>
-                    $this->makePaletteAnalyzer(),
+            'teaser' =>
+                new TeaserAnalyzer(),
 
-                'youtube_video' =>
-                    new PlaylistVideoAnalyzer(
-                        $this->defaultPantry()
-                    ),
+            'youtube_video' =>
+                new PlaylistVideoAnalyzer(
+                    $this->defaultPantry()
+                ),
 
-                'youtube_teaser_pin' =>
-                    new YouTubeTeaserAnalyzer(),
+            default =>
+                throw new RuntimeException(
+                    "ANALYZE has no Analyzer registered for output type '{$outputType}'."
+                ),
+        };
 
-                default =>
-                    throw new RuntimeException(
-                        "ANALYZE has no Analyzer registered for output type '{$outputType}'."
-                    ),
-            };
-
-
-        $this->analyzers[
-            $outputType
-        ] = $analyzer;
-
+        $this->analyzers[$outputType] = $analyzer;
 
         return $analyzer;
     }
 
 
-    /**
-     * Shared ANALYZE default pantry.
-     *
-     * Wake it only when a specialist actually needs a declared fallback
-     * ingredient. Today that is YouTube music.
-     *
-     * The pantry may resolve Asset Library references. It returns prepared
-     * ingredient shapes; Creators never receive pantry IDs or perform lookups.
-     */
     private function defaultPantry(): DefaultPantry
     {
         if ($this->defaultPantry === null) {
-            $this->defaultPantry =
-                new DefaultPantry(
-                    $this->pdo,
-                    $this->projectRoot
-                );
+            $this->defaultPantry = new DefaultPantry(
+                $this->pdo,
+                $this->projectRoot
+            );
         }
 
-
         return $this->defaultPantry;
-    }
-
-
-    /**
-     * Palette Analyzer has department equipment of its own. Build that
-     * equipment only when this specialist is actually assigned work.
-     */
-    private function makePaletteAnalyzer(): PaletteAnalyzer
-    {
-        $rexRepository =
-            new PdoRexReservationRepository(
-                $this->pdo
-            );
-
-        $playlistPaletteResolver =
-            new PlaylistPaletteResolver(
-                $rexRepository,
-                new RexReservationRelationships(
-                    $rexRepository
-                ),
-                new RexReserver(
-                    $rexRepository,
-                    new RexTokenGenerator()
-                ),
-                new ViewerService(
-                    $this->pdo
-                )
-            );
-
-
-        return new PaletteAnalyzer(
-            $playlistPaletteResolver
-        );
-    }
-
-
-    /**
-     * Pinterest channel eligibility.
-     */
-    private function pinterestItems(
-        array $items
-    ): array {
-        return array_values(
-            array_filter(
-                $items,
-
-                static fn(
-                    array $item
-                ): bool =>
-                    !empty(
-                        $item['pin']
-                    )
-            )
-        );
-    }
-
-
-    /**
-     * YouTube channel eligibility.
-     */
-    private function youtubeItems(
-        array $items
-    ): array {
-        return array_values(
-            array_filter(
-                $items,
-
-                static fn(
-                    array $item
-                ): bool =>
-                    !empty(
-                        $item['yt']
-                    )
-            )
-        );
     }
 }

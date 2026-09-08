@@ -7,6 +7,7 @@ use App\PUB\Create\Pinterest\BeforeAfterVideoCreator;
 use App\PUB\Create\Pinterest\CompositeCreator;
 use App\PUB\Create\Pinterest\IdeaCreator;
 use App\PUB\Create\Pinterest\PaletteCreator;
+use App\PUB\Create\Pinterest\TeaserCreator;
 use App\PUB\Create\Pinterest\Support\PinterestCreatorTools;
 use App\PUB\Create\Video\PdoVideoJobRepository;
 use App\PUB\Create\Video\VideoWorkerHealthService;
@@ -20,7 +21,6 @@ use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\PUB\Services\PubRunService;
-use App\PUB\Support\ProductionSignature;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -233,7 +233,7 @@ final class CreateManager implements PubComManagerContract
      */
     public function createBatch(
         array $boxes,
-        string $duplicatePolicy = 'check'
+        array|string $existingPolicy = 'check'
     ): array {
         $orders = [];
 
@@ -251,7 +251,7 @@ final class CreateManager implements PubComManagerContract
 
         return $this->processBatch(
             $orders,
-            $duplicatePolicy
+            $existingPolicy
         );
     }
 
@@ -269,89 +269,166 @@ final class CreateManager implements PubComManagerContract
      *
      * but not both.
      *
+     * Existing-policy shape:
+     *
+     *   [
+     *     'unshipped' => 'check' | 'replace',
+     *     'shipped'   => 'check' | 'new_version',
+     *   ]
+     *
      * @param array<int, array<string, mixed>> $orders
      */
     public function processBatch(
         array $orders,
-        string $duplicatePolicy = 'check'
+        array|string $existingPolicy = 'check'
     ): array {
-        $duplicatePolicy =
-            strtolower(
-                trim(
-                    $duplicatePolicy
-                )
+        $existingPolicy =
+            $this->normalizeExistingPolicy(
+                $existingPolicy
             );
-
-
-        if (
-            !in_array(
-                $duplicatePolicy,
-                [
-                    'check',
-                    'skip',
-                    'include',
-                ],
-                true
-            )
-        ) {
-            throw new RuntimeException(
-                "CREATE does not support duplicate policy '{$duplicatePolicy}'."
-            );
-        }
 
 
         /*
          * ========================================================
-         * NEW-PRODUCTION DUPLICATE GATE
+         * LOGICAL EXISTING-ASSET GATE
          * ========================================================
          *
-         * This gate runs for the WHOLE incoming batch before:
+         * Runs before any Creator wakes, any ID is reserved/reused,
+         * or any lifecycle state changes.
          *
-         *   - any Creator is awakened
-         *   - any Creator preflight runs
-         *   - any pub_asset_id is reserved
-         *   - any filed order is created
-         *   - any lifecycle state changes
-         *
-         * REDO orders are intentionally ignored here. REDO remakes an
-         * existing in-house asset; it does not create a second publication.
+         * This is intentionally NOT an exact production-signature
+         * comparison. A changed source may still be a new version of
+         * the same logical asset.
          */
-        $duplicateCheck =
-            $this->inspectNewOrderDuplicates(
+        $existingCheck =
+            $this->inspectExistingNewOrders(
                 $orders
             );
 
 
-        $duplicates =
-            $duplicateCheck[
-                'duplicates'
+        $existingMatches =
+            $existingCheck[
+                'matches'
             ];
 
 
-        if (
-            $duplicates !== []
-            && $duplicatePolicy === 'check'
+        $existingByOrderIndex = [];
+
+
+        foreach (
+            $existingMatches
+            as $match
         ) {
+            $existingByOrderIndex[
+                (int)$match[
+                    'order_index'
+                ]
+            ] =
+                $match;
+        }
+
+
+        $unresolvedMatches =
+            array_values(
+                array_filter(
+                    $existingMatches,
+
+                    static function (
+                        array $match
+                    ) use (
+                        $existingPolicy
+                    ): bool {
+                        $state =
+                            (string)(
+                                $match[
+                                    'existing_state'
+                                ]
+                                ?? ''
+                            );
+
+
+                        return (
+                            $state === 'unshipped'
+                            && (
+                                $existingPolicy[
+                                    'unshipped'
+                                ]
+                                ?? 'check'
+                            ) === 'check'
+                        )
+                        || (
+                            $state === 'shipped'
+                            && (
+                                $existingPolicy[
+                                    'shipped'
+                                ]
+                                ?? 'check'
+                            ) === 'check'
+                        );
+                    }
+                )
+            );
+
+
+        if ($unresolvedMatches !== []) {
+            $unshippedCount =
+                count(
+                    array_filter(
+                        $unresolvedMatches,
+
+                        static fn(
+                            array $match
+                        ): bool =>
+                            (
+                                $match[
+                                    'existing_state'
+                                ]
+                                ?? ''
+                            ) === 'unshipped'
+                    )
+                );
+
+            $shippedCount =
+                count(
+                    array_filter(
+                        $unresolvedMatches,
+
+                        static fn(
+                            array $match
+                        ): bool =>
+                            (
+                                $match[
+                                    'existing_state'
+                                ]
+                                ?? ''
+                            ) === 'shipped'
+                    )
+                );
+
+
             return [
                 'code' =>
-                    'duplicate_warning',
+                    'existing_asset_warning',
 
-                'duplicate_warning' =>
+                'existing_asset_warning' =>
                     true,
 
-                'duplicate_count' =>
+                'existing_policy' =>
+                    $existingPolicy,
+
+                'match_count' =>
                     count(
-                        $duplicates
+                        $unresolvedMatches
                     ),
 
-                'duplicates' =>
-                    $duplicates,
+                'unshipped_count' =>
+                    $unshippedCount,
 
-                'duplicate_policy' =>
-                    'check',
+                'shipped_count' =>
+                    $shippedCount,
 
-                'skipped_duplicate_count' =>
-                    0,
+                'matches' =>
+                    $unresolvedMatches,
 
                 'created' =>
                     [],
@@ -362,70 +439,6 @@ final class CreateManager implements PubComManagerContract
                 'failed' =>
                     [],
             ];
-        }
-
-
-        $skippedDuplicates = [];
-
-
-        if (
-            $duplicates !== []
-            && $duplicatePolicy === 'skip'
-        ) {
-            $duplicateIndexes = [];
-
-
-            foreach (
-                $duplicates
-                as $duplicate
-            ) {
-                $duplicateIndexes[
-                    (int)$duplicate[
-                        'order_index'
-                    ]
-                ] = true;
-            }
-
-
-            $keptOrders = [];
-
-
-            foreach (
-                $orders
-                as $index => $order
-            ) {
-                if (
-                    isset(
-                        $duplicateIndexes[
-                            (int)$index
-                        ]
-                    )
-                ) {
-                    $skippedDuplicates[] =
-                        $duplicates[
-                            array_search(
-                                (int)$index,
-                                array_column(
-                                    $duplicates,
-                                    'order_index'
-                                ),
-                                true
-                            )
-                        ];
-
-                    continue;
-                }
-
-
-                $keptOrders[] =
-                    $order;
-            }
-
-
-            $orders =
-                array_values(
-                    $keptOrders
-                );
         }
 
 
@@ -648,7 +661,14 @@ final class CreateManager implements PubComManagerContract
                  */
                 $resolved =
                     $this->resolveOrder(
-                        $order
+                        $order,
+
+                        $existingByOrderIndex[
+                            (int)$index
+                        ]
+                        ?? null,
+
+                        $existingPolicy
                     );
 
 
@@ -785,6 +805,125 @@ final class CreateManager implements PubComManagerContract
 
 
                 /*
+                 * IDEMPOTENT REPLACEMENT.
+                 *
+                 * This exact Box has already been prepared or completed
+                 * for this same Analyze run. Treat it as accepted without
+                 * waking the Creator a second time.
+                 */
+                if (
+                    !empty(
+                        $resolved[
+                            'already_prepared'
+                        ]
+                    )
+                ) {
+                    $currentAsset =
+                        $this->assets
+                            ->getById(
+                                $resolved[
+                                    'pub_asset_id'
+                                ]
+                            );
+
+
+                    if ($currentAsset === null) {
+                        throw new RuntimeException(
+                            "PUB asset #{$resolved['pub_asset_id']} disappeared during idempotent CREATE handling."
+                        );
+                    }
+
+
+                    $currentStage =
+                        strtolower(
+                            trim(
+                                (string)(
+                                    $currentAsset[
+                                        'pipeline_stage'
+                                    ]
+                                    ?? ''
+                                )
+                            )
+                        );
+
+
+                    $alreadyQueued =
+                        $currentStage ===
+                        'creating';
+
+
+                    $productionEntry = [
+                        'index' =>
+                            $index,
+
+                        'asset_type' =>
+                            $resolved[
+                                'asset_type'
+                            ],
+
+                        'pub_asset_id' =>
+                            $resolved[
+                                'pub_asset_id'
+                            ],
+
+                        'existing_action' =>
+                            $resolved[
+                                'existing_action'
+                            ]
+                            ?? null,
+
+                        'predecessor_pub_asset_id' =>
+                            $resolved[
+                                'predecessor_pub_asset_id'
+                            ]
+                            ?? null,
+
+                        'asset' => [
+                            'create_status' =>
+                                $alreadyQueued
+                                    ? 'queued'
+                                    : 'created',
+
+                            'idempotent' =>
+                                true,
+                        ],
+
+                        'persistence' => [
+                            'pub_asset_id' =>
+                                $resolved[
+                                    'pub_asset_id'
+                                ],
+
+                            'pipeline_stage' =>
+                                $currentStage,
+
+                            'idempotent' =>
+                                true,
+                        ],
+
+                        'pubcom' =>
+                            $pubComChannel
+                                ? $pubComChannel
+                                    ->dispositionsAsArray()
+                                : [],
+                    ];
+
+
+                    if ($alreadyQueued) {
+                        $queued[] =
+                            $productionEntry;
+
+                    } else {
+                        $created[] =
+                            $productionEntry;
+                    }
+
+
+                    continue;
+                }
+
+
+                /*
                  * MANAGER AUTHORIZED PRODUCTION.
                  *
                  * Every numbered CREATE order enters the same durable
@@ -863,6 +1002,18 @@ final class CreateManager implements PubComManagerContract
                         $resolved[
                             'pub_asset_id'
                         ],
+
+                    'existing_action' =>
+                        $resolved[
+                            'existing_action'
+                        ]
+                        ?? null,
+
+                    'predecessor_pub_asset_id' =>
+                        $resolved[
+                            'predecessor_pub_asset_id'
+                        ]
+                        ?? null,
 
                     'asset' =>
                         $asset,
@@ -984,6 +1135,7 @@ final class CreateManager implements PubComManagerContract
                             'pin_composite',
                             'pin_idea',
                             'pin_idea_palette',
+                            'pin_teaser',
                         ],
                         true
                     )
@@ -1001,6 +1153,9 @@ final class CreateManager implements PubComManagerContract
 
                                     'pin_idea_palette' =>
                                         'palette_create_failed',
+
+                                    'pin_teaser' =>
+                                        'teaser_create_failed',
 
                                     default =>
                                         'composite_create_failed',
@@ -1100,28 +1255,68 @@ final class CreateManager implements PubComManagerContract
         }
 
 
+        $acceptedEntries = [
+            ...$created,
+            ...$queued,
+        ];
+
+
+        $replacedCount =
+            count(
+                array_filter(
+                    $acceptedEntries,
+
+                    static fn(
+                        array $entry
+                    ): bool =>
+                        (
+                            $entry[
+                                'existing_action'
+                            ]
+                            ?? null
+                        ) === 'replace'
+                )
+            );
+
+
+        $newVersionCount =
+            count(
+                array_filter(
+                    $acceptedEntries,
+
+                    static fn(
+                        array $entry
+                    ): bool =>
+                        (
+                            $entry[
+                                'existing_action'
+                            ]
+                            ?? null
+                        ) === 'new_version'
+                )
+            );
+
+
         return [
             'code' =>
                 'processed',
 
-            'duplicate_warning' =>
+            'existing_asset_warning' =>
                 false,
 
-            'duplicate_policy' =>
-                $duplicatePolicy,
+            'existing_policy' =>
+                $existingPolicy,
 
-            'duplicate_count' =>
+            'existing_match_count' =>
                 count(
-                    $duplicates
+                    $existingMatches
                 ),
 
-            'skipped_duplicate_count' =>
-                count(
-                    $skippedDuplicates
-                ),
+            'replaced_count' =>
+                $replacedCount,
 
-            'skipped_duplicates' =>
-                $skippedDuplicates,
+            'new_version_count' =>
+                $newVersionCount,
 
             'created' =>
                 $created,
@@ -1136,31 +1331,152 @@ final class CreateManager implements PubComManagerContract
 
 
     /**
-     * Inspect NEW orders for exact production recipes that have already
-     * shipped from the same source as the same asset type.
+     * Normalize the boss decision for logical existing assets.
      *
-     * This method is deliberately product-blind. Every specialist has
-     * already supplied the complete final ingredients box; CREATE only
-     * fingerprints that sealed production input and compares permanent
-     * production history.
+     * Legacy string support:
+     *
+     *   check   -> ask for both decisions
+     *   include -> replace in-house + create new version of shipped
+     *
+     * @return array{
+     *   unshipped: string,
+     *   shipped: string
+     * }
+     */
+    private function normalizeExistingPolicy(
+        array|string $policy
+    ): array {
+        $normalized = [
+            'unshipped' =>
+                'check',
+
+            'shipped' =>
+                'check',
+        ];
+
+
+        if (is_string($policy)) {
+            $value =
+                strtolower(
+                    trim(
+                        $policy
+                    )
+                );
+
+
+            if (
+                $value === ''
+                || $value === 'check'
+            ) {
+                return $normalized;
+            }
+
+
+            if ($value === 'include') {
+                return [
+                    'unshipped' =>
+                        'replace',
+
+                    'shipped' =>
+                        'new_version',
+                ];
+            }
+
+
+            throw new RuntimeException(
+                "CREATE does not support existing-asset policy '{$value}'."
+            );
+        }
+
+
+        $unshipped =
+            strtolower(
+                trim(
+                    (string)(
+                        $policy[
+                            'unshipped'
+                        ]
+                        ?? 'check'
+                    )
+                )
+            );
+
+        $shipped =
+            strtolower(
+                trim(
+                    (string)(
+                        $policy[
+                            'shipped'
+                        ]
+                        ?? 'check'
+                    )
+                )
+            );
+
+
+        if (
+            !in_array(
+                $unshipped,
+                [
+                    'check',
+                    'replace',
+                ],
+                true
+            )
+        ) {
+            throw new RuntimeException(
+                "CREATE does not support unshipped existing-asset policy '{$unshipped}'."
+            );
+        }
+
+
+        if (
+            !in_array(
+                $shipped,
+                [
+                    'check',
+                    'new_version',
+                ],
+                true
+            )
+        ) {
+            throw new RuntimeException(
+                "CREATE does not support shipped existing-asset policy '{$shipped}'."
+            );
+        }
+
+
+        return [
+            'unshipped' =>
+                $unshipped,
+
+            'shipped' =>
+                $shipped,
+        ];
+    }
+
+
+    /**
+     * Inspect NEW orders for prior rows representing the same logical
+     * asset combination.
+     *
+     * The newest in-house row wins over shipped history:
+     *
+     *   in-house exists -> replace that SAME pub_asset_id
+     *   shipped only    -> create a NEW pub_asset_id using shipped copy
      *
      * @param array<int, array<string, mixed>> $orders
      *
      * @return array{
-     *   duplicates: array<int, array<string, mixed>>
+     *   matches: array<int, array<string, mixed>>
      * }
      */
-    private function inspectNewOrderDuplicates(
+    private function inspectExistingNewOrders(
         array $orders
     ): array {
-        $duplicates = [];
+        $matches = [];
 
-        /*
-         * Reuse one history lookup for every box that shares the same
-         * source + asset type within this Manager wake.
-         *
-         * @var array<string, array<int, array<string, mixed>>>
-         */
+        /** @var array<string, array<int, array<string, mixed>>> $historyCache */
         $historyCache = [];
 
 
@@ -1186,12 +1502,6 @@ final class CreateManager implements PubComManagerContract
                     : null;
 
 
-            /*
-             * Only NEW work participates.
-             *
-             * Ambiguous box + pub_asset_id orders remain invalid and will
-             * be handled by the existing normal CREATE validation path.
-             */
             if (
                 $box === null
                 ||
@@ -1238,36 +1548,30 @@ final class CreateManager implements PubComManagerContract
                     ?? 0
                 );
 
-            $ingredients =
-                $box[
-                    'ingredients'
-                ]
-                ?? null;
+            $sortOrder =
+                isset(
+                    $box[
+                        'sort_order'
+                    ]
+                )
+                && $box[
+                    'sort_order'
+                ] !== null
+                    ? (int)$box[
+                        'sort_order'
+                    ]
+                    : null;
 
 
-            /*
-             * Malformed NEW orders are not turned into gate failures here.
-             * The existing per-order CREATE validation remains authoritative.
-             */
             if (
                 $assetType === ''
                 ||
                 $sourceType === ''
                 ||
                 $sourceId <= 0
-                ||
-                !is_array(
-                    $ingredients
-                )
             ) {
                 continue;
             }
-
-
-            $signature =
-                ProductionSignature::fromIngredients(
-                    $ingredients
-                );
 
 
             $historyKey =
@@ -1275,7 +1579,13 @@ final class CreateManager implements PubComManagerContract
                 . ':'
                 . $sourceId
                 . ':'
-                . $assetType;
+                . $assetType
+                . ':'
+                . (
+                    $sortOrder === null
+                        ? 'null'
+                        : (string)$sortOrder
+                );
 
 
             if (
@@ -1288,29 +1598,40 @@ final class CreateManager implements PubComManagerContract
                     $historyKey
                 ] =
                     $this->assets
-                        ->listShippedProductionSignatures(
+                        ->listLogicalAssetHistory(
                             $sourceType,
                             $sourceId,
-                            $assetType
+                            $assetType,
+                            $sortOrder
                         );
             }
 
 
-            $shippedMatches = [];
+            $history =
+                $historyCache[
+                    $historyKey
+                ];
+
+
+            if ($history === []) {
+                continue;
+            }
+
+
+            $inHouse = [];
+            $shipped = [];
 
 
             foreach (
-                $historyCache[
-                    $historyKey
-                ]
+                $history
                 as $historical
             ) {
-                $historicalSignature =
+                $stage =
                     strtolower(
                         trim(
                             (string)(
                                 $historical[
-                                    'production_signature'
+                                    'pipeline_stage'
                                 ]
                                 ?? ''
                             )
@@ -1319,36 +1640,44 @@ final class CreateManager implements PubComManagerContract
 
 
                 if (
-                    $historicalSignature !== ''
-                    && hash_equals(
-                        $historicalSignature,
-                        $signature
+                    in_array(
+                        $stage,
+                        [
+                            'shipping',
+                            'shipped',
+                            'dispatched',
+                            'published',
+                        ],
+                        true
                     )
                 ) {
-                    $shippedMatches[] = [
-                        'pub_asset_id' =>
-                            (int)(
-                                $historical[
-                                    'pub_asset_id'
-                                ]
-                                ?? 0
-                            ),
+                    $shipped[] =
+                        $historical;
 
-                        'production_signature' =>
-                            $historicalSignature,
-                    ];
+                } else {
+                    $inHouse[] =
+                        $historical;
                 }
             }
 
 
-            if ($shippedMatches === []) {
-                continue;
-            }
+            $existingState =
+                $inHouse !== []
+                    ? 'unshipped'
+                    : 'shipped';
+
+            $existingAsset =
+                $inHouse !== []
+                    ? $inHouse[0]
+                    : $shipped[0];
 
 
-            $duplicates[] = [
+            $matches[] = [
                 'order_index' =>
                     (int)$index,
+
+                'existing_state' =>
+                    $existingState,
 
                 'asset_type' =>
                     $assetType,
@@ -1359,7 +1688,10 @@ final class CreateManager implements PubComManagerContract
                 'source_id' =>
                     $sourceId,
 
-                'search_title' =>
+                'sort_order' =>
+                    $sortOrder,
+
+                'incoming_search_title' =>
                     trim(
                         (string)(
                             $box[
@@ -1369,18 +1701,46 @@ final class CreateManager implements PubComManagerContract
                         )
                     ),
 
-                'production_signature' =>
-                    $signature,
+                'existing_asset' => [
+                    'pub_asset_id' =>
+                        (int)(
+                            $existingAsset[
+                                'pub_asset_id'
+                            ]
+                            ?? 0
+                        ),
 
-                'shipped_matches' =>
-                    $shippedMatches,
+                    'pipeline_stage' =>
+                        (string)(
+                            $existingAsset[
+                                'pipeline_stage'
+                            ]
+                            ?? ''
+                        ),
+
+                    'search_title' =>
+                        (string)(
+                            $existingAsset[
+                                'search_title'
+                            ]
+                            ?? ''
+                        ),
+
+                    'description' =>
+                        (string)(
+                            $existingAsset[
+                                'description'
+                            ]
+                            ?? ''
+                        ),
+                ],
             ];
         }
 
 
         return [
-            'duplicates' =>
-                $duplicates,
+            'matches' =>
+                $matches,
         ];
     }
 
@@ -1925,6 +2285,7 @@ final class CreateManager implements PubComManagerContract
                         'pin_composite',
                         'pin_idea',
                         'pin_idea_palette',
+                        'pin_teaser',
                     ],
                     true
                 )
@@ -1946,6 +2307,9 @@ final class CreateManager implements PubComManagerContract
 
                                 'pin_idea_palette' =>
                                     'palette_create_failed',
+
+                                'pin_teaser' =>
+                                    'teaser_create_failed',
 
                                 default =>
                                     'composite_create_failed',
@@ -1990,7 +2354,12 @@ final class CreateManager implements PubComManagerContract
      *   Box missing
      */
     private function resolveOrder(
-        array $order
+        array $order,
+        ?array $existingMatch = null,
+        array $existingPolicy = [
+            'unshipped' => 'check',
+            'shipped' => 'check',
+        ]
     ): array {
         $hasBox =
             is_array(
@@ -2075,101 +2444,231 @@ final class CreateManager implements PubComManagerContract
 
 
             /*
-             * Reserve asset number and file
-             * exact sealed order atomically.
+             * Common durable identity/routing for either:
              *
-             * NOTE:
-             *
-             * PubCom readiness / preflight has already
-             * cleared this NEW order before we get here.
-             *
-             * Physical-output staging is a separate
-             * production-safety change and is not part
-             * of this PubCom wiring pass.
+             *   brand-new asset
+             *   in-house replacement
+             *   new version of a shipped predecessor
              */
-            $pubAssetId =
-                $this->assets
-                    ->reserveWithOrder(
-                        [
-                            'pub_run_id' =>
-                                (int)(
-                                    $box[
-                                        'pub_run_id'
-                                    ]
-                                    ?? 0
-                                ),
+            $assetReservation = [
+                'pub_run_id' =>
+                    (int)(
+                        $box[
+                            'pub_run_id'
+                        ]
+                        ?? 0
+                    ),
 
-                            'channel' =>
-                                $this->channelForAssetType(
-                                    $assetType
-                                ),
+                'channel' =>
+                    $this->channelForAssetType(
+                        $assetType
+                    ),
 
-                            'asset_type' =>
-                                $assetType,
+                'asset_type' =>
+                    $assetType,
 
-                            'creator_key' =>
-                                $creatorKey,
+                'creator_key' =>
+                    $creatorKey,
 
-                            'source_type' =>
-                                trim(
-                                    (string)(
-                                        $box[
-                                            'source_type'
-                                        ]
-                                        ?? ''
-                                    )
-                                ),
+                'source_type' =>
+                    trim(
+                        (string)(
+                            $box[
+                                'source_type'
+                            ]
+                            ?? ''
+                        )
+                    ),
 
-                            'source_id' =>
-                                (int)(
-                                    $box[
-                                        'source_id'
-                                    ]
-                                    ?? 0
-                                ),
+                'source_id' =>
+                    (int)(
+                        $box[
+                            'source_id'
+                        ]
+                        ?? 0
+                    ),
 
-                            'sort_order' =>
-                                isset(
-                                    $box[
-                                        'sort_order'
-                                    ]
-                                )
-                                    ? (int)$box[
-                                        'sort_order'
-                                    ]
-                                    : null,
+                'sort_order' =>
+                    isset(
+                        $box[
+                            'sort_order'
+                        ]
+                    )
+                        ? (int)$box[
+                            'sort_order'
+                        ]
+                        : null,
 
-                            'search_title' =>
-                                (string)(
-                                    $box[
-                                        'search_title'
-                                    ]
-                                    ?? ''
-                                ),
+                'search_title' =>
+                    (string)(
+                        $box[
+                            'search_title'
+                        ]
+                        ?? ''
+                    ),
 
-                            'description' =>
-                                (string)(
-                                    $box[
-                                        'description'
-                                    ]
-                                    ?? ''
-                                ),
+                'description' =>
+                    (string)(
+                        $box[
+                            'description'
+                        ]
+                        ?? ''
+                    ),
 
-                            'pingback' =>
-                                (string)(
-                                    $box[
-                                        'pingback'
-                                    ]
-                                    ?? ''
-                                ),
-                        ],
+                'pingback' =>
+                    (string)(
+                        $box[
+                            'pingback'
+                        ]
+                        ?? ''
+                    ),
+            ];
 
-                        /*
-                         * Exact Creator ingredients prepared
-                         * by ANALYZE.
-                         */
-                        $ingredients
+
+            $existingAction = null;
+            $predecessorPubAssetId = null;
+            $alreadyPrepared = false;
+
+
+            if (is_array($existingMatch)) {
+                $existingState =
+                    strtolower(
+                        trim(
+                            (string)(
+                                $existingMatch[
+                                    'existing_state'
+                                ]
+                                ?? ''
+                            )
+                        )
                     );
+
+                $existingAsset =
+                    is_array(
+                        $existingMatch[
+                            'existing_asset'
+                        ]
+                        ?? null
+                    )
+                        ? $existingMatch[
+                            'existing_asset'
+                        ]
+                        : [];
+
+                $predecessorPubAssetId =
+                    (int)(
+                        $existingAsset[
+                            'pub_asset_id'
+                        ]
+                        ?? 0
+                    );
+
+
+                if ($predecessorPubAssetId <= 0) {
+                    throw new RuntimeException(
+                        'CREATE existing-asset match has no valid predecessor pub_asset_id.'
+                    );
+                }
+
+
+                if ($existingState === 'unshipped') {
+                    if (
+                        (
+                            $existingPolicy[
+                                'unshipped'
+                            ]
+                            ?? 'check'
+                        ) !== 'replace'
+                    ) {
+                        throw new RuntimeException(
+                            'CREATE requires explicit replace authorization for an existing in-house asset.'
+                        );
+                    }
+
+
+                    /*
+                     * Idempotent retry / duplicate guard.
+                     *
+                     * If this exact replacement Box has already been
+                     * prepared or completed for this same Analyze run,
+                     * do not wake the Creator again. This matters most
+                     * for asynchronous video assets, where a duplicate
+                     * CREATE attempt would otherwise queue a second job.
+                     */
+                    if (
+                        $this->assets
+                            ->replacementAlreadyPrepared(
+                                $predecessorPubAssetId,
+                                $assetReservation,
+                                $ingredients
+                            )
+                    ) {
+                        $pubAssetId =
+                            $predecessorPubAssetId;
+
+                        $alreadyPrepared =
+                            true;
+
+                    } else {
+                        $pubAssetId =
+                            $this->assets
+                                ->replaceWithOrder(
+                                    $predecessorPubAssetId,
+                                    $assetReservation,
+                                    $ingredients
+                                );
+                    }
+
+                    $existingAction =
+                        'replace';
+
+                } elseif ($existingState === 'shipped') {
+                    if (
+                        (
+                            $existingPolicy[
+                                'shipped'
+                            ]
+                            ?? 'check'
+                        ) !== 'new_version'
+                    ) {
+                        throw new RuntimeException(
+                            'CREATE requires explicit new-version authorization for a shipped predecessor.'
+                        );
+                    }
+
+
+                    /*
+                     * NEW durable ID.
+                     *
+                     * ANALYZE already prefilled predecessor outside copy
+                     * into the workbench. The final incoming Box may contain
+                     * operator edits, so search_title / description are used
+                     * exactly as supplied here.
+                     */
+                    $pubAssetId =
+                        $this->assets
+                            ->reserveWithOrder(
+                                $assetReservation,
+                                $ingredients
+                            );
+
+                    $existingAction =
+                        'new_version';
+
+                } else {
+                    throw new RuntimeException(
+                        "CREATE received unsupported existing asset state '{$existingState}'."
+                    );
+                }
+
+            } else {
+                $pubAssetId =
+                    $this->assets
+                        ->reserveWithOrder(
+                            $assetReservation,
+                            $ingredients
+                        );
+            }
 
 
             return [
@@ -2185,11 +2684,15 @@ final class CreateManager implements PubComManagerContract
                 'ingredients' =>
                     $ingredients,
 
-                /*
-                 * Retained only as NEW-order context while this
-                 * Manager call is active. It is not filed as the
-                 * Creator order.
-                 */
+                'existing_action' =>
+                    $existingAction,
+
+                'predecessor_pub_asset_id' =>
+                    $predecessorPubAssetId,
+
+                'already_prepared' =>
+                    $alreadyPrepared,
+
                 'box' =>
                     $box,
             ];
@@ -2357,6 +2860,15 @@ final class CreateManager implements PubComManagerContract
 
             'ingredients' =>
                 $ingredients,
+
+            'existing_action' =>
+                null,
+
+            'predecessor_pub_asset_id' =>
+                null,
+
+            'already_prepared' =>
+                false,
         ];
     }
 
@@ -2494,6 +3006,13 @@ final class CreateManager implements PubComManagerContract
 
                 'pin_idea_palette' =>
                     new PaletteCreator(
+                        $this->pinterestTools(),
+                        $this->projectRoot,
+                        $this->logoPath()
+                    ),
+
+                'pin_teaser' =>
+                    new TeaserCreator(
                         $this->pinterestTools(),
                         $this->projectRoot,
                         $this->logoPath()
@@ -2689,7 +3208,8 @@ final class CreateManager implements PubComManagerContract
             'pin_composite',
             'pin_before_after_video',
             'pin_idea',
-            'pin_idea_palette' =>
+            'pin_idea_palette',
+            'pin_teaser' =>
                 'pinterest',
 
             'youtube_video' =>
@@ -2723,6 +3243,9 @@ final class CreateManager implements PubComManagerContract
 
             'pin_idea_palette' =>
                 'pinterest.idea_palette',
+
+            'pin_teaser' =>
+                'pinterest.teaser',
 
             'youtube_video' =>
                 'youtube.playlist_video',

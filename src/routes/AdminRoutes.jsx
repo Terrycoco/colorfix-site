@@ -1,9 +1,9 @@
 import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext.jsx';
 import { isAdmin } from '@helpers/authHelper';
 import '@layout/MainLayout/mainlayout.css';
-
+import { AdminDialogProvider } from "@components/AdminDialog";
 
 const HomePage = lazy(() => import('@pages/HomePage'));
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
@@ -95,6 +95,7 @@ export default function AdminRoutes() {
 
   if (!adminAllowed) {
     return (
+
       <Routes>
         <Route path="login" element={renderWithSuspense(LoginPage, 'Loading login...')} />
         <Route path="*" element={<Navigate to="/admin/login" replace />} />
@@ -103,10 +104,11 @@ export default function AdminRoutes() {
   }
 
   return (
+     <AdminDialogProvider>
     <Routes>
       <Route path="login" element={<Navigate to="/admin/" replace />} />
       <Route index element={<AdminHomePage />} />
-      <Route path="results/:queryId" element={<AdminHomePage />} />
+      <Route path="results/:queryId" element={<AdminGalleryRoute />} />
       <Route path="youtube-player/:playlistId" element={renderWithSuspense(YoutubePlayerPage, 'Loading YouTube player...')} />
       <Route path="color/:id" element={<AdminPublicPage><ColorDetailPage /></AdminPublicPage>} />
       <Route path="search" element={<AdminPublicPage><SearchPage /></AdminPublicPage>} />
@@ -190,14 +192,26 @@ export default function AdminRoutes() {
           <Route path="rexrelationships" element={renderWithSuspense(RexRelationships, "Loading REX...")}/>  
       </Route>
     </Routes>
+    </AdminDialogProvider>
   );
 }
 
 function AdminHomePage() {
   return (
-    <Suspense fallback={<RouteFallback label="Loading admin home…" />}>
+    <AdminPublicPage>
       <HomePage />
-    </Suspense>
+    </AdminPublicPage>
+  );
+}
+
+function AdminGalleryRoute() {
+  const { queryId } = useParams();
+  const isHomePage = Number(queryId) === 4;
+
+  return (
+    <AdminPublicPage>
+      {isHomePage ? <HomePage /> : <GalleryPage />}
+    </AdminPublicPage>
   );
 }
 

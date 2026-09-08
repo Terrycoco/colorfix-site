@@ -44,7 +44,7 @@
   gap: .16em;
   color: rgba(170, 205, 202, 1);
   font-family: "Nothing You Could Do", cursive;
-  font-size: calc(var(--brand-bumper-logo-size) * .48);
+  font-size: calc(var(--brand-bumper-logo-size) * .60);
   font-weight: 400;
   letter-spacing: 0;
   word-spacing: 0;

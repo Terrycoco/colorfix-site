@@ -46,10 +46,26 @@ export default function PubAssetsTable({
   const [assetTypes, setAssetTypes] =
     useState([]);
 
+  const [stages, setStages] =
+    useState([]);
+
+  const [
+    sourcePlaylists,
+    setSourcePlaylists,
+  ] = useState([]);
+
+  const [
+    sourcePlaylistFilter,
+    setSourcePlaylistFilter,
+  ] = useState("");
+
   const [channelFilter, setChannelFilter] =
     useState("");
 
   const [typeFilter, setTypeFilter] =
+    useState("");
+
+  const [stageFilter, setStageFilter] =
     useState("");
 
   const [loading, setLoading] =
@@ -84,6 +100,11 @@ export default function PubAssetsTable({
     sendingToPackaging,
     setSendingToPackaging,
   ] = useState(false);
+
+  const [
+    approvingAssetId,
+    setApprovingAssetId,
+  ] = useState(0);
 
   const [
     previewVersion,
@@ -129,6 +150,18 @@ export default function PubAssetsTable({
             ),
         });
 
+      if (sourcePlaylistFilter) {
+        params.set(
+          "source_type",
+          "playlist"
+        );
+
+        params.set(
+          "source_id",
+          sourcePlaylistFilter
+        );
+      }
+
       if (channelFilter) {
         params.set(
           "channel",
@@ -140,6 +173,13 @@ export default function PubAssetsTable({
         params.set(
           "asset_type",
           typeFilter
+        );
+      }
+
+      if (stageFilter) {
+        params.set(
+          "stage",
+          stageFilter
         );
       }
 
@@ -189,6 +229,22 @@ export default function PubAssetsTable({
           : []
       );
 
+      setStages(
+        Array.isArray(
+          data?.filters?.stages
+        )
+          ? data.filters.stages
+          : []
+      );
+
+      setSourcePlaylists(
+        Array.isArray(
+          data?.filters?.source_playlists
+        )
+          ? data.filters.source_playlists
+          : []
+      );
+
     } catch (err) {
       setError(
         err?.message ||
@@ -204,8 +260,10 @@ export default function PubAssetsTable({
   useEffect(() => {
     loadAssets();
   }, [
+    sourcePlaylistFilter,
     channelFilter,
     typeFilter,
+    stageFilter,
   ]);
 
 
@@ -241,31 +299,6 @@ export default function PubAssetsTable({
   async function openAssetEditor(
     asset
   ) {
-    if (
-      !isVideoAsset(
-        asset
-      )
-    ) {
-      setEditIngredientValues(
-        {}
-      );
-
-      setEditIngredientBindings(
-        []
-      );
-
-      setEditAsset(
-        asset
-      );
-
-      setPreviewVersion(
-        Date.now()
-      );
-
-      return;
-    }
-
-
     const id =
       Number(
         asset
@@ -285,26 +318,249 @@ export default function PubAssetsTable({
 
 
     try {
-      const params =
-        new URLSearchParams({
-          pub_asset_id:
-            String(
-              id
-            ),
-
-          _:
-            String(
-              Date.now()
-            ),
-        });
+      const detail =
+        await fetchAssetEditorDetail(
+          id
+        );
 
 
+      setEditIngredientValues(
+        detail
+          .ingredient_values &&
+        typeof detail
+          .ingredient_values ===
+          "object"
+          ? detail
+              .ingredient_values
+          : {}
+      );
+
+
+      setEditIngredientBindings(
+        Array.isArray(
+          detail
+            .ingredient_bindings
+        )
+          ? detail
+              .ingredient_bindings
+          : []
+      );
+
+
+      setEditAsset(
+        detail.asset ||
+        asset
+      );
+
+
+      setPreviewVersion(
+        Date.now()
+      );
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Could not load asset editor."
+      );
+    }
+  }
+
+
+  async function fetchAssetEditorDetail(
+    pubAssetId
+  ) {
+    const id =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!id) {
+      throw new Error(
+        "Valid PUB asset ID required."
+      );
+    }
+
+
+    const params =
+      new URLSearchParams({
+        pub_asset_id:
+          String(
+            id
+          ),
+
+        _:
+          String(
+            Date.now()
+          ),
+      });
+
+
+    const res =
+      await fetch(
+        `${ASSETS_URL}?${params.toString()}`,
+        {
+          credentials:
+            "include",
+        }
+      );
+
+
+    const data =
+      await res.json();
+
+
+    if (
+      !res.ok ||
+      !data?.ok
+    ) {
+      throw new Error(
+        data?.error ||
+        "Could not load asset editor."
+      );
+    }
+
+
+    return data;
+  }
+
+
+  async function refreshOpenAsset(
+    pubAssetId
+  ) {
+    const id =
+      Number(
+        pubAssetId ||
+        editAsset
+          ?.pub_asset_id ||
+        0
+      );
+
+
+    if (!id) {
+      return false;
+    }
+
+
+    try {
+      const detail =
+        await fetchAssetEditorDetail(
+          id
+        );
+
+
+      setEditAsset(
+        detail.asset ||
+        null
+      );
+
+
+      setEditIngredientValues(
+        detail
+          .ingredient_values &&
+        typeof detail
+          .ingredient_values ===
+          "object"
+          ? detail
+              .ingredient_values
+          : {}
+      );
+
+
+      setEditIngredientBindings(
+        Array.isArray(
+          detail
+            .ingredient_bindings
+        )
+          ? detail
+              .ingredient_bindings
+          : []
+      );
+
+
+      setPreviewVersion(
+        Date.now()
+      );
+
+
+      await loadAssets();
+
+      return true;
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Could not refresh asset editor."
+      );
+
+      return false;
+    }
+  }
+
+
+  /*
+   * APPROVE / UNAPPROVE.
+   *
+   * This is an immediate human checkpoint, not an Editor Save.
+   */
+  async function setAssetApproval(
+    asset,
+    approved
+  ) {
+    const id =
+      Number(
+        asset?.pub_asset_id ||
+        0
+      );
+
+
+    if (!id) {
+      return {
+        ok:
+          false,
+
+        error:
+          "Valid PUB asset ID required.",
+      };
+    }
+
+
+    setApprovingAssetId(
+      id
+    );
+
+    setError(
+      ""
+    );
+
+
+    try {
       const res =
         await fetch(
-          `${ASSETS_URL}?${params.toString()}`,
+          ASSETS_URL,
           {
+            method:
+              "PATCH",
+
             credentials:
               "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                pub_asset_id:
+                  id,
+
+                approved:
+                  Boolean(
+                    approved
+                  ),
+              }),
           }
         );
 
@@ -319,48 +575,98 @@ export default function PubAssetsTable({
       ) {
         throw new Error(
           data?.error ||
-          "Could not load asset editor."
+          "Could not change asset approval."
         );
       }
 
 
-      setEditIngredientValues(
-        data
-          .ingredient_values &&
-        typeof data
-          .ingredient_values ===
-          "object"
-          ? data
-              .ingredient_values
-          : {}
-      );
+      const updatedAsset =
+        data.asset || {
+          ...asset,
+          approved:
+            approved
+              ? 1
+              : 0,
+          display_stage:
+            approved
+              ? "approved"
+              : "created",
+        };
 
 
-      setEditIngredientBindings(
-        Array.isArray(
-          data
-            .ingredient_bindings
-        )
-          ? data
-              .ingredient_bindings
-          : []
+      setAssets(
+        (current) =>
+          current.map(
+            (item) =>
+              Number(
+                item.pub_asset_id
+              ) === id
+                ? {
+                    ...item,
+                    ...updatedAsset,
+                  }
+                : item
+          )
       );
 
 
       setEditAsset(
-        data.asset ||
-        asset
+        (current) =>
+          Number(
+            current?.pub_asset_id ||
+            0
+          ) === id
+            ? {
+                ...current,
+                ...updatedAsset,
+              }
+            : current
       );
 
 
-      setPreviewVersion(
-        Date.now()
-      );
+      /*
+       * If CREATED or APPROVED itself is the active filter, the row may
+       * have just moved out of that result set. Reload immediately so the
+       * grid remains truthful.
+       */
+      if (
+        stageFilter === "created" ||
+        stageFilter === "approved"
+      ) {
+        await loadAssets();
+      }
+
+
+      return {
+        ok:
+          true,
+
+        asset:
+          updatedAsset,
+      };
 
     } catch (err) {
-      setError(
+      const message =
         err?.message ||
-        "Could not load asset editor."
+        "Could not change asset approval.";
+
+
+      setError(
+        message
+      );
+
+
+      return {
+        ok:
+          false,
+
+        error:
+          message,
+      };
+
+    } finally {
+      setApprovingAssetId(
+        0
       );
     }
   }
@@ -1188,6 +1494,11 @@ async function recreateAsset(
                   .source_id ||
                 "";
 
+              const title =
+                asset
+                  .source_title ||
+                "";
+
               if (
                 !type &&
                 !id
@@ -1195,11 +1506,21 @@ async function recreateAsset(
                 return "—";
               }
 
+              if (
+                type ===
+                  "playlist" &&
+                title
+              ) {
+                return title;
+              }
+
               return `${type} #${id}`;
             },
 
           sortValue:
             (asset) =>
+              asset
+                .source_title ||
               `${asset.source_type || ""} ${asset.source_id || ""}`,
         },
 
@@ -1214,7 +1535,7 @@ async function recreateAsset(
           render:
             (asset) => {
               const stage =
-                normalizedStage(
+                displayStage(
                   asset
                 );
 
@@ -1243,11 +1564,103 @@ async function recreateAsset(
 
           sortValue:
             (asset) =>
-              String(
+              displayStage(
                 asset
-                  .pipeline_stage ||
-                ""
               ),
+        },
+
+
+        {
+          key:
+            "approved",
+
+          label:
+            "Approved",
+
+          sortable:
+            false,
+
+          render:
+            (asset) => {
+              const stage =
+                normalizedStage(
+                  asset
+                );
+
+              const id =
+                Number(
+                  asset
+                    .pub_asset_id ||
+                  0
+                );
+
+              const checked =
+                Number(
+                  asset.approved ||
+                  0
+                ) === 1;
+
+              const editable =
+                stage ===
+                  "created";
+
+              const saving =
+                Number(
+                  approvingAssetId
+                ) === id;
+
+
+              return (
+                <input
+                  type="checkbox"
+
+                  checked={
+                    checked
+                  }
+
+                  disabled={
+                    !editable ||
+                    saving
+                  }
+
+                  aria-label={
+                    checked
+                      ? `Unapprove asset #${id}`
+                      : `Approve asset #${id}`
+                  }
+
+                  title={
+                    editable
+                      ? checked
+                        ? "Unapprove this asset"
+                        : "Approve this asset"
+                      : "Approval is locked after the asset leaves CREATED."
+                  }
+
+                  style={
+                    approvalCheckboxStyle
+                  }
+
+                  onClick={(
+                    event
+                  ) => {
+                    event
+                      .stopPropagation();
+                  }}
+
+                  onChange={(
+                    event
+                  ) => {
+                    setAssetApproval(
+                      asset,
+                      event
+                        .target
+                        .checked
+                    );
+                  }}
+                />
+              );
+            },
         },
 
 
@@ -1362,6 +1775,8 @@ async function recreateAsset(
       ],
       [
         deletingAssetId,
+        approvingAssetId,
+        stageFilter,
       ]
     );
 
@@ -1390,6 +1805,63 @@ async function recreateAsset(
             filterBarStyle
           }
         >
+          <label
+            className="admin-field"
+          >
+            <span
+              className="admin-field__label"
+            >
+              Source Playlist
+            </span>
+
+            <select
+              className="admin-field__control"
+
+              value={
+                sourcePlaylistFilter
+              }
+
+              onChange={(
+                event
+              ) =>
+                setSourcePlaylistFilter(
+                  event
+                    .target
+                    .value
+                )
+              }
+            >
+              <option value="">
+                All
+              </option>
+
+              {sourcePlaylists.map(
+                (playlist) => (
+                  <option
+                    key={
+                      playlist
+                        .playlist_id
+                    }
+
+                    value={
+                      String(
+                        playlist
+                          .playlist_id
+                      )
+                    }
+                  >
+                    {
+                      playlist
+                        .title ||
+                      `Playlist #${playlist.playlist_id}`
+                    }
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+
           <label
             className="admin-field"
           >
@@ -1484,6 +1956,57 @@ async function recreateAsset(
                   >
                     {humanize(
                       assetType
+                    )}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+
+          <label
+            className="admin-field"
+          >
+            <span
+              className="admin-field__label"
+            >
+              Stage
+            </span>
+
+            <select
+              className="admin-field__control"
+
+              value={
+                stageFilter
+              }
+
+              onChange={(
+                event
+              ) =>
+                setStageFilter(
+                  event
+                    .target
+                    .value
+                )
+              }
+            >
+              <option value="">
+                All
+              </option>
+
+              {stages.map(
+                (stage) => (
+                  <option
+                    key={
+                      stage
+                    }
+
+                    value={
+                      stage
+                    }
+                  >
+                    {humanize(
+                      stage
                     )}
                   </option>
                 )
@@ -1634,6 +2157,21 @@ async function recreateAsset(
               sendingToPackaging
             }
 
+            approvalSaving={
+              Number(
+                approvingAssetId
+              ) ===
+              Number(
+                editAsset
+                  ?.pub_asset_id ||
+                0
+              )
+            }
+
+            onSetApproval={
+              setAssetApproval
+            }
+
             onSave={
               saveAssetCopy
             }
@@ -1676,6 +2214,10 @@ async function recreateAsset(
                 ),
             }}
 
+            ingredientBindings={
+              editIngredientBindings
+            }
+
             saving={
               savingCopy
             }
@@ -1686,6 +2228,21 @@ async function recreateAsset(
 
             sendingToPackaging={
               sendingToPackaging
+            }
+
+            approvalSaving={
+              Number(
+                approvingAssetId
+              ) ===
+              Number(
+                editAsset
+                  ?.pub_asset_id ||
+                0
+              )
+            }
+
+            onSetApproval={
+              setAssetApproval
             }
 
             onSave={
@@ -1700,6 +2257,10 @@ async function recreateAsset(
               sendAssetToPackaging
             }
 
+            onRefreshAsset={
+              refreshOpenAsset
+            }
+
             onClose={() => {
               setEditAsset(
                 null
@@ -1707,6 +2268,10 @@ async function recreateAsset(
 
               setEditIngredientValues(
                 {}
+              );
+
+              setEditIngredientBindings(
+                []
               );
             }}
           />
@@ -1926,6 +2491,44 @@ function normalizedStage(
   )
     .trim()
     .toLowerCase();
+}
+
+
+function displayStage(
+  asset
+) {
+  const explicit =
+    String(
+      asset?.display_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  if (explicit) {
+    return explicit;
+  }
+
+
+  const stage =
+    normalizedStage(
+      asset
+    );
+
+
+  if (
+    stage === "created" &&
+    Number(
+      asset?.approved ||
+      0
+    ) === 1
+  ) {
+    return "approved";
+  }
+
+
+  return stage;
 }
 
 
@@ -2205,6 +2808,21 @@ const rowActionButtonStyle = {
 
   fontWeight:
     500,
+
+  cursor:
+    "pointer",
+};
+
+
+const approvalCheckboxStyle = {
+  width:
+    17,
+
+  height:
+    17,
+
+  margin:
+    0,
 
   cursor:
     "pointer",

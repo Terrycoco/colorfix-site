@@ -1,9 +1,11 @@
 import {useAppState} from '@context/AppStateContext';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { resolveAppPath } from '@helpers/routingHelper';
 
 
 function SwatchCard({ color, className, onSelect=null }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setInfoCardVisible, setCurrentColorDetail, showField, working, setWorking, showMessage} = useAppState();
 
   if (!color) return null; // gracefully handle empty props
@@ -24,7 +26,7 @@ function SwatchCard({ color, className, onSelect=null }) {
       onSelect(color);  //can override behavior on click
     } else {
       setCurrentColorDetail(color);
-      navigate(`/color/${color.id}`);
+      navigate(resolveAppPath(`/color/${color.id}`, location.pathname));
     }
   }
 
@@ -76,6 +78,3 @@ function SwatchCard({ color, className, onSelect=null }) {
 }
 
 export default SwatchCard;
-
-
- 

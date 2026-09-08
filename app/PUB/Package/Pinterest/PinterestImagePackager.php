@@ -6,6 +6,12 @@ namespace App\PUB\Package\Pinterest;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
+use App\PUB\Repos\PdoPubAssetRepository;
+use App\REX\DTO\RexReservation;
+use App\REX\DTO\RexReservationSearchCriteria;
+use App\REX\Repos\PdoRexReservationRepository;
+use App\REX\Services\RexReservationRelationships;
+use PDO;
 use RuntimeException;
 
 /**
@@ -14,8 +20,9 @@ use RuntimeException;
  * Packing specialist for finished Pinterest image assets.
  *
  * By the time this worker receives an asset, CREATE is done.
- * It does not care whether the JPEG came from Composite,
- * Idea, Palette, or any future Pinterest image recipe.
+ * It does not care how the JPEG was rendered. It may inspect
+ * outside-of-box asset_type when a Pinterest image product has
+ * special packaging behavior (for example pin_teaser).
  *
  * INPUT:
  *   one durable pub_assets row
@@ -38,7 +45,9 @@ use RuntimeException;
  *   - verify required per-asset metadata is present
  *   - verify the finished physical image still exists
  *   - resolve browser-facing URLs to absolute public URLs
- *   - attach src=pin to the outbound REX destination
+ *   - recover a missing normal Pinterest REX destination
+ *   - clear an inherited source REX for pin_teaser and hold it PENDING
+ *   - attach src=pin to normal outbound REX destinations
  *   - build the exact variable Pinterest image payload
  *
  * This Packager DOES NOT:
@@ -72,9 +81,23 @@ final class PinterestImagePackager implements PubComWorkerContract
 
     private ?PubComChannel $pubComChannel = null;
 
+    private PdoPubAssetRepository $assets;
+    private PdoRexReservationRepository $rexReservations;
+    private RexReservationRelationships $rexRelationships;
+
+    /**
+     * Effective destinations resolved during this PackageManager pass.
+     * The same Packager instance is reused across the batch, so this
+     * prevents duplicate REX lookups between preflight() and pack().
+     *
+     * @var array<int, string>
+     */
+    private array $effectivePingbacks = [];
+
 
     public function __construct(
         private string $publicBaseUrl,
+        PDO $pdo,
     ) {
         $this->publicBaseUrl =
             rtrim(
@@ -82,6 +105,21 @@ final class PinterestImagePackager implements PubComWorkerContract
                     $this->publicBaseUrl
                 ),
                 '/'
+            );
+
+        $this->assets =
+            new PdoPubAssetRepository(
+                $pdo
+            );
+
+        $this->rexReservations =
+            new PdoRexReservationRepository(
+                $pdo
+            );
+
+        $this->rexRelationships =
+            new RexReservationRelationships(
+                $this->rexReservations
             );
     }
 
@@ -304,20 +342,19 @@ final class PinterestImagePackager implements PubComWorkerContract
 
 
         $pingback =
-            trim(
-                (string)(
-                    $asset[
-                        'pingback'
-                    ]
-                    ?? ''
-                )
+            $this->effectivePingback(
+                $asset
             );
 
 
         if ($pingback === '') {
             return $this->pending(
                 'pinterest_image_destination_pending',
-                'Waiting for Pinterest destination URL.',
+                $this->isTeaserAsset(
+                    $asset
+                )
+                    ? 'Waiting for teaser destination URL.'
+                    : 'Waiting for Pinterest destination URL.',
                 'pingback'
             );
         }
@@ -396,13 +433,24 @@ final class PinterestImagePackager implements PubComWorkerContract
             );
 
         $destinationUrl =
-            $this->withSourceTag(
-                $this->absoluteUrl(
-                    (string)$asset[
-                        'pingback'
-                    ]
+            $this->absoluteUrl(
+                $this->effectivePingback(
+                    $asset
                 )
             );
+
+
+        /*
+         * Normal ColorFix Pinterest destinations retain src=pin.
+         * Teasers deliberately point outside the normal REX path
+         * (currently YouTube), so preserve the operator's URL exactly.
+         */
+        if (!$this->isTeaserAsset($asset)) {
+            $destinationUrl =
+                $this->withSourceTag(
+                    $destinationUrl
+                );
+        }
 
 
         return [
@@ -486,7 +534,6 @@ final class PinterestImagePackager implements PubComWorkerContract
                 'url',
                 'search_title',
                 'description',
-                'pingback',
             ]
             as $field
         ) {
@@ -531,10 +578,17 @@ final class PinterestImagePackager implements PubComWorkerContract
 
         $destinationUrl =
             $this->absoluteUrl(
-                (string)$asset[
-                    'pingback'
-                ]
+                $this->effectivePingback(
+                    $asset
+                )
             );
+
+
+        if ($destinationUrl === '') {
+            throw new RuntimeException(
+                'Pinterest Image Packager cannot pack without pingback.'
+            );
+        }
 
 
         if (!$this->isAbsoluteHttpUrl($mediaUrl)) {
@@ -549,6 +603,379 @@ final class PinterestImagePackager implements PubComWorkerContract
                 'Pinterest Image Packager cannot resolve a valid destination URL.'
             );
         }
+    }
+
+
+    /**
+     * Resolve the outside-of-box destination for this Pinterest image.
+     *
+     * Normal Pinterest images:
+     *   - preserve an explicit pingback
+     *   - if blank, recover the source Playlist's canonical Public REX
+     *     and persist it on pub_assets
+     *
+     * Teasers:
+     *   - if the inherited pingback is the source Playlist REX, clear it
+     *   - if blank, remain PENDING until the operator supplies a target
+     *   - preserve any deliberate non-REX destination (for example YouTube)
+     */
+    private function effectivePingback(
+        array $asset
+    ): string {
+        $pubAssetId =
+            (int)(
+                $asset[
+                    'pub_asset_id'
+                ]
+                ?? 0
+            );
+
+
+        if (
+            $pubAssetId > 0
+            && array_key_exists(
+                $pubAssetId,
+                $this->effectivePingbacks
+            )
+        ) {
+            return $this->effectivePingbacks[
+                $pubAssetId
+            ];
+        }
+
+
+        $pingback =
+            trim(
+                (string)(
+                    $asset[
+                        'pingback'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        $sourceType =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'source_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $sourceId =
+            (int)(
+                $asset[
+                    'source_id'
+                ]
+                ?? 0
+            );
+
+
+        if ($this->isTeaserAsset($asset)) {
+            /*
+             * Blank is the expected teaser state until the operator knows
+             * the outbound destination. Do not wake REX merely to confirm
+             * that an already-blank value should stay blank.
+             */
+            if ($pingback === '') {
+                if ($pubAssetId > 0) {
+                    $this->effectivePingbacks[
+                        $pubAssetId
+                    ] = '';
+                }
+
+
+                return '';
+            }
+
+
+            $sourceRex =
+                $sourceType === 'playlist'
+                && $sourceId > 0
+                    ? $this->canonicalPublicPlaylistRexUrl(
+                        $sourceId
+                    )
+                    : '';
+
+
+            if (
+                $sourceRex !== ''
+                && $this->sameDestinationIgnoringQuery(
+                    $pingback,
+                    $sourceRex
+                )
+            ) {
+                if ($pubAssetId > 0) {
+                    $this->assets
+                        ->updatePackagePingback(
+                            $pubAssetId,
+                            null
+                        );
+                }
+
+                $pingback = '';
+            }
+
+
+            if ($pubAssetId > 0) {
+                $this->effectivePingbacks[
+                    $pubAssetId
+                ] =
+                    $pingback;
+            }
+
+
+            return $pingback;
+        }
+
+
+        /*
+         * Explicit destinations always win for normal Pinterest images.
+         * Only a genuinely blank destination needs the source REX fallback.
+         */
+        if ($pingback !== '') {
+            if ($pubAssetId > 0) {
+                $this->effectivePingbacks[
+                    $pubAssetId
+                ] =
+                    $pingback;
+            }
+
+
+            return $pingback;
+        }
+
+
+        $sourceRex =
+            $sourceType === 'playlist'
+            && $sourceId > 0
+                ? $this->canonicalPublicPlaylistRexUrl(
+                    $sourceId
+                )
+                : '';
+
+
+        if ($sourceRex !== '') {
+            $pingback =
+                $sourceRex;
+
+
+            if ($pubAssetId > 0) {
+                $this->assets
+                    ->updatePackagePingback(
+                        $pubAssetId,
+                        $pingback
+                    );
+            }
+        }
+
+
+        if ($pubAssetId > 0) {
+            $this->effectivePingbacks[
+                $pubAssetId
+            ] =
+                $pingback;
+        }
+
+
+        return $pingback;
+    }
+
+
+    private function isTeaserAsset(
+        array $asset
+    ): bool {
+        return strtolower(
+            trim(
+                (string)(
+                    $asset[
+                        'asset_type'
+                    ]
+                    ?? ''
+                )
+            )
+        ) === 'pin_teaser';
+    }
+
+
+    /**
+     * Same canonical Public Playlist REX selection used by the admin
+     * playlist-url helper: active public playlist_experience rows,
+     * preferring a reservation with viewer children and then the oldest.
+     *
+     * PACKAGE deliberately does not create a REX. If none exists, the
+     * normal Pinterest image remains PENDING rather than manufacturing
+     * routing resources as a side effect of packing.
+     */
+    private function canonicalPublicPlaylistRexUrl(
+        int $playlistId
+    ): string {
+        if ($playlistId <= 0) {
+            return '';
+        }
+
+
+        $reservations =
+            $this->rexReservations
+                ->search(
+                    new RexReservationSearchCriteria(
+                        resolverKey: 'playlist_experience',
+                        resourceType: 'playlist',
+                        resourceId: $playlistId,
+                        status: 'active',
+                        limit: 500,
+                        experienceKey: 'public',
+                    )
+                );
+
+
+        $eligible =
+            array_values(
+                array_filter(
+                    $reservations,
+                    static fn (
+                        RexReservation $reservation
+                    ): bool =>
+                        strtolower(
+                            trim(
+                                $reservation->resolverKey
+                            )
+                        ) === 'playlist_experience'
+                        && strtolower(
+                            trim(
+                                $reservation->resourceType
+                            )
+                        ) === 'playlist'
+                        && strtolower(
+                            trim(
+                                (string)(
+                                    $reservation->experienceKey
+                                    ?? ''
+                                )
+                            )
+                        ) === 'public'
+                        && strtolower(
+                            trim(
+                                $reservation->status
+                            )
+                        ) === 'active'
+                )
+            );
+
+
+        if ($eligible === []) {
+            return '';
+        }
+
+
+        usort(
+            $eligible,
+            function (
+                RexReservation $a,
+                RexReservation $b
+            ): int {
+                $aChildren =
+                    count(
+                        $this->rexRelationships
+                            ->children(
+                                $a->id,
+                                'viewer'
+                            )
+                    );
+
+                $bChildren =
+                    count(
+                        $this->rexRelationships
+                            ->children(
+                                $b->id,
+                                'viewer'
+                            )
+                    );
+
+
+                if ($aChildren !== $bChildren) {
+                    return $bChildren <=> $aChildren;
+                }
+
+
+                return $a->id <=> $b->id;
+            }
+        );
+
+
+        $selected =
+            $eligible[0]
+            ?? null;
+
+
+        if (!$selected instanceof RexReservation) {
+            return '';
+        }
+
+
+        $token =
+            trim(
+                $selected->token
+            );
+
+
+        if ($token === '') {
+            return '';
+        }
+
+
+        return $this->absoluteUrl(
+            '/t/'
+            . $token
+        );
+    }
+
+
+    private function sameDestinationIgnoringQuery(
+        string $a,
+        string $b
+    ): bool {
+        $a =
+            $this->absoluteUrl(
+                $a
+            );
+
+        $b =
+            $this->absoluteUrl(
+                $b
+            );
+
+
+        if (
+            $a === ''
+            || $b === ''
+        ) {
+            return false;
+        }
+
+
+        $strip =
+            static fn (
+                string $url
+            ): string =>
+                rtrim(
+                    (string)(
+                        preg_replace(
+                            '/[?#].*$/',
+                            '',
+                            $url
+                        )
+                    ),
+                    '/'
+                );
+
+
+        return $strip($a) === $strip($b);
     }
 
 

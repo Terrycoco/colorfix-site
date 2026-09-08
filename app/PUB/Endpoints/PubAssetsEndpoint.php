@@ -17,6 +17,7 @@ use Throwable;
  *
  * Owns:
  *   - GET asset grid / editor detail
+ *   - PATCH immediate approval toggle
  *   - PATCH editable asset metadata / authorized ingredients
  *   - DELETE pre-dispatch assets
  *
@@ -227,6 +228,37 @@ final class PubAssetsEndpoint
             );
 
 
+        $stage =
+            trim(
+                (string)(
+                    $_GET[
+                        'stage'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        $sourceType =
+            trim(
+                (string)(
+                    $_GET[
+                        'source_type'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        $sourceId =
+            (int)(
+                $_GET[
+                    'source_id'
+                ]
+                ?? 0
+            );
+
+
         self::sendJson(
             200,
             [
@@ -241,15 +273,41 @@ final class PubAssetsEndpoint
 
                         $assetType !== ''
                             ? $assetType
+                            : null,
+
+                        $stage !== ''
+                            ? $stage
+                            : null,
+
+                        $sourceType !== ''
+                            ? $sourceType
+                            : null,
+
+                        $sourceId > 0
+                            ? $sourceId
                             : null
                     ),
 
                 'filters' => [
+                    'source_playlists' =>
+                        $repo->listSourcePlaylists(),
+
                     'channels' =>
                         $repo->listChannels(),
 
+                    /*
+                     * Asset Type is a product catalog, not a history query.
+                     *
+                     * Show every durable CREATE asset type PUB knows how to
+                     * make even when no pub_assets row exists for it yet.
+                     */
                     'asset_types' =>
-                        $repo->listAssetTypes(),
+                        array_keys(
+                            PubContract::assetCatalog()
+                        ),
+
+                    'stages' =>
+                        $repo->listStages(),
                 ],
             ]
         );
@@ -289,6 +347,56 @@ final class PubAssetsEndpoint
             throw new RuntimeException(
                 'PUB asset not found.'
             );
+        }
+
+
+        /*
+         * IMMEDIATE HUMAN APPROVAL TOGGLE.
+         *
+         * The Assets grid/editor sends only:
+         *
+         *   pub_asset_id
+         *   approved
+         *
+         * This is intentionally independent of the Save/REDO flow.
+         */
+        if (
+            array_key_exists(
+                'approved',
+                $body
+            )
+        ) {
+            if (!is_bool($body['approved'])) {
+                throw new RuntimeException(
+                    'approved must be true or false.'
+                );
+            }
+
+
+            $updated =
+                $repo->setApproved(
+                    $pubAssetId,
+                    $body['approved']
+                );
+
+
+            self::sendJson(
+                200,
+                [
+                    'ok' =>
+                        true,
+
+                    'approval' =>
+                        $updated,
+
+                    'asset' =>
+                        $repo->getById(
+                            $pubAssetId
+                        ),
+                ]
+            );
+
+            return;
         }
 
 

@@ -30,8 +30,8 @@ use Throwable;
  * DispatchManager knows PUB workflow, not external API anatomy.
  *
  * It:
- *   - receives one packed asset ID from Manual Send Now or Schedule
- *   - accepts custody by moving packed -> shipping
+ *   - receives one queued asset ID released by Scheduler or Manual Send Now
+ *   - accepts custody by moving queued -> shipping
  *   - reads only channel + mime_type to choose a shipping line
  *   - wakes only the required Shipper
  *   - hands the sealed package to that specialist unchanged
@@ -174,10 +174,10 @@ final class DispatchManager implements PubComManagerContract
      * Recovery/administrative sweep for assets already in Dispatch custody.
      *
      * Normal one-box entry is shipOne(pub_asset_id), which accepts a
-     * PACKED asset and owns the packed -> shipping transition.
+     * QUEUED asset and owns the queued -> shipping transition.
      *
-     * Schedule does NOT move rows to shipping. When an asset is due,
-     * Schedule calls shipOne(pub_asset_id), exactly like Manual Send Now.
+     * Scheduler does NOT move rows to shipping directly. When Scheduler releases
+     * an asset, it calls shipOne(pub_asset_id), exactly like Manual Send Now.
      *
      * Repository methods expected:
      *
@@ -262,11 +262,11 @@ final class DispatchManager implements PubComManagerContract
     /**
      * Canonical one-box Dispatch entrypoint.
      *
-     * Both Manual Send Now and Schedule call this exact method.
+     * Both Scheduler release and Manual Send Now call this exact method.
      *
      * DispatchManager owns custody:
      *
-     *   packed -> shipping
+     *   queued -> shipping
      *
      * Once custody is accepted, every outcome must leave shipping:
      *
@@ -292,13 +292,13 @@ final class DispatchManager implements PubComManagerContract
         /*
          * Canonical first attempt:
          *
-         *   packed -> shipping
+         *   queued -> shipping
          *
          * Explicit recovery:
          *
          *   error / dispatch -> shipping
          *
-         * Schedule does not pre-mark anything as shipping. A retry also
+         * Scheduler does not pre-mark anything as shipping. A retry also
          * comes through this same one-box Dispatch entrypoint.
          */
         $candidate =
@@ -345,11 +345,11 @@ final class DispatchManager implements PubComManagerContract
 
 
         if (
-            $stage !== 'packed'
+            $stage !== 'queued'
             && !$isDispatchRetry
         ) {
             throw new RuntimeException(
-                "PUB asset #{$pubAssetId} is not ready for Dispatch; expected packed or a Dispatch-stage error."
+                "PUB asset #{$pubAssetId} is not ready for Dispatch; expected queued or a Dispatch-stage error."
             );
         }
 

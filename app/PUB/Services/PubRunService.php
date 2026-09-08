@@ -25,21 +25,18 @@ final class PubRunService
 
     /**
      * Open a new PUB run and return its permanent ID.
+     *
+     * A run is one ANALYZE execution against one source.
+     * It may later contain mixed channels and mixed asset types.
      */
     public function start(
         string $sourceType,
         int $sourceId,
-        string $outputType,
         int $expectedCount = 0
     ): int {
         $sourceType =
             strtolower(
                 trim($sourceType)
-            );
-
-        $outputType =
-            strtolower(
-                trim($outputType)
             );
 
         if ($sourceType === '') {
@@ -54,12 +51,6 @@ final class PubRunService
             );
         }
 
-        if ($outputType === '') {
-            throw new RuntimeException(
-                'PUB run requires output_type.'
-            );
-        }
-
         if ($expectedCount < 0) {
             throw new RuntimeException(
                 'PUB run expected_count cannot be negative.'
@@ -69,29 +60,24 @@ final class PubRunService
         return $this->runRepository->create(
             $sourceType,
             $sourceId,
-            $outputType,
             $expectedCount
         );
     }
 
 
     /**
-     * Find the newest job matching the exact source + output.
+     * Find the newest run for the same source.
      */
     public function findLatestMatching(
         string $sourceType,
-        int $sourceId,
-        string $outputType
+        int $sourceId
     ): ?array {
         return $this->runRepository
             ->findLatestMatching(
                 strtolower(
                     trim($sourceType)
                 ),
-                $sourceId,
-                strtolower(
-                    trim($outputType)
-                )
+                $sourceId
             );
     }
 
@@ -198,7 +184,7 @@ final class PubRunService
      * Meaning:
      *
      *   - keep the SAME pub_run_id
-     *   - require exact same source + output identity
+     *   - require exact same source identity
      *   - refuse if ANY asset has left the building
      *   - delete every generated physical file
      *   - delete every pub_asset_order + pub_asset row
@@ -209,8 +195,7 @@ final class PubRunService
     public function overwrite(
         int $pubRunId,
         string $sourceType,
-        int $sourceId,
-        string $outputType
+        int $sourceId
     ): array {
         $this->assertRunId(
             $pubRunId
@@ -230,11 +215,6 @@ final class PubRunService
                 trim($sourceType)
             );
 
-        $outputType =
-            strtolower(
-                trim($outputType)
-            );
-
         $run =
             $this->runRepository
                 ->findById(
@@ -249,8 +229,8 @@ final class PubRunService
 
 
         /*
-         * Never let a caller use overwrite to turn one job
-         * identity into another.
+         * Never let a caller use overwrite to turn one source run
+         * into a different source run.
          */
         if (
             strtolower(
@@ -270,20 +250,9 @@ final class PubRunService
                 ]
                 ?? 0
             ) !== $sourceId
-            ||
-            strtolower(
-                trim(
-                    (string)(
-                        $run[
-                            'output_type'
-                        ]
-                        ?? ''
-                    )
-                )
-            ) !== $outputType
         ) {
             throw new RuntimeException(
-                "PUB run #{$pubRunId} does not match this source/output request."
+                "PUB run #{$pubRunId} does not match this source request."
             );
         }
 
@@ -553,16 +522,23 @@ final class PubRunService
      * Recalculate CREATE progress from the durable assets belonging
      * to this run.
      *
-     * This is used when asynchronous CREATE work finishes later than
-     * the original HTTP handoff. A queued asset remains "creating"
-     * and is therefore not counted as actual until its physical file
-     * has been promoted and the asset has advanced beyond CREATE.
+     * The run closes automatically only when:
+     *
+     *   - the run is still preparing
+     *   - expected_count is known and greater than zero
+     *   - every expected asset row exists
+     *   - no asset is still in a CREATE-pending state
+     *
+     * This prevents a multi-box run from closing after the first
+     * synchronous asset finishes.
      *
      * @return array{
      *   actual_count: int,
      *   failed_count: int,
      *   pending_count: int,
-     *   asset_count: int
+     *   asset_count: int,
+     *   run_status: string,
+     *   completed_at: mixed
      * }
      */
     public function refreshProgressFromAssets(
@@ -571,6 +547,19 @@ final class PubRunService
         $this->assertRunId(
             $pubRunId
         );
+
+
+        $run =
+            $this->runRepository
+                ->findById(
+                    $pubRunId
+                );
+
+        if ($run === null) {
+            throw new RuntimeException(
+                "PUB run #{$pubRunId} was not found."
+            );
+        }
 
 
         $assets =
@@ -583,6 +572,21 @@ final class PubRunService
         $actualCount = 0;
         $failedCount = 0;
         $pendingCount = 0;
+
+
+        $createdOrBeyond = [
+            'created',
+            'redo_required',
+            'packing',
+            'packed',
+            'packaged',
+            'scheduling',
+            'scheduled',
+            'shipping',
+            'shipped',
+            'dispatched',
+            'published',
+        ];
 
 
         foreach (
@@ -611,13 +615,7 @@ final class PubRunService
             if (
                 in_array(
                     $stage,
-                    [
-                        'created',
-                        'packaged',
-                        'scheduled',
-                        'dispatched',
-                        'published',
-                    ],
+                    $createdOrBeyond,
                     true
                 )
             ) {
@@ -642,6 +640,65 @@ final class PubRunService
         );
 
 
+        $expectedCount =
+            (int)(
+                $run[
+                    'expected_count'
+                ]
+                ?? 0
+            );
+
+        $assetCount =
+            count(
+                $assets
+            );
+
+        $runStatus =
+            strtolower(
+                trim(
+                    (string)(
+                        $run[
+                            'status'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        /*
+         * CLOSE THE RUN ONLY ONCE.
+         *
+         * A historical ready/partial/failed run keeps its original
+         * completed_at even if an asset is later REDO'd.
+         */
+        if (
+            $runStatus === 'preparing'
+            && $expectedCount > 0
+            && $assetCount >= $expectedCount
+            && $pendingCount === 0
+        ) {
+            $run =
+                $this->complete(
+                    $pubRunId,
+                    $actualCount,
+                    $failedCount
+                );
+
+            $runStatus =
+                strtolower(
+                    trim(
+                        (string)(
+                            $run[
+                                'status'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+        }
+
+
         return [
             'actual_count' =>
                 $actualCount,
@@ -653,9 +710,16 @@ final class PubRunService
                 $pendingCount,
 
             'asset_count' =>
-                count(
-                    $assets
-                ),
+                $assetCount,
+
+            'run_status' =>
+                $runStatus,
+
+            'completed_at' =>
+                $run[
+                    'completed_at'
+                ]
+                ?? null,
         ];
     }
 
@@ -751,6 +815,17 @@ final class PubRunService
         int $actualCount,
         int $failedCount
     ): string {
+        /*
+         * A successful ANALYZE run is expected to produce at least
+         * one Box. Zero-output runs are anomalous and must not be
+         * labeled ready merely because 0 === 0.
+         */
+        if ($expectedCount <= 0) {
+            return $actualCount > 0
+                ? 'partial'
+                : 'failed';
+        }
+
         if (
             $failedCount === 0
             && $actualCount === $expectedCount

@@ -10,6 +10,7 @@ import MiniBrandIcon from '@components/BrandFilter/MiniBrandIcon';
 import BrandFilterModal from "@components/BrandFilter";
 import AdminMenu from "@components/AdminMenu/AdminMenu";
 import colorfixDarkBgUrl from "../../assets/brand/colorfix_darkbg.png";
+import { resolveAppPath } from '@helpers/routingHelper';
 
 
 const BoardScroller = ({ adminContext = false }) => {
@@ -17,7 +18,7 @@ const BoardScroller = ({ adminContext = false }) => {
   const location= useLocation();
   const { palette, paletteCollapsed, setPaletteCollapsed, searchFilters } = useAppState();
   const canGoBack = useCanGoBack();
-  const isPaletteRoute = location.pathname.startsWith('/my-palette');
+  const isPaletteRoute = location.pathname === '/my-palette' || location.pathname === '/admin/my-palette';
   const hasSwatches    = Array.isArray(palette) && palette.length > 0;
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
@@ -178,7 +179,7 @@ const goToPalette = (e) => {
      else window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
 
-     navigate('/my-palette#palette-hero');
+     navigate(resolveAppPath('/my-palette#palette-hero', location.pathname));
     }
   };
 

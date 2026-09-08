@@ -1,5 +1,6 @@
 import './palettedisplay.css';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { resolveAppPath } from '@helpers/routingHelper';
 
 // 🛡️ Global click shield helpers
 window.__clickShieldUntil = 0;
@@ -7,6 +8,7 @@ window.armClickShield = (ms = 450) => { window.__clickShieldUntil = Date.now() +
 
 const PaletteSwatch = ({ color }) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   function getTextColor(hcl_l) {
     return (hcl_l > 70 ? 'black' : 'white');
@@ -20,7 +22,7 @@ const PaletteSwatch = ({ color }) => {
     }
     if (e?.target?.closest?.('.no-nav')) return;
     console.log('NAV click', color.id);
-    navigate(`/color/${color.id}`);
+    navigate(resolveAppPath(`/color/${color.id}`, location.pathname));
   }
 
   return (

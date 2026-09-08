@@ -13,69 +13,593 @@ export default function PubPipelineReference({
     );
   }
 
-  const sharedBoxFields =
-    contracts?.shared?.boxFields || [];
+  /*
+   * The contract itself owns the top-level reference order.
+   *
+   * Do NOT maintain a second hardcoded section/stage catalog here.
+   * Any new top-level PubContract section should automatically appear
+   * in this reference page in the same order PubContract::all() returns it.
+   */
+  const sections =
+    Object.entries(
+      contracts
+    );
 
-  const stages = [
-    "analyze",
-    "create",
-    "package",
-    "schedule",
-    "dispatch",
-  ];
+  const pipelineStages =
+    sections
+      .filter(
+        ([, contract]) =>
+          contract &&
+          typeof contract === "object" &&
+          !Array.isArray(contract) &&
+          contract.stage
+      )
+      .map(
+        ([sectionKey, contract]) =>
+          humanize(
+            contract?.stage ||
+            sectionKey
+          ).toUpperCase()
+      );
 
   return (
     <div style={pageStyle}>
-      <div style={pipelineStyle}>
-        ANALYZE → CREATE → PACKAGE → SCHEDULE → DISPATCH
-      </div>
+      {pipelineStages.length ? (
+        <div style={pipelineStyle}>
+          {pipelineStages.join(
+            " → "
+          )}
+        </div>
+      ) : null}
 
+      {sections.map(
+        ([
+          sectionKey,
+          contract,
+        ]) => (
+          <TopLevelContractSection
+            key={sectionKey}
+            sectionKey={sectionKey}
+            contract={contract}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+
+function TopLevelContractSection({
+  sectionKey,
+  contract,
+}) {
+  if (sectionKey === "defaults") {
+    return (
       <DefaultsReference
         defaults={
-          contracts?.defaults ||
+          contract ||
           {}
         }
       />
+    );
+  }
 
-      <SharedBoxFields
-        fields={sharedBoxFields}
+  if (sectionKey === "marketRun") {
+    return (
+      <MarketRunReference
+        marketRun={
+          contract ||
+          {}
+        }
       />
+    );
+  }
 
-      {stages.map((stageKey) => {
-        const stage =
-          contracts?.[stageKey] || {};
+  if (sectionKey === "shared") {
+    return (
+      <>
+        <StateConventionReference
+          convention={
+            contract?.stateConvention ||
+            {}
+          }
+        />
 
-        return (
-          <StageSection
-            key={stageKey}
-            title={stageKey.toUpperCase()}
-            role={stage?.referenceRole}
-          >
-            <StageStates
-              contract={stage}
-            />
+        <SharedBoxFields
+          fields={
+            contract?.boxFields ||
+            []
+          }
+        />
 
-            <ManagerContract
-              manager={stage?.manager}
-            />
+        <GenericContractRemainder
+          title="SHARED — OTHER CONTRACT DATA"
+          contract={contract}
+          omitKeys={[
+            "stateConvention",
+            "boxFields",
+          ]}
+        />
+      </>
+    );
+  }
 
-            <AssetTypes
-              assetTypes={
-                stage?.assetTypes ||
-                {}
-              }
-            />
-          </StageSection>
-        );
-      })}
-
+  if (sectionKey === "repositories") {
+    return (
       <Repositories
         repositories={
-          contracts?.repositories ||
+          contract ||
           {}
         }
       />
+    );
+  }
+
+  if (
+    contract &&
+    typeof contract === "object" &&
+    !Array.isArray(contract) &&
+    contract.stage
+  ) {
+    return (
+      <StageSection
+        title={
+          humanize(
+            contract?.stage ||
+            sectionKey
+          ).toUpperCase()
+        }
+        role={
+          contract?.referenceRole
+        }
+      >
+        <StageContractSummary
+          contract={contract}
+        />
+
+        <StageStates
+          contract={contract}
+        />
+
+        <ManagerContract
+          manager={
+            contract?.manager
+          }
+        />
+
+        <AssetTypes
+          assetTypes={
+            contract?.assetTypes ||
+            {}
+          }
+        />
+
+        <GenericContractValue
+          value={
+            omitObjectKeys(
+              contract,
+              [
+                "stage",
+                "referenceRole",
+                "nextStage",
+                "states",
+                "manager",
+                "assetTypes",
+              ]
+            )
+          }
+        />
+      </StageSection>
+    );
+  }
+
+  /*
+   * Future top-level contract sections need no React change.
+   * Unknown sections fall back to the generic recursive renderer.
+   */
+  return (
+    <GenericReferenceSection
+      sectionKey={sectionKey}
+      contract={contract}
+    />
+  );
+}
+
+
+function MarketRunReference({
+  marketRun,
+}) {
+  const sourceTypes =
+    marketRun?.sourceTypes ||
+    {};
+
+  const entries =
+    Object.entries(
+      sourceTypes
+    );
+
+  return (
+    <AccordionSection
+      title="MARKET RUN"
+      role={
+        marketRun?.referenceRole ||
+        "Source Delivery"
+      }
+      sectionStyle={marketRunSectionStyle}
+      headerStyle={marketRunHeaderStyle}
+    >
+      <div style={marketRunIntroStyle}>
+        {marketRun?.label ||
+          "Market Run"}
+        {" — "}
+        neutral source delivery before ANALYZE creates individual asset boxes.
+        The fields below come directly from the PUB contract.
+      </div>
+
+      {entries.length ? (
+        <div style={marketRunGridStyle}>
+          {entries.map(
+            ([
+              sourceType,
+              sourceContract,
+            ]) => (
+              <div
+                key={sourceType}
+                style={contractStyle}
+              >
+                <div style={contractHeaderStyle}>
+                  {sourceContract?.label ||
+                    humanize(
+                      sourceType
+                    )}
+                </div>
+
+                <div style={identityStyle}>
+                  <div style={identityItemStyle}>
+                    <span style={identityLabelStyle}>
+                      Source Type
+                    </span>
+
+                    <code>
+                      {sourceType}
+                    </code>
+                  </div>
+
+                  {sourceContract?.preparer ? (
+                    <div style={identityItemStyle}>
+                      <span style={identityLabelStyle}>
+                        Preparer
+                      </span>
+
+                      <code>
+                        {sourceContract.preparer}
+                      </code>
+                    </div>
+                  ) : null}
+                </div>
+
+                {sourceContract?.selectionRules ? (
+                  <div style={specialistStyle}>
+                    <div style={subHeaderStyle}>
+                      SELECTION RULES
+                    </div>
+
+                    <KeyValueReference
+                      value={
+                        sourceContract.selectionRules
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                {sourceContract?.output?.length ? (
+                  <div style={specialistStyle}>
+                    <div style={subHeaderStyle}>
+                      DELIVERY OUTPUT
+                    </div>
+
+                    <ContractFieldList
+                      fields={
+                        sourceContract.output
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <GenericContractValue
+                  value={
+                    omitObjectKeys(
+                      sourceContract,
+                      [
+                        "label",
+                        "preparer",
+                        "selectionRules",
+                        "output",
+                      ]
+                    )
+                  }
+                />
+              </div>
+            )
+          )}
+        </div>
+      ) : (
+        <GenericContractValue
+          value={
+            omitObjectKeys(
+              marketRun,
+              [
+                "label",
+                "referenceRole",
+                "sourceTypes",
+              ]
+            )
+          }
+        />
+      )}
+
+      <GenericContractValue
+        value={
+          omitObjectKeys(
+            marketRun,
+            [
+              "label",
+              "referenceRole",
+              "sourceTypes",
+            ]
+          )
+        }
+      />
+    </AccordionSection>
+  );
+}
+
+
+function GenericReferenceSection({
+  sectionKey,
+  contract,
+}) {
+  const isObject =
+    contract &&
+    typeof contract === "object" &&
+    !Array.isArray(contract);
+
+  return (
+    <AccordionSection
+      title={
+        humanize(
+          sectionKey
+        ).toUpperCase()
+      }
+      role={
+        isObject
+          ? contract?.referenceRole || ""
+          : ""
+      }
+      sectionStyle={genericSectionStyle}
+      headerStyle={genericHeaderStyle}
+    >
+      <GenericContractValue
+        value={
+          isObject
+            ? omitObjectKeys(
+                contract,
+                [
+                  "referenceRole",
+                ]
+              )
+            : contract
+        }
+      />
+    </AccordionSection>
+  );
+}
+
+
+function GenericContractRemainder({
+  title,
+  contract,
+  omitKeys = [],
+}) {
+  const remaining =
+    omitObjectKeys(
+      contract,
+      omitKeys
+    );
+
+  if (
+    !remaining ||
+    !Object.keys(
+      remaining
+    ).length
+  ) {
+    return null;
+  }
+
+  return (
+    <AccordionSection
+      title={title}
+      sectionStyle={genericSectionStyle}
+      headerStyle={genericHeaderStyle}
+    >
+      <GenericContractValue
+        value={remaining}
+      />
+    </AccordionSection>
+  );
+}
+
+
+function GenericContractValue({
+  value,
+}) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    if (!value.length) {
+      return null;
+    }
+
+    const looksLikeFieldList =
+      value.every(
+        (item) =>
+          item &&
+          typeof item === "object" &&
+          !Array.isArray(item) &&
+          Object.prototype.hasOwnProperty.call(
+            item,
+            "key"
+          )
+      );
+
+    if (looksLikeFieldList) {
+      return (
+        <div style={genericBodyStyle}>
+          <ContractFieldList
+            fields={value}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div style={genericBodyStyle}>
+        {value.map(
+          (item, index) => (
+            <div
+              key={index}
+              style={genericValueRowStyle}
+            >
+              <GenericContractValue
+                value={item}
+              />
+            </div>
+          )
+        )}
+      </div>
+    );
+  }
+
+  if (
+    typeof value === "object"
+  ) {
+    const entries =
+      Object.entries(
+        value
+      );
+
+    if (!entries.length) {
+      return null;
+    }
+
+    return (
+      <div style={genericBodyStyle}>
+        {entries.map(
+          ([key, nestedValue]) => (
+            <div
+              key={key}
+              style={genericObjectBlockStyle}
+            >
+              <div style={genericObjectKeyStyle}>
+                {humanize(
+                  key
+                )}
+                <span style={genericCodeKeyStyle}>
+                  <code>
+                    {key}
+                  </code>
+                </span>
+              </div>
+
+              <GenericContractValue
+                value={nestedValue}
+              />
+            </div>
+          )
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={genericPrimitiveStyle}>
+      {formatContractValue(
+        value
+      )}
     </div>
+  );
+}
+
+
+function KeyValueReference({
+  value,
+}) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  return (
+    <div style={keyValueGridStyle}>
+      {Object.entries(
+        value
+      ).map(
+        ([key, nestedValue]) => (
+          <div
+            key={key}
+            style={keyValueRowStyle}
+          >
+            <code>
+              {key}
+            </code>
+
+            <span>
+              {formatContractValue(
+                nestedValue
+              )}
+            </span>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+
+function omitObjectKeys(
+  value,
+  keys
+) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return {};
+  }
+
+  const omitted =
+    new Set(
+      keys
+    );
+
+  return Object.fromEntries(
+    Object.entries(
+      value
+    ).filter(
+      ([key]) =>
+        !omitted.has(
+          key
+        )
+    )
   );
 }
 
@@ -1156,6 +1680,115 @@ function humanize(
         character.toUpperCase()
     );
 }
+
+
+const marketRunSectionStyle = {
+  marginBottom: 24,
+  border: "1px solid #9fb6aa",
+  background: "#fbfdfc",
+};
+
+
+const marketRunHeaderStyle = {
+  padding: "8px 10px",
+  background: "#355f4a",
+  color: "#ffffff",
+  fontSize: 15,
+  fontWeight: 700,
+};
+
+
+const marketRunIntroStyle = {
+  padding: "9px 10px",
+  borderBottom: "1px solid #d8e3dc",
+  color: "#425c4e",
+  fontSize: 12,
+};
+
+
+const marketRunGridStyle = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit, minmax(360px, 1fr))",
+  gap: 10,
+  padding: 10,
+};
+
+
+const genericSectionStyle = {
+  marginBottom: 24,
+  border: "1px solid #d8dde3",
+  background: "#ffffff",
+};
+
+
+const genericHeaderStyle = {
+  padding: "8px 10px",
+  background: "#526273",
+  color: "#ffffff",
+  fontSize: 15,
+  fontWeight: 700,
+};
+
+
+const genericBodyStyle = {
+  display: "grid",
+  gap: 7,
+  padding: 9,
+};
+
+
+const genericObjectBlockStyle = {
+  border: "1px solid #e1e6eb",
+  background: "#ffffff",
+};
+
+
+const genericObjectKeyStyle = {
+  display: "flex",
+  alignItems: "baseline",
+  gap: 7,
+  padding: "5px 7px",
+  background: "#f7f8fa",
+  borderBottom: "1px solid #e1e6eb",
+  fontSize: 11,
+  fontWeight: 800,
+  color: "#4b6b8a",
+};
+
+
+const genericCodeKeyStyle = {
+  fontSize: 9,
+  fontWeight: 400,
+  color: "#6b7280",
+};
+
+
+const genericValueRowStyle = {
+  borderBottom: "1px solid #eef1f4",
+};
+
+
+const genericPrimitiveStyle = {
+  padding: "5px 7px",
+  fontSize: 12,
+};
+
+
+const keyValueGridStyle = {
+  display: "grid",
+  gap: 3,
+};
+
+
+const keyValueRowStyle = {
+  display: "grid",
+  gridTemplateColumns: "minmax(180px, auto) 1fr",
+  gap: 10,
+  padding: "4px 6px",
+  borderBottom: "1px solid #eef1f4",
+  fontSize: 11,
+};
 
 
 const pageStyle = {

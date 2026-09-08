@@ -1,8 +1,10 @@
-import {useNavigate} from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {useAppState} from '@context/AppStateContext';
+import { resolveAppPath } from '@helpers/routingHelper';
 
 const ButtonItem = ({ item }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { loggedIn } = useAppState();
 
   // normalize and detect the login button
@@ -14,7 +16,7 @@ const ButtonItem = ({ item }) => {
 
   const handleClick = () => {
     if (item?.target_url) {
-      navigate(item.target_url);
+      navigate(resolveAppPath(item.target_url, location.pathname));
     }
   };
 

@@ -21,8 +21,8 @@ import PubPackageDrawer
 const PACKAGE_URL =
   `${API_FOLDER}/v2/admin/pub/package.php`;
 
-const DISPATCH_URL =
-  `${API_FOLDER}/v2/admin/pub/dispatch.php`;
+const SCHEDULE_URL =
+  `${API_FOLDER}/v2/admin/pub/schedule.php`;
 
 
 export default function PubPackageTable({
@@ -54,6 +54,11 @@ export default function PubPackageTable({
   ] = useState("");
 
   const [
+    stageFilter,
+    setStageFilter,
+  ] = useState("");
+
+  const [
     loading,
     setLoading,
   ] = useState(true);
@@ -66,6 +71,16 @@ export default function PubPackageTable({
   const [
     sending,
     setSending,
+  ] = useState(false);
+
+  const [
+    enqueueing,
+    setEnqueueing,
+  ] = useState(false);
+
+  const [
+    savingPingback,
+    setSavingPingback,
   ] = useState(false);
 
   const [
@@ -104,6 +119,7 @@ export default function PubPackageTable({
    *
    * Expected rows:
    *
+   *   approved CREATED assets waiting to enter Package
    *   packing
    *   packed
    *   error where error_stage = package
@@ -333,14 +349,24 @@ export default function PubPackageTable({
       }
 
 
+      const packedCount =
+        Number(
+          data.packed_count ||
+          0
+        );
+
+
       await loadAssets();
 
 
       /*
-       * Package has handed this asset to Dispatch.
-       * Move the operator directly to the Dispatch workbench.
+       * PENDING is a normal Package result. Keep the operator here so
+       * the drawer can show what the asset is waiting for. Only move
+       * onward when this exact asset actually reached PACKED.
        */
-      onOpenDispatch?.();
+      if (packedCount > 0) {
+        onOpenDispatch?.();
+      }
 
     } catch (err) {
       const message =
@@ -377,13 +403,366 @@ export default function PubPackageTable({
 
 
   /*
-   * Hand exactly one PACKED asset to Dispatch.
+   * Pack every APPROVED asset currently visible through the active
+   * Channel / Type / Stage filters.
    *
-   * DispatchManager owns:
+   * Batch packing deliberately stays on the Package workbench so the
+   * operator can inspect the resulting rows.
+   */
+  async function packAllAssets() {
+    const eligible =
+      filteredAssets.filter(
+        isApprovedCreatedAsset
+      );
+
+
+    if (!eligible.length) {
+      return;
+    }
+
+
+    setProcessing(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+
+    const failures = [];
+
+
+    try {
+      for (
+        const asset
+        of eligible
+      ) {
+        const pubAssetId =
+          Number(
+            asset
+              ?.pub_asset_id ||
+            0
+          );
+
+
+        if (!pubAssetId) {
+          continue;
+        }
+
+
+        try {
+          const res =
+            await fetch(
+              PACKAGE_URL,
+              {
+                method:
+                  "POST",
+
+                credentials:
+                  "include",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    pub_asset_id:
+                      pubAssetId,
+                  }),
+              }
+            );
+
+
+          const data =
+            await res.json();
+
+
+          if (
+            !res.ok
+            ||
+            !data?.ok
+          ) {
+            throw new Error(
+              data?.error ||
+              `Failed to pack asset #${pubAssetId}.`
+            );
+          }
+
+        } catch (err) {
+          failures.push(
+            `#${pubAssetId}: ${
+              err?.message ||
+              "Packaging failed."
+            }`
+          );
+        }
+      }
+
+
+      await loadAssets();
+
+
+      if (failures.length) {
+        setError(
+          failures.join(
+            "  "
+          )
+        );
+      }
+
+    } finally {
+      setProcessing(
+        false
+      );
+    }
+  }
+
+
+  /*
+   * Edit outside-of-box destination metadata while the asset is still
+   * under Package control. The endpoint/repository invalidates any
+   * already-built package if the destination changes.
+   */
+  async function savePingback(
+    pubAssetId,
+    pingback
+  ) {
+    pubAssetId =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!pubAssetId) {
+      return;
+    }
+
+
+    setSavingPingback(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setDrawerError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          PACKAGE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "update_pingback",
+                pub_asset_id:
+                  pubAssetId,
+                pingback:
+                  String(
+                    pingback ||
+                    ""
+                  ).trim(),
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          `Failed to save destination for asset #${pubAssetId}.`
+        );
+      }
+
+
+      if (data?.asset) {
+        setDrawerAsset(
+          data.asset
+        );
+      }
+
+
+      await loadAssets();
+
+    } catch (err) {
+      const message =
+        err?.message ||
+        `Failed to save destination for asset #${pubAssetId}.`;
+
+
+      setDrawerError(
+        message
+      );
+
+      setError(
+        message
+      );
+
+    } finally {
+      setSavingPingback(
+        false
+      );
+    }
+  }
+
+
+  /*
+   * Release exactly one PACKED asset into Schedule's active queue.
    *
-   *   packed -> shipping
+   *   packed -> queued
    *
-   * and the Shipper/driver owns the external delivery work after that.
+   * Once queued, the asset has left Package custody, so close the
+   * Package drawer and refresh this workbench.
+   */
+  async function enqueueAsset(
+    pubAssetId
+  ) {
+    pubAssetId =
+      Number(
+        pubAssetId ||
+        0
+      );
+
+
+    if (!pubAssetId) {
+      return;
+    }
+
+
+    setEnqueueing(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setDrawerError(
+      ""
+    );
+
+
+    try {
+      const res =
+        await fetch(
+          SCHEDULE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                action:
+                  "enqueue",
+
+                pub_asset_id:
+                  pubAssetId,
+              }),
+          }
+        );
+
+
+      const data =
+        await res.json();
+
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          `Failed to enqueue asset #${pubAssetId}.`
+        );
+      }
+
+
+      /*
+       * QUEUED belongs to Schedule, not Package.
+       */
+      setDrawerOpen(
+        false
+      );
+
+      setDrawerAsset(
+        null
+      );
+
+      setSelectedAsset(
+        null
+      );
+
+
+      await loadAssets();
+
+    } catch (err) {
+      const message =
+        err?.message ||
+        `Failed to enqueue asset #${pubAssetId}.`;
+
+
+      setDrawerError(
+        message
+      );
+
+      setError(
+        message
+      );
+
+    } finally {
+      setEnqueueing(
+        false
+      );
+    }
+  }
+
+
+  /*
+   * Manual Send Now.
+   *
+   * This deliberately goes through ScheduleManager's explicit override
+   * path rather than calling Dispatch directly:
+   *
+   *   packed -> queued -> shipping -> shipped
+   *
+   * Automatic Schedule timing/ranking is bypassed.
    */
   async function sendAsset(
     pubAssetId
@@ -396,6 +775,17 @@ export default function PubPackageTable({
 
 
     if (!pubAssetId) {
+      return;
+    }
+
+
+    const confirmed =
+      window.confirm(
+        `Send asset #${pubAssetId} now?\n\nThis bypasses Schedule and sends it directly to Dispatch.`
+      );
+
+
+    if (!confirmed) {
       return;
     }
 
@@ -416,7 +806,7 @@ export default function PubPackageTable({
     try {
       const res =
         await fetch(
-          DISPATCH_URL,
+          SCHEDULE_URL,
           {
             method:
               "POST",
@@ -431,6 +821,9 @@ export default function PubPackageTable({
 
             body:
               JSON.stringify({
+                action:
+                  "send_now",
+
                 pub_asset_id:
                   pubAssetId,
               }),
@@ -452,7 +845,7 @@ export default function PubPackageTable({
           data?.result
             ?.failed
             ?.error ||
-          `Failed to send asset #${pubAssetId} to Dispatch.`
+          `Failed to send asset #${pubAssetId}.`
         );
       }
 
@@ -479,7 +872,7 @@ export default function PubPackageTable({
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to send asset #${pubAssetId} to Dispatch.`;
+        `Failed to send asset #${pubAssetId}.`;
 
 
       setDrawerError(
@@ -641,6 +1034,41 @@ export default function PubPackageTable({
   }
 
 
+  const filteredAssets =
+    useMemo(
+      () => {
+        if (!stageFilter) {
+          return assets;
+        }
+
+
+        return assets.filter(
+          (asset) =>
+            displayStage(
+              asset
+            ) ===
+            stageFilter
+        );
+      },
+      [
+        assets,
+        stageFilter,
+      ]
+    );
+
+
+  const approvedReadyCount =
+    useMemo(
+      () =>
+        filteredAssets.filter(
+          isApprovedCreatedAsset
+        ).length,
+      [
+        filteredAssets,
+      ]
+    );
+
+
   /*
    * GRID COLUMNS
    */
@@ -752,18 +1180,27 @@ export default function PubPackageTable({
           render:
             (asset) => {
               const stage =
-                String(
+                displayStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
+                );
 
 
               if (!stage) {
                 return "—";
               }
+
+
+              const waiting =
+                stage ===
+                  "packing"
+                &&
+                Boolean(
+                  String(
+                    asset
+                      .stage_note ||
+                    ""
+                  ).trim()
+                );
 
 
               return (
@@ -800,9 +1237,11 @@ export default function PubPackageTable({
                       )
                     )
                       ? "Package Error"
-                      : humanize(
-                          stage
-                        )
+                      : waiting
+                        ? "Waiting"
+                        : humanize(
+                            stage
+                          )
                   }
                 </span>
               );
@@ -810,10 +1249,8 @@ export default function PubPackageTable({
 
           sortValue:
             (asset) =>
-              String(
+              displayStage(
                 asset
-                  .pipeline_stage ||
-                ""
               ),
         },
 
@@ -1037,6 +1474,92 @@ export default function PubPackageTable({
                   )}
                 </select>
               </label>
+              <label
+                className="admin-field"
+              >
+                <span
+                  className="admin-field__label"
+                >
+                  Stage
+                </span>
+
+                <select
+                  className="admin-field__control"
+
+                  value={
+                    stageFilter
+                  }
+
+                  onChange={(
+                    event
+                  ) =>
+                    setStageFilter(
+                      event
+                        .target
+                        .value
+                    )
+                  }
+                >
+                  <option value="">
+                    All
+                  </option>
+
+                  <option value="approved">
+                    Approved
+                  </option>
+
+                  <option value="packing">
+                    Packing
+                  </option>
+
+                  <option value="packed">
+                    Packed
+                  </option>
+
+                  <option value="error">
+                    Package Error
+                  </option>
+                </select>
+              </label>
+
+
+              <button
+                type="button"
+
+                onClick={
+                  packAllAssets
+                }
+
+                disabled={
+                  loading ||
+                  processing ||
+                  approvedReadyCount === 0
+                }
+
+                style={
+                  packAllButtonStyle
+                }
+
+                title={
+                  approvedReadyCount > 0
+                    ? `Pack ${approvedReadyCount} approved asset${
+                        approvedReadyCount === 1
+                          ? ""
+                          : "s"
+                      } currently visible.`
+                    : "No approved assets in the current filtered view."
+                }
+              >
+                {
+                  processing
+                    ? "Packing..."
+                    : approvedReadyCount > 0
+                      ? `Pack All (${approvedReadyCount})`
+                      : "Pack All"
+                }
+              </button>
+
+
 <button
                 type="button"
             
@@ -1046,7 +1569,8 @@ export default function PubPackageTable({
             
                 disabled={
                   loading ||
-                  processing
+                  processing ||
+                  enqueueing
                 }
             
                 style={
@@ -1066,9 +1590,9 @@ export default function PubPackageTable({
                   countStyle
                 }
               >
-                {assets.length} asset
+                {filteredAssets.length} asset
                 {
-                  assets.length === 1
+                  filteredAssets.length === 1
                     ? ""
                     : "s"
                 }
@@ -1109,7 +1633,7 @@ export default function PubPackageTable({
 
             <AdminDataGrid
               items={
-                assets
+                filteredAssets
               }
             
               columns={
@@ -1176,12 +1700,28 @@ export default function PubPackageTable({
               processing
             }
 
+            savingPingback={
+              savingPingback
+            }
+
             sending={
               sending
             }
 
+            enqueueing={
+              enqueueing
+            }
+
             onPack={
               packAsset
+            }
+
+            onSavePingback={
+              savePingback
+            }
+
+            onEnqueue={
+              enqueueAsset
             }
 
             onSend={
@@ -1197,6 +1737,74 @@ export default function PubPackageTable({
         }}
       />
     </div>
+  );
+}
+
+
+function displayStage(
+  asset
+) {
+  const explicit =
+    String(
+      asset
+        ?.display_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  if (explicit) {
+    return explicit;
+  }
+
+
+  const pipelineStage =
+    String(
+      asset
+        ?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  if (
+    pipelineStage ===
+      "created"
+    &&
+    Number(
+      asset
+        ?.approved ||
+      0
+    ) === 1
+  ) {
+    return "approved";
+  }
+
+
+  return pipelineStage;
+}
+
+
+function isApprovedCreatedAsset(
+  asset
+) {
+  return (
+    String(
+      asset
+        ?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "created"
+    &&
+    Number(
+      asset
+        ?.approved ||
+      0
+    ) === 1
   );
 }
 

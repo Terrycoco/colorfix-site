@@ -1,13 +1,26 @@
 // components/items/BackItem.jsx
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import useCanGoBack from '@hooks/useCanGoBack';
+import { isAdminPath, resolveAppPath } from '@helpers/routingHelper';
 
-const BackItem = () => {
+const BackItem = ({ item }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const canGoBack = useCanGoBack();
+
+  const handleClick = () => {
+    if (canGoBack) {
+      navigate(-1);
+      return;
+    }
+    const fallback = item?.target_url || (isAdminPath(location.pathname) ? "/admin/" : "/");
+    navigate(resolveAppPath(fallback, location.pathname));
+  };
 
   return (
     <div
       className="back-item item"
-      onClick={() => navigate(-1)}
+      onClick={handleClick}
       style={{
         cursor: 'pointer',
         fontSize: '1rem',

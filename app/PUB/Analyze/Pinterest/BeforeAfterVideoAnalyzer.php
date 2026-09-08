@@ -11,7 +11,7 @@ use App\PUB\PubCom\PubComWorkerContract;
 /**
  * PINTEREST BEFORE / AFTER VIDEO ANALYZER
  *
- * Receives the common Pinterest market source.
+ * Receives the complete neutral Market source and performs its own pin = 1 cull.
  *
  * Uses:
  *   items[]
@@ -85,12 +85,9 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
         array $source
     ): PubComSignal {
         $pinItems =
-            is_array(
-                $source['items']
-                ?? null
-            )
-                ? $source['items']
-                : [];
+            $this->pinItems(
+                $source
+            );
 
 
         $coverItem =
@@ -263,12 +260,9 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
         array $source
     ): array {
         $pinItems =
-            is_array(
-                $source['items']
-                ?? null
-            )
-                ? $source['items']
-                : [];
+            $this->pinItems(
+                $source
+            );
 
 
         $linkedPVs =
@@ -556,9 +550,8 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
     /**
      * Find the authored playlist representation for this product.
      *
-     * AnalyzeManager has already culled the market source to pin = 1,
-     * so this specialist only needs to identify the product-specific
-     * cover-image item.
+     * This specialist has already culled the Market delivery to pin = 1
+     * before looking for the product-specific cover-image item.
      */
     private function coverImageItem(
         array $items
@@ -682,4 +675,31 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
                 ),
         ];
     }
+
+    /**
+     * Pinterest channel participation belongs to the Pinterest specialist,
+     * not AnalyzeManager.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function pinItems(
+        array $source
+    ): array {
+        $items = is_array(
+            $source['items']
+            ?? null
+        )
+            ? $source['items']
+            : [];
+
+        return array_values(
+            array_filter(
+                $items,
+                static fn (mixed $item): bool =>
+                    is_array($item)
+                    && !empty($item['pin'])
+            )
+        );
+    }
+
 }

@@ -1,4 +1,8 @@
 import {
+  useState,
+} from "react";
+
+import {
   AdminWorkbenchDrawer,
 } from "@components/AdminLayout";
 
@@ -12,6 +16,14 @@ export default function PubDispatchDrawer({
   onRetry,
   onClose,
 }) {
+  const [
+    copiedUrl,
+    setCopiedUrl,
+  ] = useState(
+    false
+  );
+
+
   const packageValue =
     normalizeJson(
       asset?.package
@@ -64,6 +76,42 @@ export default function PubDispatchDrawer({
       .trim()
       .toLowerCase() ===
       "dispatch";
+
+
+  async function copyLiveUrl() {
+    if (!externalUrl) {
+      return;
+    }
+
+
+    try {
+      await navigator
+        .clipboard
+        .writeText(
+          externalUrl
+        );
+
+
+      setCopiedUrl(
+        true
+      );
+
+
+      window.setTimeout(
+        () => {
+          setCopiedUrl(
+            false
+          );
+        },
+        1400
+      );
+
+    } catch {
+      setCopiedUrl(
+        false
+      );
+    }
+  }
 
 
   return (
@@ -204,19 +252,55 @@ export default function PubDispatchDrawer({
                 value={
                   externalUrl
                     ? (
-                        <a
-                          href={
-                            externalUrl
+                        <div
+                          style={
+                            liveUrlStyle
                           }
-
-                          target="_blank"
-
-                          rel="noreferrer"
                         >
-                          {
-                            externalUrl
-                          }
-                        </a>
+                          <a
+                            href={
+                              externalUrl
+                            }
+
+                            target="_blank"
+
+                            rel="noreferrer"
+
+                            style={
+                              liveUrlLinkStyle
+                            }
+                          >
+                            {
+                              externalUrl
+                            }
+                          </a>
+
+                          <button
+                            type="button"
+
+                            onClick={
+                              copyLiveUrl
+                            }
+
+                            title={
+                              copiedUrl
+                                ? "Copied"
+                                : "Copy live URL"
+                            }
+
+                            aria-label="Copy live URL"
+
+                            style={
+                              copyButtonStyle
+                            }
+                          >
+                            {
+                              copiedUrl
+                                ? "✓"
+                                : "⧉"
+                            }
+                          </button>
+                        </div>
                       )
                     : "—"
                 }
@@ -632,6 +716,63 @@ const detailValueStyle = {
 
   lineHeight:
     1.4,
+};
+
+
+const liveUrlStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "center",
+
+  gap:
+    7,
+
+  minWidth:
+    0,
+};
+
+
+const liveUrlLinkStyle = {
+  minWidth:
+    0,
+
+  overflowWrap:
+    "anywhere",
+};
+
+
+const copyButtonStyle = {
+  flex:
+    "0 0 auto",
+
+  minWidth:
+    28,
+
+  padding:
+    "2px 6px",
+
+  border:
+    "1px solid #d8dde3",
+
+  borderRadius:
+    4,
+
+  background:
+    "#ffffff",
+
+  color:
+    "#526273",
+
+  fontSize:
+    14,
+
+  lineHeight:
+    1.2,
+
+  cursor:
+    "pointer",
 };
 
 

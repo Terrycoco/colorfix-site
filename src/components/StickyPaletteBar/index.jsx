@@ -1,6 +1,7 @@
 import './stickypalette.css';
 import { useAppState } from '@context/AppStateContext';
 import { useNavigate, useLocation } from "react-router-dom";
+import { resolveAppPath } from '@helpers/routingHelper';
  
 export default function PaletteBar() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function PaletteBar() {
 
 
   function handlePaletteClick() {
-    navigate('/my-palette#palette-hero');
+    navigate(resolveAppPath('/my-palette#palette-hero', pathname));
   }
 
   const handleClick = (e, color) => {
@@ -24,7 +25,7 @@ export default function PaletteBar() {
 
   
 
-     navigate(`/color/${color.id}`);
+     navigate(resolveAppPath(`/color/${color.id}`, pathname));
   };
 
   const hasSwatches = Array.isArray(palette) && palette.length > 0;

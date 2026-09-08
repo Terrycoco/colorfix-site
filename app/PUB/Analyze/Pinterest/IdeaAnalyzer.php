@@ -10,7 +10,7 @@ use App\PUB\PubCom\PubComWorkerContract;
 /**
  * PINTEREST IDEA ANALYZER
  *
- * Receives the common Pinterest market source.
+ * Receives the complete neutral Market source and performs its own pin = 1 cull.
  *
  * Uses:
  *   items[]
@@ -76,12 +76,9 @@ final class IdeaAnalyzer implements PubComWorkerContract
         array $source
     ): PubComSignal {
         $pinItems =
-            is_array(
-                $source['items']
-                ?? null
-            )
-                ? $source['items']
-                : [];
+            $this->pinItems(
+                $source
+            );
 
 
         $eligibleCount =
@@ -191,12 +188,9 @@ final class IdeaAnalyzer implements PubComWorkerContract
         array $source
     ): array {
         $pinItems =
-            is_array(
-                $source['items']
-                ?? null
-            )
-                ? $source['items']
-                : [];
+            $this->pinItems(
+                $source
+            );
 
 
         $linkedPVs =
@@ -476,4 +470,31 @@ final class IdeaAnalyzer implements PubComWorkerContract
             )
         );
     }
+
+    /**
+     * Pinterest channel participation belongs to the Pinterest specialist,
+     * not AnalyzeManager.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function pinItems(
+        array $source
+    ): array {
+        $items = is_array(
+            $source['items']
+            ?? null
+        )
+            ? $source['items']
+            : [];
+
+        return array_values(
+            array_filter(
+                $items,
+                static fn (mixed $item): bool =>
+                    is_array($item)
+                    && !empty($item['pin'])
+            )
+        );
+    }
+
 }

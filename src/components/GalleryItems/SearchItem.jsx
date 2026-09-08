@@ -1,5 +1,5 @@
 import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
-import {buildResultsUrl} from '@helpers/routingHelper';
+import { buildResultsUrl, resolveAppPath } from '@helpers/routingHelper';
 import { PaletteOutlineIcon } from '../Icons/PaletteIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -34,9 +34,7 @@ const SearchItem = ({ item }) => {
   const goToTarget = (url) => {
     const target = String(url || '').trim();
     if (!target) return;
-    const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
-    const isPublicAbsolutePath = target.startsWith('/') && !target.startsWith('/admin');
-    navigate(target);
+    navigate(resolveAppPath(target, location.pathname));
   };
 
 

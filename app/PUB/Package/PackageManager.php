@@ -742,7 +742,8 @@ final class PackageManager implements PubComManagerContract
             ) {
                 'pinterest.image' =>
                     new PinterestImagePackager(
-                        $this->publicBaseUrl()
+                        $this->publicBaseUrl(),
+                        $this->pdo
                     ),
 
                 'pinterest.video' =>

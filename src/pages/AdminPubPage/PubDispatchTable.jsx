@@ -1462,6 +1462,51 @@ export default function PubDispatchTable() {
       0
     );
 
+  /*
+   * CONNECTION PANEL CHANNEL.
+   *
+   * If the operator explicitly filters by Channel, honor that.
+   *
+   * Otherwise infer the channel when the currently visible Dispatch
+   * result set belongs to exactly one channel. This matters when the
+   * operator chooses a channel-specific Type (for example YouTube Video)
+   * while leaving Channel = All.
+   */
+  const visibleChannels =
+    [
+      ...new Set(
+        assets
+          .map(
+            (asset) =>
+              String(
+                asset
+                  ?.channel ||
+                ""
+              )
+                .trim()
+                .toLowerCase()
+          )
+          .filter(
+            Boolean
+          )
+      ),
+    ];
+
+
+  const connectionPanelChannel =
+    String(
+      channelFilter ||
+      (
+        visibleChannels.length ===
+          1
+          ? visibleChannels[0]
+          : ""
+      )
+    )
+      .trim()
+      .toLowerCase();
+
+
 
   if (
     loading
@@ -1676,7 +1721,7 @@ export default function PubDispatchTable() {
 
 
 
-        {channelFilter === "pinterest" ? (
+        {connectionPanelChannel === "pinterest" ? (
         <section
           style={
             connectionPanelStyle
@@ -1849,7 +1894,7 @@ export default function PubDispatchTable() {
         ) : null}
 
 
-        {channelFilter === "youtube" ? (
+        {connectionPanelChannel === "youtube" ? (
           <section
             style={
               connectionPanelStyle

@@ -2,7 +2,8 @@
 import { useAppState } from '@context/AppStateContext';
 import { isClickShielded, armClickShield } from '@helpers/utils';
 import './swatches.css';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { resolveAppPath } from '@helpers/routingHelper';
 import { PaletteToggleIcon } from '@components/Icons/PaletteIcons';
 import DesignerIcon from '@components/Icons/DesignerIcon';
 import FanDeckIcon from '@components/Icons/FanDeckIcon';
@@ -40,6 +41,7 @@ function pickTextColor({ r, g, b }, fallbackLightness) {
 
 export default function PaletteSwatch({ color, widthPercent = 20, onSelectColor }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToPalette, removeFromPalette, palette } = useAppState();
   const inPalette = palette?.some((c) => c.id === color.id);
 
@@ -57,7 +59,7 @@ export default function PaletteSwatch({ color, widthPercent = 20, onSelectColor 
   const go = () => {
     if (isClickShielded()) return;
     history.replaceState(null, '', `#swatch-${color.id}`); // mark where to return
-    navigate(`/color/${color.id}`); // go to detail
+    navigate(resolveAppPath(`/color/${color.id}`, location.pathname)); // go to detail
   };
 
   const isStain = Number(color?.is_stain) === 1;

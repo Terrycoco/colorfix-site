@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { API_FOLDER } from '@helpers/config';
 import GalleryItem from '@components/Gallery/GalleryItem';
 import TopSpacer from '@layout/TopSpacer';
+import { resolveAppPath } from '@helpers/routingHelper';
 import './searchpage.css';
 
 const SearchPage = () => {
   const [searchOptions, setSearchOptions] = useState([]);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchSearchPresets = async () => {
@@ -28,7 +30,7 @@ const SearchPage = () => {
         <GalleryItem
           key={option.id}
           item={option}
-          onClick={() => navigate(`/results/${option.id}`)}
+          onClick={() => navigate(resolveAppPath(`/results/${option.id}`, location.pathname))}
         />
       ))}
     </div>

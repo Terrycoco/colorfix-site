@@ -1,0 +1,769 @@
+{
+  "composition_id": "colorfix-generic-video",
+  "plan": {
+    "video": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "duration_in_frames": 1590
+    },
+    "render": {
+      "codec": "h264"
+    },
+    "layers": [
+      {
+        "id": "video-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 1590,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 0
+        },
+        "style": {
+          "backgroundColor": "#000000"
+        },
+        "animations": []
+      },
+      {
+        "id": "yt-scene-1-photo",
+        "type": "image",
+        "start_frame": 0,
+        "end_frame": 362,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 101
+        },
+        "style": {
+          "opacity": 1
+        },
+        "animations": [],
+        "src": "https://colorfix.terrymarr.com/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_9f2ac3327a09.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-1-caption-background",
+        "type": "rect",
+        "start_frame": 0,
+        "end_frame": 362,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 762,
+          "height": 144,
+          "z": 104
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 68,
+            "end_frame": 128
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 233,
+            "end_frame": 257
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-1-caption-title",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 362,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 706,
+          "height": 65,
+          "z": 105
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 68,
+            "end_frame": 128
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 233,
+            "end_frame": 257
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-1-caption-subtitle",
+        "type": "text",
+        "start_frame": 0,
+        "end_frame": 362,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 706,
+          "height": 47,
+          "z": 106
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 68,
+            "end_frame": 128
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 233,
+            "end_frame": 257
+          }
+        ],
+        "text": "Tired bungalow had lost its welcome"
+      },
+      {
+        "id": "yt-scene-2-photo",
+        "type": "image",
+        "start_frame": 302,
+        "end_frame": 663,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 121
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 302,
+            "end_frame": 362
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_930ddf1e351a.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-2-caption-background",
+        "type": "rect",
+        "start_frame": 302,
+        "end_frame": 663,
+        "box": {
+          "x": 67,
+          "y": 851,
+          "width": 900,
+          "height": 191,
+          "z": 124
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 370,
+            "end_frame": 430
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 534,
+            "end_frame": 558
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-2-caption-title",
+        "type": "text",
+        "start_frame": 302,
+        "end_frame": 663,
+        "box": {
+          "x": 95,
+          "y": 867,
+          "width": 844,
+          "height": 65,
+          "z": 125
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 370,
+            "end_frame": 430
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 534,
+            "end_frame": 558
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-2-caption-subtitle",
+        "type": "text",
+        "start_frame": 302,
+        "end_frame": 663,
+        "box": {
+          "x": 95,
+          "y": 932,
+          "width": 844,
+          "height": 94,
+          "z": 126
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 370,
+            "end_frame": 430
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 534,
+            "end_frame": 558
+          }
+        ],
+        "text": "Welcome restored with fresh, modern palette"
+      },
+      {
+        "id": "yt-scene-3-photo",
+        "type": "image",
+        "start_frame": 603,
+        "end_frame": 965,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 141
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 603,
+            "end_frame": 663
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_891454d4bc13.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-3-caption-background",
+        "type": "rect",
+        "start_frame": 603,
+        "end_frame": 965,
+        "box": {
+          "x": 67,
+          "y": 898,
+          "width": 883,
+          "height": 144,
+          "z": 144
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 671,
+            "end_frame": 731
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 836,
+            "end_frame": 860
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-3-caption-title",
+        "type": "text",
+        "start_frame": 603,
+        "end_frame": 965,
+        "box": {
+          "x": 95,
+          "y": 914,
+          "width": 827,
+          "height": 65,
+          "z": 145
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 671,
+            "end_frame": 731
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 836,
+            "end_frame": 860
+          }
+        ],
+        "text": "Before"
+      },
+      {
+        "id": "yt-scene-3-caption-subtitle",
+        "type": "text",
+        "start_frame": 603,
+        "end_frame": 965,
+        "box": {
+          "x": 95,
+          "y": 979,
+          "width": 827,
+          "height": 47,
+          "z": 146
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 671,
+            "end_frame": 731
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 836,
+            "end_frame": 860
+          }
+        ],
+        "text": "Back porch not living up to its potential"
+      },
+      {
+        "id": "yt-scene-4-photo",
+        "type": "image",
+        "start_frame": 905,
+        "end_frame": 1266,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 161
+        },
+        "style": {
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 905,
+            "end_frame": 965
+          }
+        ],
+        "src": "https://colorfix.terrymarr.com/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_5276e6675e68.jpg",
+        "fit": "contain"
+      },
+      {
+        "id": "yt-scene-4-caption-background",
+        "type": "rect",
+        "start_frame": 905,
+        "end_frame": 1266,
+        "box": {
+          "x": 67,
+          "y": 851,
+          "width": 900,
+          "height": 191,
+          "z": 164
+        },
+        "style": {
+          "backgroundColor": "rgba(0, 0, 0, 0.45)",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 973,
+            "end_frame": 1033
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1137,
+            "end_frame": 1161
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-4-caption-title",
+        "type": "text",
+        "start_frame": 905,
+        "end_frame": 1266,
+        "box": {
+          "x": 95,
+          "y": 867,
+          "width": 844,
+          "height": 65,
+          "z": 165
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 52,
+          "fontWeight": 700,
+          "lineHeight": 1.25,
+          "whiteSpace": "nowrap",
+          "overflowWrap": "normal",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 973,
+            "end_frame": 1033
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1137,
+            "end_frame": 1161
+          }
+        ],
+        "text": "ColorFixed"
+      },
+      {
+        "id": "yt-scene-4-caption-subtitle",
+        "type": "text",
+        "start_frame": 905,
+        "end_frame": 1266,
+        "box": {
+          "x": 95,
+          "y": 932,
+          "width": 844,
+          "height": 94,
+          "z": 166
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "flex-start",
+          "justifyContent": "flex-start",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 36,
+          "fontWeight": 400,
+          "lineHeight": 1.3,
+          "whiteSpace": "pre-wrap",
+          "overflowWrap": "break-word",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 973,
+            "end_frame": 1033
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1137,
+            "end_frame": 1161
+          }
+        ],
+        "text": "Rejuventated back porch replaces lost front porch"
+      },
+      {
+        "id": "yt-scene-5-title",
+        "type": "text",
+        "start_frame": 1206,
+        "end_frame": 1434,
+        "box": {
+          "x": 154,
+          "y": 456,
+          "width": 1612,
+          "height": 90,
+          "z": 185
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 68,
+          "fontWeight": 600,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1206,
+            "end_frame": 1266
+          }
+        ],
+        "text": "Want Exact Colors Used?"
+      },
+      {
+        "id": "yt-scene-5-subtitle",
+        "type": "text",
+        "start_frame": 1206,
+        "end_frame": 1434,
+        "box": {
+          "x": 154,
+          "y": 568,
+          "width": 1612,
+          "height": 56,
+          "z": 186
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "color": "#ffffff",
+          "fontFamily": "Helvetica, Arial, sans-serif",
+          "fontSize": 42,
+          "fontWeight": 400,
+          "lineHeight": 1.2,
+          "textAlign": "center",
+          "whiteSpace": "pre-wrap",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1206,
+            "end_frame": 1266
+          }
+        ],
+        "text": "See link in the description"
+      },
+      {
+        "id": "scene-5-exit-fade",
+        "type": "rect",
+        "start_frame": 1374,
+        "end_frame": 1434,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 199
+        },
+        "style": {
+          "backgroundColor": "#000000",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1374,
+            "end_frame": 1433
+          }
+        ]
+      },
+      {
+        "id": "yt-scene-6-brand",
+        "type": "component",
+        "start_frame": 1434,
+        "end_frame": 1590,
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080,
+          "z": 205
+        },
+        "style": {
+          "display": "flex",
+          "alignItems": "center",
+          "justifyContent": "center",
+          "opacity": 0
+        },
+        "animations": [
+          {
+            "target": "style.opacity",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1434,
+            "end_frame": 1447
+          },
+          {
+            "target": "style.opacity",
+            "from": 1,
+            "to": 0,
+            "start_frame": 1577,
+            "end_frame": 1589
+          },
+          {
+            "target": "props.signatureProgress",
+            "from": 0,
+            "to": 1,
+            "start_frame": 1457,
+            "end_frame": 1510
+          }
+        ],
+        "component": "brand_bumper_logo",
+        "props": {
+          "signatureProgress": 0,
+          "style": {
+            "--brand-bumper-logo-size": "88px"
+          }
+        }
+      }
+    ],
+    "audio": [
+      {
+        "src": "https://colorfix.terrymarr.com/photos/assets/audio/epic-violin-cinematic-instrumental-music-283511-7ce36112e8.mp3",
+        "start_frame": 0,
+        "end_frame": 1590,
+        "volume": 0.2,
+        "fade_out_start_frame": 1500,
+        "fade_out_end_frame": 1589
+      }
+    ]
+  },
+  "render": {
+    "codec": "h264"
+  }
+}

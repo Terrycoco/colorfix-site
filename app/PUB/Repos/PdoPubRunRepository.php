@@ -11,9 +11,12 @@ use RuntimeException;
  *
  * Persistence layer for PUB production runs.
  *
- * A run represents one requested batch of PUB output:
+ * A run represents one execution of ANALYZE against one source.
  *
- *   source_type + source_id + output_type
+ *   source_type + source_id + created_at/pub_run_id
+ *
+ * A single run may contain mixed output types and mixed channels.
+ * Individual asset identity lives on pub_assets, not on pub_runs.
  *
  * The run records how many boxes were expected, how many
  * successfully came back, and how many failed.
@@ -40,14 +43,10 @@ final class PdoPubRunRepository
     public function create(
         string $sourceType,
         int $sourceId,
-        string $outputType,
         int $expectedCount = 0
     ): int {
         $sourceType =
             trim($sourceType);
-
-        $outputType =
-            trim($outputType);
 
         if ($sourceType === '') {
             throw new RuntimeException(
@@ -58,12 +57,6 @@ final class PdoPubRunRepository
         if ($sourceId <= 0) {
             throw new RuntimeException(
                 'PUB run source_id must be greater than zero.'
-            );
-        }
-
-        if ($outputType === '') {
-            throw new RuntimeException(
-                'PUB run output_type is required.'
             );
         }
 
@@ -78,7 +71,6 @@ final class PdoPubRunRepository
             INSERT INTO pub_runs (
                 source_type,
                 source_id,
-                output_type,
                 status,
                 expected_count,
                 actual_count,
@@ -86,7 +78,6 @@ final class PdoPubRunRepository
             ) VALUES (
                 :source_type,
                 :source_id,
-                :output_type,
                 'preparing',
                 :expected_count,
                 0,
@@ -106,9 +97,6 @@ final class PdoPubRunRepository
 
             'source_id' =>
                 $sourceId,
-
-            'output_type' =>
-                $outputType,
 
             'expected_count' =>
                 $expectedCount,
@@ -138,7 +126,6 @@ final class PdoPubRunRepository
                     pub_run_id,
                     source_type,
                     source_id,
-                    output_type,
                     status,
                     expected_count,
                     actual_count,
@@ -169,29 +156,22 @@ final class PdoPubRunRepository
 
 
     /**
-     * Find the newest job for the exact same source + output.
+     * Find the newest run for the same source.
      *
-     * ANALYZE uses this before opening another run.
+     * Output type is deliberately not part of run identity.
      */
     public function findLatestMatching(
         string $sourceType,
-        int $sourceId,
-        string $outputType
+        int $sourceId
     ): ?array {
         $sourceType =
             strtolower(
                 trim($sourceType)
             );
 
-        $outputType =
-            strtolower(
-                trim($outputType)
-            );
-
         if (
             $sourceType === ''
             || $sourceId <= 0
-            || $outputType === ''
         ) {
             return null;
         }
@@ -204,7 +184,6 @@ final class PdoPubRunRepository
                     pub_run_id,
                     source_type,
                     source_id,
-                    output_type,
                     status,
                     expected_count,
                     actual_count,
@@ -215,7 +194,6 @@ final class PdoPubRunRepository
                 FROM pub_runs
                 WHERE source_type = :source_type
                   AND source_id = :source_id
-                  AND output_type = :output_type
                 ORDER BY pub_run_id DESC
                 LIMIT 1
                 SQL
@@ -227,9 +205,6 @@ final class PdoPubRunRepository
 
             'source_id' =>
                 $sourceId,
-
-            'output_type' =>
-                $outputType,
         ]);
 
 

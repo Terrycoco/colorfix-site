@@ -14,21 +14,9 @@ use Throwable;
  *
  * Public doorbell for the ANALYZE department.
  *
- * This endpoint owns ONLY HTTP/request concerns:
- *   - accept one ANALYZE request
- *   - validate that the request is complete
- *   - wake AnalyzeManager
- *   - hand the Manager the routing parameters
- *   - translate the Manager result back to HTTP/JSON
- *
- * It must NOT:
- *   - instantiate Procurement
- *   - instantiate any Analyzer
- *   - choose an Analyzer
- *   - inspect source material
- *   - decide ANALYZE workflow
- *
- * AnalyzeManager owns everything after the doorbell rings.
+ * The HTTP request identifies only the source. It does NOT choose an
+ * output type, Analyzer, channel, or run mode. AnalyzeManager owns the
+ * complete factory event after the doorbell rings.
  */
 final class AnalyzeEndpoint
 {
@@ -59,9 +47,7 @@ final class AnalyzeEndpoint
 
         $sourceType = '';
         $sourceId = 0;
-        $outputType = '';
-        $runMode = 'check';
-        $overwritePubRunId = 0;
+        $pubRunId = 0;
 
         try {
             $data = self::requestJson();
@@ -72,34 +58,6 @@ final class AnalyzeEndpoint
 
             $sourceId = (int)($data['source_id'] ?? 0);
 
-            $outputTypeRaw =
-                $data['output_type']
-                ?? (
-                    is_array($data['outputs'] ?? null)
-                        ? ($data['outputs'][0] ?? '')
-                        : ''
-                );
-
-            $outputType = strtolower(
-                trim((string)$outputTypeRaw)
-            );
-
-            $runMode = strtolower(
-                trim((string)($data['run_mode'] ?? 'check'))
-            );
-
-            $overwritePubRunId = (int)(
-                $data['overwrite_pub_run_id']
-                ?? 0
-            );
-
-            /*
-             * REQUEST COMPLETENESS ONLY.
-             *
-             * The endpoint checks whether the caller supplied enough
-             * information to ring the correct doorbell. It does not
-             * make ANALYZE-stage decisions.
-             */
             if ($sourceType === '') {
                 throw new RuntimeException(
                     'source_type required'
@@ -112,43 +70,6 @@ final class AnalyzeEndpoint
                 );
             }
 
-            if ($outputType === '') {
-                throw new RuntimeException(
-                    'output_type required'
-                );
-            }
-
-            if (!in_array(
-                $runMode,
-                ['check', 'new', 'overwrite'],
-                true
-            )) {
-                throw new RuntimeException(
-                    'Invalid run_mode.'
-                );
-            }
-
-            if (
-                $runMode === 'overwrite'
-                && $overwritePubRunId <= 0
-            ) {
-                throw new RuntimeException(
-                    'overwrite_pub_run_id required for overwrite.'
-                );
-            }
-
-            /*
-             * WAKE ANALYZE MANAGER.
-             *
-             * AnalyzeManager is intentionally created only when an
-             * ANALYZE request arrives. The Manager is responsible for
-             * waking Procurement and the one specialist Analyzer needed
-             * for this assignment.
-             *
-             * NOTE: AnalyzeManager's constructor will be refactored to
-             * accept only shared facility resources (PDO/project root)
-             * and lazily create its department staff.
-             */
             $manager = new AnalyzeManager(
                 $pdo,
                 $projectRoot
@@ -156,41 +77,10 @@ final class AnalyzeEndpoint
 
             $result = $manager->analyze(
                 $sourceType,
-                $sourceId,
-                $outputType,
-                $runMode,
-                $overwritePubRunId
+                $sourceId
             );
 
-            /*
-             * The Manager decided an existing job blocks this request.
-             * The endpoint only converts that decision to HTTP.
-             */
-            if (($result['code'] ?? '') === 'existing_pub_run') {
-                $existingRunId = (int)(
-                    $result['pub_run_id']
-                    ?? 0
-                );
-
-                self::sendJson(409, [
-                    'ok' => false,
-                    'code' => 'existing_pub_run',
-                    'error' =>
-                        "PUB job #{$existingRunId} already exists for this source and output.",
-                    'existing_run' =>
-                        $result['existing_run']
-                        ?? null,
-                    'can_overwrite' =>
-                        (bool)($result['can_overwrite'] ?? false),
-                    'blocking_assets' =>
-                        $result['blocking_assets']
-                        ?? [],
-                    'asset_count' =>
-                        (int)($result['asset_count'] ?? 0),
-                ]);
-
-                return;
-            }
+            $pubRunId = (int)($result['pub_run_id'] ?? 0);
 
             $boxes = is_array($result['boxes'] ?? null)
                 ? array_values($result['boxes'])
@@ -200,36 +90,52 @@ final class AnalyzeEndpoint
                 ? array_values($result['failed'])
                 : [];
 
+            $skipped = is_array($result['skipped'] ?? null)
+                ? array_values($result['skipped'])
+                : [];
+
             $pubCom = is_array($result['pubcom'] ?? null)
                 ? array_values($result['pubcom'])
                 : [];
 
+            $existingAssetMatches =
+                is_array(
+                    $result['existing_asset_matches']
+                    ?? null
+                )
+                    ? array_values(
+                        $result['existing_asset_matches']
+                    )
+                    : [];
+
             self::sendJson(200, [
                 'ok' => true,
-                'pub_run_id' =>
-                    (int)($result['pub_run_id'] ?? 0),
-                'run_mode' =>
-                    (string)($result['run_mode'] ?? $runMode),
-                'overwrote_existing_job' =>
-                    (bool)($result['overwrote_existing_job'] ?? false),
-                'deleted_asset_count' =>
-                    (int)($result['deleted_asset_count'] ?? 0),
+                'pub_run_id' => $pubRunId,
                 'source_type' =>
                     (string)($result['source_type'] ?? $sourceType),
                 'source_id' =>
                     (int)($result['source_id'] ?? $sourceId),
-                'output_type' =>
-                    (string)($result['output_type'] ?? $outputType),
-                'box_count' =>
-                    count($boxes),
-                'failed_count' =>
-                    count($failed),
-                'boxes' =>
-                    $boxes,
-                'failed' =>
-                    $failed,
-                'pubcom' =>
-                    $pubCom,
+                'output_types' =>
+                    is_array($result['output_types'] ?? null)
+                        ? array_values($result['output_types'])
+                        : [],
+                'box_count' => count($boxes),
+                'failed_count' => count($failed),
+                'skipped_count' => count($skipped),
+
+                /*
+                 * AnalyzeManager found logical predecessors and already
+                 * prefilled durable outside copy into matching Boxes.
+                 */
+                'existing_asset_match_count' =>
+                    count($existingAssetMatches),
+                'existing_asset_matches' =>
+                    $existingAssetMatches,
+
+                'boxes' => $boxes,
+                'failed' => $failed,
+                'skipped' => $skipped,
+                'pubcom' => $pubCom,
             ]);
 
         } catch (Throwable $e) {
@@ -238,8 +144,8 @@ final class AnalyzeEndpoint
                 [
                     'stage' => 'analyze',
                     'pub_run_id' =>
-                        $overwritePubRunId > 0
-                            ? $overwritePubRunId
+                        $pubRunId > 0
+                            ? $pubRunId
                             : null,
                     'source_type' =>
                         $sourceType !== ''
@@ -264,12 +170,9 @@ final class AnalyzeEndpoint
                 'pub_run_id' =>
                     $failure['pub_run_id']
                     ?? null,
-                'error_class' =>
-                    get_class($e),
-                'error_file' =>
-                    $e->getFile(),
-                'error_line' =>
-                    $e->getLine(),
+                'error_class' => get_class($e),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
             ]);
         }
     }

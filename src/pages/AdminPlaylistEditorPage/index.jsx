@@ -112,7 +112,7 @@ const DEFAULT_BRAND_BUMPER_CONFIG = {
 const BRAND_BUMPER_BODY_TEMPLATE = JSON.stringify(DEFAULT_BRAND_BUMPER_CONFIG, null, 2);
 
 const DEFAULT_PLAYLIST_TYPES = ["teaching"];
-const ANALYZER_ROLES = ["ignore", "before", "after", "single"];
+const ANALYZER_ROLES = ["ignore", "before", "after", "single", "teaser"];
 const FINDER_START_VALUES = ["auto", "this", "previous"];
 
 function slugifyPlaylistValue(value) {
@@ -676,26 +676,29 @@ export default function AdminPlaylistEditorPage() {
 
   function addItem(type = "non-palette") {
     setItems((prev) => {
+      const isTeaser = type === "teaser";
+      const authoredType = isTeaser ? "non-palette" : type;
+
       const nextItem = {
         ...emptyItem,
         _clientKey: makeClientItemKey(),
-        item_type: type,
-        body: type === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : type === "brand-bumper" ? BRAND_BUMPER_BODY_TEMPLATE : emptyItem.body,
-        title: type === "brand-bumper" ? "ColorFix" : emptyItem.title,
-        subtitle: type === "brand-bumper" ? "by Terry" : emptyItem.subtitle,
-        star: ["hue-wheel", "brand-bumper", "cover-image"].includes(type) ? false : emptyItem.star,
-        site: type === "brand-bumper" ? true : emptyItem.site,
-        yt: type === "brand-bumper" ? true : emptyItem.yt,
-        concept: type === "brand-bumper" ? true : emptyItem.concept,
-        client: type === "brand-bumper" ? true : emptyItem.client,
-        pin: type === "brand-bumper" ? false : emptyItem.pin,
-        analyzer_role: type === "brand-bumper" ? "single" : emptyItem.analyzer_role,
-        duration_ms: type === "brand-bumper" ? "4200" : emptyItem.duration_ms,
+        item_type: authoredType,
+        body: authoredType === "hue-wheel" ? HUE_WHEEL_BODY_TEMPLATE : authoredType === "brand-bumper" ? BRAND_BUMPER_BODY_TEMPLATE : emptyItem.body,
+        title: authoredType === "brand-bumper" ? "ColorFix" : emptyItem.title,
+        subtitle: authoredType === "brand-bumper" ? "by Terry" : emptyItem.subtitle,
+        star: ["hue-wheel", "brand-bumper", "cover-image"].includes(authoredType) ? false : emptyItem.star,
+        site: authoredType === "brand-bumper" ? true : isTeaser ? false : emptyItem.site,
+        yt: authoredType === "brand-bumper" ? true : isTeaser ? false : emptyItem.yt,
+        concept: authoredType === "brand-bumper" ? true : isTeaser ? false : emptyItem.concept,
+        client: authoredType === "brand-bumper" ? true : isTeaser ? false : emptyItem.client,
+        pin: authoredType === "brand-bumper" ? false : isTeaser ? true : emptyItem.pin,
+        analyzer_role: authoredType === "brand-bumper" ? "single" : isTeaser ? "teaser" : emptyItem.analyzer_role,
+        duration_ms: authoredType === "brand-bumper" ? "4200" : emptyItem.duration_ms,
       };
-      if (type === "cover-image") {
+      if (authoredType === "cover-image") {
         return [nextItem, ...prev];
       }
-      if (type === "intro") {
+      if (authoredType === "intro") {
         return [nextItem, ...prev];
       }
       return [...prev, nextItem];
@@ -1084,6 +1087,7 @@ export default function AdminPlaylistEditorPage() {
           <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
           <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
           <button type="button" onClick={() => addItem("cover-image")}>Add Cover Image</button>
+          <button type="button" onClick={() => addItem("teaser")}>Add Teaser</button>
         </div>
       </div>
 
@@ -1114,7 +1118,7 @@ export default function AdminPlaylistEditorPage() {
                 </select>
               </label>
               <label className="item-cell item-analyzer-role">
-                Pin Role
+                Analyzer Role
                 <select
                   value={item.analyzer_role || "ignore"}
                   onChange={(e) => updateItem(index, "analyzer_role", e.target.value)}
@@ -1123,6 +1127,7 @@ export default function AdminPlaylistEditorPage() {
                   <option value="before">before</option>
                   <option value="after">after</option>
                   <option value="single">single</option>
+                  <option value="teaser">teaser</option>
                 </select>
               </label>
               <label className="item-cell item-finder-start">
@@ -1482,6 +1487,7 @@ export default function AdminPlaylistEditorPage() {
         <button type="button" onClick={() => addItem("hue-wheel")}>Add Hue Wheel</button>
         <button type="button" onClick={() => addItem("brand-bumper")}>Add Brand Bumper</button>
         <button type="button" onClick={() => addItem("cover-image")}>Add Cover Image</button>
+        <button type="button" onClick={() => addItem("teaser")}>Add Teaser</button>
         <button type="button" className="primary-btn" onClick={handleSave} disabled={saving}>
           {saving ? "Saving..." : "Save"}
         </button>

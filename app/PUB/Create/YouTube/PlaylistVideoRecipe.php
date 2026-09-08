@@ -6,12 +6,9 @@ namespace App\PUB\Create\YouTube;
 /**
  * YOUTUBE PLAYLIST VIDEO RECIPE
  *
- * Passive reference notebook beside the YouTube Playlist Video Creator.
+ * Passive product settings for the YouTube Playlist Video Creator.
  *
- * This class contains product settings only.
- *
- * The Chef decides how to use these settings while building one complete
- * renderer-neutral video blueprint. The Recipe does NOT:
+ * This class contains tweakable product values only. It does NOT:
  *   - inspect ingredients
  *   - build scenes
  *   - build layers
@@ -19,180 +16,162 @@ namespace App\PUB\Create\YouTube;
  *   - queue jobs
  *   - know PUB lifecycle
  *
- * All tweakable product timing is expressed in milliseconds here so there
- * is one obvious place to tune the YouTube video.
+ * All timing values are expressed in milliseconds.
  */
 final class PlaylistVideoRecipe
 {
-    /*
+    /* ================================================================
      * OUTPUT
-     *
-     * CODEC is an output preference supplied to the current video
-     * translator. It is not part of the neutral visual blueprint.
-     */
-    public const OUTPUT_MIME_TYPE =
-        'video/mp4';
+     * ================================================================ */
 
-    public const CODEC =
-        'h264';
+    public const OUTPUT_MIME_TYPE = 'video/mp4';
+    public const CODEC = 'h264';
 
 
-    /*
+    /* ================================================================
      * VIDEO
-     */
+     * ================================================================ */
+
     public const WIDTH = 1920;
     public const HEIGHT = 1080;
     public const FPS = 30;
 
 
-    /*
-     * ================================================================
-     * TIMING — milliseconds
-     * ================================================================
-     */
+    /* ================================================================
+     * TIMING — SCENES
+     * ================================================================ */
 
     public const INTRO_DURATION_MS = 3600;
-
-    /*
-     * Intro scene entry/exit.
-     *
-     * Intro never overlaps another scene. Previous content reaches
-     * black first; intro fades in from black; intro fades back to
-     * black before the following scene begins.
-     */
-    public const INTRO_PRE_FADE_TO_BLACK_MS = 900;
-    public const INTRO_BLACK_HOLD_MS = 0;
-    public const INTRO_FADE_IN_MS = 900;
-    public const INTRO_FADE_OUT_TO_BLACK_MS = 900;
+    public const TEXT_DURATION_MS = 7600;
 
     public const PALETTE_PHOTO_DURATION_MS = 8500;
     public const NON_PALETTE_PHOTO_DURATION_MS = 8500;
     public const NORMAL_PHOTO_DURATION_MS = 8500;
 
-    public const TEXT_DURATION_MS = 7600;
+    public const HUE_WHEEL_MIN_DURATION_MS = 6200;
+    public const BRAND_BUMPER_DURATION_MS = 5200;
 
-    /*
-     * Text scene entry/exit.
+
+    /* ================================================================
+     * TIMING — PHOTO TO PHOTO
      *
-     * Text slides also travel through black rather than overlapping
-     * neighboring scenes.
+     * Timeline for a normal captioned photo:
+     *
+     *   picture dissolves in
+     *   -> short visual breath
+     *   -> caption fades in
+     *   -> caption stays readable
+     *   -> caption fades out
+     *   -> CLEAN PHOTO HOLD (no caption)
+     *   -> next picture begins dissolving in
+     *
+     * PHOTO_CLEAN_HOLD_AFTER_CAPTION_MS is the knob Terry wanted:
+     * how long the viewer gets to look again after reading the caption.
+     * ================================================================ */
+
+    public const PHOTO_DISSOLVE_MS = 2000;
+
+    public const PHOTO_CAPTION_DELAY_AFTER_DISSOLVE_MS = 250;
+    public const PHOTO_CAPTION_FADE_IN_MS = 2000;
+    public const PHOTO_CAPTION_READ_HOLD_MS = 3500;
+    public const PHOTO_CAPTION_FADE_OUT_MS = 800;
+
+    public const PHOTO_CLEAN_HOLD_AFTER_CAPTION_MS = 1500;
+
+    /**
+     * Caption starts only after the incoming photo has completed its dissolve,
+     * plus the small visual-breath delay.
      */
+    public const PHOTO_CAPTION_START_MS =
+        self::PHOTO_DISSOLVE_MS
+        + self::PHOTO_CAPTION_DELAY_AFTER_DISSOLVE_MS;
+
+    /**
+     * The caption must be completely gone this long before the current
+     * photo scene ends. That window contains:
+     *   1) clean-photo hold
+     *   2) outgoing photo dissolve into the next scene
+     */
+    public const PHOTO_CAPTION_GONE_BEFORE_SCENE_END_MS =
+        self::PHOTO_CLEAN_HOLD_AFTER_CAPTION_MS
+        + self::PHOTO_DISSOLVE_MS;
+
+
+    /* ================================================================
+     * LEGACY PHOTO-TIMING ALIASES
+     *
+     * Keep these so the existing Chef continues to work while the clearer
+     * names above become the canonical Recipe vocabulary.
+     * ================================================================ */
+
+    public const DISSOLVE_MS = self::PHOTO_DISSOLVE_MS;
+
+    public const CAPTION_AFTER_DISSOLVE_DELAY_MS =
+        self::PHOTO_CAPTION_DELAY_AFTER_DISSOLVE_MS;
+
+    public const CAPTION_DELAY_MS =
+        self::PHOTO_CAPTION_START_MS;
+
+    public const CAPTION_FADE_MS =
+        self::PHOTO_CAPTION_FADE_IN_MS;
+
+    public const CAPTION_HOLD_MS =
+        self::PHOTO_CAPTION_READ_HOLD_MS;
+
+    public const CAPTION_FADE_OUT_MS =
+        self::PHOTO_CAPTION_FADE_OUT_MS;
+
+    public const CAPTION_POST_FADE_HOLD_MS =
+        self::PHOTO_CLEAN_HOLD_AFTER_CAPTION_MS;
+
+    public const CAPTION_FADE_OUT_END_BEFORE_SCENE_END_MS =
+        self::PHOTO_CAPTION_GONE_BEFORE_SCENE_END_MS;
+
+
+    /* ================================================================
+     * TIMING — INTRO
+     * ================================================================ */
+
+    public const INTRO_PRE_FADE_TO_BLACK_MS = 900;
+    public const INTRO_BLACK_HOLD_MS = 0;
+    public const INTRO_FADE_IN_MS = 900;
+    public const INTRO_FADE_OUT_TO_BLACK_MS = 900;
+
+    public const INTRO_TEXT_FADE_MS =
+        self::INTRO_FADE_IN_MS;
+
+
+    /* ================================================================
+     * TIMING — TEXT SLIDES
+     * ================================================================ */
+
     public const TEXT_PRE_FADE_TO_BLACK_MS = 1200;
     public const TEXT_BLACK_HOLD_MS = 0;
     public const TEXT_FADE_IN_MS = 2000;
     public const TEXT_FADE_OUT_TO_BLACK_MS = 1200;
 
-    /*
-     * Hue-wheel slide.
-     *
-     * The Chef may extend this minimum when many spokes require more
-     * animation time so the final spoke is never clipped.
-     */
-    /*
-     * Hue-wheel entry.
-     *
-     * Do not dissolve the wheel over the previous scene.
-     * Let the previous scene fade completely to black first, then
-     * optionally hold black before the wheel/title begin fading in.
-     */
+    public const TEXT_FADE_MS =
+        self::TEXT_FADE_IN_MS;
+
+
+    /* ================================================================
+     * TIMING — HUE WHEEL
+     * ================================================================ */
+
     public const HUE_WHEEL_PRE_FADE_TO_BLACK_MS = 2000;
     public const HUE_WHEEL_BLACK_HOLD_MS = 0;
 
-    public const HUE_WHEEL_MIN_DURATION_MS = 6200;
     public const HUE_WHEEL_FADE_IN_MS = 420;
     public const HUE_WHEEL_SPOKE_DELAY_MS = 420;
     public const HUE_WHEEL_SPOKE_STAGGER_MS = 260;
     public const HUE_WHEEL_SPOKE_DURATION_MS = 800;
     public const HUE_WHEEL_HOLD_AFTER_SPOKES_MS = 900;
 
-    public const BRAND_BUMPER_DURATION_MS = 5200;
 
+    /* ================================================================
+     * TIMING — BRAND BUMPER
+     * ================================================================ */
 
-    /*
-     * Scene-to-scene dissolve.
-     */
-    public const DISSOLVE_MS = 2000;
-
-
-    /*
-     * Photo caption.
-     *
-     * Photo-to-photo scenes may overlap during the normal dissolve, but
-     * their captions should not. Wait until the incoming picture has
-     * finished its dissolve, then pause briefly before fading its copy in.
-     *
-     * Tune CAPTION_AFTER_DISSOLVE_DELAY_MS for the little visual breath.
-     */
-    public const CAPTION_AFTER_DISSOLVE_DELAY_MS = 250;
-
-    public const CAPTION_DELAY_MS =
-        self::DISSOLVE_MS
-        + self::CAPTION_AFTER_DISSOLVE_DELAY_MS;
-
-    public const CAPTION_FADE_MS = 2000;
-
-    /*
-     * Readable hold after the caption has fully faded in.
-     *
-     * Photo slides with copy are automatically extended as needed so
-     * this full-opacity reading time is never squeezed by the outgoing
-     * caption fade and the following picture dissolve.
-     */
-    public const CAPTION_HOLD_MS = 3500;
-
-    /*
-     * Outgoing photo caption.
-     *
-     * The old caption must be completely gone BEFORE the next picture
-     * begins its dissolve. This keeps two captions from ever sharing
-     * the screen and prevents text fragments from hanging in letterbox
-     * or empty image areas.
-     */
-    public const CAPTION_FADE_OUT_MS = 500;
-
-    public const CAPTION_FADE_OUT_END_BEFORE_SCENE_END_MS =
-        self::DISSOLVE_MS;
-
-
-    /*
-     * Text screen.
-     *
-     * The old first-pass Recipe used 900 ms directly in code for intro
-     * copy. It is now exposed here with every other timing knob.
-     */
-    public const INTRO_TEXT_FADE_MS =
-        self::INTRO_FADE_IN_MS;
-
-    public const TEXT_FADE_MS =
-        self::TEXT_FADE_IN_MS;
-
-
-    /*
-     * Whole-video ending.
-     */
-    public const FINAL_FADE_MS = 1400;
-
-    /*
-     * Music ending.
-     *
-     * The Chef knows the final video duration and starts reducing the
-     * music this many milliseconds before the video ends so volume reaches
-     * zero on the final frame.
-     */
-    public const MUSIC_FADE_OUT_MS = 3000;
-
-    public const DEFAULT_MUSIC_VOLUME = 0.20;
-
-
-    /*
-     * Standard ColorFix brand bumper.
-     *
-     * Content must finish fading completely to black before the bumper
-     * is allowed to begin. BLACK_HOLD may be zero.
-     *
-     * The authored playlist slide supplies only item_type=brand-bumper.
-     * These production settings determine the standardized video bumper.
-     */
     public const BRAND_BUMPER_PRE_FADE_TO_BLACK_MS = 2000;
     public const BRAND_BUMPER_BLACK_HOLD_MS = 0;
 
@@ -203,124 +182,32 @@ final class PlaylistVideoRecipe
     public const BRAND_BUMPER_SIGNATURE_DURATION_MS = 1750;
 
 
-    /*
-     * ================================================================
-     * VISUALS
-     * ================================================================
-     */
+    /* ================================================================
+     * TIMING — WHOLE VIDEO / MUSIC
+     * ================================================================ */
+
+    public const FINAL_FADE_MS = 1400;
+    public const MUSIC_FADE_OUT_MS = 3000;
+    public const DEFAULT_MUSIC_VOLUME = 0.20;
+
+
+    /* ================================================================
+     * VISUALS — GENERAL
+     * ================================================================ */
 
     public const BACKGROUND_COLOR = '#000000';
     public const TEXT_COLOR = '#ffffff';
     public const FONT_FAMILY = 'Helvetica, Arial, sans-serif';
 
-
-    /*
-     * YouTube thumbnail typography.
-     *
-     * The Chef resolves this project-relative font file against
-     * projectRoot when rendering the companion thumbnail JPEG.
-     */
-    /*public const THUMBNAIL_FONT_FILE =
-        'public/fonts/Poppins-Bold.ttf';
-*/
-        public const THUMBNAIL_FONT_FILE =
-    'public/fonts/Poppins-SemiBold.ttf';
-
-    /*
-     * YouTube thumbnail layout and treatment.
-     *
-     * These are product knobs, so they live in the Recipe rather than
-     * inside the Chef.
-     */
-    public const THUMBNAIL_WIDTH = 1280;
-    public const THUMBNAIL_HEIGHT = 720;
-
-    public const THUMBNAIL_TITLE_SIDE_PADDING = 72;
-    public const THUMBNAIL_TITLE_FONT_SIZE = 68;
-    public const THUMBNAIL_TITLE_MIN_FONT_SIZE = 48;
-    public const THUMBNAIL_TITLE_MAX_LINES = 3;
-    public const THUMBNAIL_LINE_GAP = 24;
-
-    /*
-     * Current tuned placement from the visual pass.
-     *
-     * A single-line title needs to sit lower than a taller multi-line
-     * title block. The Chef measures the actual wrapped title and chooses
-     * the appropriate Recipe position.
-     */
-public const THUMBNAIL_TITLE_TOP_SINGLE_LINE = 200;
-public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
-    public const THUMBNAIL_TITLE_AREA_HEIGHT = 250;
-
-    /*
-     * Default thumbnail title color.
-     *
-     * An individual YouTube asset may override this through the saved
-     * Creator ingredient cover.text_color. Older orders that do not carry
-     * an override therefore continue to render with white title text.
-     */
-    public const THUMBNAIL_TEXT_COLOR = '#FFFFFF';
-
-    public const THUMBNAIL_TEXT_STROKE_PX = 4;
-    public const THUMBNAIL_JPEG_QUALITY = 90;
-
-
     public const PHOTO_OBJECT_FIT = 'contain';
 
 
-    /*
-     * Intro/photo-backed text treatment.
-     */
+    /* ================================================================
+     * VISUALS — INTRO
+     * ================================================================ */
+
     public const INTRO_PHOTO_OPACITY = 0.36;
 
-
-    /*
-     * Caption placement.
-     *
-     * CAPTION_MAX_WIDTH is a cap, not a fixed banner width.
-     * The rendered caption should hug its content until it reaches
-     * this maximum, then wrap normally.
-     */
-    public const CAPTION_LEFT = 67;
-    public const CAPTION_BOTTOM = 38;
-    public const CAPTION_MAX_WIDTH = 900;
-
-    public const CAPTION_PADDING_X = 28;
-    public const CAPTION_PADDING_Y = 16;
-
-    public const CAPTION_BACKGROUND =
-        'rgba(0, 0, 0, 0.45)';
-
-
-    /*
-     * Caption typography.
-     *
-     * Title/subtitle/body remain separate recipe knobs even while the
-     * current generic oven may need to realize them as separate layers.
-     */
-    public const CAPTION_TITLE_FONT_SIZE = 52;
-    public const CAPTION_TITLE_FONT_WEIGHT = 700;
-    public const CAPTION_TITLE_LINE_HEIGHT = 1.25;
-
-    public const CAPTION_SUBTITLE_FONT_SIZE = 36;
-    public const CAPTION_SUBTITLE_FONT_WEIGHT = 400;
-    public const CAPTION_SUBTITLE_LINE_HEIGHT = 1.30;
-
-    public const CAPTION_BODY_FONT_SIZE = 36;
-    public const CAPTION_BODY_FONT_WEIGHT = 400;
-    public const CAPTION_BODY_LINE_HEIGHT = 1.35;
-
-
-    /*
-     * Text-screen placement.
-     */
-    public const TEXT_SCREEN_PADDING_X = 154;
-    public const TEXT_SCREEN_PADDING_Y = 86;
-
-
-    /*
-     * Intro typography.
-     */
     public const INTRO_TITLE_FONT_SIZE = 68;
     public const INTRO_TITLE_FONT_WEIGHT = 600;
 
@@ -333,9 +220,40 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
     public const INTRO_LINE_HEIGHT = 1.20;
 
 
-    /*
-     * Standard text-slide typography.
-     */
+    /* ================================================================
+     * VISUALS — PHOTO CAPTIONS
+     * ================================================================ */
+
+    public const CAPTION_LEFT = 67;
+    public const CAPTION_BOTTOM = 38;
+    public const CAPTION_MAX_WIDTH = 900;
+
+    public const CAPTION_PADDING_X = 28;
+    public const CAPTION_PADDING_Y = 16;
+
+    public const CAPTION_BACKGROUND =
+        'rgba(0, 0, 0, 0.45)';
+
+    public const CAPTION_TITLE_FONT_SIZE = 64;
+    public const CAPTION_TITLE_FONT_WEIGHT = 700;
+    public const CAPTION_TITLE_LINE_HEIGHT = 1.25;
+
+    public const CAPTION_SUBTITLE_FONT_SIZE = 52;
+    public const CAPTION_SUBTITLE_FONT_WEIGHT = 400;
+    public const CAPTION_SUBTITLE_LINE_HEIGHT = 1.30;
+
+    public const CAPTION_BODY_FONT_SIZE = 52;
+    public const CAPTION_BODY_FONT_WEIGHT = 400;
+    public const CAPTION_BODY_LINE_HEIGHT = 1.35;
+
+
+    /* ================================================================
+     * VISUALS — TEXT SLIDES
+     * ================================================================ */
+
+    public const TEXT_SCREEN_PADDING_X = 154;
+    public const TEXT_SCREEN_PADDING_Y = 86;
+
     public const TEXT_TITLE_FONT_SIZE = 68;
     public const TEXT_TITLE_FONT_WEIGHT = 600;
 
@@ -348,14 +266,35 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
     public const TEXT_LINE_HEIGHT = 1.20;
 
 
-    /*
-     * Hue-wheel presentation.
-     *
-     * The static wheel artwork is renderer equipment. These values are
-     * product presentation settings owned by the YouTube Recipe.
-     *
-     * Radii use the established 300 x 300 hue-wheel coordinate system.
-     */
+    /* ================================================================
+     * VISUALS — YOUTUBE THUMBNAIL
+     * ================================================================ */
+
+    public const THUMBNAIL_FONT_FILE =
+        'public/fonts/Poppins-SemiBold.ttf';
+
+    public const THUMBNAIL_WIDTH = 1280;
+    public const THUMBNAIL_HEIGHT = 720;
+
+    public const THUMBNAIL_TITLE_SIDE_PADDING = 72;
+    public const THUMBNAIL_TITLE_FONT_SIZE = 68;
+    public const THUMBNAIL_TITLE_MIN_FONT_SIZE = 48;
+    public const THUMBNAIL_TITLE_MAX_LINES = 3;
+    public const THUMBNAIL_LINE_GAP = 24;
+
+    public const THUMBNAIL_TITLE_TOP_SINGLE_LINE = 200;
+    public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
+    public const THUMBNAIL_TITLE_AREA_HEIGHT = 250;
+
+    public const THUMBNAIL_TEXT_COLOR = '#FFFFFF';
+    public const THUMBNAIL_TEXT_STROKE_PX = 4;
+    public const THUMBNAIL_JPEG_QUALITY = 90;
+
+
+    /* ================================================================
+     * VISUALS — HUE WHEEL
+     * ================================================================ */
+
     public const HUE_WHEEL_SIZE_PX = 520;
 
     public const HUE_WHEEL_START_RADIUS = 0;
@@ -373,11 +312,9 @@ public const THUMBNAIL_TITLE_TOP_MULTI_LINE = 70;
     public const HUE_WHEEL_TEXT_MAX_WIDTH_PX = 1400;
 
 
-    /*
-     * Standard ColorFix brand bumper.
-     *
-     * The shared brand-logo primitive owns the actual logo artwork.
-     * The Recipe controls only product presentation.
-     */
-    public const BRAND_BUMPER_LOGO_SIZE_PX = 88;
+    /* ================================================================
+     * VISUALS — BRAND BUMPER
+     * ================================================================ */
+
+    public const BRAND_BUMPER_LOGO_SIZE_PX = 120;
 }

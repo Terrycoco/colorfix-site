@@ -80,7 +80,7 @@ final class PlaylistSourcePreparer
          */
         $items =
             $this->playlists
-                ->getPublicActiveSlides(
+                ->getActivePublishingSlides(
                     $playlistId
                 );
 

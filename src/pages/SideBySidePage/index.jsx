@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {API_FOLDER} from '@helpers/config';
 import {useAppState} from '@context/AppStateContext';
 import {isAdmin} from '@helpers/authHelper';
+import { resolveAppPath } from '@helpers/routingHelper';
 import './sidebyside.css';
 import {getWarmerColor } from '@helpers/colorCalcs';
 import FuzzySearchColorSelect from '@components/FuzzySearchColorSelect';
@@ -120,8 +121,8 @@ export default function SideBySidePage() {
       if (colorB?.id) params.set('b', colorB.id);
       const query = params.toString();
       const returnTo = `/sbs${query ? `?${query}` : ''}`;
-      navigate(`/color/${colorid}${query ? `?${query}` : ''}`, {
-        state: { returnTo }
+      navigate(resolveAppPath(`/color/${colorid}${query ? `?${query}` : ''}`, location.pathname), {
+        state: { returnTo: resolveAppPath(returnTo, location.pathname) }
       }); // go to detail
     };
 

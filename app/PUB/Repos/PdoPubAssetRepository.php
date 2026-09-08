@@ -561,6 +561,431 @@ final class PdoPubAssetRepository
     }
 
 
+    /**
+     * REPLACEMENT NEW ORDER.
+     *
+     * Reuse an existing in-house pub_asset_id for a newly analyzed
+     * version of the same logical asset.
+     *
+     * The current physical output remains in place until CREATE
+     * successfully produces its replacement.
+     *
+     * ANALYZE has already prefilled predecessor outside copy into the
+     * workbench. The operator may edit it there, so the final incoming
+     * search_title / description are authoritative and are saved here.
+     *
+     * Fresh Analyze values replace routing/order data such as:
+     *
+     *   pub_run_id
+     *   sort_order
+     *   pingback
+     *   ingredients
+     *
+     * Historical shipped rows are never eligible for this operation.
+     */
+    public function replaceWithOrder(
+        int $pubAssetId,
+        array $asset,
+        array $ingredients
+    ): int {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Replacement requires a valid pub_asset_id.'
+            );
+        }
+
+
+        foreach (
+            [
+                'channel',
+                'asset_type',
+                'creator_key',
+                'source_type',
+            ]
+            as $field
+        ) {
+            if (
+                trim(
+                    (string)(
+                        $asset[$field]
+                        ?? ''
+                    )
+                ) === ''
+            ) {
+                throw new RuntimeException(
+                    "PUB asset replacement requires {$field}."
+                );
+            }
+        }
+
+
+        if (
+            (int)(
+                $asset['pub_run_id']
+                ?? 0
+            ) <= 0
+        ) {
+            throw new RuntimeException(
+                'PUB asset replacement requires a valid pub_run_id.'
+            );
+        }
+
+
+        if (
+            (int)(
+                $asset['source_id']
+                ?? 0
+            ) <= 0
+        ) {
+            throw new RuntimeException(
+                'PUB asset replacement requires a valid source_id.'
+            );
+        }
+
+
+        $this->pdo
+            ->beginTransaction();
+
+
+        try {
+            /*
+             * The workbench Box is authoritative for outside copy.
+             * ANALYZE may have inherited these values from a predecessor,
+             * but the operator is free to edit them before CREATE.
+             */
+            $stmt =
+                $this->pdo->prepare(
+                    <<<SQL
+                    UPDATE pub_assets
+                    SET
+                        pub_run_id =
+                            :pub_run_id,
+
+                        channel =
+                            :channel,
+
+                        asset_type =
+                            :asset_type,
+
+                        creator_key =
+                            :creator_key,
+
+                        source_type =
+                            :source_type,
+
+                        source_id =
+                            :source_id,
+
+                        sort_order =
+                            :sort_order,
+
+                        search_title =
+                            :search_title,
+
+                        description =
+                            :description,
+
+                        pingback =
+                            :pingback,
+
+                        pipeline_stage =
+                            'creating',
+
+                        approved =
+                            0,
+
+                        `package` =
+                            NULL,
+
+                        shipping_receipt =
+                            NULL,
+
+                        production_signature =
+                            NULL,
+
+                        stage_note =
+                            NULL,
+
+                        dispatched_at =
+                            NULL,
+
+                        error_stage =
+                            NULL,
+
+                        error_code =
+                            NULL,
+
+                        error_message =
+                            NULL,
+
+                        errored_at =
+                            NULL
+
+                    WHERE pub_asset_id =
+                        :pub_asset_id
+
+                      AND pipeline_stage NOT IN (
+                          'shipping',
+                          'shipped',
+                          'dispatched',
+                          'published'
+                      )
+                    SQL
+                );
+
+
+            $stmt->execute([
+                'pub_run_id' =>
+                    (int)$asset['pub_run_id'],
+
+                'channel' =>
+                    trim(
+                        (string)$asset['channel']
+                    ),
+
+                'asset_type' =>
+                    trim(
+                        (string)$asset['asset_type']
+                    ),
+
+                'creator_key' =>
+                    trim(
+                        (string)$asset['creator_key']
+                    ),
+
+                'source_type' =>
+                    trim(
+                        (string)$asset['source_type']
+                    ),
+
+                'source_id' =>
+                    (int)$asset['source_id'],
+
+                'sort_order' =>
+                    isset(
+                        $asset['sort_order']
+                    )
+                    && $asset['sort_order'] !== null
+                        ? (int)$asset['sort_order']
+                        : null,
+
+                'search_title' =>
+                    $this->nullableString(
+                        $asset['search_title']
+                        ?? null
+                    ),
+
+                'description' =>
+                    $this->nullableString(
+                        $asset['description']
+                        ?? null
+                    ),
+
+                'pingback' =>
+                    $this->nullableString(
+                        $asset['pingback']
+                        ?? null
+                    ),
+
+                'pub_asset_id' =>
+                    $pubAssetId,
+            ]);
+
+
+            if ($stmt->rowCount() !== 1) {
+                /*
+                 * MySQL reports changed rows for UPDATE by default.
+                 * A legitimate idempotent retry can therefore report 0
+                 * when this exact replacement metadata has already been
+                 * prepared and the row is already at creating.
+                 *
+                 * Re-read the durable row instead of treating rowCount()
+                 * as the authority. If the row already reflects the exact
+                 * incoming replacement metadata, continue and refresh the
+                 * filed order below. Any lifecycle/identity mismatch still
+                 * fails hard.
+                 */
+                $current =
+                    $this->getById(
+                        $pubAssetId
+                    );
+
+
+                $currentStage =
+                    strtolower(
+                        trim(
+                            (string)(
+                                $current[
+                                    'pipeline_stage'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    );
+
+
+                if (
+                    $current === null
+                    || $currentStage !== 'creating'
+                    || !$this->replacementMetadataMatches(
+                        $current,
+                        $asset
+                    )
+                ) {
+                    throw new RuntimeException(
+                        "PUB asset #{$pubAssetId} could not be prepared for replacement."
+                    );
+                }
+            }
+
+
+            $this->saveOrder(
+                $pubAssetId,
+
+                trim(
+                    (string)$asset[
+                        'creator_key'
+                    ]
+                ),
+
+                $ingredients
+            );
+
+
+            $this->pdo
+                ->commit();
+
+
+            return $pubAssetId;
+
+        } catch (Throwable $e) {
+            if (
+                $this->pdo
+                    ->inTransaction()
+            ) {
+                $this->pdo
+                    ->rollBack();
+            }
+
+
+            throw $e;
+        }
+    }
+
+
+
+    /**
+     * Determine whether this exact replacement order has already been
+     * prepared or completed for the same Analyze run.
+     *
+     * CREATE uses this as an idempotency guard before waking the Creator.
+     * It prevents a duplicate/retried Box from rendering or queueing the
+     * same durable asset twice while still allowing genuinely changed
+     * ingredients to proceed through replaceWithOrder().
+     */
+    public function replacementAlreadyPrepared(
+        int $pubAssetId,
+        array $asset,
+        array $ingredients
+    ): bool {
+        if ($pubAssetId <= 0) {
+            return false;
+        }
+
+
+        $current =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if ($current === null) {
+            return false;
+        }
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if (
+            !in_array(
+                $stage,
+                [
+                    'creating',
+                    'created',
+                ],
+                true
+            )
+        ) {
+            return false;
+        }
+
+
+        if (
+            !$this->replacementMetadataMatches(
+                $current,
+                $asset
+            )
+        ) {
+            return false;
+        }
+
+
+        $order =
+            $this->getOrder(
+                $pubAssetId
+            );
+
+
+        if ($order === null) {
+            return false;
+        }
+
+
+        $incomingCreatorKey =
+            trim(
+                (string)(
+                    $asset[
+                        'creator_key'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        if (
+            trim(
+                (string)(
+                    $order[
+                        'creator_key'
+                    ]
+                    ?? ''
+                )
+            ) !== $incomingCreatorKey
+        ) {
+            return false;
+        }
+
+
+        return (
+            $order[
+                'ingredients'
+            ]
+            ?? []
+        ) == $ingredients;
+    }
+
+
     /*
      * ========================================================
      * ORDER
@@ -1076,6 +1501,9 @@ public function updateOrder(
          */
         if ($ingredientsChanged) {
             $assetUpdates[] =
+                'approved = 0';
+
+            $assetUpdates[] =
                 '`package` = NULL';
 
             $assetUpdates[] =
@@ -1110,7 +1538,9 @@ public function updateOrder(
                 $currentStage,
                 [
                     'packing',
+                    'pending',
                     'packed',
+                    'queued',
                 ],
                 true
             )
@@ -1232,7 +1662,9 @@ public function updateOrder(
                         $currentStage,
                         [
                             'packing',
+                            'pending',
                             'packed',
+                            'queued',
                         ],
                         true
                     )
@@ -1356,6 +1788,7 @@ public function updateOrder(
                 UPDATE pub_assets
                 SET
                     pipeline_stage = 'creating',
+                    approved = 0,
                     `package` = NULL,
                     stage_note = NULL,
 
@@ -1561,6 +1994,7 @@ public function updateOrder(
                     stage_note = NULL,
 
                     pipeline_stage = 'created',
+                    approved = 0,
                     local_file_status = 'present',
 
                     error_stage = NULL,
@@ -1665,6 +2099,266 @@ public function updateOrder(
      */
 
     /**
+     * Update the outside-of-box destination used by Package.
+     *
+     * PinterestImagePackager uses this to deliberately clear an inherited
+     * source REX from pin_teaser assets before returning PENDING.
+     *
+     * The Package admin also uses it when the operator supplies or changes
+     * a destination.
+     *
+     * Lifecycle:
+     *
+     *   packing
+     *     destination may change without changing stage
+     *
+     *   pending
+     *     destination may change; remains pending until an explicit retry
+     *
+     *   packed
+     *     changing destination invalidates the sealed package and returns
+     *     the asset to packing
+     *
+     *   error/package
+     *     destination may be corrected while the Package error remains;
+     *     an explicit retry then re-enters packing
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string,
+     *   pingback: string|null
+     * }
+     */
+    public function updatePackagePingback(
+        int $pubAssetId,
+        ?string $pingback
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $asset =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if ($asset === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found."
+            );
+        }
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $errorStage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'error_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        $isPackageError =
+            $stage === 'error'
+            && $errorStage === 'package';
+
+
+        if (
+            !in_array(
+                $stage,
+                [
+                    'packing',
+                    'pending',
+                    'packed',
+                ],
+                true
+            )
+            && !$isPackageError
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} is not under Package control."
+            );
+        }
+
+
+        $normalizedPingback =
+            $this->nullableString(
+                $pingback
+            );
+
+        $currentPingback =
+            $this->nullableString(
+                $asset[
+                    'pingback'
+                ]
+                ?? null
+            );
+
+
+        /*
+         * A no-op must not disturb Package state or updated_at.
+         */
+        if ($normalizedPingback === $currentPingback) {
+            return [
+                'pub_asset_id' =>
+                    $pubAssetId,
+
+                'pipeline_stage' =>
+                    $stage,
+
+                'pingback' =>
+                    $normalizedPingback,
+            ];
+        }
+
+
+        /*
+         * A PACKED package physically contains the old destination.
+         * Changing it makes that sealed box stale, so return it to
+         * PACKING and discard the old package.
+         *
+         * PENDING stays PENDING until the operator explicitly retries.
+         * PACKING stays PACKING so the current Packager pass can continue.
+         * PACKAGE errors remain errors until an explicit retry.
+         */
+        $nextStage =
+            $stage === 'packed'
+                ? 'packing'
+                : $stage;
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    pingback =
+                        :pingback,
+
+                    pipeline_stage =
+                        :pipeline_stage,
+
+                    `package` =
+                        NULL,
+
+                    stage_note =
+                        CASE
+                            WHEN :clear_stage_note = 1
+                                THEN NULL
+                            ELSE stage_note
+                        END
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND (
+                      pipeline_stage IN (
+                          'packing',
+                          'pending',
+                          'packed'
+                      )
+
+                      OR (
+                          pipeline_stage = 'error'
+                          AND error_stage = 'package'
+                      )
+                  )
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pingback' =>
+                $normalizedPingback,
+
+            'pipeline_stage' =>
+                $nextStage,
+
+            'clear_stage_note' =>
+                $stage === 'packed'
+                    ? 1
+                    : 0,
+
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $current =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if ($current === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} disappeared while updating Package pingback."
+            );
+        }
+
+
+        $currentStage =
+            strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if (
+            $currentStage !== $nextStage
+            || $this->nullableString(
+                $current[
+                    'pingback'
+                ]
+                ?? null
+            ) !== $normalizedPingback
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} Package pingback could not be updated."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                $currentStage,
+
+            'pingback' =>
+                $normalizedPingback,
+        ];
+    }
+
+
+    /**
      * Move one reviewed in-house asset onto the Packing station.
      *
      * Any previous package is deliberately discarded. A package is
@@ -1740,7 +2434,9 @@ public function updateOrder(
                 [
                     'created',
                     'packing',
+                    'pending',
                     'packed',
+                    'queued',
                 ],
                 true
             )
@@ -1748,6 +2444,21 @@ public function updateOrder(
         ) {
             throw new RuntimeException(
                 "PUB asset #{$pubAssetId} is not ready for Packing."
+            );
+        }
+
+
+        if (
+            $stage === 'created'
+            && (int)(
+                $asset[
+                    'approved'
+                ]
+                ?? 0
+            ) !== 1
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} must be approved before Packing."
             );
         }
 
@@ -1770,10 +2481,16 @@ public function updateOrder(
                     :pub_asset_id
 
                   AND (
-                      pipeline_stage IN (
-                          'created',
+                      (
+                          pipeline_stage = 'created'
+                          AND approved = 1
+                      )
+
+                      OR pipeline_stage IN (
                           'packing',
-                          'packed'
+                          'pending',
+                          'packed',
+                          'queued'
                       )
 
                       OR (
@@ -1913,10 +2630,16 @@ public function updateOrder(
 
 
     /**
-     * Keep one valid Package assignment at Packing because a required
-     * dependency does not exist yet.
+     * Hold one valid Package assignment because a required dependency
+     * does not exist yet.
      *
-     * PENDING is not an error and is not a separate pipeline stage.
+     * PENDING is a normal durable pipeline stage, not an error.
+     *
+     *   packing -> pending
+     *
+     * An explicit retry later returns:
+     *
+     *   pending -> packing
      */
     public function markPackingPending(
         int $pubAssetId,
@@ -1947,8 +2670,14 @@ public function updateOrder(
                 <<<SQL
                 UPDATE pub_assets
                 SET
+                    pipeline_stage = 'pending',
                     stage_note = :stage_note,
-                    `package` = NULL
+                    `package` = NULL,
+
+                    error_stage = NULL,
+                    error_code = NULL,
+                    error_message = NULL,
+                    errored_at = NULL
 
                 WHERE pub_asset_id =
                     :pub_asset_id
@@ -1984,10 +2713,10 @@ public function updateOrder(
                         ?? ''
                     )
                 )
-            ) !== 'packing'
+            ) !== 'pending'
         ) {
             throw new RuntimeException(
-                "PUB asset #{$pubAssetId} could not be marked pending in Packing."
+                "PUB asset #{$pubAssetId} could not be marked pending."
             );
         }
 
@@ -1997,7 +2726,7 @@ public function updateOrder(
                 $pubAssetId,
 
             'pipeline_stage' =>
-                'packing',
+                'pending',
 
             'stage_note' =>
                 $note,
@@ -2147,6 +2876,441 @@ public function updateOrder(
     }
 
 
+    /*
+     * ========================================================
+     * ASSET — SCHEDULE QUEUE
+     * ========================================================
+     */
+
+    /**
+     * Release one sealed PACKED asset into Schedule's active queue.
+     *
+     * PACKED means:
+     *   complete and sealed, but held outside automatic scheduling.
+     *
+     * QUEUED means:
+     *   explicitly released into the active Schedule candidate pool.
+     *
+     * The sealed package is preserved unchanged.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string,
+     *   updated_at: string|null
+     * }
+     */
+    public function enqueue(
+        int $pubAssetId
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    pipeline_stage = 'queued',
+                    stage_note = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage =
+                    'packed'
+
+                  AND `package` IS NOT NULL
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        if ($stmt->rowCount() !== 1) {
+            $current =
+                $this->getById(
+                    $pubAssetId
+                );
+
+
+            if ($current === null) {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} was not found."
+                );
+            }
+
+
+            $stage =
+                strtolower(
+                    trim(
+                        (string)(
+                            $current[
+                                'pipeline_stage'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            if ($stage !== 'packed') {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} cannot be queued; expected packed."
+                );
+            }
+
+
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no sealed package to queue."
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $updatedAt =
+            $stmt->fetchColumn();
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'queued',
+
+            'updated_at' =>
+                $updatedAt !== false
+                    ? (string)$updatedAt
+                    : null,
+        ];
+    }
+
+
+    /**
+     * Pull one QUEUED asset back out of automatic Schedule selection.
+     *
+     * This is a control move only:
+     *
+     *   queued -> packed
+     *
+     * The sealed package is preserved unchanged, so the asset may be
+     * re-enqueued later without returning to Package.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   pipeline_stage: string
+     * }
+     */
+    public function dequeue(
+        int $pubAssetId
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    pipeline_stage = 'packed',
+                    stage_note = NULL
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage =
+                    'queued'
+
+                  AND `package` IS NOT NULL
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        if ($stmt->rowCount() !== 1) {
+            $current =
+                $this->getById(
+                    $pubAssetId
+                );
+
+
+            if ($current === null) {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} was not found."
+                );
+            }
+
+
+            $stage =
+                strtolower(
+                    trim(
+                        (string)(
+                            $current[
+                                'pipeline_stage'
+                            ]
+                            ?? ''
+                        )
+                    )
+                );
+
+
+            if ($stage !== 'queued') {
+                throw new RuntimeException(
+                    "PUB asset #{$pubAssetId} cannot be removed from the Schedule queue; expected queued."
+                );
+            }
+
+
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} has no sealed package."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'pipeline_stage' =>
+                'packed',
+        ];
+    }
+
+
+    /**
+     * ScheduleManager's active loading dock.
+     *
+     * Only QUEUED rows are returned. PACKED rows are deliberately
+     * invisible to automatic scheduling.
+     *
+     * Package JSON is not decoded because Schedule never opens it.
+     * It needs only to know that a sealed package exists.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listQueued(
+        ?string $channel = null
+    ): array {
+        $channel =
+            strtolower(
+                trim(
+                    (string)$channel
+                )
+            );
+
+
+        $where = [
+            "pipeline_stage = 'queued'",
+            "`package` IS NOT NULL",
+        ];
+
+        $params = [];
+
+
+        if ($channel !== '') {
+            $where[] =
+                'channel = :channel';
+
+            $params[
+                'channel'
+            ] =
+                $channel;
+        }
+
+
+        $sql = <<<SQL
+            SELECT
+                pub_asset_id,
+                pub_run_id,
+
+                channel,
+                asset_type,
+                creator_key,
+
+                source_type,
+                source_id,
+                sort_order,
+
+                pipeline_stage,
+
+                search_title,
+                description,
+                pingback,
+
+                mime_type,
+
+                updated_at
+
+            FROM pub_assets
+
+            WHERE
+            SQL;
+
+        $sql .=
+            "\n    "
+            . implode(
+                "\n    AND ",
+                $where
+            );
+
+        $sql .=
+            "\nORDER BY updated_at ASC, pub_asset_id ASC";
+
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+
+        $stmt->execute(
+            $params
+        );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
+    /**
+     * Durable successful shipment history consumed by ScheduleManager.
+     *
+     * This is history, not Scheduler memory. Every Schedule run may
+     * reconstruct cadence/diversity decisions fresh from these rows.
+     *
+     * shipping_receipt is not exposed wholesale. Schedule only needs the
+     * durable external_url for dependency checks such as Pinterest teasers
+     * waiting on an already-published YouTube destination.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listShippedForSchedule(
+        ?string $channel = null
+    ): array {
+        $channel =
+            strtolower(
+                trim(
+                    (string)$channel
+                )
+            );
+
+
+        $where = [
+            "pipeline_stage = 'shipped'",
+            "dispatched_at IS NOT NULL",
+        ];
+
+        $params = [];
+
+
+        if ($channel !== '') {
+            $where[] =
+                'channel = :channel';
+
+            $params[
+                'channel'
+            ] =
+                $channel;
+        }
+
+
+        $sql = <<<SQL
+            SELECT
+                pub_asset_id,
+                pub_run_id,
+
+                channel,
+                asset_type,
+
+                source_type,
+                source_id,
+                sort_order,
+
+                description,
+                pingback,
+
+                JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        shipping_receipt,
+                        '$.external_url'
+                    )
+                ) AS external_url,
+
+                dispatched_at
+
+            FROM pub_assets
+
+            WHERE
+            SQL;
+
+        $sql .=
+            "\n    "
+            . implode(
+                "\n    AND ",
+                $where
+            );
+
+        $sql .=
+            "\nORDER BY dispatched_at DESC, pub_asset_id DESC";
+
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+
+        $stmt->execute(
+            $params
+        );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
     public function markError(
         int $pubAssetId,
         string $stage,
@@ -2194,45 +3358,54 @@ public function updateOrder(
 
     /*
      * ========================================================
-     * PACKAGE — ADMIN
+     * SCHEDULE — ADMIN
      * ========================================================
      */
 
     /**
-     * Package workbench summary rows.
+     * Schedule workbench summary rows.
      *
-     * Includes:
-     *   packing
+     * Includes only the two durable Schedule-controlled stages:
+     *
      *   packed
-     *   PACKAGE-stage errors
+     *   queued
      *
-     * The package JSON itself is intentionally omitted.
-     * has_package is enough for the workbench checkmark.
+     * PACKED means sealed/on deck but held outside automatic Schedule.
+     * QUEUED means released into ScheduleManager's active candidate pool.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function listForPackageAdmin(
+    public function listForScheduleAdmin(
         ?string $channel = null,
-        ?string $assetType = null
+        ?string $assetType = null,
+        ?string $stage = null
     ): array {
         $where = [
-            "("
-            . "pipeline_stage IN ('packing', 'packed')"
-            . " OR (pipeline_stage = 'error' AND error_stage = 'package')"
-            . ")",
+            "pipeline_stage IN ('packed', 'queued')",
+            "`package` IS NOT NULL",
         ];
 
         $params = [];
 
-
         $channel =
-            trim(
-                (string)$channel
+            strtolower(
+                trim(
+                    (string)$channel
+                )
             );
 
         $assetType =
-            trim(
-                (string)$assetType
+            strtolower(
+                trim(
+                    (string)$assetType
+                )
+            );
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)$stage
+                )
             );
 
 
@@ -2258,6 +3431,333 @@ public function updateOrder(
         }
 
 
+        if ($stage !== '') {
+            if (
+                !in_array(
+                    $stage,
+                    [
+                        'packed',
+                        'queued',
+                    ],
+                    true
+                )
+            ) {
+                throw new RuntimeException(
+                    "Unsupported Schedule stage filter '{$stage}'."
+                );
+            }
+
+
+            $where[] =
+                'pipeline_stage = :pipeline_stage';
+
+            $params[
+                'pipeline_stage'
+            ] =
+                $stage;
+        }
+
+
+        $sql = <<<SQL
+            SELECT
+                pub_asset_id,
+                pub_run_id,
+
+                channel,
+                asset_type,
+
+                source_type,
+                source_id,
+                sort_order,
+
+                pipeline_stage,
+                stage_note,
+
+                search_title,
+                description,
+                pingback,
+
+                updated_at
+
+            FROM pub_assets
+
+            WHERE
+            SQL;
+
+        $sql .=
+            "\n    "
+            . implode(
+                "\n    AND ",
+                $where
+            );
+
+        $sql .=
+            "\nORDER BY updated_at ASC, pub_asset_id ASC";
+
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+
+        $stmt->execute(
+            $params
+        );
+
+
+        return $stmt->fetchAll(
+            PDO::FETCH_ASSOC
+        ) ?: [];
+    }
+
+
+    /**
+     * One Schedule drawer detail row.
+     *
+     * The package remains sealed and is deliberately not returned.
+     * Schedule only needs the asset metadata and package presence.
+     */
+    public function getScheduleAdminById(
+        int $pubAssetId
+    ): ?array {
+        if ($pubAssetId <= 0) {
+            return null;
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+
+                    source_type,
+                    source_id,
+                    sort_order,
+
+                    pipeline_stage,
+                    stage_note,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    file_path,
+                    url,
+                    thumbnail_file_path,
+                    thumbnail_url,
+                    mime_type,
+                    duration_ms,
+
+                    CASE
+                        WHEN `package` IS NULL THEN 0
+                        ELSE 1
+                    END AS has_package,
+
+                    created_at,
+                    updated_at
+
+                FROM pub_assets
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage IN (
+                      'packed',
+                      'queued'
+                  )
+
+                  AND `package` IS NOT NULL
+
+                LIMIT 1
+                SQL
+            );
+
+
+        $stmt->execute([
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $row =
+            $stmt->fetch(
+                PDO::FETCH_ASSOC
+            );
+
+
+        return $row ?: null;
+    }
+
+
+    public function listScheduleChannels(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT channel
+
+                FROM pub_assets
+
+                WHERE channel IS NOT NULL
+                  AND TRIM(channel) <> ''
+                  AND pipeline_stage IN (
+                      'packed',
+                      'queued'
+                  )
+                  AND `package` IS NOT NULL
+
+                ORDER BY channel ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
+    public function listScheduleAssetTypes(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT asset_type
+
+                FROM pub_assets
+
+                WHERE asset_type IS NOT NULL
+                  AND TRIM(asset_type) <> ''
+                  AND pipeline_stage IN (
+                      'packed',
+                      'queued'
+                  )
+                  AND `package` IS NOT NULL
+
+                ORDER BY asset_type ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
+    /*
+     * ========================================================
+     * PACKAGE — ADMIN
+     * ========================================================
+     */
+
+    /**
+     * Package workbench summary rows.
+     *
+     * Includes:
+     *   packing
+     *   pending
+     *   packed
+     *   PACKAGE-stage errors
+     *
+     * The package JSON itself is intentionally omitted.
+     * has_package is enough for the workbench checkmark.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForPackageAdmin(
+        ?string $channel = null,
+        ?string $assetType = null,
+        ?string $stage = null
+    ): array {
+        $where = [
+            "("
+            . "(pipeline_stage = 'created' AND approved = 1)"
+            . " OR pipeline_stage IN ('packing', 'pending', 'packed')"
+            . " OR (pipeline_stage = 'error' AND error_stage = 'package')"
+            . ")",
+        ];
+
+        $params = [];
+
+
+        $channel =
+            trim(
+                (string)$channel
+            );
+
+        $assetType =
+            trim(
+                (string)$assetType
+            );
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)$stage
+                )
+            );
+
+
+        if ($channel !== '') {
+            $where[] =
+                'channel = :channel';
+
+            $params[
+                'channel'
+            ] =
+                $channel;
+        }
+
+
+        if ($assetType !== '') {
+            $where[] =
+                'asset_type = :asset_type';
+
+            $params[
+                'asset_type'
+            ] =
+                $assetType;
+        }
+
+
+        if ($stage !== '') {
+            if ($stage === 'approved') {
+                $where[] =
+                    "(pipeline_stage = 'created' AND approved = 1)";
+            } elseif ($stage === 'error') {
+                $where[] =
+                    "(pipeline_stage = 'error' AND error_stage = 'package')";
+            } else {
+                $where[] =
+                    'pipeline_stage = :pipeline_stage';
+
+                $params[
+                    'pipeline_stage'
+                ] =
+                    $stage;
+            }
+        }
+
+
         $sql = <<<SQL
             SELECT
                 pub_asset_id,
@@ -2270,6 +3770,15 @@ public function updateOrder(
                 source_id,
 
                 pipeline_stage,
+                approved,
+
+                CASE
+                    WHEN pipeline_stage = 'created'
+                     AND approved = 1
+                        THEN 'approved'
+                    ELSE pipeline_stage
+                END AS display_stage,
+
                 stage_note,
 
                 search_title,
@@ -2343,6 +3852,15 @@ public function updateOrder(
                     source_id,
 
                     pipeline_stage,
+                    approved,
+
+                    CASE
+                        WHEN pipeline_stage = 'created'
+                         AND approved = 1
+                            THEN 'approved'
+                        ELSE pipeline_stage
+                    END AS display_stage,
+
                     stage_note,
 
                     search_title,
@@ -2375,8 +3893,14 @@ public function updateOrder(
                     :pub_asset_id
 
                   AND (
-                      pipeline_stage IN (
+                      (
+                          pipeline_stage = 'created'
+                          AND approved = 1
+                      )
+
+                      OR pipeline_stage IN (
                           'packing',
+                          'pending',
                           'packed'
                       )
 
@@ -2459,8 +3983,14 @@ public function updateOrder(
                   AND TRIM(channel) <> ''
 
                   AND (
-                      pipeline_stage IN (
+                      (
+                          pipeline_stage = 'created'
+                          AND approved = 1
+                      )
+
+                      OR pipeline_stage IN (
                           'packing',
+                          'pending',
                           'packed'
                       )
 
@@ -2500,8 +4030,14 @@ public function updateOrder(
                   AND TRIM(asset_type) <> ''
 
                   AND (
-                      pipeline_stage IN (
+                      (
+                          pipeline_stage = 'created'
+                          AND approved = 1
+                      )
+
+                      OR pipeline_stage IN (
                           'packing',
+                          'pending',
                           'packed'
                       )
 
@@ -2526,6 +4062,156 @@ public function updateOrder(
             )
         );
     }
+
+
+    /**
+     * Prior rows for one logical asset combination.
+     *
+     * Logical identity is:
+     *
+     *   source_type
+     *   source_id
+     *   asset_type
+     *   sort_order
+     *
+     * sort_order prevents sibling outputs of the same type from being
+     * mistaken for one another.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listLogicalAssetHistory(
+        string $sourceType,
+        int $sourceId,
+        string $assetType,
+        ?int $sortOrder
+    ): array {
+        $sourceType =
+            strtolower(
+                trim(
+                    $sourceType
+                )
+            );
+
+        $assetType =
+            strtolower(
+                trim(
+                    $assetType
+                )
+            );
+
+
+        if ($sourceType === '') {
+            throw new RuntimeException(
+                'Logical asset lookup requires source_type.'
+            );
+        }
+
+
+        if ($sourceId <= 0) {
+            throw new RuntimeException(
+                'Logical asset lookup requires a valid source_id.'
+            );
+        }
+
+
+        if ($assetType === '') {
+            throw new RuntimeException(
+                'Logical asset lookup requires asset_type.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    pub_run_id,
+
+                    channel,
+                    asset_type,
+                    creator_key,
+
+                    source_type,
+                    source_id,
+                    sort_order,
+
+                    pipeline_stage,
+                    approved,
+
+                    search_title,
+                    description,
+                    pingback,
+
+                    created_at,
+                    updated_at,
+                    dispatched_at
+
+                FROM pub_assets
+
+                WHERE source_type =
+                    :source_type
+
+                  AND source_id =
+                    :source_id
+
+                  AND asset_type =
+                    :asset_type
+
+                  AND (
+                      sort_order <=> :sort_order
+                  )
+
+                ORDER BY pub_asset_id DESC
+                SQL
+            );
+
+
+        $stmt->bindValue(
+            ':source_type',
+            $sourceType,
+            PDO::PARAM_STR
+        );
+
+        $stmt->bindValue(
+            ':source_id',
+            $sourceId,
+            PDO::PARAM_INT
+        );
+
+        $stmt->bindValue(
+            ':asset_type',
+            $assetType,
+            PDO::PARAM_STR
+        );
+
+
+        if ($sortOrder === null) {
+            $stmt->bindValue(
+                ':sort_order',
+                null,
+                PDO::PARAM_NULL
+            );
+
+        } else {
+            $stmt->bindValue(
+                ':sort_order',
+                $sortOrder,
+                PDO::PARAM_INT
+            );
+        }
+
+
+        $stmt->execute();
+
+
+        return array_values(
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: []
+        );
+    }
+
 
 
     /**
@@ -2689,15 +4375,15 @@ public function updateOrder(
      */
 
     /**
-     * Accept one sealed PACKED asset into Dispatch custody.
+     * Accept one sealed QUEUED asset into Dispatch custody.
      *
      * DispatchManager owns this lifecycle transition:
      *
-     *   packed -> shipping
+     *   queued -> shipping
      *
-     * Schedule never marks an asset shipping. Manual Send Now and
-     * Schedule both call DispatchManager::shipOne(pub_asset_id), and
-     * the Manager asks this repository to persist custody atomically.
+     * Scheduler never marks an asset shipping directly. Scheduler makes
+     * the release decision, then DispatchManager::shipOne(pub_asset_id)
+     * accepts custody and asks this repository to persist it atomically.
      *
      * The package is deliberately preserved unchanged.
      *
@@ -2719,7 +4405,7 @@ public function updateOrder(
         /*
          * Dispatch owns both:
          *
-         *   packed -> shipping
+         *   queued -> shipping
          *
          * and the explicit recovery transition:
          *
@@ -2746,7 +4432,7 @@ public function updateOrder(
                   AND `package` IS NOT NULL
 
                   AND (
-                      pipeline_stage = 'packed'
+                      pipeline_stage = 'queued'
 
                       OR (
                           pipeline_stage = 'error'
@@ -2807,11 +4493,11 @@ public function updateOrder(
 
 
             if (
-                $stage !== 'packed'
+                $stage !== 'queued'
                 && !$isDispatchRetry
             ) {
                 throw new RuntimeException(
-                    "PUB asset #{$pubAssetId} is not ready for Dispatch; expected packed or a Dispatch-stage error."
+                    "PUB asset #{$pubAssetId} is not ready for Dispatch; expected queued or a Dispatch-stage error."
                 );
             }
 
@@ -3684,7 +5370,10 @@ public function updateOrder(
      */
     public function listForAdmin(
         ?string $channel = null,
-        ?string $assetType = null
+        ?string $assetType = null,
+        ?string $stage = null,
+        ?string $sourceType = null,
+        ?int $sourceId = null
     ): array {
         $where = [];
         $params = [];
@@ -3699,9 +5388,28 @@ public function updateOrder(
                 (string)$assetType
             );
 
+        $stage =
+            strtolower(
+                trim(
+                    (string)$stage
+                )
+            );
+
+        $sourceType =
+            strtolower(
+                trim(
+                    (string)$sourceType
+                )
+            );
+
+        $sourceId =
+            $sourceId !== null
+                ? (int)$sourceId
+                : null;
+
         if ($channel !== '') {
             $where[] =
-                'channel = :channel';
+                'a.channel = :channel';
 
             $params['channel'] =
                 $channel;
@@ -3709,39 +5417,87 @@ public function updateOrder(
 
         if ($assetType !== '') {
             $where[] =
-                'asset_type = :asset_type';
+                'a.asset_type = :asset_type';
 
             $params['asset_type'] =
                 $assetType;
         }
 
+        if ($stage !== '') {
+            if ($stage === 'approved') {
+                $where[] =
+                    "(a.pipeline_stage = 'created' AND a.approved = 1)";
+            } elseif ($stage === 'created') {
+                $where[] =
+                    "(a.pipeline_stage = 'created' AND a.approved = 0)";
+            } else {
+                $where[] =
+                    'a.pipeline_stage = :pipeline_stage';
+
+                $params['pipeline_stage'] =
+                    $stage;
+            }
+        }
+
+        if ($sourceType !== '') {
+            $where[] =
+                'a.source_type = :source_type';
+
+            $params['source_type'] =
+                $sourceType;
+        }
+
+        if (
+            $sourceId !== null
+            && $sourceId > 0
+        ) {
+            $where[] =
+                'a.source_id = :source_id';
+
+            $params['source_id'] =
+                $sourceId;
+        }
+
         $sql = <<<SQL
             SELECT
-                pub_asset_id,
-                pub_run_id,
+                a.pub_asset_id,
+                a.pub_run_id,
 
-                channel,
-                asset_type,
-                creator_key,
+                a.channel,
+                a.asset_type,
+                a.creator_key,
 
-                source_type,
-                source_id,
+                a.source_type,
+                a.source_id,
+                p.title AS source_title,
 
-                pipeline_stage,
+                a.pipeline_stage,
+                a.approved,
 
-                search_title,
-                description,
+                CASE
+                    WHEN a.pipeline_stage = 'created'
+                     AND a.approved = 1
+                        THEN 'approved'
+                    ELSE a.pipeline_stage
+                END AS display_stage,
 
-                file_path,
-                url,
-                mime_type,
+                a.search_title,
+                a.description,
 
-                error_message,
+                a.file_path,
+                a.url,
+                a.mime_type,
 
-                updated_at,
-                dispatched_at
+                a.error_message,
 
-            FROM pub_assets
+                a.updated_at,
+                a.dispatched_at
+
+            FROM pub_assets a
+
+            LEFT JOIN playlists p
+              ON a.source_type = 'playlist'
+             AND p.playlist_id = a.source_id
             SQL;
 
         if ($where) {
@@ -3754,7 +5510,7 @@ public function updateOrder(
         }
 
         $sql .=
-            "\nORDER BY pub_asset_id DESC";
+            "\nORDER BY a.pub_asset_id DESC";
 
         $stmt =
             $this->pdo->prepare(
@@ -3768,6 +5524,64 @@ public function updateOrder(
         return $stmt->fetchAll(
             PDO::FETCH_ASSOC
         ) ?: [];
+    }
+
+
+    /**
+     * Playlist sources currently represented by durable PUB assets.
+     *
+     * Used by the Assets workbench so one source Playlist can be
+     * reviewed as a mixed cross-channel batch.
+     *
+     * @return array<int, array{playlist_id: int, title: string}>
+     */
+    public function listSourcePlaylists(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT
+                    a.source_id AS playlist_id,
+                    p.title
+
+                FROM pub_assets a
+
+                INNER JOIN playlists p
+                  ON p.playlist_id = a.source_id
+
+                WHERE a.source_type = 'playlist'
+                  AND a.source_id > 0
+
+                ORDER BY p.title ASC, a.source_id ASC
+                SQL
+            );
+
+        $rows =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+        return array_values(
+            array_map(
+                static fn (
+                    array $row
+                ): array => [
+                    'playlist_id' =>
+                        (int)(
+                            $row['playlist_id']
+                            ?? 0
+                        ),
+
+                    'title' =>
+                        (string)(
+                            $row['title']
+                            ?? ''
+                        ),
+                ],
+
+                $rows
+            )
+        );
     }
 
 
@@ -3827,6 +5641,42 @@ public function updateOrder(
     }
 
 
+
+    public function listStages(): array
+    {
+        $stmt =
+            $this->pdo->query(
+                <<<SQL
+                SELECT DISTINCT
+                    CASE
+                        WHEN pipeline_stage = 'created'
+                         AND approved = 1
+                            THEN 'approved'
+                        ELSE pipeline_stage
+                    END AS display_stage
+
+                FROM pub_assets
+
+                WHERE pipeline_stage IS NOT NULL
+                  AND TRIM(pipeline_stage) <> ''
+
+                ORDER BY display_stage ASC
+                SQL
+            );
+
+
+        return array_values(
+            array_map(
+                'strval',
+
+                $stmt->fetchAll(
+                    PDO::FETCH_COLUMN
+                ) ?: []
+            )
+        );
+    }
+
+
     public function getById(
         int $pubAssetId
     ): ?array {
@@ -3838,41 +5688,55 @@ public function updateOrder(
             $this->pdo->prepare(
                 <<<SQL
                 SELECT
-                    pub_asset_id,
-                    pub_run_id,
+                    a.pub_asset_id,
+                    a.pub_run_id,
 
-                    channel,
-                    asset_type,
-                    creator_key,
+                    a.channel,
+                    a.asset_type,
+                    a.creator_key,
 
-                    source_type,
-                    source_id,
+                    a.source_type,
+                    a.source_id,
+                    a.sort_order,
+                    p.title AS source_title,
 
-                    pipeline_stage,
+                    a.pipeline_stage,
+                    a.approved,
 
-                    error_stage,
-                    error_code,
-                    error_message,
-                    errored_at,
+                    CASE
+                        WHEN a.pipeline_stage = 'created'
+                         AND a.approved = 1
+                            THEN 'approved'
+                        ELSE a.pipeline_stage
+                    END AS display_stage,
 
-                    search_title,
-                    description,
-                    pingback,
+                    a.error_stage,
+                    a.error_code,
+                    a.error_message,
+                    a.errored_at,
 
-                    file_path,
-                    url,
-                    thumbnail_file_path,
-                    thumbnail_url,
-                    mime_type,
-                    duration_ms,
+                    a.search_title,
+                    a.description,
+                    a.pingback,
 
-                    created_at,
-                    updated_at,
-                    dispatched_at
+                    a.file_path,
+                    a.url,
+                    a.thumbnail_file_path,
+                    a.thumbnail_url,
+                    a.mime_type,
+                    a.duration_ms,
 
-                FROM pub_assets
+                    a.created_at,
+                    a.updated_at,
+                    a.dispatched_at
 
-                WHERE pub_asset_id =
+                FROM pub_assets a
+
+                LEFT JOIN playlists p
+                  ON a.source_type = 'playlist'
+                 AND p.playlist_id = a.source_id
+
+                WHERE a.pub_asset_id =
                     :pub_asset_id
 
                 LIMIT 1
@@ -3890,6 +5754,154 @@ public function updateOrder(
             );
 
         return $row ?: null;
+    }
+
+
+    /**
+     * Explicit human approval checkpoint.
+     *
+     * Approval is deliberately separate from pipeline_stage:
+     *
+     *   created + approved = 0  -> CREATED
+     *   created + approved = 1  -> APPROVED
+     *
+     * The checkbox can be changed only while the current physical
+     * asset is fully created and has not yet entered Package.
+     *
+     * @return array{
+     *   pub_asset_id: int,
+     *   approved: bool,
+     *   pipeline_stage: string,
+     *   display_stage: string
+     * }
+     */
+    public function setApproved(
+        int $pubAssetId,
+        bool $approved
+    ): array {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException(
+                'Valid pub_asset_id required.'
+            );
+        }
+
+
+        $asset =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if ($asset === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found."
+            );
+        }
+
+
+        $stage =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        if ($stage !== 'created') {
+            throw new RuntimeException(
+                'Approval can only be changed while an asset is at CREATED.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                UPDATE pub_assets
+                SET
+                    approved = :approved
+
+                WHERE pub_asset_id =
+                    :pub_asset_id
+
+                  AND pipeline_stage =
+                    'created'
+                SQL
+            );
+
+
+        $stmt->execute([
+            'approved' =>
+                $approved
+                    ? 1
+                    : 0,
+
+            'pub_asset_id' =>
+                $pubAssetId,
+        ]);
+
+
+        $current =
+            $this->getById(
+                $pubAssetId
+            );
+
+
+        if (
+            $current === null
+            || strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'pipeline_stage'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) !== 'created'
+        ) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} approval could not be changed."
+            );
+        }
+
+
+        $currentApproved =
+            (int)(
+                $current[
+                    'approved'
+                ]
+                ?? 0
+            ) === 1;
+
+
+        if ($currentApproved !== $approved) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} approval could not be changed."
+            );
+        }
+
+
+        return [
+            'pub_asset_id' =>
+                $pubAssetId,
+
+            'approved' =>
+                $currentApproved,
+
+            'pipeline_stage' =>
+                'created',
+
+            'display_stage' =>
+                $currentApproved
+                    ? 'approved'
+                    : 'created',
+        ];
     }
 
 
@@ -4049,6 +6061,194 @@ public function updateOrder(
      * INTERNAL HELPERS
      * ========================================================
      */
+
+    /**
+     * Compare the durable outside-of-box replacement metadata that must
+     * agree before an UPDATE no-op can be treated as idempotent.
+     */
+    private function replacementMetadataMatches(
+        array $current,
+        array $incoming
+    ): bool {
+        $currentSortOrder =
+            isset(
+                $current[
+                    'sort_order'
+                ]
+            )
+            && $current[
+                'sort_order'
+            ] !== null
+                ? (int)$current[
+                    'sort_order'
+                ]
+                : null;
+
+        $incomingSortOrder =
+            isset(
+                $incoming[
+                    'sort_order'
+                ]
+            )
+            && $incoming[
+                'sort_order'
+            ] !== null
+                ? (int)$incoming[
+                    'sort_order'
+                ]
+                : null;
+
+
+        return
+            (int)(
+                $current[
+                    'pub_run_id'
+                ]
+                ?? 0
+            ) ===
+            (int)(
+                $incoming[
+                    'pub_run_id'
+                ]
+                ?? 0
+            )
+
+            && strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'channel'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) ===
+            strtolower(
+                trim(
+                    (string)(
+                        $incoming[
+                            'channel'
+                        ]
+                        ?? ''
+                    )
+                )
+            )
+
+            && strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'asset_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) ===
+            strtolower(
+                trim(
+                    (string)(
+                        $incoming[
+                            'asset_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            )
+
+            && trim(
+                (string)(
+                    $current[
+                        'creator_key'
+                    ]
+                    ?? ''
+                )
+            ) ===
+            trim(
+                (string)(
+                    $incoming[
+                        'creator_key'
+                    ]
+                    ?? ''
+                )
+            )
+
+            && strtolower(
+                trim(
+                    (string)(
+                        $current[
+                            'source_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            ) ===
+            strtolower(
+                trim(
+                    (string)(
+                        $incoming[
+                            'source_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            )
+
+            && (int)(
+                $current[
+                    'source_id'
+                ]
+                ?? 0
+            ) ===
+            (int)(
+                $incoming[
+                    'source_id'
+                ]
+                ?? 0
+            )
+
+            && $currentSortOrder ===
+                $incomingSortOrder
+
+            && $this->nullableString(
+                $current[
+                    'search_title'
+                ]
+                ?? null
+            ) ===
+            $this->nullableString(
+                $incoming[
+                    'search_title'
+                ]
+                ?? null
+            )
+
+            && $this->nullableString(
+                $current[
+                    'description'
+                ]
+                ?? null
+            ) ===
+            $this->nullableString(
+                $incoming[
+                    'description'
+                ]
+                ?? null
+            )
+
+            && $this->nullableString(
+                $current[
+                    'pingback'
+                ]
+                ?? null
+            ) ===
+            $this->nullableString(
+                $incoming[
+                    'pingback'
+                ]
+                ?? null
+            );
+    }
+
 
     private function assertEditableStage(
         array $asset

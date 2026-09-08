@@ -7,6 +7,7 @@ use App\PUB\Errors\PubErrorReporter;
 use App\PUB\Package\PackageManager;
 use App\PUB\Repos\PdoPubAssetRepository;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -22,6 +23,10 @@ use Throwable;
  *
  * POST
  *   Wake PackageManager.
+ *
+ * POST action=update_pingback
+ *   Edit outside-of-box destination metadata while the asset is still
+ *   under Package control.
  *
  * Operational Package rules remain in PackageManager / Packagers.
  */
@@ -223,6 +228,19 @@ final class PackageEndpoint
             self::requestJson();
 
 
+        $action =
+            strtolower(
+                trim(
+                    (string)(
+                        $data[
+                            'action'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
         $pubAssetId =
             (int)(
                 $data[
@@ -230,6 +248,55 @@ final class PackageEndpoint
                 ]
                 ?? 0
             );
+
+
+        if ($action === 'update_pingback') {
+            if ($pubAssetId <= 0) {
+                throw new RuntimeException(
+                    'Package pingback update requires pub_asset_id.'
+                );
+            }
+
+
+            $assets =
+                new PdoPubAssetRepository(
+                    $pdo
+                );
+
+
+            $asset =
+                $assets
+                    ->updatePackagePingback(
+                        $pubAssetId,
+                        isset(
+                            $data[
+                                'pingback'
+                            ]
+                        )
+                            ? (string)$data[
+                                'pingback'
+                            ]
+                            : null
+                    );
+
+
+            self::sendJson(200, [
+                'ok' =>
+                    true,
+
+                'asset' =>
+                    $asset,
+            ]);
+
+            return;
+        }
+
+
+        if ($action !== '') {
+            throw new RuntimeException(
+                "Unsupported Package action '{$action}'."
+            );
+        }
 
 
         $manager =
@@ -325,6 +392,13 @@ final class PackageEndpoint
      * Review handoff sends:
      *   { "pub_asset_id": 123 }
      *
+     * Package metadata edit sends:
+     *   {
+     *     "action": "update_pingback",
+     *     "pub_asset_id": 123,
+     *     "pingback": "https://..."
+     *   }
+     *
      * @return array<string, mixed>
      */
     private static function requestJson(): array
@@ -348,7 +422,7 @@ final class PackageEndpoint
 
 
         if (!is_array($data)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Valid JSON body required.'
             );
         }

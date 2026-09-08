@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
 import './advsearch.css';
 import CategoryDropdown, { LightnessDropdown, ChromaDropdown } from '@components/CategoryDropdown';
@@ -8,11 +8,13 @@ import ColorWheel300 from '@components/ColorWheel/ColorWheel300';
 import ColorWheelIndicator from '@components/ColorWheel/ColorWheelIndicator';
 import TopSpacer from '@layout/TopSpacer';
 import { API_FOLDER } from '@helpers/config';
+import { resolveAppPath } from '@helpers/routingHelper';
 
 const GALLERY_PATH = '/adv-results'; // results page reads from appState.advancedSearch
 
 export default function AdvancedSearchPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { categories = [], advancedSearch, setAdvancedSearch } = useAppState();
 
   const {
@@ -151,7 +153,7 @@ function handleSubmit(e) {
   e.preventDefault();
   // bump a submit token so results page knows this was an explicit submit
   setAdvancedSearch(p => ({ ...p, _submitSeq: Date.now() }));
-  navigate('/adv-results');
+  navigate(resolveAppPath(GALLERY_PATH, location.pathname));
 }
 
   return (

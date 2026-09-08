@@ -13,15 +13,15 @@ use RuntimeException;
  *
  * Reuses the existing durable tables:
  *
- *   publishing_channels
- *   publisher_sync_runs
+ *   pub_channels
+ *   pub_sync_runs
  *
  * Those tables currently contain the proven Pinterest/YouTube connection
- * records and encrypted credentials. The old Publisher repository is no
+ * records and encrypted credentials. The old PUB repository is no
  * longer required by active PUB code.
  *
  * This repository intentionally contains ONLY connection persistence.
- * Old publishing jobs, packages, attempts, schedules, and publication
+ * Old PUB jobs, packages, attempts, schedules, and publication
  * history do not belong here.
  */
 final class PdoPubChannelConnectionRepository
@@ -50,7 +50,7 @@ final class PdoPubChannelConnectionRepository
                 <<<SQL
                 SELECT *
 
-                FROM publishing_channels
+                FROM pub_channels
 
                 WHERE channel_key =
                     :channel_key
@@ -93,10 +93,10 @@ final class PdoPubChannelConnectionRepository
                 <<<SQL
                 SELECT *
 
-                FROM publishing_channels
+                FROM pub_channels
 
-                WHERE publishing_channel_id =
-                    :publishing_channel_id
+                WHERE pub_channel_id =
+                    :pub_channel_id
 
                 LIMIT 1
                 SQL
@@ -104,7 +104,7 @@ final class PdoPubChannelConnectionRepository
 
 
         $stmt->execute([
-            'publishing_channel_id' =>
+            'pub_channel_id' =>
                 $channelId,
         ]);
 
@@ -216,10 +216,10 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                INSERT INTO publishing_channels (
+                INSERT INTO pub_channels (
                     platform,
                     channel_key,
-                    publisher_service,
+                    pub_service,
                     label,
                     account_name,
                     status,
@@ -228,7 +228,7 @@ final class PdoPubChannelConnectionRepository
                 ) VALUES (
                     :platform,
                     :channel_key,
-                    :publisher_service,
+                    :pub_service,
                     :label,
                     :account_name,
                     :status,
@@ -250,7 +250,7 @@ final class PdoPubChannelConnectionRepository
              * Kept only as existing table metadata.
              * Active PUB routing uses Shippers, not this value.
              */
-            'publisher_service' =>
+            'pub_service' =>
                 'PinterestImageShipper',
 
             'label' =>
@@ -331,10 +331,10 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                INSERT INTO publishing_channels (
+                INSERT INTO pub_channels (
                     platform,
                     channel_key,
-                    publisher_service,
+                    pub_service,
                     label,
                     account_name,
                     status,
@@ -343,7 +343,7 @@ final class PdoPubChannelConnectionRepository
                 ) VALUES (
                     :platform,
                     :channel_key,
-                    :publisher_service,
+                    :pub_service,
                     :label,
                     :account_name,
                     :status,
@@ -361,7 +361,7 @@ final class PdoPubChannelConnectionRepository
             'channel_key' =>
                 'youtube_colorfix',
 
-            'publisher_service' =>
+            'pub_service' =>
                 'YouTubeVideoShipper',
 
             'label' =>
@@ -417,7 +417,7 @@ final class PdoPubChannelConnectionRepository
     ): void {
         if ($channelId <= 0) {
             throw new RuntimeException(
-                'Valid publishing_channel_id required.'
+                'Valid pub_channel_id required.'
             );
         }
 
@@ -425,7 +425,7 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                UPDATE publishing_channels
+                UPDATE pub_channels
 
                 SET
                     status =
@@ -455,8 +455,8 @@ final class PdoPubChannelConnectionRepository
                     metadata_json =
                         :metadata_json
 
-                WHERE publishing_channel_id =
-                    :publishing_channel_id
+                WHERE pub_channel_id =
+                    :pub_channel_id
                 SQL
             );
 
@@ -520,7 +520,7 @@ final class PdoPubChannelConnectionRepository
         );
 
         $stmt->bindValue(
-            ':publishing_channel_id',
+            ':pub_channel_id',
             $channelId,
             PDO::PARAM_INT
         );
@@ -537,7 +537,7 @@ final class PdoPubChannelConnectionRepository
     ): void {
         if ($channelId <= 0) {
             throw new RuntimeException(
-                'Valid publishing_channel_id required.'
+                'Valid pub_channel_id required.'
             );
         }
 
@@ -545,7 +545,7 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                UPDATE publishing_channels
+                UPDATE pub_channels
 
                 SET
                     status =
@@ -575,8 +575,8 @@ final class PdoPubChannelConnectionRepository
                     metadata_json =
                         :metadata_json
 
-                WHERE publishing_channel_id =
-                    :publishing_channel_id
+                WHERE pub_channel_id =
+                    :pub_channel_id
                 SQL
             );
 
@@ -593,7 +593,7 @@ final class PdoPubChannelConnectionRepository
                     | JSON_THROW_ON_ERROR
                 ),
 
-            'publishing_channel_id' =>
+            'pub_channel_id' =>
                 $channelId,
         ]);
     }
@@ -606,13 +606,13 @@ final class PdoPubChannelConnectionRepository
     ): void {
         if ($channelId <= 0) {
             throw new RuntimeException(
-                'Valid publishing_channel_id required.'
+                'Valid pub_channel_id required.'
             );
         }
 
 
         $sql =
-            'UPDATE publishing_channels'
+            'UPDATE pub_channels'
             . ' SET metadata_json = :metadata_json';
 
         $params = [
@@ -624,7 +624,7 @@ final class PdoPubChannelConnectionRepository
                     | JSON_THROW_ON_ERROR
                 ),
 
-            'publishing_channel_id' =>
+            'pub_channel_id' =>
                 $channelId,
         ];
 
@@ -641,7 +641,7 @@ final class PdoPubChannelConnectionRepository
 
 
         $sql .=
-            ' WHERE publishing_channel_id = :publishing_channel_id';
+            ' WHERE pub_channel_id = :pub_channel_id';
 
 
         $stmt =
@@ -667,7 +667,7 @@ final class PdoPubChannelConnectionRepository
     ): int {
         if ($channelId <= 0) {
             throw new RuntimeException(
-                'Valid publishing_channel_id required.'
+                'Valid pub_channel_id required.'
             );
         }
 
@@ -707,15 +707,15 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                INSERT INTO publisher_sync_runs (
-                    publishing_channel_id,
+                INSERT INTO pub_sync_runs (
+                    pub_channel_id,
                     platform,
                     sync_kind,
                     status,
                     request_payload_json,
                     started_at
                 ) VALUES (
-                    :publishing_channel_id,
+                    :pub_channel_id,
                     :platform,
                     :sync_kind,
                     :status,
@@ -727,7 +727,7 @@ final class PdoPubChannelConnectionRepository
 
 
         $stmt->execute([
-            'publishing_channel_id' =>
+            'pub_channel_id' =>
                 $channelId,
 
             'platform' =>
@@ -767,7 +767,7 @@ final class PdoPubChannelConnectionRepository
     ): void {
         if ($runId <= 0) {
             throw new RuntimeException(
-                'Valid publisher_sync_run_id required.'
+                'Valid pub_sync_run_id required.'
             );
         }
 
@@ -775,7 +775,7 @@ final class PdoPubChannelConnectionRepository
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
-                UPDATE publisher_sync_runs
+                UPDATE pub_sync_runs
 
                 SET
                     status =
@@ -793,8 +793,8 @@ final class PdoPubChannelConnectionRepository
                     finished_at =
                         UTC_TIMESTAMP()
 
-                WHERE publisher_sync_run_id =
-                    :publisher_sync_run_id
+                WHERE pub_sync_run_id =
+                    :pub_sync_run_id
                 SQL
             );
 
@@ -825,7 +825,7 @@ final class PdoPubChannelConnectionRepository
                     $errorMessage
                 ),
 
-            'publisher_sync_run_id' =>
+            'pub_sync_run_id' =>
                 $runId,
         ]);
     }
@@ -837,15 +837,15 @@ final class PdoPubChannelConnectionRepository
         if (
             isset(
                 $row[
-                    'publishing_channel_id'
+                    'pub_channel_id'
                 ]
             )
         ) {
             $row[
-                'publishing_channel_id'
+                'pub_channel_id'
             ] =
                 (int)$row[
-                    'publishing_channel_id'
+                    'pub_channel_id'
                 ];
         }
 

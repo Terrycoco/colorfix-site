@@ -12,8 +12,8 @@ use App\PUB\PubCom\PubComWorkerContract;
 /**
  * YOUTUBE PLAYLIST VIDEO ANALYZER
  *
- * Receives the YouTube-channel market source from AnalyzeManager.
- * items[] has already been culled to yt = 1.
+ * Receives the complete neutral Market source from AnalyzeManager.
+ * This Analyzer performs its own yt = 1 channel cull.
  *
  * The Analyzer prepares ONE ingredient box for ONE YouTube video.
  * It does not pass raw playlist slide rows to CREATE.
@@ -87,7 +87,7 @@ final class PlaylistVideoAnalyzer implements PubComWorkerContract
 
 
     /**
-     * Confirm that the YouTube-channel haul contains at least one slide
+     * Confirm that the YouTube-eligible portion of the Market haul contains at least one slide
      * and that every slide can satisfy the Chef's current baseline order.
      */
     public function preflight(
@@ -750,23 +750,29 @@ public function analyze(
 
 
     /**
-     * AnalyzeManager already performs the YouTube channel cull.
+     * YouTube channel participation belongs to the YouTube specialist,
+     * not AnalyzeManager.
+     *
+     * @return array<int, array<string, mixed>>
      */
     private function sourceItems(
         array $source
     ): array {
-        return is_array(
-            $source[
-                'items'
-            ]
+        $items = is_array(
+            $source['items']
             ?? null
         )
-            ? array_values(
-                $source[
-                    'items'
-                ]
-            )
+            ? $source['items']
             : [];
+
+        return array_values(
+            array_filter(
+                $items,
+                static fn (mixed $item): bool =>
+                    is_array($item)
+                    && !empty($item['yt'])
+            )
+        );
     }
 
 

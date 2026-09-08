@@ -10,12 +10,16 @@ import {
 
 export default function PubAssetCopyEditor({
   asset,
+  ingredientBindings = [],
   saving = false,
   recreating = false,
   sendingToPackaging = false,
+  approvalSaving = false,
+  onSetApproval,
   onSave,
   onRecreate,
   onSendToPackaging,
+  onRefreshAsset,
   onClose,
 }) {
   const [
@@ -37,6 +41,12 @@ export default function PubAssetCopyEditor({
     actionError,
     setActionError,
   ] = useState("");
+
+  const [
+    redoPromptOpen,
+    setRedoPromptOpen,
+  ] = useState(false);
+
 
   const [
     previewVersion,
@@ -63,6 +73,10 @@ export default function PubAssetCopyEditor({
 
     setActionError(
       ""
+    );
+
+    setRedoPromptOpen(
+      false
     );
   }, [
     asset,
@@ -109,6 +123,19 @@ export default function PubAssetCopyEditor({
     isDispatchLocked;
 
 
+  const isApproved =
+    Number(
+      asset?.approved ||
+      0
+    ) === 1;
+
+
+  const approvalEditable =
+    pipelineStage ===
+      "created" &&
+    !isDispatchLocked;
+
+
   function currentChanges() {
     return {
       search_title:
@@ -117,6 +144,59 @@ export default function PubAssetCopyEditor({
       description:
         description,
     };
+  }
+
+
+  function changedMetadataFields() {
+    const changed = [];
+
+    if (
+      String(title || "") !==
+      String(asset?.search_title || "")
+    ) {
+      changed.push(
+        "search_title"
+      );
+    }
+
+    if (
+      String(description || "") !==
+      String(asset?.description || "")
+    ) {
+      changed.push(
+        "description"
+      );
+    }
+
+    return changed;
+  }
+
+
+  function saveRequiresRedo() {
+    const changed =
+      new Set(
+        changedMetadataFields()
+      );
+
+    if (changed.size === 0) {
+      return false;
+    }
+
+    return (
+      Array.isArray(
+        ingredientBindings
+      )
+        ? ingredientBindings
+        : []
+    ).some(
+      (binding) =>
+        changed.has(
+          String(
+            binding?.boxField ||
+            ""
+          ).trim()
+        )
+    );
   }
 
 
@@ -137,6 +217,15 @@ export default function PubAssetCopyEditor({
       ""
     );
 
+    if (saveRequiresRedo()) {
+      setRedoPromptOpen(
+        true
+      );
+
+      return;
+    }
+
+
     const result =
       await onSave?.(
         currentChanges()
@@ -152,10 +241,14 @@ export default function PubAssetCopyEditor({
   }
 
 
-  async function handleRecreate() {
+  async function saveAndRedo() {
     if (isDispatchLocked) {
-      return;
+      return false;
     }
+
+    setRedoPromptOpen(
+      false
+    );
 
     setSuccessMessage(
       ""
@@ -166,13 +259,10 @@ export default function PubAssetCopyEditor({
     );
 
     /*
-     * Redo always saves the current
-     * editor values first.
-     *
-     * Copy Editing updates the filed
-     * order. CREATE then receives only
-     * the asset number and fetches that
-     * latest order itself.
+     * Save the new outside copy first. The repository repairs any
+     * contract-bound Creator ingredients and marks REDO_REQUIRED.
+     * CREATE then receives only the durable asset ID and rebuilds from
+     * that freshly filed order.
      */
     const saved =
       await onSave?.(
@@ -182,7 +272,7 @@ export default function PubAssetCopyEditor({
     if (
       saved === false
     ) {
-      return;
+      return false;
     }
 
     const recreated =
@@ -191,14 +281,65 @@ export default function PubAssetCopyEditor({
       );
 
     if (
-      recreated !== false
+      recreated === false
     ) {
-      setPreviewVersion(
-        Date.now()
+      return false;
+    }
+
+    await onRefreshAsset?.(
+      asset.pub_asset_id
+    );
+
+    setPreviewVersion(
+      Date.now()
+    );
+
+    setSuccessMessage(
+      `Asset #${asset.pub_asset_id} recreated successfully.`
+    );
+
+    return true;
+  }
+
+
+  async function handleRecreate() {
+    await saveAndRedo();
+  }
+
+
+  async function handleApprovalChange(
+    event
+  ) {
+    const checked =
+      event
+        .target
+        .checked;
+
+
+    setSuccessMessage(
+      ""
+    );
+
+    setActionError(
+      ""
+    );
+
+
+    const result =
+      await onSetApproval?.(
+        asset,
+        checked
       );
 
-      setSuccessMessage(
-        `Asset #${asset.pub_asset_id} recreated successfully.`
+
+    if (
+      result === false
+      ||
+      result?.ok === false
+    ) {
+      setActionError(
+        result?.error ||
+        "Could not change asset approval."
       );
     }
   }
@@ -206,6 +347,15 @@ export default function PubAssetCopyEditor({
 
   async function handleSendToPackaging() {
     if (isDispatchLocked) {
+      return;
+    }
+
+
+    if (!isApproved) {
+      setActionError(
+        "Approve this asset before sending it to Packaging."
+      );
+
       return;
     }
 
@@ -522,6 +672,42 @@ export default function PubAssetCopyEditor({
             footerStyle
           }
         >
+          <label
+            style={
+              approvalControlStyle
+            }
+            title={
+              approvalEditable
+                ? isApproved
+                  ? "Uncheck to revoke approval."
+                  : "Approve this asset for Packaging."
+                : "Approval is locked after the asset leaves CREATED."
+            }
+          >
+            <input
+              type="checkbox"
+
+              checked={
+                isApproved
+              }
+
+              disabled={
+                !approvalEditable ||
+                approvalSaving ||
+                busy
+              }
+
+              onChange={
+                handleApprovalChange
+              }
+            />
+
+            <span>
+              Approved
+            </span>
+          </label>
+
+
           <button
             type="button"
 
@@ -581,7 +767,15 @@ export default function PubAssetCopyEditor({
                 type="button"
 
                 disabled={
-                  busy
+                  busy ||
+                  approvalSaving ||
+                  !isApproved
+                }
+
+                title={
+                  isApproved
+                    ? "Send this approved asset to Packaging."
+                    : "Approve this asset before sending it to Packaging."
                 }
 
                 onClick={
@@ -598,6 +792,81 @@ export default function PubAssetCopyEditor({
           ) : null}
         </div>
       </form>
+
+
+      {redoPromptOpen ? (
+        <div
+          style={
+            redoConfirmOverlayStyle
+          }
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Save changes and redo asset"
+            style={
+              redoConfirmDialogStyle
+            }
+          >
+            <div
+              style={
+                redoConfirmTitleStyle
+              }
+            >
+              This change requires a new render
+            </div>
+
+            <div
+              style={
+                redoConfirmBodyStyle
+              }
+            >
+              One or more changed fields are baked into the physical asset.
+              Save the new values and redo this asset now?
+            </div>
+
+            <div
+              style={
+                redoConfirmActionsStyle
+              }
+            >
+              <button
+                type="button"
+                style={
+                  quietButtonStyle
+                }
+                disabled={
+                  busy
+                }
+                onClick={() =>
+                  setRedoPromptOpen(
+                    false
+                  )
+                }
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  busy
+                }
+                onClick={
+                  saveAndRedo
+                }
+              >
+                {
+                  saving ||
+                  recreating
+                    ? "Saving & Redoing..."
+                    : "Save & Redo"
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>,
 
     document.body
@@ -642,6 +911,96 @@ function versionedPreviewUrl(
     )
   )}`;
 }
+
+
+const redoConfirmOverlayStyle = {
+  position:
+    "fixed",
+
+  inset:
+    0,
+
+  zIndex:
+    2147483648,
+
+  display:
+    "grid",
+
+  placeItems:
+    "center",
+
+  padding:
+    30,
+
+  background:
+    "rgba(0, 0, 0, 0.48)",
+};
+
+
+const redoConfirmDialogStyle = {
+  width:
+    "min(460px, 92vw)",
+
+  background:
+    "#ffffff",
+
+  border:
+    "1px solid #cfd5dc",
+
+  borderRadius:
+    5,
+
+  boxShadow:
+    "0 18px 50px rgba(0,0,0,0.30)",
+};
+
+
+const redoConfirmTitleStyle = {
+  padding:
+    "13px 15px",
+
+  borderBottom:
+    "1px solid #d8dde3",
+
+  fontSize:
+    17,
+
+  fontWeight:
+    700,
+};
+
+
+const redoConfirmBodyStyle = {
+  padding:
+    16,
+
+  color:
+    "#334155",
+
+  fontSize:
+    13,
+
+  lineHeight:
+    1.5,
+};
+
+
+const redoConfirmActionsStyle = {
+  display:
+    "flex",
+
+  justifyContent:
+    "flex-end",
+
+  gap:
+    8,
+
+  padding:
+    "11px 12px",
+
+  borderTop:
+    "1px solid #d8dde3",
+};
 
 
 const overlayStyle = {
@@ -848,6 +1207,33 @@ const fieldsStyle = {
 
   minWidth:
     0,
+};
+
+
+const approvalControlStyle = {
+  display:
+    "flex",
+
+  alignItems:
+    "center",
+
+  gap:
+    7,
+
+  marginRight:
+    "auto",
+
+  color:
+    "#334155",
+
+  fontSize:
+    12,
+
+  fontWeight:
+    700,
+
+  cursor:
+    "pointer",
 };
 
 

@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
 import { photoThumbUrl } from "@helpers/imageThumb";
+import { resolveAppPath } from "@helpers/routingHelper";
 
 const PlaylistItem = ({ item }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [imageSrc, setImageSrc] = useState("");
 
   const handleClick = () => {
     if (item?.target_url) {
-      navigate(item.target_url);
+      navigate(resolveAppPath(item.target_url, location.pathname));
     }
   };
 

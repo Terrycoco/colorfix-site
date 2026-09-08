@@ -17,10 +17,12 @@ use App\PUB\Create\YouTube\PlaylistVideoRecipe;
  * CREATE consumes those ingredients and returns the
  * created physical asset plus any product-owned companion output
  * (for example, a video thumbnail).
- * PACKAGE consumes durable pub_assets rows and returns
- * channel/media-specific package arrays.
- * DISPATCH consumes packed package arrays and returns
- * shipping receipt arrays.
+ * PACKAGE consumes durable pub_assets rows, seals the outbound
+ * package, and leaves the finished asset at pipeline_stage = packed.
+ * SCHEDULE consumes Scheduler controls, queued inventory, and durable
+ * shipped history, then returns a release decision only.
+ * DISPATCH accepts a selected queued asset into Shipping custody,
+ * consumes its sealed package unchanged, and returns a shipping receipt.
  */
 final class PubContract
 {
@@ -75,6 +77,564 @@ final class PubContract
 
                             'volume' =>
                                 self::DEFAULT_YOUTUBE_MUSIC_VOLUME,
+                        ],
+                    ],
+                ],
+            ],
+
+
+            /*
+             * ============================================================
+             * MARKET RUN — SOURCE DELIVERY
+             * ============================================================
+             *
+             * The Market Run is the neutral morning delivery into PUB.
+             * It happens BEFORE ANALYZE creates any product-specific Box.
+             *
+             * Source preparers own this boundary. They collect and normalize
+             * source material into one canonical delivery that every Analyzer
+             * may inspect.
+             *
+             * IMPORTANT:
+             *   - Market Run does NOT choose a publishing channel.
+             *   - Market Run does NOT choose asset types.
+             *   - Market Run does NOT pair Before / After slides.
+             *   - Market Run does NOT decide Pinterest or YouTube eligibility.
+             *   - Market Run does NOT create Creator ingredients.
+             *
+             * For Playlist sources, ACTIVE is the procurement rule.
+             * Site / Concept / Client are audience-experience flags carried as
+             * data; they are not general PUB inclusion filters.
+             * Pin / YT are publisher-channel flags carried as data so the
+             * downstream channel Analyzers can decide what they consume.
+             */
+            'marketRun' => [
+
+                'label' =>
+                    'Market Run',
+
+                'referenceRole' =>
+                    'Source Delivery',
+
+                'sourceTypes' => [
+
+                    /*
+                     * ----------------------------------------------------
+                     * PLAYLIST DELIVERY TRUCK
+                     * ----------------------------------------------------
+                     *
+                     * PlaylistSourcePreparer turns one ColorFix Playlist into
+                     * the canonical neutral source delivery consumed by
+                     * ANALYZE.
+                     */
+                    'playlist' => [
+
+                        'label' =>
+                            'Playlist',
+
+                        'preparer' =>
+                            'PlaylistSourcePreparer',
+
+                        'selectionRules' => [
+
+                            'active_items_only' =>
+                                true,
+
+                            'site_required' =>
+                                false,
+
+                            'concept_required' =>
+                                false,
+
+                            'client_required' =>
+                                false,
+
+                            'pin_required' =>
+                                false,
+
+                            'yt_required' =>
+                                false,
+
+                            'note' =>
+                                'Bring every active Playlist item. Audience flags and publisher flags travel with the item; downstream Analyzers interpret them.',
+                        ],
+
+                        /*
+                         * Exact canonical delivery shape available to
+                         * AnalyzeManager and every specialist Analyzer.
+                         */
+                        'output' => [
+
+                            [
+                                'key' =>
+                                    'source_type',
+
+                                'type' =>
+                                    'text',
+
+                                'value' =>
+                                    'playlist',
+                            ],
+
+                            [
+                                'key' =>
+                                    'source_id',
+
+                                'type' =>
+                                    'number',
+
+                                'note' =>
+                                    'Playlist ID.',
+                            ],
+
+                            [
+                                'key' =>
+                                    'title',
+
+                                'type' =>
+                                    'text',
+
+                                'note' =>
+                                    'Playlist title.',
+                            ],
+
+                            [
+                                'key' =>
+                                    'items[]',
+
+                                'type' =>
+                                    'array',
+
+                                'note' =>
+                                    'All active Playlist items in Playlist order.',
+
+                                'fields' => [
+
+                                    [
+                                        'key' =>
+                                            'playlist_item_id',
+
+                                        'type' =>
+                                            'number',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'order_index',
+
+                                        'type' =>
+                                            'number',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'item_type',
+
+                                        'type' =>
+                                            'text',
+
+                                        'note' =>
+                                            'Authored slide type such as cover-image, intro, text, palette, non-palette, hue-wheel, brand-bumper, or another supported type.',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'title',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'subtitle',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'subtitle_2',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'body',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+
+                                        'note' =>
+                                            'Raw authored body. Some item types, such as hue-wheel, may encode structured source data here for ANALYZE to parse.',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'layout',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'title_mode',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'star',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'transition',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'duration_ms',
+
+                                        'type' =>
+                                            'number',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    /*
+                                     * PLAYER / AUDIENCE EXPERIENCE FLAGS.
+                                     *
+                                     * These are not general PUB filters.
+                                     * "site" replaces the old overloaded
+                                     * meaning of Public for ordinary site
+                                     * visitors.
+                                     */
+                                    [
+                                        'key' =>
+                                            'site',
+
+                                        'type' =>
+                                            'boolean',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'concept',
+
+                                        'type' =>
+                                            'boolean',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'client',
+
+                                        'type' =>
+                                            'boolean',
+                                    ],
+
+                                    /*
+                                     * PUBLISHER CHANNEL FLAGS.
+                                     */
+                                    [
+                                        'key' =>
+                                            'pin',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'note' =>
+                                            'Pinterest channel participation. Pinterest Analyzer decides what to do with the item.',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'yt',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'note' =>
+                                            'YouTube channel participation. YouTube Analyzer decides what to do with the item.',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'analyzer_role',
+
+                                        'type' =>
+                                            'text',
+
+                                        'note' =>
+                                            'Generic authored Analyzer hint such as before, after, single, teaser, or ignore. Each specialist decides whether and how the role matters to its own recipe.',
+                                    ],
+
+                                    /*
+                                     * SOURCE / PALETTE REFERENCES.
+                                     */
+                                    [
+                                        'key' =>
+                                            'ap_id',
+
+                                        'type' =>
+                                            'number',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'palette_hash',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'saved_palette_set_id',
+
+                                        'type' =>
+                                            'number',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'color_plan_id',
+
+                                        'type' =>
+                                            'number',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    /*
+                                     * NORMALIZED PHOTOENTITY.
+                                     *
+                                     * If the source item has a usable photo,
+                                     * procurement resolves it before ANALYZE.
+                                     */
+                                    [
+                                        'key' =>
+                                            'photo',
+
+                                        'type' =>
+                                            'object',
+
+                                        'required' =>
+                                            false,
+
+                                        'fields' => [
+
+                                            [
+                                                'key' =>
+                                                    'photo_library_id',
+
+                                                'type' =>
+                                                    'number',
+                                            ],
+
+                                            [
+                                                'key' =>
+                                                    'image_url',
+
+                                                'type' =>
+                                                    'text',
+                                            ],
+
+                                            [
+                                                'key' =>
+                                                    'file_path',
+
+                                                'type' =>
+                                                    'text',
+                                            ],
+
+                                            [
+                                                'key' =>
+                                                    'title',
+
+                                                'type' =>
+                                                    'text',
+
+                                                'required' =>
+                                                    false,
+                                            ],
+                                        ],
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'exclude_from_thumbs',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'is_share_image',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'finder_start',
+
+                                        'type' =>
+                                            'text',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'version_number',
+
+                                        'type' =>
+                                            'number',
+
+                                        'required' =>
+                                            false,
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'is_final',
+
+                                        'type' =>
+                                            'boolean',
+
+                                        'required' =>
+                                            false,
+                                    ],
+                                ],
+                            ],
+
+                            /*
+                             * LINKED PUBLISHING VIEWERS.
+                             *
+                             * These arrive on the same neutral truck so
+                             * Pinterest/other Analyzers can join prepared
+                             * source photos to palette/copy data without
+                             * reopening procurement themselves.
+                             */
+                            [
+                                'key' =>
+                                    'linked_pvs[]',
+
+                                'type' =>
+                                    'array',
+
+                                'fields' => [
+
+                                    [
+                                        'key' =>
+                                            'pv_id',
+
+                                        'type' =>
+                                            'number',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'kicker',
+
+                                        'type' =>
+                                            'text',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'intro',
+
+                                        'type' =>
+                                            'text',
+                                    ],
+
+                                    [
+                                        'key' =>
+                                            'photo_palettes[]',
+
+                                        'type' =>
+                                            'array',
+
+                                        'fields' => [
+
+                                            [
+                                                'key' =>
+                                                    'photo_library_id',
+
+                                                'type' =>
+                                                    'number',
+                                            ],
+
+                                            [
+                                                'key' =>
+                                                    'hex6s[]',
+
+                                                'type' =>
+                                                    'array',
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                     ],
                 ],
@@ -255,8 +815,9 @@ final class PubContract
                 /*
                  * ANALYZE MANAGER
                  *
-                 * Receives the prepared source and performs only the
-                 * destination/channel cull before specialist routing.
+                 * Receives one neutral Market delivery and hands that same
+                 * delivery unchanged to every registered Analyzer. Each
+                 * specialist owns its own channel and recipe culling.
                  */
                 'manager' => [
 
@@ -615,7 +1176,7 @@ final class PubContract
                                         'items[]',
 
                                     'note' =>
-                                        'pin = 1',
+                                        'Full Market items[]; this Pinterest Analyzer performs its own pin = 1 cull.',
                                 ],
 
                                 [
@@ -1155,8 +1716,8 @@ final class PubContract
                         /*
                          * SPECIALIST ANALYZER CONTRACT
                          *
-                         * AnalyzeManager has already culled items[] to yt = 1.
-                         * PlaylistVideoAnalyzer prepares ONE proposal for the
+                         * AnalyzeManager supplies the complete neutral Market delivery.
+                         * PlaylistVideoAnalyzer performs its own yt = 1 cull and prepares ONE proposal for the
                          * complete playlist video and returns only the fields
                          * declared by the YouTube Creator.
                          *
@@ -1172,7 +1733,7 @@ final class PubContract
                                         'items[]',
 
                                     'note' =>
-                                        'yt = 1; array order is playlist order; source may contain more fields than the Creator orders; cover-image is companion source material and is not emitted into slides[]',
+                                        'Full Market items[]; PlaylistVideoAnalyzer performs its own yt = 1 cull. Eligible item order is playlist order; cover-image is companion source material and is not emitted into slides[].',
 
                                     'fields' => [
                                         [
@@ -1684,21 +2245,121 @@ final class PubContract
 
                     /*
                      * ----------------------------------------------------
-                     * YOUTUBE TEASER PIN
+                     * PINTEREST TEASER
                      * ----------------------------------------------------
+                     *
+                     * Teasers are explicitly authored Playlist items.
+                     * Zero teaser items is valid. Every matching item creates
+                     * one proposal; PACKAGE later supplies the destination URL
+                     * through pingback.
                      */
-                    'youtube_teaser_pin' => [
+                    'teaser' => [
 
                         'label' =>
-                            'YouTube Teaser Pin',
+                            'Teaser Pin',
 
                         'channel' =>
                             'pinterest',
 
-                        'requiredIngredients' => [
-                            'source_item',
-                            'search_title',
-                            'description',
+                        'createsAssetType' =>
+                            'pin_teaser',
+
+                        'workbench' => [
+                            'sourceColumns' => [
+                                [
+                                    'label' =>
+                                        'Teaser',
+
+                                    'ingredientPath' =>
+                                        'source.file_path',
+                                ],
+                            ],
+                        ],
+
+                        'analyzer' => [
+                            'input' => [
+                                [
+                                    'key' =>
+                                        'items[]',
+
+                                    'note' =>
+                                        'Full Market items[]; TeaserAnalyzer selects pin = 1 + analyzer_role = teaser.',
+                                ],
+                            ],
+
+                            'requires' => [
+                                [
+                                    'key' =>
+                                        'optional_teaser_items',
+
+                                    'note' =>
+                                        'Zero is valid. Each authored pin = 1 + analyzer_role = teaser item may produce one teaser asset.',
+                                ],
+                            ],
+
+                            'output' => [
+                                [
+                                    'key' =>
+                                        'asset_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'sort_order',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'search_title',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'ingredients',
+
+                                    'type' =>
+                                        'object',
+
+                                    'fields' => [
+                                        [
+                                            'key' =>
+                                                'source.file_path',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'source.image_url',
+
+                                            'required' =>
+                                                true,
+                                        ],
+
+                                        [
+                                            'key' =>
+                                                'search_title',
+
+                                            'required' =>
+                                                true,
+
+                                            'note' =>
+                                                'Authored teaser title; production copy for the static teaser image.',
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+
+                        'ingredientBindings' => [
+                            [
+                                'boxField' =>
+                                    'search_title',
+
+                                'ingredientPath' =>
+                                    'search_title',
+                            ],
                         ],
                     ],
                 ],
@@ -3061,9 +3722,15 @@ final class PubContract
                         ],
                     ],
 
-                    'youtube_teaser_pin' => [
+                    'pin_teaser' => [
+                        'label' =>
+                            'Pinterest Teaser',
+
                         'channel' =>
                             'pinterest',
+
+                        'note' =>
+                            'Analyze contract is established. The dedicated Teaser Creator is still to be implemented.',
                     ],
                 ],
             ],
@@ -3101,12 +3768,12 @@ final class PubContract
 
                 'states' => [
 
-                    'ready_to_pack' => [
+                    'approved' => [
                         'kind' =>
                             'waiting',
 
                         'meaning' =>
-                            'waiting to start',
+                            'admin-approved and ready to pack',
                     ],
 
                     'packing' => [
@@ -3117,7 +3784,7 @@ final class PubContract
                             'in process',
                     ],
 
-                    'package_pending' => [
+                    'pending' => [
                         'kind' =>
                             'waiting',
 
@@ -3715,6 +4382,45 @@ final class PubContract
              * ============================================================
              * STAGE 4 — SCHEDULE
              * ============================================================
+             *
+             * SCHEDULE is the loading dock.
+             *
+             * PACKAGE finishes at PACKED:
+             *
+             *   packed
+             *     = sealed and complete
+             *     = NOT available to automatic Scheduler selection
+             *
+             * An explicit admin enqueue action moves:
+             *
+             *   packed -> queued
+             *
+             * QUEUED is the active Scheduler candidate pool:
+             *
+             *   queued
+             *     = sealed
+             *     = deliberately released into circulation
+             *     = fair game for Scheduler whenever channel policy allows
+             *
+             * An explicit admin dequeue action moves:
+             *
+             *   queued -> packed
+             *
+             * without invalidating or rebuilding the sealed package.
+             *
+             * Scheduler NEVER publishes and NEVER writes shipping itself.
+             * Its successful output is only a release decision:
+             *
+             *   queued asset ID
+             *       -> DispatchManager::shipOne(pub_asset_id)
+             *
+             * DispatchManager owns:
+             *
+             *   queued -> shipping -> shipped
+             *
+             * Scheduler rotation memory is reconstructed fresh from durable
+             * pub_assets shipping history. There is no hidden last-type pointer,
+             * next-source cursor, or separate rotation-memory table.
              */
             'schedule' => [
 
@@ -3722,7 +4428,7 @@ final class PubContract
                     'schedule',
 
                 'referenceRole' =>
-                    'Queue',
+                    'Loading Dock / Scheduler',
 
                 'nextStage' =>
                     'dispatch',
@@ -3734,33 +4440,570 @@ final class PubContract
                             'waiting',
 
                         'meaning' =>
-                            'waiting to schedule',
+                            'sealed and complete; held outside the active Scheduler queue',
+
+                        'schedulerEligible' =>
+                            false,
                     ],
 
-                    'shipping' => [
+                    'queued' => [
                         'kind' =>
-                            'processing',
+                            'waiting',
 
                         'meaning' =>
-                            'dispatch in process',
+                            'sealed and explicitly released into the active Scheduler candidate pool',
+
+                        'schedulerEligible' =>
+                            true,
                     ],
                 ],
 
 
                 /*
-                 * Schedule is intentionally product-agnostic.
+                 * ========================================================
+                 * ALARM CLOCK
+                 * ========================================================
                  *
-                 * It will eventually wake itself, determine which channel
-                 * is due, select one eligible packed asset, and hand pub_asset_id
-                 * to DispatchManager. DispatchManager owns packed -> shipping
-                 * and must start real shipping work when that gerund is persisted.
+                 * The alarm is deliberately stupid.
                  *
-                 * Product/channel dependency rules must already be resolved
-                 * upstream before an asset reaches packed.
+                 * A server-side cron job wakes Scheduler approximately once
+                 * per hour. Cron owns no Pinterest/YouTube cadence and no PUB
+                 * business rules. It only invokes ScheduleManager::run().
                  *
-                 * The Scheduler itself is not built yet, so no specialist
-                 * assetTypes are declared here.
+                 * The database owns the editable cadence. Therefore changing
+                 * a channel from every 6 hours to every 12 hours requires no
+                 * cron change.
+                 *
+                 * Scheduler OFF does not disable cron. The next wake simply
+                 * reads scheduler_enabled = 0 and exits without touching queue
+                 * inventory.
+                 *
+                 * Missed intervals are NOT accumulated or replayed later.
+                 * Turning Scheduler back ON resumes from current durable
+                 * history; there is no catch-up burst.
                  */
+                'clock' => [
+
+                    'type' =>
+                        'server_cron',
+
+                    'cadence' =>
+                        'hourly',
+
+                    'cronExpression' =>
+                        '0 * * * *',
+
+                    'input' =>
+                        [],
+
+                    'output' => [
+                        [
+                            'key' =>
+                                'wake_scheduler',
+
+                            'note' =>
+                                'Invoke ScheduleManager::run(); no channel or asset decision is made by the clock.',
+                        ],
+                    ],
+                ],
+
+
+                /*
+                 * ========================================================
+                 * SCHEDULER MANAGER
+                 * ========================================================
+                 *
+                 * ScheduleManager receives no preselected asset.
+                 * Every run reconstructs the decision from current controls,
+                 * current QUEUED inventory, and durable SHIPPED history.
+                 */
+                'manager' => [
+
+                    'input' => [
+
+                        [
+                            'key' =>
+                                'current_time',
+
+                            'type' =>
+                                'datetime',
+
+                            'note' =>
+                                'Current server run time interpreted using the configured Scheduler timezone.',
+                        ],
+
+                        [
+                            'key' =>
+                                'settings',
+
+                            'type' =>
+                                'object',
+
+                            'fields' => [
+                                [
+                                    'key' =>
+                                        'scheduler_enabled',
+
+                                    'type' =>
+                                        'boolean',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Global master switch. OFF means automatic Scheduler work stops while PACKED/QUEUED inventory remains untouched.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'timezone',
+
+                                    'type' =>
+                                        'text',
+
+                                    'required' =>
+                                        true,
+                                ],
+                            ],
+                        ],
+
+                        [
+                            'key' =>
+                                'channel_rules[]',
+
+                            'type' =>
+                                'array',
+
+                            'fields' => [
+                                [
+                                    'key' =>
+                                        'channel',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'enabled',
+
+                                    'type' =>
+                                        'boolean',
+
+                                    'required' =>
+                                        true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'release_interval_minutes',
+
+                                    'type' =>
+                                        'number',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Minimum elapsed time between automatic releases for this channel. Example: 360 = one automatic release every 6 hours.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'same_source_max',
+
+                                    'type' =>
+                                        'number',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Maximum automatic shipments from the same source_type + source_id within the configured source window.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'same_source_window_minutes',
+
+                                    'type' =>
+                                        'number',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Rolling source-diversity window. Example: 1440 = 24 hours.',
+                                ],
+                            ],
+                        ],
+
+                        [
+                            'key' =>
+                                'queued_assets[]',
+
+                            'type' =>
+                                'array',
+
+                            'note' =>
+                                'Only pipeline_stage = queued rows may enter the automatic candidate pool. PACKED rows are intentionally invisible to Scheduler selection.',
+
+                            'fields' => [
+                                [
+                                    'key' =>
+                                        'pub_asset_id',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'channel',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'asset_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'source_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'source_id',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'sort_order',
+
+                                    'required' =>
+                                        false,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        false,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'pingback',
+
+                                    'required' =>
+                                        false,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'updated_at',
+
+                                    'type' =>
+                                        'datetime',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Existing pub_assets automatic row timestamp; entering QUEUED refreshes it, so Schedule V1 may use it as a soft queue-age/starvation signal.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'has_package',
+
+                                    'type' =>
+                                        'boolean',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Scheduler verifies that a sealed package exists but never opens or maps package contents.',
+                                ],
+                            ],
+                        ],
+
+                        [
+                            'key' =>
+                                'shipped_history[]',
+
+                            'type' =>
+                                'array',
+
+                            'note' =>
+                                'Durable pub_assets history is Scheduler memory. Manual Send Now shipments are included naturally because they are ordinary shipped history.',
+
+                            'fields' => [
+                                [
+                                    'key' =>
+                                        'pub_asset_id',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'channel',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'asset_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'source_type',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'source_id',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'description',
+
+                                    'required' =>
+                                        false,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'shipping_receipt',
+
+                                    'type' =>
+                                        'object',
+
+                                    'required' =>
+                                        false,
+
+                                    'note' =>
+                                        'May provide the final external_url needed to verify a queued teaser dependency.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'dispatched_at',
+
+                                    'type' =>
+                                        'datetime',
+
+                                    'required' =>
+                                        true,
+                                ],
+                            ],
+                        ],
+                    ],
+
+
+                    /*
+                     * HARD ELIGIBILITY.
+                     *
+                     * A failed hard rule means "not this candidate now."
+                     * The asset remains QUEUED; this is not an error.
+                     */
+                    'hardRules' => [
+
+                        'queued_only' =>
+                            true,
+
+                        'sealed_package_required' =>
+                            true,
+
+                        'channel_due' =>
+                            'Automatic release is allowed only after release_interval_minutes has elapsed since the most recent successful shipment for that channel. No prior shipped history means the channel may release its first queued asset immediately.',
+
+                        'same_source_limit' =>
+                            'For the same channel + source_type + source_id, do not automatically release more than same_source_max assets during the rolling same_source_window_minutes interval.',
+
+                        'teaser_dependency' =>
+                            'A Pinterest pin_teaser may not be automatically released until its pingback destination corresponds to the external_url of an already SHIPPED YouTube asset. No durable relationship table or Scheduler cursor is required.',
+
+                        'candidate_still_queued' =>
+                            'Re-check lifecycle state immediately before Dispatch handoff so a concurrent dequeue cannot accidentally ship.',
+                    ],
+
+
+                    /*
+                     * SOFT SELECTION.
+                     *
+                     * These rules rank viable candidates; they do not make
+                     * good inventory permanently ineligible.
+                     */
+                    'softRules' => [
+
+                        'description_anti_repeat' =>
+                            'For Pinterest, normalize the candidate description and compare it with the most recently shipped Pinterest description. If they are the same, pass that candidate for now when a different viable candidate exists. If the queue is thin and no alternative exists, repetition is allowed.',
+
+                        'asset_type_diversity' =>
+                            'Prefer currently eligible asset types that are underused or least recently used in shipped channel history before unnecessarily repeating a heavily represented type.',
+
+                        'sort_order' =>
+                            'Where sibling assets from one source have meaningful sort_order, preserve that internal order when diversity policy does not require deferral.',
+
+                        'queue_age' =>
+                            'Older valid QUEUED inventory should gain preference over time so a good asset cannot starve forever.',
+                    ],
+
+
+                    /*
+                     * Scheduler returns a decision report. It does not return
+                     * or rewrite a package and does not call any external API.
+                     */
+                    'output' => [
+
+                        [
+                            'key' =>
+                                'scheduler_enabled',
+
+                            'type' =>
+                                'boolean',
+                        ],
+
+                        [
+                            'key' =>
+                                'checked_at',
+
+                            'type' =>
+                                'datetime',
+                        ],
+
+                        [
+                            'key' =>
+                                'lanes[]',
+
+                            'type' =>
+                                'array',
+
+                            'fields' => [
+                                [
+                                    'key' =>
+                                        'channel',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'action',
+
+                                    'note' =>
+                                        'One of: scheduler_disabled, channel_disabled, not_due, no_queued_assets, no_eligible_assets, released_to_dispatch.',
+                                ],
+
+                                [
+                                    'key' =>
+                                        'selected_pub_asset_id',
+
+                                    'required' =>
+                                        false,
+
+                                    'note' =>
+                                        'Present only when Scheduler selected one QUEUED asset for Dispatch.',
+                                ],
+                            ],
+                        ],
+                    ],
+
+                    'outputToDispatch' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+
+                            'required' =>
+                                true,
+
+                            'note' =>
+                                'Only the selected queued asset ID is handed to DispatchManager::shipOne(). Dispatch owns queued -> shipping.',
+                        ],
+                    ],
+                ],
+
+
+                /*
+                 * ========================================================
+                 * MANUAL ADMIN OVERRIDE — SEND NOW
+                 * ========================================================
+                 *
+                 * Human authority always outranks automatic Scheduler policy.
+                 *
+                 * Send Now remains available even when:
+                 *   - Scheduler is globally OFF
+                 *   - the channel lane is OFF
+                 *   - the automatic release interval is not due
+                 *   - the same-source limit has already been reached
+                 *   - a soft diversity rule would have passed the asset
+                 *
+                 * PACKED may be explicitly promoted into dispatch custody as
+                 * part of Send Now; QUEUED may be sent immediately.
+                 *
+                 * Manual shipments still become ordinary SHIPPED history.
+                 * Therefore they naturally reset channel cadence and participate
+                 * in future same-source/diversity calculations without any
+                 * special Scheduler memory.
+                 */
+                'manualOverride' => [
+
+                    'inputStages' => [
+                        'packed',
+                        'queued',
+                    ],
+
+                    'input' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+                    ],
+
+                    'outputToDispatch' => [
+                        [
+                            'key' =>
+                                'pub_asset_id',
+                        ],
+                    ],
+
+                    'bypasses' => [
+                        'scheduler_enabled',
+                        'channel_enabled',
+                        'release_interval',
+                        'same_source_limit',
+                        'soft_selection',
+                    ],
+                ],
+
+
+                /*
+                 * ========================================================
+                 * QUEUE ADMIN ACTIONS
+                 * ========================================================
+                 */
+                'queueAdmin' => [
+
+                    'enqueue' => [
+                        'transition' =>
+                            'packed -> queued',
+
+                        'effect' =>
+                            'Asset becomes available to automatic Scheduler selection; the existing pub_assets.updated_at timestamp refreshes automatically.',
+                    ],
+
+                    'dequeue' => [
+                        'transition' =>
+                            'queued -> packed',
+
+                        'effect' =>
+                            'Asset is removed from automatic Scheduler selection without changing its sealed package.',
+                    ],
+
+                    'bulkActions' => [
+                        'enqueue',
+                        'dequeue',
+                    ],
+                ],
             ],
 
 
@@ -3771,9 +5014,14 @@ final class PubContract
              *
              * DISPATCH is Shipping.
              *
-             * DispatchManager receives the asset selected by Schedule,
+             * DispatchManager receives an explicit pub_asset_id released
+             * either by Scheduler or by Manual Send Now, accepts custody,
              * routes only far enough to choose the correct Shipper, and
              * persists the Shipper's returned receipt.
+             *
+             * Normal automatic custody transition:
+             *
+             *   queued -> shipping
              *
              * The Shipper is the courier:
              *   - reads the sealed package
@@ -3832,8 +5080,16 @@ final class PubContract
                         [
                             'key' =>
                                 'pub_asset_id',
-                        ],
 
+                            'required' =>
+                                true,
+
+                            'note' =>
+                                'Canonical department handoff. Normal automatic entry is a QUEUED asset selected by Scheduler; explicit Dispatch recovery may re-enter from a Dispatch-stage error.',
+                        ],
+                    ],
+
+                    'loadedAfterCustody' => [
                         [
                             'key' =>
                                 'channel',
@@ -3849,7 +5105,7 @@ final class PubContract
                                 'pipeline_stage',
 
                             'note' =>
-                                'shipping',
+                                'shipping; DispatchManager owns queued -> shipping before waking the Shipper',
                         ],
 
                         [
@@ -3861,6 +5117,9 @@ final class PubContract
 
                             'required' =>
                                 true,
+
+                            'note' =>
+                                'sealed PACKAGE output; passed to the selected Shipper unchanged',
                         ],
                     ],
 
@@ -4271,8 +5530,8 @@ final class PubContract
              *
              * Only storage fields relevant to PUB handoffs are listed here.
              * Most lifecycle timestamps and error bookkeeping are intentionally
-             * omitted. dispatched_at is retained because Schedule consumes
-             * successful shipment history.
+             * omitted. updated_at / dispatched_at plus Schedule control rows
+             * are retained because Schedule consumes them directly.
              */
             'repositories' => [
 
@@ -4511,13 +5770,145 @@ final class PubContract
 
                         [
                             'key' =>
+                                'updated_at',
+
+                            'type' =>
+                                'datetime',
+
+                            'note' =>
+                                'automatic row timestamp maintained by MySQL; Schedule V1 may use it as a soft age signal for QUEUED inventory',
+                        ],
+
+                        [
+                            'key' =>
                                 'dispatched_at',
 
                             'type' =>
                                 'datetime',
 
                             'note' =>
-                                'successful shipment time; consumed by Schedule history',
+                                'successful shipment time; authoritative Schedule cadence/history input',
+                        ],
+                    ],
+                ],
+
+
+                /*
+                 * --------------------------------------------------------
+                 * PUB SCHEDULER SETTINGS
+                 * --------------------------------------------------------
+                 *
+                 * Singleton human-editable controls for the Scheduler
+                 * department itself. These are configuration, not rotation
+                 * memory.
+                 */
+                'pub_scheduler_settings' => [
+
+                    'label' =>
+                        'PUB Scheduler Settings',
+
+                    'fields' => [
+
+                        [
+                            'key' =>
+                                'scheduler_enabled',
+
+                            'type' =>
+                                'tinyint(1)',
+
+                            'note' =>
+                                'global automatic Scheduler ON/OFF switch; Packaging and queue inventory continue normally while OFF',
+                        ],
+
+                        [
+                            'key' =>
+                                'timezone',
+
+                            'type' =>
+                                'varchar(64)',
+
+                            'note' =>
+                                'IANA timezone used for Scheduler timing/display',
+                        ],
+                    ],
+                ],
+
+
+                /*
+                 * --------------------------------------------------------
+                 * PUB SCHEDULER CHANNEL RULES
+                 * --------------------------------------------------------
+                 *
+                 * One human-editable row per publishing channel.
+                 *
+                 * Example Pinterest starting policy:
+                 *
+                 *   release_interval_minutes   = 360
+                 *   same_source_max            = 1
+                 *   same_source_window_minutes = 1440
+                 *
+                 * These values may change without code or cron changes.
+                 */
+                'pub_scheduler_channel_rules' => [
+
+                    'label' =>
+                        'PUB Scheduler Channel Rules',
+
+                    'fields' => [
+
+                        [
+                            'key' =>
+                                'channel',
+
+                            'type' =>
+                                'varchar(50)',
+
+                            'note' =>
+                                'one row per PUB channel, e.g. pinterest or youtube',
+                        ],
+
+                        [
+                            'key' =>
+                                'enabled',
+
+                            'type' =>
+                                'tinyint(1)',
+
+                            'note' =>
+                                'channel-specific automatic Scheduler ON/OFF',
+                        ],
+
+                        [
+                            'key' =>
+                                'release_interval_minutes',
+
+                            'type' =>
+                                'int unsigned',
+
+                            'note' =>
+                                'minimum interval between automatic releases for this channel',
+                        ],
+
+                        [
+                            'key' =>
+                                'same_source_max',
+
+                            'type' =>
+                                'int unsigned',
+
+                            'note' =>
+                                'maximum automatic shipments from one source_type + source_id during the rolling source window',
+                        ],
+
+                        [
+                            'key' =>
+                                'same_source_window_minutes',
+
+                            'type' =>
+                                'int unsigned',
+
+                            'note' =>
+                                'rolling interval used by same_source_max; e.g. 1440 = 24 hours',
                         ],
                     ],
                 ],
@@ -4719,6 +6110,60 @@ final class PubContract
             'assetTypes'
         ]
             ?? [];
+    }
+
+
+    /**
+     * Return the durable PUB asset catalog.
+     *
+     * This is the master list used by admin filters and other UI that
+     * must show products even when no pub_assets row has been created yet.
+     *
+     * CREATE asset type keys are the durable pub_assets.asset_type values.
+     */
+    public static function assetCatalog(): array
+    {
+        return self::assetTypes(
+            'create'
+        );
+    }
+
+
+    /**
+     * Return one neutral source-procurement / Market Run contract.
+     */
+    public static function marketRun(
+        string $sourceType
+    ): ?array {
+        $sourceType =
+            strtolower(
+                trim(
+                    $sourceType
+                )
+            );
+
+
+        if ($sourceType === '') {
+            return null;
+        }
+
+
+        $contract =
+            self::all()[
+                'marketRun'
+            ][
+                'sourceTypes'
+            ][
+                $sourceType
+            ]
+            ?? null;
+
+
+        return is_array(
+            $contract
+        )
+            ? $contract
+            : null;
     }
 
 

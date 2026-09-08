@@ -9,6 +9,7 @@ import fetchColorTriggerPhotos from '@data/fetchColorTriggerPhotos';
 import AnimatedHueWheel from '@components/AnimatedHueWheel';
 import {getColorUrl} from '@helpers/colorUrlHelper';
 import {photoThumbUrl} from '@helpers/imageThumb';
+import { resolveAppPath } from '@helpers/routingHelper';
 import './detailpage.css';
 import {PaletteToggleIcon} from '@components/Icons/PaletteIcons';
 import TopSpacer from '@layout/TopSpacer';
@@ -227,12 +228,12 @@ export default function ColorDetailPage() {
     }
 
     const handleCompare = () => {
-       navigate('/sbs')
+       navigate(resolveAppPath('/sbs', location.pathname));
     };
 
     const handleSeeOtherBrands = () => {
       if (!currentColorDetail?.id) return;
-      navigate(`/matches?source_id=${encodeURIComponent(currentColorDetail.id)}`);
+      navigate(resolveAppPath(`/matches?source_id=${encodeURIComponent(currentColorDetail.id)}`, location.pathname));
     };
 
     function formatCategoryList(catString) {

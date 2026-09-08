@@ -1,11 +1,13 @@
 import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
+import { resolveAppPath } from '@helpers/routingHelper';
 import './searchitem.css';
 
 export default function NameSearchItem({ item }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const itemRef = useRef(null);
   const inputRef = useRef(null);
   const formRef = useRef(null);
@@ -69,9 +71,8 @@ export default function NameSearchItem({ item }) {
     submittingRef.current = true;
     setNoResults(false);
     setDidSubmit(true);
-    navigate(
-      `/results/18?name=${encodeURIComponent('%' + term + '%')}&code=${encodeURIComponent('%' + term + '%')}`
-    );
+    const target = `/results/18?name=${encodeURIComponent('%' + term + '%')}&code=${encodeURIComponent('%' + term + '%')}`;
+    navigate(resolveAppPath(target, location.pathname));
   };
 
   const handleClick = () => {

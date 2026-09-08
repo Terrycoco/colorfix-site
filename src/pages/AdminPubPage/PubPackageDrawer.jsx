@@ -1,10 +1,20 @@
+import {
+  useEffect,
+  useState,
+} from "react";
+
+
 export default function PubPackageDrawer({
   asset,
   loading = false,
   error = "",
-  retrying = false,
+  packing = false,
+  savingPingback = false,
   sending = false,
-  onRetry,
+  enqueueing = false,
+  onPack,
+  onSavePingback,
+  onEnqueue,
   onSend,
 }) {
   const packageValue =
@@ -22,17 +32,43 @@ export default function PubPackageDrawer({
       .toLowerCase();
 
 
-  const canRetryPackaging =
-    stage ===
-      "error"
-    &&
+  const errorStage =
     String(
       asset?.error_stage ||
       ""
     )
       .trim()
-      .toLowerCase() ===
+      .toLowerCase();
+
+
+  const isApprovedCreated =
+    stage ===
+      "created"
+    &&
+    Number(
+      asset?.approved ||
+      0
+    ) === 1;
+
+
+  const isPackageError =
+    stage ===
+      "error"
+    &&
+    errorStage ===
       "package";
+
+
+  const canPack =
+    isApprovedCreated
+    ||
+    stage ===
+      "packing"
+    ||
+    stage ===
+      "pending"
+    ||
+    isPackageError;
 
 
   const canSendNow =
@@ -43,245 +79,403 @@ export default function PubPackageDrawer({
       null;
 
 
+  const showDestination =
+    String(
+      asset?.channel ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+      "pinterest";
+
+
+  const [
+    pingback,
+    setPingback,
+  ] = useState("");
+
+
+  useEffect(() => {
+    setPingback(
+      String(
+        asset?.pingback ||
+        ""
+      )
+    );
+  }, [
+    asset?.pub_asset_id,
+    asset?.pingback,
+  ]);
+
+
+  const savedPingback =
+    String(
+      asset?.pingback ||
+      ""
+    ).trim();
+
+  const editedPingback =
+    String(
+      pingback ||
+      ""
+    ).trim();
+
+  const pingbackChanged =
+    editedPingback !==
+    savedPingback;
+
+
   return (
     <div
-        style={
-          bodyStyle
-        }
-      >
-        {loading ? (
-          <div
-            style={
-              mutedStyle
-            }
+      style={
+        bodyStyle
+      }
+    >
+      {loading ? (
+        <div
+          style={
+            mutedStyle
+          }
+        >
+          Loading Package details...
+        </div>
+      ) : error ? (
+        <div
+          style={
+            errorStyle
+          }
+        >
+          {error}
+        </div>
+      ) : asset ? (
+        <>
+          <Section
+            title="Asset"
           >
-            Loading Package details...
-          </div>
-        ) : error ? (
-          <div
-            style={
-              errorStyle
-            }
+            <DetailRow
+              label="Channel"
+              value={
+                humanize(
+                  asset.channel
+                )
+              }
+            />
+
+            <DetailRow
+              label="Type"
+              value={
+                humanize(
+                  asset.asset_type
+                )
+              }
+            />
+
+            <DetailRow
+              label="Source"
+              value={
+                formatSource(
+                  asset
+                )
+              }
+            />
+
+            <DetailRow
+              label="Title"
+              value={
+                asset.search_title ||
+                "—"
+              }
+            />
+          </Section>
+
+
+          <Section
+            title="Status"
           >
-            {error}
-          </div>
-        ) : asset ? (
-          <>
-            <Section
-              title="Asset"
-            >
-              <DetailRow
-                label="Channel"
-                value={
-                  humanize(
-                    asset.channel
-                  )
-                }
-              />
-
-              <DetailRow
-                label="Type"
-                value={
-                  humanize(
-                    asset.asset_type
-                  )
-                }
-              />
-
-              <DetailRow
-                label="Source"
-                value={
-                  formatSource(
-                    asset
-                  )
-                }
-              />
-
-              <DetailRow
-                label="Title"
-                value={
-                  asset.search_title ||
-                  "—"
-                }
-              />
-            </Section>
-
-
-            <Section
-              title="Status"
-            >
-              <DetailRow
-                label="Stage"
-                value={
-                  humanize(
-                    asset.pipeline_stage
-                  )
-                }
-              />
-
-              <DetailRow
-                label="Stage Note"
-                value={
+            <DetailRow
+              label="Stage"
+              value={
+                stage ===
+                  "packing"
+                &&
+                String(
                   asset.stage_note ||
-                  "—"
-                }
-              />
+                  ""
+                ).trim()
+                  ? "Waiting"
+                  : humanize(
+                      asset.display_stage ||
+                      asset.pipeline_stage
+                    )
+              }
+            />
 
-              <DetailRow
-                label="Updated"
-                value={
-                  asset.updated_at ||
-                  "—"
-                }
-              />
+            <DetailRow
+              label="Stage Note"
+              value={
+                asset.stage_note ||
+                "—"
+              }
+            />
 
-              {canSendNow ? (
+            <DetailRow
+              label="Updated"
+              value={
+                asset.updated_at ||
+                "—"
+              }
+            />
+
+            {canPack ? (
+              <div
+                style={
+                  actionStyle
+                }
+              >
+                <button
+                  type="button"
+
+                  disabled={
+                    packing
+                  }
+
+                  onClick={() => {
+                    onPack?.(
+                      asset.pub_asset_id
+                    );
+                  }}
+                >
+                  {
+                    packing
+                      ? "Packing..."
+                      : stage ===
+                          "packing"
+                        || stage ===
+                          "pending"
+                          ? "Retry Packaging"
+                          : isPackageError
+                            ? "Retry Packaging"
+                            : "Pack"
+                  }
+                </button>
+              </div>
+            ) : null}
+
+            {canSendNow ? (
+              <div
+                style={
+                  packedActionStyle
+                }
+              >
+                <button
+                  type="button"
+
+                  disabled={
+                    enqueueing ||
+                    sending
+                  }
+
+                  onClick={() => {
+                    onEnqueue?.(
+                      asset.pub_asset_id
+                    );
+                  }}
+                >
+                  {
+                    enqueueing
+                      ? "Enqueueing..."
+                      : "Enqueue"
+                  }
+                </button>
+
+                <button
+                  type="button"
+
+                  disabled={
+                    sending ||
+                    enqueueing
+                  }
+
+                  onClick={() => {
+                    onSend?.(
+                      asset.pub_asset_id
+                    );
+                  }}
+                >
+                  {
+                    sending
+                      ? "Sending..."
+                      : "Send Now"
+                  }
+                </button>
+              </div>
+            ) : null}
+          </Section>
+
+
+          {showDestination ? (
+            <Section
+              title="Destination"
+            >
+              <div
+                style={
+                  destinationStyle
+                }
+              >
+                <label
+                  className="admin-field"
+                >
+                  <span
+                    className="admin-field__label"
+                  >
+                    Pingback
+                  </span>
+
+                  <input
+                    className="admin-field__control"
+                    type="text"
+                    value={
+                      pingback
+                    }
+                    placeholder="Destination URL"
+                    onChange={(
+                      event
+                    ) =>
+                      setPingback(
+                        event
+                          .target
+                          .value
+                      )
+                    }
+                    style={{
+                      width:
+                        "100%",
+                      boxSizing:
+                        "border-box",
+                    }}
+                  />
+                </label>
+
                 <div
                   style={
-                    actionStyle
+                    destinationActionStyle
                   }
                 >
                   <button
                     type="button"
-
                     disabled={
-                      sending
+                      savingPingback
+                      ||
+                      !pingbackChanged
                     }
-
                     onClick={() => {
-                      onSend?.(
-                        asset.pub_asset_id
+                      onSavePingback?.(
+                        asset.pub_asset_id,
+                        editedPingback
                       );
                     }}
                   >
                     {
-                      sending
-                        ? "Sending..."
-                        : "Send Now"
+                      savingPingback
+                        ? "Saving..."
+                        : "Save Pingback"
                     }
                   </button>
                 </div>
-              ) : null}
+              </div>
             </Section>
+          ) : null}
 
 
-            {
-              asset.error_stage
-              ||
-              asset.error_code
-              ||
-              asset.error_message
-                ? (
-                    <Section
-                      title="Error"
-                    >
-                      <DetailRow
-                        label="Stage"
-                        value={
-                          asset.error_stage ||
-                          "—"
-                        }
-                      />
+          {
+            asset.error_stage
+            ||
+            asset.error_code
+            ||
+            asset.error_message
+              ? (
+                  <Section
+                    title="Error"
+                  >
+                    <DetailRow
+                      label="Stage"
+                      value={
+                        asset.error_stage ||
+                        "—"
+                      }
+                    />
 
-                      <DetailRow
-                        label="Code"
-                        value={
-                          asset.error_code ||
-                          "—"
-                        }
-                      />
+                    <DetailRow
+                      label="Code"
+                      value={
+                        asset.error_code ||
+                        "—"
+                      }
+                    />
 
-                      <DetailRow
-                        label="Message"
-                        value={
-                          asset.error_message ||
-                          "—"
-                        }
-                      />
+                    <DetailRow
+                      label="Message"
+                      value={
+                        asset.error_message ||
+                        "—"
+                      }
+                    />
 
-                      <DetailRow
-                        label="At"
-                        value={
-                          asset.errored_at ||
-                          "—"
-                        }
-                      />
-
-                      {canRetryPackaging ? (
-                        <div
-                          style={
-                            actionStyle
-                          }
-                        >
-                          <button
-                            type="button"
-
-                            disabled={
-                              retrying
-                            }
-
-                            onClick={() => {
-                              onRetry?.(
-                                asset.pub_asset_id
-                              );
-                            }}
-                          >
-                            {
-                              retrying
-                                ? "Retrying..."
-                                : "Retry Packaging"
-                            }
-                          </button>
-                        </div>
-                      ) : null}
-                    </Section>
-                  )
-                : null
-            }
+                    <DetailRow
+                      label="At"
+                      value={
+                        asset.errored_at ||
+                        "—"
+                      }
+                    />
+                  </Section>
+                )
+              : null
+          }
 
 
-            <Section
-              title="Package"
-            >
-              {
-                packageValue === null
-                  ? (
-                      <div
-                        style={
-                          noPackageStyle
-                        }
-                      >
-                        No package has been built.
-                      </div>
-                    )
-                  : (
-                      <pre
-                        style={
-                          jsonStyle
-                        }
-                      >
-                        {
-                          JSON.stringify(
-                            packageValue,
-                            null,
-                            2
-                          )
-                        }
-                      </pre>
-                    )
-              }
-            </Section>
-          </>
-        ) : (
-          <div
-            style={
-              mutedStyle
-            }
+          <Section
+            title="Package"
           >
-            Select a Package row.
-          </div>
-        )}
-      </div>
+            {
+              packageValue === null
+                ? (
+                    <div
+                      style={
+                        noPackageStyle
+                      }
+                    >
+                      No package has been built.
+                    </div>
+                  )
+                : (
+                    <pre
+                      style={
+                        jsonStyle
+                      }
+                    >
+                      {
+                        JSON.stringify(
+                          packageValue,
+                          null,
+                          2
+                        )
+                      }
+                    </pre>
+                  )
+            }
+          </Section>
+        </>
+      ) : (
+        <div
+          style={
+            mutedStyle
+          }
+        >
+          Select a Package row.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -555,6 +749,32 @@ const actionStyle = {
 
   background:
     "#fafbfc",
+};
+
+
+const packedActionStyle = {
+  ...actionStyle,
+
+  gap:
+    8,
+};
+
+
+const destinationStyle = {
+  padding:
+    10,
+};
+
+
+const destinationActionStyle = {
+  display:
+    "flex",
+
+  justifyContent:
+    "flex-end",
+
+  marginTop:
+    8,
 };
 
 

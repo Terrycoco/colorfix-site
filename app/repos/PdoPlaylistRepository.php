@@ -146,6 +146,10 @@ class PdoPlaylistRepository
         return $this->hydratePublicSeoResult($stmt->fetch(PDO::FETCH_ASSOC) ?: null);
     }
 
+
+
+
+
     public function findWatchPlaylistInstanceIdBySlug(string $slug): ?int
     {
         $slug = trim($slug);
@@ -574,9 +578,217 @@ class PdoPlaylistRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+/**
+ * Return ALL active playlist slides for PUB procurement.
+ *
+ * Channel / experience eligibility is NOT applied here.
+ * ANALYZE decides whether a slide belongs to Pinterest,
+ * YouTube, or another publishing channel.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+public function getActivePublishingSlides(
+    int $playlistId
+): array {
+    if ($playlistId <= 0) {
+        return [];
+    }
+
+    $excludeSelect =
+        $this->getExcludeFromThumbsSelect();
+
+    $savedPaletteSetSelect =
+        $this->getSavedPaletteSetIdSelect();
+
+    $colorPlanSelect =
+        $this->hasPlaylistItemColumn(
+            'color_plan_id'
+        )
+            ? 'color_plan_id'
+            : 'NULL AS color_plan_id';
+
+    $shareImageSelect =
+        $this->getIsShareImageSelect();
+
+    $siteSelect =
+        $this->getPlaylistItemFlagSelect(
+            'site'
+        );
+
+    $ytSelect =
+        $this->getPlaylistItemFlagSelect(
+            'yt'
+        );
+
+    $conceptSelect =
+        $this->getPlaylistItemFlagSelect(
+            'concept'
+        );
+
+    $clientSelect =
+        $this->getPlaylistItemFlagSelect(
+            'client'
+        );
+
+    $pinSelect =
+        $this->getPlaylistItemFlagSelect(
+            'pin'
+        );
+
+    $analyzerRoleSelect =
+        $this->hasPlaylistItemColumn(
+            'analyzer_role'
+        )
+            ? 'analyzer_role'
+            : "'ignore' AS analyzer_role";
+
+    $finderStartSelect =
+        $this->hasPlaylistItemColumn(
+            'finder_start'
+        )
+            ? 'finder_start'
+            : "'auto' AS finder_start";
+
+    $versionNumberSelect =
+        $this->hasPlaylistItemColumn(
+            'version_number'
+        )
+            ? 'version_number'
+            : '1 AS version_number';
+
+    $isFinalSelect =
+        $this->hasPlaylistItemColumn(
+            'is_final'
+        )
+            ? 'is_final'
+            : '0 AS is_final';
+
+
+    $sql = <<<SQL
+        SELECT
+            slides.playlist_item_id,
+            slides.playlist_id,
+            slides.order_index,
+
+            slides.ap_id,
+            slides.palette_hash,
+            slides.photo_library_id,
+            slides.saved_palette_set_id,
+            slides.color_plan_id,
+
+            CASE
+                WHEN
+                    slides.photo_library_id IS NOT NULL
+                    AND slides.photo_library_id > 0
+                    AND pl.rel_path IS NOT NULL
+                    AND TRIM(pl.rel_path) <> ''
+                THEN pl.rel_path
+
+                ELSE slides.legacy_image_url
+            END AS image_url,
+
+            slides.title,
+            slides.subtitle,
+            slides.subtitle_2,
+            slides.body,
+            slides.item_type,
+            slides.layout,
+            slides.title_mode,
+            slides.star,
+            slides.transition,
+            slides.duration_ms,
+
+            slides.exclude_from_thumbs,
+            slides.is_share_image,
+
+            slides.site,
+            slides.yt,
+            slides.concept,
+            slides.client,
+            slides.pin,
+
+            slides.analyzer_role,
+            slides.finder_start,
+            slides.version_number,
+            slides.is_final,
+            slides.is_active
+
+        FROM (
+            SELECT
+                playlist_item_id,
+                playlist_id,
+                order_index,
+
+                ap_id,
+                palette_hash,
+
+                image_url AS legacy_image_url,
+
+                photo_library_id,
+
+                {$savedPaletteSetSelect},
+                {$colorPlanSelect},
+
+                title,
+                subtitle,
+                subtitle_2,
+                body,
+                item_type,
+                layout,
+                title_mode,
+                star,
+                transition,
+                duration_ms,
+
+                {$excludeSelect},
+                {$shareImageSelect},
+
+                {$siteSelect},
+                {$ytSelect},
+                {$conceptSelect},
+                {$clientSelect},
+                {$pinSelect},
+
+                {$analyzerRoleSelect},
+                {$finderStartSelect},
+                {$versionNumberSelect},
+                {$isFinalSelect},
+
+                is_active
+
+            FROM playlist_items
+
+            WHERE playlist_id = :playlist_id
+              AND is_active = 1
+        ) AS slides
+
+        LEFT JOIN photo_library pl
+            ON pl.photo_library_id =
+               slides.photo_library_id
+
+        ORDER BY
+            slides.order_index ASC
+        SQL;
+
+    $stmt =
+        $this->pdo->prepare(
+            $sql
+        );
+
+    $stmt->execute([
+        'playlist_id' =>
+            $playlistId,
+    ]);
+
+    return $stmt->fetchAll(
+        PDO::FETCH_ASSOC
+    ) ?: [];
+}
+
+
 
 /**
- * Return active Public playlist slides for publishing.
+ * Return active Public playlist slides for public
  *
  * Hardcoded intentionally:
  *   - playlist_items.is_active = 1
@@ -918,7 +1130,7 @@ public function getPublicActiveSlides(
             }
             if ($hasAnalyzerRole) {
                 $role = strtolower(trim((string)($item['analyzer_role'] ?? 'ignore')));
-                $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single'], true) ? $role : 'ignore';
+                $data['analyzer_role'] = in_array($role, ['ignore', 'before', 'after', 'single', 'teaser'], true) ? $role : 'ignore';
             }
             if ($hasFinderStart) {
                 $finderStart = strtolower(trim((string)($item['finder_start'] ?? 'auto')));
