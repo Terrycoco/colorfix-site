@@ -450,6 +450,12 @@ final class CompositeAnalyzer implements PubComWorkerContract
 
 
         return [
+            'photo_library_id' =>
+                (int)(
+                    $photo['photo_library_id']
+                    ?? 0
+                ),
+
             'file_path' =>
                 trim(
                     (string)(

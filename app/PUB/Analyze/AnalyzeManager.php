@@ -360,6 +360,7 @@ final class AnalyzeManager implements PubComManagerContract
                                 'sort_order',
                                 'search_title',
                                 'description',
+                                'estimated_duration_ms',
                                 'ingredients',
                             ])
                         );
@@ -373,6 +374,7 @@ final class AnalyzeManager implements PubComManagerContract
                             'sort_order' => $proposalSortOrder,
                             'search_title' => '',
                             'description' => '',
+                            'estimated_duration_ms' => null,
                             'pingback' => '',
                             'ingredients' => [],
                         ];
@@ -400,7 +402,12 @@ final class AnalyzeManager implements PubComManagerContract
                             $sourceType,
                             $sourceId,
                             (string)$nextBox['asset_type'],
-                            $proposalSortOrder
+                            is_array(
+                                $nextBox['ingredients']
+                                ?? null
+                            )
+                                ? $nextBox['ingredients']
+                                : []
                         );
 
                         if ($logicalMatch !== null) {
@@ -521,7 +528,28 @@ final class AnalyzeManager implements PubComManagerContract
 
 
     /**
-     * Find the current predecessor for one logical output.
+     * Find the current in-house predecessor for one logical output.
+     *
+     * Logical identity is intentionally NOT sort_order.
+     *
+     * Match rules:
+     *
+     *   source_type
+     *   source_id
+     *   asset_type
+     *   + photo_library_id when the product has one
+     *
+     * The newly analyzed Box always owns the current sort_order and current
+     * ingredients. A match is used only to carry forward durable outside copy
+     * and to identify an existing in-house row that CREATE may replace.
+     *
+     * Historical shipping/shipped/dispatched/published rows are excluded by
+     * the repository. Once an asset has left the building, re-analysis starts
+     * fresh.
+     *
+     * Older in-house orders created before photo_library_id was preserved in
+     * Creator ingredients may be matched by the same subject file_path as a
+     * one-time legacy fallback. New orders should match by photo_library_id.
      *
      * @return array<string, mixed>|null
      */
@@ -529,86 +557,184 @@ final class AnalyzeManager implements PubComManagerContract
         string $sourceType,
         int $sourceId,
         string $assetType,
-        ?int $sortOrder
+        array $newIngredients
     ): ?array {
-        $history = $this->assetRepository()
-            ->listLogicalAssetHistory(
+        $candidates = $this->assetRepository()
+            ->listInHouseLogicalAssetCandidates(
                 $sourceType,
                 $sourceId,
-                $assetType,
-                $sortOrder
+                $assetType
             );
 
-        if ($history === []) {
+        if ($candidates === []) {
             return null;
         }
 
-        $inHouse = [];
-        $shipped = [];
+        $newSubject = $this->subjectIdentity(
+            $newIngredients
+        );
 
-        foreach ($history as $historical) {
-            $stage = strtolower(
-                trim(
-                    (string)(
-                        $historical['pipeline_stage']
-                        ?? ''
-                    )
+        foreach ($candidates as $candidate) {
+            if (!is_array($candidate)) {
+                continue;
+            }
+
+            $candidateIngredients = is_array(
+                $candidate['ingredients']
+                ?? null
+            )
+                ? $candidate['ingredients']
+                : [];
+
+            $candidateSubject = $this->subjectIdentity(
+                $candidateIngredients
+            );
+
+            if (!$this->sameLogicalSubject(
+                $newSubject,
+                $candidateSubject
+            )) {
+                continue;
+            }
+
+            return [
+                'existing_state' => 'unshipped',
+                'existing_asset' => [
+                    'pub_asset_id' =>
+                        (int)(
+                            $candidate['pub_asset_id']
+                            ?? 0
+                        ),
+                    'pipeline_stage' =>
+                        (string)(
+                            $candidate['pipeline_stage']
+                            ?? ''
+                        ),
+                    'search_title' =>
+                        (string)(
+                            $candidate['search_title']
+                            ?? ''
+                        ),
+                    'description' =>
+                        (string)(
+                            $candidate['description']
+                            ?? ''
+                        ),
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+
+    /**
+     * Extract the stable photo-backed subject from one Creator ingredient box.
+     *
+     * Single-photo products use ingredients.source.
+     * Before/After products use ingredients.after because the After photo owns
+     * the linked PV copy for those products.
+     *
+     * Products with no single photo subject (for example one YouTube playlist
+     * video per source) return an empty subject and therefore match by
+     * source/type only.
+     *
+     * @return array{photo_library_id:int|null,file_path:string|null}
+     */
+    private function subjectIdentity(
+        array $ingredients
+    ): array {
+        $subject = [];
+
+        if (
+            isset($ingredients['source'])
+            && is_array($ingredients['source'])
+        ) {
+            $subject = $ingredients['source'];
+
+        } elseif (
+            isset($ingredients['after'])
+            && is_array($ingredients['after'])
+        ) {
+            $subject = $ingredients['after'];
+        }
+
+        $photoLibraryId =
+            isset($subject['photo_library_id'])
+            && (int)$subject['photo_library_id'] > 0
+                ? (int)$subject['photo_library_id']
+                : null;
+
+        $filePath = trim(
+            (string)(
+                $subject['file_path']
+                ?? ''
+            )
+        );
+
+        return [
+            'photo_library_id' => $photoLibraryId,
+            'file_path' => $filePath !== ''
+                ? $filePath
+                : null,
+        ];
+    }
+
+
+    /**
+     * Compare the actual logical subject of two same-source/same-type Boxes.
+     *
+     * If the new Box has a photo ID, that ID is authoritative. The file path
+     * fallback exists only so already-created in-house orders from before the
+     * photo-ID preservation fix can still retain their copy on the first
+     * re-analysis after deployment.
+     *
+     * If the product has no single photo subject, source + asset_type is the
+     * complete logical identity; the repository has already applied those
+     * constraints before candidates reach this method.
+     */
+    private function sameLogicalSubject(
+        array $newSubject,
+        array $candidateSubject
+    ): bool {
+        $newPhotoId =
+            isset($newSubject['photo_library_id'])
+            && $newSubject['photo_library_id'] !== null
+                ? (int)$newSubject['photo_library_id']
+                : null;
+
+        $candidatePhotoId =
+            isset($candidateSubject['photo_library_id'])
+            && $candidateSubject['photo_library_id'] !== null
+                ? (int)$candidateSubject['photo_library_id']
+                : null;
+
+        if ($newPhotoId !== null) {
+            if ($candidatePhotoId !== null) {
+                return $newPhotoId === $candidatePhotoId;
+            }
+
+            $newFilePath = trim(
+                (string)(
+                    $newSubject['file_path']
+                    ?? ''
                 )
             );
 
-            if (in_array(
-                $stage,
-                [
-                    'shipping',
-                    'shipped',
-                    'dispatched',
-                    'published',
-                ],
-                true
-            )) {
-                $shipped[] = $historical;
-            } else {
-                $inHouse[] = $historical;
-            }
+            $candidateFilePath = trim(
+                (string)(
+                    $candidateSubject['file_path']
+                    ?? ''
+                )
+            );
+
+            return
+                $newFilePath !== ''
+                && $candidateFilePath !== ''
+                && $newFilePath === $candidateFilePath;
         }
 
-        $existingState = $inHouse !== []
-            ? 'unshipped'
-            : 'shipped';
-
-        $existingAsset = $inHouse !== []
-            ? $inHouse[0]
-            : ($shipped[0] ?? null);
-
-        if (!is_array($existingAsset)) {
-            return null;
-        }
-
-        return [
-            'existing_state' => $existingState,
-            'existing_asset' => [
-                'pub_asset_id' =>
-                    (int)(
-                        $existingAsset['pub_asset_id']
-                        ?? 0
-                    ),
-                'pipeline_stage' =>
-                    (string)(
-                        $existingAsset['pipeline_stage']
-                        ?? ''
-                    ),
-                'search_title' =>
-                    (string)(
-                        $existingAsset['search_title']
-                        ?? ''
-                    ),
-                'description' =>
-                    (string)(
-                        $existingAsset['description']
-                        ?? ''
-                    ),
-            ],
-        ];
+        return true;
     }
 
 

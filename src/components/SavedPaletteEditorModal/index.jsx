@@ -250,6 +250,8 @@ export default function SavedPaletteEditorModal({
   const [fullAttachMode, setFullAttachMode] = useState("replace");
   const [attachChoiceOpen, setAttachChoiceOpen] = useState(false);
   const [noteEditorIndex, setNoteEditorIndex] = useState(null);
+  const [dragMemberIndex, setDragMemberIndex] = useState(null);
+  const [dragOverMemberIndex, setDragOverMemberIndex] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -492,6 +494,53 @@ export default function SavedPaletteEditorModal({
 
   function handleRemoveMember(index) {
     setEditMembers((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  function handleMoveMember(fromIndex, toIndex) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    setEditMembers((prev) => {
+      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setNoteEditorIndex((prev) => {
+      if (prev === null) return prev;
+      if (prev === fromIndex) return toIndex;
+      if (fromIndex < toIndex && prev > fromIndex && prev <= toIndex) return prev - 1;
+      if (fromIndex > toIndex && prev >= toIndex && prev < fromIndex) return prev + 1;
+      return prev;
+    });
+  }
+
+  function handleMemberDragStart(event, index) {
+    setDragMemberIndex(index);
+    setDragOverMemberIndex(index);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+  }
+
+  function handleMemberDragOver(event, index) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverMemberIndex(index);
+  }
+
+  function handleMemberDrop(event, index) {
+    event.preventDefault();
+    const rawIndex = event.dataTransfer.getData("text/plain");
+    const fromIndex = rawIndex === "" ? dragMemberIndex : Number(rawIndex);
+    if (Number.isInteger(fromIndex)) {
+      handleMoveMember(fromIndex, index);
+    }
+    setDragMemberIndex(null);
+    setDragOverMemberIndex(null);
+  }
+
+  function handleMemberDragEnd() {
+    setDragMemberIndex(null);
+    setDragOverMemberIndex(null);
   }
 
   function handlePhotoField(photoId, field, value) {
@@ -1461,7 +1510,44 @@ export default function SavedPaletteEditorModal({
             </label>
             <div className="asp-member-rows">
               {editMembers.map((row, index) => (
-                <div key={row.key || index} className="asp-member-row">
+                <div
+                  key={row.key || index}
+                  className={`asp-member-row${dragMemberIndex === index ? " is-dragging" : ""}${dragOverMemberIndex === index && dragMemberIndex !== index ? " is-drag-over" : ""}`}
+                  onDragOver={(event) => handleMemberDragOver(event, index)}
+                  onDrop={(event) => handleMemberDrop(event, index)}
+                  onDragLeave={() => setDragOverMemberIndex((prev) => (prev === index ? null : prev))}
+                >
+                  <div className="asp-member-reorder" aria-label={`Position ${index + 1}`}>
+                    <button
+                      type="button"
+                      className="asp-member-move"
+                      onClick={() => handleMoveMember(index, index - 1)}
+                      disabled={index === 0}
+                      title="Move earlier"
+                      aria-label={`Move ${row.color?.name || "color"} earlier`}
+                    >
+                      ↑
+                    </button>
+                    <span
+                      className="asp-member-drag-handle"
+                      draggable
+                      onDragStart={(event) => handleMemberDragStart(event, index)}
+                      onDragEnd={handleMemberDragEnd}
+                      title="Drag to reorder"
+                    >
+                      ≡
+                    </span>
+                    <button
+                      type="button"
+                      className="asp-member-move"
+                      onClick={() => handleMoveMember(index, index + 1)}
+                      disabled={index === editMembers.length - 1}
+                      title="Move later"
+                      aria-label={`Move ${row.color?.name || "color"} later`}
+                    >
+                      ↓
+                    </button>
+                  </div>
                   <EditableSwatch
                     value={row.color}
                     onChange={(color) => handleEditMemberColor(index, color)}

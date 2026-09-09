@@ -219,6 +219,28 @@ final class IdeaAnalyzer implements PubComWorkerContract
             }
 
 
+            $photo =
+                is_array(
+                    $item[
+                        'photo'
+                    ]
+                    ?? null
+                )
+                    ? $item[
+                        'photo'
+                    ]
+                    : [];
+
+
+            $photoLibraryId =
+                (int)(
+                    $photo[
+                        'photo_library_id'
+                    ]
+                    ?? 0
+                );
+
+
             $filePath =
                 $this->sourceFilePath(
                     $item
@@ -242,6 +264,9 @@ final class IdeaAnalyzer implements PubComWorkerContract
 
                 'ingredients' => [
                     'source' => [
+                        'photo_library_id' =>
+                            $photoLibraryId,
+
                         'file_path' =>
                             $filePath,
                     ],

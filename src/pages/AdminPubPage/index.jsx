@@ -146,6 +146,13 @@ export default function AdminPubPage() {
   );
 
   const [
+    cancelAnalysisToken,
+    setCancelAnalysisToken,
+  ] = useState(
+    0
+  );
+
+  const [
     stage,
     setStageState,
   ] = useState(
@@ -248,6 +255,31 @@ export default function AdminPubPage() {
 
 
     return dispositions;
+  }
+
+
+  function cancelAnalysis() {
+    /*
+     * The backend ANALYZE request has already completed by the time
+     * PubCom warnings are displayed. Cancel here means:
+     *
+     *   - stop presenting the remaining warning queue
+     *   - clear Analyze-owned notices
+     *   - tell PubAnalyzeStage to discard this Analyze result/workbench
+     *   - remain on ANALYZE with the selected playlist intact
+     */
+    setPubComPopups(
+      []
+    );
+
+    setPubComToasts(
+      []
+    );
+
+    setCancelAnalysisToken(
+      (current) =>
+        current + 1
+    );
   }
 
 
@@ -586,6 +618,9 @@ export default function AdminPubPage() {
                 receivePubCom={
                   receivePubCom
                 }
+                cancelAnalysisToken={
+                  cancelAnalysisToken
+                }
               />
 
             ) : (
@@ -633,6 +668,12 @@ export default function AdminPubPage() {
                       1
                     )
                 )
+              }
+              onCancelAnalysis={
+                stage ===
+                "analyze"
+                  ? cancelAnalysis
+                  : null
               }
             />,
             document.body
@@ -826,6 +867,7 @@ function PubComToast({
 function PubComPopup({
   disposition,
   onClose,
+  onCancelAnalysis,
 }) {
   const signalType =
     String(
@@ -840,6 +882,15 @@ function PubComPopup({
       ?.signal
       ?.message ||
     "PUB needs your attention.";
+
+  const reason =
+    String(
+      disposition
+        ?.signal
+        ?.context
+        ?.reason ||
+      ""
+    ).trim();
 
   const title =
     signalType ===
@@ -880,7 +931,22 @@ function PubComPopup({
             pubComPopupMessageStyle
           }
         >
-          {message}
+          <div>
+            {message}
+          </div>
+
+          {reason ? (
+            <div
+              style={
+                pubComPopupReasonStyle
+              }
+            >
+              <strong>
+                Reason:
+              </strong>{" "}
+              {reason}
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -888,6 +954,21 @@ function PubComPopup({
             pubComPopupActionsStyle
           }
         >
+          {typeof onCancelAnalysis ===
+          "function" ? (
+            <button
+              type="button"
+              style={
+                pubComCancelButtonStyle
+              }
+              onClick={
+                onCancelAnalysis
+              }
+            >
+              Cancel Analysis
+            </button>
+          ) : null}
+
           <button
             type="button"
             autoFocus
@@ -1000,11 +1081,41 @@ const pubComPopupMessageStyle = {
 };
 
 
+const pubComPopupReasonStyle = {
+  marginTop:
+    12,
+  padding:
+    "10px 12px",
+  border:
+    "1px solid #d8dde3",
+  borderRadius:
+    4,
+  background:
+    "#f7f8fa",
+  color:
+    "#334155",
+};
+
+
 const pubComPopupActionsStyle = {
   display:
     "flex",
   justifyContent:
     "flex-end",
+  gap:
+    8,
   marginTop:
     20,
+};
+
+
+const pubComCancelButtonStyle = {
+  background:
+    "#f7f8fa",
+  color:
+    "#334155",
+  border:
+    "1px solid #c7d0d9",
+  boxShadow:
+    "none",
 };

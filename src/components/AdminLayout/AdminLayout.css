@@ -408,7 +408,22 @@
 }
 
 
-
+/*
+ * ADMIN DISABLED BUTTONS
+ *
+ * Disabled actions must read as unavailable everywhere in Admin,
+ * regardless of the normal button color supplied by the shared
+ * application button styles.
+ */
+button:disabled,
+button[disabled] {
+  background: #d7dce2;
+  border-color: #c7ccd2;
+  color: #7a8490;
+  cursor: not-allowed;
+  opacity: 1;
+  box-shadow: none;
+}
 
 
 @media (max-width: 720px) {

@@ -4065,6 +4065,205 @@ public function updateOrder(
 
 
     /**
+     * Current in-house candidates for one source/type combination.
+     *
+     * ANALYZE owns logical-subject matching. The repository only returns
+     * durable candidate rows plus their currently filed Creator ingredients.
+     *
+     * IMPORTANT:
+     *   - sort_order is returned as current metadata only; it is NOT identity.
+     *   - shipping/shipped/dispatched/published rows are excluded. Once an
+     *     asset has left the in-house workflow, re-analysis starts fresh.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listInHouseLogicalAssetCandidates(
+        string $sourceType,
+        int $sourceId,
+        string $assetType
+    ): array {
+        $sourceType =
+            strtolower(
+                trim(
+                    $sourceType
+                )
+            );
+
+        $assetType =
+            strtolower(
+                trim(
+                    $assetType
+                )
+            );
+
+
+        if ($sourceType === '') {
+            throw new RuntimeException(
+                'Logical asset candidate lookup requires source_type.'
+            );
+        }
+
+
+        if ($sourceId <= 0) {
+            throw new RuntimeException(
+                'Logical asset candidate lookup requires a valid source_id.'
+            );
+        }
+
+
+        if ($assetType === '') {
+            throw new RuntimeException(
+                'Logical asset candidate lookup requires asset_type.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    a.pub_asset_id,
+                    a.pub_run_id,
+
+                    a.channel,
+                    a.asset_type,
+                    a.creator_key,
+
+                    a.source_type,
+                    a.source_id,
+                    a.sort_order,
+
+                    a.pipeline_stage,
+                    a.approved,
+
+                    a.search_title,
+                    a.description,
+                    a.pingback,
+
+                    a.created_at,
+                    a.updated_at,
+
+                    o.ingredients AS order_ingredients
+
+                FROM pub_assets a
+
+                LEFT JOIN pub_asset_orders o
+                  ON o.pub_asset_id = a.pub_asset_id
+
+                WHERE a.source_type =
+                    :source_type
+
+                  AND a.source_id =
+                    :source_id
+
+                  AND a.asset_type =
+                    :asset_type
+
+                  AND a.pipeline_stage NOT IN (
+                      'shipping',
+                      'shipped',
+                      'dispatched',
+                      'published'
+                  )
+
+                ORDER BY a.pub_asset_id DESC
+                SQL
+            );
+
+
+        $stmt->execute([
+            'source_type' =>
+                $sourceType,
+
+            'source_id' =>
+                $sourceId,
+
+            'asset_type' =>
+                $assetType,
+        ]);
+
+
+        $rows =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+
+        $result = [];
+
+
+        foreach (
+            $rows
+            as $row
+        ) {
+            $rawIngredients =
+                $row[
+                    'order_ingredients'
+                ]
+                ?? null;
+
+            $ingredients = [];
+
+
+            if (
+                is_string(
+                    $rawIngredients
+                )
+                && trim(
+                    $rawIngredients
+                ) !== ''
+            ) {
+                $decoded =
+                    json_decode(
+                        $rawIngredients,
+                        true,
+                        512,
+                        JSON_THROW_ON_ERROR
+                    );
+
+
+                if (!is_array($decoded)) {
+                    throw new RuntimeException(
+                        'PUB asset #'
+                        . (int)(
+                            $row[
+                                'pub_asset_id'
+                            ]
+                            ?? 0
+                        )
+                        . ' contains invalid filed ingredients.'
+                    );
+                }
+
+
+                $ingredients =
+                    $decoded;
+            }
+
+
+            unset(
+                $row[
+                    'order_ingredients'
+                ]
+            );
+
+
+            $row[
+                'ingredients'
+            ] =
+                $ingredients;
+
+
+            $result[] =
+                $row;
+        }
+
+
+        return $result;
+    }
+
+
+    /**
      * Prior rows for one logical asset combination.
      *
      * Logical identity is:

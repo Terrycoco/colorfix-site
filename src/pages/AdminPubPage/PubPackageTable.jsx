@@ -755,6 +755,160 @@ export default function PubPackageTable({
 
 
   /*
+   * Release every PACKED asset currently visible through the active
+   * Channel / Type / Stage filters into Schedule's active queue.
+   *
+   *   packed -> queued
+   *
+   * This is the Package department's normal batch handoff to the
+   * loading dock. It uses the same Schedule enqueue action as the
+   * single-asset drawer control.
+   */
+  async function enqueueAllPackedAssets() {
+    const eligible =
+      filteredAssets.filter(
+        isPackedAsset
+      );
+
+
+    if (!eligible.length) {
+      return;
+    }
+
+
+    setEnqueueing(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    setDrawerError(
+      ""
+    );
+
+
+    const failures = [];
+    let enqueuedCount = 0;
+
+
+    try {
+      for (
+        const asset
+        of eligible
+      ) {
+        const pubAssetId =
+          Number(
+            asset
+              ?.pub_asset_id ||
+            0
+          );
+
+
+        if (!pubAssetId) {
+          continue;
+        }
+
+
+        try {
+          const res =
+            await fetch(
+              SCHEDULE_URL,
+              {
+                method:
+                  "POST",
+
+                credentials:
+                  "include",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    action:
+                      "enqueue",
+
+                    pub_asset_id:
+                      pubAssetId,
+                  }),
+              }
+            );
+
+
+          const data =
+            await res.json();
+
+
+          if (
+            !res.ok
+            ||
+            !data?.ok
+          ) {
+            throw new Error(
+              data?.error ||
+              `Failed to enqueue asset #${pubAssetId}.`
+            );
+          }
+
+
+          enqueuedCount +=
+            1;
+
+        } catch (err) {
+          failures.push(
+            `#${pubAssetId}: ${
+              err?.message ||
+              "Queue handoff failed."
+            }`
+          );
+        }
+      }
+
+
+      /*
+       * Any successfully queued asset has left Package custody.
+       * Close stale selection/drawer state before re-reading the
+       * Package workbench.
+       */
+      if (enqueuedCount > 0) {
+        setDrawerOpen(
+          false
+        );
+
+        setDrawerAsset(
+          null
+        );
+
+        setSelectedAsset(
+          null
+        );
+      }
+
+
+      await loadAssets();
+
+
+      if (failures.length) {
+        setError(
+          failures.join(
+            "  "
+          )
+        );
+      }
+
+    } finally {
+      setEnqueueing(
+        false
+      );
+    }
+  }
+
+
+  /*
    * Manual Send Now.
    *
    * This deliberately goes through ScheduleManager's explicit override
@@ -1062,6 +1216,18 @@ export default function PubPackageTable({
       () =>
         filteredAssets.filter(
           isApprovedCreatedAsset
+        ).length,
+      [
+        filteredAssets,
+      ]
+    );
+
+
+  const packedReadyCount =
+    useMemo(
+      () =>
+        filteredAssets.filter(
+          isPackedAsset
         ).length,
       [
         filteredAssets,
@@ -1560,7 +1726,45 @@ export default function PubPackageTable({
               </button>
 
 
-<button
+              <button
+                type="button"
+
+                onClick={
+                  enqueueAllPackedAssets
+                }
+
+                disabled={
+                  loading ||
+                  processing ||
+                  enqueueing ||
+                  packedReadyCount === 0
+                }
+
+                style={
+                  sendToQueueButtonStyle
+                }
+
+                title={
+                  packedReadyCount > 0
+                    ? `Send ${packedReadyCount} packed asset${
+                        packedReadyCount === 1
+                          ? ""
+                          : "s"
+                      } currently visible to the Scheduler queue.`
+                    : "No packed assets in the current filtered view."
+                }
+              >
+                {
+                  enqueueing
+                    ? "Sending to Queue..."
+                    : packedReadyCount > 0
+                      ? `Send To Queue (${packedReadyCount})`
+                      : "Send To Queue"
+                }
+              </button>
+
+
+              <button
                 type="button"
             
                 onClick={
@@ -1809,6 +2013,22 @@ function isApprovedCreatedAsset(
 }
 
 
+function isPackedAsset(
+  asset
+) {
+  return (
+    String(
+      asset
+        ?.pipeline_stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+    "packed"
+  );
+}
+
+
 function hasPackage(
   asset
 ) {
@@ -1962,6 +2182,12 @@ const selectedPackButtonStyle = {
 
 
 const packAllButtonStyle = {
+  marginBottom:
+    1,
+};
+
+
+const sendToQueueButtonStyle = {
   marginBottom:
     1,
 };

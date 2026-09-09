@@ -275,7 +275,17 @@ export default function PubAssetsTable({
           "creating"
       );
 
-    if (!hasCreating) {
+    /*
+     * Never let background polling disturb an active asset editor.
+     *
+     * Opening an editor immediately clears the current timer because
+     * editAsset is a dependency of this effect. Polling resumes only
+     * after the editor closes.
+     */
+    if (
+      !hasCreating ||
+      editAsset
+    ) {
       return;
     }
 
@@ -290,7 +300,10 @@ export default function PubAssetsTable({
     return () => {
       clearInterval(timer);
     };
-  }, [assets]);
+  }, [
+    assets,
+    editAsset,
+  ]);
 
 
   /*
@@ -2200,6 +2213,8 @@ async function recreateAsset(
               setEditIngredientBindings(
                 []
               );
+
+              loadAssets();
             }}
           />
         ) : (
@@ -2273,6 +2288,8 @@ async function recreateAsset(
               setEditIngredientBindings(
                 []
               );
+
+              loadAssets();
             }}
           />
         )

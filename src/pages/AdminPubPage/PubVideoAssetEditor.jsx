@@ -836,13 +836,13 @@ function appendDescriptionLink(
   }
 
 
-  async function handleApprovalChange(
-    event
-  ) {
-    const checked =
-      event
-        .target
-        .checked;
+  async function handleApproveAndClose() {
+    if (
+      isDispatchLocked ||
+      !approvalEditable
+    ) {
+      return;
+    }
 
 
     setSuccessMessage(
@@ -854,10 +854,48 @@ function appendDescriptionLink(
     );
 
 
+    /*
+     * A video with baked-in edits must be rendered again and reviewed
+     * again before it can be approved. Do not approve the stale physical
+     * video merely because its replacement has been queued.
+     */
+    if (hasIngredientChanges) {
+      setActionError(
+        "This video has baked-in changes. Save & Redo it, then review the new render before approving."
+      );
+
+      return;
+    }
+
+
+    /*
+     * Final review action:
+     *
+     *   save current metadata
+     *   approve the finished video
+     *   close the editor
+     */
+    const saved =
+      await onSave?.(
+        currentChanges(
+          false
+        )
+      );
+
+
+    if (saved === false) {
+      setActionError(
+        "Could not save this video before approval."
+      );
+
+      return;
+    }
+
+
     const result =
       await onSetApproval?.(
         asset,
-        checked
+        true
       );
 
 
@@ -868,9 +906,16 @@ function appendDescriptionLink(
     ) {
       setActionError(
         result?.error ||
-        "Could not change asset approval."
+        "Could not approve this video."
       );
+
+      return;
     }
+
+
+    onClose?.();
+
+    await onRefreshAssets?.();
   }
 
 
@@ -1080,45 +1125,47 @@ function appendDescriptionLink(
               }
             />
 
-            <div
-              style={
-                thumbnailBlockStyle
-              }
-            >
+            {isYouTubeVideo ? (
               <div
                 style={
-                  thumbnailLabelStyle
+                  thumbnailBlockStyle
                 }
               >
-                Thumbnail
-              </div>
-
-              {asset.thumbnail_url ? (
-                <img
-                  src={
-                    versionedPreviewUrl(
-                      asset.thumbnail_url,
-                      previewVersion
-                    )
-                  }
-
-                  alt="Video thumbnail"
-
-                  style={
-                    thumbnailPreviewStyle
-                  }
-                />
-              ) : (
                 <div
                   style={
-                    thumbnailEmptyStyle
+                    thumbnailLabelStyle
                   }
                 >
-                  No thumbnail yet
+                  Thumbnail
                 </div>
-              )}
 
-            </div>
+                {asset.thumbnail_url ? (
+                  <img
+                    src={
+                      versionedPreviewUrl(
+                        asset.thumbnail_url,
+                        previewVersion
+                      )
+                    }
+
+                    alt="Video thumbnail"
+
+                    style={
+                      thumbnailPreviewStyle
+                    }
+                  />
+                ) : (
+                  <div
+                    style={
+                      thumbnailEmptyStyle
+                    }
+                  >
+                    No thumbnail yet
+                  </div>
+                )}
+
+              </div>
+            ) : null}
           </div>
 
 
@@ -1756,23 +1803,12 @@ function appendDescriptionLink(
             footerStyle
           }
         >
-          <label
-            style={
-              approvalControlStyle
-            }
-            title={
-              approvalEditable
-                ? isApproved
-                  ? "Uncheck to revoke approval."
-                  : "Approve this asset for Packaging."
-                : "Approval is locked after the asset leaves CREATED."
-            }
-          >
-            <input
-              type="checkbox"
+          {!isDispatchLocked ? (
+            <button
+              type="button"
 
-              checked={
-                isApproved
+              style={
+                approveAndCloseButtonStyle
               }
 
               disabled={
@@ -1781,15 +1817,31 @@ function appendDescriptionLink(
                 busy
               }
 
-              onChange={
-                handleApprovalChange
+              title={
+                approvalEditable
+                  ? "Save, approve, and close this video."
+                  : "Approval is locked after the asset leaves CREATED."
+              }
+
+              onClick={
+                handleApproveAndClose
+              }
+            >
+              {
+                approvalSaving
+                  ? "Approving..."
+                  : saving
+                    ? "Saving..."
+                    : "Approve & Close"
+              }
+            </button>
+          ) : (
+            <div
+              style={
+                footerSpacerStyle
               }
             />
-
-            <span>
-              Approved
-            </span>
-          </label>
+          )}
 
 
           <button
@@ -3857,30 +3909,15 @@ const redoNoticeStyle = {
 };
 
 
-const approvalControlStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  gap:
-    7,
-
+const approveAndCloseButtonStyle = {
   marginRight:
     "auto",
+};
 
-  color:
-    "#334155",
 
-  fontSize:
-    12,
-
-  fontWeight:
-    700,
-
-  cursor:
-    "pointer",
+const footerSpacerStyle = {
+  marginRight:
+    "auto",
 };
 
 

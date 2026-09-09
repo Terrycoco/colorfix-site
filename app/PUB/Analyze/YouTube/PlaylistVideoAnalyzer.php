@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PUB\Analyze\YouTube;
 
 use App\PUB\Analyze\Support\DefaultPantry;
+use App\PUB\Create\Video\Support\YouTubeDurationEstimator;
 use App\PUB\Contracts\PubContract;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComSignal;
@@ -50,7 +51,8 @@ use App\PUB\PubCom\PubComWorkerContract;
  *
  * Array order is playback order.
  *
- * This class prepares ingredients only.
+ * This class prepares ingredients and may ask CREATE-owned support for
+ * a production estimate. It does not own timing decisions.
  * Timing, layout, transitions, typography, intro treatment,
  * text-only treatment, and all other video decisions belong to CREATE.
  */
@@ -440,6 +442,13 @@ public function analyze(
     }
 
 
+    $durationEstimate =
+        (new YouTubeDurationEstimator())
+            ->estimate(
+                $slides
+            );
+
+
     return [
         'proposals' => [
             [
@@ -448,6 +457,16 @@ public function analyze(
 
                 'search_title' =>
                     $searchTitle,
+
+                /*
+                 * ANALYZE asks the YouTube production helper for a quote.
+                 * This is proposal metadata only; it is not a Creator
+                 * ingredient and does not alter the finished video.
+                 */
+                'estimated_duration_ms' =>
+                    $durationEstimate[
+                        'duration_ms'
+                    ],
 
                 'ingredients' => [
                     'cover' =>

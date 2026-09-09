@@ -29,11 +29,6 @@ use Throwable;
  *       image_url
  *     }
  *
- *     cover {
- *       file_path
- *       image_url
- *     }
- *
  *     search_title
  *     end_slide_text
  *   }
@@ -66,7 +61,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
     private const REQUIRED_INGREDIENTS = [
         'before',
         'after',
-        'cover',
         'search_title',
         'end_slide_text',
     ];
@@ -118,25 +112,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
             return PubComSignal::unavailable(
                 'before_after_video_public_base_url_unavailable',
                 'Before/After Video Creator has no public base URL.',
-                [
-                    'worker' =>
-                        self::class,
-                ]
-            );
-        }
-
-
-        if (
-            !extension_loaded(
-                'gd'
-            )
-            || !function_exists(
-                'imagecreatetruecolor'
-            )
-        ) {
-            return PubComSignal::unavailable(
-                'before_after_video_thumbnail_gd_unavailable',
-                'Before/After Video Creator cannot create its companion JPEG because PHP GD is unavailable.',
                 [
                     'worker' =>
                         self::class,
@@ -262,12 +237,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
                 );
 
 
-            /*
-             * The cover is a required companion ingredient for the
-             * finished Pinterest video product, but it is not rendered
-             * into the MP4. The filed Creator order preserves it for the
-             * later packaging/shipping handoff.
-             */
             $recipe =
                 BeforeAfterVideoRecipe::plan(
                     $this->absolutePublicUrl(
@@ -351,7 +320,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
     public function promoteCompletedVideo(
         int $pubAssetId,
         string $outputRelPath,
-        array $cover,
         ?int $reportedFileSizeBytes = null
     ): array {
         if ($pubAssetId <= 0) {
@@ -486,21 +454,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
             }
 
 
-            /*
-             * COMPANION PINTEREST COVER.
-             *
-             * Version 1 deliberately preserves the authored cover photo
-             * with no text treatment. CREATE still owns the finished JPEG,
-             * so a future branded/text treatment can change here without
-             * changing Package or Dispatch.
-             */
-            $thumbnail =
-                $this->createCoverJpeg(
-                    $pubAssetId,
-                    $cover,
-                    $targetDir
-                );
-
 
             $created = [
                 'file_path' =>
@@ -510,16 +463,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
                     '/public/pub_assets/pinterest/'
                     . $pubAssetId
                     . '.mp4',
-
-                'thumbnail_file_path' =>
-                    $thumbnail[
-                        'file_path'
-                    ],
-
-                'thumbnail_url' =>
-                    $thumbnail[
-                        'url'
-                    ],
 
                 'mime_type' =>
                     BeforeAfterVideoRecipe::OUTPUT_MIME_TYPE,
@@ -651,13 +594,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
             'Before/After Video'
         );
 
-        CreateBoxValidator::assertArray(
-            $ingredients,
-            'cover',
-            'Before/After Video'
-        );
-
-
         $beforePath =
             trim(
                 (string)(
@@ -699,30 +635,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
                 (string)(
                     $ingredients[
                         'after'
-                    ][
-                        'image_url'
-                    ]
-                    ?? ''
-                )
-            );
-
-        $coverPath =
-            trim(
-                (string)(
-                    $ingredients[
-                        'cover'
-                    ][
-                        'file_path'
-                    ]
-                    ?? ''
-                )
-            );
-
-        $coverUrl =
-            trim(
-                (string)(
-                    $ingredients[
-                        'cover'
                     ][
                         'image_url'
                     ]
@@ -775,18 +687,6 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
             );
         }
 
-        if ($coverPath === '') {
-            throw new RuntimeException(
-                'Before/After Video cover image source file path is missing.'
-            );
-        }
-
-        if ($coverUrl === '') {
-            throw new RuntimeException(
-                'Before/After Video cover image URL is missing.'
-            );
-        }
-
         if ($searchTitle === '') {
             throw new RuntimeException(
                 'Before/After Video search_title is missing.'
@@ -811,265 +711,10 @@ final class BeforeAfterVideoCreator implements PubComWorkerContract
             );
         }
 
-        if (!is_file($coverPath)) {
-            throw new RuntimeException(
-                'Before/After Video cover image source file does not exist.'
-            );
-        }
     }
 
 
-    /**
-     * Convert the authored cover-image photo into the durable companion JPEG.
-     *
-     * @return array{file_path:string,url:string}
-     */
-    private function createCoverJpeg(
-        int $pubAssetId,
-        array $cover,
-        string $targetDir
-    ): array {
-        $sourcePath =
-            trim(
-                (string)(
-                    $cover[
-                        'file_path'
-                    ]
-                    ?? ''
-                )
-            );
-
-
-        if ($sourcePath === '') {
-            throw new RuntimeException(
-                'Before/After Video cover file path is missing during promotion.'
-            );
-        }
-
-
-        if (!is_file($sourcePath)) {
-            throw new RuntimeException(
-                'Before/After Video cover source file does not exist during promotion.'
-            );
-        }
-
-
-        $info =
-            getimagesize(
-                $sourcePath
-            );
-
-
-        if (!$info) {
-            throw new RuntimeException(
-                'Before/After Video cover source is not a valid image.'
-            );
-        }
-
-
-        $width =
-            (int)(
-                $info[
-                    0
-                ]
-                ?? 0
-            );
-
-        $height =
-            (int)(
-                $info[
-                    1
-                ]
-                ?? 0
-            );
-
-
-        if (
-            $width <= 0
-            || $height <= 0
-        ) {
-            throw new RuntimeException(
-                'Before/After Video cover source has invalid dimensions.'
-            );
-        }
-
-
-        $sourceBytes =
-            file_get_contents(
-                $sourcePath
-            );
-
-
-        if ($sourceBytes === false) {
-            throw new RuntimeException(
-                'Could not read Before/After Video cover source.'
-            );
-        }
-
-
-        $source =
-            @imagecreatefromstring(
-                $sourceBytes
-            );
-
-
-        if (!$source instanceof \GdImage) {
-            throw new RuntimeException(
-                'Before/After Video cover source could not be decoded.'
-            );
-        }
-
-
-        $canvas =
-            imagecreatetruecolor(
-                $width,
-                $height
-            );
-
-
-        if (!$canvas instanceof \GdImage) {
-            imagedestroy(
-                $source
-            );
-
-            throw new RuntimeException(
-                'Could not create Before/After Video cover JPEG canvas.'
-            );
-        }
-
-
-        try {
-            /*
-             * JPEG has no alpha channel. Fill with white first so any
-             * transparent source pixels have deterministic output.
-             */
-            $white =
-                imagecolorallocate(
-                    $canvas,
-                    255,
-                    255,
-                    255
-                );
-
-
-            imagefilledrectangle(
-                $canvas,
-                0,
-                0,
-                $width,
-                $height,
-                $white
-            );
-
-
-            if (
-                !imagecopy(
-                    $canvas,
-                    $source,
-                    0,
-                    0,
-                    0,
-                    0,
-                    $width,
-                    $height
-                )
-            ) {
-                throw new RuntimeException(
-                    'Could not compose Before/After Video cover JPEG.'
-                );
-            }
-
-
-            $targetPath =
-                rtrim(
-                    $targetDir,
-                    DIRECTORY_SEPARATOR
-                )
-                . '/'
-                . $pubAssetId
-                . '-thumbnail.jpg';
-
-
-            $temporaryPath =
-                $targetPath
-                . '.tmp-'
-                . bin2hex(
-                    random_bytes(6)
-                );
-
-
-            if (
-                !imagejpeg(
-                    $canvas,
-                    $temporaryPath,
-                    90
-                )
-            ) {
-                throw new RuntimeException(
-                    'Could not write Before/After Video cover JPEG.'
-                );
-            }
-
-
-            $fileSize =
-                filesize(
-                    $temporaryPath
-                );
-
-
-            if (
-                $fileSize === false
-                || $fileSize <= 0
-            ) {
-                @unlink(
-                    $temporaryPath
-                );
-
-                throw new RuntimeException(
-                    'Before/After Video cover JPEG is empty.'
-                );
-            }
-
-
-            if (
-                !rename(
-                    $temporaryPath,
-                    $targetPath
-                )
-            ) {
-                @unlink(
-                    $temporaryPath
-                );
-
-                throw new RuntimeException(
-                    'Could not promote Before/After Video cover JPEG.'
-                );
-            }
-
-
-            return [
-                'file_path' =>
-                    $targetPath,
-
-                'url' =>
-                    '/public/pub_assets/pinterest/'
-                    . $pubAssetId
-                    . '-thumbnail.jpg',
-            ];
-
-        } finally {
-            imagedestroy(
-                $source
-            );
-
-            imagedestroy(
-                $canvas
-            );
-        }
-    }
-
-
-    private function absolutePublicUrl(
+        private function absolutePublicUrl(
         string $url
     ): string {
         $url =

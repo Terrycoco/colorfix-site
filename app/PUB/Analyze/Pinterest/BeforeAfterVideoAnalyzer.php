@@ -28,8 +28,6 @@ use App\PUB\PubCom\PubComWorkerContract;
  *     before.image_url
  *     after.file_path
  *     after.image_url
- *     cover.file_path
- *     cover.image_url
  *     search_title
  *   }
  *
@@ -88,51 +86,6 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
             $this->pinItems(
                 $source
             );
-
-
-        $coverItem =
-            $this->coverImageItem(
-                $pinItems
-            );
-
-
-        if ($coverItem === null) {
-            return PubComSignal::ineligible(
-                'before_after_video_no_cover_image',
-                'Before/After Video cannot be analyzed because no Pinterest-eligible cover-image slide was found.',
-                [
-                    'worker' =>
-                        self::class,
-
-                    'pin_item_count' =>
-                        count($pinItems),
-                ]
-            );
-        }
-
-
-        $coverIngredients =
-            $this->sourceItemIngredients(
-                $coverItem
-            );
-
-
-        if (
-            $coverIngredients['file_path'] === ''
-            || $coverIngredients['image_url'] === ''
-        ) {
-            return PubComSignal::ineligible(
-                'before_after_video_cover_image_unusable',
-                'Before/After Video cannot be analyzed because its cover-image slide has no usable photo.',
-                [
-                    'worker' =>
-                        self::class,
-
-                    'pin_item_count' =>
-                        count($pinItems),
-                ]
-            );
-        }
 
 
         $beforeCount =
@@ -244,9 +197,6 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
                     count(
                         $transformationPairs
                     ),
-
-                'cover_image' =>
-                    true,
             ]
         );
     }
@@ -272,37 +222,6 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
             )
                 ? $source['linked_pvs']
                 : [];
-
-
-        $coverItem =
-            $this->coverImageItem(
-                $pinItems
-            );
-
-
-        if ($coverItem === null) {
-            return [
-                'proposals' =>
-                    [],
-            ];
-        }
-
-
-        $coverIngredients =
-            $this->sourceItemIngredients(
-                $coverItem
-            );
-
-
-        if (
-            $coverIngredients['file_path'] === ''
-            || $coverIngredients['image_url'] === ''
-        ) {
-            return [
-                'proposals' =>
-                    [],
-            ];
-        }
 
 
         $pairFinder =
@@ -381,9 +300,6 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
 
     'after' =>
         $afterIngredients,
-
-    'cover' =>
-        $coverIngredients,
 
     'end_slide_text' =>
         self::DEFAULT_END_SLIDE_TEXT,
@@ -547,47 +463,6 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
     }
 
 
-    /**
-     * Find the authored playlist representation for this product.
-     *
-     * This specialist has already culled the Market delivery to pin = 1
-     * before looking for the product-specific cover-image item.
-     */
-    private function coverImageItem(
-        array $items
-    ): ?array {
-        foreach (
-            $items
-            as $item
-        ) {
-            if (!is_array($item)) {
-                continue;
-            }
-
-
-            $itemType =
-                strtolower(
-                    trim(
-                        (string)(
-                            $item[
-                                'item_type'
-                            ]
-                            ?? ''
-                        )
-                    )
-                );
-
-
-            if ($itemType === 'cover-image') {
-                return $item;
-            }
-        }
-
-
-        return null;
-    }
-
-
     private function countRole(
         array $items,
         string $role
@@ -654,6 +529,14 @@ final class BeforeAfterVideoAnalyzer implements PubComWorkerContract
 
 
         return [
+            'photo_library_id' =>
+                (int)(
+                    $photo[
+                        'photo_library_id'
+                    ]
+                    ?? 0
+                ),
+
             'file_path' =>
                 trim(
                     (string)(

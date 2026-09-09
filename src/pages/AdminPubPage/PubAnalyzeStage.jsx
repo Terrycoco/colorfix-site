@@ -52,6 +52,7 @@ export default function PubAnalyzeStage({
   onCreateMessage,
   onCreateComplete,
   receivePubCom,
+  cancelAnalysisToken = 0,
 }) {
   const dialog =
     useAdminDialog();
@@ -306,6 +307,62 @@ export default function PubAnalyzeStage({
   ] = useState(
     false
   );
+
+
+  useEffect(() => {
+    if (
+      !cancelAnalysisToken
+    ) {
+      return;
+    }
+
+
+    /*
+     * Parent-level PubCom Cancel Analysis.
+     *
+     * Keep the selected playlist so Terry can immediately click
+     * Edit Playlist, but discard this Analyze result/workbench and
+     * close any Analyze-owned overlays.
+     */
+    setAnalysis(
+      null
+    );
+
+    setProposals(
+      []
+    );
+
+    setAnalyzeHandoffValues(
+      {}
+    );
+
+    setAnalyzeExistingPolicy({
+      unshipped:
+        "check",
+      shipped:
+        "check",
+    });
+
+    setMarketingOpen(
+      false
+    );
+
+    setHandoffOpen(
+      false
+    );
+
+    setError(
+      ""
+    );
+
+    clearPubStageErrors();
+
+    onCreateMessage?.(
+      ""
+    );
+  }, [
+    cancelAnalysisToken,
+  ]);
 
 
   useEffect(() => {
@@ -2523,13 +2580,50 @@ export default function PubAnalyzeStage({
                           </td>
 
                           <td style={bodyCell}>
-                            {product
-                              ?.contract
-                              ?.label ||
-                              humanize(
-                                proposal
-                                  .asset_type
-                              )}
+                            <div>
+                              {product
+                                ?.contract
+                                ?.label ||
+                                humanize(
+                                  proposal
+                                    .asset_type
+                                )}
+                            </div>
+
+                            {String(
+                              proposal
+                                ?.asset_type ||
+                              ""
+                            )
+                              .trim()
+                              .toLowerCase() ===
+                              "youtube_video" &&
+                            Number(
+                              proposal
+                                ?.estimated_duration_ms ||
+                              0
+                            ) > 0 ? (
+                              <div
+                                style={{
+                                  marginTop:
+                                    5,
+                                  color:
+                                    "#586675",
+                                  fontSize:
+                                    11,
+                                  fontWeight:
+                                    600,
+                                  whiteSpace:
+                                    "nowrap",
+                                }}
+                              >
+                                Est. runtime:{" "}
+                                {formatEstimatedRuntime(
+                                  proposal
+                                    .estimated_duration_ms
+                                )}
+                              </div>
+                            ) : null}
                           </td>
 
 
@@ -2857,6 +2951,53 @@ export default function PubAnalyzeStage({
         : null}
     </>
   );
+}
+
+
+function formatEstimatedRuntime(
+  durationMs
+) {
+  const milliseconds =
+    Number(
+      durationMs ||
+      0
+    );
+
+
+  if (
+    !Number.isFinite(
+      milliseconds
+    ) ||
+    milliseconds <=
+      0
+  ) {
+    return "—";
+  }
+
+
+  const totalSeconds =
+    Math.round(
+      milliseconds /
+      1000
+    );
+
+  const minutes =
+    Math.floor(
+      totalSeconds /
+      60
+    );
+
+  const seconds =
+    totalSeconds %
+    60;
+
+
+  return `${minutes}:${String(
+    seconds
+  ).padStart(
+    2,
+    "0"
+  )}`;
 }
 
 

@@ -258,6 +258,11 @@ final class PaletteAnalyzer implements PubComWorkerContract
 
                 'ingredients' => [
                     'source' => [
+                        'photo_library_id' =>
+                            $match[
+                                'photo_library_id'
+                            ],
+
                         'file_path' =>
                             $match[
                                 'file_path'

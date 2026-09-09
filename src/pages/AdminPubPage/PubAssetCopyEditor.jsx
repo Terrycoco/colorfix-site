@@ -307,13 +307,13 @@ export default function PubAssetCopyEditor({
   }
 
 
-  async function handleApprovalChange(
-    event
-  ) {
-    const checked =
-      event
-        .target
-        .checked;
+  async function handleApproveAndClose() {
+    if (
+      isDispatchLocked ||
+      !approvalEditable
+    ) {
+      return;
+    }
 
 
     setSuccessMessage(
@@ -325,10 +325,46 @@ export default function PubAssetCopyEditor({
     );
 
 
+    /*
+     * Approval is the final review action for this editor:
+     *
+     *   save current copy
+     *   redo first when a changed field is baked into the asset
+     *   approve the finished asset
+     *   close the editor
+     *
+     * Never approve a stale physical render.
+     */
+    if (saveRequiresRedo()) {
+      const recreated =
+        await saveAndRedo();
+
+
+      if (!recreated) {
+        return;
+      }
+
+    } else {
+      const saved =
+        await onSave?.(
+          currentChanges()
+        );
+
+
+      if (saved === false) {
+        setActionError(
+          "Could not save this asset before approval."
+        );
+
+        return;
+      }
+    }
+
+
     const result =
       await onSetApproval?.(
         asset,
-        checked
+        true
       );
 
 
@@ -339,9 +375,14 @@ export default function PubAssetCopyEditor({
     ) {
       setActionError(
         result?.error ||
-        "Could not change asset approval."
+        "Could not approve this asset."
       );
+
+      return;
     }
+
+
+    onClose?.();
   }
 
 
@@ -672,23 +713,12 @@ export default function PubAssetCopyEditor({
             footerStyle
           }
         >
-          <label
-            style={
-              approvalControlStyle
-            }
-            title={
-              approvalEditable
-                ? isApproved
-                  ? "Uncheck to revoke approval."
-                  : "Approve this asset for Packaging."
-                : "Approval is locked after the asset leaves CREATED."
-            }
-          >
-            <input
-              type="checkbox"
+          {!isDispatchLocked ? (
+            <button
+              type="button"
 
-              checked={
-                isApproved
+              style={
+                approveAndCloseButtonStyle
               }
 
               disabled={
@@ -697,15 +727,33 @@ export default function PubAssetCopyEditor({
                 busy
               }
 
-              onChange={
-                handleApprovalChange
+              title={
+                approvalEditable
+                  ? "Save, approve, and close this asset."
+                  : "Approval is locked after the asset leaves CREATED."
+              }
+
+              onClick={
+                handleApproveAndClose
+              }
+            >
+              {
+                approvalSaving
+                  ? "Approving..."
+                  : saving
+                    ? "Saving..."
+                    : recreating
+                      ? "Recreating..."
+                      : "Approve & Close"
+              }
+            </button>
+          ) : (
+            <div
+              style={
+                footerSpacerStyle
               }
             />
-
-            <span>
-              Approved
-            </span>
-          </label>
+          )}
 
 
           <button
@@ -1210,30 +1258,15 @@ const fieldsStyle = {
 };
 
 
-const approvalControlStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  gap:
-    7,
-
+const approveAndCloseButtonStyle = {
   marginRight:
     "auto",
+};
 
-  color:
-    "#334155",
 
-  fontSize:
-    12,
-
-  fontWeight:
-    700,
-
-  cursor:
-    "pointer",
+const footerSpacerStyle = {
+  marginRight:
+    "auto",
 };
 
 

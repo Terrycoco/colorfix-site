@@ -758,6 +758,26 @@ final class PubContract
 
                     [
                         'key' =>
+                            'sort_order',
+
+                        'label' =>
+                            'Sibling Order',
+
+                        'type' =>
+                            'number',
+
+                        'requiredAtHandoff' =>
+                            true,
+
+                        'systemSupplied' =>
+                            true,
+
+                        'note' =>
+                            'Presentation order among sibling assets within source + asset_type. ANALYZE assigns it and every downstream handoff preserves it. It is not logical asset identity.',
+                    ],
+
+                    [
+                        'key' =>
                             'pub_run_id',
 
                         'label' =>
@@ -933,6 +953,11 @@ final class PubContract
                         [
                             'key' =>
                                 'source_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'sort_order',
                         ],
 
                         [
@@ -1233,13 +1258,6 @@ final class PubContract
                                         'valid_transformation_pair',
                                 ],
 
-                                [
-                                    'key' =>
-                                        'cover_image_slide',
-
-                                    'note' =>
-                                        'item_type = cover-image; must contain a usable prepared photo',
-                                ],
                             ],
 
                             'output' => [
@@ -1302,25 +1320,6 @@ final class PubContract
 
                                             'required' =>
                                                 true,
-                                        ],
-
-                                        [
-                                            'key' =>
-                                                'cover.file_path',
-
-                                            'required' =>
-                                                true,
-                                        ],
-
-                                        [
-                                            'key' =>
-                                                'cover.image_url',
-
-                                            'required' =>
-                                                true,
-
-                                            'note' =>
-                                                'authored cover-image photo; CREATE turns this into the durable companion JPEG',
                                         ],
 
                                         [
@@ -2458,6 +2457,11 @@ final class PubContract
 
                         [
                             'key' =>
+                                'sort_order',
+                        ],
+
+                        [
+                            'key' =>
                                 'search_title',
                         ],
 
@@ -2524,6 +2528,11 @@ final class PubContract
                         [
                             'key' =>
                                 'source_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'sort_order',
                         ],
 
                         [
@@ -2800,25 +2809,6 @@ final class PubContract
 
                                         [
                                             'key' =>
-                                                'cover.file_path',
-
-                                            'required' =>
-                                                true,
-                                        ],
-
-                                        [
-                                            'key' =>
-                                                'cover.image_url',
-
-                                            'required' =>
-                                                true,
-
-                                            'note' =>
-                                                'authored cover-image photo used by CREATE to produce the companion JPEG',
-                                        ],
-
-                                        [
-                                            'key' =>
                                                 'search_title',
 
                                             'required' =>
@@ -2857,28 +2847,6 @@ final class PubContract
 
                                     'required' =>
                                         true,
-                                ],
-
-                                [
-                                    'key' =>
-                                        'thumbnail_file_path',
-
-                                    'required' =>
-                                        true,
-
-                                    'note' =>
-                                        'durable companion JPEG produced from cover-image source',
-                                ],
-
-                                [
-                                    'key' =>
-                                        'thumbnail_url',
-
-                                    'required' =>
-                                        true,
-
-                                    'note' =>
-                                        'public URL Pinterest later uses as cover_image_url',
                                 ],
 
                                 [
@@ -3903,7 +3871,7 @@ final class PubContract
                      * ----------------------------------------------------
                      *
                      * Produces one sealed outbound manifest for a finished
-                     * Pinterest video plus its Creator-owned companion cover.
+                     * Pinterest video.
                      */
                     'pinterest_video' => [
 
@@ -3950,28 +3918,6 @@ final class PubContract
 
                                     'note' =>
                                         'finished local video file uploaded by Shipping',
-                                ],
-
-                                [
-                                    'key' =>
-                                        'thumbnail_file_path',
-
-                                    'required' =>
-                                        true,
-
-                                    'note' =>
-                                        'durable companion JPEG must exist before packing',
-                                ],
-
-                                [
-                                    'key' =>
-                                        'thumbnail_url',
-
-                                    'required' =>
-                                        true,
-
-                                    'note' =>
-                                        'public companion JPEG URL; Packager resolves to an absolute Pinterest cover_image_url',
                                 ],
 
                                 [
@@ -4047,16 +3993,6 @@ final class PubContract
                                         'local MP4 supplied unchanged to Pinterest video Shipping',
                                 ],
 
-                                [
-                                    'key' =>
-                                        'cover_image_url',
-
-                                    'required' =>
-                                        true,
-
-                                    'note' =>
-                                        'absolute public companion JPEG URL used when the Pin is created',
-                                ],
                             ],
                         ],
                     ],
@@ -5227,17 +5163,10 @@ final class PubContract
                                                 true,
                                         ],
 
-                                        [
-                                            'key' =>
-                                                'cover_image_url',
-
-                                            'required' =>
-                                                true,
-                                        ],
                                     ],
 
                                     'note' =>
-                                        'Shipper registers media, uploads video_file_path using Pinterest transient upload parameters, polls media status to succeeded, then creates the Pin with source_type=video_id and cover_image_url. Transient upload credentials are never persisted.',
+                                        'Shipper registers media, uploads video_file_path using Pinterest transient upload parameters, polls media status to succeeded, then creates the Pin with source_type=video_id. Transient upload credentials are never persisted.',
                                 ],
                             ],
 

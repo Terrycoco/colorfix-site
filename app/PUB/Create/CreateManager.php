@@ -1476,8 +1476,8 @@ final class CreateManager implements PubComManagerContract
     ): array {
         $matches = [];
 
-        /** @var array<string, array<int, array<string, mixed>>> $historyCache */
-        $historyCache = [];
+        /** @var array<string, array<int, array<string, mixed>>> $candidateCache */
+        $candidateCache = [];
 
 
         foreach (
@@ -1562,6 +1562,18 @@ final class CreateManager implements PubComManagerContract
                     ]
                     : null;
 
+            $ingredients =
+                is_array(
+                    $box[
+                        'ingredients'
+                    ]
+                    ?? null
+                )
+                    ? $box[
+                        'ingredients'
+                    ]
+                    : [];
+
 
             if (
                 $assetType === ''
@@ -1574,102 +1586,98 @@ final class CreateManager implements PubComManagerContract
             }
 
 
-            $historyKey =
+            /*
+             * Logical identity is NOT sort_order.
+             *
+             * The repository gives us current in-house candidates for the
+             * same source + asset type. We then match the actual subject
+             * carried by the ingredient box.
+             */
+            $candidateKey =
                 $sourceType
                 . ':'
                 . $sourceId
                 . ':'
-                . $assetType
-                . ':'
-                . (
-                    $sortOrder === null
-                        ? 'null'
-                        : (string)$sortOrder
-                );
+                . $assetType;
 
 
             if (
                 !array_key_exists(
-                    $historyKey,
-                    $historyCache
+                    $candidateKey,
+                    $candidateCache
                 )
             ) {
-                $historyCache[
-                    $historyKey
+                $candidateCache[
+                    $candidateKey
                 ] =
                     $this->assets
-                        ->listLogicalAssetHistory(
+                        ->listInHouseLogicalAssetCandidates(
                             $sourceType,
                             $sourceId,
-                            $assetType,
-                            $sortOrder
+                            $assetType
                         );
             }
 
 
-            $history =
-                $historyCache[
-                    $historyKey
-                ];
+            $newSubject =
+                $this->subjectIdentity(
+                    $ingredients
+                );
 
-
-            if ($history === []) {
-                continue;
-            }
-
-
-            $inHouse = [];
-            $shipped = [];
+            $existingAsset =
+                null;
 
 
             foreach (
-                $history
-                as $historical
+                $candidateCache[
+                    $candidateKey
+                ]
+                as $candidate
             ) {
-                $stage =
-                    strtolower(
-                        trim(
-                            (string)(
-                                $historical[
-                                    'pipeline_stage'
-                                ]
-                                ?? ''
-                            )
-                        )
+                if (!is_array($candidate)) {
+                    continue;
+                }
+
+
+                $candidateIngredients =
+                    is_array(
+                        $candidate[
+                            'ingredients'
+                        ]
+                        ?? null
+                    )
+                        ? $candidate[
+                            'ingredients'
+                        ]
+                        : [];
+
+
+                $candidateSubject =
+                    $this->subjectIdentity(
+                        $candidateIngredients
                     );
 
 
                 if (
-                    in_array(
-                        $stage,
-                        [
-                            'shipping',
-                            'shipped',
-                            'dispatched',
-                            'published',
-                        ],
-                        true
+                    !$this->sameLogicalSubject(
+                        $newSubject,
+                        $candidateSubject
                     )
                 ) {
-                    $shipped[] =
-                        $historical;
-
-                } else {
-                    $inHouse[] =
-                        $historical;
+                    continue;
                 }
+
+
+                $existingAsset =
+                    $candidate;
+
+                break;
             }
 
 
-            $existingState =
-                $inHouse !== []
-                    ? 'unshipped'
-                    : 'shipped';
-
-            $existingAsset =
-                $inHouse !== []
-                    ? $inHouse[0]
-                    : $shipped[0];
+            if (!is_array($existingAsset)) {
+                continue;
+            }
 
 
             $matches[] = [
@@ -1677,7 +1685,7 @@ final class CreateManager implements PubComManagerContract
                     (int)$index,
 
                 'existing_state' =>
-                    $existingState,
+                    'unshipped',
 
                 'asset_type' =>
                     $assetType,
@@ -1688,6 +1696,9 @@ final class CreateManager implements PubComManagerContract
                 'source_id' =>
                     $sourceId,
 
+                /*
+                 * Current order metadata only. Never identity.
+                 */
                 'sort_order' =>
                     $sortOrder,
 
@@ -1742,6 +1753,180 @@ final class CreateManager implements PubComManagerContract
             'matches' =>
                 $matches,
         ];
+    }
+
+
+    /**
+     * Extract the stable subject carried by one Creator ingredient box.
+     *
+     * Single-photo products use source.
+     * Before/After products use after because the After photo owns the
+     * publishing copy for those products.
+     *
+     * Products with no single-photo subject return an empty subject and
+     * therefore match by source + asset type only.
+     *
+     * @return array{photo_library_id:int|null,file_path:string|null}
+     */
+    private function subjectIdentity(
+        array $ingredients
+    ): array {
+        $subject = [];
+
+
+        if (
+            isset(
+                $ingredients[
+                    'source'
+                ]
+            )
+            && is_array(
+                $ingredients[
+                    'source'
+                ]
+            )
+        ) {
+            $subject =
+                $ingredients[
+                    'source'
+                ];
+
+        } elseif (
+            isset(
+                $ingredients[
+                    'after'
+                ]
+            )
+            && is_array(
+                $ingredients[
+                    'after'
+                ]
+            )
+        ) {
+            $subject =
+                $ingredients[
+                    'after'
+                ];
+        }
+
+
+        $photoLibraryId =
+            isset(
+                $subject[
+                    'photo_library_id'
+                ]
+            )
+            && (int)$subject[
+                'photo_library_id'
+            ] > 0
+                ? (int)$subject[
+                    'photo_library_id'
+                ]
+                : null;
+
+
+        $filePath =
+            trim(
+                (string)(
+                    $subject[
+                        'file_path'
+                    ]
+                    ?? ''
+                )
+            );
+
+
+        return [
+            'photo_library_id' =>
+                $photoLibraryId,
+
+            'file_path' =>
+                $filePath !== ''
+                    ? $filePath
+                    : null,
+        ];
+    }
+
+
+    /**
+     * Match the actual logical subject, never sibling order.
+     *
+     * photo_library_id is authoritative when both boxes have it.
+     * file_path is only a legacy bridge for already-created in-house orders
+     * from before photo IDs were preserved in Creator ingredients.
+     */
+    private function sameLogicalSubject(
+        array $newSubject,
+        array $candidateSubject
+    ): bool {
+        $newPhotoId =
+            isset(
+                $newSubject[
+                    'photo_library_id'
+                ]
+            )
+            && $newSubject[
+                'photo_library_id'
+            ] !== null
+                ? (int)$newSubject[
+                    'photo_library_id'
+                ]
+                : null;
+
+
+        $candidatePhotoId =
+            isset(
+                $candidateSubject[
+                    'photo_library_id'
+                ]
+            )
+            && $candidateSubject[
+                'photo_library_id'
+            ] !== null
+                ? (int)$candidateSubject[
+                    'photo_library_id'
+                ]
+                : null;
+
+
+        if ($newPhotoId !== null) {
+            if ($candidatePhotoId !== null) {
+                return
+                    $newPhotoId ===
+                    $candidatePhotoId;
+            }
+
+
+            $newFilePath =
+                trim(
+                    (string)(
+                        $newSubject[
+                            'file_path'
+                        ]
+                        ?? ''
+                    )
+                );
+
+            $candidateFilePath =
+                trim(
+                    (string)(
+                        $candidateSubject[
+                            'file_path'
+                        ]
+                        ?? ''
+                    )
+                );
+
+
+            return
+                $newFilePath !== ''
+                && $candidateFilePath !== ''
+                && $newFilePath ===
+                    $candidateFilePath;
+        }
+
+
+        return true;
     }
 
 
@@ -1995,9 +2180,6 @@ final class CreateManager implements PubComManagerContract
                             ->promoteCompletedVideo(
                                 $pubAssetId,
                                 $path,
-                                $this->coverIngredientForAsset(
-                                    $pubAssetId
-                                ),
                                 $outputFileSizeBytes
                             ),
 
@@ -3450,11 +3632,11 @@ final class CreateManager implements PubComManagerContract
 
 
     /**
-     * Async video settlement still belongs to the original filed CREATE order.
+     * YouTube async settlement still belongs to the original filed CREATE
+     * order. The Manager retrieves the exact YouTube cover ingredient and
+     * hands it back to the YouTube Chef.
      *
-     * The Manager owns that filed order, so it retrieves the exact cover
-     * ingredient and hands it back to the selected Chef. No Chef reaches
-     * into storage looking for missing ingredients.
+     * Pinterest Before/After video has no cover/thumbnail ingredient.
      */
     private function coverIngredientForAsset(
         int $pubAssetId

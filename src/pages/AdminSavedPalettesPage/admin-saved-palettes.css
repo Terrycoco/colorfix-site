@@ -841,11 +841,74 @@
 
 .asp-member-row {
   display: grid;
-  grid-template-columns: minmax(210px, 1.25fr) minmax(130px, 0.75fr) minmax(145px, 0.7fr) 30px 30px;
+  grid-template-columns: 74px minmax(210px, 1.25fr) minmax(130px, 0.75fr) minmax(145px, 0.7fr) 30px 30px;
   gap: 0.35rem;
   align-items: center;
   justify-items: stretch;
   text-align: left;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.2rem;
+  transition: background 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+.asp-member-row.is-dragging {
+  opacity: 0.48;
+}
+
+.asp-member-row.is-drag-over {
+  background: #eef6ff;
+  border-color: #7ca7df;
+}
+
+.asp-member-reorder {
+  display: grid;
+  grid-template-columns: 20px 24px 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 32px;
+}
+
+.asp-member-drag-handle,
+.asp-member-move {
+  width: 20px;
+  height: 26px;
+  border: 1px solid #cbd5f5;
+  border-radius: 4px;
+  background: #fff;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.asp-member-drag-handle {
+  width: 24px;
+  cursor: grab;
+  font-weight: 700;
+}
+
+.asp-member-drag-handle:active {
+  cursor: grabbing;
+}
+
+.asp-member-move {
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0;
+}
+
+.asp-member-move:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.asp-member-drag-handle:focus-visible,
+.asp-member-move:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .asp-member-row input,

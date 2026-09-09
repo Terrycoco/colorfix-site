@@ -1666,9 +1666,10 @@ export default function PubDispatchTable() {
             }
           >
             {
+              retryingAssetId
+              &&
               Number(
-                retryingAssetId ||
-                0
+                retryingAssetId
               ) ===
               Number(
                 selectedAsset
