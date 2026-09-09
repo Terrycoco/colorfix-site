@@ -399,12 +399,25 @@ final class YouTubeAuthService implements ChannelAuthContract, ChannelConnection
             return true;
         }
 
-        $expiresAt = strtotime($expires);
-        if ($expiresAt === false) {
+        /*
+         * auth_expires_at is stored as a UTC timestamp.
+         *
+         * Never let PHP's application/default timezone reinterpret that
+         * timezone-less database value. Convert it explicitly as UTC, then
+         * compare epoch seconds.
+         */
+        try {
+            $expiresAt =
+                new \DateTimeImmutable(
+                    $expires,
+                    new \DateTimeZone('UTC')
+                );
+        } catch (Throwable) {
             return true;
         }
 
-        return $expiresAt <= (time() + YouTubeAuthConfig::EXPIRY_SAFETY_SECONDS);
+        return $expiresAt->getTimestamp()
+            <= (time() + YouTubeAuthConfig::EXPIRY_SAFETY_SECONDS);
     }
 
     private function decryptTokens(array $channel): array

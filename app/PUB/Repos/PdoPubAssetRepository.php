@@ -3311,6 +3311,116 @@ public function updateOrder(
     }
 
 
+    /**
+     * Find assets that have remained in Dispatch custody beyond the
+     * maximum allowed Shipping age.
+     *
+     * This is a persistence query only. The repository does NOT decide
+     * that these rows have failed; DispatchManager owns that lifecycle
+     * decision and settles each candidate through failShipment().
+     *
+     * Age is calculated entirely by MySQL using NOW() and updated_at so
+     * both sides of the comparison use the same database-session clock.
+     *
+     * @return array<int, array{
+     *   pub_asset_id: int,
+     *   channel: string,
+     *   asset_type: string,
+     *   updated_at: string|null,
+     *   shipping_age_seconds: int
+     * }>
+     */
+    public function listShippingOlderThan(
+        int $ageSeconds
+    ): array {
+        if ($ageSeconds <= 0) {
+            throw new RuntimeException(
+                'Shipping stale-age threshold must be greater than zero.'
+            );
+        }
+
+
+        $stmt =
+            $this->pdo->prepare(
+                <<<SQL
+                SELECT
+                    pub_asset_id,
+                    channel,
+                    asset_type,
+                    updated_at,
+
+                    TIMESTAMPDIFF(
+                        SECOND,
+                        updated_at,
+                        NOW()
+                    ) AS shipping_age_seconds
+
+                FROM pub_assets
+
+                WHERE pipeline_stage = 'shipping'
+
+                  AND updated_at IS NOT NULL
+
+                  AND TIMESTAMPDIFF(
+                      SECOND,
+                      updated_at,
+                      NOW()
+                  ) >= :age_seconds
+
+                ORDER BY updated_at ASC, pub_asset_id ASC
+                SQL
+            );
+
+
+        $stmt->bindValue(
+            ':age_seconds',
+            $ageSeconds,
+            PDO::PARAM_INT
+        );
+
+
+        $stmt->execute();
+
+
+        $rows =
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: [];
+
+
+        return array_values(
+            array_map(
+                static function (
+                    array $row
+                ): array {
+                    $row[
+                        'pub_asset_id'
+                    ] =
+                        (int)(
+                            $row[
+                                'pub_asset_id'
+                            ]
+                            ?? 0
+                        );
+
+                    $row[
+                        'shipping_age_seconds'
+                    ] =
+                        (int)(
+                            $row[
+                                'shipping_age_seconds'
+                            ]
+                            ?? 0
+                        );
+
+                    return $row;
+                },
+                $rows
+            )
+        );
+    }
+
+
     public function markError(
         int $pubAssetId,
         string $stage,

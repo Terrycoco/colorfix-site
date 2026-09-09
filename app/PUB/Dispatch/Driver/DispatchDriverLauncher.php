@@ -12,9 +12,20 @@ use RuntimeException;
  * Creates one detached server-side process for one DispatchDriverJob.
  * There are no idle drivers. Each process handles one assignment and dies.
  *
- * A hard OS-level timeout wraps every driver. If the route exceeds the
- * assignment limit, the wrapper kills it and immediately calls the same
- * CLI entrypoint in timeout-report mode so the box cannot remain Shipping.
+ * A hard OS-level timeout wraps every driver.
+ *
+ * IMPORTANT LIFECYCLE GUARANTEE:
+ *
+ * After the route process exits for ANY reason, a fresh settlement pass is
+ * always invoked. DispatchManager::failShipment() is deliberately idempotent:
+ *
+ *   - SHIPPED stays SHIPPED
+ *   - ERROR / DISPATCH stays ERROR / DISPATCH
+ *   - a stranded SHIPPING row becomes ERROR / DISPATCH
+ *
+ * This means a normal route failure, an unexpected non-zero exit, or even a
+ * route process that exits zero without reporting a result cannot silently
+ * leave the box sitting at SHIPPING.
  */
 final class DispatchDriverLauncher
 {
@@ -71,10 +82,14 @@ final class DispatchDriverLauncher
         /*
          * The detached shell wrapper is the driver's process handle.
          *
-         * - timeout enforces a hard ceiling even if route code hangs.
-         * - normal route errors are reported by DispatchDriverRunner.
-         * - timeout exit codes are reported by a fresh tiny CLI call so the
-         *   asset never remains stranded at pipeline_stage=shipping.
+         * The route process is bounded by GNU timeout. Regardless of how the
+         * route process exits, the wrapper then invokes the same tiny CLI
+         * entrypoint in SETTLE mode.
+         *
+         * SETTLE is intentionally unconditional. If the route already
+         * reported success or failure, DispatchManager leaves that durable
+         * state alone. If the route exited without settling the asset, SETTLE
+         * converts the stranded SHIPPING row into ERROR / DISPATCH.
          */
         $inner =
             escapeshellarg(
@@ -95,7 +110,6 @@ final class DispatchDriverLauncher
                 $ticket
             )
             . '; code=$?; '
-            . 'if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then '
             . escapeshellarg(
                 $php
             )
@@ -103,11 +117,15 @@ final class DispatchDriverLauncher
             . escapeshellarg(
                 $runner
             )
-            . ' timeout '
+            . ' settle '
             . escapeshellarg(
                 $ticket
             )
-            . '; fi';
+            . ' "$code"; '
+            . 'settle_code=$?; '
+            . 'if [ "$settle_code" -ne 0 ]; then '
+            . 'echo "Dispatch settlement pass failed with exit code $settle_code." >&2; '
+            . 'fi';
 
 
         $command =

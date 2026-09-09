@@ -50,6 +50,18 @@ use Throwable;
  */
 final class DispatchManager implements PubComManagerContract
 {
+    /*
+     * Last-resort lifecycle safety net.
+     *
+     * The longest current one-shot driver leash is 15 minutes. Give the
+     * detached route and its settlement wrapper another 15 minutes before
+     * declaring a SHIPPING row abandoned.
+     *
+     * This does not replace normal Driver/Desk reporting; it catches cases
+     * where the detached shell or host dies before it can report anything.
+     */
+    private const STALE_SHIPPING_SECONDS = 1800;
+
     private PubErrorReporter $errors;
     private PdoPubAssetRepository $assets;
 
@@ -189,6 +201,145 @@ final class DispatchManager implements PubComManagerContract
      *   failed: array<int, array<string, mixed>>
      * }
      */
+    /**
+     * Last-resort reconciliation for abandoned SHIPPING rows.
+     *
+     * Normal asynchronous routes are settled immediately by DispatchDesk.
+     * This sweep exists only for catastrophic cases where the detached
+     * driver/wrapper disappears before it can report success, failure, or
+     * timeout.
+     *
+     * Every candidate is settled through failShipment() so the Manager
+     * remains the lifecycle authority. A race with a late successful
+     * completion is safe: failShipment() leaves SHIPPED rows untouched.
+     *
+     * @return array{
+     *   checked: int,
+     *   failed: array<int, array<string, mixed>>
+     * }
+     */
+    public function reconcileStaleShipping(
+        int $maxAgeSeconds = self::STALE_SHIPPING_SECONDS
+    ): array {
+        if ($maxAgeSeconds <= 0) {
+            throw new RuntimeException(
+                'Dispatch stale-shipping threshold must be greater than zero.'
+            );
+        }
+
+
+        $candidates =
+            $this->assets
+                ->listShippingOlderThan(
+                    $maxAgeSeconds
+                );
+
+
+        $failed = [];
+
+
+        foreach (
+            $candidates
+            as $candidate
+        ) {
+            $pubAssetId =
+                (int)(
+                    $candidate[
+                        'pub_asset_id'
+                    ]
+                    ?? 0
+                );
+
+
+            if ($pubAssetId <= 0) {
+                continue;
+            }
+
+
+            $ageSeconds =
+                (int)(
+                    $candidate[
+                        'shipping_age_seconds'
+                    ]
+                    ?? 0
+                );
+
+
+            try {
+                $state =
+                    $this->failShipment(
+                        $pubAssetId,
+                        'dispatch_stale_shipping',
+                        'Dispatch shipment remained in SHIPPING for '
+                        . $ageSeconds
+                        . ' seconds without a final driver report.'
+                    );
+
+
+                /*
+                 * If a concurrent successful completion won the race,
+                 * failShipment() returns SHIPPED and no error is recorded.
+                 */
+                if (
+                    strtolower(
+                        trim(
+                            (string)(
+                                $state[
+                                    'pipeline_stage'
+                                ]
+                                ?? ''
+                            )
+                        )
+                    ) === 'error'
+                ) {
+                    $failed[] = [
+                        'pub_asset_id' =>
+                            $pubAssetId,
+
+                        'shipping_age_seconds' =>
+                            $ageSeconds,
+
+                        'state' =>
+                            $state,
+                    ];
+                }
+
+            } catch (Throwable $e) {
+                $this->errors
+                    ->report(
+                        $e,
+                        [
+                            'stage' =>
+                                'dispatch',
+
+                            'pub_asset_id' =>
+                                $pubAssetId,
+
+                            'code' =>
+                                'dispatch_stale_reconciliation_failure',
+
+                            'diagnostics' => [
+                                'shipping_age_seconds' =>
+                                    $ageSeconds,
+                            ],
+                        ]
+                    );
+            }
+        }
+
+
+        return [
+            'checked' =>
+                count(
+                    $candidates
+                ),
+
+            'failed' =>
+                $failed,
+        ];
+    }
+
+
     public function processShipping(): array
     {
         $shipped = [];
