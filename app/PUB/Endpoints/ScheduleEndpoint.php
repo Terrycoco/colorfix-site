@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\PUB\Endpoints;
 
+use App\PUB\Dispatch\DispatchManager;
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Schedule\ScheduleManager;
@@ -217,6 +218,46 @@ final class ScheduleEndpoint
                 $projectRoot
                 . '/app/PUB/Errors/pub_errors.log'
             );
+
+
+        /*
+         * DISPATCH SAFETY SWEEP
+         *
+         * The Schedule clock is PUB's existing reliable hourly wake-up.
+         * Before Schedule releases any new work, give Dispatch a chance
+         * to reconcile boxes that have remained at SHIPPING beyond the
+         * driver's maximum runtime + grace period.
+         *
+         * DispatchManager remains the lifecycle authority. This endpoint
+         * merely rings that department's bell.
+         *
+         * A reconciliation failure is logged but must not prevent the
+         * independent Schedule department from running its own clock.
+         */
+        try {
+            $dispatchManager =
+                new DispatchManager(
+                    $pdo,
+                    $projectRoot
+                );
+
+
+            $dispatchManager
+                ->reconcileStaleShipping();
+
+        } catch (Throwable $e) {
+            $errorReporter
+                ->report(
+                    $e,
+                    [
+                        'stage' =>
+                            'dispatch',
+
+                        'code' =>
+                            'dispatch_stale_reconciliation_failure',
+                    ]
+                );
+        }
 
 
         try {

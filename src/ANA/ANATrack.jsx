@@ -29,12 +29,26 @@ export default function ANATrack({
         resourceId,
       ].join(":");
 
-      if (sessionStorage.getItem(storageKey) === "1") {
-        tracked.current = true;
-        return;
-      }
+      /*
+       * sessionStorage is an optimization for deduping, not a requirement
+       * for rendering or recording ANA events.
+       *
+       * Some mobile/private/browser contexts may throw on storage access.
+       * In that case, continue with tracking rather than letting analytics
+       * break the page.
+       */
+      try {
+        if (typeof window !== "undefined" && window.sessionStorage) {
+          if (window.sessionStorage.getItem(storageKey) === "1") {
+            tracked.current = true;
+            return;
+          }
 
-      sessionStorage.setItem(storageKey, "1");
+          window.sessionStorage.setItem(storageKey, "1");
+        }
+      } catch (error) {
+        console.warn("ANA once-per-session storage unavailable:", error);
+      }
     }
 
     tracked.current = true;

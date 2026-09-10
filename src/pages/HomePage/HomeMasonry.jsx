@@ -15,13 +15,42 @@ function HomeMasonryCard({ data }) {
   );
 }
 
+function getInitialWidth(isMobile) {
+  if (typeof window === 'undefined') {
+    return isMobile ? 320 : 1200;
+  }
+
+  const viewportWidth =
+    window.innerWidth ||
+    document.documentElement?.clientWidth ||
+    0;
+
+  if (viewportWidth <= 0) {
+    return isMobile ? 320 : 1200;
+  }
+
+  return isMobile
+    ? viewportWidth
+    : Math.min(viewportWidth, 1320);
+}
+
 export default function HomeMasonry({
   items = [],
   playlistItem = null,
   isMobile = false,
 }) {
   const measureRef = useRef(null);
-  const [width, setWidth] = useState(0);
+
+  /*
+   * Never begin at width 0.
+   *
+   * Masonic used to be gated behind `width > 0`, which meant the entire
+   * front page could stay blank on a browser/device where ResizeObserver
+   * did not fire as expected. Start with a safe viewport-based width so
+   * there is always something to render, then replace it with the exact
+   * measured container width as soon as measurement is available.
+   */
+  const [width, setWidth] = useState(() => getInitialWidth(isMobile));
 
   const columnCount = isMobile ? 2 : 4;
   const gutter = isMobile ? 5 : 8;
@@ -63,10 +92,26 @@ export default function HomeMasonry({
 
     const measure = () => {
       const nextWidth = node.getBoundingClientRect().width;
-      setWidth(nextWidth);
+
+      if (nextWidth > 0) {
+        setWidth(nextWidth);
+      }
     };
 
     measure();
+
+    /*
+     * ResizeObserver is preferred, but do not make the homepage depend
+     * on it existing or firing correctly. Older/quirky mobile browsers
+     * still get a working page and resize support.
+     */
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+
+      return () => {
+        window.removeEventListener('resize', measure);
+      };
+    }
 
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -74,15 +119,27 @@ export default function HomeMasonry({
     return () => observer.disconnect();
   }, []);
 
-  const columnWidth =
+  /*
+   * If the responsive mode changes, immediately give Masonic a sensible
+   * width for the new mode. The observer will refine it afterward.
+   */
+  useLayoutEffect(() => {
+    setWidth((currentWidth) =>
+      currentWidth > 0
+        ? currentWidth
+        : getInitialWidth(isMobile)
+    );
+  }, [isMobile]);
+
+  const safeWidth =
     width > 0
-      ? Math.max(
-          1,
-          (width - gutter * (columnCount - 1)) / columnCount
-        )
-      : isMobile
-        ? 160
-        : 280;
+      ? width
+      : getInitialWidth(isMobile);
+
+  const columnWidth = Math.max(
+    1,
+    (safeWidth - gutter * (columnCount - 1)) / columnCount
+  );
 
   return (
     <div
@@ -96,17 +153,15 @@ export default function HomeMasonry({
       }}
     >
       <div ref={measureRef} style={{ width: '100%' }}>
-        {width > 0 && (
-          <Masonry
-            key={`${columnCount}-${Math.round(width)}`}
-            items={masonryItems}
-            render={HomeMasonryCard}
-            columnWidth={columnWidth}
-            columnGutter={gutter}
-            rowGutter={gutter}
-            maxColumnCount={columnCount}
-          />
-        )}
+        <Masonry
+          key={`${columnCount}-${Math.round(safeWidth)}`}
+          items={masonryItems}
+          render={HomeMasonryCard}
+          columnWidth={columnWidth}
+          columnGutter={gutter}
+          rowGutter={gutter}
+          maxColumnCount={columnCount}
+        />
       </div>
     </div>
   );

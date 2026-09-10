@@ -1256,6 +1256,96 @@ export default function PubDispatchTable() {
 
         {
           key:
+            "dispatch_error",
+
+          label:
+            "Error",
+
+          render:
+            (asset) => {
+              const stage =
+                String(
+                  asset
+                    ?.pipeline_stage ||
+                  ""
+                )
+                  .trim()
+                  .toLowerCase();
+
+              const errorStage =
+                String(
+                  asset
+                    ?.error_stage ||
+                  ""
+                )
+                  .trim()
+                  .toLowerCase();
+
+              const code =
+                String(
+                  asset
+                    ?.error_code ||
+                  ""
+                )
+                  .trim();
+
+              const message =
+                String(
+                  asset
+                    ?.error_message ||
+                  ""
+                )
+                  .trim();
+
+              if (
+                stage !== "error"
+                ||
+                errorStage !== "dispatch"
+              ) {
+                return "—";
+              }
+
+              const fullText =
+                [
+                  code,
+                  message,
+                ]
+                  .filter(Boolean)
+                  .join(": ");
+
+              if (!fullText) {
+                return "Dispatch error";
+              }
+
+              return (
+                <span
+                  title={
+                    fullText
+                  }
+
+                  style={
+                    dispatchErrorTextStyle
+                  }
+                >
+                  {fullText}
+                </span>
+              );
+            },
+
+          sortValue:
+            (asset) =>
+              String(
+                asset
+                  ?.error_message ||
+                asset
+                  ?.error_code ||
+                ""
+              ),
+        },
+
+
+        {
+          key:
             "sent",
 
           label:
@@ -2489,6 +2579,36 @@ const errorStageStyle = {
 
   border:
     "1px solid #e2baba",
+};
+
+
+const dispatchErrorTextStyle = {
+  display:
+    "inline-block",
+
+  maxWidth:
+    360,
+
+  overflow:
+    "hidden",
+
+  textOverflow:
+    "ellipsis",
+
+  whiteSpace:
+    "nowrap",
+
+  color:
+    "#8a3131",
+
+  fontSize:
+    11,
+
+  fontWeight:
+    600,
+
+  verticalAlign:
+    "middle",
 };
 
 

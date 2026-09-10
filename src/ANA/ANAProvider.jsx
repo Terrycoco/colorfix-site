@@ -1,5 +1,6 @@
 import { createContext, useMemo } from "react";
 import { getCurrentSourceParam } from "@helpers/sourceParam";
+import { ensureViewerId } from "../lib/viewer";
 
 const ANA_SOURCE_KEY = "ana_src";
 const ANA_SESSION_KEY = "ana_session_id";
@@ -29,6 +30,24 @@ export function resolveSessionId() {
     sessionStorage.setItem(ANA_SESSION_KEY, next);
 
     return next;
+  } catch {
+    return null;
+  }
+}
+
+function resolveViewerId(viewerId = null) {
+  const supplied = String(viewerId || "").trim();
+
+  if (supplied) {
+    return supplied;
+  }
+
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return ensureViewerId();
   } catch {
     return null;
   }
@@ -80,6 +99,7 @@ export default function ANAProvider({
   viewerId = null,
   children,
 }) {
+  const resolvedViewerId = resolveViewerId(viewerId);
   const src = resolveSource();
   const sessionId = resolveSessionId();
   const referrer = resolveReferrer();
@@ -87,12 +107,12 @@ export default function ANAProvider({
   const value = useMemo(
     () => ({
       rex,
-      viewer_id: viewerId,
+      viewer_id: resolvedViewerId,
       src,
       session_id: sessionId,
-      referrer: referrer,
+      referrer,
     }),
-    [rex, viewerId, src, sessionId, referrer]
+    [rex, resolvedViewerId, src, sessionId, referrer]
   );
 
   return (
