@@ -5,9 +5,17 @@ import {
 } from "react";
 
 import {
+  AdminBadge,
+  AdminButton,
   AdminDataGrid,
+  AdminDialog,
   AdminEmptyState,
-  AdminWorkbench,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminToolbar,
+  AdminToolbarSpacer,
+  useAdminDialog,
 } from "@components/AdminLayout";
 
 import {
@@ -26,6 +34,9 @@ const SCHEDULE_URL =
 
 
 export default function PubScheduleTable() {
+  const dialog =
+    useAdminDialog();
+
   const [
     controlsOpen,
     setControlsOpen,
@@ -88,43 +99,7 @@ export default function PubScheduleTable() {
     setError,
   ] = useState("");
 
-  const [
-    selectedAsset,
-    setSelectedAsset,
-  ] = useState(null);
 
-  const [
-    drawerOpen,
-    setDrawerOpen,
-  ] = useState(false);
-
-  const [
-    drawerAsset,
-    setDrawerAsset,
-  ] = useState(null);
-
-  const [
-    drawerLoading,
-    setDrawerLoading,
-  ] = useState(false);
-
-  const [
-    drawerError,
-    setDrawerError,
-  ] = useState("");
-
-
-  /*
-   * SCHEDULE WORKBENCH
-   *
-   * Expected rows:
-   *
-   *   packed = sealed and held outside automatic scheduling
-   *   queued = released into Schedule's automatic candidate pool
-   *
-   * Exact publication times are NOT assigned to rows here.
-   * ScheduleManager chooses from QUEUED inventory when a channel is due.
-   */
   async function loadAssets() {
     setLoading(
       true
@@ -133,7 +108,6 @@ export default function PubScheduleTable() {
     setError(
       ""
     );
-
 
     try {
       const params =
@@ -144,14 +118,12 @@ export default function PubScheduleTable() {
             ),
         });
 
-
       if (channelFilter) {
         params.set(
           "channel",
           channelFilter
         );
       }
-
 
       if (typeFilter) {
         params.set(
@@ -160,14 +132,12 @@ export default function PubScheduleTable() {
         );
       }
 
-
       if (stageFilter) {
         params.set(
           "stage",
           stageFilter
         );
       }
-
 
       const res =
         await fetch(
@@ -178,10 +148,8 @@ export default function PubScheduleTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -194,19 +162,13 @@ export default function PubScheduleTable() {
         );
       }
 
-
-      const nextAssets =
+      setAssets(
         Array.isArray(
           data.assets
         )
           ? data.assets
-          : [];
-
-
-      setAssets(
-        nextAssets
+          : []
       );
-
 
       setChannels(
         Array.isArray(
@@ -216,7 +178,6 @@ export default function PubScheduleTable() {
           : []
       );
 
-
       setAssetTypes(
         Array.isArray(
           data?.filters?.asset_types
@@ -224,61 +185,6 @@ export default function PubScheduleTable() {
           ? data.filters.asset_types
           : []
       );
-
-
-      /*
-       * Keep the selected row current after Refresh or stage changes.
-       */
-      if (
-        selectedAsset
-          ?.pub_asset_id
-      ) {
-        const refreshed =
-          nextAssets.find(
-            (
-              asset
-            ) =>
-              Number(
-                asset
-                  .pub_asset_id
-              ) ===
-              Number(
-                selectedAsset
-                  .pub_asset_id
-              )
-          );
-
-
-        if (refreshed) {
-          setSelectedAsset(
-            refreshed
-          );
-
-
-          if (drawerOpen) {
-            await loadDrawerAsset(
-              refreshed
-                .pub_asset_id
-            );
-          }
-
-        } else {
-          setSelectedAsset(
-            null
-          );
-
-
-          if (drawerOpen) {
-            setDrawerOpen(
-              false
-            );
-
-            setDrawerAsset(
-              null
-            );
-          }
-        }
-      }
 
     } catch (err) {
       setError(
@@ -303,7 +209,8 @@ export default function PubScheduleTable() {
   ]);
 
 
-  async function loadDrawerAsset(
+  async function changeStage(
+    action,
     pubAssetId
   ) {
     const id =
@@ -312,129 +219,14 @@ export default function PubScheduleTable() {
         0
       );
 
-
     if (!id) {
-      return;
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
-
-    setDrawerLoading(
-      true
-    );
-
-    setDrawerError(
-      ""
-    );
-
-
-    try {
-      const params =
-        new URLSearchParams({
-          pub_asset_id:
-            String(
-              id
-            ),
-
-          _:
-            String(
-              Date.now()
-            ),
-        });
-
-
-      const res =
-        await fetch(
-          `${SCHEDULE_URL}?${params.toString()}`,
-          {
-            credentials:
-              "include",
-          }
-        );
-
-
-      const data =
-        await res.json();
-
-
-      if (
-        !res.ok
-        ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "Could not load Schedule details."
-        );
-      }
-
-
-      setDrawerAsset(
-        data.asset ||
-        null
-      );
-
-    } catch (err) {
-      setDrawerError(
-        err?.message ||
-        "Could not load Schedule details."
-      );
-
-    } finally {
-      setDrawerLoading(
-        false
-      );
-    }
-  }
-
-
-  function selectAsset(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-
-    if (drawerOpen) {
-      loadDrawerAsset(
-        asset.pub_asset_id
-      );
-    }
-  }
-
-
-  function openDrawer(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-    setDrawerOpen(
-      true
-    );
-
-    loadDrawerAsset(
-      asset.pub_asset_id
-    );
-  }
-
-
-  async function changeStage(
-    action,
-    pubAssetId
-  ) {
-    pubAssetId =
-      Number(
-        pubAssetId ||
-        0
-      );
-
-
-    if (!pubAssetId) {
-      return;
-    }
-
 
     setChangingStage(
       true
@@ -443,11 +235,6 @@ export default function PubScheduleTable() {
     setError(
       ""
     );
-
-    setDrawerError(
-      ""
-    );
-
 
     try {
       const res =
@@ -469,15 +256,13 @@ export default function PubScheduleTable() {
               JSON.stringify({
                 action,
                 pub_asset_id:
-                  pubAssetId,
+                  id,
               }),
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -486,33 +271,32 @@ export default function PubScheduleTable() {
       ) {
         throw new Error(
           data?.error ||
-          `Failed to ${action} asset #${pubAssetId}.`
+          `Failed to ${action} asset #${id}.`
         );
       }
-
 
       await loadAssets();
 
-
-      if (drawerOpen) {
-        await loadDrawerAsset(
-          pubAssetId
-        );
-      }
+      return {
+        ok:
+          true,
+      };
 
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to update asset #${pubAssetId}.`;
-
-
-      setDrawerError(
-        message
-      );
+        `Failed to update asset #${id}.`;
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setChangingStage(
@@ -522,53 +306,42 @@ export default function PubScheduleTable() {
   }
 
 
-  /*
-   * Enqueue every PACKED asset currently visible through the active
-   * Channel / Type / Stage filters.
-   *
-   * This is the Schedule equivalent of Package's Pack All:
-   *
-   *   packed -> queued
-   *
-   * Each row still goes through the normal Schedule endpoint so the
-   * same repository lifecycle checks apply.
-   */
   async function enqueueAllPacked() {
     const packedAssets =
       assets.filter(
-        (
-          asset
-        ) =>
-          String(
+        (asset) =>
+          normalizedStage(
             asset
-              ?.pipeline_stage ||
-            ""
-          )
-            .trim()
-            .toLowerCase() ===
+          ) ===
           "packed"
       );
-
 
     if (!packedAssets.length) {
       return;
     }
 
-
     const confirmed =
-      window.confirm(
-        `Enqueue ${packedAssets.length} packed asset${
-          packedAssets.length === 1
-            ? ""
-            : "s"
-        }?\n\nThey will become eligible for automatic Schedule.`
-      );
+      await dialog.confirm({
+        title:
+          "Enqueue packed assets?",
 
+        message:
+          `Enqueue ${packedAssets.length} packed asset${
+            packedAssets.length === 1
+              ? ""
+              : "s"
+          }? They will become eligible for automatic Schedule.`,
+
+        confirmLabel:
+          "Enqueue",
+
+        cancelLabel:
+          "Cancel",
+      });
 
     if (!confirmed) {
       return;
     }
-
 
     setBulkEnqueueing(
       true
@@ -578,9 +351,7 @@ export default function PubScheduleTable() {
       ""
     );
 
-
     const failures = [];
-
 
     try {
       for (
@@ -594,11 +365,9 @@ export default function PubScheduleTable() {
             0
           );
 
-
         if (!pubAssetId) {
           continue;
         }
-
 
         try {
           const res =
@@ -627,10 +396,8 @@ export default function PubScheduleTable() {
               }
             );
 
-
           const data =
             await res.json();
-
 
           if (
             !res.ok
@@ -653,22 +420,7 @@ export default function PubScheduleTable() {
         }
       }
 
-
-      setDrawerOpen(
-        false
-      );
-
-      setDrawerAsset(
-        null
-      );
-
-      setSelectedAsset(
-        null
-      );
-
-
       await loadAssets();
-
 
       if (failures.length) {
         setError(
@@ -689,28 +441,44 @@ export default function PubScheduleTable() {
   async function sendNow(
     pubAssetId
   ) {
-    pubAssetId =
+    const id =
       Number(
         pubAssetId ||
         0
       );
 
-
-    if (!pubAssetId) {
-      return;
+    if (!id) {
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     const confirmed =
-      window.confirm(
-        `Send asset #${pubAssetId} now?\n\nThis bypasses Schedule and sends it directly to Dispatch.`
-      );
+      await dialog.confirm({
+        title:
+          "Send asset now?",
 
+        message:
+          `Send asset #${id} now? This bypasses Schedule timing and sends it directly to Dispatch.`,
+
+        confirmLabel:
+          "Send Now",
+
+        cancelLabel:
+          "Cancel",
+      });
 
     if (!confirmed) {
-      return;
+      return {
+        ok:
+          false,
+        cancelled:
+          true,
+      };
     }
-
 
     setSending(
       true
@@ -719,11 +487,6 @@ export default function PubScheduleTable() {
     setError(
       ""
     );
-
-    setDrawerError(
-      ""
-    );
-
 
     try {
       const res =
@@ -747,15 +510,13 @@ export default function PubScheduleTable() {
                   "send_now",
 
                 pub_asset_id:
-                  pubAssetId,
+                  id,
               }),
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -767,42 +528,32 @@ export default function PubScheduleTable() {
           data?.result
             ?.failed
             ?.error ||
-          `Failed to send asset #${pubAssetId}.`
+          `Failed to send asset #${id}.`
         );
       }
 
-
-      /*
-       * A successful Send Now leaves Schedule custody.
-       */
-      setDrawerOpen(
-        false
-      );
-
-      setDrawerAsset(
-        null
-      );
-
-      setSelectedAsset(
-        null
-      );
-
-
       await loadAssets();
+
+      return {
+        ok:
+          true,
+      };
 
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to send asset #${pubAssetId}.`;
-
-
-      setDrawerError(
-        message
-      );
+        `Failed to send asset #${id}.`;
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setSending(
@@ -816,16 +567,10 @@ export default function PubScheduleTable() {
     useMemo(
       () =>
         assets.filter(
-          (
-            asset
-          ) =>
-            String(
+          (asset) =>
+            normalizedStage(
               asset
-                ?.pipeline_stage ||
-              ""
-            )
-              .trim()
-              .toLowerCase() ===
+            ) ===
             "packed"
         ).length,
       [
@@ -853,7 +598,6 @@ export default function PubScheduleTable() {
               ),
         },
 
-
         {
           key:
             "channel",
@@ -867,7 +611,6 @@ export default function PubScheduleTable() {
                 asset.channel
               ),
         },
-
 
         {
           key:
@@ -884,7 +627,6 @@ export default function PubScheduleTable() {
               ),
         },
 
-
         {
           key:
             "source",
@@ -893,35 +635,17 @@ export default function PubScheduleTable() {
             "Source",
 
           value:
-            (asset) => {
-              const type =
+            (asset) =>
+              formatSource(
                 asset
-                  .source_type ||
-                "";
-
-              const id =
-                asset
-                  .source_id ||
-                "";
-
-
-              if (
-                !type
-                &&
-                !id
-              ) {
-                return "—";
-              }
-
-
-              return `${type} #${id}`;
-            },
+              ),
 
           sortValue:
             (asset) =>
+              asset
+                .source_title ||
               `${asset.source_type || ""} ${asset.source_id || ""}`,
         },
-
 
         {
           key:
@@ -937,7 +661,6 @@ export default function PubScheduleTable() {
               "—",
         },
 
-
         {
           key:
             "pipeline_stage",
@@ -948,22 +671,17 @@ export default function PubScheduleTable() {
           render:
             (asset) => {
               const stage =
-                String(
+                normalizedStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
-
+                );
 
               return (
-                <span
-                  style={
+                <AdminBadge
+                  variant={
                     stage ===
                       "queued"
-                      ? queuedStageStyle
-                      : packedStageStyle
+                      ? "info"
+                      : "neutral"
                   }
                 >
                   {
@@ -971,19 +689,16 @@ export default function PubScheduleTable() {
                       stage
                     )
                   }
-                </span>
+                </AdminBadge>
               );
             },
 
           sortValue:
             (asset) =>
-              String(
+              normalizedStage(
                 asset
-                  .pipeline_stage ||
-                ""
               ),
         },
-
 
         {
           key:
@@ -1003,19 +718,6 @@ export default function PubScheduleTable() {
     );
 
 
-  if (controlsOpen) {
-    return (
-      <PubScheduleControls
-        onBack={() =>
-          setControlsOpen(
-            false
-          )
-        }
-      />
-    );
-  }
-
-
   if (
     loading
     &&
@@ -1031,406 +733,480 @@ export default function PubScheduleTable() {
   }
 
 
-  const drawerTitle =
-    drawerAsset
-      ?.pub_asset_id
-      ? `Schedule · Asset #${drawerAsset.pub_asset_id}`
-      : "Schedule";
-
-
   return (
-    <div
-      className="admin-detail-workarea"
-    >
-      <AdminWorkbench
-        header={
-          <div
-            style={
-              filterBarStyle
+    <div className="admin-detail-workarea">
+      <AdminToolbar>
+        <AdminField
+          label="Channel"
+          compact
+        >
+          <select
+            className="admin-field__control"
+
+            value={
+              channelFilter
+            }
+
+            onChange={(
+              event
+            ) =>
+              setChannelFilter(
+                event
+                  .target
+                  .value
+              )
             }
           >
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Channel
-              </span>
+            <option value="">
+              All
+            </option>
 
-              <select
-                className="admin-field__control"
-
-                value={
-                  channelFilter
-                }
-
-                onChange={(
-                  event
-                ) =>
-                  setChannelFilter(
-                    event
-                      .target
-                      .value
-                  )
-                }
-              >
-                <option value="">
-                  All
-                </option>
-
-                {channels.map(
-                  (
+            {channels.map(
+              (
+                channel
+              ) => (
+                <option
+                  key={
                     channel
-                  ) => (
-                    <option
-                      key={
-                        channel
-                      }
+                  }
 
-                      value={
-                        channel
-                      }
-                    >
-                      {
-                        humanize(
-                          channel
-                        )
-                      }
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Type
-              </span>
-
-              <select
-                className="admin-field__control"
-
-                value={
-                  typeFilter
-                }
-
-                onChange={(
-                  event
-                ) =>
-                  setTypeFilter(
-                    event
-                      .target
-                      .value
-                  )
-                }
-              >
-                <option value="">
-                  All
+                  value={
+                    channel
+                  }
+                >
+                  {
+                    humanize(
+                      channel
+                    )
+                  }
                 </option>
-
-                {assetTypes.map(
-                  (
-                    assetType
-                  ) => (
-                    <option
-                      key={
-                        assetType
-                      }
-
-                      value={
-                        assetType
-                      }
-                    >
-                      {
-                        humanize(
-                          assetType
-                        )
-                      }
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
+              )
+            )}
+          </select>
+        </AdminField>
 
 
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Stage
-              </span>
+        <AdminField
+          label="Type"
+          compact
+        >
+          <select
+            className="admin-field__control"
 
-              <select
-                className="admin-field__control"
+            value={
+              typeFilter
+            }
 
-                value={
-                  stageFilter
-                }
-
-                onChange={(
-                  event
-                ) =>
-                  setStageFilter(
-                    event
-                      .target
-                      .value
-                  )
-                }
-              >
-                <option value="">
-                  All
-                </option>
-
-                <option value="packed">
-                  Packed
-                </option>
-
-                <option value="queued">
-                  Queued
-                </option>
-              </select>
-            </label>
-
-
-            <button
-              type="button"
-
-              onClick={
-                enqueueAllPacked
-              }
-
-              disabled={
-                loading ||
-                changingStage ||
-                bulkEnqueueing ||
-                sending ||
-                packedCount === 0
-              }
-
-              style={
-                enqueueAllButtonStyle
-              }
-
-              title={
-                packedCount > 0
-                  ? `Enqueue ${packedCount} packed asset${
-                      packedCount === 1
-                        ? ""
-                        : "s"
-                    } currently visible.`
-                  : "No packed assets in the current filtered view."
-              }
-            >
-              {
-                bulkEnqueueing
-                  ? "Enqueueing..."
-                  : packedCount > 0
-                    ? `Enqueue All (${packedCount})`
-                    : "Enqueue All"
-              }
-            </button>
-
-
-            <button
-              type="button"
-
-              onClick={() =>
-                setControlsOpen(
-                  true
-                )
-              }
-
-              disabled={
-                changingStage ||
-                bulkEnqueueing ||
-                sending
-              }
-
-              style={
-                controlsButtonStyle
-              }
-            >
-              Schedule Controls
-            </button>
-
-
-            <button
-              type="button"
-
-              onClick={
-                loadAssets
-              }
-
-              disabled={
-                loading ||
-                changingStage ||
-                bulkEnqueueing ||
-                sending
-              }
-
-              style={
-                refreshButtonStyle
-              }
-            >
-              {
-                loading
-                  ? "Refreshing..."
-                  : "Refresh"
-              }
-            </button>
-
-
-            <div
-              style={
-                countStyle
-              }
-            >
-              {assets.length} asset
-              {
-                assets.length === 1
-                  ? ""
-                  : "s"
-              }
-            </div>
-          </div>
-        }
-
-        upperLeft={null}
-        upperRight={null}
-        upperHeight="0px"
-
-        lower={
-          <div
-            className="admin-detail-workarea"
-
-            style={{
-              height:
-                "100%",
-            }}
+            onChange={(
+              event
+            ) =>
+              setTypeFilter(
+                event
+                  .target
+                  .value
+              )
+            }
           >
-            {error ? (
-              <div
-                style={
-                  errorStyle
+            <option value="">
+              All
+            </option>
+
+            {assetTypes.map(
+              (
+                assetType
+              ) => (
+                <option
+                  key={
+                    assetType
+                  }
+
+                  value={
+                    assetType
+                  }
+                >
+                  {
+                    humanize(
+                      assetType
+                    )
+                  }
+                </option>
+              )
+            )}
+          </select>
+        </AdminField>
+
+
+        <AdminField
+          label="Stage"
+          compact
+        >
+          <select
+            className="admin-field__control"
+
+            value={
+              stageFilter
+            }
+
+            onChange={(
+              event
+            ) =>
+              setStageFilter(
+                event
+                  .target
+                  .value
+              )
+            }
+          >
+            <option value="">
+              All
+            </option>
+
+            <option value="packed">
+              Packed
+            </option>
+
+            <option value="queued">
+              Queued
+            </option>
+          </select>
+        </AdminField>
+
+
+        <AdminButton
+          type="button"
+
+          onClick={
+            enqueueAllPacked
+          }
+
+          disabled={
+            loading
+            ||
+            changingStage
+            ||
+            bulkEnqueueing
+            ||
+            sending
+            ||
+            packedCount ===
+              0
+          }
+
+          title={
+            packedCount > 0
+              ? `Enqueue ${packedCount} packed asset${
+                  packedCount === 1
+                    ? ""
+                    : "s"
+                } currently visible.`
+              : "No packed assets in the current filtered view."
+          }
+        >
+          {
+            bulkEnqueueing
+              ? "Enqueueing..."
+              : packedCount > 0
+                ? `Enqueue All (${packedCount})`
+                : "Enqueue All"
+          }
+        </AdminButton>
+
+
+        <AdminButton
+          type="button"
+
+          variant="secondary"
+
+          onClick={() =>
+            setControlsOpen(
+              true
+            )
+          }
+
+          disabled={
+            changingStage
+            ||
+            bulkEnqueueing
+            ||
+            sending
+          }
+        >
+          Schedule Controls
+        </AdminButton>
+
+
+        <AdminToolbarSpacer />
+
+
+        <AdminButton
+          type="button"
+
+          variant="secondary"
+
+          onClick={
+            loadAssets
+          }
+
+          disabled={
+            loading
+            ||
+            changingStage
+            ||
+            bulkEnqueueing
+            ||
+            sending
+          }
+        >
+          {
+            loading
+              ? "Refreshing..."
+              : "Refresh"
+          }
+        </AdminButton>
+
+
+        <AdminMetaText as="div">
+          {assets.length} asset
+          {
+            assets.length === 1
+              ? ""
+              : "s"
+          }
+        </AdminMetaText>
+      </AdminToolbar>
+
+
+      {error ? (
+        <AdminNotice variant="danger">
+          {error}
+        </AdminNotice>
+      ) : null}
+
+
+      <AdminDataGrid
+        items={
+          assets
+        }
+
+        columns={
+          columns
+        }
+
+        getRowKey={(
+          asset
+        ) =>
+          asset
+            .pub_asset_id
+        }
+
+        defaultSortKey="updated_at"
+
+        defaultSortDirection="asc"
+
+        ariaLabel="PUB Schedule workbench"
+
+        drawer={{
+          title:
+            (asset) =>
+              `Schedule · Asset #${asset.pub_asset_id}`,
+
+          width:
+            440,
+
+          render:
+            ({ item }) => (
+              <PubScheduleDrawer
+                asset={
+                  item
                 }
-              >
-                {error}
-              </div>
-            ) : null}
 
+                loadAsset={
+                  fetchScheduleAssetDetail
+                }
 
-            <AdminDataGrid
-              items={
-                assets
-              }
+                changingStage={
+                  changingStage
+                }
 
-              columns={
-                columns
-              }
+                sending={
+                  sending
+                }
 
-              getRowKey={(
-                asset
-              ) =>
-                asset
-                  .pub_asset_id
-              }
+                onEnqueue={(
+                  pubAssetId
+                ) =>
+                  changeStage(
+                    "enqueue",
+                    pubAssetId
+                  )
+                }
 
-              selectedKey={
-                selectedAsset
-                  ?.pub_asset_id ??
-                null
-              }
+                onDequeue={(
+                  pubAssetId
+                ) =>
+                  changeStage(
+                    "dequeue",
+                    pubAssetId
+                  )
+                }
 
-              onSelectionChange={
-                selectAsset
-              }
-
-              onRowDoubleClick={
-                openDrawer
-              }
-
-              defaultSortKey="updated_at"
-              defaultSortDirection="asc"
-
-              ariaLabel="PUB Schedule workbench"
-            />
-          </div>
-        }
-
-        drawerOpen={
-          drawerOpen
-        }
-
-        drawerWidth={
-          440
-        }
-
-        drawerTitle={
-          drawerTitle
-        }
-
-        drawerContent={
-          <PubScheduleDrawer
-            asset={
-              drawerAsset
-            }
-
-            loading={
-              drawerLoading
-            }
-
-            error={
-              drawerError
-            }
-
-            changingStage={
-              changingStage
-            }
-
-            sending={
-              sending
-            }
-
-            onEnqueue={(
-              pubAssetId
-            ) =>
-              changeStage(
-                "enqueue",
-                pubAssetId
-              )
-            }
-
-            onDequeue={(
-              pubAssetId
-            ) =>
-              changeStage(
-                "dequeue",
-                pubAssetId
-              )
-            }
-
-            onSendNow={
-              sendNow
-            }
-          />
-        }
-
-        onCloseDrawer={() => {
-          setDrawerOpen(
-            false
-          );
+                onSendNow={
+                  sendNow
+                }
+              />
+            ),
         }}
       />
+
+
+      <AdminDialog
+        open={
+          controlsOpen
+        }
+
+        title="Schedule Controls"
+
+        message="Automatic publishing rules. These settings do not affect Manual Send Now."
+
+        width={
+          780
+        }
+
+        onClose={() =>
+          setControlsOpen(
+            false
+          )
+        }
+
+        actions={[
+          {
+            key:
+              "close",
+
+            label:
+              "Close",
+
+            variant:
+              "secondary",
+
+            onClick: () =>
+              setControlsOpen(
+                false
+              ),
+          },
+        ]}
+      >
+        <PubScheduleControls />
+      </AdminDialog>
     </div>
   );
+}
+
+
+async function fetchScheduleAssetDetail(
+  pubAssetId
+) {
+  const id =
+    Number(
+      pubAssetId ||
+      0
+    );
+
+  if (!id) {
+    throw new Error(
+      "Valid PUB asset ID required."
+    );
+  }
+
+  const params =
+    new URLSearchParams({
+      pub_asset_id:
+        String(
+          id
+        ),
+
+      _:
+        String(
+          Date.now()
+        ),
+    });
+
+  const res =
+    await fetch(
+      `${SCHEDULE_URL}?${params.toString()}`,
+      {
+        credentials:
+          "include",
+      }
+    );
+
+  const data =
+    await res.json();
+
+  if (
+    !res.ok
+    ||
+    !data?.ok
+  ) {
+    throw new Error(
+      data?.error ||
+      "Could not load Schedule details."
+    );
+  }
+
+  return (
+    data.asset ||
+    null
+  );
+}
+
+
+function normalizedStage(
+  asset
+) {
+  return String(
+    asset
+      ?.pipeline_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+
+function formatSource(
+  asset
+) {
+  const title =
+    String(
+      asset
+        ?.source_title ||
+      ""
+    ).trim();
+
+  if (title) {
+    return title;
+  }
+
+  const type =
+    asset
+      ?.source_type ||
+    "";
+
+  const id =
+    asset
+      ?.source_id ||
+    "";
+
+  if (
+    !type
+    &&
+    !id
+  ) {
+    return "—";
+  }
+
+  return `${type} #${id}`;
 }
 
 
@@ -1458,109 +1234,3 @@ function humanize(
           .toUpperCase()
     );
 }
-
-
-const baseStageStyle = {
-  display:
-    "inline-block",
-
-  padding:
-    "3px 7px",
-
-  borderRadius:
-    999,
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-
-  lineHeight:
-    1.2,
-};
-
-
-const packedStageStyle = {
-  ...baseStageStyle,
-
-  background:
-    "#eef1f4",
-
-  color:
-    "#465465",
-};
-
-
-const queuedStageStyle = {
-  ...baseStageStyle,
-
-  background:
-    "#e8f1fb",
-
-  color:
-    "#245b88",
-};
-
-
-const filterBarStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "flex-end",
-
-  gap:
-    12,
-
-  padding:
-    "14px 0",
-};
-
-
-const enqueueAllButtonStyle = {
-  marginLeft:
-    "auto",
-
-  marginBottom:
-    1,
-};
-
-
-const controlsButtonStyle = {
-  marginBottom:
-    1,
-};
-
-
-const refreshButtonStyle = {
-  marginBottom:
-    1,
-};
-
-
-const countStyle = {
-  paddingBottom:
-    7,
-
-  color:
-    "#586675",
-
-  fontSize:
-    13,
-};
-
-
-const errorStyle = {
-  marginBottom:
-    12,
-
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #d8dde3",
-
-  background:
-    "#fff7f7",
-};

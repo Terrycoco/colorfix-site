@@ -1,0 +1,133 @@
+.admin-object-list {
+  width: 100%;
+}
+
+.admin-object-list-item {
+  position: relative;
+  border-bottom: 1px solid var(--admin-border-soft);
+  background: var(--admin-bg);
+}
+
+.admin-object-list-item__main {
+  display: block;
+  padding: 9px 10px 9px 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.admin-object-list-item__main:hover {
+  background: var(--admin-hover);
+}
+
+.admin-object-list-item__main:focus-visible {
+  box-shadow: inset 3px 0 0 #667784;
+  background: var(--admin-hover);
+}
+
+.admin-object-list-item.is-selected .admin-object-list-item__main {
+  background: var(--admin-selected);
+  box-shadow: inset 3px 0 0 var(--admin-focus);
+}
+
+.admin-object-list-item__topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-object-list-item__title-wrap {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-object-list-item__title {
+  font-size: 13.5px;
+  line-height: 1.35;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.admin-object-list-item__id {
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.admin-object-list-item__meta {
+  margin-top: 3px;
+}
+
+.admin-object-list-item__meta-line {
+  color: var(--admin-muted);
+  font-size: 11.75px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.admin-object-list-item__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 24px;
+  min-height: 24px;
+  margin: -3px -3px 0 0;
+  padding: 3px 5px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--admin-muted);
+  cursor: pointer;
+}
+
+.admin-object-list-item__status:hover,
+.admin-object-list-item__status:focus-visible {
+  background: #eef1f3;
+  outline: none;
+}
+
+.admin-object-list-item__dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid #aab2ba;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.admin-object-list-item__status.is-active .admin-object-list-item__dot {
+  border-color: var(--admin-success);
+  background: var(--admin-success);
+}
+
+.admin-object-list-item__status-count {
+  font-size: 10.5px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.admin-empty-state {
+  display: grid;
+  place-content: center;
+  min-height: 220px;
+  padding: 24px;
+  text-align: center;
+  color: var(--admin-muted);
+}
+
+.admin-empty-state__title {
+  color: var(--admin-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-empty-state__message {
+  max-width: 420px;
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}

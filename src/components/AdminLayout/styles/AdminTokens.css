@@ -1,0 +1,36 @@
+:root {
+  --admin-bg: #ffffff;
+  --admin-surface: #ffffff;
+  --admin-surface-muted: #f7f8fa;
+  --admin-header-bg: #f3f4f5;
+  --admin-text: #1f2933;
+  --admin-muted: #6b7280;
+  --admin-border: #d8dde3;
+  --admin-border-soft: #e9edf1;
+  --admin-hover: #f7f9fa;
+  --admin-selected: var(--highlight-cyan, #bedcdd);
+  --admin-focus: #506a78;
+  --admin-success: #2f8f4e;
+  --admin-danger: #b42318;
+  --admin-warning: #c2410c;
+  --admin-info: #4b6b8a;
+  --admin-accent: #e4658e;
+
+  /* Shared admin overlay stack. */
+  --admin-z-fullscreen: 1000000;
+  --admin-z-drawer: 1000100;
+  --admin-z-editor: 1000200;
+  --admin-z-dialog: 1000300;
+  --admin-z-toast: 1000400;
+
+  /* Backward-compatible aliases used by existing admin pages. */
+  --admin-layout-bg: var(--admin-bg);
+  --admin-layout-text: var(--admin-text);
+  --admin-layout-muted: var(--admin-muted);
+  --admin-layout-border: var(--admin-border);
+  --admin-layout-border-soft: var(--admin-border-soft);
+  --admin-layout-selected: var(--admin-selected);
+  --admin-layout-hover: var(--admin-hover);
+  --admin-layout-dot: var(--admin-success);
+  --admin-layout-header-bg: var(--admin-header-bg);
+}

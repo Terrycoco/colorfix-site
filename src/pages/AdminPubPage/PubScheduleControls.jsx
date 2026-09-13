@@ -5,6 +5,18 @@ import {
 } from "react";
 
 import {
+  AdminButton,
+  AdminCheckboxRow,
+  AdminEmptyState,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminStack,
+  AdminToolbar,
+} from "@components/AdminLayout";
+
+import {
   API_FOLDER,
 } from "@helpers/config";
 
@@ -13,9 +25,7 @@ const SCHEDULE_URL =
   `${API_FOLDER}/v2/admin/pub/schedule.php`;
 
 
-export default function PubScheduleControls({
-  onBack,
-}) {
+export default function PubScheduleControls() {
   const [
     config,
     setConfig,
@@ -68,7 +78,6 @@ export default function PubScheduleControls({
       ""
     );
 
-
     try {
       const params =
         new URLSearchParams({
@@ -81,7 +90,6 @@ export default function PubScheduleControls({
             ),
         });
 
-
       const res =
         await fetch(
           `${SCHEDULE_URL}?${params.toString()}`,
@@ -91,10 +99,8 @@ export default function PubScheduleControls({
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -106,7 +112,6 @@ export default function PubScheduleControls({
           "Failed to load Schedule controls."
         );
       }
-
 
       setConfig(
         normalizeConfig(
@@ -138,7 +143,6 @@ export default function PubScheduleControls({
       return;
     }
 
-
     setSavingSettings(
       true
     );
@@ -150,7 +154,6 @@ export default function PubScheduleControls({
     setMessage(
       ""
     );
-
 
     try {
       const res =
@@ -191,10 +194,8 @@ export default function PubScheduleControls({
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -206,7 +207,6 @@ export default function PubScheduleControls({
           "Failed to save Schedule settings."
         );
       }
-
 
       setConfig(
         normalizeConfig(
@@ -239,9 +239,7 @@ export default function PubScheduleControls({
       config
         ?.channel_rules
         ?.find(
-          (
-            item
-          ) =>
+          (item) =>
             String(
               item
                 ?.channel ||
@@ -257,11 +255,9 @@ export default function PubScheduleControls({
               .toLowerCase()
         );
 
-
     if (!rule) {
       return;
     }
-
 
     setSavingChannel(
       rule.channel
@@ -274,7 +270,6 @@ export default function PubScheduleControls({
     setMessage(
       ""
     );
-
 
     try {
       const res =
@@ -329,10 +324,8 @@ export default function PubScheduleControls({
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -344,7 +337,6 @@ export default function PubScheduleControls({
           `Failed to save ${rule.channel} Schedule controls.`
         );
       }
-
 
       setConfig(
         normalizeConfig(
@@ -375,13 +367,10 @@ export default function PubScheduleControls({
     value
   ) {
     setConfig(
-      (
-        current
-      ) => {
+      (current) => {
         if (!current) {
           return current;
         }
-
 
         return {
           ...current,
@@ -404,13 +393,10 @@ export default function PubScheduleControls({
     value
   ) {
     setConfig(
-      (
-        current
-      ) => {
+      (current) => {
         if (!current) {
           return current;
         }
-
 
         return {
           ...current,
@@ -419,9 +405,7 @@ export default function PubScheduleControls({
             current
               .channel_rules
               .map(
-                (
-                  rule
-                ) =>
+                (rule) =>
                   rule.channel ===
                   channel
                     ? {
@@ -453,144 +437,94 @@ export default function PubScheduleControls({
     );
 
 
+  if (
+    loading
+    &&
+    !config
+  ) {
+    return (
+      <AdminEmptyState
+        title="Schedule Controls"
+
+        message="Loading Schedule controls..."
+      />
+    );
+  }
+
+
   return (
-    <div
-      className="admin-detail-workarea"
-      style={
-        pageStyle
-      }
-    >
-      <div
-        style={
-          pageHeaderStyle
-        }
-      >
-        <div>
-          <div
-            style={
-              titleStyle
-            }
-          >
-            Schedule Controls
-          </div>
-
-          <div
-            style={
-              subtitleStyle
-            }
-          >
-            Automatic publishing rules. These settings do not affect Manual Send Now.
-          </div>
-        </div>
-
-
-        <button
-          type="button"
-          onClick={
-            onBack
-          }
-        >
-          Back to Schedule
-        </button>
-      </div>
-
-
+    <AdminStack gap="md">
       {error ? (
-        <div
-          style={
-            errorStyle
-          }
-        >
+        <AdminNotice variant="danger">
           {error}
-        </div>
+        </AdminNotice>
       ) : null}
 
 
       {message ? (
-        <div
-          style={
-            messageStyle
-          }
-        >
+        <AdminNotice variant="success">
           {message}
-        </div>
+        </AdminNotice>
       ) : null}
 
 
-      {loading ? (
-        <div
-          style={
-            mutedStyle
-          }
-        >
-          Loading Schedule controls...
-        </div>
-      ) : config ? (
+      {config ? (
         <>
-          <section
-            style={
-              sectionStyle
-            }
-          >
-            <div
-              style={
-                sectionTitleStyle
-              }
-            >
-              Master
-            </div>
+          <AdminPanel
+            title="Master"
 
-            <div
-              style={
-                cardStyle
-              }
-            >
-              <label
-                className="admin-field"
-                style={
-                  checkboxFieldStyle
+            compact
+
+            actions={
+              <AdminButton
+                type="button"
+
+                disabled={
+                  savingSettings
+                }
+
+                onClick={
+                  saveSettings
                 }
               >
-                <span
-                  className="admin-field__label"
-                >
-                  Automatic Schedule
-                </span>
+                {
+                  savingSettings
+                    ? "Saving..."
+                    : "Save Master"
+                }
+              </AdminButton>
+            }
+          >
+            <AdminToolbar compact>
+              <AdminCheckboxRow
+                checked={
+                  Boolean(
+                    config
+                      .settings
+                      .scheduler_enabled
+                  )
+                }
 
-                <input
-                  type="checkbox"
-
-                  checked={
-                    Boolean(
-                      config
-                        .settings
-                        .scheduler_enabled
-                    )
-                  }
-
-                  onChange={(
+                onChange={(
+                  event
+                ) =>
+                  updateSettings(
+                    "scheduler_enabled",
                     event
-                  ) =>
-                    updateSettings(
-                      "scheduler_enabled",
-                      event
-                        .target
-                        .checked
-                    )
-                  }
-                />
-              </label>
-
-
-              <label
-                className="admin-field"
+                      .target
+                      .checked
+                  )
+                }
               >
-                <span
-                  className="admin-field__label"
-                >
-                  Timezone
-                </span>
+                Automatic Schedule
+              </AdminCheckboxRow>
 
+
+              <AdminField
+                label="Timezone"
+
+                compact
+              >
                 <input
                   className="admin-field__control"
 
@@ -613,241 +547,182 @@ export default function PubScheduleControls({
                     )
                   }
                 />
-              </label>
-
-
-              <div
-                style={
-                  actionRowStyle
-                }
-              >
-                <button
-                  type="button"
-
-                  disabled={
-                    savingSettings
-                  }
-
-                  onClick={
-                    saveSettings
-                  }
-                >
-                  {
-                    savingSettings
-                      ? "Saving..."
-                      : "Save Master Controls"
-                  }
-                </button>
-              </div>
-            </div>
-          </section>
+              </AdminField>
+            </AdminToolbar>
+          </AdminPanel>
 
 
           {rules.map(
-            (
-              rule
-            ) => (
-              <section
+            (rule) => (
+              <AdminPanel
                 key={
                   rule.channel
                 }
 
-                style={
-                  sectionStyle
+                title={
+                  humanize(
+                    rule.channel
+                  )
+                }
+
+                compact
+
+                actions={
+                  <AdminButton
+                    type="button"
+
+                    disabled={
+                      savingChannel ===
+                      rule.channel
+                    }
+
+                    onClick={() =>
+                      saveChannelRule(
+                        rule.channel
+                      )
+                    }
+                  >
+                    {
+                      savingChannel ===
+                      rule.channel
+                        ? "Saving..."
+                        : "Save"
+                    }
+                  </AdminButton>
                 }
               >
-                <div
-                  style={
-                    sectionTitleStyle
-                  }
-                >
-                  {
-                    humanize(
-                      rule.channel
-                    )
-                  }
-                </div>
+                <AdminStack gap="sm">
+                  <AdminCheckboxRow
+                    checked={
+                      Boolean(
+                        rule.enabled
+                      )
+                    }
 
-                <div
-                  style={
-                    cardStyle
-                  }
-                >
-                  <label
-                    className="admin-field"
-                    style={
-                      checkboxFieldStyle
+                    onChange={(
+                      event
+                    ) =>
+                      updateChannelRule(
+                        rule.channel,
+                        "enabled",
+                        event
+                          .target
+                          .checked
+                      )
                     }
                   >
-                    <span
-                      className="admin-field__label"
+                    Channel Enabled
+                  </AdminCheckboxRow>
+
+
+                  <AdminToolbar compact>
+                    <AdminField
+                      label="Release Interval (minutes)"
+
+                      compact
                     >
-                      Channel Enabled
-                    </span>
+                      <input
+                        className="admin-field__control"
 
-                    <input
-                      type="checkbox"
+                        type="number"
 
-                      checked={
-                        Boolean(
-                          rule.enabled
-                        )
-                      }
+                        min="1"
 
-                      onChange={(
-                        event
-                      ) =>
-                        updateChannelRule(
-                          rule.channel,
-                          "enabled",
+                        value={
+                          rule
+                            .release_interval_minutes
+                        }
+
+                        onChange={(
                           event
-                            .target
-                            .checked
-                        )
-                      }
-                    />
-                  </label>
+                        ) =>
+                          updateChannelRule(
+                            rule.channel,
+                            "release_interval_minutes",
+                            event
+                              .target
+                              .value
+                          )
+                        }
+                      />
+                    </AdminField>
 
 
-                  <label
-                    className="admin-field"
-                  >
-                    <span
-                      className="admin-field__label"
+                    <AdminField
+                      label="Same Source Max"
+
+                      compact
                     >
-                      Release Interval (minutes)
-                    </span>
+                      <input
+                        className="admin-field__control"
 
-                    <input
-                      className="admin-field__control"
+                        type="number"
 
-                      type="number"
-                      min="1"
+                        min="1"
 
-                      value={
-                        rule
-                          .release_interval_minutes
-                      }
+                        value={
+                          rule
+                            .same_source_max
+                        }
 
-                      onChange={(
-                        event
-                      ) =>
-                        updateChannelRule(
-                          rule.channel,
-                          "release_interval_minutes",
+                        onChange={(
                           event
-                            .target
-                            .value
-                        )
-                      }
-                    />
-                  </label>
+                        ) =>
+                          updateChannelRule(
+                            rule.channel,
+                            "same_source_max",
+                            event
+                              .target
+                              .value
+                          )
+                        }
+                      />
+                    </AdminField>
 
 
-                  <label
-                    className="admin-field"
-                  >
-                    <span
-                      className="admin-field__label"
+                    <AdminField
+                      label="Same Source Window (minutes)"
+
+                      compact
                     >
-                      Same Source Max
-                    </span>
+                      <input
+                        className="admin-field__control"
 
-                    <input
-                      className="admin-field__control"
+                        type="number"
 
-                      type="number"
-                      min="1"
+                        min="1"
 
-                      value={
-                        rule
-                          .same_source_max
-                      }
+                        value={
+                          rule
+                            .same_source_window_minutes
+                        }
 
-                      onChange={(
-                        event
-                      ) =>
-                        updateChannelRule(
-                          rule.channel,
-                          "same_source_max",
+                        onChange={(
                           event
-                            .target
-                            .value
-                        )
-                      }
-                    />
-                  </label>
-
-
-                  <label
-                    className="admin-field"
-                  >
-                    <span
-                      className="admin-field__label"
-                    >
-                      Same Source Window (minutes)
-                    </span>
-
-                    <input
-                      className="admin-field__control"
-
-                      type="number"
-                      min="1"
-
-                      value={
-                        rule
-                          .same_source_window_minutes
-                      }
-
-                      onChange={(
-                        event
-                      ) =>
-                        updateChannelRule(
-                          rule.channel,
-                          "same_source_window_minutes",
-                          event
-                            .target
-                            .value
-                        )
-                      }
-                    />
-                  </label>
-
-
-                  <div
-                    style={
-                      actionRowStyle
-                    }
-                  >
-                    <button
-                      type="button"
-
-                      disabled={
-                        savingChannel ===
-                        rule.channel
-                      }
-
-                      onClick={() =>
-                        saveChannelRule(
-                          rule.channel
-                        )
-                      }
-                    >
-                      {
-                        savingChannel ===
-                        rule.channel
-                          ? "Saving..."
-                          : `Save ${humanize(rule.channel)} Controls`
-                      }
-                    </button>
-                  </div>
-                </div>
-              </section>
+                        ) =>
+                          updateChannelRule(
+                            rule.channel,
+                            "same_source_window_minutes",
+                            event
+                              .target
+                              .value
+                          )
+                        }
+                      />
+                    </AdminField>
+                  </AdminToolbar>
+                </AdminStack>
+              </AdminPanel>
             )
           )}
+
+
+          <AdminMetaText as="div">
+            Schedule changes take effect after their individual Save button is used.
+          </AdminMetaText>
         </>
       ) : null}
-    </div>
+    </AdminStack>
   );
 }
 
@@ -863,7 +738,6 @@ function normalizeConfig(
       ? raw.settings
       : {};
 
-
   const rules =
     Array.isArray(
       raw
@@ -871,7 +745,6 @@ function normalizeConfig(
     )
       ? raw.channel_rules
       : [];
-
 
   return {
     settings: {
@@ -891,9 +764,7 @@ function normalizeConfig(
 
     channel_rules:
       rules.map(
-        (
-          rule
-        ) => ({
+        (rule) => ({
           channel:
             String(
               rule
@@ -948,154 +819,8 @@ function humanize(
     )
     .replace(
       /\b\w/g,
-      (
-        character
-      ) =>
+      (character) =>
         character
           .toUpperCase()
     );
 }
-
-
-const pageStyle = {
-  padding:
-    "16px 18px 28px",
-  overflow:
-    "auto",
-};
-
-
-const pageHeaderStyle = {
-  display:
-    "flex",
-  alignItems:
-    "flex-start",
-  justifyContent:
-    "space-between",
-  gap:
-    16,
-  marginBottom:
-    18,
-};
-
-
-const titleStyle = {
-  fontSize:
-    18,
-  fontWeight:
-    700,
-};
-
-
-const subtitleStyle = {
-  marginTop:
-    4,
-  color:
-    "#64748b",
-  fontSize:
-    12,
-};
-
-
-const sectionStyle = {
-  marginBottom:
-    20,
-};
-
-
-const sectionTitleStyle = {
-  marginBottom:
-    7,
-  color:
-    "#526273",
-  fontSize:
-    11,
-  fontWeight:
-    800,
-  letterSpacing:
-    "0.05em",
-  textTransform:
-    "uppercase",
-};
-
-
-const cardStyle = {
-  display:
-    "grid",
-  gridTemplateColumns:
-    "repeat(auto-fit, minmax(220px, 1fr))",
-  gap:
-    14,
-  padding:
-    14,
-  border:
-    "1px solid #d8dde3",
-  borderRadius:
-    4,
-  background:
-    "#ffffff",
-};
-
-
-const checkboxFieldStyle = {
-  display:
-    "flex",
-  flexDirection:
-    "column",
-  justifyContent:
-    "flex-end",
-  gap:
-    9,
-};
-
-
-const actionRowStyle = {
-  display:
-    "flex",
-  alignItems:
-    "flex-end",
-  justifyContent:
-    "flex-end",
-};
-
-
-const errorStyle = {
-  marginBottom:
-    12,
-  padding:
-    "8px 10px",
-  border:
-    "1px solid #e2baba",
-  background:
-    "#fff7f7",
-  color:
-    "#7d2e2e",
-  fontSize:
-    12,
-};
-
-
-const messageStyle = {
-  marginBottom:
-    12,
-  padding:
-    "8px 10px",
-  border:
-    "1px solid #b8d8c0",
-  background:
-    "#f3faf5",
-  color:
-    "#2f6840",
-  fontSize:
-    12,
-  fontWeight:
-    600,
-};
-
-
-const mutedStyle = {
-  color:
-    "#64748b",
-  fontSize:
-    12,
-};

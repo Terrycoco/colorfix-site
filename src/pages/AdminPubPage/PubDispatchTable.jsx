@@ -5,8 +5,18 @@ import {
 } from "react";
 
 import {
+  AdminBadge,
+  AdminButton,
   AdminDataGrid,
   AdminEmptyState,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminStack,
+  AdminToolbar,
+  AdminToolbarSpacer,
+  useAdminDialog,
 } from "@components/AdminLayout";
 
 import {
@@ -23,19 +33,17 @@ const DISPATCH_URL =
 const CONNECTION_URL =
   `${API_FOLDER}/v2/admin/pub/channel-connection.php`;
 
-/*
- * Preserve the already-working public Pinterest OAuth route.
- * Its implementation can now be only a thin door into app/PUB.
- */
 const PINTEREST_CONNECT_URL =
   `${API_FOLDER}/v2/admin/pub/pinterest-oauth-start.php`;
-
 
 const YOUTUBE_CONNECT_URL =
   `${API_FOLDER}/v2/admin/pub/youtube-oauth-start.php`;
 
 
 export default function PubDispatchTable() {
+  const dialog =
+    useAdminDialog();
+
   const [
     assets,
     setAssets,
@@ -82,37 +90,11 @@ export default function PubDispatchTable() {
   ] = useState(null);
 
   const [
-    drawerOpen,
-    setDrawerOpen,
-  ] = useState(false);
-
-  const [
-    drawerAsset,
-    setDrawerAsset,
-  ] = useState(null);
-
-  const [
-    drawerLoading,
-    setDrawerLoading,
-  ] = useState(false);
-
-  const [
-    drawerError,
-    setDrawerError,
-  ] = useState("");
-
-  const [
     retryingAssetId,
     setRetryingAssetId,
   ] = useState(null);
 
 
-  /*
-   * CHANNEL CONNECTION
-   *
-   * This is deliberately separate from DispatchManager.
-   * The UI talks to PUB's channel-connection endpoint.
-   */
   const [
     pinterestConnection,
     setPinterestConnection,
@@ -153,7 +135,6 @@ export default function PubDispatchTable() {
       ""
     );
 
-
     try {
       const params =
         new URLSearchParams({
@@ -163,7 +144,6 @@ export default function PubDispatchTable() {
             ),
         });
 
-
       if (channelFilter) {
         params.set(
           "channel",
@@ -171,14 +151,12 @@ export default function PubDispatchTable() {
         );
       }
 
-
       if (typeFilter) {
         params.set(
           "asset_type",
           typeFilter
         );
       }
-
 
       const res =
         await fetch(
@@ -189,10 +167,8 @@ export default function PubDispatchTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -205,7 +181,6 @@ export default function PubDispatchTable() {
         );
       }
 
-
       const nextAssets =
         Array.isArray(
           data.items
@@ -213,51 +188,36 @@ export default function PubDispatchTable() {
           ? data.items
           : [];
 
-
       setAssets(
         nextAssets
       );
 
-
-      if (
-        selectedAsset
-          ?.pub_asset_id
-      ) {
-        const refreshed =
-          nextAssets.find(
-            (
-              asset
-            ) =>
-              Number(
-                asset
-                  .pub_asset_id
-              ) ===
-              Number(
-                selectedAsset
-                  .pub_asset_id
-              )
-          );
-
-
-        if (refreshed) {
-          setSelectedAsset(
-            refreshed
-          );
-
-
-          if (drawerOpen) {
-            await loadDrawerAsset(
-              refreshed
-                .pub_asset_id
-            );
+      setSelectedAsset(
+        (current) => {
+          if (
+            !current
+              ?.pub_asset_id
+          ) {
+            return current;
           }
 
-        } else {
-          setSelectedAsset(
+          return (
+            nextAssets.find(
+              (asset) =>
+                Number(
+                  asset
+                    .pub_asset_id
+                ) ===
+                Number(
+                  current
+                    .pub_asset_id
+                )
+            )
+            ||
             null
           );
         }
-      }
+      );
 
     } catch (err) {
       setError(
@@ -286,7 +246,6 @@ export default function PubDispatchTable() {
             ),
         });
 
-
       const res =
         await fetch(
           `${DISPATCH_URL}?${params.toString()}`,
@@ -296,10 +255,8 @@ export default function PubDispatchTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -311,7 +268,6 @@ export default function PubDispatchTable() {
           "Failed to load Dispatch filters."
         );
       }
-
 
       setChannels(
         Array.isArray(
@@ -343,7 +299,6 @@ export default function PubDispatchTable() {
       true
     );
 
-
     try {
       const params =
         new URLSearchParams({
@@ -356,7 +311,6 @@ export default function PubDispatchTable() {
             ),
         });
 
-
       const res =
         await fetch(
           `${CONNECTION_URL}?${params.toString()}`,
@@ -366,10 +320,8 @@ export default function PubDispatchTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -381,7 +333,6 @@ export default function PubDispatchTable() {
           "Failed to load Pinterest connection."
         );
       }
-
 
       setPinterestConnection(
         data.item ||
@@ -476,7 +427,6 @@ export default function PubDispatchTable() {
       ""
     );
 
-
     try {
       const res =
         await fetch(
@@ -503,10 +453,8 @@ export default function PubDispatchTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -518,7 +466,6 @@ export default function PubDispatchTable() {
           `Pinterest ${action} failed.`
         );
       }
-
 
       if (
         action ===
@@ -547,7 +494,6 @@ export default function PubDispatchTable() {
           "Pinterest disconnected."
         );
       }
-
 
       await loadPinterestConnection();
 
@@ -656,32 +602,19 @@ export default function PubDispatchTable() {
   ]);
 
 
-  /*
-   * ASYNC DISPATCH WATCH
-   *
-   * A driver may still be out on the road after this screen mounts.
-   * While any visible asset is SHIPPING, refresh periodically so the
-   * workbench naturally changes to SHIPPED or ERROR when the driver
-   * reports back to DispatchDesk.
-   */
   useEffect(() => {
     const hasShipping =
       assets.some(
         (asset) =>
-          String(
-            asset?.pipeline_stage ||
-            ""
-          )
-            .trim()
-            .toLowerCase() ===
+          normalizedStage(
+            asset
+          ) ===
           "shipping"
       );
-
 
     if (!hasShipping) {
       return undefined;
     }
-
 
     const timer =
       window.setInterval(
@@ -690,7 +623,6 @@ export default function PubDispatchTable() {
         },
         3000
       );
-
 
     return () => {
       window.clearInterval(
@@ -701,8 +633,6 @@ export default function PubDispatchTable() {
     assets,
     channelFilter,
     typeFilter,
-    drawerOpen,
-    selectedAsset?.pub_asset_id,
   ]);
 
 
@@ -711,11 +641,6 @@ export default function PubDispatchTable() {
     loadPinterestConnection();
     loadYoutubeConnection();
 
-
-    /*
-     * OAuth returns to the admin app with the result in the query.
-     * Surface either Pinterest or YouTube status here.
-     */
     const params =
       new URLSearchParams(
         window.location.search
@@ -736,7 +661,6 @@ export default function PubDispatchTable() {
         "message"
       );
 
-
     if (pinterestAuthStatus) {
       if (
         pinterestAuthStatus ===
@@ -754,7 +678,6 @@ export default function PubDispatchTable() {
         );
       }
     }
-
 
     if (youtubeAuthStatus) {
       setChannelFilter(
@@ -778,7 +701,6 @@ export default function PubDispatchTable() {
       }
     }
 
-
     if (
       pinterestAuthStatus
       ||
@@ -796,10 +718,8 @@ export default function PubDispatchTable() {
         "message"
       );
 
-
       const query =
         params.toString();
-
 
       window.history.replaceState(
         {},
@@ -814,135 +734,6 @@ export default function PubDispatchTable() {
   }, []);
 
 
-  async function loadDrawerAsset(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        0
-      );
-
-
-    if (!id) {
-      return;
-    }
-
-
-    setDrawerLoading(
-      true
-    );
-
-    setDrawerError(
-      ""
-    );
-
-
-    try {
-      const params =
-        new URLSearchParams({
-          pub_asset_id:
-            String(
-              id
-            ),
-
-          _:
-            String(
-              Date.now()
-            ),
-        });
-
-
-      const res =
-        await fetch(
-          `${DISPATCH_URL}?${params.toString()}`,
-          {
-            credentials:
-              "include",
-          }
-        );
-
-
-      const data =
-        await res.json();
-
-
-      if (
-        !res.ok
-        ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "Could not load Dispatch details."
-        );
-      }
-
-
-      setDrawerAsset(
-        data.item ||
-        null
-      );
-
-    } catch (err) {
-      setDrawerError(
-        err?.message ||
-        "Could not load Dispatch details."
-      );
-
-    } finally {
-      setDrawerLoading(
-        false
-      );
-    }
-  }
-
-
-  function selectAsset(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-
-    if (drawerOpen) {
-      loadDrawerAsset(
-        asset
-          .pub_asset_id
-      );
-    }
-  }
-
-
-  function openDrawer(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-    setDrawerOpen(
-      true
-    );
-
-    loadDrawerAsset(
-      asset
-        .pub_asset_id
-    );
-  }
-
-
-  /*
-   * RETRY ONE DISPATCH ERROR
-   *
-   * First attempt and explicit retry use the same one-box Dispatch
-   * endpoint. DispatchManager owns:
-   *
-   *   error / dispatch -> shipping
-   *
-   * The UI never rewrites lifecycle state itself.
-   */
   async function retryShipping(
     pubAssetId
   ) {
@@ -952,73 +743,84 @@ export default function PubDispatchTable() {
         0
       );
 
-
     if (!id) {
-      return;
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     const asset =
       assets.find(
         (item) =>
           Number(
-            item?.pub_asset_id ||
+            item
+              ?.pub_asset_id ||
             0
           ) === id
       )
       ||
       (
         Number(
-          drawerAsset?.pub_asset_id ||
+          selectedAsset
+            ?.pub_asset_id ||
           0
         ) === id
-          ? drawerAsset
+          ? selectedAsset
           : null
       );
 
-
-    const stage =
-      String(
-        asset?.pipeline_stage ||
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-    const errorStage =
-      String(
-        asset?.error_stage ||
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-
     if (
-      stage !== "error"
+      normalizedStage(
+        asset
+      ) !==
+        "error"
       ||
-      errorStage !== "dispatch"
+      normalizedErrorStage(
+        asset
+      ) !==
+        "dispatch"
     ) {
+      const message =
+        `Asset #${id} is not a retryable Dispatch error.`;
+
       setError(
-        `Asset #${id} is not a retryable Dispatch error.`
+        message
       );
 
-      return;
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
     }
 
+    const confirmed =
+      await dialog.confirm({
+        title:
+          "Retry shipping?",
 
-    const ok =
-      window.confirm(
-        `Retry shipping asset #${id}?\n\n`
-        + "If the external service accepted part of the previous attempt "
-        + "before the failure was reported, a retry could create a duplicate."
-      );
+        message:
+          `Retry shipping asset #${id}? If the external service accepted part of the previous attempt before the failure was reported, a retry could create a duplicate.`,
 
+        confirmLabel:
+          "Retry Shipping",
 
-    if (!ok) {
-      return;
+        cancelLabel:
+          "Cancel",
+      });
+
+    if (!confirmed) {
+      return {
+        ok:
+          false,
+        cancelled:
+          true,
+      };
     }
-
 
     setRetryingAssetId(
       id
@@ -1028,14 +830,9 @@ export default function PubDispatchTable() {
       ""
     );
 
-    setDrawerError(
-      ""
-    );
-
     setStatusMessage(
       ""
     );
-
 
     try {
       const res =
@@ -1061,10 +858,8 @@ export default function PubDispatchTable() {
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -1085,7 +880,6 @@ export default function PubDispatchTable() {
         );
       }
 
-
       if (
         data
           ?.result
@@ -1101,29 +895,30 @@ export default function PubDispatchTable() {
         );
       }
 
-
       await loadAssets();
 
-      if (drawerOpen) {
-        await loadDrawerAsset(
-          id
-        );
-      }
+      return {
+        ok:
+          true,
+      };
 
     } catch (err) {
-      setError(
+      const message =
         err?.message ||
-        `Asset #${id} could not restart Dispatch.`
-      );
+        `Asset #${id} could not restart Dispatch.`;
 
+      setError(
+        message
+      );
 
       await loadAssets();
 
-      if (drawerOpen) {
-        await loadDrawerAsset(
-          id
-        );
-      }
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setRetryingAssetId(
@@ -1152,7 +947,6 @@ export default function PubDispatchTable() {
               ),
         },
 
-
         {
           key:
             "channel",
@@ -1166,7 +960,6 @@ export default function PubDispatchTable() {
                 asset.channel
               ),
         },
-
 
         {
           key:
@@ -1183,7 +976,6 @@ export default function PubDispatchTable() {
               ),
         },
 
-
         {
           key:
             "search_title",
@@ -1198,7 +990,6 @@ export default function PubDispatchTable() {
               "—",
         },
 
-
         {
           key:
             "pipeline_stage",
@@ -1209,30 +1000,24 @@ export default function PubDispatchTable() {
           render:
             (asset) => {
               const stage =
-                String(
+                normalizedStage(
                   asset
-                    .pipeline_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
-
+                );
 
               if (!stage) {
                 return "—";
               }
 
-
               return (
-                <span
-                  style={
+                <AdminBadge
+                  variant={
                     stage ===
                       "error"
-                      ? errorStageStyle
+                      ? "danger"
                       : stage ===
                           "shipping"
-                        ? shippingStageStyle
-                        : shippedStageStyle
+                        ? "warning"
+                        : "success"
                   }
                 >
                   {
@@ -1240,19 +1025,16 @@ export default function PubDispatchTable() {
                       stage
                     )
                   }
-                </span>
+                </AdminBadge>
               );
             },
 
           sortValue:
             (asset) =>
-              String(
+              normalizedStage(
                 asset
-                  .pipeline_stage ||
-                ""
               ),
         },
-
 
         {
           key:
@@ -1261,88 +1043,49 @@ export default function PubDispatchTable() {
           label:
             "Error",
 
-          render:
+          value:
             (asset) => {
-              const stage =
-                String(
-                  asset
-                    ?.pipeline_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
-
-              const errorStage =
-                String(
-                  asset
-                    ?.error_stage ||
-                  ""
-                )
-                  .trim()
-                  .toLowerCase();
-
-              const code =
-                String(
-                  asset
-                    ?.error_code ||
-                  ""
-                )
-                  .trim();
-
-              const message =
-                String(
-                  asset
-                    ?.error_message ||
-                  ""
-                )
-                  .trim();
-
               if (
-                stage !== "error"
+                normalizedStage(
+                  asset
+                ) !==
+                  "error"
                 ||
-                errorStage !== "dispatch"
+                normalizedErrorStage(
+                  asset
+                ) !==
+                  "dispatch"
               ) {
                 return "—";
               }
 
-              const fullText =
+              const text =
                 [
-                  code,
-                  message,
-                ]
-                  .filter(Boolean)
-                  .join(": ");
+                  String(
+                    asset
+                      ?.error_code ||
+                    ""
+                  ).trim(),
 
-              if (!fullText) {
-                return "Dispatch error";
-              }
+                  String(
+                    asset
+                      ?.error_message ||
+                    ""
+                  ).trim(),
+                ]
+                  .filter(
+                    Boolean
+                  )
+                  .join(
+                    ": "
+                  );
 
               return (
-                <span
-                  title={
-                    fullText
-                  }
-
-                  style={
-                    dispatchErrorTextStyle
-                  }
-                >
-                  {fullText}
-                </span>
+                text ||
+                "Dispatch error"
               );
             },
-
-          sortValue:
-            (asset) =>
-              String(
-                asset
-                  ?.error_message ||
-                asset
-                  ?.error_code ||
-                ""
-              ),
         },
-
 
         {
           key:
@@ -1357,9 +1100,13 @@ export default function PubDispatchTable() {
                 asset
               )
                 ? (
-                    <Check
-                      label="Shipped"
-                    />
+                    <AdminBadge
+                      variant="success"
+                      title="Shipped"
+                      aria-label="Shipped"
+                    >
+                      ✓
+                    </AdminBadge>
                   )
                 : "",
 
@@ -1371,7 +1118,6 @@ export default function PubDispatchTable() {
                 ? 1
                 : 0,
         },
-
 
         {
           key:
@@ -1386,9 +1132,13 @@ export default function PubDispatchTable() {
                 asset
               )
                 ? (
-                    <Check
-                      label="Shipping receipt saved"
-                    />
+                    <AdminBadge
+                      variant="success"
+                      title="Shipping receipt saved"
+                      aria-label="Shipping receipt saved"
+                    >
+                      ✓
+                    </AdminBadge>
                   )
                 : "",
 
@@ -1400,7 +1150,6 @@ export default function PubDispatchTable() {
                 ? 1
                 : 0,
         },
-
 
         {
           key:
@@ -1415,7 +1164,6 @@ export default function PubDispatchTable() {
                 .external_id ||
               "—",
         },
-
 
         {
           key:
@@ -1458,7 +1206,6 @@ export default function PubDispatchTable() {
                 ? 1
                 : 0,
         },
-
 
         {
           key:
@@ -1524,22 +1271,14 @@ export default function PubDispatchTable() {
         ?.pub_asset_id
     )
     &&
-    String(
+    normalizedStage(
       selectedAsset
-        ?.pipeline_stage ||
-      ""
-    )
-      .trim()
-      .toLowerCase() ===
+    ) ===
       "error"
     &&
-    String(
+    normalizedErrorStage(
       selectedAsset
-        ?.error_stage ||
-      ""
-    )
-      .trim()
-      .toLowerCase() ===
+    ) ===
       "dispatch"
     &&
     Number(
@@ -1552,16 +1291,7 @@ export default function PubDispatchTable() {
       0
     );
 
-  /*
-   * CONNECTION PANEL CHANNEL.
-   *
-   * If the operator explicitly filters by Channel, honor that.
-   *
-   * Otherwise infer the channel when the currently visible Dispatch
-   * result set belongs to exactly one channel. This matters when the
-   * operator chooses a channel-specific Type (for example YouTube Video)
-   * while leaving Channel = All.
-   */
+
   const visibleChannels =
     [
       ...new Set(
@@ -1582,7 +1312,6 @@ export default function PubDispatchTable() {
       ),
     ];
 
-
   const connectionPanelChannel =
     String(
       channelFilter ||
@@ -1595,7 +1324,6 @@ export default function PubDispatchTable() {
     )
       .trim()
       .toLowerCase();
-
 
 
   if (
@@ -1614,270 +1342,217 @@ export default function PubDispatchTable() {
 
 
   return (
-    <div
-      style={
-        workbenchShellStyle
-      }
-    >
-      <div
-        className="admin-detail-workarea"
-
-        style={
-          workbenchMainStyle
-        }
-      >
-        <div
-          style={
-            filterBarStyle
-          }
+    <div className="admin-detail-workarea">
+      <AdminToolbar>
+        <AdminField
+          label="Channel"
+          compact
         >
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Channel
-            </span>
+          <select
+            className="admin-field__control"
 
-            <select
-              className="admin-field__control"
-
-              value={
-                channelFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setChannelFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
-            >
-              <option value="">
-                All
-              </option>
-
-              {channels.map(
-                (
-                  channel
-                ) => (
-                  <option
-                    key={
-                      channel
-                    }
-
-                    value={
-                      channel
-                    }
-                  >
-                    {
-                      humanize(
-                        channel
-                      )
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Type
-            </span>
-
-            <select
-              className="admin-field__control"
-
-              value={
-                typeFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setTypeFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
-            >
-              <option value="">
-                All
-              </option>
-
-              {assetTypes.map(
-                (
-                  assetType
-                ) => (
-                  <option
-                    key={
-                      assetType
-                    }
-
-                    value={
-                      assetType
-                    }
-                  >
-                    {
-                      humanize(
-                        assetType
-                      )
-                    }
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-
-          <button
-            type="button"
-
-            onClick={() => {
-              retryShipping(
-                selectedAsset
-                  ?.pub_asset_id
-              );
-            }}
-
-            disabled={
-              !canRetrySelected
+            value={
+              channelFilter
             }
-          >
-            {
-              retryingAssetId
-              &&
-              Number(
-                retryingAssetId
-              ) ===
-              Number(
-                selectedAsset
-                  ?.pub_asset_id ||
-                0
+
+            onChange={(
+              event
+            ) =>
+              setChannelFilter(
+                event
+                  .target
+                  .value
               )
-                ? "Retrying..."
-                : "Retry Shipping"
-            }
-          </button>
-
-
-          <button
-            type="button"
-
-            onClick={() => {
-              loadAssets();
-              loadFilters();
-            }}
-
-            disabled={
-              loading
-            }
-
-            style={
-              refreshButtonStyle
             }
           >
-            {
-              loading
-                ? "Refreshing Assets..."
-                : "Refresh Assets"
+            <option value="">
+              All
+            </option>
+
+            {channels.map(
+              (channel) => (
+                <option
+                  key={
+                    channel
+                  }
+
+                  value={
+                    channel
+                  }
+                >
+                  {
+                    humanize(
+                      channel
+                    )
+                  }
+                </option>
+              )
+            )}
+          </select>
+        </AdminField>
+
+
+        <AdminField
+          label="Type"
+          compact
+        >
+          <select
+            className="admin-field__control"
+
+            value={
+              typeFilter
             }
-          </button>
 
-
-          <div
-            style={
-              countStyle
+            onChange={(
+              event
+            ) =>
+              setTypeFilter(
+                event
+                  .target
+                  .value
+              )
             }
           >
-            {assets.length} asset
-            {
-              assets.length === 1
-                ? ""
-                : "s"
-            }
-          </div>
-        </div>
+            <option value="">
+              All
+            </option>
+
+            {assetTypes.map(
+              (assetType) => (
+                <option
+                  key={
+                    assetType
+                  }
+
+                  value={
+                    assetType
+                  }
+                >
+                  {
+                    humanize(
+                      assetType
+                    )
+                  }
+                </option>
+              )
+            )}
+          </select>
+        </AdminField>
 
 
+        <AdminButton
+          type="button"
 
-        {connectionPanelChannel === "pinterest" ? (
-        <section
-          style={
-            connectionPanelStyle
+          variant="secondary"
+
+          onClick={() =>
+            retryShipping(
+              selectedAsset
+                ?.pub_asset_id
+            )
           }
 
-          aria-label="Pinterest connection"
+          disabled={
+            !canRetrySelected
+          }
         >
-          <div
-            style={
-              connectionHeadingStyle
-            }
-          >
-            <div>
-              <div
-                style={
-                  connectionTitleStyle
+          {
+            retryingAssetId
+            &&
+            Number(
+              retryingAssetId
+            ) ===
+            Number(
+              selectedAsset
+                ?.pub_asset_id ||
+              0
+            )
+              ? "Retrying..."
+              : "Retry Shipping"
+          }
+        </AdminButton>
+
+
+        <AdminToolbarSpacer />
+
+
+        <AdminButton
+          type="button"
+
+          variant="secondary"
+
+          onClick={() => {
+            loadAssets();
+            loadFilters();
+          }}
+
+          disabled={
+            loading
+          }
+        >
+          {
+            loading
+              ? "Refreshing Assets..."
+              : "Refresh Assets"
+          }
+        </AdminButton>
+
+
+        <AdminMetaText as="div">
+          {assets.length} asset
+          {
+            assets.length === 1
+              ? ""
+              : "s"
+          }
+        </AdminMetaText>
+      </AdminToolbar>
+
+
+      {connectionPanelChannel ===
+      "pinterest" ? (
+        <AdminPanel
+          title="Pinterest"
+          compact
+        >
+          <AdminStack gap="sm">
+            <AdminMetaText as="div">
+              Connection:{" "}
+              <strong>
+                {
+                  connectionLoading
+                    ? "Checking..."
+                    : pinterestConnected
+                      ? "Connected ✓"
+                      : "Not connected"
                 }
-              >
-                Pinterest
-              </div>
+              </strong>
 
-              <div
-                style={
-                  connectionMetaStyle
-                }
-              >
-                Connection:{" "}
-                <strong>
-                  {
-                    connectionLoading
-                      ? "Checking..."
-                      : pinterestConnected
-                        ? "Connected ✓"
-                        : "Not connected"
-                  }
-                </strong>
+              {" · "}
 
-                {" · "}
-
-                Production board:{" "}
-                <strong>
-                  {
-                    productionBoard
-                      ?.board_name ||
-                    "ColorFix Makeovers"
-                  }
-                </strong>
-
+              Production board:{" "}
+              <strong>
                 {
                   productionBoard
-                    ?.board_id
-                    ? ` · ${productionBoard.board_id}`
-                    : ""
+                    ?.board_name ||
+                  "ColorFix Makeovers"
                 }
-              </div>
-            </div>
+              </strong>
 
-
-            <div
-              style={
-                connectionActionsStyle
+              {
+                productionBoard
+                  ?.board_id
+                  ? ` · ${productionBoard.board_id}`
+                  : ""
               }
-            >
-              <button
+            </AdminMetaText>
+
+
+            <AdminToolbar compact>
+              <AdminButton
                 type="button"
+
+                variant="secondary"
 
                 onClick={() =>
                   runConnectionAction(
@@ -1896,18 +1571,18 @@ export default function PubDispatchTable() {
                   connectionAction ===
                     "test"
                     ? "Testing..."
-                    : "Test Pinterest Connection"
+                    : "Test Connection"
                 }
-              </button>
+              </AdminButton>
 
 
-              <a
-                href={
-                  `${PINTEREST_CONNECT_URL}?return=${encodeURIComponent("/admin/pub")}`
-                }
+              <AdminButton
+                type="button"
 
-                style={
-                  linkButtonStyle
+                onClick={() =>
+                  window.location.assign(
+                    `${PINTEREST_CONNECT_URL}?return=${encodeURIComponent("/admin/pub")}`
+                  )
                 }
               >
                 {
@@ -1915,11 +1590,13 @@ export default function PubDispatchTable() {
                     ? "Reconnect Pinterest"
                     : "Connect Pinterest"
                 }
-              </a>
+              </AdminButton>
 
 
-              <button
+              <AdminButton
                 type="button"
+
+                variant="secondary"
 
                 onClick={() =>
                   runConnectionAction(
@@ -1938,13 +1615,15 @@ export default function PubDispatchTable() {
                   connectionAction ===
                     "sync"
                     ? "Syncing..."
-                    : "Sync Pinterest Boards"
+                    : "Sync Boards"
                 }
-              </button>
+              </AdminButton>
 
 
-              <button
+              <AdminButton
                 type="button"
+
+                variant="secondary"
 
                 onClick={
                   loadPinterestConnection
@@ -1954,166 +1633,142 @@ export default function PubDispatchTable() {
                   connectionLoading
                 }
               >
-                Refresh Pinterest
-              </button>
-            </div>
-          </div>
+                Refresh
+              </AdminButton>
+            </AdminToolbar>
 
 
-          {
-            pinterestConnection
-              ?.auth
-              ?.last_auth_error
-              ? (
-                  <div
-                    style={
-                      connectionErrorStyle
-                    }
-                  >
-                    {
-                      pinterestConnection
-                        .auth
-                        .last_auth_error
-                    }
-                  </div>
-                )
-              : null
-          }
-        </section>
-
-
-        ) : null}
-
-
-        {connectionPanelChannel === "youtube" ? (
-          <section
-            style={
-              connectionPanelStyle
-            }
-
-            aria-label="YouTube connection"
-          >
-            <div
-              style={
-                connectionHeadingStyle
-              }
-            >
-              <div>
-                <div
-                  style={
-                    connectionTitleStyle
-                  }
-                >
-                  YouTube
-                </div>
-
-                <div
-                  style={
-                    connectionMetaStyle
-                  }
-                >
-                  Connection:{" "}
-                  <strong>
-                    {
-                      youtubeConnectionLoading
-                        ? "Checking..."
-                        : youtubeConnected
-                          ? "Connected ✓"
-                          : "Not connected"
-                    }
-                  </strong>
-
-                  {Array.isArray(
-                    youtubeConnection
-                      ?.scopes_requested
+            {
+              pinterestConnection
+                ?.auth
+                ?.last_auth_error
+                ? (
+                    <AdminNotice variant="danger">
+                      {
+                        pinterestConnection
+                          .auth
+                          .last_auth_error
+                      }
+                    </AdminNotice>
                   )
-                    && youtubeConnection
-                      .scopes_requested
-                      .length
-                    ? (
-                        <>
-                          {" · "}
-                          Scope:{" "}
-                          <strong>
-                            {
-                              youtubeConnection
-                                .scopes_requested
-                                .join(", ")
-                            }
-                          </strong>
-                        </>
-                      )
-                    : null}
-                </div>
-              </div>
+                : null
+            }
+          </AdminStack>
+        </AdminPanel>
+      ) : null}
 
 
-              <div
-                style={
-                  connectionActionsStyle
+      {connectionPanelChannel ===
+      "youtube" ? (
+        <AdminPanel
+          title="YouTube"
+          compact
+        >
+          <AdminStack gap="sm">
+            <AdminMetaText as="div">
+              Connection:{" "}
+              <strong>
+                {
+                  youtubeConnectionLoading
+                    ? "Checking..."
+                    : youtubeConnected
+                      ? "Connected ✓"
+                      : "Not connected"
+                }
+              </strong>
+
+              {
+                Array.isArray(
+                  youtubeConnection
+                    ?.scopes_requested
+                )
+                &&
+                youtubeConnection
+                  .scopes_requested
+                  .length
+                  ? (
+                      <>
+                        {" · "}
+                        Scope:{" "}
+                        <strong>
+                          {
+                            youtubeConnection
+                              .scopes_requested
+                              .join(", ")
+                          }
+                        </strong>
+                      </>
+                    )
+                  : null
+              }
+            </AdminMetaText>
+
+
+            <AdminToolbar compact>
+              <AdminButton
+                type="button"
+
+                variant="secondary"
+
+                onClick={() =>
+                  runYoutubeConnectionAction(
+                    "test"
+                  )
+                }
+
+                disabled={
+                  youtubeConnectionAction !==
+                    ""
+                  ||
+                  !youtubeConnected
                 }
               >
-                <button
-                  type="button"
-
-                  onClick={() =>
-                    runYoutubeConnectionAction(
-                      "test"
-                    )
-                  }
-
-                  disabled={
-                    youtubeConnectionAction !==
-                      ""
-                    ||
-                    !youtubeConnected
-                  }
-                >
-                  {
-                    youtubeConnectionAction ===
-                      "test"
-                      ? "Testing..."
-                      : "Test YouTube Connection"
-                  }
-                </button>
+                {
+                  youtubeConnectionAction ===
+                    "test"
+                    ? "Testing..."
+                    : "Test Connection"
+                }
+              </AdminButton>
 
 
-                <a
-                  href={
+              <AdminButton
+                type="button"
+
+                onClick={() =>
+                  window.location.assign(
                     `${YOUTUBE_CONNECT_URL}?return=${encodeURIComponent("/admin/pub?stage=dispatch")}`
-                  }
-
-                  style={
-                    linkButtonStyle
-                  }
-                >
-                  {
-                    youtubeConnected
-                      ? "Reconnect YouTube"
-                      : "Connect YouTube"
-                  }
-                </a>
+                  )
+                }
+              >
+                {
+                  youtubeConnected
+                    ? "Reconnect YouTube"
+                    : "Connect YouTube"
+                }
+              </AdminButton>
 
 
-                <button
-                  type="button"
+              <AdminButton
+                type="button"
 
-                  onClick={
-                    loadYoutubeConnection
-                  }
+                variant="secondary"
 
-                  disabled={
-                    youtubeConnectionLoading
-                  }
-                >
-                  {
-                    youtubeConnectionLoading
-                      ? "Refreshing YouTube..."
-                      : "Refresh YouTube"
-                  }
-                </button>
-              </div>
-            </div>
+                onClick={
+                  loadYoutubeConnection
+                }
+
+                disabled={
+                  youtubeConnectionLoading
+                }
+              >
+                {
+                  youtubeConnectionLoading
+                    ? "Refreshing..."
+                    : "Refresh"
+                }
+              </AdminButton>
+            </AdminToolbar>
 
 
             {
@@ -2121,149 +1776,195 @@ export default function PubDispatchTable() {
                 ?.auth
                 ?.last_auth_error
                 ? (
-                    <div
-                      style={
-                        connectionErrorStyle
-                      }
-                    >
+                    <AdminNotice variant="danger">
                       {
                         youtubeConnection
                           .auth
                           .last_auth_error
                       }
-                    </div>
+                    </AdminNotice>
                   )
                 : null
             }
-          </section>
-        ) : null}
+          </AdminStack>
+        </AdminPanel>
+      ) : null}
 
 
-        {error ? (
-          <div
-            style={
-              errorStyle
-            }
-          >
-            {error}
-          </div>
-        ) : null}
+      {error ? (
+        <AdminNotice variant="danger">
+          {error}
+        </AdminNotice>
+      ) : null}
 
 
-        {statusMessage ? (
-          <div
-            style={
-              successStyle
-            }
-          >
-            {statusMessage}
-          </div>
-        ) : null}
+      {statusMessage ? (
+        <AdminNotice variant="success">
+          {statusMessage}
+        </AdminNotice>
+      ) : null}
 
 
-        <AdminDataGrid
-          items={
-            assets
-          }
+      <AdminDataGrid
+        items={
+          assets
+        }
 
-          columns={
-            columns
-          }
+        columns={
+          columns
+        }
 
-          getRowKey={(
+        getRowKey={(
+          asset
+        ) =>
+          asset
+            .pub_asset_id
+        }
+
+        selectedKey={
+          selectedAsset
+            ?.pub_asset_id ??
+          null
+        }
+
+        onSelectionChange={(
+          asset
+        ) =>
+          setSelectedAsset(
             asset
-          ) =>
-            asset
-              .pub_asset_id
-          }
-
-          selectedKey={
-            selectedAsset
-              ?.pub_asset_id ??
-            null
-          }
-
-          onSelectionChange={
-            selectAsset
-          }
-
-          onRowDoubleClick={
-            openDrawer
-          }
-
-          defaultSortKey="pub_asset_id"
-
-          defaultSortDirection="desc"
-
-          ariaLabel="PUB Dispatch workbench"
-        />
-      </div>
-
-
-      <PubDispatchDrawer
-        open={
-          drawerOpen
-        }
-
-        asset={
-          drawerAsset
-        }
-
-        loading={
-          drawerLoading
-        }
-
-        error={
-          drawerError
-        }
-
-        retrying={
-          Number(
-            retryingAssetId ||
-            0
-          ) ===
-          Number(
-            drawerAsset
-              ?.pub_asset_id ||
-            0
           )
         }
 
-        onRetry={
-          retryShipping
-        }
+        defaultSortKey="pub_asset_id"
 
-        onClose={() =>
-          setDrawerOpen(
-            false
-          )
-        }
+        defaultSortDirection="desc"
+
+        ariaLabel="PUB Dispatch workbench"
+
+        drawer={{
+          title:
+            (asset) =>
+              `Dispatch · Asset #${asset.pub_asset_id}`,
+
+          width:
+            500,
+
+          render:
+            ({ item }) => (
+              <PubDispatchDrawer
+                asset={
+                  item
+                }
+
+                loadAsset={
+                  fetchDispatchAssetDetail
+                }
+
+                retrying={
+                  Number(
+                    retryingAssetId ||
+                    0
+                  ) ===
+                  Number(
+                    item
+                      ?.pub_asset_id ||
+                    0
+                  )
+                }
+
+                onRetry={
+                  retryShipping
+                }
+              />
+            ),
+        }}
       />
     </div>
   );
 }
 
 
-function Check({
-  label,
-}) {
+async function fetchDispatchAssetDetail(
+  pubAssetId
+) {
+  const id =
+    Number(
+      pubAssetId ||
+      0
+    );
+
+  if (!id) {
+    throw new Error(
+      "Valid PUB asset ID required."
+    );
+  }
+
+  const params =
+    new URLSearchParams({
+      pub_asset_id:
+        String(
+          id
+        ),
+
+      _:
+        String(
+          Date.now()
+        ),
+    });
+
+  const res =
+    await fetch(
+      `${DISPATCH_URL}?${params.toString()}`,
+      {
+        credentials:
+          "include",
+      }
+    );
+
+  const data =
+    await res.json();
+
+  if (
+    !res.ok
+    ||
+    !data?.ok
+  ) {
+    throw new Error(
+      data?.error ||
+      "Could not load Dispatch details."
+    );
+  }
+
   return (
-    <span
-      title={
-        label
-      }
-
-      aria-label={
-        label
-      }
-
-      style={
-        checkStyle
-      }
-    >
-      ✓
-    </span>
+    data.item ||
+    null
   );
+}
+
+
+function normalizedStage(
+  asset
+) {
+  return String(
+    asset
+      ?.pipeline_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+
+function normalizedErrorStage(
+  asset
+) {
+  return String(
+    asset
+      ?.error_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
 }
 
 
@@ -2271,13 +1972,9 @@ function isShipped(
   asset
 ) {
   return (
-    String(
+    normalizedStage(
       asset
-        ?.pipeline_stage ||
-      ""
-    )
-      .trim()
-      .toLowerCase() ===
+    ) ===
     "shipped"
   );
 }
@@ -2319,11 +2016,9 @@ function humanize(
     )
       .trim();
 
-
   if (!raw) {
     return "—";
   }
-
 
   return raw
     .replace(
@@ -2336,346 +2031,8 @@ function humanize(
     )
     .replace(
       /\b\w/g,
-      (
-        character
-      ) =>
+      (character) =>
         character
           .toUpperCase()
     );
 }
-
-
-const workbenchShellStyle = {
-  display:
-    "flex",
-
-  width:
-    "100%",
-
-  minWidth:
-    0,
-
-  minHeight:
-    0,
-};
-
-
-const workbenchMainStyle = {
-  flex:
-    1,
-
-  minWidth:
-    0,
-};
-
-
-const connectionPanelStyle = {
-  marginTop:
-    0,
-
-  padding:
-    12,
-
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#f8fafb",
-};
-
-
-const connectionHeadingStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  justifyContent:
-    "space-between",
-
-  gap:
-    16,
-};
-
-
-const connectionTitleStyle = {
-  marginBottom:
-    4,
-
-  fontSize:
-    14,
-
-  fontWeight:
-    800,
-};
-
-
-const connectionMetaStyle = {
-  color:
-    "#586675",
-
-  fontSize:
-    12,
-};
-
-
-const connectionActionsStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  flexWrap:
-    "wrap",
-
-  gap:
-    7,
-};
-
-
-const linkButtonStyle = {
-  display:
-    "inline-flex",
-
-  alignItems:
-    "center",
-
-  minHeight:
-    28,
-
-  padding:
-    "2px 9px",
-
-  border:
-    "1px solid #aeb8c2",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#273444",
-
-  fontSize:
-    12,
-
-  textDecoration:
-    "none",
-};
-
-
-const connectionErrorStyle = {
-  marginTop:
-    8,
-
-  color:
-    "#8a3131",
-
-  fontSize:
-    12,
-};
-
-
-const filterBarStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "flex-end",
-
-  gap:
-    12,
-
-  padding:
-    "14px 0",
-};
-
-
-const refreshButtonStyle = {
-  marginLeft:
-    "auto",
-
-  marginBottom:
-    1,
-};
-
-
-const countStyle = {
-  paddingBottom:
-    7,
-
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
-
-
-const stageBadgeStyle = {
-  display:
-    "inline-block",
-
-  padding:
-    "3px 7px",
-
-  borderRadius:
-    999,
-
-  background:
-    "#eef1f4",
-
-  color:
-    "#465465",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-
-  lineHeight:
-    1.2,
-};
-
-
-const shippingStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#fff6df",
-
-  color:
-    "#7a5b00",
-};
-
-
-const shippedStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#eaf7ef",
-
-  color:
-    "#246640",
-};
-
-
-const errorStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#fff1f1",
-
-  color:
-    "#8a3131",
-
-  border:
-    "1px solid #e2baba",
-};
-
-
-const dispatchErrorTextStyle = {
-  display:
-    "inline-block",
-
-  maxWidth:
-    360,
-
-  overflow:
-    "hidden",
-
-  textOverflow:
-    "ellipsis",
-
-  whiteSpace:
-    "nowrap",
-
-  color:
-    "#8a3131",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-
-  verticalAlign:
-    "middle",
-};
-
-
-const checkStyle = {
-  display:
-    "inline-block",
-
-  minWidth:
-    18,
-
-  color:
-    "#248451",
-
-  fontSize:
-    18,
-
-  fontWeight:
-    800,
-
-  lineHeight:
-    1,
-
-  textAlign:
-    "center",
-};
-
-
-const errorStyle = {
-  marginBottom:
-    10,
-
-  padding:
-    "9px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const successStyle = {
-  marginBottom:
-    10,
-
-  padding:
-    "9px 10px",
-
-  border:
-    "1px solid #b8d8c0",
-
-  background:
-    "#f3faf5",
-
-  color:
-    "#2c6540",
-
-  fontSize:
-    12,
-
-  fontWeight:
-    600,
-};

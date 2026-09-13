@@ -15,14 +15,13 @@ use RuntimeException;
  *
  * CREATE has already produced:
  *   - the permanent MP4
- *   - the companion thumbnail JPEG
  *   - per-asset title/description/pingback metadata
  *
  * Shipping will later:
  *   1. register media with Pinterest
  *   2. upload the MP4 bytes
  *   3. receive/poll the Pinterest media_id
- *   4. create the Pin using that media_id + this package's cover image URL
+ *   4. create the Pin using that media_id
  *
  * PACKAGE SHAPE:
  *
@@ -31,7 +30,6 @@ use RuntimeException;
  *   link
  *   video_file_path
  *   media_source.source_type = video_id
- *   media_source.cover_image_url
  *
  * media_id is deliberately NOT part of PACKAGE. It does not exist until
  * Shipping talks to Pinterest.
@@ -39,14 +37,12 @@ use RuntimeException;
  * This Packager DOES:
  *   - verify this is a Pinterest video asset
  *   - verify the finished MP4 exists
- *   - verify the companion thumbnail exists
  *   - verify required per-asset metadata is present
- *   - resolve the thumbnail URL to an absolute public URL
  *   - attach src=pin to the outbound REX destination
  *   - seal the variable information Shipping will need
  *
  * This Packager DOES NOT:
- *   - render or alter the video/thumbnail
+ *   - render or alter the video
  *   - authenticate with Pinterest
  *   - choose a Pinterest board
  *   - register/upload media
@@ -207,80 +203,6 @@ final class PinterestVideoPackager implements PubComWorkerContract
         }
 
 
-        $thumbnailFilePath =
-            trim(
-                (string)(
-                    $asset[
-                        'thumbnail_file_path'
-                    ]
-                    ?? ''
-                )
-            );
-
-
-        if ($thumbnailFilePath === '') {
-            return $this->pending(
-                'pinterest_video_thumbnail_file_path_pending',
-                'Waiting for Pinterest video thumbnail file.',
-                'thumbnail_file_path'
-            );
-        }
-
-
-        if (!is_file($thumbnailFilePath)) {
-            return $this->pending(
-                'pinterest_video_thumbnail_file_pending',
-                'Waiting for Pinterest video thumbnail file to be available.',
-                'thumbnail_file_path',
-                [
-                    'thumbnail_file_path' =>
-                        $thumbnailFilePath,
-                ]
-            );
-        }
-
-
-        $thumbnailUrl =
-            trim(
-                (string)(
-                    $asset[
-                        'thumbnail_url'
-                    ]
-                    ?? ''
-                )
-            );
-
-
-        if ($thumbnailUrl === '') {
-            return $this->pending(
-                'pinterest_video_thumbnail_url_pending',
-                'Waiting for Pinterest video thumbnail public URL.',
-                'thumbnail_url'
-            );
-        }
-
-
-        $coverImageUrl =
-            $this->absoluteUrl(
-                $thumbnailUrl
-            );
-
-
-        if (!$this->isAbsoluteHttpUrl($coverImageUrl)) {
-            return PubComSignal::ineligible(
-                'pinterest_video_thumbnail_url_invalid',
-                'Pinterest video thumbnail public URL is not usable.',
-                [
-                    'worker' =>
-                        self::class,
-
-                    'thumbnail_url' =>
-                        $thumbnailUrl,
-                ]
-            );
-        }
-
-
         $title =
             trim(
                 (string)(
@@ -376,8 +298,8 @@ final class PinterestVideoPackager implements PubComWorkerContract
      * Seal one finished Pinterest video for Shipping.
      *
      * The local MP4 path is package data because Pinterest video shipping
-     * uploads the actual bytes. The companion thumbnail is public URL data
-     * because Pinterest's final Pin create call references cover_image_url.
+     * uploads the actual bytes. No thumbnail or cover-image ingredient is
+     * part of this product.
      *
      * @return array<string, mixed>
      */
@@ -410,13 +332,6 @@ final class PinterestVideoPackager implements PubComWorkerContract
                 ]
             );
 
-        $coverImageUrl =
-            $this->absoluteUrl(
-                (string)$asset[
-                    'thumbnail_url'
-                ]
-            );
-
         $destinationUrl =
             $this->withSourceTag(
                 $this->absoluteUrl(
@@ -443,9 +358,6 @@ final class PinterestVideoPackager implements PubComWorkerContract
             'media_source' => [
                 'source_type' =>
                     self::MEDIA_SOURCE_TYPE,
-
-                'cover_image_url' =>
-                    $coverImageUrl,
             ],
         ];
     }
@@ -503,8 +415,6 @@ final class PinterestVideoPackager implements PubComWorkerContract
         foreach (
             [
                 'file_path',
-                'thumbnail_file_path',
-                'thumbnail_url',
                 'search_title',
                 'description',
                 'pingback',
@@ -543,41 +453,12 @@ final class PinterestVideoPackager implements PubComWorkerContract
         }
 
 
-        $thumbnailFilePath =
-            trim(
-                (string)$asset[
-                    'thumbnail_file_path'
-                ]
-            );
-
-
-        if (!is_file($thumbnailFilePath)) {
-            throw new RuntimeException(
-                "Pinterest Video Packager cannot find thumbnail file: {$thumbnailFilePath}"
-            );
-        }
-
-
-        $coverImageUrl =
-            $this->absoluteUrl(
-                (string)$asset[
-                    'thumbnail_url'
-                ]
-            );
-
         $destinationUrl =
             $this->absoluteUrl(
                 (string)$asset[
                     'pingback'
                 ]
             );
-
-
-        if (!$this->isAbsoluteHttpUrl($coverImageUrl)) {
-            throw new RuntimeException(
-                'Pinterest Video Packager cannot resolve a valid public thumbnail URL.'
-            );
-        }
 
 
         if (!$this->isAbsoluteHttpUrl($destinationUrl)) {

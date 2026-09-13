@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import { useAppState } from '@context/AppStateContext.jsx';
 import { isAdmin } from '@helpers/authHelper';
 import '@layout/MainLayout/mainlayout.css';
-import { AdminDialogProvider } from "@components/AdminDialog";
+import { AdminDialogProvider } from "@components/AdminLayout";
 
 const HomePage = lazy(() => import('@pages/HomePage'));
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));

@@ -15,20 +15,18 @@ try {
         workflow_respond(['ok' => false, 'error' => 'GET only'], 405);
     }
 
-    $repo = new PdoPropertyRepository($pdo);
-    $rows = $repo->list([
-        'client_id' => isset($_GET['client_id']) ? (int)$_GET['client_id'] : 0,
-    ], 500);
+    // Property is WHERE, not WHO. No client_id filter here.
+    $rows = (new PdoPropertyRepository($pdo))->list([], 500);
+    $items = array_map('workflow_property_payload', $rows);
 
     $query = strtolower(trim((string)($_GET['q'] ?? '')));
-    $items = array_map('workflow_property_payload', $rows);
     if ($query !== '') {
         $items = array_values(array_filter($items, static function (array $item) use ($query): bool {
             $address = $item['address'] ?? [];
             return str_contains(strtolower(implode(' ', [
                 $item['name'] ?? '',
-                $item['client_name'] ?? '',
                 $address['street_1'] ?? '',
+                $address['street_2'] ?? '',
                 $address['city'] ?? '',
                 $address['state'] ?? '',
                 $address['postal_code'] ?? '',

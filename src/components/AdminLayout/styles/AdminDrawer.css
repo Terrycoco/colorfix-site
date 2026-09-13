@@ -1,0 +1,118 @@
+/*
+ * ADMIN DRAWER
+ *
+ * Standard inspection drawer used by AdminDataGrid and AdminWorkbench.
+ * All drawer presentation lives here so pages and grid implementations
+ * only supply content and behavior.
+ */
+
+.admin-workbench.is-drawer-open .admin-workbench__upper {
+  width: calc(100% - var(--admin-workbench-drawer-width, 400px));
+}
+
+.admin-workbench__drawer-slot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  width: var(--admin-workbench-drawer-width, 400px);
+}
+
+.admin-workbench-drawer-host {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--admin-z-drawer);
+  display: flex;
+  width: var(--admin-workbench-drawer-width, 380px);
+}
+
+.admin-workbench-drawer {
+  width: var(--admin-workbench-drawer-width, 380px);
+  min-width: var(--admin-workbench-drawer-width, 380px);
+  max-width: var(--admin-workbench-drawer-width, 380px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.admin-workbench-drawer__header {
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-selected);
+
+}
+
+.admin-workbench-drawer__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-workbench-drawer__close {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+}
+
+.admin-workbench-drawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  color: var(--admin-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.admin-workbench-drawer__body.is-padded {
+  padding: 10px 12px;
+}
+
+/* Compact inspection fields inside drawers. */
+.admin-workbench-drawer__body .admin-field {
+  gap: 2px;
+}
+
+.admin-workbench-drawer__body .admin-field__label {
+  margin-top: 3px;
+  color: #3b4f60;
+  font-size: 9px;
+  line-height: 1.1;
+}
+
+.admin-workbench-drawer__body .admin-stack--md {
+  gap: 9px;
+}
+
+.admin-workbench-drawer__body a,
+.admin-workbench-drawer__body .admin-field > div {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-workbench-drawer__body a {
+  font-size: 12px;
+}
+
+.admin-workbench-drawer__footer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}

@@ -4,95 +4,28 @@ export default function AdminWorkbenchTabs({
   onChange,
   action = null,
   children,
+  className = "",
 }) {
   return (
     <section
-      style={{
-        minWidth: 0,
-        minHeight: 0,
-
-        display: "flex",
-        flexDirection: "column",
-
-        background:
-          "var(--admin-layout-bg, #fff)",
-
-        borderTop:
-          "1px solid var(--admin-layout-border, #d8dde3)",
-      }}
+      className={["admin-workbench-tabs", className].filter(Boolean).join(" ")}
     >
-      <div
-        style={{
-          height: 38,
-          flexShrink: 0,
-
-          display: "flex",
-          alignItems: "stretch",
-
-          gap: 4,
-
-          padding: "0 8px",
-
-          borderBottom:
-            "1px solid var(--admin-layout-border, #d8dde3)",
-
-          background:
-            "var(--admin-layout-header-bg, #eef1f3)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "stretch",
-
-            minWidth: 0,
-
-            gap: 2,
-          }}
-        >
+      <div className="admin-workbench-tabs__header">
+        <div className="admin-workbench-tabs__list" role="tablist">
           {tabs.map((tab) => {
-            const selected =
-              tab.key === activeKey;
+            const selected = tab.key === activeKey;
 
             return (
               <button
                 key={tab.key}
                 type="button"
-
-                onClick={() =>
-                  onChange?.(tab.key)
-                }
-
-                style={{
-                  border:
-                    "1px solid var(--admin-layout-border, #cbd1d6)",
-
-                  borderBottom:
-                    selected
-                      ? "1px solid var(--highlight-cyan)"
-                      : "1px solid var(--admin-layout-border, #cbd1d6)",
-
-                  background:
-                    selected
-                      ? "var(--highlight-cyan)"
-                      : "#dfe4e8",
-
-                  color:
-                    selected
-                      ? "#1f2933"
-                      : "#39434d",
-
-                  padding: "0 12px",
-
-                  fontSize: 12,
-
-                  fontWeight:
-                    selected
-                      ? 700
-                      : 600,
-
-                  cursor: "pointer",
-                }}
+                role="tab"
+                aria-selected={selected}
+                className={[
+                  "admin-workbench-tabs__tab",
+                  selected ? "is-active" : "",
+                ].filter(Boolean).join(" ")}
+                onClick={() => onChange?.(tab.key)}
               >
                 {tab.label}
               </button>
@@ -101,27 +34,13 @@ export default function AdminWorkbenchTabs({
         </div>
 
         {action ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-
-              marginLeft: 2,
-            }}
-          >
+          <div className="admin-workbench-tabs__action">
             {action}
           </div>
         ) : null}
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-
-          overflow: "auto",
-        }}
-      >
+      <div className="admin-workbench-tabs__body">
         {children}
       </div>
     </section>

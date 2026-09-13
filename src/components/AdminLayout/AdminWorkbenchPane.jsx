@@ -2,61 +2,22 @@ export default function AdminWorkbenchPane({
   title = "",
   action = null,
   children,
-  style = {},
+  className = "",
+  style = undefined,
 }) {
   return (
     <section
-      style={{
-        minWidth: 0,
-        minHeight: 0,
-
-        display: "flex",
-        flexDirection: "column",
-
-        background:
-          "var(--admin-layout-bg, #fff)",
-
-        ...style,
-      }}
+      className={["admin-workbench-pane", className].filter(Boolean).join(" ")}
+      style={style}
     >
-      <div
-        style={{
-          height: 38,
-          flexShrink: 0,
-
-          display: "flex",
-          alignItems: "center",
-
-          gap: 6,
-
-          padding: "0 8px",
-
-          borderBottom:
-            "1px solid var(--admin-layout-border, #d8dde3)",
-
-          background:
-            "var(--admin-layout-header-bg, #f3f4f5)",
-        }}
-      >
-        <strong
-          style={{
-            fontSize: 12,
-          }}
-        >
+      <div className="admin-workbench-pane__header">
+        <strong className="admin-workbench-pane__title">
           {title}
         </strong>
-
         {action}
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-
-          overflow: "auto",
-        }}
-      >
+      <div className="admin-workbench-pane__body">
         {children}
       </div>
     </section>

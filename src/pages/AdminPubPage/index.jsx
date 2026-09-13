@@ -4,20 +4,21 @@ import {
 } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
-import {
   API_FOLDER,
 } from "@helpers/config";
 
 import {
   AdminDetailPane,
+  AdminDialog,
   AdminEmptyState,
   AdminListPane,
   AdminMasterDetail,
+  AdminNote,
+  AdminNotice,
   AdminObjectList,
   AdminObjectListItem,
+  AdminStack,
+  AdminToast,
 } from "@components/AdminLayout";
 
 import PubPipelineReference
@@ -159,39 +160,6 @@ export default function AdminPubPage() {
     () =>
       pubStageFromLocation()
   );
-
-
-  useEffect(() => {
-    if (
-      pubComToasts.length ===
-      0
-    ) {
-      return undefined;
-    }
-
-
-    const timer =
-      window.setTimeout(
-        () => {
-          setPubComToasts(
-            (current) =>
-              current.slice(
-                1
-              )
-          );
-        },
-        6000
-      );
-
-
-    return () => {
-      window.clearTimeout(
-        timer
-      );
-    };
-  }, [
-    pubComToasts,
-  ]);
 
 
   function receivePubCom(
@@ -548,26 +516,11 @@ export default function AdminPubPage() {
 
             ) : stage ===
             "assets" ? (
-              <>
+              <AdminStack gap="md">
                 {createMessage ? (
-                  <div
-                    style={{
-                      marginBottom:
-                        12,
-                      padding:
-                        "8px 10px",
-                      border:
-                        "1px solid #b8d8c0",
-                      background:
-                        "#f3faf5",
-                      fontSize:
-                        13,
-                      fontWeight:
-                        600,
-                    }}
-                  >
+                  <AdminNotice variant="success">
                     {createMessage}
-                  </div>
+                  </AdminNotice>
                 ) : null}
 
                 <PubAssetsTable
@@ -577,7 +530,7 @@ export default function AdminPubPage() {
                     )
                   }
                 />
-              </>
+              </AdminStack>
 
             ) : stage ===
             "package" ? (
@@ -643,42 +596,29 @@ export default function AdminPubPage() {
       />
 
 
-      {pubComToasts.length
-        ? createPortal(
-            <PubComToast
-              disposition={
-                pubComToasts[0]
-              }
-            />,
-            document.body
-          )
-        : null}
+      {pubComToasts.length ? (
+        <PubComToast
+          disposition={pubComToasts[0]}
+          onClose={() =>
+            setPubComToasts((current) => current.slice(1))
+          }
+        />
+      ) : null}
 
 
-      {pubComPopups.length
-        ? createPortal(
-            <PubComPopup
-              disposition={
-                pubComPopups[0]
-              }
-              onClose={() =>
-                setPubComPopups(
-                  (current) =>
-                    current.slice(
-                      1
-                    )
-                )
-              }
-              onCancelAnalysis={
-                stage ===
-                "analyze"
-                  ? cancelAnalysis
-                  : null
-              }
-            />,
-            document.body
-          )
-        : null}
+      {pubComPopups.length ? (
+        <PubComPopup
+          disposition={pubComPopups[0]}
+          onClose={() =>
+            setPubComPopups((current) => current.slice(1))
+          }
+          onCancelAnalysis={
+            stage === "analyze"
+              ? cancelAnalysis
+              : null
+          }
+        />
+      ) : null}
     </>
   );
 }
@@ -832,6 +772,7 @@ function collectPubComDispositions(
 
 function PubComToast({
   disposition,
+  onClose,
 }) {
   const message =
     disposition
@@ -841,25 +782,12 @@ function PubComToast({
 
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={
-        pubComToastStyle
-      }
-    >
-      <div
-        style={
-          pubComToastLabelStyle
-        }
-      >
-        PUB
-      </div>
-
-      <div>
-        {message}
-      </div>
-    </div>
+    <AdminToast
+      label="PUB"
+      message={message}
+      duration={6000}
+      onClose={onClose}
+    />
   );
 }
 
@@ -903,219 +831,35 @@ function PubComPopup({
 
 
   return (
-    <div
-      role="presentation"
-      style={
-        pubComPopupOverlayStyle
-      }
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pubcom-popup-title"
-        style={
-          pubComPopupStyle
-        }
-      >
-        <div
-          id="pubcom-popup-title"
-          style={
-            pubComPopupTitleStyle
-          }
-        >
-          {title}
-        </div>
-
-        <div
-          style={
-            pubComPopupMessageStyle
-          }
-        >
-          <div>
-            {message}
-          </div>
-
-          {reason ? (
-            <div
-              style={
-                pubComPopupReasonStyle
-              }
-            >
-              <strong>
-                Reason:
-              </strong>{" "}
-              {reason}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          style={
-            pubComPopupActionsStyle
-          }
-        >
-          {typeof onCancelAnalysis ===
-          "function" ? (
-            <button
-              type="button"
-              style={
-                pubComCancelButtonStyle
-              }
-              onClick={
-                onCancelAnalysis
-              }
-            >
-              Cancel Analysis
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            autoFocus
-            onClick={
-              onClose
+    <AdminDialog
+      open
+      title={title}
+      message={message}
+      dismissOnBackdrop={false}
+      onClose={onClose}
+      actions={[
+        typeof onCancelAnalysis === "function"
+          ? {
+              key: "cancel-analysis",
+              label: "Cancel Analysis",
+              variant: "secondary",
+              onClick: onCancelAnalysis,
             }
-          >
-            OK
-          </button>
-        </div>
-      </div>
-    </div>
+          : null,
+        {
+          key: "ok",
+          label: "OK",
+          autoFocus: true,
+          onClick: onClose,
+        },
+      ].filter(Boolean)}
+    >
+      {reason ? (
+        <AdminNote>
+          <strong>Reason:</strong>{" "}
+          {reason}
+        </AdminNote>
+      ) : null}
+    </AdminDialog>
   );
 }
-
-
-const pubComToastStyle = {
-  position:
-    "fixed",
-  top:
-    18,
-  right:
-    18,
-  zIndex:
-    2147483646,
-  maxWidth:
-    420,
-  padding:
-    "11px 14px",
-  border:
-    "1px solid #cbd5df",
-  borderRadius:
-    6,
-  background:
-    "#ffffff",
-  boxShadow:
-    "0 8px 24px rgba(0, 0, 0, 0.16)",
-  fontSize:
-    13,
-  lineHeight:
-    1.4,
-};
-
-
-const pubComToastLabelStyle = {
-  marginBottom:
-    3,
-  color:
-    "#4b6b8a",
-  fontSize:
-    10,
-  fontWeight:
-    700,
-  letterSpacing:
-    "0.08em",
-  textTransform:
-    "uppercase",
-};
-
-
-const pubComPopupOverlayStyle = {
-  position:
-    "fixed",
-  inset:
-    0,
-  zIndex:
-    2147483647,
-  display:
-    "grid",
-  placeItems:
-    "center",
-  padding:
-    24,
-  background:
-    "rgba(0, 0, 0, 0.34)",
-};
-
-
-const pubComPopupStyle = {
-  width:
-    "min(520px, 100%)",
-  padding:
-    22,
-  borderRadius:
-    8,
-  background:
-    "#ffffff",
-  boxShadow:
-    "0 18px 48px rgba(0, 0, 0, 0.24)",
-};
-
-
-const pubComPopupTitleStyle = {
-  marginBottom:
-    8,
-  fontSize:
-    18,
-  fontWeight:
-    700,
-};
-
-
-const pubComPopupMessageStyle = {
-  color:
-    "#4b5563",
-  fontSize:
-    14,
-  lineHeight:
-    1.5,
-};
-
-
-const pubComPopupReasonStyle = {
-  marginTop:
-    12,
-  padding:
-    "10px 12px",
-  border:
-    "1px solid #d8dde3",
-  borderRadius:
-    4,
-  background:
-    "#f7f8fa",
-  color:
-    "#334155",
-};
-
-
-const pubComPopupActionsStyle = {
-  display:
-    "flex",
-  justifyContent:
-    "flex-end",
-  gap:
-    8,
-  marginTop:
-    20,
-};
-
-
-const pubComCancelButtonStyle = {
-  background:
-    "#f7f8fa",
-  color:
-    "#334155",
-  border:
-    "1px solid #c7d0d9",
-  boxShadow:
-    "none",
-};

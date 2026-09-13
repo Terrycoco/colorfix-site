@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddressModal from "@components/AddressModal";
+import {
+  AdminDetailPane,
+  AdminEmptyState,
+  AdminListPane,
+  AdminMasterDetail,
+  AdminObjectList,
+  AdminObjectListItem,
+} from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
-import "../AdminProjectsPage/admin-projects.css";
 import "./admin-properties.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/properties/list.php`;
@@ -9,19 +16,23 @@ const GET_URL = `${API_FOLDER}/v2/admin/properties/get.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/properties/save.php`;
 const ADDRESS_SAVE_URL = `${API_FOLDER}/v2/admin/properties/address-save.php`;
 const ADDRESS_REMOVE_URL = `${API_FOLDER}/v2/admin/properties/address-remove.php`;
-const OPTIONS_URL = `${API_FOLDER}/v2/admin/projects/options.php`;
 
 const emptyProperty = {
   id: null,
   name: "",
-  client_id: "",
   notes: "",
   address: null,
 };
 
 function addressLine(address) {
   if (!address) return "No address entered";
-  return [address.street_1, address.street_2, address.city, address.state, address.postal_code]
+  return [
+    address.street_1,
+    address.street_2,
+    address.city,
+    address.state,
+    address.postal_code,
+  ]
     .filter(Boolean)
     .join(", ");
 }
@@ -30,24 +41,23 @@ function formatDate(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-function clientDisplayName(client) {
-  return client?.name || client?.email || `Client #${client?.id || ""}`;
-}
-
-function sortClientsByName(items) {
-  return [...items].sort((a, b) => clientDisplayName(a).localeCompare(clientDisplayName(b), undefined, { sensitivity: "base" }));
+function projectTypeLabel(project) {
+  return project.project_type_name || project.project_type_key || "";
 }
 
 export default function AdminPropertiesPage() {
   const [properties, setProperties] = useState([]);
-  const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyProperty);
-  const [filters, setFilters] = useState({ q: "" });
+  const [query, setQuery] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,38 +65,40 @@ export default function AdminPropertiesPage() {
   const [addressSaving, setAddressSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+
   const selectedIdRef = useRef(null);
-  const propertyModeRef = useRef("detail");
+  const modeRef = useRef("detail");
 
   const selectedProperty = useMemo(
     () => properties.find((item) => Number(item.id) === Number(selectedId)) || null,
     [properties, selectedId]
   );
 
-  const loadOptions = useCallback(async () => {
-    const res = await fetch(`${OPTIONS_URL}?_=${Date.now()}`, { credentials: "include" });
-    const data = await res.json();
-    if (res.ok && data?.ok) {
-      setClients(sortClientsByName(Array.isArray(data.clients) ? data.clients : []));
-    }
-  }, []);
-
   const loadProperty = useCallback(async (id) => {
     if (!id) return;
-    propertyModeRef.current = "detail";
-    selectedIdRef.current = id;
+
+    modeRef.current = "detail";
+    selectedIdRef.current = Number(id);
+    setSelectedId(Number(id));
     setLoadingDetail(true);
     setError("");
+
     try {
-      const res = await fetch(`${GET_URL}?id=${encodeURIComponent(id)}&_=${Date.now()}`, { credentials: "include" });
+      const res = await fetch(
+        `${GET_URL}?id=${encodeURIComponent(id)}&_=${Date.now()}`,
+        { credentials: "include" }
+      );
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+
       const data = JSON.parse(text);
-      if (!data?.ok || !data?.property) throw new Error(data?.error || "Failed to load property");
+      if (!data?.ok || !data?.property) {
+        throw new Error(data?.error || "Failed to load property");
+      }
+
       setForm({
         id: data.property.id,
         name: data.property.name || "",
-        client_id: data.property.client_id || "",
         notes: data.property.notes || "",
         address: data.property.address || null,
       });
@@ -98,49 +110,61 @@ export default function AdminPropertiesPage() {
     }
   }, []);
 
-  const loadProperties = useCallback(async (preferredId = null) => {
-    setLoadingList(true);
-    setError("");
-    try {
-      const params = new URLSearchParams();
-      if (filters.q.trim()) params.set("q", filters.q.trim());
-      params.set("_", String(Date.now()));
-      const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
-      const text = await res.text();
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-      const data = JSON.parse(text);
-      if (!data?.ok) throw new Error(data?.error || "Failed to load properties");
-      const items = Array.isArray(data.items) ? data.items : [];
-      setProperties(items);
-      if (!preferredId && propertyModeRef.current === "new") {
-        return;
-      }
-      const targetId = preferredId || selectedIdRef.current || (items[0] ? Number(items[0].id) : null);
-      if (targetId) {
-        propertyModeRef.current = "detail";
-        selectedIdRef.current = targetId;
-        setSelectedId(targetId);
-        await loadProperty(targetId);
-      } else {
-        resetForm();
-      }
-    } catch (err) {
-      setError(err?.message || "Failed to load properties");
-    } finally {
-      setLoadingList(false);
-    }
-  }, [filters.q, loadProperty]);
+  const loadProperties = useCallback(
+    async (preferredId = null) => {
+      setLoadingList(true);
+      setError("");
 
-  useEffect(() => {
-    void loadOptions();
-  }, [loadOptions]);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        params.set("_", String(Date.now()));
+
+        const res = await fetch(`${LIST_URL}?${params.toString()}`, {
+          credentials: "include",
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+
+        const data = JSON.parse(text);
+        if (!data?.ok) throw new Error(data?.error || "Failed to load properties");
+
+        const items = Array.isArray(data.items) ? data.items : [];
+        setProperties(items);
+
+        if (modeRef.current === "new" && !preferredId) return;
+
+        const preferred = preferredId ? Number(preferredId) : null;
+        const current = selectedIdRef.current ? Number(selectedIdRef.current) : null;
+        const currentStillVisible = current && items.some((item) => Number(item.id) === current);
+        const targetId =
+          preferred ||
+          (currentStillVisible ? current : null) ||
+          (items[0] ? Number(items[0].id) : null);
+
+        if (targetId) {
+          await loadProperty(targetId);
+        } else {
+          selectedIdRef.current = null;
+          setSelectedId(null);
+          setForm(emptyProperty);
+          setProjects([]);
+        }
+      } catch (err) {
+        setError(err?.message || "Failed to load properties");
+      } finally {
+        setLoadingList(false);
+      }
+    },
+    [loadProperty, query]
+  );
 
   useEffect(() => {
     void loadProperties();
   }, [loadProperties]);
 
-  function resetForm() {
-    propertyModeRef.current = "new";
+  function startNewProperty() {
+    modeRef.current = "new";
     selectedIdRef.current = null;
     setSelectedId(null);
     setForm(emptyProperty);
@@ -154,16 +178,23 @@ export default function AdminPropertiesPage() {
   }
 
   async function saveProperty() {
+    const name = form.name.trim();
+    if (!name) {
+      setError("Property name required.");
+      return;
+    }
+
     setSaving(true);
     setStatus("");
     setError("");
+
     try {
       const payload = {
         id: form.id,
-        name: form.name.trim(),
-        client_id: Number(form.client_id || 0) || null,
+        name,
         notes: form.notes.trim(),
       };
+
       const res = await fetch(SAVE_URL, {
         method: "POST",
         credentials: "include",
@@ -172,22 +203,34 @@ export default function AdminPropertiesPage() {
       });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+
       const data = JSON.parse(text);
       if (!data?.ok) throw new Error(data?.error || "Failed to save property");
+
+      const propertyId = Number(data.id);
+
       if (!form.id && form.address?.street_1) {
         const addressRes = await fetch(ADDRESS_SAVE_URL, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ property_id: data.id, address: form.address }),
+          body: JSON.stringify({ property_id: propertyId, address: form.address }),
         });
         const addressText = await addressRes.text();
-        if (!addressRes.ok) throw new Error(`HTTP ${addressRes.status}: ${addressText.slice(0, 200)}`);
+        if (!addressRes.ok) {
+          throw new Error(`HTTP ${addressRes.status}: ${addressText.slice(0, 200)}`);
+        }
+
         const addressData = JSON.parse(addressText);
-        if (!addressData?.ok) throw new Error(addressData?.error || "Failed to save address");
+        if (!addressData?.ok) {
+          throw new Error(addressData?.error || "Failed to save address");
+        }
       }
+
+      modeRef.current = "detail";
+      selectedIdRef.current = propertyId;
       setStatus("Property saved.");
-      await loadProperties(Number(data.id));
+      await loadProperties(propertyId);
     } catch (err) {
       setError(err?.message || "Failed to save property");
     } finally {
@@ -202,8 +245,10 @@ export default function AdminPropertiesPage() {
       setStatus("Address will be saved with the property.");
       return;
     }
+
     setAddressSaving(true);
     setError("");
+
     try {
       const res = await fetch(ADDRESS_SAVE_URL, {
         method: "POST",
@@ -213,8 +258,10 @@ export default function AdminPropertiesPage() {
       });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+
       const data = JSON.parse(text);
       if (!data?.ok) throw new Error(data?.error || "Failed to save address");
+
       setAddressModalOpen(false);
       setStatus("Address saved.");
       await loadProperties(form.id);
@@ -231,9 +278,12 @@ export default function AdminPropertiesPage() {
       setAddressModalOpen(false);
       return;
     }
-    if (!form.id || !window.confirm("Remove the address from this property?")) return;
+
+    if (!window.confirm("Remove the address from this property?")) return;
+
     setAddressSaving(true);
     setError("");
+
     try {
       const res = await fetch(ADDRESS_REMOVE_URL, {
         method: "POST",
@@ -241,8 +291,12 @@ export default function AdminPropertiesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ property_id: form.id }),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to remove address");
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+
+      const data = JSON.parse(text);
+      if (!data?.ok) throw new Error(data?.error || "Failed to remove address");
+
       setAddressModalOpen(false);
       setStatus("Address removed.");
       await loadProperties(form.id);
@@ -253,129 +307,166 @@ export default function AdminPropertiesPage() {
     }
   }
 
-  return (
-    <div className="admin-projects admin-properties">
-      <aside className="admin-projects__sidebar">
-        <div className="admin-projects__sidebar-header">
-          <div>
-            <h1>Properties</h1>
-            <p>Physical places where project work may happen.</p>
-          </div>
-          <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={resetForm}>
-            New Property
+  const listPane = (
+    <AdminListPane
+      title="Properties"
+      actions={
+        <button
+          type="button"
+          className="admin-properties__button admin-properties__button--primary admin-properties__button--compact"
+          onClick={startNewProperty}
+        >
+          New
+        </button>
+      }
+      toolbar={
+        <input
+          className="admin-properties__search"
+          type="search"
+          placeholder="Search properties"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      }
+    >
+      {loadingList ? (
+        <AdminEmptyState title="Loading properties…" />
+      ) : properties.length === 0 ? (
+        <AdminEmptyState
+          title="No properties found"
+          message={query.trim() ? "Try a different search." : "Create the first property."}
+        />
+      ) : (
+        <AdminObjectList ariaLabel="Properties">
+          {properties.map((property) => (
+            <AdminObjectListItem
+              key={property.id}
+              id={property.id}
+              title={property.name || "Untitled property"}
+              selected={Number(selectedId) === Number(property.id)}
+              meta={[
+                addressLine(property.address),
+                `${Number(property.project_count || 0)} project${Number(property.project_count || 0) === 1 ? "" : "s"}`,
+              ]}
+              onSelect={() => void loadProperty(property.id)}
+            />
+          ))}
+        </AdminObjectList>
+      )}
+    </AdminListPane>
+  );
+
+  const detailPane = (
+    <AdminDetailPane ariaLabel="Property detail" className="admin-properties__detail">
+      {error ? <div className="admin-properties__message admin-properties__message--error">{error}</div> : null}
+      {status ? <div className="admin-properties__message admin-properties__message--status">{status}</div> : null}
+
+      <header className="admin-detail-header">
+        <div>
+          <h1 className="admin-detail-header__title">
+            {form.id ? form.name || "Property" : "New Property"}
+          </h1>
+          <p className="admin-detail-header__description">
+            {form.id && selectedProperty?.updated_at
+              ? `Updated ${formatDate(selectedProperty.updated_at)}`
+              : "A physical place where project work may happen."}
+          </p>
+        </div>
+
+        <div className="admin-detail-header__actions">
+          {form.id ? (
+            <a
+              className="admin-properties__button"
+              href={`/admin/projects?action=new&property_id=${encodeURIComponent(form.id)}`}
+            >
+              New Project
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="admin-properties__button admin-properties__button--primary"
+            onClick={saveProperty}
+            disabled={saving || loadingDetail}
+          >
+            {saving ? "Saving…" : "Save Property"}
           </button>
         </div>
+      </header>
 
-        <div className="admin-projects__filters">
-          <input
-            type="text"
-            placeholder="Search properties"
-            value={filters.q}
-            onChange={(event) => setFilters({ q: event.target.value })}
-          />
-        </div>
+      {loadingDetail ? (
+        <AdminEmptyState title="Loading property…" />
+      ) : (
+        <>
+          <section className="admin-properties__section">
+            <h2 className="admin-properties__section-title">Property</h2>
 
-        <div className="admin-projects__project-list">
-          {loadingList ? (
-            <div className="admin-projects__empty">Loading properties...</div>
-          ) : properties.length === 0 ? (
-            <div className="admin-projects__empty">No properties yet.</div>
-          ) : properties.map((property) => (
-            <button
-              key={property.id}
-              type="button"
-              className={`admin-projects__project-card${Number(selectedId) === Number(property.id) ? " is-active" : ""}`}
-              onClick={() => {
-                setSelectedId(property.id);
-                void loadProperty(property.id);
-              }}
-            >
-              <span className="admin-projects__project-title">{property.name || "Untitled property"}</span>
-              <span className="admin-projects__project-meta">
-                <span>{property.client_name || "No client assigned"}</span>
-                <span>{property.project_count || 0} project{Number(property.project_count || 0) === 1 ? "" : "s"}</span>
-              </span>
-              <span className="admin-projects__project-slug">{addressLine(property.address)}</span>
-            </button>
-          ))}
-        </div>
-      </aside>
-
-      <main className="admin-projects__main">
-        {error ? <div className="admin-projects__message admin-projects__message--error">{error}</div> : null}
-        {status ? <div className="admin-projects__message admin-projects__message--status">{status}</div> : null}
-
-        <section className="admin-projects__panel">
-          <div className="admin-projects__panel-header">
-            <div>
-              <h2>{form.id ? form.name || "Property" : "New Property"}</h2>
-              {selectedProperty?.updated_at ? <p className="admin-properties__subhead">Updated {formatDate(selectedProperty.updated_at)}</p> : null}
-            </div>
-            <div className="admin-projects__actions">
-              {form.id ? (
-                <a className="admin-projects__btn" href={`/admin/projects?action=new&property_id=${encodeURIComponent(form.id)}`}>
-                  New Project for this Property
-                </a>
-              ) : null}
-              <button type="button" className="admin-projects__btn admin-projects__btn--primary" onClick={saveProperty} disabled={saving}>
-                {saving ? "Saving..." : "Save Property"}
-              </button>
-            </div>
-          </div>
-
-          {loadingDetail ? (
-            <div className="admin-projects__empty">Loading property...</div>
-          ) : (
-            <div className="admin-projects__form-grid">
-              <label>
-                <span>Property name</span>
-                <input value={form.name} onChange={(event) => updateForm("name", event.target.value)} />
+            <div className="admin-properties__form-grid">
+              <label className="admin-field admin-properties__wide">
+                <span className="admin-field__label">Property name</span>
+                <input
+                  className="admin-field__control admin-properties__input"
+                  value={form.name}
+                  onChange={(event) => updateForm("name", event.target.value)}
+                  placeholder="e.g. Biane Winery"
+                />
               </label>
-              <label>
-                <span>Client</span>
-                <select value={form.client_id || ""} onChange={(event) => updateForm("client_id", event.target.value)}>
-                  <option value="">No client assigned</option>
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>{clientDisplayName(client)}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="admin-projects__field admin-projects__wide">
-                <span>Address</span>
-                <div className="admin-properties__address-row">
-                  <strong>{addressLine(form.address)}</strong>
-                  <button type="button" className="admin-projects__btn" onClick={() => setAddressModalOpen(true)}>
-                    {form.address ? "Add/Edit Address" : "Add Address"}
+
+              <div className="admin-field admin-properties__wide">
+                <span className="admin-field__label">Address</span>
+                <div className="admin-properties__address-box">
+                  <div className={`admin-properties__address-text${form.address ? "" : " is-empty"}`}>
+                    {addressLine(form.address)}
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-properties__button"
+                    onClick={() => setAddressModalOpen(true)}
+                  >
+                    {form.address ? "Edit Address" : "Add Address"}
                   </button>
                 </div>
               </div>
-              <label className="admin-projects__wide">
-                <span>Notes</span>
-                <textarea value={form.notes} rows={4} onChange={(event) => updateForm("notes", event.target.value)} />
+
+              <label className="admin-field admin-properties__wide">
+                <span className="admin-field__label">Notes</span>
+                <textarea
+                  className="admin-properties__textarea"
+                  value={form.notes}
+                  rows={5}
+                  onChange={(event) => updateForm("notes", event.target.value)}
+                />
               </label>
             </div>
-          )}
-        </section>
+          </section>
 
-        <section className="admin-projects__panel">
-          <div className="admin-projects__panel-header">
-            <h2>Projects at this property</h2>
-          </div>
-          {projects.length === 0 ? (
-            <div className="admin-projects__empty">No projects yet.</div>
-          ) : (
-            <div className="admin-properties__project-table">
-              {projects.map((project) => (
-                <a key={project.id} href={`/admin/projects?project_id=${project.id}`} className="admin-properties__project-row">
-                  <span>{project.name}</span>
-                  <span>{project.project_type_name}</span>
-                  <span>{project.experience_key}</span>
-                </a>
-              ))}
+          <section className="admin-properties__section">
+            <div className="admin-properties__section-heading-row">
+              <h2 className="admin-properties__section-title">Projects at this property</h2>
+              {form.id ? <span className="admin-properties__count">{projects.length}</span> : null}
             </div>
-          )}
-        </section>
-      </main>
+
+            {!form.id ? (
+              <div className="admin-properties__empty-row">Save the property before adding projects.</div>
+            ) : projects.length === 0 ? (
+              <div className="admin-properties__empty-row">No projects at this property yet.</div>
+            ) : (
+              <div className="admin-properties__project-list">
+                {projects.map((project) => (
+                  <a
+                    key={project.id}
+                    href={`/admin/projects?project_id=${encodeURIComponent(project.id)}`}
+                    className="admin-properties__project-row"
+                  >
+                    <span className="admin-properties__project-name">{project.name || `Project #${project.id}`}</span>
+                    <span>{projectTypeLabel(project)}</span>
+                    <span>{project.status || project.experience_key || ""}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       <AddressModal
         open={addressModalOpen}
@@ -386,6 +477,18 @@ export default function AdminPropertiesPage() {
         onSave={saveAddress}
         onRemove={form.address ? removeAddress : undefined}
       />
-    </div>
+    </AdminDetailPane>
+  );
+
+  return (
+    <AdminMasterDetail
+      className="admin-properties"
+      storageKey="admin-properties-list-width"
+      defaultListWidth={330}
+      minListWidth={240}
+      maxListWidth={500}
+      list={listPane}
+      detail={detailPane}
+    />
   );
 }

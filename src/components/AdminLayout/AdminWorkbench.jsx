@@ -1,151 +1,64 @@
 import AdminWorkbenchDrawer from "./AdminWorkbenchDrawer.jsx";
 
+function cssSize(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+  return typeof value === "number" ? `${value}px` : String(value);
+}
+
 export default function AdminWorkbench({
   header = null,
-
   upperLeft,
   upperRight,
   lower,
-
   drawerOpen = false,
   drawerWidth = 400,
   drawerTitle = "",
   drawerContent = null,
   onCloseDrawer,
-
   upperLeftWidth = 280,
   upperHeight = "48%",
+  className = "",
 }) {
+  const classes = [
+    "admin-workbench",
+    drawerOpen ? "is-drawer-open" : "",
+    className,
+  ].filter(Boolean).join(" ");
+
   return (
     <div
+      className={classes}
       style={{
-        height: "100%",
-        minHeight: 0,
-        minWidth: 0,
-
-        display: "flex",
-        flexDirection: "column",
-
-        background:
-          "var(--admin-layout-bg, #fff)",
+        "--admin-workbench-upper-height": cssSize(upperHeight, "48%"),
+        "--admin-workbench-upper-left-width": cssSize(upperLeftWidth, "280px"),
+        "--admin-workbench-drawer-width": cssSize(drawerWidth, "400px"),
       }}
     >
       {header ? (
-        <div
-          style={{
-            flexShrink: 0,
-          }}
-        >
+        <div className="admin-workbench__header">
           {header}
         </div>
       ) : null}
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-
-          padding: 12,
-
-          boxSizing: "border-box",
-
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
-        {/* MAIN WORKSPACE */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 12,
-
-            minWidth: 0,
-            minHeight: 0,
-
-            display: "grid",
-            gridTemplateRows:
-              `${upperHeight} minmax(0, 1fr)`,
-
-            overflow: "hidden",
-
-            border:
-              "1px solid var(--admin-layout-border, #d8dde3)",
-
-            background:
-              "var(--admin-layout-bg, #fff)",
-          }}
-        >
-          {/* UPPER AREA SHRINKS FOR DRAWER */}
-          <div
-            style={{
-              minWidth: 0,
-              minHeight: 0,
-
-              width: drawerOpen
-                ? `calc(100% - ${drawerWidth}px)`
-                : "100%",
-
-              display: "grid",
-
-              gridTemplateColumns:
-                `${upperLeftWidth}px minmax(0, 1fr)`,
-
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                minWidth: 0,
-                minHeight: 0,
-
-                borderRight:
-                  "1px solid var(--admin-layout-border, #d8dde3)",
-              }}
-            >
+      <div className="admin-workbench__body">
+        <div className="admin-workbench__workspace">
+          <div className="admin-workbench__upper">
+            <div className="admin-workbench__upper-left">
               {upperLeft}
             </div>
 
-            <div
-              style={{
-                minWidth: 0,
-                minHeight: 0,
-              }}
-            >
+            <div className="admin-workbench__upper-right">
               {upperRight}
             </div>
           </div>
 
-          {/* LOWER REMAINS FULL WIDTH */}
-          <div
-            style={{
-              minWidth: 0,
-              minHeight: 0,
-
-              overflow: "hidden",
-            }}
-          >
+          <div className="admin-workbench__lower">
             {lower}
           </div>
         </div>
 
-        {/* DRAWER OVERLAYS LOWER AREA */}
         {drawerOpen ? (
-          <div
-            style={{
-              position: "absolute",
-
-              top: 12,
-              right: 12,
-              bottom: 12,
-
-              width: drawerWidth,
-
-              display: "flex",
-
-              zIndex: 5,
-            }}
-          >
+          <div className="admin-workbench__drawer-slot">
             <AdminWorkbenchDrawer
               open
               width={drawerWidth}

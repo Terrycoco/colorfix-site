@@ -2,6 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import InsertLinkModal from "@components/InsertLinkModal";
 import LookupTypeManagerModal from "@components/LookupTypeManagerModal";
 import ModalDialog from "@components/ModalDialog";
+import {
+  AdminMasterDetail,
+  AdminListPane,
+  AdminDetailPane,
+  AdminObjectList,
+  AdminObjectListItem,
+  AdminEmptyState,
+  AdminWorkbenchAddButton,
+} from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
 import { copyShareText, openTextShare } from "@helpers/shareUrls";
 import { BRAND } from "@config/brand";
@@ -384,7 +393,6 @@ export default function AdminClientsPage() {
   const [emailView, setEmailView] = useState("plain");
   const [emailHtmlManuallyEdited, setEmailHtmlManuallyEdited] = useState(false);
   const [activityDetail, setActivityDetail] = useState(null);
-  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const plainTextBodyRef = useRef(null);
@@ -683,7 +691,6 @@ export default function AdminClientsPage() {
     setPhotosLoadedForClientId("");
     setError("");
     setNotice("");
-    setMobileDetailOpen(true);
   }
 
   function startNew() {
@@ -701,7 +708,6 @@ export default function AdminClientsPage() {
     setEmailView("plain");
     setError("");
     setNotice("");
-    setMobileDetailOpen(true);
   }
 
   function updateField(key, value) {
@@ -1138,72 +1144,94 @@ export default function AdminClientsPage() {
   }
 
   return (
-    <div className={`admin-clients ${mobileDetailOpen ? "is-mobile-detail-open" : ""}`}>
-      <aside className="admin-clients__sidebar">
-        <div className="admin-clients__sidebar-header">
-          <div>
-            <h1>Clients</h1>
-            <p>Pick a client from the list and manage details, email, and activity on the right.</p>
-          </div>
-          <button type="button" className="admin-clients__primary" onClick={startNew}>
-            New Client
-          </button>
-        </div>
+    <>
+      <AdminMasterDetail
+        storageKey="admin-clients-list-width"
+        defaultListWidth={300}
+        minListWidth={220}
+        maxListWidth={460}
+        list={
+          <AdminListPane
+            title="Clients"
+            actions={
+              <AdminWorkbenchAddButton
+                onClick={startNew}
+                title="New Client"
+              />
+            }
+            toolbar={
+              <input
+                className="admin-clients__search"
+                type="search"
+                placeholder="Search by name, email, or phone"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            }
+          >
+            {loading ? (
+              <div className="admin-clients__empty">Loading clients…</div>
+            ) : null}
 
-        <input
-          className="admin-clients__search"
-          type="search"
-          placeholder="Search by name, email, or phone"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+            {!loading && items.length === 0 ? (
+              <AdminEmptyState
+                title="No clients found"
+                message={query.trim() ? "Try a different search." : "Create the first client to get started."}
+              />
+            ) : null}
 
-        <div className="admin-clients__list">
-          {loading ? <div className="admin-clients__empty">Loading clients…</div> : null}
-          {!loading && items.length === 0 ? <div className="admin-clients__empty">No clients found.</div> : null}
-          {!loading && items.map((client) => (
-            <button
-              key={client.id}
-              type="button"
-              className={`admin-clients__card ${String(client.id) === String(selectedId) ? "is-active" : ""}`}
-                onClick={() => { void selectClient(client); }}
-            >
-              <div className="admin-clients__card-row">
-                <div className="admin-clients__card-title">{displayClientListName(client) || "Unnamed client"}</div>
-                {Number(client.unread_site_note_count || 0) > 0 ? (
-                  <span className="admin-clients__note-badge">{client.unread_site_note_count}</span>
-                ) : null}
-              </div>
-              <div className="admin-clients__card-email">{client.email || "No email"}</div>
-              <div className="admin-clients__card-meta">{client.phone || "No phone"}</div>
-            </button>
-          ))}
-        </div>
-      </aside>
-
-      <main className="admin-clients__main">
-        <section className="admin-clients__panel">
-          <div className="admin-clients__panel-header">
-            <div>
-              <button
-                type="button"
-                className="admin-clients__mobile-back"
-                onClick={() => setMobileDetailOpen(false)}
-              >
-                Back to Clients
-              </button>
-              <h2>{form.id ? (displayClientName(form) || `Client #${form.id}`) : "New Client"}</h2>
-              <div className="admin-clients__panel-sub">
-                {clientTypeLabel(form.client_type)} · {selectedUsage}
-                {form.started_at ? ` · Started ${formatDateTime(form.started_at)}` : ""}
-                {form.photo_permission_requested_at ? ` · Requested ${formatDateTime(form.photo_permission_requested_at)}` : ""}
-                {form.photo_permission_granted_at ? ` · Granted ${formatDateTime(form.photo_permission_granted_at)}` : ""}
-              </div>
-            </div>
-            <div className={`admin-clients__perm-badge is-${form.photo_permission_status || "unknown"}`}>
-              {formatPermissionStatus(form.photo_permission_status)}
-            </div>
-          </div>
+            {!loading && items.length > 0 ? (
+              <AdminObjectList ariaLabel="Clients">
+                {items.map((client) => {
+                  const unreadCount = Number(client.unread_site_note_count || 0);
+                  return (
+                    <AdminObjectListItem
+                      key={client.id}
+                      id={client.id}
+                      title={displayClientListName(client) || "Unnamed client"}
+                      meta={[
+                        client.email || "No email",
+                        client.phone || "No phone",
+                      ]}
+                      selected={String(client.id) === String(selectedId)}
+                      status={unreadCount > 0 ? {
+                        active: true,
+                        count: unreadCount,
+                        label: `${unreadCount} unread site note${unreadCount === 1 ? "" : "s"}`,
+                      } : null}
+                      onSelect={() => { void selectClient(client); }}
+                      onStatusClick={() => {
+                        void selectClient(client).then(() => setActiveTab("activity"));
+                      }}
+                    />
+                  );
+                })}
+              </AdminObjectList>
+            ) : null}
+          </AdminListPane>
+        }
+        detail={
+          <AdminDetailPane ariaLabel="Client detail">
+            {form.id || isCreatingNew ? (
+              <>
+                <div className="admin-detail-header">
+                  <div>
+                    <h1 className="admin-detail-header__title">
+                      {form.id ? (displayClientName(form) || `Client #${form.id}`) : "New Client"}
+                    </h1>
+                    <p className="admin-detail-header__description">
+                      {clientTypeLabel(form.client_type)} · {selectedUsage}
+                      {form.started_at ? ` · Started ${formatDateTime(form.started_at)}` : ""}
+                      {form.photo_permission_requested_at ? ` · Requested ${formatDateTime(form.photo_permission_requested_at)}` : ""}
+                      {form.photo_permission_granted_at ? ` · Granted ${formatDateTime(form.photo_permission_granted_at)}` : ""}
+                    </p>
+                  </div>
+                  <div className="admin-detail-header__actions">
+                    <div className={`admin-clients__perm-badge is-${form.photo_permission_status || "unknown"}`}>
+                      {formatPermissionStatus(form.photo_permission_status)}
+                    </div>
+                  </div>
+                </div>
 
           {error ? <div className="admin-clients__message admin-clients__message--error">{error}</div> : null}
           {notice ? <div className="admin-clients__message admin-clients__message--ok">{notice}</div> : null}
@@ -1719,8 +1747,17 @@ export default function AdminClientsPage() {
               ) : null}
             </div>
           ) : null}
-        </section>
-      </main>
+
+              </>
+            ) : (
+              <AdminEmptyState
+                title="Select a client"
+                message="Choose a client from the list, or create a new client."
+              />
+            )}
+          </AdminDetailPane>
+        }
+      />
 
       <InsertLinkModal
         open={linkModalOpen}
@@ -1812,6 +1849,6 @@ export default function AdminClientsPage() {
           </div>
         ) : null}
       </ModalDialog>
-    </div>
+    </>
   );
 }

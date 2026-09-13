@@ -1,0 +1,183 @@
+.admin-workbench {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--admin-bg);
+}
+
+.admin-workbench__header {
+  flex-shrink: 0;
+}
+
+.admin-workbench__body {
+  position: relative;
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.admin-workbench__workspace {
+  position: absolute;
+  inset: 12px;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: var(--admin-workbench-upper-height, 48%) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}
+
+.admin-workbench__upper {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--admin-workbench-upper-left-width, 280px) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+
+.admin-workbench__upper-left,
+.admin-workbench__upper-right,
+.admin-workbench__lower {
+  min-width: 0;
+  min-height: 0;
+}
+
+.admin-workbench__upper-left {
+  border-right: 1px solid var(--admin-border);
+}
+
+.admin-workbench__lower {
+  overflow: hidden;
+}
+
+
+.admin-workbench-pane,
+.admin-workbench-tabs {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--admin-bg);
+}
+
+.admin-workbench-pane__header,
+.admin-workbench-tabs__header {
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-header-bg);
+}
+
+.admin-workbench-pane__title {
+  font-size: 12px;
+}
+
+.admin-workbench-pane__body,
+.admin-workbench-tabs__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.admin-workbench-tabs {
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-workbench-tabs__header {
+  align-items: stretch;
+  gap: 4px;
+  background: #eef1f3;
+}
+
+.admin-workbench-tabs__list {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  gap: 2px;
+}
+
+.admin-workbench-tabs__tab {
+  padding: 0 12px;
+  border: 1px solid var(--admin-border);
+  border-bottom-color: var(--admin-border);
+  background: #dfe4e8;
+  color: #39434d;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-workbench-tabs__tab.is-active {
+  border-bottom-color: var(--admin-selected);
+  background: var(--admin-selected);
+  color: var(--admin-text);
+  font-weight: 700;
+}
+
+.admin-workbench-tabs__action {
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+
+.admin-workbench-list-row {
+  min-height: 30px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--admin-border-soft);
+  background: transparent;
+  cursor: default;
+  user-select: none;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.admin-workbench-list-row.is-selected {
+  background: var(--admin-selected);
+}
+
+.admin-workbench-list-row.is-wrap {
+  align-items: flex-start;
+  padding: 6px 8px;
+  line-height: 1.35;
+}
+
+.admin-workbench-list-row__content {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-workbench-list-row.is-wrap .admin-workbench-list-row__content {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.admin-workbench-add-button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+}

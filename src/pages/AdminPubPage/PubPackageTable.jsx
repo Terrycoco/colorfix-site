@@ -5,9 +5,16 @@ import {
 } from "react";
 
 import {
+  AdminBadge,
+  AdminButton,
   AdminDataGrid,
   AdminEmptyState,
-  AdminWorkbench,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminToolbar,
+  AdminToolbarSpacer,
+  useAdminDialog,
 } from "@components/AdminLayout";
 
 import {
@@ -28,6 +35,9 @@ const SCHEDULE_URL =
 export default function PubPackageTable({
   onOpenDispatch,
 }) {
+  const dialog =
+    useAdminDialog();
+
   const [
     assets,
     setAssets,
@@ -88,47 +98,7 @@ export default function PubPackageTable({
     setError,
   ] = useState("");
 
-  const [
-    selectedAsset,
-    setSelectedAsset,
-  ] = useState(null);
 
-  const [
-    drawerOpen,
-    setDrawerOpen,
-  ] = useState(false);
-
-  const [
-    drawerAsset,
-    setDrawerAsset,
-  ] = useState(null);
-
-  const [
-    drawerLoading,
-    setDrawerLoading,
-  ] = useState(false);
-
-  const [
-    drawerError,
-    setDrawerError,
-  ] = useState("");
-
-
-  /*
-   * PACKAGE WORKBENCH
-   *
-   * Expected rows:
-   *
-   *   approved CREATED assets waiting to enter Package
-   *   packing
-   *   packed
-   *   error where error_stage = package
-   *
-   * The summary request deliberately does NOT need the actual
-   * package JSON. It only needs has_package for the green checkmark.
-   *
-   * Package JSON is fetched only when the drawer is open.
-   */
   async function loadAssets() {
     setLoading(
       true
@@ -137,7 +107,6 @@ export default function PubPackageTable({
     setError(
       ""
     );
-
 
     try {
       const params =
@@ -148,7 +117,6 @@ export default function PubPackageTable({
             ),
         });
 
-
       if (channelFilter) {
         params.set(
           "channel",
@@ -156,14 +124,12 @@ export default function PubPackageTable({
         );
       }
 
-
       if (typeFilter) {
         params.set(
           "asset_type",
           typeFilter
         );
       }
-
 
       const res =
         await fetch(
@@ -174,10 +140,8 @@ export default function PubPackageTable({
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -190,19 +154,13 @@ export default function PubPackageTable({
         );
       }
 
-
-      const nextAssets =
+      setAssets(
         Array.isArray(
           data.assets
         )
           ? data.assets
-          : [];
-
-
-      setAssets(
-        nextAssets
+          : []
       );
-
 
       setChannels(
         Array.isArray(
@@ -212,7 +170,6 @@ export default function PubPackageTable({
           : []
       );
 
-
       setAssetTypes(
         Array.isArray(
           data?.filters?.asset_types
@@ -220,45 +177,6 @@ export default function PubPackageTable({
           ? data.filters.asset_types
           : []
       );
-
-
-      /*
-       * Keep the selected row current after Refresh.
-       */
-      if (
-        selectedAsset
-          ?.pub_asset_id
-      ) {
-        const refreshed =
-          nextAssets.find(
-            (
-              asset
-            ) =>
-              Number(
-                asset
-                  .pub_asset_id
-              ) ===
-              Number(
-                selectedAsset
-                  .pub_asset_id
-              )
-          );
-
-
-        if (refreshed) {
-          setSelectedAsset(
-            refreshed
-          );
-
-
-          if (drawerOpen) {
-            await loadDrawerAsset(
-              refreshed
-                .pub_asset_id
-            );
-          }
-        }
-      }
 
     } catch (err) {
       setError(
@@ -274,30 +192,23 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Pack exactly the selected asset.
-   *
-   * PackageEndpoint already supports the single-asset path:
-   *
-   *   POST { "pub_asset_id": 123 }
-   *
-   * That calls PackageManager::sendToPacking() and does NOT
-   * sweep sibling rows already waiting at Packing.
-   */
   async function packAsset(
     pubAssetId
   ) {
-    pubAssetId =
+    const id =
       Number(
         pubAssetId ||
         0
       );
 
-
-    if (!pubAssetId) {
-      return;
+    if (!id) {
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     setProcessing(
       true
@@ -306,7 +217,6 @@ export default function PubPackageTable({
     setError(
       ""
     );
-
 
     try {
       const res =
@@ -327,15 +237,13 @@ export default function PubPackageTable({
             body:
               JSON.stringify({
                 pub_asset_id:
-                  pubAssetId,
+                  id,
               }),
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -344,10 +252,9 @@ export default function PubPackageTable({
       ) {
         throw new Error(
           data?.error ||
-          `Failed to pack asset #${pubAssetId}.`
+          `Failed to pack asset #${id}.`
         );
       }
-
 
       const packedCount =
         Number(
@@ -355,44 +262,40 @@ export default function PubPackageTable({
           0
         );
 
-
       await loadAssets();
 
-
-      /*
-       * PENDING is a normal Package result. Keep the operator here so
-       * the drawer can show what the asset is waiting for. Only move
-       * onward when this exact asset actually reached PACKED.
-       */
       if (packedCount > 0) {
         onOpenDispatch?.();
       }
 
+      return {
+        ok:
+          true,
+        data,
+      };
+
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to pack asset #${pubAssetId}.`;
-
+        `Failed to pack asset #${id}.`;
 
       /*
-       * PackageManager may already have persisted error/package before
-       * the HTTP request returns failure. Re-read durable state so the
-       * workbench and open drawer never remain visually stuck at
-       * "Packing" after the process has actually failed.
+       * Durable Package state may already have changed even if the
+       * request returned an error. Re-read the workbench before
+       * reporting the failure.
        */
       await loadAssets();
-
-
-      if (drawerOpen) {
-        await loadDrawerAsset(
-          pubAssetId
-        );
-      }
-
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setProcessing(
@@ -402,24 +305,15 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Pack every APPROVED asset currently visible through the active
-   * Channel / Type / Stage filters.
-   *
-   * Batch packing deliberately stays on the Package workbench so the
-   * operator can inspect the resulting rows.
-   */
   async function packAllAssets() {
     const eligible =
       filteredAssets.filter(
         isApprovedCreatedAsset
       );
 
-
     if (!eligible.length) {
       return;
     }
-
 
     setProcessing(
       true
@@ -429,9 +323,7 @@ export default function PubPackageTable({
       ""
     );
 
-
     const failures = [];
-
 
     try {
       for (
@@ -445,11 +337,9 @@ export default function PubPackageTable({
             0
           );
 
-
         if (!pubAssetId) {
           continue;
         }
-
 
         try {
           const res =
@@ -475,10 +365,8 @@ export default function PubPackageTable({
               }
             );
 
-
           const data =
             await res.json();
-
 
           if (
             !res.ok
@@ -501,9 +389,7 @@ export default function PubPackageTable({
         }
       }
 
-
       await loadAssets();
-
 
       if (failures.length) {
         setError(
@@ -521,26 +407,24 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Edit outside-of-box destination metadata while the asset is still
-   * under Package control. The endpoint/repository invalidates any
-   * already-built package if the destination changes.
-   */
   async function savePingback(
     pubAssetId,
     pingback
   ) {
-    pubAssetId =
+    const id =
       Number(
         pubAssetId ||
         0
       );
 
-
-    if (!pubAssetId) {
-      return;
+    if (!id) {
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     setSavingPingback(
       true
@@ -549,11 +433,6 @@ export default function PubPackageTable({
     setError(
       ""
     );
-
-    setDrawerError(
-      ""
-    );
-
 
     try {
       const res =
@@ -575,8 +454,10 @@ export default function PubPackageTable({
               JSON.stringify({
                 action:
                   "update_pingback",
+
                 pub_asset_id:
-                  pubAssetId,
+                  id,
+
                 pingback:
                   String(
                     pingback ||
@@ -586,10 +467,8 @@ export default function PubPackageTable({
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -598,33 +477,35 @@ export default function PubPackageTable({
       ) {
         throw new Error(
           data?.error ||
-          `Failed to save destination for asset #${pubAssetId}.`
+          `Failed to save destination for asset #${id}.`
         );
       }
-
-
-      if (data?.asset) {
-        setDrawerAsset(
-          data.asset
-        );
-      }
-
 
       await loadAssets();
+
+      return {
+        ok:
+          true,
+        asset:
+          data?.asset ||
+          null,
+      };
 
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to save destination for asset #${pubAssetId}.`;
-
-
-      setDrawerError(
-        message
-      );
+        `Failed to save destination for asset #${id}.`;
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setSavingPingback(
@@ -634,28 +515,23 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Release exactly one PACKED asset into Schedule's active queue.
-   *
-   *   packed -> queued
-   *
-   * Once queued, the asset has left Package custody, so close the
-   * Package drawer and refresh this workbench.
-   */
   async function enqueueAsset(
     pubAssetId
   ) {
-    pubAssetId =
+    const id =
       Number(
         pubAssetId ||
         0
       );
 
-
-    if (!pubAssetId) {
-      return;
+    if (!id) {
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     setEnqueueing(
       true
@@ -664,11 +540,6 @@ export default function PubPackageTable({
     setError(
       ""
     );
-
-    setDrawerError(
-      ""
-    );
-
 
     try {
       const res =
@@ -692,15 +563,13 @@ export default function PubPackageTable({
                   "enqueue",
 
                 pub_asset_id:
-                  pubAssetId,
+                  id,
               }),
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -709,42 +578,32 @@ export default function PubPackageTable({
       ) {
         throw new Error(
           data?.error ||
-          `Failed to enqueue asset #${pubAssetId}.`
+          `Failed to enqueue asset #${id}.`
         );
       }
 
-
-      /*
-       * QUEUED belongs to Schedule, not Package.
-       */
-      setDrawerOpen(
-        false
-      );
-
-      setDrawerAsset(
-        null
-      );
-
-      setSelectedAsset(
-        null
-      );
-
-
       await loadAssets();
+
+      return {
+        ok:
+          true,
+      };
 
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to enqueue asset #${pubAssetId}.`;
-
-
-      setDrawerError(
-        message
-      );
+        `Failed to enqueue asset #${id}.`;
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setEnqueueing(
@@ -754,27 +613,15 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Release every PACKED asset currently visible through the active
-   * Channel / Type / Stage filters into Schedule's active queue.
-   *
-   *   packed -> queued
-   *
-   * This is the Package department's normal batch handoff to the
-   * loading dock. It uses the same Schedule enqueue action as the
-   * single-asset drawer control.
-   */
   async function enqueueAllPackedAssets() {
     const eligible =
       filteredAssets.filter(
         isPackedAsset
       );
 
-
     if (!eligible.length) {
       return;
     }
-
 
     setEnqueueing(
       true
@@ -784,14 +631,7 @@ export default function PubPackageTable({
       ""
     );
 
-    setDrawerError(
-      ""
-    );
-
-
     const failures = [];
-    let enqueuedCount = 0;
-
 
     try {
       for (
@@ -805,11 +645,9 @@ export default function PubPackageTable({
             0
           );
 
-
         if (!pubAssetId) {
           continue;
         }
-
 
         try {
           const res =
@@ -838,10 +676,8 @@ export default function PubPackageTable({
               }
             );
 
-
           const data =
             await res.json();
-
 
           if (
             !res.ok
@@ -854,10 +690,6 @@ export default function PubPackageTable({
             );
           }
 
-
-          enqueuedCount +=
-            1;
-
         } catch (err) {
           failures.push(
             `#${pubAssetId}: ${
@@ -868,29 +700,7 @@ export default function PubPackageTable({
         }
       }
 
-
-      /*
-       * Any successfully queued asset has left Package custody.
-       * Close stale selection/drawer state before re-reading the
-       * Package workbench.
-       */
-      if (enqueuedCount > 0) {
-        setDrawerOpen(
-          false
-        );
-
-        setDrawerAsset(
-          null
-        );
-
-        setSelectedAsset(
-          null
-        );
-      }
-
-
       await loadAssets();
-
 
       if (failures.length) {
         setError(
@@ -908,41 +718,47 @@ export default function PubPackageTable({
   }
 
 
-  /*
-   * Manual Send Now.
-   *
-   * This deliberately goes through ScheduleManager's explicit override
-   * path rather than calling Dispatch directly:
-   *
-   *   packed -> queued -> shipping -> shipped
-   *
-   * Automatic Schedule timing/ranking is bypassed.
-   */
   async function sendAsset(
     pubAssetId
   ) {
-    pubAssetId =
+    const id =
       Number(
         pubAssetId ||
         0
       );
 
-
-    if (!pubAssetId) {
-      return;
+    if (!id) {
+      return {
+        ok:
+          false,
+        error:
+          "Valid PUB asset ID required.",
+      };
     }
-
 
     const confirmed =
-      window.confirm(
-        `Send asset #${pubAssetId} now?\n\nThis bypasses Schedule and sends it directly to Dispatch.`
-      );
+      await dialog.confirm({
+        title:
+          "Send asset now?",
 
+        message:
+          `Send asset #${id} now? This bypasses Schedule timing and sends it to Dispatch immediately.`,
+
+        confirmLabel:
+          "Send Now",
+
+        cancelLabel:
+          "Cancel",
+      });
 
     if (!confirmed) {
-      return;
+      return {
+        ok:
+          false,
+        cancelled:
+          true,
+      };
     }
-
 
     setSending(
       true
@@ -951,11 +767,6 @@ export default function PubPackageTable({
     setError(
       ""
     );
-
-    setDrawerError(
-      ""
-    );
-
 
     try {
       const res =
@@ -979,15 +790,13 @@ export default function PubPackageTable({
                   "send_now",
 
                 pub_asset_id:
-                  pubAssetId,
+                  id,
               }),
           }
         );
 
-
       const data =
         await res.json();
-
 
       if (
         !res.ok
@@ -999,43 +808,32 @@ export default function PubPackageTable({
           data?.result
             ?.failed
             ?.error ||
-          `Failed to send asset #${pubAssetId}.`
+          `Failed to send asset #${id}.`
         );
       }
 
-
-      /*
-       * The asset has left Package custody. Close the Package drawer
-       * instead of trying to reload a row that no longer belongs here.
-       */
-      setDrawerOpen(
-        false
-      );
-
-      setDrawerAsset(
-        null
-      );
-
-      setSelectedAsset(
-        null
-      );
-
-
       await loadAssets();
+
+      return {
+        ok:
+          true,
+      };
 
     } catch (err) {
       const message =
         err?.message ||
-        `Failed to send asset #${pubAssetId}.`;
-
-
-      setDrawerError(
-        message
-      );
+        `Failed to send asset #${id}.`;
 
       setError(
         message
       );
+
+      return {
+        ok:
+          false,
+        error:
+          message,
+      };
 
     } finally {
       setSending(
@@ -1053,148 +851,12 @@ export default function PubPackageTable({
   ]);
 
 
-  /*
-   * DETAIL DRAWER
-   *
-   * The actual package object is loaded only when somebody
-   * wants to inspect the selected row.
-   */
-  async function loadDrawerAsset(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        0
-      );
-
-
-    if (!id) {
-      return;
-    }
-
-
-    setDrawerLoading(
-      true
-    );
-
-    setDrawerError(
-      ""
-    );
-
-
-    try {
-      const params =
-        new URLSearchParams({
-          pub_asset_id:
-            String(
-              id
-            ),
-
-          _:
-            String(
-              Date.now()
-            ),
-        });
-
-
-      const res =
-        await fetch(
-          `${PACKAGE_URL}?${params.toString()}`,
-          {
-            credentials:
-              "include",
-          }
-        );
-
-
-      const data =
-        await res.json();
-
-
-      if (
-        !res.ok
-        ||
-        !data?.ok
-      ) {
-        throw new Error(
-          data?.error ||
-          "Could not load Package details."
-        );
-      }
-
-
-      setDrawerAsset(
-        data.asset ||
-        null
-      );
-
-    } catch (err) {
-      setDrawerError(
-        err?.message ||
-        "Could not load Package details."
-      );
-
-    } finally {
-      setDrawerLoading(
-        false
-      );
-    }
-  }
-
-
-  /*
-   * One click:
-   *   select/highlight the row.
-   *
-   * If the drawer is already open, selecting another row
-   * immediately changes the drawer to that asset.
-   */
-  function selectAsset(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-
-    if (drawerOpen) {
-      loadDrawerAsset(
-        asset.pub_asset_id
-      );
-    }
-  }
-
-
-  /*
-   * Double click:
-   *   select the row
-   *   open the Package drawer
-   */
-  function openDrawer(
-    asset
-  ) {
-    setSelectedAsset(
-      asset
-    );
-
-    setDrawerOpen(
-      true
-    );
-
-    loadDrawerAsset(
-      asset.pub_asset_id
-    );
-  }
-
-
   const filteredAssets =
     useMemo(
       () => {
         if (!stageFilter) {
           return assets;
         }
-
 
         return assets.filter(
           (asset) =>
@@ -1235,9 +897,6 @@ export default function PubPackageTable({
     );
 
 
-  /*
-   * GRID COLUMNS
-   */
   const columns =
     useMemo(
       () => [
@@ -1257,7 +916,6 @@ export default function PubPackageTable({
               ),
         },
 
-
         {
           key:
             "channel",
@@ -1265,7 +923,6 @@ export default function PubPackageTable({
           label:
             "Channel",
         },
-
 
         {
           key:
@@ -1282,7 +939,6 @@ export default function PubPackageTable({
               ),
         },
 
-
         {
           key:
             "source",
@@ -1291,35 +947,17 @@ export default function PubPackageTable({
             "Source",
 
           value:
-            (asset) => {
-              const type =
+            (asset) =>
+              formatSource(
                 asset
-                  .source_type ||
-                "";
-
-              const id =
-                asset
-                  .source_id ||
-                "";
-
-
-              if (
-                !type
-                &&
-                !id
-              ) {
-                return "—";
-              }
-
-
-              return `${type} #${id}`;
-            },
+              ),
 
           sortValue:
             (asset) =>
+              asset
+                .source_title ||
               `${asset.source_type || ""} ${asset.source_id || ""}`,
         },
-
 
         {
           key:
@@ -1335,7 +973,6 @@ export default function PubPackageTable({
               "—",
         },
 
-
         {
           key:
             "pipeline_stage",
@@ -1350,11 +987,9 @@ export default function PubPackageTable({
                   asset
                 );
 
-
               if (!stage) {
                 return "—";
               }
-
 
               const waiting =
                 stage ===
@@ -1368,48 +1003,48 @@ export default function PubPackageTable({
                   ).trim()
                 );
 
+              const packageError =
+                String(
+                  asset
+                    .error_stage ||
+                  ""
+                )
+                  .trim()
+                  .toLowerCase() ===
+                  "package"
+                ||
+                (
+                  stage ===
+                    "error"
+                  &&
+                  Boolean(
+                    asset
+                      .error_message
+                  )
+                );
+
+              const label =
+                packageError
+                  ? "Package Error"
+                  : waiting
+                    ? "Waiting"
+                    : humanize(
+                        stage
+                      );
 
               return (
-                <span
-                  style={
-                    stage ===
-                      "error"
-                      ? errorStageStyle
-                      : stage ===
-                          "packing"
-                        ? packingStageStyle
-                        : stageBadgeStyle
+                <AdminBadge
+                  variant={
+                    packageError
+                      ? "danger"
+                      : stageBadgeVariant(
+                          stage,
+                          waiting
+                        )
                   }
                 >
-                  {
-                    (
-                      String(
-                        asset
-                          .error_stage ||
-                        ""
-                      )
-                        .trim()
-                        .toLowerCase() ===
-                      "package"
-                      ||
-                      (
-                        stage ===
-                          "error"
-                        &&
-                        Boolean(
-                          asset
-                            .error_message
-                        )
-                      )
-                    )
-                      ? "Package Error"
-                      : waiting
-                        ? "Waiting"
-                        : humanize(
-                            stage
-                          )
-                  }
-                </span>
+                  {label}
+                </AdminBadge>
               );
             },
 
@@ -1419,7 +1054,6 @@ export default function PubPackageTable({
                 asset
               ),
         },
-
 
         {
           key:
@@ -1443,7 +1077,6 @@ export default function PubPackageTable({
               ),
         },
 
-
         {
           key:
             "has_package",
@@ -1457,16 +1090,13 @@ export default function PubPackageTable({
                 asset
               )
                 ? (
-                    <span
+                    <AdminBadge
+                      variant="success"
                       title="Package complete"
                       aria-label="Package complete"
-
-                      style={
-                        packageCheckStyle
-                      }
                     >
                       ✓
-                    </span>
+                    </AdminBadge>
                   )
                 : "",
 
@@ -1478,7 +1108,6 @@ export default function PubPackageTable({
                 ? 1
                 : 0,
         },
-
 
         {
           key:
@@ -1513,434 +1142,398 @@ export default function PubPackageTable({
   }
 
 
-  const drawerTitle =
-    drawerAsset
-      ?.pub_asset_id
-      ? `Package · Asset #${drawerAsset.pub_asset_id}`
-      : "Package";
-
-
   return (
-    <div
-      className="admin-detail-workarea"
-    >
-      <AdminWorkbench
-        header={
-          <>
-            <div
-              style={
-                filterBarStyle
-              }
-            >
-              <label
-                className="admin-field"
-              >
-                <span
-                  className="admin-field__label"
-                >
-                  Channel
-                </span>
-            
-                <select
-                  className="admin-field__control"
-            
+    <div className="admin-detail-workarea">
+      <AdminToolbar>
+        <AdminField
+          label="Channel"
+          compact
+        >
+          <select
+            className="admin-field__control"
+
+            value={
+              channelFilter
+            }
+
+            onChange={(
+              event
+            ) =>
+              setChannelFilter(
+                event
+                  .target
+                  .value
+              )
+            }
+          >
+            <option value="">
+              All
+            </option>
+
+            {channels.map(
+              (
+                channel
+              ) => (
+                <option
+                  key={
+                    channel
+                  }
+
                   value={
-                    channelFilter
-                  }
-            
-                  onChange={(
-                    event
-                  ) =>
-                    setChannelFilter(
-                      event
-                        .target
-                        .value
-                    )
+                    channel
                   }
                 >
-                  <option value="">
-                    All
-                  </option>
-            
-                  {channels.map(
-                    (
+                  {
+                    humanize(
                       channel
-                    ) => (
-                      <option
-                        key={
-                          channel
-                        }
-            
-                        value={
-                          channel
-                        }
-                      >
-                        {
-                          humanize(
-                            channel
-                          )
-                        }
-                      </option>
                     )
-                  )}
-                </select>
-              </label>
-            
-            
-              <label
-                className="admin-field"
-              >
-                <span
-                  className="admin-field__label"
-                >
-                  Type
-                </span>
-            
-                <select
-                  className="admin-field__control"
-            
+                  }
+                </option>
+              )
+            )}
+          </select>
+        </AdminField>
+
+
+        <AdminField
+          label="Type"
+          compact
+        >
+          <select
+            className="admin-field__control"
+
+            value={
+              typeFilter
+            }
+
+            onChange={(
+              event
+            ) =>
+              setTypeFilter(
+                event
+                  .target
+                  .value
+              )
+            }
+          >
+            <option value="">
+              All
+            </option>
+
+            {assetTypes.map(
+              (
+                assetType
+              ) => (
+                <option
+                  key={
+                    assetType
+                  }
+
                   value={
-                    typeFilter
-                  }
-            
-                  onChange={(
-                    event
-                  ) =>
-                    setTypeFilter(
-                      event
-                        .target
-                        .value
-                    )
+                    assetType
                   }
                 >
-                  <option value="">
-                    All
-                  </option>
-            
-                  {assetTypes.map(
-                    (
+                  {
+                    humanize(
                       assetType
-                    ) => (
-                      <option
-                        key={
-                          assetType
-                        }
-            
-                        value={
-                          assetType
-                        }
-                      >
-                        {
-                          humanize(
-                            assetType
-                          )
-                        }
-                      </option>
-                    )
-                  )}
-                </select>
-              </label>
-              <label
-                className="admin-field"
-              >
-                <span
-                  className="admin-field__label"
-                >
-                  Stage
-                </span>
-
-                <select
-                  className="admin-field__control"
-
-                  value={
-                    stageFilter
-                  }
-
-                  onChange={(
-                    event
-                  ) =>
-                    setStageFilter(
-                      event
-                        .target
-                        .value
                     )
                   }
-                >
-                  <option value="">
-                    All
-                  </option>
-
-                  <option value="approved">
-                    Approved
-                  </option>
-
-                  <option value="packing">
-                    Packing
-                  </option>
-
-                  <option value="packed">
-                    Packed
-                  </option>
-
-                  <option value="error">
-                    Package Error
-                  </option>
-                </select>
-              </label>
+                </option>
+              )
+            )}
+          </select>
+        </AdminField>
 
 
-              <button
-                type="button"
+        <AdminField
+          label="Stage"
+          compact
+        >
+          <select
+            className="admin-field__control"
 
-                onClick={
-                  packAllAssets
-                }
+            value={
+              stageFilter
+            }
 
-                disabled={
-                  loading ||
-                  processing ||
-                  approvedReadyCount === 0
-                }
+            onChange={(
+              event
+            ) =>
+              setStageFilter(
+                event
+                  .target
+                  .value
+              )
+            }
+          >
+            <option value="">
+              All
+            </option>
 
-                style={
-                  packAllButtonStyle
-                }
+            <option value="approved">
+              Approved
+            </option>
 
-                title={
-                  approvedReadyCount > 0
-                    ? `Pack ${approvedReadyCount} approved asset${
-                        approvedReadyCount === 1
-                          ? ""
-                          : "s"
-                      } currently visible.`
-                    : "No approved assets in the current filtered view."
-                }
-              >
-                {
-                  processing
-                    ? "Packing..."
-                    : approvedReadyCount > 0
-                      ? `Pack All (${approvedReadyCount})`
-                      : "Pack All"
-                }
-              </button>
+            <option value="packing">
+              Packing
+            </option>
 
+            <option value="packed">
+              Packed
+            </option>
 
-              <button
-                type="button"
-
-                onClick={
-                  enqueueAllPackedAssets
-                }
-
-                disabled={
-                  loading ||
-                  processing ||
-                  enqueueing ||
-                  packedReadyCount === 0
-                }
-
-                style={
-                  sendToQueueButtonStyle
-                }
-
-                title={
-                  packedReadyCount > 0
-                    ? `Send ${packedReadyCount} packed asset${
-                        packedReadyCount === 1
-                          ? ""
-                          : "s"
-                      } currently visible to the Scheduler queue.`
-                    : "No packed assets in the current filtered view."
-                }
-              >
-                {
-                  enqueueing
-                    ? "Sending to Queue..."
-                    : packedReadyCount > 0
-                      ? `Send To Queue (${packedReadyCount})`
-                      : "Send To Queue"
-                }
-              </button>
+            <option value="error">
+              Package Error
+            </option>
+          </select>
+        </AdminField>
 
 
-              <button
-                type="button"
-            
-                onClick={
-                  loadAssets
-                }
-            
-                disabled={
-                  loading ||
-                  processing ||
-                  enqueueing
-                }
-            
-                style={
-                  refreshButtonStyle
-                }
-              >
-                {
-                  loading
-                    ? "Refreshing..."
-                    : "Refresh"
-                }
-              </button>
-            
-            
-              <div
-                style={
-                  countStyle
-                }
-              >
-                {filteredAssets.length} asset
-                {
-                  filteredAssets.length === 1
+        <AdminButton
+          type="button"
+
+          onClick={
+            packAllAssets
+          }
+
+          disabled={
+            loading
+            ||
+            processing
+            ||
+            approvedReadyCount ===
+              0
+          }
+
+          title={
+            approvedReadyCount > 0
+              ? `Pack ${approvedReadyCount} approved asset${
+                  approvedReadyCount === 1
                     ? ""
                     : "s"
+                } currently visible.`
+              : "No approved assets in the current filtered view."
+          }
+        >
+          {
+            processing
+              ? "Packing..."
+              : approvedReadyCount > 0
+                ? `Pack All (${approvedReadyCount})`
+                : "Pack All"
+          }
+        </AdminButton>
+
+
+        <AdminButton
+          type="button"
+
+          onClick={
+            enqueueAllPackedAssets
+          }
+
+          disabled={
+            loading
+            ||
+            processing
+            ||
+            enqueueing
+            ||
+            packedReadyCount ===
+              0
+          }
+        >
+          {
+            enqueueing
+              ? "Sending to Queue..."
+              : packedReadyCount > 0
+                ? `Send To Queue (${packedReadyCount})`
+                : "Send To Queue"
+          }
+        </AdminButton>
+
+
+        <AdminToolbarSpacer />
+
+
+        <AdminButton
+          type="button"
+
+          variant="secondary"
+
+          onClick={
+            loadAssets
+          }
+
+          disabled={
+            loading
+            ||
+            processing
+            ||
+            enqueueing
+          }
+        >
+          {
+            loading
+              ? "Refreshing..."
+              : "Refresh"
+          }
+        </AdminButton>
+
+
+        <AdminMetaText as="div">
+          {filteredAssets.length} asset
+          {
+            filteredAssets.length === 1
+              ? ""
+              : "s"
+          }
+        </AdminMetaText>
+      </AdminToolbar>
+
+
+      {error ? (
+        <AdminNotice variant="danger">
+          {error}
+        </AdminNotice>
+      ) : null}
+
+
+      <AdminDataGrid
+        items={
+          filteredAssets
+        }
+
+        columns={
+          columns
+        }
+
+        getRowKey={(
+          asset
+        ) =>
+          asset
+            .pub_asset_id
+        }
+
+        defaultSortKey="pub_asset_id"
+
+        defaultSortDirection="desc"
+
+        ariaLabel="PUB Package workbench"
+
+        drawer={{
+          title:
+            (asset) =>
+              `Package · Asset #${asset.pub_asset_id}`,
+
+          width:
+            440,
+
+          render:
+            ({ item }) => (
+              <PubPackageDrawer
+                asset={
+                  item
                 }
-              </div>
-            </div>
-          </>
-        }
 
-        /*
-         * PACKAGE is a single-grid workbench.
-         * Give AdminWorkbench a zero-height upper section and use the
-         * full lower workspace for the Package grid. AdminWorkbench,
-         * not this table and not PubPackageDrawer, owns drawer geometry.
-         */
-        upperLeft={null}
-        upperRight={null}
-        upperHeight="0px"
-
-        lower={
-          <div
-            className="admin-detail-workarea"
-
-            style={{
-              height:
-                "100%",
-            }}
-          >
-            {error ? (
-              <div
-                style={
-                  errorStyle
+                loadAsset={
+                  fetchPackageAssetDetail
                 }
-              >
-                {error}
-              </div>
-            ) : null}
-            
 
-            <AdminDataGrid
-              items={
-                filteredAssets
-              }
-            
-              columns={
-                columns
-              }
-            
-              getRowKey={(
-                asset
-              ) =>
-                asset
-                  .pub_asset_id
-              }
-            
-              selectedKey={
-                selectedAsset
-                  ?.pub_asset_id ??
-                null
-              }
-            
-              onSelectionChange={
-                selectAsset
-              }
-            
-              onRowDoubleClick={
-                openDrawer
-              }
-            
-              defaultSortKey="pub_asset_id"
-            
-              defaultSortDirection="desc"
-            
-              ariaLabel="PUB Package workbench"
-            />
-          </div>
-        }
+                packing={
+                  processing
+                }
 
-        drawerOpen={
-          drawerOpen
-        }
+                savingPingback={
+                  savingPingback
+                }
 
-        drawerWidth={
-          440
-        }
+                sending={
+                  sending
+                }
 
-        drawerTitle={
-          drawerTitle
-        }
+                enqueueing={
+                  enqueueing
+                }
 
-        drawerContent={
-          <PubPackageDrawer
-            asset={
-              drawerAsset
-            }
+                onPack={
+                  packAsset
+                }
 
-            loading={
-              drawerLoading
-            }
+                onSavePingback={
+                  savePingback
+                }
 
-            error={
-              drawerError
-            }
+                onEnqueue={
+                  enqueueAsset
+                }
 
-            packing={
-              processing
-            }
-
-            savingPingback={
-              savingPingback
-            }
-
-            sending={
-              sending
-            }
-
-            enqueueing={
-              enqueueing
-            }
-
-            onPack={
-              packAsset
-            }
-
-            onSavePingback={
-              savePingback
-            }
-
-            onEnqueue={
-              enqueueAsset
-            }
-
-            onSend={
-              sendAsset
-            }
-          />
-        }
-
-        onCloseDrawer={() => {
-          setDrawerOpen(
-            false
-          );
+                onSend={
+                  sendAsset
+                }
+              />
+            ),
         }}
       />
     </div>
+  );
+}
+
+
+async function fetchPackageAssetDetail(
+  pubAssetId
+) {
+  const id =
+    Number(
+      pubAssetId ||
+      0
+    );
+
+  if (!id) {
+    throw new Error(
+      "Valid PUB asset ID required."
+    );
+  }
+
+  const params =
+    new URLSearchParams({
+      pub_asset_id:
+        String(
+          id
+        ),
+
+      _:
+        String(
+          Date.now()
+        ),
+    });
+
+  const res =
+    await fetch(
+      `${PACKAGE_URL}?${params.toString()}`,
+      {
+        credentials:
+          "include",
+      }
+    );
+
+  const data =
+    await res.json();
+
+  if (
+    !res.ok
+    ||
+    !data?.ok
+  ) {
+    throw new Error(
+      data?.error ||
+      "Could not load Package details."
+    );
+  }
+
+  return (
+    data.asset ||
+    null
   );
 }
 
@@ -1957,11 +1550,9 @@ function displayStage(
       .trim()
       .toLowerCase();
 
-
   if (explicit) {
     return explicit;
   }
-
 
   const pipelineStage =
     String(
@@ -1971,7 +1562,6 @@ function displayStage(
     )
       .trim()
       .toLowerCase();
-
 
   if (
     pipelineStage ===
@@ -1985,7 +1575,6 @@ function displayStage(
   ) {
     return "approved";
   }
-
 
   return pipelineStage;
 }
@@ -2055,6 +1644,74 @@ function hasPackage(
 }
 
 
+function formatSource(
+  asset
+) {
+  const title =
+    String(
+      asset
+        ?.source_title ||
+      ""
+    ).trim();
+
+  if (title) {
+    return title;
+  }
+
+  const type =
+    asset?.source_type ||
+    "";
+
+  const id =
+    asset?.source_id ||
+    "";
+
+  if (
+    !type
+    &&
+    !id
+  ) {
+    return "—";
+  }
+
+  return `${type} #${id}`;
+}
+
+
+function stageBadgeVariant(
+  stage,
+  waiting = false
+) {
+  if (waiting) {
+    return "warning";
+  }
+
+  switch (
+    String(
+      stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase()
+  ) {
+    case "packed":
+      return "success";
+
+    case "packing":
+      return "info";
+
+    case "pending":
+      return "warning";
+
+    case "error":
+      return "danger";
+
+    default:
+      return "neutral";
+  }
+}
+
+
 function humanize(
   value
 ) {
@@ -2079,148 +1736,3 @@ function humanize(
           .toUpperCase()
     );
 }
-
-
-const stageBadgeStyle = {
-  display:
-    "inline-block",
-
-  padding:
-    "3px 7px",
-
-  borderRadius:
-    999,
-
-  background:
-    "#eef1f4",
-
-  color:
-    "#465465",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-
-  lineHeight:
-    1.2,
-};
-
-
-const packingStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#e8f1fb",
-
-  color:
-    "#245b88",
-};
-
-
-const errorStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#fff1f1",
-
-  color:
-    "#8a3131",
-
-  border:
-    "1px solid #e2baba",
-};
-
-
-const packageCheckStyle = {
-  display:
-    "inline-block",
-
-  minWidth:
-    18,
-
-  color:
-    "#248451",
-
-  fontSize:
-    18,
-
-  fontWeight:
-    800,
-
-  lineHeight:
-    1,
-
-  textAlign:
-    "center",
-};
-
-
-const filterBarStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "flex-end",
-
-  gap:
-    12,
-
-  padding:
-    "14px 0",
-};
-
-
-const selectedPackButtonStyle = {
-  marginLeft:
-    "auto",
-
-  marginBottom:
-    1,
-};
-
-
-const packAllButtonStyle = {
-  marginBottom:
-    1,
-};
-
-
-const sendToQueueButtonStyle = {
-  marginBottom:
-    1,
-};
-
-
-const refreshButtonStyle = {
-  marginBottom:
-    1,
-};
-
-
-const countStyle = {
-  paddingBottom:
-    7,
-
-  color:
-    "#586675",
-
-  fontSize:
-    13,
-};
-
-
-const errorStyle = {
-  marginBottom:
-    12,
-
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #d8dde3",
-
-  background:
-    "#fff7f7",
-};

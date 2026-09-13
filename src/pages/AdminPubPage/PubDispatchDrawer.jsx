@@ -1,21 +1,48 @@
 import {
+  useEffect,
   useState,
 } from "react";
 
 import {
-  AdminWorkbenchDrawer,
+  AdminBadge,
+  AdminButton,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminStack,
+  AdminToolbar,
 } from "@components/AdminLayout";
 
 
 export default function PubDispatchDrawer({
-  open,
   asset,
-  loading = false,
-  error = "",
+  loadAsset,
   retrying = false,
   onRetry,
-  onClose,
 }) {
+  const [
+    detailAsset,
+    setDetailAsset,
+  ] = useState(
+    asset ||
+    null
+  );
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(
+    false
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState(
+    ""
+  );
+
   const [
     copiedUrl,
     setCopiedUrl,
@@ -24,57 +51,143 @@ export default function PubDispatchDrawer({
   );
 
 
+  async function refreshDetail() {
+    const id =
+      Number(
+        asset
+          ?.pub_asset_id ||
+        0
+      );
+
+    if (!id) {
+      setDetailAsset(
+        null
+      );
+
+      return;
+    }
+
+    if (
+      typeof loadAsset !==
+      "function"
+    ) {
+      setDetailAsset(
+        asset
+      );
+
+      return;
+    }
+
+    setLoading(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    try {
+      const loaded =
+        await loadAsset(
+          id
+        );
+
+      setDetailAsset(
+        loaded ||
+        asset
+      );
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Could not load Dispatch details."
+      );
+
+      setDetailAsset(
+        asset
+      );
+
+    } finally {
+      setLoading(
+        false
+      );
+    }
+  }
+
+
+  useEffect(() => {
+    setDetailAsset(
+      asset ||
+      null
+    );
+
+    setCopiedUrl(
+      false
+    );
+
+    refreshDetail();
+  }, [
+    asset?.pub_asset_id,
+    asset?.updated_at,
+  ]);
+
+
+  const currentAsset =
+    detailAsset ||
+    asset;
+
   const packageValue =
     normalizeJson(
-      asset?.package
+      currentAsset
+        ?.package
     );
 
   const receiptValue =
     normalizeJson(
-      asset
+      currentAsset
         ?.shipping_receipt
     );
 
   const externalId =
     receiptValue
-      && typeof receiptValue ===
-        "object"
+    &&
+    typeof receiptValue ===
+      "object"
       ? receiptValue
           .external_id ||
+        currentAsset
+          ?.external_id ||
         "—"
-      : "—";
+      : currentAsset
+          ?.external_id ||
+        "—";
 
   const externalUrl =
     receiptValue
-      && typeof receiptValue ===
-        "object"
+    &&
+    typeof receiptValue ===
+      "object"
       ? receiptValue
           .external_url ||
+        currentAsset
+          ?.external_url ||
         ""
-      : "";
+      : currentAsset
+          ?.external_url ||
+        "";
 
-  const title =
-    asset
-      ?.pub_asset_id
-      ? `Dispatch · Asset #${asset.pub_asset_id}`
-      : "Dispatch";
-
+  const stage =
+    normalizedStage(
+      currentAsset
+    );
 
   const canRetryShipping =
-    String(
-      asset?.pipeline_stage ||
-      ""
-    )
-      .trim()
-      .toLowerCase() ===
+    stage ===
       "error"
     &&
-    String(
-      asset?.error_stage ||
-      ""
-    )
-      .trim()
-      .toLowerCase() ===
+    normalizedErrorStage(
+      currentAsset
+    ) ===
       "dispatch";
 
 
@@ -83,7 +196,6 @@ export default function PubDispatchDrawer({
       return;
     }
 
-
     try {
       await navigator
         .clipboard
@@ -91,11 +203,9 @@ export default function PubDispatchDrawer({
           externalUrl
         );
 
-
       setCopiedUrl(
         true
       );
-
 
       window.setTimeout(
         () => {
@@ -114,369 +224,381 @@ export default function PubDispatchDrawer({
   }
 
 
+  async function handleRetry() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onRetry?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.cancelled
+    ) {
+      return;
+    }
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Dispatch retry failed."
+      );
+
+      return;
+    }
+
+    await refreshDetail();
+  }
+
+
+  if (
+    loading
+    &&
+    !currentAsset
+  ) {
+    return (
+      <AdminMetaText as="div">
+        Loading Dispatch details...
+      </AdminMetaText>
+    );
+  }
+
+
+  if (!currentAsset) {
+    return (
+      <AdminMetaText as="div">
+        Select a Dispatch row.
+      </AdminMetaText>
+    );
+  }
+
+
   return (
-    <AdminWorkbenchDrawer
-      open={
-        open
-      }
+    <AdminStack gap="lg">
+      {loading ? (
+        <AdminMetaText as="div">
+          Refreshing Dispatch details...
+        </AdminMetaText>
+      ) : null}
 
-      width={
-        500
-      }
 
-      title={
-        title
-      }
+      {error ? (
+        <AdminNotice variant="danger">
+          {error}
+        </AdminNotice>
+      ) : null}
 
-      onClose={
-        onClose
-      }
-    >
-      <div
-        style={
-          bodyStyle
-        }
+
+      <AdminPanel
+        title="Asset"
+        compact
       >
-        {loading ? (
-          <div
-            style={
-              mutedStyle
+        <AdminStack gap="sm">
+          <DetailField
+            label="Channel"
+            value={
+              humanize(
+                currentAsset
+                  .channel
+              )
             }
-          >
-            Loading Dispatch details...
-          </div>
-        ) : error ? (
-          <div
-            style={
-              errorStyle
+          />
+
+          <DetailField
+            label="Type"
+            value={
+              humanize(
+                currentAsset
+                  .asset_type
+              )
             }
-          >
-            {error}
-          </div>
-        ) : asset ? (
-          <>
-            <Section
-              title="Asset"
-            >
-              <DetailRow
-                label="Channel"
-                value={
+          />
+
+          <DetailField
+            label="Source"
+            value={
+              formatSource(
+                currentAsset
+              )
+            }
+          />
+
+          <DetailField
+            label="Title"
+            value={
+              currentAsset
+                .search_title ||
+              "—"
+            }
+          />
+        </AdminStack>
+      </AdminPanel>
+
+
+      <AdminPanel
+        title="Status"
+        compact
+      >
+        <AdminStack gap="sm">
+          <AdminField label="Stage">
+            <div>
+              <AdminBadge
+                variant={
+                  stage ===
+                    "error"
+                    ? "danger"
+                    : stage ===
+                        "shipping"
+                      ? "warning"
+                      : "success"
+                }
+              >
+                {
                   humanize(
-                    asset.channel
+                    stage
                   )
                 }
-              />
+              </AdminBadge>
+            </div>
+          </AdminField>
 
-              <DetailRow
-                label="Type"
-                value={
-                  humanize(
-                    asset.asset_type
-                  )
-                }
-              />
+          <DetailField
+            label="Dispatched"
+            value={
+              currentAsset
+                .dispatched_at ||
+              "—"
+            }
+          />
 
-              <DetailRow
-                label="Source"
-                value={
-                  formatSource(
-                    asset
-                  )
-                }
-              />
+          <DetailField
+            label="Stage Note"
+            value={
+              currentAsset
+                .stage_note ||
+              "—"
+            }
+          />
 
-              <DetailRow
-                label="Title"
-                value={
-                  asset.search_title ||
-                  "—"
-                }
-              />
-            </Section>
-
-
-            <Section
-              title="Status"
-            >
-              <DetailRow
-                label="Stage"
-                value={
-                  humanize(
-                    asset
-                      .pipeline_stage
-                  )
-                }
-              />
-
-              <DetailRow
-                label="Dispatched"
-                value={
-                  asset
-                    .dispatched_at ||
-                  "—"
-                }
-              />
-
-              <DetailRow
-                label="Stage Note"
-                value={
-                  asset
-                    .stage_note ||
-                  "—"
-                }
-              />
-
-              <DetailRow
-                label="Updated"
-                value={
-                  asset
-                    .updated_at ||
-                  "—"
-                }
-              />
-            </Section>
+          <DetailField
+            label="Updated"
+            value={
+              currentAsset
+                .updated_at ||
+              "—"
+            }
+          />
+        </AdminStack>
+      </AdminPanel>
 
 
-            <Section
-              title="Result"
-            >
-              <DetailRow
-                label="External ID"
-                value={
-                  externalId
-                }
-              />
+      <AdminPanel
+        title="Result"
+        compact
+      >
+        <AdminStack gap="sm">
+          <DetailField
+            label="External ID"
+            value={
+              externalId
+            }
+          />
 
-              <DetailRow
-                label="Live URL"
-                value={
-                  externalUrl
-                    ? (
-                        <div
-                          style={
-                            liveUrlStyle
-                          }
-                        >
-                          <a
-                            href={
-                              externalUrl
-                            }
-
-                            target="_blank"
-
-                            rel="noreferrer"
-
-                            style={
-                              liveUrlLinkStyle
-                            }
-                          >
-                            {
-                              externalUrl
-                            }
-                          </a>
-
-                          <button
-                            type="button"
-
-                            onClick={
-                              copyLiveUrl
-                            }
-
-                            title={
-                              copiedUrl
-                                ? "Copied"
-                                : "Copy live URL"
-                            }
-
-                            aria-label="Copy live URL"
-
-                            style={
-                              copyButtonStyle
-                            }
-                          >
-                            {
-                              copiedUrl
-                                ? "✓"
-                                : "⧉"
-                            }
-                          </button>
-                        </div>
-                      )
-                    : "—"
-                }
-              />
-            </Section>
-
-
+          <AdminField label="Live URL">
             {
-              asset.error_stage
-              ||
-              asset.error_code
-              ||
-              asset.error_message
+              externalUrl
                 ? (
-                    <Section
-                      title="Dispatch Error"
-                    >
-                      <DetailRow
-                        label="Stage"
-                        value={
-                          asset.error_stage ||
-                          "—"
+                    <AdminToolbar compact>
+                      <a
+                        href={
+                          externalUrl
                         }
-                      />
 
-                      <DetailRow
-                        label="Code"
-                        value={
-                          asset.error_code ||
-                          "—"
+                        target="_blank"
+
+                        rel="noreferrer"
+                      >
+                        {
+                          externalUrl
                         }
-                      />
+                      </a>
 
-                      <DetailRow
-                        label="Message"
-                        value={
-                          asset.error_message ||
-                          "—"
+                      <AdminButton
+                        type="button"
+
+                        size="sm"
+
+                        variant="secondary"
+
+                        onClick={
+                          copyLiveUrl
                         }
-                      />
 
-                      <DetailRow
-                        label="At"
-                        value={
-                          asset.errored_at ||
-                          "—"
+                        title={
+                          copiedUrl
+                            ? "Copied"
+                            : "Copy live URL"
                         }
-                      />
 
-                      {canRetryShipping ? (
-                        <div
-                          style={
-                            actionStyle
-                          }
-                        >
-                          <button
-                            type="button"
-
-                            disabled={
-                              retrying
-                            }
-
-                            onClick={() => {
-                              onRetry?.(
-                                asset.pub_asset_id
-                              );
-                            }}
-                          >
-                            {
-                              retrying
-                                ? "Retrying..."
-                                : "Retry Shipping"
-                            }
-                          </button>
-                        </div>
-                      ) : null}
-                    </Section>
+                        aria-label="Copy live URL"
+                      >
+                        {
+                          copiedUrl
+                            ? "✓"
+                            : "⧉"
+                        }
+                      </AdminButton>
+                    </AdminToolbar>
                   )
-                : null
+                : (
+                    <div>
+                      —
+                    </div>
+                  )
             }
+          </AdminField>
+        </AdminStack>
+      </AdminPanel>
 
 
-            <JsonSection
-              title="Outbound Package"
+      {
+        currentAsset
+          .error_stage
+        ||
+        currentAsset
+          .error_code
+        ||
+        currentAsset
+          .error_message
+          ? (
+              <AdminPanel
+                title="Dispatch Error"
+                compact
+              >
+                <AdminStack gap="sm">
+                  <DetailField
+                    label="Stage"
+                    value={
+                      currentAsset
+                        .error_stage ||
+                      "—"
+                    }
+                  />
 
-              emptyMessage="No outbound package is stored."
+                  <DetailField
+                    label="Code"
+                    value={
+                      currentAsset
+                        .error_code ||
+                      "—"
+                    }
+                  />
 
-              value={
-                packageValue
-              }
-            />
+                  <DetailField
+                    label="Message"
+                    value={
+                      currentAsset
+                        .error_message ||
+                      "—"
+                    }
+                  />
 
-
-            <JsonSection
-              title="Returned Shipping Receipt"
-
-              emptyMessage="No shipping receipt has been returned."
-
-              value={
-                receiptValue
-              }
-            />
-          </>
-        ) : (
-          <div
-            style={
-              mutedStyle
-            }
-          >
-            Select a Dispatch row.
-          </div>
-        )}
-      </div>
-    </AdminWorkbenchDrawer>
-  );
-}
+                  <DetailField
+                    label="At"
+                    value={
+                      currentAsset
+                        .errored_at ||
+                      "—"
+                    }
+                  />
 
 
-function Section({
-  title,
-  children,
-}) {
-  return (
-    <section
-      style={
-        sectionStyle
+                  {canRetryShipping ? (
+                    <AdminToolbar compact>
+                      <AdminButton
+                        type="button"
+
+                        disabled={
+                          retrying
+                        }
+
+                        onClick={
+                          handleRetry
+                        }
+                      >
+                        {
+                          retrying
+                            ? "Retrying..."
+                            : "Retry Shipping"
+                        }
+                      </AdminButton>
+                    </AdminToolbar>
+                  ) : null}
+                </AdminStack>
+              </AdminPanel>
+            )
+          : null
       }
-    >
-      <div
-        style={
-          sectionTitleStyle
-        }
-      >
-        {title}
-      </div>
 
-      <div
-        style={
-          sectionBodyStyle
+
+      <JsonPanel
+        title="Outbound Package"
+
+        emptyMessage="No outbound package is stored."
+
+        value={
+          packageValue
         }
-      >
-        {children}
-      </div>
-    </section>
+      />
+
+
+      <JsonPanel
+        title="Returned Shipping Receipt"
+
+        emptyMessage="No shipping receipt has been returned."
+
+        value={
+          receiptValue
+        }
+      />
+    </AdminStack>
   );
 }
 
 
-function JsonSection({
+function JsonPanel({
   title,
   value,
   emptyMessage,
 }) {
   return (
-    <Section
+    <AdminPanel
       title={
         title
       }
+
+      compact
     >
       {
-        value === null
+        value ===
+        null
           ? (
-              <div
-                style={
-                  noJsonStyle
-                }
-              >
+              <AdminMetaText as="div">
                 {emptyMessage}
-              </div>
+              </AdminMetaText>
             )
           : (
-              <pre
-                style={
-                  jsonStyle
-                }
-              >
+              <pre className="admin-code-block">
                 {
                   JSON.stringify(
                     value,
@@ -487,37 +609,28 @@ function JsonSection({
               </pre>
             )
       }
-    </Section>
+    </AdminPanel>
   );
 }
 
 
-function DetailRow({
+function DetailField({
   label,
   value,
 }) {
   return (
-    <div
-      style={
-        detailRowStyle
+    <AdminField
+      label={
+        label
       }
     >
-      <div
-        style={
-          detailLabelStyle
+      <div>
+        {
+          value ||
+          "—"
         }
-      >
-        {label}
       </div>
-
-      <div
-        style={
-          detailValueStyle
-        }
-      >
-        {value || "—"}
-      </div>
-    </div>
+    </AdminField>
   );
 }
 
@@ -528,13 +641,13 @@ function normalizeJson(
   if (
     value === null
     ||
-    value === undefined
+    value ===
+      undefined
     ||
     value === ""
   ) {
     return null;
   }
-
 
   if (
     typeof value ===
@@ -542,7 +655,6 @@ function normalizeJson(
   ) {
     return value;
   }
-
 
   if (
     typeof value ===
@@ -558,14 +670,50 @@ function normalizeJson(
     }
   }
 
-
   return value;
+}
+
+
+function normalizedStage(
+  asset
+) {
+  return String(
+    asset
+      ?.pipeline_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+
+function normalizedErrorStage(
+  asset
+) {
+  return String(
+    asset
+      ?.error_stage ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
 }
 
 
 function formatSource(
   asset
 ) {
+  const title =
+    String(
+      asset
+        ?.source_title ||
+      ""
+    ).trim();
+
+  if (title) {
+    return title;
+  }
+
   const type =
     asset
       ?.source_type ||
@@ -576,7 +724,6 @@ function formatSource(
       ?.source_id ||
     "";
 
-
   if (
     !type
     &&
@@ -584,7 +731,6 @@ function formatSource(
   ) {
     return "—";
   }
-
 
   return `${type} #${id}`;
 }
@@ -600,11 +746,9 @@ function humanize(
     )
       .trim();
 
-
   if (!raw) {
     return "—";
   }
-
 
   return raw
     .replace(
@@ -617,250 +761,8 @@ function humanize(
     )
     .replace(
       /\b\w/g,
-      (
-        character
-      ) =>
+      (character) =>
         character
           .toUpperCase()
     );
 }
-
-
-const bodyStyle = {
-  padding:
-    14,
-};
-
-
-const sectionStyle = {
-  marginBottom:
-    18,
-};
-
-
-const sectionTitleStyle = {
-  marginBottom:
-    7,
-
-  color:
-    "#526273",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    800,
-
-  letterSpacing:
-    "0.05em",
-
-  textTransform:
-    "uppercase",
-};
-
-
-const sectionBodyStyle = {
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#ffffff",
-};
-
-
-const detailRowStyle = {
-  display:
-    "grid",
-
-  gridTemplateColumns:
-    "110px minmax(0, 1fr)",
-
-  gap:
-    10,
-
-  padding:
-    "8px 10px",
-
-  borderBottom:
-    "1px solid #edf0f2",
-};
-
-
-const detailLabelStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    700,
-};
-
-
-const detailValueStyle = {
-  minWidth:
-    0,
-
-  overflowWrap:
-    "anywhere",
-
-  color:
-    "#273444",
-
-  fontSize:
-    12,
-
-  lineHeight:
-    1.4,
-};
-
-
-const liveUrlStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  gap:
-    7,
-
-  minWidth:
-    0,
-};
-
-
-const liveUrlLinkStyle = {
-  minWidth:
-    0,
-
-  overflowWrap:
-    "anywhere",
-};
-
-
-const copyButtonStyle = {
-  flex:
-    "0 0 auto",
-
-  minWidth:
-    28,
-
-  padding:
-    "2px 6px",
-
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#526273",
-
-  fontSize:
-    14,
-
-  lineHeight:
-    1.2,
-
-  cursor:
-    "pointer",
-};
-
-
-const actionStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  padding:
-    "10px",
-
-  borderTop:
-    "1px solid #edf0f2",
-
-  background:
-    "#fafbfc",
-};
-
-
-const jsonStyle = {
-  margin:
-    0,
-
-  padding:
-    12,
-
-  overflow:
-    "auto",
-
-  whiteSpace:
-    "pre-wrap",
-
-  overflowWrap:
-    "anywhere",
-
-  background:
-    "#f7f9fa",
-
-  color:
-    "#263443",
-
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-
-  fontSize:
-    11,
-
-  lineHeight:
-    1.5,
-};
-
-
-const noJsonStyle = {
-  padding:
-    12,
-
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
-
-
-const errorStyle = {
-  padding:
-    "9px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const mutedStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};

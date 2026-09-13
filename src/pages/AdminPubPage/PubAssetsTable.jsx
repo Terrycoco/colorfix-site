@@ -1,27 +1,24 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
-import {
-  AdminDataGrid,
+  AdminBadge,
+  AdminButton,
+  AdminCheckboxRow,
+  AdminDialog,
   AdminEmptyState,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminSmartGrid,
+  AdminStack,
+  AdminToolbar,
+  AdminToolbarSpacer,
+  useAdminDialog,
 } from "@components/AdminLayout";
 
-import PubAssetCopyEditor
-  from "./PubAssetCopyEditor";
-
-import PubVideoAssetEditor
-  from "./PubVideoAssetEditor";
-
-import {
-  API_FOLDER,
-} from "@helpers/config";
+import PubAssetCopyEditor from "./PubAssetCopyEditor";
+import PubVideoAssetEditor from "./PubVideoAssetEditor";
+import { API_FOLDER } from "@helpers/config";
 
 
 const ASSETS_URL =
@@ -37,6 +34,8 @@ const PACKAGE_URL =
 export default function PubAssetsTable({
   onOpenPackage,
 }) {
+  const dialog = useAdminDialog();
+
   const [assets, setAssets] =
     useState([]);
 
@@ -74,21 +73,7 @@ export default function PubAssetsTable({
   const [error, setError] =
     useState("");
 
-  const [previewAsset, setPreviewAsset] =
-    useState(null);
-
-  const [editAsset, setEditAsset] =
-    useState(null);
-
-  const [
-    editIngredientValues,
-    setEditIngredientValues,
-  ] = useState({});
-
-  const [
-    editIngredientBindings,
-    setEditIngredientBindings,
-  ] = useState([]);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const [savingCopy, setSavingCopy] =
     useState(false);
@@ -104,11 +89,6 @@ export default function PubAssetsTable({
   const [
     approvingAssetId,
     setApprovingAssetId,
-  ] = useState(0);
-
-  const [
-    previewVersion,
-    setPreviewVersion,
   ] = useState(0);
 
   /*
@@ -278,13 +258,12 @@ export default function PubAssetsTable({
     /*
      * Never let background polling disturb an active asset editor.
      *
-     * Opening an editor immediately clears the current timer because
-     * editAsset is a dependency of this effect. Polling resumes only
-     * after the editor closes.
+     * Opening a SmartGrid editor immediately clears the current timer.
+     * Polling resumes only after the editor closes.
      */
     if (
       !hasCreating ||
-      editAsset
+      editorOpen
     ) {
       return;
     }
@@ -302,81 +281,8 @@ export default function PubAssetsTable({
     };
   }, [
     assets,
-    editAsset,
+    editorOpen,
   ]);
-
-
-  /*
-   * OPEN THE CORRECT ASSET EDITOR.
-   */
-  async function openAssetEditor(
-    asset
-  ) {
-    const id =
-      Number(
-        asset
-          ?.pub_asset_id ||
-        0
-      );
-
-
-    if (!id) {
-      return;
-    }
-
-
-    setError(
-      ""
-    );
-
-
-    try {
-      const detail =
-        await fetchAssetEditorDetail(
-          id
-        );
-
-
-      setEditIngredientValues(
-        detail
-          .ingredient_values &&
-        typeof detail
-          .ingredient_values ===
-          "object"
-          ? detail
-              .ingredient_values
-          : {}
-      );
-
-
-      setEditIngredientBindings(
-        Array.isArray(
-          detail
-            .ingredient_bindings
-        )
-          ? detail
-              .ingredient_bindings
-          : []
-      );
-
-
-      setEditAsset(
-        detail.asset ||
-        asset
-      );
-
-
-      setPreviewVersion(
-        Date.now()
-      );
-
-    } catch (err) {
-      setError(
-        err?.message ||
-        "Could not load asset editor."
-      );
-    }
-  }
 
 
   async function fetchAssetEditorDetail(
@@ -436,79 +342,6 @@ export default function PubAssetsTable({
 
 
     return data;
-  }
-
-
-  async function refreshOpenAsset(
-    pubAssetId
-  ) {
-    const id =
-      Number(
-        pubAssetId ||
-        editAsset
-          ?.pub_asset_id ||
-        0
-      );
-
-
-    if (!id) {
-      return false;
-    }
-
-
-    try {
-      const detail =
-        await fetchAssetEditorDetail(
-          id
-        );
-
-
-      setEditAsset(
-        detail.asset ||
-        null
-      );
-
-
-      setEditIngredientValues(
-        detail
-          .ingredient_values &&
-        typeof detail
-          .ingredient_values ===
-          "object"
-          ? detail
-              .ingredient_values
-          : {}
-      );
-
-
-      setEditIngredientBindings(
-        Array.isArray(
-          detail
-            .ingredient_bindings
-        )
-          ? detail
-              .ingredient_bindings
-          : []
-      );
-
-
-      setPreviewVersion(
-        Date.now()
-      );
-
-
-      await loadAssets();
-
-      return true;
-
-    } catch (err) {
-      setError(
-        err?.message ||
-        "Could not refresh asset editor."
-      );
-
-      return false;
-    }
   }
 
 
@@ -623,20 +456,6 @@ export default function PubAssetsTable({
       );
 
 
-      setEditAsset(
-        (current) =>
-          Number(
-            current?.pub_asset_id ||
-            0
-          ) === id
-            ? {
-                ...current,
-                ...updatedAsset,
-              }
-            : current
-      );
-
-
       /*
        * If CREATED or APPROVED itself is the active filter, the row may
        * have just moved out of that result set. Reload immediately so the
@@ -688,7 +507,7 @@ export default function PubAssetsTable({
   /*
    * DELETE
    */
-  function requestDeleteAsset(
+  async function requestDeleteAsset(
     asset
   ) {
     const id =
@@ -741,9 +560,12 @@ export default function PubAssetsTable({
 
 
     const confirmed =
-      window.confirm(
-        `Delete PUB asset #${id}?`
-      );
+      await dialog.confirm({
+        title: "Delete PUB asset?",
+        message: `Delete PUB asset #${id}?`,
+        confirmLabel: "Delete",
+        cancelLabel: "Cancel",
+      });
 
 
     if (!confirmed) {
@@ -751,7 +573,7 @@ export default function PubAssetsTable({
     }
 
 
-    performDeleteAsset(
+    await performDeleteAsset(
       asset,
       false
     );
@@ -845,40 +667,6 @@ export default function PubAssetsTable({
 
       if (
         Number(
-          previewAsset
-            ?.pub_asset_id ||
-          0
-        ) === id
-      ) {
-        setPreviewAsset(
-          null
-        );
-      }
-
-
-      if (
-        Number(
-          editAsset
-            ?.pub_asset_id ||
-          0
-        ) === id
-      ) {
-        setEditAsset(
-          null
-        );
-
-        setEditIngredientValues(
-          {}
-        );
-
-        setEditIngredientBindings(
-          []
-        );
-      }
-
-
-      if (
-        Number(
           deleteForeverAsset
             ?.pub_asset_id ||
           0
@@ -916,11 +704,12 @@ export default function PubAssetsTable({
    * SAVE COPY.
    */
   async function saveAssetCopy(
+    asset,
     changes
   ) {
     const id =
       Number(
-        editAsset
+        asset
           ?.pub_asset_id ||
         0
       );
@@ -993,7 +782,7 @@ export default function PubAssetsTable({
 
       const updatedAsset =
         data.asset || {
-          ...editAsset,
+          ...asset,
 
           search_title:
             changes
@@ -1020,31 +809,6 @@ export default function PubAssetsTable({
                 : asset
           )
       );
-
-
-      setEditAsset(
-        (current) =>
-          current
-            ? {
-                ...current,
-                ...updatedAsset,
-              }
-            : current
-      );
-
-
-      if (
-        data
-          .ingredient_values &&
-        typeof data
-          .ingredient_values ===
-          "object"
-      ) {
-        setEditIngredientValues(
-          data
-            .ingredient_values
-        );
-      }
 
 
       return true;
@@ -1167,11 +931,6 @@ async function recreateAsset(
         "CREATE did not queue the REDO."
       );
     }
-
-
-    setPreviewVersion(
-      Date.now()
-    );
 
     return true;
 
@@ -1307,23 +1066,7 @@ async function recreateAsset(
       }
 
 
-      setEditAsset(
-        null
-      );
-
-      setEditIngredientValues(
-        {}
-      );
-
-      setEditIngredientBindings(
-        []
-      );
-
-
       await loadAssets();
-
-
-      onOpenPackage?.();
 
 
       return {
@@ -1367,67 +1110,182 @@ async function recreateAsset(
 
 
   /*
+   * SEND ALL CURRENTLY VISIBLE APPROVED ASSETS TO PACKAGE.
+   *
+   * The button acts on the current filtered Assets workbench only.
+   * Approval remains the human gate. PACKAGE remains responsible for
+   * deciding packed / pending / failed for each individual asset.
+   */
+  async function sendApprovedAssetsToPackaging() {
+    const approvedAssets =
+      assets.filter(
+        (asset) =>
+          Number(
+            asset?.approved ||
+            0
+          ) === 1
+          &&
+          normalizedStage(
+            asset
+          ) === "created"
+      );
+
+
+    if (!approvedAssets.length) {
+      return;
+    }
+
+
+    setSendingToPackaging(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+
+    const failures = [];
+
+
+    try {
+      for (const asset of approvedAssets) {
+        const id =
+          Number(
+            asset?.pub_asset_id ||
+            0
+          );
+
+
+        if (!id) {
+          continue;
+        }
+
+
+        try {
+          const res =
+            await fetch(
+              PACKAGE_URL,
+              {
+                method:
+                  "POST",
+
+                credentials:
+                  "include",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    pub_asset_id:
+                      id,
+                  }),
+              }
+            );
+
+
+          const data =
+            await res.json();
+
+
+          if (
+            !res.ok
+            ||
+            !data?.ok
+          ) {
+            throw new Error(
+              data?.error ||
+              "Could not send asset to Packaging."
+            );
+          }
+
+
+          const failed =
+            Array.isArray(
+              data.failed
+            )
+              ? data.failed
+              : [];
+
+
+          if (failed.length) {
+            throw new Error(
+              failed[0]
+                ?.error ||
+              failed[0]
+                ?.message ||
+              "Packaging failed."
+            );
+          }
+
+
+          const packed =
+            Array.isArray(
+              data.packed
+            )
+              ? data.packed
+              : [];
+
+          const pending =
+            Array.isArray(
+              data.pending
+            )
+              ? data.pending
+              : [];
+
+
+          if (
+            packed.length === 0
+            &&
+            pending.length === 0
+          ) {
+            throw new Error(
+              "Packaging did not accept this asset."
+            );
+          }
+
+        } catch (err) {
+          failures.push(
+            `#${id}: ${
+              err?.message ||
+              "Packaging failed."
+            }`
+          );
+        }
+      }
+
+
+      await loadAssets();
+
+
+      if (failures.length) {
+        setError(
+          `Some approved assets could not be sent to Packaging:\n${failures.join("\n")}`
+        );
+
+        return;
+      }
+
+
+      onOpenPackage?.();
+
+    } finally {
+      setSendingToPackaging(
+        false
+      );
+    }
+  }
+
+
+  /*
    * GRID COLUMNS
    */
   const columns =
     useMemo(
       () => [
-        {
-          key:
-            "edit",
-
-          label:
-            "",
-
-          sortable:
-            false,
-
-          render:
-            (asset) => {
-              const stage =
-                normalizedStage(
-                  asset
-                );
-
-              const locked =
-                stage ===
-                  "shipping" ||
-                isHistoricalStage(
-                  stage
-                );
-
-              if (locked) {
-                return "—";
-              }
-
-              return (
-                <button
-                  type="button"
-
-                  title="Edit asset"
-
-                  style={
-                    pencilButtonStyle
-                  }
-
-                  onClick={(
-                    event
-                  ) => {
-                    event
-                      .stopPropagation();
-
-                    openAssetEditor(
-                      asset
-                    );
-                  }}
-                >
-                  ✎
-                </button>
-              );
-            },
-        },
-
-
         {
           key:
             "pub_asset_id",
@@ -1557,21 +1415,17 @@ async function recreateAsset(
               }
 
               return (
-                <span
-                  style={
-                    stage ===
-                      "redo_required"
-                      ? redoRequiredStageStyle
-                      : stage ===
-                          "creating"
-                        ? creatingStageStyle
-                        : stageBadgeStyle
+                <AdminBadge
+                  variant={
+                    stage === "redo_required"
+                      ? "warning"
+                      : stage === "creating"
+                        ? "info"
+                        : "neutral"
                   }
                 >
-                  {humanize(
-                    stage
-                  )}
-                </span>
+                  {humanize(stage)}
+                </AdminBadge>
               );
             },
 
@@ -1650,9 +1504,6 @@ async function recreateAsset(
                       : "Approval is locked after the asset leaves CREATED."
                   }
 
-                  style={
-                    approvalCheckboxStyle
-                  }
 
                   onClick={(
                     event
@@ -1739,49 +1590,29 @@ async function recreateAsset(
                 );
 
               return (
-                <button
+                <AdminButton
                   type="button"
-
-                  style={
-                    isHistoricalStage(
-                      stage
-                    )
-                      ? historicalDeleteButtonStyle
-                      : rowActionButtonStyle
-                  }
-
-                  disabled={
+                  size="sm"
+                  variant="secondary"
+                 disabled={
                     shipping ||
+                    isHistoricalStage(stage) ||
                     deleting
                   }
-
                   title={
                     shipping
                       ? "Cannot delete while Dispatch is running."
-                      : isHistoricalStage(
-                          stage
-                        )
+                      : isHistoricalStage(stage)
                         ? "Permanent historical delete requires confirmation."
                         : "Delete asset"
                   }
-
-                  onClick={(
-                    event
-                  ) => {
-                    event
-                      .stopPropagation();
-
-                    requestDeleteAsset(
-                      asset
-                    );
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    requestDeleteAsset(asset);
                   }}
                 >
-                  {
-                    deleting
-                      ? "Deleting..."
-                      : "Delete"
-                  }
-                </button>
+                  {deleting ? "Deleting..." : "Delete"}
+                </AdminButton>
               );
             },
         },
@@ -1791,6 +1622,20 @@ async function recreateAsset(
         approvingAssetId,
         stageFilter,
       ]
+    );
+
+
+  const approvedReadyAssets =
+    assets.filter(
+      (asset) =>
+        Number(
+          asset?.approved ||
+          0
+        ) === 1
+        &&
+        normalizedStage(
+          asset
+        ) === "created"
     );
 
 
@@ -1810,691 +1655,462 @@ async function recreateAsset(
 
   return (
     <>
-      <div
-        className="admin-detail-workarea"
-      >
-        <div
-          style={
-            filterBarStyle
-          }
-        >
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Source Playlist
-            </span>
-
+      <div className="admin-detail-workarea">
+        <AdminToolbar>
+          <AdminField label="Source Playlist" compact>
             <select
               className="admin-field__control"
-
-              value={
-                sourcePlaylistFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setSourcePlaylistFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
+              value={sourcePlaylistFilter}
+              onChange={(event) => setSourcePlaylistFilter(event.target.value)}
             >
-              <option value="">
-                All
-              </option>
+              <option value="">All</option>
 
-              {sourcePlaylists.map(
-                (playlist) => (
-                  <option
-                    key={
-                      playlist
-                        .playlist_id
-                    }
-
-                    value={
-                      String(
-                        playlist
-                          .playlist_id
-                      )
-                    }
-                  >
-                    {
-                      playlist
-                        .title ||
-                      `Playlist #${playlist.playlist_id}`
-                    }
-                  </option>
-                )
-              )}
+              {sourcePlaylists.map((playlist) => (
+                <option
+                  key={playlist.playlist_id}
+                  value={String(playlist.playlist_id)}
+                >
+                  {playlist.title || `Playlist #${playlist.playlist_id}`}
+                </option>
+              ))}
             </select>
-          </label>
+          </AdminField>
 
-
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Channel
-            </span>
-
+          <AdminField label="Channel" compact>
             <select
               className="admin-field__control"
-
-              value={
-                channelFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setChannelFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
+              value={channelFilter}
+              onChange={(event) => setChannelFilter(event.target.value)}
             >
-              <option value="">
-                All
-              </option>
-
-              {channels.map(
-                (channel) => (
-                  <option
-                    key={
-                      channel
-                    }
-
-                    value={
-                      channel
-                    }
-                  >
-                    {humanize(
-                      channel
-                    )}
-                  </option>
-                )
-              )}
+              <option value="">All</option>
+              {channels.map((channel) => (
+                <option key={channel} value={channel}>
+                  {humanize(channel)}
+                </option>
+              ))}
             </select>
-          </label>
+          </AdminField>
 
-
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Type
-            </span>
-
+          <AdminField label="Type" compact>
             <select
               className="admin-field__control"
-
-              value={
-                typeFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setTypeFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
             >
-              <option value="">
-                All
-              </option>
-
-              {assetTypes.map(
-                (assetType) => (
-                  <option
-                    key={
-                      assetType
-                    }
-
-                    value={
-                      assetType
-                    }
-                  >
-                    {humanize(
-                      assetType
-                    )}
-                  </option>
-                )
-              )}
+              <option value="">All</option>
+              {assetTypes.map((assetType) => (
+                <option key={assetType} value={assetType}>
+                  {humanize(assetType)}
+                </option>
+              ))}
             </select>
-          </label>
+          </AdminField>
 
-
-          <label
-            className="admin-field"
-          >
-            <span
-              className="admin-field__label"
-            >
-              Stage
-            </span>
-
+          <AdminField label="Stage" compact>
             <select
               className="admin-field__control"
-
-              value={
-                stageFilter
-              }
-
-              onChange={(
-                event
-              ) =>
-                setStageFilter(
-                  event
-                    .target
-                    .value
-                )
-              }
+              value={stageFilter}
+              onChange={(event) => setStageFilter(event.target.value)}
             >
-              <option value="">
-                All
-              </option>
-
-              {stages.map(
-                (stage) => (
-                  <option
-                    key={
-                      stage
-                    }
-
-                    value={
-                      stage
-                    }
-                  >
-                    {humanize(
-                      stage
-                    )}
-                  </option>
-                )
-              )}
+              <option value="">All</option>
+              {stages.map((stage) => (
+                <option key={stage} value={stage}>
+                  {humanize(stage)}
+                </option>
+              ))}
             </select>
-          </label>
+          </AdminField>
 
-
-          <button
+          <AdminButton
             type="button"
-
-            onClick={
-              loadAssets
-            }
-
+            onClick={sendApprovedAssetsToPackaging}
             disabled={
-              loading
-            }
-
-            style={
-              refreshButtonStyle
+              sendingToPackaging ||
+              approvedReadyAssets.length === 0
             }
           >
-            {loading
-              ? "Refreshing..."
-              : "Refresh"}
-          </button>
-
-
-          <div
-            style={
-              countStyle
+            {
+              sendingToPackaging
+                ? "Sending..."
+                : `Send To Packaging (${approvedReadyAssets.length})`
             }
-          >
-            {assets.length} asset
-            {assets.length === 1
-              ? ""
-              : "s"}
-          </div>
-        </div>
+          </AdminButton>
 
+          <AdminToolbarSpacer />
+
+          <AdminButton
+            type="button"
+            variant="secondary"
+            onClick={loadAssets}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </AdminButton>
+
+          <AdminMetaText as="div">
+            {assets.length} asset{assets.length === 1 ? "" : "s"}
+          </AdminMetaText>
+        </AdminToolbar>
 
         {error ? (
-          <div
-            style={
-              errorStyle
-            }
-          >
+          <AdminNotice variant="danger">
             {error}
-          </div>
+          </AdminNotice>
         ) : null}
 
-
-        <AdminDataGrid
-          items={
-            assets
-          }
-
-          columns={
-            columns
-          }
-
-          getRowKey={(
-            asset
-          ) =>
-            asset
-              .pub_asset_id
-          }
-
+        <AdminSmartGrid
+          items={assets}
+          columns={columns}
+          getRowKey={(asset) => asset.pub_asset_id}
           defaultSortKey="pub_asset_id"
-
           defaultSortDirection="desc"
-
           ariaLabel="PUB assets"
+          drawer={{
+            title: (asset) => `Asset #${asset.pub_asset_id}`,
+            width: 440,
+            render: ({ item }) => (
+              <PubAssetDetails asset={item} />
+            ),
+          }}
+          editable
+          canEdit={(asset) => {
+            const stage = normalizedStage(asset);
+            return stage !== "shipping" && !isHistoricalStage(stage);
+          }}
+          onEditOpen={() => setEditorOpen(true)}
+          onEditClose={() => {
+            setEditorOpen(false);
+            loadAssets();
+          }}
+          editor={{
+            title: (asset) =>
+              isVideoAsset(asset)
+                ? "Edit Video Asset"
+                : "Edit Asset Copy",
+
+            size: (asset) =>
+              isVideoAsset(asset)
+                ? "xl"
+                : "md",
+
+            meta: (asset) => {
+              const values = [];
+
+              if (
+                isVideoAsset(asset) &&
+                Number(asset?.duration_ms || 0) > 0
+              ) {
+                values.push(`Runtime ${formatDurationMs(asset.duration_ms)}`);
+              }
+
+              values.push(`Asset #${asset.pub_asset_id}`);
+              return values;
+            },
+
+            busy: () =>
+              savingCopy ||
+              recreating ||
+              sendingToPackaging,
+
+            load: (asset) =>
+              fetchAssetEditorDetail(asset.pub_asset_id),
+
+            render: ({ item, data, close, reload }) => {
+              const editorAsset = data?.asset || item;
+
+              const ingredientValues =
+                data?.ingredient_values &&
+                typeof data.ingredient_values === "object"
+                  ? data.ingredient_values
+                  : {};
+
+              const ingredientBindings =
+                Array.isArray(data?.ingredient_bindings)
+                  ? data.ingredient_bindings
+                  : [];
+
+              const approvalSaving =
+                Number(approvingAssetId) ===
+                Number(editorAsset?.pub_asset_id || 0);
+
+              const sharedProps = {
+                asset: editorAsset,
+                ingredientBindings,
+                saving: savingCopy,
+                recreating,
+                sendingToPackaging,
+                approvalSaving,
+                onSetApproval: setAssetApproval,
+                onSave: (changes) =>
+                  saveAssetCopy(editorAsset, changes),
+                onRecreate: recreateAsset,
+                onSendToPackaging: sendAssetToPackaging,
+                onPackagingComplete: onOpenPackage,
+                onClose: close,
+              };
+
+              if (isVideoAsset(editorAsset)) {
+                return (
+                  <PubVideoAssetEditor
+                    {...sharedProps}
+                    ingredientValues={ingredientValues}
+                    onRefreshAssets={loadAssets}
+                  />
+                );
+              }
+
+              return (
+                <PubAssetCopyEditor
+                  {...sharedProps}
+                  onRefreshAsset={async () => {
+                    await reload();
+                    await loadAssets();
+                    return true;
+                  }}
+                />
+              );
+            },
+          }}
         />
       </div>
 
+      <AdminDialog
+        open={Boolean(deleteForeverAsset)}
+        mode="danger"
+        title="Delete shipped asset forever?"
+        width={560}
+        dismissOnBackdrop={!deletingAssetId}
+        onClose={() => {
+          if (deletingAssetId) return;
+          setDeleteForeverAsset(null);
+          setDeleteForeverAuthorized(false);
+        }}
+        actions={[
+          {
+            key: "cancel",
+            label: "Cancel",
+            variant: "secondary",
+            disabled: Boolean(deletingAssetId),
+            onClick: () => {
+              setDeleteForeverAsset(null);
+              setDeleteForeverAuthorized(false);
+            },
+          },
+          {
+            key: "delete-forever",
+            label: deletingAssetId ? "Deleting..." : "Delete Forever",
+            variant: "danger",
+            disabled:
+              !deleteForeverAuthorized ||
+              Boolean(deletingAssetId),
+            onClick: () => {
+              if (!deleteForeverAsset) return;
+              performDeleteAsset(deleteForeverAsset, true);
+            },
+          },
+        ]}
+      >
+        {deleteForeverAsset ? (
+          <AdminStack gap="md">
+            <AdminNotice variant="danger">
+              PUB has already recorded this asset as{" "}
+              <strong>
+                {humanize(normalizedStage(deleteForeverAsset))}
+              </strong>.
+            </AdminNotice>
 
-      {previewAsset
-        ?.url
-        ? createPortal(
-            <div
-              style={
-                previewOverlayStyle
-              }
+            <div>
+              Asset #{deleteForeverAsset.pub_asset_id}
+              {" · "}
+              {deleteForeverAsset.search_title || "Untitled"}
+            </div>
 
-              onClick={() =>
-                setPreviewAsset(
-                  null
-                )
+            <div>
+              This deletes the permanent PUB record and its local creative
+              files. It does <strong>not</strong> delete anything from YouTube,
+              Pinterest, or another channel. Only continue when the channel
+              item has already been removed, or when you deliberately want PUB
+              to forget this historical shipment.
+            </div>
+
+            <AdminCheckboxRow
+              checked={deleteForeverAuthorized}
+              disabled={Boolean(deletingAssetId)}
+              onChange={(event) =>
+                setDeleteForeverAuthorized(event.target.checked)
               }
             >
-              <img
-                src={
-                  withVersion(
-                    previewAsset
-                      .url,
-
-                    previewVersion
-                  )
-                }
-
-                alt=""
-
-                style={
-                  previewImageStyle
-                }
-              />
-            </div>,
-
-            document.body
-          )
-        : null}
+              I understand this permanently deletes this shipped PUB asset
+              record.
+            </AdminCheckboxRow>
+          </AdminStack>
+        ) : null}
+      </AdminDialog>
+    </>
+  );
+}
 
 
-      {editAsset ? (
-        isVideoAsset(
-          editAsset
-        ) ? (
-          <PubVideoAssetEditor
-            ingredientValues={
-              editIngredientValues
-            }
+function PubAssetDetails({
+  asset,
+}) {
+  const sourceType =
+    String(
+      asset?.source_type ||
+      ""
+    ).trim();
 
-            ingredientBindings={
-              editIngredientBindings
-            }
+  const sourceId =
+    Number(
+      asset?.source_id ||
+      0
+    );
 
-            asset={{
-              ...editAsset,
+  const sourceTitle =
+    String(
+      asset?.source_title ||
+      ""
+    ).trim();
 
-              url:
-                withVersion(
-                  editAsset.url,
-                  previewVersion
-                ),
-            }}
+  const sourceLabel =
+    sourceTitle ||
+    (
+      sourceType &&
+      sourceId
+        ? `${humanize(sourceType)} #${sourceId}`
+        : "—"
+    );
 
-            saving={
-              savingCopy
-            }
+  const stage =
+    displayStage(
+      asset
+    );
 
-            recreating={
-              recreating
-            }
+  const approved =
+    Number(
+      asset?.approved ||
+      0
+    ) === 1;
 
-            sendingToPackaging={
-              sendingToPackaging
-            }
+  return (
+    <AdminStack gap="md">
+      <AdminField label="Asset ID">
+        <div>
+          #{asset?.pub_asset_id || "—"}
+        </div>
+      </AdminField>
 
-            approvalSaving={
-              Number(
-                approvingAssetId
-              ) ===
-              Number(
-                editAsset
-                  ?.pub_asset_id ||
-                0
-              )
-            }
+      <AdminField label="Job ID">
+        <div>
+          {
+            Number(
+              asset?.pub_run_id ||
+              0
+            ) || "—"
+          }
+        </div>
+      </AdminField>
 
-            onSetApproval={
-              setAssetApproval
-            }
+      <AdminField label="Channel">
+        <div>
+          {asset?.channel || "—"}
+        </div>
+      </AdminField>
 
-            onSave={
-              saveAssetCopy
-            }
+      <AdminField label="Type">
+        <div>
+          {
+            asset?.asset_type
+              ? humanize(
+                  asset.asset_type
+                )
+              : "—"
+          }
+        </div>
+      </AdminField>
 
-            onRecreate={
-              recreateAsset
-            }
+      <AdminField label="Source">
+        <div>
+          {sourceLabel}
+        </div>
+      </AdminField>
 
-            onSendToPackaging={
-              sendAssetToPackaging
-            }
+      <AdminField label="Stage">
+        <div>
+          {stage ? (
+            <AdminBadge
+              variant={
+                stage === "redo_required"
+                  ? "warning"
+                  : stage === "creating"
+                    ? "info"
+                    : "neutral"
+              }
+            >
+              {humanize(stage)}
+            </AdminBadge>
+          ) : (
+            "—"
+          )}
+        </div>
+      </AdminField>
 
-            onRefreshAssets={
-              loadAssets
-            }
+      <AdminField label="Approved">
+        <div>
+          {approved ? "Yes" : "No"}
+        </div>
+      </AdminField>
 
-            onClose={() => {
-              setEditAsset(
-                null
-              );
+      <AdminField label="Title">
+        <div>
+          {asset?.search_title || "—"}
+        </div>
+      </AdminField>
 
-              setEditIngredientValues(
-                {}
-              );
+      <AdminField label="Description">
+        <div>
+          {asset?.description || "—"}
+        </div>
+      </AdminField>
 
-              setEditIngredientBindings(
-                []
-              );
-
-              loadAssets();
-            }}
-          />
-        ) : (
-          <PubAssetCopyEditor
-            asset={{
-              ...editAsset,
-
-              url:
-                withVersion(
-                  editAsset.url,
-                  previewVersion
-                ),
-            }}
-
-            ingredientBindings={
-              editIngredientBindings
-            }
-
-            saving={
-              savingCopy
-            }
-
-            recreating={
-              recreating
-            }
-
-            sendingToPackaging={
-              sendingToPackaging
-            }
-
-            approvalSaving={
-              Number(
-                approvingAssetId
-              ) ===
-              Number(
-                editAsset
-                  ?.pub_asset_id ||
-                0
-              )
-            }
-
-            onSetApproval={
-              setAssetApproval
-            }
-
-            onSave={
-              saveAssetCopy
-            }
-
-            onRecreate={
-              recreateAsset
-            }
-
-            onSendToPackaging={
-              sendAssetToPackaging
-            }
-
-            onRefreshAsset={
-              refreshOpenAsset
-            }
-
-            onClose={() => {
-              setEditAsset(
-                null
-              );
-
-              setEditIngredientValues(
-                {}
-              );
-
-              setEditIngredientBindings(
-                []
-              );
-
-              loadAssets();
-            }}
-          />
-        )
+      {asset?.url ? (
+        <AdminField label="Asset URL">
+          <a
+            href={asset.url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {asset.url}
+          </a>
+        </AdminField>
       ) : null}
 
+      {asset?.thumbnail_url ? (
+        <AdminField label="Thumbnail URL">
+          <a
+            href={asset.thumbnail_url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {asset.thumbnail_url}
+          </a>
+        </AdminField>
+      ) : null}
 
-      {deleteForeverAsset
-        ? createPortal(
-            <div
-              style={
-                deleteOverlayStyle
-              }
+      {asset?.created_at ? (
+        <AdminField label="Created">
+          <AdminMetaText>
+            {asset.created_at}
+          </AdminMetaText>
+        </AdminField>
+      ) : null}
 
-              onMouseDown={(
-                event
-              ) => {
-                if (
-                  event.target ===
-                    event.currentTarget
-                  &&
-                  !deletingAssetId
-                ) {
-                  setDeleteForeverAsset(
-                    null
-                  );
-
-                  setDeleteForeverAuthorized(
-                    false
-                  );
-                }
-              }}
-            >
-              <div
-                role="dialog"
-
-                aria-modal="true"
-
-                aria-label="Delete shipped asset forever"
-
-                style={
-                  deleteDialogStyle
-                }
-              >
-                <div
-                  style={
-                    deleteHeaderStyle
-                  }
-                >
-                  <strong>
-                    Delete shipped asset forever?
-                  </strong>
-                </div>
-
-
-                <div
-                  style={
-                    deleteBodyStyle
-                  }
-                >
-                  <div
-                    style={
-                      deleteWarningStyle
-                    }
-                  >
-                    PUB has already recorded this asset as{" "}
-                    <strong>
-                      {humanize(
-                        normalizedStage(
-                          deleteForeverAsset
-                        )
-                      )}
-                    </strong>.
-                  </div>
-
-
-                  <div>
-                    Asset #
-                    {
-                      deleteForeverAsset
-                        .pub_asset_id
-                    }
-                    {" · "}
-                    {
-                      deleteForeverAsset
-                        .search_title ||
-                      "Untitled"
-                    }
-                  </div>
-
-
-                  <div>
-                    This deletes the permanent PUB record and its local
-                    creative files. It does <strong>not</strong> delete
-                    anything from YouTube, Pinterest, or another channel.
-                    Only continue when the channel item has already been
-                    removed, or when you deliberately want PUB to forget
-                    this historical shipment.
-                  </div>
-
-
-                  <label
-                    style={
-                      deleteCheckboxStyle
-                    }
-                  >
-                    <input
-                      type="checkbox"
-
-                      checked={
-                        deleteForeverAuthorized
-                      }
-
-                      disabled={
-                        Boolean(
-                          deletingAssetId
-                        )
-                      }
-
-                      onChange={(
-                        event
-                      ) => {
-                        setDeleteForeverAuthorized(
-                          event
-                            .target
-                            .checked
-                        );
-                      }}
-                    />
-
-                    <span>
-                      I understand this permanently deletes this shipped
-                      PUB asset record.
-                    </span>
-                  </label>
-                </div>
-
-
-                <div
-                  style={
-                    deleteFooterStyle
-                  }
-                >
-                  <button
-                    type="button"
-
-                    style={
-                      quietButtonStyle
-                    }
-
-                    disabled={
-                      Boolean(
-                        deletingAssetId
-                      )
-                    }
-
-                    onClick={() => {
-                      setDeleteForeverAsset(
-                        null
-                      );
-
-                      setDeleteForeverAuthorized(
-                        false
-                      );
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-
-                  <button
-                    type="button"
-
-                    style={
-                      deleteForeverButtonStyle
-                    }
-
-                    disabled={
-                      !deleteForeverAuthorized
-                      ||
-                      Boolean(
-                        deletingAssetId
-                      )
-                    }
-
-                    onClick={() => {
-                      performDeleteAsset(
-                        deleteForeverAsset,
-                        true
-                      );
-                    }}
-                  >
-                    {
-                      deletingAssetId
-                        ? "Deleting..."
-                        : "Delete Forever"
-                    }
-                  </button>
-                </div>
-              </div>
-            </div>,
-
-            document.body
-          )
-        : null}
-    </>
+      <AdminField label="Last Updated">
+        <AdminMetaText>
+          {asset?.updated_at || "—"}
+        </AdminMetaText>
+      </AdminField>
+    </AdminStack>
   );
 }
 
@@ -2588,37 +2204,18 @@ function isVideoAsset(
 }
 
 
-function withVersion(
-  url,
-  version
-) {
-  const raw =
-    String(
-      url || ""
-    ).trim();
+function formatDurationMs(value) {
+  const milliseconds = Number(value || 0);
 
-  if (!raw) {
-    return "";
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+    return "—";
   }
 
-  if (!version) {
-    return raw;
-  }
+  const totalSeconds = Math.round(milliseconds / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
 
-  return (
-    raw +
-    (
-      raw.includes("?")
-        ? "&"
-        : "?"
-    ) +
-    "v=" +
-    encodeURIComponent(
-      String(
-        version
-      )
-    )
-  );
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 
@@ -2643,428 +2240,3 @@ function humanize(
     );
 }
 
-
-const stageBadgeStyle = {
-  display:
-    "inline-block",
-
-  padding:
-    "3px 7px",
-
-  borderRadius:
-    999,
-
-  background:
-    "#eef1f4",
-
-  color:
-    "#465465",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-
-  lineHeight:
-    1.2,
-};
-
-
-const creatingStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#e8f1fb",
-
-  color:
-    "#245b88",
-};
-
-
-const redoRequiredStageStyle = {
-  ...stageBadgeStyle,
-
-  background:
-    "#fff1bf",
-
-  color:
-    "#7a5600",
-
-  border:
-    "1px solid #e1c15e",
-};
-
-
-const filterBarStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "flex-end",
-
-  gap:
-    12,
-
-  padding:
-    "14px 0",
-};
-
-
-const refreshButtonStyle = {
-  marginLeft:
-    "auto",
-
-  marginBottom:
-    1,
-};
-
-
-const countStyle = {
-  paddingBottom:
-    7,
-
-  color:
-    "#586675",
-
-  fontSize:
-    13,
-};
-
-
-const errorStyle = {
-  marginBottom:
-    12,
-
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #d8dde3",
-
-  background:
-    "#fff7f7",
-};
-
-
-const previewOverlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483647,
-
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  justifyContent:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.88)",
-
-  cursor:
-    "pointer",
-};
-
-
-const previewImageStyle = {
-  display:
-    "block",
-
-  maxWidth:
-    "95vw",
-
-  maxHeight:
-    "95vh",
-
-  width:
-    "auto",
-
-  height:
-    "auto",
-
-  objectFit:
-    "contain",
-};
-
-
-const rowActionButtonStyle = {
-  padding:
-    "3px 7px",
-
-  minHeight:
-    0,
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#334155",
-
-  fontSize:
-    11,
-
-  lineHeight:
-    1.2,
-
-  fontWeight:
-    500,
-
-  cursor:
-    "pointer",
-};
-
-
-const approvalCheckboxStyle = {
-  width:
-    17,
-
-  height:
-    17,
-
-  margin:
-    0,
-
-  cursor:
-    "pointer",
-};
-
-
-const historicalDeleteButtonStyle = {
-  ...rowActionButtonStyle,
-
-  border:
-    "1px solid #d4a4a4",
-
-  color:
-    "#7d2e2e",
-};
-
-
-const pencilButtonStyle = {
-  padding:
-    "2px 5px",
-
-  minHeight:
-    0,
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#526273",
-
-  fontSize:
-    14,
-
-  lineHeight:
-    1,
-
-  fontWeight:
-    400,
-
-  cursor:
-    "pointer",
-};
-
-
-const deleteOverlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483647,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.60)",
-};
-
-
-const deleteDialogStyle = {
-  width:
-    "min(560px, 94vw)",
-
-  background:
-    "#ffffff",
-
-  color:
-    "#1f2937",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    5,
-
-  boxShadow:
-    "0 18px 50px rgba(0,0,0,0.30)",
-};
-
-
-const deleteHeaderStyle = {
-  padding:
-    "13px 15px",
-
-  borderBottom:
-    "1px solid #d8dde3",
-
-  fontSize:
-    17,
-};
-
-
-const deleteBodyStyle = {
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    14,
-
-  padding:
-    16,
-
-  fontSize:
-    13,
-
-  lineHeight:
-    1.5,
-};
-
-
-const deleteWarningStyle = {
-  padding:
-    "10px 12px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-};
-
-
-const deleteCheckboxStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "flex-start",
-
-  gap:
-    9,
-
-  padding:
-    "11px 12px",
-
-  border:
-    "1px solid #d8dde3",
-
-  background:
-    "#f8fafc",
-
-  cursor:
-    "pointer",
-};
-
-
-const deleteFooterStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  gap:
-    8,
-
-  padding:
-    "11px 12px",
-
-  borderTop:
-    "1px solid #d8dde3",
-};
-
-
-const quietButtonStyle = {
-  padding:
-    "5px 9px",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#334155",
-
-  cursor:
-    "pointer",
-};
-
-
-const deleteForeverButtonStyle = {
-  padding:
-    "5px 10px",
-
-  border:
-    "1px solid #9e2f2f",
-
-  borderRadius:
-    3,
-
-  background:
-    "#b93636",
-
-  color:
-    "#ffffff",
-
-  fontWeight:
-    700,
-
-  cursor:
-    "pointer",
-};

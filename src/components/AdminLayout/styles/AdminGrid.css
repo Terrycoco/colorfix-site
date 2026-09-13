@@ -1,0 +1,218 @@
+.admin-data-grid-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.admin-data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 13px;
+}
+
+.admin-data-grid th,
+.admin-data-grid td {
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--admin-border-soft);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-data-grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--admin-surface-muted);
+  color: var(--admin-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.admin-data-grid tbody tr {
+  cursor: pointer;
+}
+
+.admin-data-grid.is-interactive tbody tr:hover {
+  background: var(--admin-hover);
+}
+
+.admin-data-grid.is-interactive tbody tr.is-selected,
+.admin-data-grid.is-interactive tbody tr.is-selected:hover {
+  background: var(--admin-selected);
+}
+
+.admin-data-grid th button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.admin-data-grid th button:hover {
+  color: var(--admin-text);
+}
+
+.admin-data-grid-wrap--bordered {
+  border: 1px solid var(--admin-border);
+}
+
+.admin-data-grid {
+  min-width: var(--admin-data-grid-min-width, 0);
+}
+
+.admin-data-grid--top td {
+  vertical-align: top;
+}
+
+.admin-data-grid tbody tr {
+  cursor: default;
+}
+
+.admin-data-grid.is-interactive tbody tr {
+  cursor: pointer;
+}
+
+.admin-grid-cell__secondary {
+  margin-top: 5px;
+  color: #586675;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-grid-empty {
+  padding: 24px !important;
+  text-align: center !important;
+}
+
+.admin-source-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-source-list__label {
+  margin-bottom: 3px;
+  color: var(--admin-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-media-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 145px;
+}
+
+.admin-media-preview__image,
+.admin-media-preview__placeholder {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  box-sizing: border-box;
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+}
+
+.admin-media-preview__image {
+  object-fit: cover;
+}
+
+.admin-media-preview__placeholder {
+  display: grid;
+  place-items: center;
+  background: #f2f4f5;
+  font-size: 11px;
+}
+
+.admin-media-preview__text {
+  min-width: 0;
+}
+
+.admin-media-preview__label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-media-preview__detail {
+  margin-top: 3px;
+  max-width: 130px;
+  overflow: hidden;
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * ADMIN SMART GRID
+ *
+ * SmartGrid is intentionally a thin behavior layer over AdminDataGrid.
+ * These rules style only the generic affordances it injects.
+ */
+.admin-smart-grid__edit-button {
+  min-height: 0;
+  padding: 2px 5px;
+  border: 1px solid #cfd5dc;
+  border-radius: 3px;
+  background: var(--admin-surface);
+  color: #526273;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.admin-smart-grid__edit-button:hover {
+  background: var(--admin-hover);
+}
+
+.admin-smart-grid__edit-button:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 2px;
+}
+
+.admin-smart-grid__edit-unavailable {
+  color: var(--admin-muted);
+}
+
+.admin-smart-grid__editor-error {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.admin-smart-grid__editor-error-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: -16px;
+  padding-bottom: 24px;
+}
+
+.admin-data-grid input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.admin-data-grid input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}

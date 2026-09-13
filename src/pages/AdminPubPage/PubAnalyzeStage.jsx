@@ -5,16 +5,8 @@ import {
 } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
-import {
   API_FOLDER,
 } from "@helpers/config";
-
-import {
-  useAdminDialog,
-} from "@components/AdminDialog";
 
 import {
   fetchRex,
@@ -24,8 +16,18 @@ import MarketingWorkspace
   from "@components/Marketing/MarketingWorkspace";
 
 import {
+  AdminButton,
+  AdminDataGrid,
   AdminEmptyState,
+  AdminFullScreenOverlay,
+  AdminMediaPreview,
+  AdminNotice,
+  AdminSectionHeader,
+  AdminStack,
+  AdminTableTextarea,
+  AdminToolbar,
   AdminWorkbenchDrawer,
+  useAdminDialog,
 } from "@components/AdminLayout";
 
 import PubStageErrors
@@ -2084,875 +2086,440 @@ export default function PubAnalyzeStage({
 
   return (
     <>
-      <div
-        className="pub-analyze admin-detail-workarea"
-      >
-        <div
-          style={{
-            display:
-              "flex",
-            alignItems:
-              "flex-end",
-            flexWrap:
-              "wrap",
-            gap:
-              12,
-            padding:
-              "14px 0",
-          }}
-        >
-          <label
-            className="admin-field"
-            style={{
-              flex:
-                "0 0 220px",
-            }}
-          >
-            <span
-              className="admin-field__label"
-            >
+      <div className="admin-detail-workarea">
+        <AdminToolbar>
+          <label className="admin-field admin-field--compact">
+            <span className="admin-field__label">
               Output
             </span>
 
             <select
               className="admin-field__control"
-              value={
-                outputFilter
-              }
-              onChange={(
-                event
-              ) =>
-                changeOutputFilter(
-                  event
-                    .target
-                    .value
-                )
+              value={outputFilter}
+              onChange={(event) =>
+                changeOutputFilter(event.target.value)
               }
             >
-              {analyzeOutputTypes.map(
-                (type) => (
-                  <option
-                    key={
-                      type.value
-                    }
-                    value={
-                      type.value
-                    }
-                  >
-                    {type.label}
-                  </option>
-                )
-              )}
+              {analyzeOutputTypes.map((type) => (
+                <option
+                  key={type.value}
+                  value={type.value}
+                >
+                  {type.label}
+                </option>
+              ))}
             </select>
           </label>
 
-
-          <label
-            className="admin-field"
-            style={{
-              flex:
-                "1 1 360px",
-            }}
-          >
-            <span
-              className="admin-field__label"
-            >
+          <label className="admin-field admin-field--grow">
+            <span className="admin-field__label">
               Source Playlist
             </span>
 
             <select
-              className="admin-field__control"
-              value={
-                playlistId
+              className="admin-field__control admin-field__control--full"
+              value={playlistId}
+              onChange={(event) =>
+                changePlaylist(event.target.value)
               }
-              onChange={(
-                event
-              ) =>
-                changePlaylist(
-                  event
-                    .target
-                    .value
-                )
-              }
-              disabled={
-                loadingPlaylists
-              }
-              style={{
-                width:
-                  "100%",
-              }}
+              disabled={loadingPlaylists}
             >
               <option value="">
                 Pick playlist
               </option>
 
-              {playlists.map(
-                (playlist) => (
-                  <option
-                    key={
-                      playlist
-                        .playlist_id
-                    }
-                    value={
-                      playlist
-                        .playlist_id
-                    }
-                  >
-                    #{playlist.playlist_id}{" "}
-                    {playlist.title}
-                  </option>
-                )
-              )}
+              {playlists.map((playlist) => (
+                <option
+                  key={playlist.playlist_id}
+                  value={playlist.playlist_id}
+                >
+                  #{playlist.playlist_id} {playlist.title}
+                </option>
+              ))}
             </select>
           </label>
 
-
           {playlistId ? (
             <>
-              <button
+              <AdminButton
                 type="button"
-                style={
-                  secondaryButtonStyle
-                }
+                variant="secondary"
                 onClick={() => {
                   window.location.href =
                     `/admin/playlists/${playlistId}`;
                 }}
               >
                 Edit Playlist
-              </button>
+              </AdminButton>
 
-              <button
+              <AdminButton
                 type="button"
-                style={
-                  secondaryButtonStyle
-                }
+                variant="secondary"
                 onClick={() => {
                   window.location.href =
                     "/admin/palette-viewers";
                 }}
               >
                 Edit PV Copy
-              </button>
+              </AdminButton>
             </>
           ) : null}
 
-
-          <button
+          <AdminButton
             type="button"
-            onClick={
-              analyzeSource
-            }
-            disabled={
-              analyzing ||
-              !playlistId
-            }
+            onClick={analyzeSource}
+            disabled={analyzing || !playlistId}
           >
-            {analyzing
-              ? "Analyzing..."
-              : "Analyze"}
-          </button>
-        </div>
-
+            {analyzing ? "Analyzing..." : "Analyze"}
+          </AdminButton>
+        </AdminToolbar>
 
         {contractError ? (
           <AdminEmptyState
             title="PUB contract failed"
-            message={
-              contractError
-            }
+            message={contractError}
           />
-
         ) : error ? (
           <AdminEmptyState
             title="Analyze failed"
-            message={
-              error
-            }
+            message={error}
           />
-
         ) : !analysis ? (
           <AdminEmptyState
             title="Analyze Source"
             message="Choose a source playlist. PUB will analyze it for all applicable outputs. Output is only a workbench filter."
           />
-
         ) : (
-          <>
-            <div
-              style={{
-                display:
-                  "flex",
-                alignItems:
-                  "flex-end",
-                justifyContent:
-                  "space-between",
-                flexWrap:
-                  "wrap",
-                gap:
-                  12,
-                marginBottom:
-                  12,
-              }}
-            >
-              <div>
-                <h2
-                  style={{
-                    margin:
-                      "0 0 3px",
-                    fontSize:
-                      20,
-                    lineHeight:
-                      1.2,
-                    fontWeight:
-                      600,
-                  }}
-                >
-                  {analysis
-                    ?.source
-                    ?.title ||
-                    "Playlist"}
-                </h2>
-
-                <div
-                  style={{
-                    fontSize:
-                      14,
-                    color:
-                      "#586675",
-                  }}
-                >
-                  {outputFilter ===
-                  "all"
+          <AdminStack gap="md" fill>
+            <AdminSectionHeader
+              title={analysis?.source?.title || "Playlist"}
+              meta={
+                <>
+                  {outputFilter === "all"
                     ? `${proposals.length} possible assets`
                     : `${visibleProposals.length} ${filterLabel} asset${
-                        visibleProposals.length === 1
-                          ? ""
-                          : "s"
+                        visibleProposals.length === 1 ? "" : "s"
                       } shown · ${proposals.length} total`}
-                  {analysis
-                    ?.pub_run_id
+                  {analysis?.pub_run_id
                     ? ` · Run #${analysis.pub_run_id}`
                     : ""}
-                </div>
-              </div>
+                </>
+              }
+              actions={
+                <>
+                  <AdminButton
+                    type="button"
+                    variant="secondary"
+                    onClick={addProposal}
+                    disabled={!canEditSingleProduct}
+                    title={
+                      canEditSingleProduct
+                        ? ""
+                        : "Choose one Output filter before adding a manual row."
+                    }
+                  >
+                    Add Row
+                  </AdminButton>
 
+                  <AdminButton
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setMarketingOpen(true)}
+                    disabled={
+                      !canEditSingleProduct ||
+                      visibleProposals.length === 0
+                    }
+                    title={
+                      canEditSingleProduct
+                        ? ""
+                        : "Choose one Output filter before calling MARK."
+                    }
+                  >
+                    Call Mark
+                  </AdminButton>
 
-              <div
-                style={{
-                  display:
-                    "flex",
-                  alignItems:
-                    "flex-end",
-                  gap:
-                    8,
-                }}
-              >
-                <button
-                  type="button"
-                  style={
-                    secondaryButtonStyle
-                  }
-                  onClick={
-                    addProposal
-                  }
-                  disabled={
-                    !canEditSingleProduct
-                  }
-                  title={
-                    canEditSingleProduct
-                      ? ""
-                      : "Choose one Output filter before adding a manual row."
-                  }
-                >
-                  Add Row
-                </button>
-
-                <button
-                  type="button"
-                  style={
-                    secondaryButtonStyle
-                  }
-                  onClick={() =>
-                    setMarketingOpen(
-                      true
-                    )
-                  }
-                  disabled={
-                    !canEditSingleProduct ||
-                    visibleProposals.length ===
-                      0
-                  }
-                  title={
-                    canEditSingleProduct
-                      ? ""
-                      : "Choose one Output filter before calling MARK."
-                  }
-                >
-                  Call Mark
-                </button>
-
-                <button
-                  type="button"
-                  disabled={
-                    selectedCount ===
-                    0
-                  }
-                  onClick={() => {
-                    clearPubStageErrors();
-                    setHandoffOpen(
-                      true
-                    );
-                  }}
-                >
-                  Send to CREATE ({selectedCount})
-                </button>
-              </div>
-            </div>
-
-
-            {createMessage ? (
-              <div
-                style={{
-                  marginBottom:
-                    12,
-                  padding:
-                    "8px 10px",
-                  border:
-                    "1px solid #b8d8c0",
-                  background:
-                    "#f3faf5",
-                  fontSize:
-                    13,
-                  fontWeight:
-                    600,
-                }}
-              >
-                {createMessage}
-              </div>
-            ) : null}
-
-
-            <PubStageErrors
-              errors={
-                pubStageErrors
+                  <AdminButton
+                    type="button"
+                    disabled={selectedCount === 0}
+                    onClick={() => {
+                      clearPubStageErrors();
+                      setHandoffOpen(true);
+                    }}
+                  >
+                    Send to CREATE ({selectedCount})
+                  </AdminButton>
+                </>
               }
             />
 
+            {createMessage ? (
+              <AdminNotice variant="success">
+                {createMessage}
+              </AdminNotice>
+            ) : null}
 
-            <div
-              className="admin-scroll-region"
-              style={{
-                width:
-                  "100%",
-                border:
-                  "1px solid #d8dde3",
-              }}
+            <PubStageErrors errors={pubStageErrors} />
+
+            <AdminDataGrid
+              ariaLabel="Analyze proposals"
+              bordered
+              minWidth={1050}
+              verticalAlign="top"
             >
-              <table
-                style={{
-                  width:
-                    "100%",
-                  borderCollapse:
-                    "collapse",
-                  minWidth:
-                    1050,
-                  fontSize:
-                    13,
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th style={headerCell}>
-                      Use
-                    </th>
+              <thead>
+                <tr>
+                  <th>Use</th>
+                  <th>Order</th>
+                  <th>Output</th>
 
-                    <th style={headerCell}>
-                      Order
-                    </th>
-
-                    <th style={headerCell}>
-                      Output
-                    </th>
-
-                    {outputFilter ===
-                    "all" ? (
-                      <th style={headerCell}>
-                        Sources
+                  {outputFilter === "all" ? (
+                    <th>Sources</th>
+                  ) : (
+                    analyzeSourceColumns.map((column, index) => (
+                      <th
+                        key={`${
+                          column?.ingredientPath || "source"
+                        }-${index}`}
+                      >
+                        {column?.label || "Source"}
                       </th>
-
-                    ) : (
-                      analyzeSourceColumns.map(
-                        (
-                          column,
-                          index
-                        ) => (
-                          <th
-                            key={`${
-                              column
-                                ?.ingredientPath ||
-                              "source"
-                            }-${index}`}
-                            style={
-                              headerCell
-                            }
-                          >
-                            {column
-                              ?.label ||
-                              "Source"}
-                          </th>
-                        )
-                      )
-                    )}
-
-                    <th style={headerCell}>
-                      Search Title
-                    </th>
-
-                    <th style={headerCell}>
-                      Description
-                    </th>
-
-                    <th style={headerCell}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-
-                <tbody>
-                  {visibleProposals.map(
-                    (proposal) => {
-                      const product =
-                        productForProposal(
-                          proposal,
-                          contractByCreatedAssetType
-                        );
-
-                      const rowSourceColumns =
-                        Array.isArray(
-                          product
-                            ?.contract
-                            ?.workbench
-                            ?.sourceColumns
-                        )
-                          ? product
-                              .contract
-                              .workbench
-                              .sourceColumns
-                          : [];
-
-
-                      return (
-                        <tr
-                          key={
-                            proposal
-                              .proposal_key
-                          }
-                        >
-                          <td style={bodyCell}>
-                            <input
-                              type="checkbox"
-                              checked={
-                                proposal
-                                  .include
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                updateProposal(
-                                  proposal
-                                    .proposal_key,
-                                  {
-                                    include:
-                                      event
-                                        .target
-                                        .checked,
-                                  }
-                                )
-                              }
-                            />
-                          </td>
-
-                          <td style={bodyCell}>
-                            {proposal
-                              .display_order}
-                          </td>
-
-                          <td style={bodyCell}>
-                            <div>
-                              {product
-                                ?.contract
-                                ?.label ||
-                                humanize(
-                                  proposal
-                                    .asset_type
-                                )}
-                            </div>
-
-                            {String(
-                              proposal
-                                ?.asset_type ||
-                              ""
-                            )
-                              .trim()
-                              .toLowerCase() ===
-                              "youtube_video" &&
-                            Number(
-                              proposal
-                                ?.estimated_duration_ms ||
-                              0
-                            ) > 0 ? (
-                              <div
-                                style={{
-                                  marginTop:
-                                    5,
-                                  color:
-                                    "#586675",
-                                  fontSize:
-                                    11,
-                                  fontWeight:
-                                    600,
-                                  whiteSpace:
-                                    "nowrap",
-                                }}
-                              >
-                                Est. runtime:{" "}
-                                {formatEstimatedRuntime(
-                                  proposal
-                                    .estimated_duration_ms
-                                )}
-                              </div>
-                            ) : null}
-                          </td>
-
-
-                          {outputFilter ===
-                          "all" ? (
-                            <td style={bodyCell}>
-                              <ProposalSources
-                                proposal={
-                                  proposal
-                                }
-                                sourceColumns={
-                                  rowSourceColumns
-                                }
-                              />
-                            </td>
-
-                          ) : (
-                            analyzeSourceColumns.map(
-                              (
-                                column,
-                                index
-                              ) => {
-                                const previewItem =
-                                  proposalIngredientPreviewItem(
-                                    proposal,
-                                    column
-                                      ?.ingredientPath
-                                  );
-
-
-                                return (
-                                  <td
-                                    key={`${
-                                      column
-                                        ?.ingredientPath ||
-                                      "source"
-                                    }-${index}`}
-                                    style={
-                                      bodyCell
-                                    }
-                                  >
-                                    {previewItem ? (
-                                      <SourcePreview
-                                        item={
-                                          previewItem
-                                        }
-                                      />
-                                    ) : (
-                                      "—"
-                                    )}
-                                  </td>
-                                );
-                              }
-                            )
-                          )}
-
-
-                          <td style={bodyCell}>
-                            <textarea
-                              rows={3}
-                              value={
-                                proposal
-                                  .search_title
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                updateProposal(
-                                  proposal
-                                    .proposal_key,
-                                  {
-                                    search_title:
-                                      event
-                                        .target
-                                        .value,
-                                  }
-                                )
-                              }
-                              style={{
-                                width:
-                                  200,
-                                boxSizing:
-                                  "border-box",
-                                fontSize:
-                                  13,
-                              }}
-                            />
-                          </td>
-
-                          <td style={bodyCell}>
-                            <textarea
-                              rows={5}
-                              value={
-                                proposal
-                                  .description
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                updateProposal(
-                                  proposal
-                                    .proposal_key,
-                                  {
-                                    description:
-                                      event
-                                        .target
-                                        .value,
-                                  }
-                                )
-                              }
-                              style={{
-                                width:
-                                  330,
-                                boxSizing:
-                                  "border-box",
-                                fontSize:
-                                  13,
-                              }}
-                            />
-                          </td>
-
-                          <td style={bodyCell}>
-                            <button
-                              type="button"
-                              style={
-                                secondaryButtonStyle
-                              }
-                              onClick={() =>
-                                removeProposal(
-                                  proposal
-                                    .proposal_key
-                                )
-                              }
-                            >
-                              Remove
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    }
+                    ))
                   )}
 
+                  <th>Search Title</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
 
-                  {visibleProposals.length ===
-                  0 ? (
-                    <tr>
-                      <td
-                        colSpan={
-                          6 +
-                          (
-                            outputFilter ===
-                            "all"
-                              ? 1
-                              : analyzeSourceColumns.length
-                          )
-                        }
-                        style={{
-                          padding:
-                            24,
-                          textAlign:
-                            "center",
-                        }}
-                      >
-                        No {filterLabel} proposals found.
+              <tbody>
+                {visibleProposals.map((proposal) => {
+                  const product =
+                    productForProposal(
+                      proposal,
+                      contractByCreatedAssetType
+                    );
+
+                  const rowSourceColumns =
+                    Array.isArray(
+                      product?.contract?.workbench?.sourceColumns
+                    )
+                      ? product.contract.workbench.sourceColumns
+                      : [];
+
+                  return (
+                    <tr key={proposal.proposal_key}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={proposal.include}
+                          onChange={(event) =>
+                            updateProposal(
+                              proposal.proposal_key,
+                              {
+                                include: event.target.checked,
+                              }
+                            )
+                          }
+                        />
+                      </td>
+
+                      <td>{proposal.display_order}</td>
+
+                      <td>
+                        <div>
+                          {product?.contract?.label ||
+                            humanize(proposal.asset_type)}
+                        </div>
+
+                        {String(proposal?.asset_type || "")
+                          .trim()
+                          .toLowerCase() === "youtube_video" &&
+                        Number(
+                          proposal?.estimated_duration_ms || 0
+                        ) > 0 ? (
+                          <div className="admin-grid-cell__secondary">
+                            Est. runtime:{" "}
+                            {formatEstimatedRuntime(
+                              proposal.estimated_duration_ms
+                            )}
+                          </div>
+                        ) : null}
+                      </td>
+
+                      {outputFilter === "all" ? (
+                        <td>
+                          <ProposalSources
+                            proposal={proposal}
+                            sourceColumns={rowSourceColumns}
+                          />
+                        </td>
+                      ) : (
+                        analyzeSourceColumns.map((column, index) => {
+                          const previewItem =
+                            proposalIngredientPreviewItem(
+                              proposal,
+                              column?.ingredientPath
+                            );
+
+                          return (
+                            <td
+                              key={`${
+                                column?.ingredientPath || "source"
+                              }-${index}`}
+                            >
+                              {previewItem ? (
+                                <SourcePreview item={previewItem} />
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          );
+                        })
+                      )}
+
+                      <td>
+                        <AdminTableTextarea
+                          width={200}
+                          rows={3}
+                          value={proposal.search_title}
+                          onChange={(event) =>
+                            updateProposal(
+                              proposal.proposal_key,
+                              {
+                                search_title: event.target.value,
+                              }
+                            )
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <AdminTableTextarea
+                          width={330}
+                          rows={5}
+                          value={proposal.description}
+                          onChange={(event) =>
+                            updateProposal(
+                              proposal.proposal_key,
+                              {
+                                description: event.target.value,
+                              }
+                            )
+                          }
+                        />
+                      </td>
+
+                      <td>
+                        <AdminButton
+                          type="button"
+                          variant="secondary"
+                          onClick={() =>
+                            removeProposal(proposal.proposal_key)
+                          }
+                        >
+                          Remove
+                        </AdminButton>
                       </td>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </>
+                  );
+                })}
+
+                {visibleProposals.length === 0 ? (
+                  <tr>
+                    <td
+                      className="admin-grid-empty"
+                      colSpan={
+                        6 +
+                        (outputFilter === "all"
+                          ? 1
+                          : analyzeSourceColumns.length)
+                      }
+                    >
+                      No {filterLabel} proposals found.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </AdminDataGrid>
+          </AdminStack>
         )}
       </div>
 
+      <AdminFullScreenOverlay
+        open={marketingOpen}
+        ariaLabel="Marketing"
+      >
+        <MarketingWorkspace
+          mode="call"
+          title="Marketing"
+          request={{
+            tags: [
+              analyzeOutputContract?.channel || "pinterest",
+            ],
+            deliverables: [
+              {
+                key: "search_title",
+                label: "Search Titles",
+                count: visibleProposals.length || 1,
+                allowDuplicates: true,
+              },
+              {
+                key: "description",
+                label: "Descriptions",
+                count: visibleProposals.length || 1,
+                allowDuplicates: true,
+              },
+            ],
+          }}
+          onReturn={handleMarkReturn}
+          onClose={() => setMarketingOpen(false)}
+        />
+      </AdminFullScreenOverlay>
 
-      {marketingOpen
-        ? createPortal(
-            <div
-              style={
-                marketingOverlayStyle
-              }
-            >
-              <MarketingWorkspace
-                mode="call"
-                title="Marketing"
-                request={{
-                  tags: [
-                    analyzeOutputContract
-                      ?.channel ||
-                    "pinterest",
-                  ],
-                  deliverables: [
-                    {
-                      key:
-                        "search_title",
-                      label:
-                        "Search Titles",
-                      count:
-                        visibleProposals.length ||
-                        1,
-                      allowDuplicates:
-                        true,
-                    },
-                    {
-                      key:
-                        "description",
-                      label:
-                        "Descriptions",
-                      count:
-                        visibleProposals.length ||
-                        1,
-                      allowDuplicates:
-                        true,
-                    },
-                  ],
-                }}
-                onReturn={
-                  handleMarkReturn
-                }
-                onClose={() =>
-                  setMarketingOpen(
-                    false
-                  )
-                }
-              />
-            </div>,
-            document.body
-          )
-        : null}
+      <AdminWorkbenchDrawer
+        open={handoffOpen}
+        portal
+        padded
+        width={440}
+        title="Analyze Handoff"
+        onClose={() => setHandoffOpen(false)}
+        footer={
+          <AdminButton
+            type="button"
+            fullWidth
+            disabled={!canSendToCreate || sendingToCreate}
+            onClick={sendToCreate}
+          >
+            {sendingToCreate
+              ? "Sending..."
+              : `Send ${createHandoffBoxes.length} Box${
+                  createHandoffBoxes.length === 1 ? "" : "es"
+                } to CREATE`}
+          </AdminButton>
+        }
+      >
+        <AdminStack gap="md">
+          <PubStageErrors errors={pubStageErrors} />
 
-
-      {handoffOpen
-        ? createPortal(
-            <div
-              style={
-                handoffDrawerHostStyle
-              }
-            >
-              <AdminWorkbenchDrawer
-                open
-                width={440}
-                title="Analyze Handoff"
-                onClose={() =>
-                  setHandoffOpen(
-                    false
-                  )
-                }
-              >
-                <div
-                  style={{
-                    height:
-                      "100%",
-                    minHeight:
-                      0,
-                    display:
-                      "flex",
-                    flexDirection:
-                      "column",
-                  }}
-                >
-                  <PubStageErrors
-                    errors={
-                      pubStageErrors
-                    }
-                  />
-
-                  <div
-                    style={{
-                      flex:
-                        1,
-                      minHeight:
-                        0,
-                    }}
-                  >
-                    <AnalyzeHandoffSummary
-                      jobId={
-                        handoffJobId
-                      }
-                      boxes={
-                        createHandoffBoxes
-                      }
-                      fieldNames={
-                        handoffFieldNames
-                      }
-                      pingback={
-                        analyzeHandoffValues
-                          .pingback ||
-                        ""
-                      }
-                      showPingback={
-                        handoffFieldNames
-                          .includes(
-                            "pingback"
-                          )
-                      }
-                      onChangePingback={(
-                        value
-                      ) =>
-                        updateAnalyzeHandoffValue(
-                          "pingback",
-                          value
-                        )
-                      }
-                      onFetchRex={() =>
-                        handleAnalyzeHelper(
-                          "rex"
-                        )
-                      }
-                      canSend={
-                        canSendToCreate
-                      }
-                      sending={
-                        sendingToCreate
-                      }
-                      onSend={
-                        sendToCreate
-                      }
-                    />
-                  </div>
-                </div>
-              </AdminWorkbenchDrawer>
-            </div>,
-            document.body
-          )
-        : null}
+          <AnalyzeHandoffSummary
+            jobId={handoffJobId}
+            boxes={createHandoffBoxes}
+            fieldNames={handoffFieldNames}
+            pingback={analyzeHandoffValues.pingback || ""}
+            showPingback={
+              handoffFieldNames.includes("pingback")
+            }
+            onChangePingback={(value) =>
+              updateAnalyzeHandoffValue("pingback", value)
+            }
+            onFetchRex={() => handleAnalyzeHelper("rex")}
+          />
+        </AdminStack>
+      </AdminWorkbenchDrawer>
     </>
   );
 }
-
 
 function formatEstimatedRuntime(
   durationMs
@@ -3122,98 +2689,42 @@ function ProposalSources({
   sourceColumns,
 }) {
   if (
-    !Array.isArray(
-      sourceColumns
-    ) ||
-    sourceColumns.length ===
-      0
+    !Array.isArray(sourceColumns) ||
+    sourceColumns.length === 0
   ) {
     return "—";
   }
-
 
   const rows =
     sourceColumns
-      .map(
-        (
-          column,
-          index
-        ) => ({
-          key:
-            `${column
-              ?.ingredientPath ||
-            "source"}-${index}`,
-          label:
-            column
-              ?.label ||
-            "Source",
-          item:
-            proposalIngredientPreviewItem(
-              proposal,
-              column
-                ?.ingredientPath
-            ),
-        })
-      )
-      .filter(
-        (row) =>
-          row.item
-      );
+      .map((column, index) => ({
+        key: `${column?.ingredientPath || "source"}-${index}`,
+        label: column?.label || "Source",
+        item: proposalIngredientPreviewItem(
+          proposal,
+          column?.ingredientPath
+        ),
+      }))
+      .filter((row) => row.item);
 
-
-  if (
-    rows.length ===
-    0
-  ) {
+  if (rows.length === 0) {
     return "—";
   }
 
-
   return (
-    <div
-      style={{
-        display:
-          "grid",
-        gap:
-          8,
-      }}
-    >
-      {rows.map(
-        (row) => (
-          <div
-            key={
-              row.key
-            }
-          >
-            <div
-              style={{
-                marginBottom:
-                  3,
-                color:
-                  "#6b7280",
-                fontSize:
-                  10,
-                fontWeight:
-                  700,
-                textTransform:
-                  "uppercase",
-              }}
-            >
-              {row.label}
-            </div>
-
-            <SourcePreview
-              item={
-                row.item
-              }
-            />
+    <div className="admin-source-list">
+      {rows.map((row) => (
+        <div key={row.key}>
+          <div className="admin-source-list__label">
+            {row.label}
           </div>
-        )
-      )}
+
+          <SourcePreview item={row.item} />
+        </div>
+      ))}
     </div>
   );
 }
-
 
 function proposalIngredientPreviewItem(
   proposal,
@@ -3304,138 +2815,34 @@ function SourcePreview({
 }) {
   const imageUrl =
     browserImageUrl(
-      item
-        ?.image_url ||
-      item
-        ?.file_path
+      item?.image_url ||
+      item?.file_path
     );
 
+  const label =
+    item?.photo_library_id
+      ? `Photo #${item.photo_library_id}`
+      : "";
+
+  const detail =
+    item?.title ||
+    (item?.file_path
+      ? sourceFileName(item.file_path)
+      : "");
 
   return (
-    <div
-      style={{
-        display:
-          "flex",
-        alignItems:
-          "flex-start",
-        gap:
-          8,
-        minWidth:
-          145,
-      }}
-    >
-      {imageUrl ? (
-        <img
-          src={
-            imageUrl
-          }
-          alt=""
-          style={{
-            width:
-              64,
-            height:
-              64,
-            objectFit:
-              "cover",
-            borderRadius:
-              4,
-            border:
-              "1px solid #d8dde3",
-          }}
-        />
-
-      ) : (
-        <div
-          style={{
-            width:
-              64,
-            height:
-              64,
-            display:
-              "grid",
-            placeItems:
-              "center",
-            background:
-              "#f2f4f5",
-            border:
-              "1px solid #d8dde3",
-            fontSize:
-              11,
-          }}
-        >
-          No image
-        </div>
-      )}
-
-
-      <div>
-        {item
-          ?.photo_library_id ? (
-          <div
-            style={{
-              fontSize:
-                12,
-              fontWeight:
-                600,
-            }}
-          >
-            Photo #{item.photo_library_id}
-          </div>
-        ) : null}
-
-
-        {item
-          ?.title ? (
-          <div
-            style={{
-              marginTop:
-                3,
-              maxWidth:
-                130,
-              fontSize:
-                11,
-              lineHeight:
-                1.35,
-              color:
-                "#6b7280",
-            }}
-          >
-            {item.title}
-          </div>
-
-        ) : item
-          ?.file_path ? (
-          <div
-            style={{
-              marginTop:
-                3,
-              maxWidth:
-                130,
-              overflow:
-                "hidden",
-              textOverflow:
-                "ellipsis",
-              whiteSpace:
-                "nowrap",
-              fontSize:
-                11,
-              color:
-                "#6b7280",
-            }}
-            title={
-              item.file_path
-            }
-          >
-            {sourceFileName(
-              item.file_path
-            )}
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <AdminMediaPreview
+      imageUrl={imageUrl}
+      label={label}
+      detail={detail}
+      detailTitle={
+        !item?.title && item?.file_path
+          ? item.file_path
+          : ""
+      }
+    />
   );
 }
-
 
 function browserImageUrl(
   value
@@ -3855,339 +3262,73 @@ function AnalyzeHandoffSummary({
   showPingback,
   onChangePingback,
   onFetchRex,
-  canSend,
-  sending,
-  onSend,
 }) {
   const boxCount =
-    Array.isArray(
-      boxes
-    )
+    Array.isArray(boxes)
       ? boxes.length
       : 0;
 
-
   return (
-    <div
-      style={{
-        height:
-          "100%",
-        display:
-          "flex",
-        flexDirection:
-          "column",
-      }}
-    >
-      <div
-        style={{
-          flex:
-            1,
-          overflow:
-            "auto",
-          padding:
-            12,
-        }}
-      >
-        <div
-          style={{
-            marginBottom:
-              18,
-          }}
-        >
-          <div
-            style={{
-              marginBottom:
-                7,
-              color:
-                "#4b6b8a",
-              fontSize:
-                10,
-              fontWeight:
-                800,
-              letterSpacing:
-                "0.08em",
-            }}
-          >
-            HANDING TO CREATE
-          </div>
-
-          <div
-            style={{
-              fontSize:
-                18,
-              fontWeight:
-                700,
-              lineHeight:
-                1.35,
-            }}
-          >
-            Run #{jobId || "—"}
-          </div>
-
-          <div
-            style={{
-              marginTop:
-                2,
-              color:
-                "#586675",
-              fontSize:
-                14,
-            }}
-          >
-            {boxCount} Box{boxCount === 1
-              ? ""
-              : "es"}
-          </div>
+    <AdminStack gap="lg">
+      <div>
+        <div className="admin-eyebrow">
+          Handing to CREATE
         </div>
 
+        <div className="admin-summary-title">
+          Run #{jobId || "—"}
+        </div>
 
-        {showPingback ? (
-          <div
-            style={{
-              marginBottom:
-                20,
-            }}
-          >
-            <label
-              className="admin-field"
+        <div className="admin-summary-meta">
+          {boxCount} Box{boxCount === 1 ? "" : "es"}
+        </div>
+      </div>
+
+      {showPingback ? (
+        <label className="admin-field">
+          <span className="admin-field__label">
+            Pingback
+          </span>
+
+          <div className="admin-field-row">
+            <input
+              className="admin-field__control"
+              type="text"
+              value={pingback}
+              onChange={(event) =>
+                onChangePingback(event.target.value)
+              }
+            />
+
+            <AdminButton
+              type="button"
+              onClick={onFetchRex}
             >
-              <span
-                className="admin-field__label"
-              >
-                Pingback
-              </span>
-
-              <div
-                style={{
-                  display:
-                    "flex",
-                  gap:
-                    8,
-                }}
-              >
-                <input
-                  className="admin-field__control"
-                  type="text"
-                  value={
-                    pingback
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    onChangePingback(
-                      event
-                        .target
-                        .value
-                    )
-                  }
-                  style={{
-                    flex:
-                      1,
-                    minWidth:
-                      0,
-                  }}
-                />
-
-                <button
-                  type="button"
-                  onClick={
-                    onFetchRex
-                  }
-                >
-                  REX
-                </button>
-              </div>
-            </label>
+              REX
+            </AdminButton>
           </div>
-        ) : null}
+        </label>
+      ) : null}
 
+      <div>
+        <div className="admin-eyebrow">
+          Each Box Contains
+        </div>
 
-        <div>
-          <div
-            style={{
-              marginBottom:
-                7,
-              color:
-                "#4b6b8a",
-              fontSize:
-                10,
-              fontWeight:
-                800,
-              letterSpacing:
-                "0.08em",
-            }}
-          >
-            EACH BOX CONTAINS
-          </div>
-
-          <div
-            style={{
-              border:
-                "1px solid #d8dde3",
-            }}
-          >
-            {fieldNames.map(
-              (fieldName) => (
-                <div
-                  key={
-                    fieldName
-                  }
-                  style={{
-                    padding:
-                      "7px 9px",
-                    borderBottom:
-                      "1px solid #e9edf1",
-                  }}
-                >
-                  <code>
-                    {fieldName}
-                    {fieldName ===
-                    "ingredients"
-                      ? " {}"
-                      : ""}
-                  </code>
-                </div>
-              )
-            )}
-          </div>
+        <div className="admin-key-list">
+          {fieldNames.map((fieldName) => (
+            <div
+              key={fieldName}
+              className="admin-key-list__item"
+            >
+              <code>
+                {fieldName}
+                {fieldName === "ingredients" ? " {}" : ""}
+              </code>
+            </div>
+          ))}
         </div>
       </div>
-
-
-      <div
-        style={{
-          padding:
-            12,
-          borderTop:
-            "1px solid #d8dde3",
-        }}
-      >
-        <button
-          type="button"
-          disabled={
-            !canSend ||
-            sending
-          }
-          onClick={
-            onSend
-          }
-          style={{
-            width:
-              "100%",
-            ...(
-              !canSend ||
-              sending
-                ? {
-                    background:
-                      "#d8dde3",
-                    color:
-                      "#6b7280",
-                    borderColor:
-                      "#c4cbd2",
-                    cursor:
-                      "not-allowed",
-                  }
-                : {}
-            ),
-          }}
-        >
-          {sending
-            ? "Sending..."
-            : `Send ${boxCount} Box${
-                boxCount === 1
-                  ? ""
-                  : "es"
-              } to CREATE`}
-        </button>
-      </div>
-    </div>
+    </AdminStack>
   );
 }
-
-
-const secondaryButtonStyle = {
-  background:
-    "#f7f8fa",
-  color:
-    "#334155",
-  border:
-    "1px solid #c7d0d9",
-  boxShadow:
-    "none",
-};
-
-
-const marketingOverlayStyle = {
-  position:
-    "fixed",
-  inset:
-    0,
-  zIndex:
-    2147483647,
-  background:
-    "#ffffff",
-  overflow:
-    "hidden",
-};
-
-
-const handoffDrawerHostStyle = {
-  position:
-    "fixed",
-  top:
-    0,
-  right:
-    0,
-  bottom:
-    0,
-  width:
-    440,
-  zIndex:
-    2147483646,
-  display:
-    "flex",
-};
-
-
-const headerCell = {
-  position:
-    "sticky",
-  top:
-    0,
-  zIndex:
-    1,
-  padding:
-    "8px 9px",
-  textAlign:
-    "left",
-  verticalAlign:
-    "middle",
-  background:
-    "#f7f8fa",
-  borderBottom:
-    "1px solid #d8dde3",
-  color:
-    "#4b6b8a",
-  fontSize:
-    10,
-  lineHeight:
-    1.15,
-  fontWeight:
-    700,
-  letterSpacing:
-    "0.08em",
-  textTransform:
-    "uppercase",
-};
-
-
-const bodyCell = {
-  padding:
-    "8px 9px",
-  textAlign:
-    "left",
-  verticalAlign:
-    "top",
-  borderBottom:
-    "1px solid #e9edf1",
-};

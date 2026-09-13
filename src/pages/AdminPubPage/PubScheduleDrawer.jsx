@@ -1,31 +1,149 @@
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  AdminBadge,
+  AdminButton,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminStack,
+  AdminToolbar,
+} from "@components/AdminLayout";
+
+
 export default function PubScheduleDrawer({
   asset,
-  loading = false,
-  error = "",
+  loadAsset,
   changingStage = false,
   sending = false,
   onEnqueue,
   onDequeue,
   onSendNow,
 }) {
+  const [
+    detailAsset,
+    setDetailAsset,
+  ] = useState(
+    asset ||
+    null
+  );
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(
+    false
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState(
+    ""
+  );
+
+
+  async function refreshDetail() {
+    const id =
+      Number(
+        asset
+          ?.pub_asset_id ||
+        0
+      );
+
+    if (!id) {
+      setDetailAsset(
+        null
+      );
+
+      return;
+    }
+
+    if (
+      typeof loadAsset !==
+      "function"
+    ) {
+      setDetailAsset(
+        asset
+      );
+
+      return;
+    }
+
+    setLoading(
+      true
+    );
+
+    setError(
+      ""
+    );
+
+    try {
+      const loaded =
+        await loadAsset(
+          id
+        );
+
+      setDetailAsset(
+        loaded ||
+        asset
+      );
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Could not load Schedule details."
+      );
+
+      setDetailAsset(
+        asset
+      );
+
+    } finally {
+      setLoading(
+        false
+      );
+    }
+  }
+
+
+  useEffect(() => {
+    setDetailAsset(
+      asset ||
+      null
+    );
+
+    refreshDetail();
+  }, [
+    asset?.pub_asset_id,
+    asset?.updated_at,
+  ]);
+
+
+  const currentAsset =
+    detailAsset ||
+    asset;
+
   const stage =
     String(
-      asset?.pipeline_stage ||
+      currentAsset
+        ?.pipeline_stage ||
       ""
     )
       .trim()
       .toLowerCase();
 
-
   const canEnqueue =
     stage ===
       "packed";
 
-
   const canDequeue =
     stage ===
       "queued";
-
 
   const canSendNow =
     stage ===
@@ -35,266 +153,313 @@ export default function PubScheduleDrawer({
       "queued";
 
 
+  async function handleStageChange(
+    action
+  ) {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const callback =
+      action ===
+        "enqueue"
+        ? onEnqueue
+        : onDequeue;
+
+    const result =
+      await callback?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Could not change Schedule stage."
+      );
+
+      return;
+    }
+
+    await refreshDetail();
+  }
+
+
+  async function handleSendNow() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onSendNow?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.cancelled
+    ) {
+      return;
+    }
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Could not send asset."
+      );
+    }
+  }
+
+
+  if (
+    loading
+    &&
+    !currentAsset
+  ) {
+    return (
+      <AdminMetaText as="div">
+        Loading Schedule details...
+      </AdminMetaText>
+    );
+  }
+
+
+  if (!currentAsset) {
+    return (
+      <AdminMetaText as="div">
+        Select a Schedule row.
+      </AdminMetaText>
+    );
+  }
+
+
   return (
-    <div
-      style={
-        bodyStyle
-      }
-    >
+    <AdminStack gap="lg">
       {loading ? (
-        <div
-          style={
-            mutedStyle
-          }
-        >
-          Loading Schedule details...
-        </div>
-      ) : error ? (
-        <div
-          style={
-            errorStyle
-          }
-        >
+        <AdminMetaText as="div">
+          Refreshing Schedule details...
+        </AdminMetaText>
+      ) : null}
+
+
+      {error ? (
+        <AdminNotice variant="danger">
           {error}
-        </div>
-      ) : asset ? (
-        <>
-          <Section
-            title="Asset"
-          >
-            <DetailRow
-              label="Channel"
-              value={
-                humanize(
-                  asset.channel
-                )
-              }
-            />
-
-            <DetailRow
-              label="Type"
-              value={
-                humanize(
-                  asset.asset_type
-                )
-              }
-            />
-
-            <DetailRow
-              label="Source"
-              value={
-                formatSource(
-                  asset
-                )
-              }
-            />
-
-            <DetailRow
-              label="Title"
-              value={
-                asset.search_title ||
-                "—"
-              }
-            />
-          </Section>
+        </AdminNotice>
+      ) : null}
 
 
-          <Section
-            title="Status"
-          >
-            <DetailRow
-              label="Stage"
-              value={
-                humanize(
-                  asset.pipeline_stage
-                )
-              }
-            />
+      <AdminPanel
+        title="Asset"
+        compact
+      >
+        <AdminStack gap="sm">
+          <DetailField
+            label="Channel"
+            value={
+              humanize(
+                currentAsset
+                  .channel
+              )
+            }
+          />
 
-            <DetailRow
-              label="Updated"
-              value={
-                asset.updated_at ||
-                "—"
-              }
-            />
+          <DetailField
+            label="Type"
+            value={
+              humanize(
+                currentAsset
+                  .asset_type
+              )
+            }
+          />
+
+          <DetailField
+            label="Source"
+            value={
+              formatSource(
+                currentAsset
+              )
+            }
+          />
+
+          <DetailField
+            label="Title"
+            value={
+              currentAsset
+                .search_title ||
+              "—"
+            }
+          />
+        </AdminStack>
+      </AdminPanel>
 
 
-            {canEnqueue ? (
-              <div
-                style={
-                  actionStyle
+      <AdminPanel
+        title="Status"
+        compact
+      >
+        <AdminStack gap="sm">
+          <AdminField label="Stage">
+            <div>
+              <AdminBadge
+                variant={
+                  stage ===
+                    "queued"
+                    ? "info"
+                    : "neutral"
                 }
               >
-                <button
-                  type="button"
+                {
+                  humanize(
+                    stage
+                  )
+                }
+              </AdminBadge>
+            </div>
+          </AdminField>
 
-                  disabled={
-                    changingStage ||
-                    sending
-                  }
+          <DetailField
+            label="Updated"
+            value={
+              currentAsset
+                .updated_at ||
+              "—"
+            }
+          />
 
-                  onClick={() => {
-                    onEnqueue?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    changingStage
-                      ? "Queueing..."
-                      : "Queue"
-                  }
-                </button>
-              </div>
+
+          <AdminToolbar compact>
+            {canEnqueue ? (
+              <AdminButton
+                type="button"
+
+                disabled={
+                  changingStage
+                  ||
+                  sending
+                }
+
+                onClick={() =>
+                  handleStageChange(
+                    "enqueue"
+                  )
+                }
+              >
+                {
+                  changingStage
+                    ? "Queueing..."
+                    : "Queue"
+                }
+              </AdminButton>
             ) : null}
 
 
             {canDequeue ? (
-              <div
-                style={
-                  actionStyle
+              <AdminButton
+                type="button"
+
+                variant="secondary"
+
+                disabled={
+                  changingStage
+                  ||
+                  sending
+                }
+
+                onClick={() =>
+                  handleStageChange(
+                    "dequeue"
+                  )
                 }
               >
-                <button
-                  type="button"
-
-                  disabled={
-                    changingStage ||
-                    sending
-                  }
-
-                  onClick={() => {
-                    onDequeue?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    changingStage
-                      ? "Removing..."
-                      : "Remove from Queue"
-                  }
-                </button>
-              </div>
+                {
+                  changingStage
+                    ? "Removing..."
+                    : "Remove from Queue"
+                }
+              </AdminButton>
             ) : null}
 
 
             {canSendNow ? (
-              <div
-                style={
-                  sendActionStyle
+              <AdminButton
+                type="button"
+
+                disabled={
+                  sending
+                  ||
+                  changingStage
+                }
+
+                onClick={
+                  handleSendNow
                 }
               >
-                <button
-                  type="button"
-
-                  disabled={
-                    sending ||
-                    changingStage
-                  }
-
-                  onClick={() => {
-                    onSendNow?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    sending
-                      ? "Sending..."
-                      : "Send Now"
-                  }
-                </button>
-              </div>
+                {
+                  sending
+                    ? "Sending..."
+                    : "Send Now"
+                }
+              </AdminButton>
             ) : null}
-          </Section>
+          </AdminToolbar>
+        </AdminStack>
+      </AdminPanel>
 
 
-          <Section
-            title="Schedule Meaning"
-          >
-            <DetailRow
-              label="Packed"
-              value="Sealed and held outside automatic scheduling."
-            />
+      <AdminPanel
+        title="Schedule Meaning"
+        compact
+      >
+        <AdminStack gap="sm">
+          <DetailField
+            label="Packed"
+            value="Sealed and held outside automatic scheduling."
+          />
 
-            <DetailRow
-              label="Queued"
-              value="Released into Schedule's automatic candidate pool."
-            />
-          </Section>
-        </>
-      ) : (
-        <div
-          style={
-            mutedStyle
-          }
-        >
-          Select a Schedule row.
-        </div>
-      )}
-    </div>
+          <DetailField
+            label="Queued"
+            value="Released into Schedule's automatic candidate pool."
+          />
+        </AdminStack>
+      </AdminPanel>
+    </AdminStack>
   );
 }
 
 
-function Section({
-  title,
-  children,
-}) {
-  return (
-    <section
-      style={
-        sectionStyle
-      }
-    >
-      <div
-        style={
-          sectionTitleStyle
-        }
-      >
-        {title}
-      </div>
-
-      <div
-        style={
-          sectionBodyStyle
-        }
-      >
-        {children}
-      </div>
-    </section>
-  );
-}
-
-
-function DetailRow({
+function DetailField({
   label,
   value,
 }) {
   return (
-    <div
-      style={
-        detailRowStyle
+    <AdminField
+      label={
+        label
       }
     >
-      <div
-        style={
-          detailLabelStyle
+      <div>
+        {
+          value ||
+          "—"
         }
-      >
-        {label}
       </div>
-
-      <div
-        style={
-          detailValueStyle
-        }
-      >
-        {value || "—"}
-      </div>
-    </div>
+    </AdminField>
   );
 }
 
@@ -302,14 +467,26 @@ function DetailRow({
 function formatSource(
   asset
 ) {
+  const title =
+    String(
+      asset
+        ?.source_title ||
+      ""
+    ).trim();
+
+  if (title) {
+    return title;
+  }
+
   const type =
-    asset?.source_type ||
+    asset
+      ?.source_type ||
     "";
 
   const id =
-    asset?.source_id ||
+    asset
+      ?.source_id ||
     "";
-
 
   if (
     !type
@@ -318,7 +495,6 @@ function formatSource(
   ) {
     return "—";
   }
-
 
   return `${type} #${id}`;
 }
@@ -334,11 +510,9 @@ function humanize(
     )
       .trim();
 
-
   if (!raw) {
     return "—";
   }
-
 
   return raw
     .replace(
@@ -358,149 +532,3 @@ function humanize(
           .toUpperCase()
     );
 }
-
-
-const bodyStyle = {
-  padding:
-    14,
-};
-
-
-const sectionStyle = {
-  marginBottom:
-    18,
-};
-
-
-const sectionTitleStyle = {
-  marginBottom:
-    7,
-
-  color:
-    "#526273",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    800,
-
-  letterSpacing:
-    "0.05em",
-
-  textTransform:
-    "uppercase",
-};
-
-
-const sectionBodyStyle = {
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#ffffff",
-};
-
-
-const detailRowStyle = {
-  display:
-    "grid",
-
-  gridTemplateColumns:
-    "105px minmax(0, 1fr)",
-
-  gap:
-    10,
-
-  padding:
-    "8px 10px",
-
-  borderBottom:
-    "1px solid #edf0f2",
-};
-
-
-const detailLabelStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    700,
-};
-
-
-const detailValueStyle = {
-  minWidth:
-    0,
-
-  overflowWrap:
-    "anywhere",
-
-  color:
-    "#273444",
-
-  fontSize:
-    12,
-
-  lineHeight:
-    1.4,
-};
-
-
-const actionStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  padding:
-    "10px",
-
-  borderTop:
-    "1px solid #edf0f2",
-
-  background:
-    "#fafbfc",
-};
-
-
-const sendActionStyle = {
-  ...actionStyle,
-
-  background:
-    "#f7f9fb",
-};
-
-
-const errorStyle = {
-  padding:
-    "9px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const mutedStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};

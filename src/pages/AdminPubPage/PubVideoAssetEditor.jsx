@@ -1,13 +1,19 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
+  AdminButton,
+  AdminDialog,
+  AdminEditorBody,
+  AdminEditorFooter,
+  AdminEditorForm,
+  AdminEditorImage,
+  AdminEditorPane,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminToolbar,
+} from "@components/AdminLayout";
 import PubVideoPlayer from "./PubVideoPlayer";
 import PubMusicEditor from "./PubMusicEditor";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
@@ -53,6 +59,7 @@ export default function PubVideoAssetEditor({
   onSave,
   onRecreate,
   onSendToPackaging,
+  onPackagingComplete,
   onRefreshAssets,
   onClose,
 }) {
@@ -992,840 +999,306 @@ function appendDescriptionLink(
         result?.error ||
         "Could not send this video to Packaging."
       );
+
+      return;
     }
+
+    onClose?.();
+    onPackagingComplete?.(result);
   }
 
 
-  return createPortal(
-    <div
-      style={
-        overlayStyle
-      }
+  return (
+    <AdminEditorForm onSubmit={handleSave}>
+      <AdminEditorBody layout="split">
+        <AdminEditorPane kind="preview">
+          <PubVideoPlayer
+            src={versionedPreviewUrl(asset.url, previewVersion)}
+            title={asset.search_title || "Video preview"}
+          />
 
-      onMouseDown={(
-        event
-      ) => {
-        if (
-          event.target ===
-          event.currentTarget
-          &&
-          !busy
-          &&
-          !musicOpen
-          &&
-          !redoWarningOpen
-        ) {
-          onClose?.();
-        }
-      }}
-    >
-      <form
-        style={
-          dialogStyle
-        }
+          {isYouTubeVideo ? (
+            <AdminPanel title="Thumbnail">
+              <AdminEditorImage
+                src={
+                  asset.thumbnail_url
+                    ? versionedPreviewUrl(asset.thumbnail_url, previewVersion)
+                    : ""
+                }
+                alt="Video thumbnail"
+                placeholder="No thumbnail yet"
+                variant="thumbnail"
+              />
+            </AdminPanel>
+          ) : null}
+        </AdminEditorPane>
 
-        onSubmit={
-          handleSave
-        }
-      >
-        <div
-          style={
-            headerStyle
-          }
-        >
-          <strong>
-            Edit Video Asset
-          </strong>
+        <AdminEditorPane kind="fields">
+          <AdminField label="Title">
+            <input
+              className="admin-field__control admin-field__control--full"
+              type="text"
+              value={title}
+              disabled={editorLocked}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setSuccessMessage("");
+                setActionError("");
+              }}
+            />
+          </AdminField>
 
-          <div
-            style={
-              headerRightStyle
-            }
-          >
-            {isDispatchLocked ? (
-              <div
-                style={
-                  shippedBadgeStyle
+          <AdminField label="Description">
+            <textarea
+              className="admin-field__control admin-field__textarea"
+              rows={9}
+              value={description}
+              disabled={editorLocked}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setSuccessMessage("");
+                setActionError("");
+              }}
+            />
+          </AdminField>
+
+          {isYouTubeVideo ? (
+            <AdminToolbar compact>
+              <AdminButton
+                type="button"
+                size="sm"
+                variant={
+                  rexLinks.colorsUsedUrl &&
+                  descriptionHasUrl(description, rexLinks.colorsUsedUrl)
+                    ? "success"
+                    : "secondary"
+                }
+                disabled={
+                  editorLocked ||
+                  rexLinksLoading ||
+                  !rexLinks.colorsUsedUrl ||
+                  descriptionHasUrl(description, rexLinks.colorsUsedUrl)
+                }
+                title={
+                  rexLinks.colorsUsedUrl
+                    ? "Append the current Public Colors Used REX URL."
+                    : rexLinksLoading
+                      ? "Loading Colors Used REX..."
+                      : "No ready Colors Used REX for this Playlist."
+                }
+                onClick={() =>
+                  appendDescriptionLink("Colors Used", rexLinks.colorsUsedUrl)
                 }
               >
                 {
-                  isShipping
-                    ? "SHIPPING"
-                    : "SHIPPED"
+                  rexLinks.colorsUsedUrl &&
+                  descriptionHasUrl(description, rexLinks.colorsUsedUrl)
+                    ? "✓ Colors Used"
+                    : "+ Colors Used"
                 }
-              </div>
-            ) : null}
+              </AdminButton>
 
-            <div
-              style={
-                assetIdStyle
-              }
-            >
-              Runtime {
-                formatDurationMs(
-                  asset.duration_ms
-                )
-              }
-            </div>
-
-            <div
-              style={
-                assetIdStyle
-              }
-            >
-              Asset #
-              {
-                asset
-                  .pub_asset_id
-              }
-            </div>
-
-            <button
-              type="button"
-
-              style={
-                quietButtonStyle
-              }
-
-              disabled={
-                busy
-              }
-
-              onClick={
-                onClose
-              }
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-
-        <div
-          style={
-            bodyStyle
-          }
-        >
-          <div
-            style={
-              playerColumnStyle
-            }
-          >
-            <PubVideoPlayer
-              src={
-                versionedPreviewUrl(
-                  asset.url,
-                  previewVersion
-                )
-              }
-
-              title={
-                asset.search_title ||
-                "Video preview"
-              }
-            />
-
-            {isYouTubeVideo ? (
-              <div
-                style={
-                  thumbnailBlockStyle
+              <AdminButton
+                type="button"
+                size="sm"
+                variant={
+                  rexLinks.playlistUrl &&
+                  descriptionHasUrl(description, rexLinks.playlistUrl)
+                    ? "success"
+                    : "secondary"
                 }
-              >
-                <div
-                  style={
-                    thumbnailLabelStyle
-                  }
-                >
-                  Thumbnail
-                </div>
-
-                {asset.thumbnail_url ? (
-                  <img
-                    src={
-                      versionedPreviewUrl(
-                        asset.thumbnail_url,
-                        previewVersion
-                      )
-                    }
-
-                    alt="Video thumbnail"
-
-                    style={
-                      thumbnailPreviewStyle
-                    }
-                  />
-                ) : (
-                  <div
-                    style={
-                      thumbnailEmptyStyle
-                    }
-                  >
-                    No thumbnail yet
-                  </div>
-                )}
-
-              </div>
-            ) : null}
-          </div>
-
-
-          <div
-            style={
-              fieldsStyle
-            }
-          >
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Title
-              </span>
-
-              <input
-                className="admin-field__control"
-
-                type="text"
-
-                value={
-                  title
-                }
-
                 disabled={
-                  editorLocked
+                  editorLocked ||
+                  rexLinksLoading ||
+                  !rexLinks.playlistUrl ||
+                  descriptionHasUrl(description, rexLinks.playlistUrl)
                 }
+                title={
+                  rexLinks.playlistUrl
+                    ? "Append this Playlist's permanent Public REX URL."
+                    : rexLinksLoading
+                      ? "Loading Playlist REX..."
+                      : "No Public Playlist REX is ready."
+                }
+                onClick={() =>
+                  appendDescriptionLink("View the Playlist", rexLinks.playlistUrl)
+                }
+              >
+                {
+                  rexLinks.playlistUrl &&
+                  descriptionHasUrl(description, rexLinks.playlistUrl)
+                    ? "✓ Playlist Link"
+                    : "+ Playlist Link"
+                }
+              </AdminButton>
 
-                onChange={(
-                  event
-                ) => {
-                  setTitle(
-                    event
-                      .target
-                      .value
-                  );
+              <AdminButton
+                type="button"
+                size="sm"
+                variant={
+                  descriptionHasUrl(description, COLORFIX_HOME_URL)
+                    ? "success"
+                    : "secondary"
+                }
+                disabled={
+                  editorLocked ||
+                  descriptionHasUrl(description, COLORFIX_HOME_URL)
+                }
+                title="Append the ColorFix home page."
+                onClick={() =>
+                  appendDescriptionLink("More from ColorFix", COLORFIX_HOME_URL)
+                }
+              >
+                {
+                  descriptionHasUrl(description, COLORFIX_HOME_URL)
+                    ? "✓ ColorFix Home"
+                    : "+ ColorFix Home"
+                }
+              </AdminButton>
 
-                  setSuccessMessage(
-                    ""
-                  );
+              {rexLinksLoading ? (
+                <AdminMetaText>Loading REX links…</AdminMetaText>
+              ) : rexLinksError ? (
+                <AdminMetaText tone="danger">
+                  {rexLinksError}
+                </AdminMetaText>
+              ) : sourcePlaylistId > 0 ? (
+                <AdminMetaText>Playlist #{sourcePlaylistId}</AdminMetaText>
+              ) : null}
+            </AdminToolbar>
+          ) : null}
 
-                  setActionError(
-                    ""
-                  );
-                }}
+          {isYouTubeVideo ? (
+            <AdminPanel
+              title="Thumbnail Text Color"
+              meta="Default is white. Choosing another color changes the thumbnail itself and requires REDO."
+            >
+              <FuzzySearchColorSelect
+                value={thumbnailTextColorPickerValue}
+                compact
+                autoFocus={false}
+                preventAutoFocus
+                showLabel={false}
+                mobileBreakpoint={0}
+                onSelect={(color) => {
+                  const nextColor = color
+                    ? colorObjectToHex(color)
+                    : DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
 
-                style={{
-                  width:
-                    "100%",
+                  setInsideValues((current) => ({
+                    ...current,
+                    cover: {
+                      ...(current?.cover || {}),
+                      text_color: normalizeThumbnailTextColor(nextColor),
+                    },
+                  }));
+
+                  setSuccessMessage("");
+                  setActionError("");
                 }}
               />
-            </label>
+            </AdminPanel>
+          ) : null}
 
-
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Description
-              </span>
-
-              <textarea
-                className="admin-field__control"
-
-                rows={9}
-
-                value={
-                  description
-                }
-
-                disabled={
-                  editorLocked
-                }
-
-                onChange={(
-                  event
-                ) => {
-                  setDescription(
-                    event
-                      .target
-                      .value
-                  );
-
-                  setSuccessMessage(
-                    ""
-                  );
-
-                  setActionError(
-                    ""
-                  );
-                }}
-
-                style={{
-                  width:
-                    "100%",
-
-                  resize:
-                    "vertical",
-
-                  boxSizing:
-                    "border-box",
-                }}
-              />
-            </label>
-
-
-            {isYouTubeVideo ? (
-              <div
-                style={
-                  descriptionHelpersStyle
-                }
-              >
-                <button
-                  type="button"
-
-                  style={
-                    descriptionHelperButtonStyle(
-                      Boolean(
-                        rexLinks.colorsUsedUrl
-                        &&
-                        descriptionHasUrl(
-                          description,
-                          rexLinks.colorsUsedUrl
-                        )
-                      )
-                    )
-                  }
-
-                  disabled={
-                    editorLocked
-                    ||
-                    rexLinksLoading
-                    ||
-                    !rexLinks.colorsUsedUrl
-                    ||
-                    descriptionHasUrl(
-                      description,
-                      rexLinks.colorsUsedUrl
-                    )
-                  }
-
-                  title={
-                    rexLinks.colorsUsedUrl
-                      ? "Append the current Public Colors Used REX URL."
-                      : rexLinksLoading
-                        ? "Loading Colors Used REX..."
-                        : "No ready Colors Used REX for this Playlist."
-                  }
-
-                  onClick={() => {
-                    appendDescriptionLink(
-                      "Colors Used",
-                      rexLinks.colorsUsedUrl
-                    );
+          {ingredientFields.map((field) => (
+            <AdminField key={field.key} label={field.label}>
+              {field.type === "textarea" ? (
+                <textarea
+                  className={[
+                    "admin-field__control",
+                    "admin-field__textarea",
+                    field.rows === 1 ? "admin-field__textarea--fixed" : "",
+                  ].filter(Boolean).join(" ")}
+                  rows={field.rows || 3}
+                  value={insideValues[field.key] ?? ""}
+                  disabled={editorLocked}
+                  onChange={(event) => {
+                    setInsideValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.value,
+                    }));
+                    setSuccessMessage("");
                   }}
-                >
-                  {
-                    rexLinks.colorsUsedUrl
-                    &&
-                    descriptionHasUrl(
-                      description,
-                      rexLinks.colorsUsedUrl
-                    )
-                      ? "✓ Colors Used"
-                      : "+ Colors Used"
-                  }
-                </button>
-
-
-                <button
-                  type="button"
-
-                  style={
-                    descriptionHelperButtonStyle(
-                      Boolean(
-                        rexLinks.playlistUrl
-                        &&
-                        descriptionHasUrl(
-                          description,
-                          rexLinks.playlistUrl
-                        )
-                      )
-                    )
-                  }
-
-                  disabled={
-                    editorLocked
-                    ||
-                    rexLinksLoading
-                    ||
-                    !rexLinks.playlistUrl
-                    ||
-                    descriptionHasUrl(
-                      description,
-                      rexLinks.playlistUrl
-                    )
-                  }
-
-                  title={
-                    rexLinks.playlistUrl
-                      ? "Append this Playlist's permanent Public REX URL."
-                      : rexLinksLoading
-                        ? "Loading Playlist REX..."
-                        : "No Public Playlist REX is ready."
-                  }
-
-                  onClick={() => {
-                    appendDescriptionLink(
-                      "View the Playlist",
-                      rexLinks.playlistUrl
-                    );
+                />
+              ) : (
+                <input
+                  className="admin-field__control admin-field__control--full"
+                  type="text"
+                  value={insideValues[field.key] ?? ""}
+                  disabled={editorLocked}
+                  onChange={(event) => {
+                    setInsideValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.value,
+                    }));
+                    setSuccessMessage("");
                   }}
-                >
-                  {
-                    rexLinks.playlistUrl
-                    &&
-                    descriptionHasUrl(
-                      description,
-                      rexLinks.playlistUrl
-                    )
-                      ? "✓ Playlist Link"
-                      : "+ Playlist Link"
-                  }
-                </button>
+                />
+              )}
+            </AdminField>
+          ))}
 
-
-                <button
+          {isYouTubeVideo ? (
+            <AdminPanel
+              title="Music"
+              meta={
+                isShipping
+                  ? "Dispatch in progress"
+                  : isShipped
+                    ? "Production order archived after shipment"
+                    : Number(insideValues?.music?.asset_library_id || 0) > 0
+                      ? `Asset #${insideValues.music.asset_library_id} · volume ${formatVolume(insideValues.music.volume)}`
+                      : "No music selected"
+              }
+              actions={
+                <AdminButton
                   type="button"
-
-                  style={
-                    descriptionHelperButtonStyle(
-                      descriptionHasUrl(
-                        description,
-                        COLORFIX_HOME_URL
-                      )
-                    )
-                  }
-
-                  disabled={
-                    editorLocked
-                    ||
-                    descriptionHasUrl(
-                      description,
-                      COLORFIX_HOME_URL
-                    )
-                  }
-
-                  title="Append the ColorFix home page."
+                  size="sm"
+                  variant="secondary"
+                  disabled={editorLocked}
                   onClick={() => {
-                    appendDescriptionLink(
-                      "More from ColorFix",
-                      COLORFIX_HOME_URL
-                    );
-                  }}
-                >
-                  {
-                    descriptionHasUrl(
-                      description,
-                      COLORFIX_HOME_URL
-                    )
-                      ? "✓ ColorFix Home"
-                      : "+ ColorFix Home"
-                  }
-                </button>
-
-
-                {rexLinksLoading ? (
-                  <span
-                    style={
-                      descriptionHelperNoteStyle
-                    }
-                  >
-                    Loading REX links…
-                  </span>
-                ) : rexLinksError ? (
-                  <span
-                    style={
-                      descriptionHelperErrorStyle
-                    }
-                  >
-                    {
-                      rexLinksError
-                    }
-                  </span>
-                ) : sourcePlaylistId > 0 ? (
-                  <span
-                    style={
-                      descriptionHelperNoteStyle
-                    }
-                  >
-                    Playlist #
-                    {
-                      sourcePlaylistId
-                    }
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-
-            {isYouTubeVideo ? (
-              <div
-                style={
-                  thumbnailColorEditorRightStyle
-                }
-              >
-                <div
-                  style={
-                    thumbnailColorLabelStyle
-                  }
-                >
-                  Thumbnail Text Color
-                </div>
-
-                <div
-                  style={
-                    thumbnailColorPickerWrapStyle
-                  }
-                >
-                  <FuzzySearchColorSelect
-                    value={
-                      thumbnailTextColorPickerValue
-                    }
-
-                    compact
-
-                    autoFocus={
-                      false
-                    }
-
-                    preventAutoFocus
-
-                    showLabel={
-                      false
-                    }
-
-                    mobileBreakpoint={
-                      0
-                    }
-
-                    onSelect={(
-                      color
-                    ) => {
-                      const nextColor =
-                        color
-                          ? colorObjectToHex(
-                              color
-                            )
-                          : DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
-
-                      setInsideValues(
-                        (
-                          current
-                        ) => ({
-                          ...current,
-
-                          cover: {
-                            ...(
-                              current
-                                ?.cover ||
-                              {}
-                            ),
-
-                            text_color:
-                              normalizeThumbnailTextColor(
-                                nextColor
-                              ),
-                          },
-                        })
-                      );
-
-                      setSuccessMessage(
-                        ""
-                      );
-
-                      setActionError(
-                        ""
-                      );
-                    }}
-                  />
-                </div>
-
-                <div
-                  style={
-                    thumbnailColorHintStyle
-                  }
-                >
-                  Default is white. Choosing another color changes the
-                  thumbnail itself and requires REDO.
-                </div>
-              </div>
-            ) : null}
-
-
-            {ingredientFields.map(
-              (
-                field
-              ) => (
-                <label
-                  className="admin-field"
-
-                  key={
-                    field.key
-                  }
-                >
-                  <span
-                    className="admin-field__label"
-                  >
-                    {
-                      field.label
-                    }
-                  </span>
-
-                  {field.type ===
-                  "textarea" ? (
-                    <textarea
-                      className="admin-field__control"
-
-                      rows={
-                        field.rows ||
-                        3
-                      }
-
-                      value={
-                        insideValues[
-                          field.key
-                        ] ??
-                        ""
-                      }
-
-                      disabled={
-                        editorLocked
-                      }
-
-                      onChange={(
-                        event
-                      ) => {
-                        setInsideValues(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-
-                            [
-                              field.key
-                            ]:
-                              event
-                                .target
-                                .value,
-                          })
-                        );
-
-                        setSuccessMessage(
-                          ""
-                        );
-                      }}
-
-                      style={{
-                        width:
-                          "100%",
-
-                        resize:
-                          field.rows === 1
-                            ? "none"
-                            : "vertical",
-
-                        boxSizing:
-                          "border-box",
-                      }}
-                    />
-                  ) : (
-                    <input
-                      className="admin-field__control"
-
-                      type="text"
-
-                      value={
-                        insideValues[
-                          field.key
-                        ] ??
-                        ""
-                      }
-
-                      disabled={
-                        editorLocked
-                      }
-
-                      onChange={(
-                        event
-                      ) => {
-                        setInsideValues(
-                          (
-                            current
-                          ) => ({
-                            ...current,
-
-                            [
-                              field.key
-                            ]:
-                              event
-                                .target
-                                .value,
-                          })
-                        );
-
-                        setSuccessMessage(
-                          ""
-                        );
-                      }}
-
-                      style={{
-                        width:
-                          "100%",
-                      }}
-                    />
-                  )}
-                </label>
-              )
-            )}
-
-
-
-            {isYouTubeVideo ? (
-              <div
-                style={
-                  musicControlStyle
-                }
-              >
-                <div>
-                  <div
-                    style={
-                      musicLabelStyle
-                    }
-                  >
-                    Music
-                  </div>
-
-                  <div
-                    style={
-                      musicValueStyle
-                    }
-                  >
-                    {
-                      isShipping
-                        ? "Dispatch in progress"
-                        : isShipped
-                          ? "Production order archived after shipment"
-                        : Number(
-                            insideValues
-                              ?.music
-                              ?.asset_library_id ||
-                            0
-                          ) > 0
-                            ? `Asset #${insideValues.music.asset_library_id} · volume ${formatVolume(
-                                insideValues.music.volume
-                              )}`
-                            : "No music selected"
-                    }
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-
-                  style={
-                    quietButtonStyle
-                  }
-
-                  disabled={
-                    editorLocked
-                  }
-
-                  onClick={() => {
-                    setMusicOpen(
-                      true
-                    );
-
-                    setSuccessMessage(
-                      ""
-                    );
+                    setMusicOpen(true);
+                    setSuccessMessage("");
                   }}
                 >
                   ♪ Music
-                </button>
-              </div>
-            ) : null}
+                </AdminButton>
+              }
+            />
+          ) : null}
 
+          {!isDispatchLocked && hasIngredientChanges ? (
+            <AdminNotice variant="warning">
+              A baked-in value has changed. Saving will require a new render.
+            </AdminNotice>
+          ) : null}
 
-            {!isDispatchLocked &&
-            hasIngredientChanges ? (
-              <div
-                style={
-                  redoNoticeStyle
-                }
-              >
-                A baked-in value has changed. Saving will require a new render.
-              </div>
-            ) : null}
+          {successMessage ? (
+            <AdminNotice variant="success">
+              {successMessage}
+            </AdminNotice>
+          ) : null}
 
+          {actionError ? (
+            <AdminNotice variant="danger">
+              {actionError}
+            </AdminNotice>
+          ) : null}
+        </AdminEditorPane>
+      </AdminEditorBody>
 
-            {successMessage ? (
-              <div
-                style={
-                  successStyle
-                }
-              >
-                {
-                  successMessage
-                }
-              </div>
-            ) : null}
-
-
-            {actionError ? (
-              <div
-                style={
-                  actionErrorStyle
-                }
-              >
-                {
-                  actionError
-                }
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-
-        <div
-          style={
-            footerStyle
-          }
-        >
-          {!isDispatchLocked ? (
-            <button
+      <AdminEditorFooter
+        leading={
+          !isDispatchLocked ? (
+            <AdminButton
               type="button"
-
-              style={
-                approveAndCloseButtonStyle
-              }
-
-              disabled={
-                !approvalEditable ||
-                approvalSaving ||
-                busy
-              }
-
+              disabled={!approvalEditable || approvalSaving || busy}
               title={
                 approvalEditable
                   ? "Save, approve, and close this video."
                   : "Approval is locked after the asset leaves CREATED."
               }
-
-              onClick={
-                handleApproveAndClose
-              }
+              onClick={handleApproveAndClose}
             >
               {
                 approvalSaving
@@ -1834,289 +1307,103 @@ function appendDescriptionLink(
                     ? "Saving..."
                     : "Approve & Close"
               }
-            </button>
-          ) : (
-            <div
-              style={
-                footerSpacerStyle
-              }
-            />
-          )}
+            </AdminButton>
+          ) : null
+        }
+      >
+        <AdminButton
+          type="button"
+          variant="secondary"
+          disabled={busy}
+          onClick={onClose}
+        >
+          Close
+        </AdminButton>
 
+        <AdminButton
+          type="submit"
+          variant="secondary"
+          disabled={editorLocked}
+        >
+          {
+            saving
+              ? "Saving..."
+              : hasIngredientChanges
+                ? "Save & Redo"
+                : "Save"
+          }
+        </AdminButton>
 
-          <button
-            type="button"
+        <AdminButton
+          type="button"
+          disabled={editorLocked}
+          onClick={commitAndRedo}
+        >
+          {recreating ? "Recreating..." : "Redo Video"}
+        </AdminButton>
 
-            style={
-              quietButtonStyle
-            }
-
-            disabled={
-              busy
-            }
-
-            onClick={
-              onClose
-            }
-          >
-            Close
-          </button>
-
-
-          <button
-            type="submit"
-
-            style={
-              quietButtonStyle
-            }
-
-            disabled={
-              editorLocked
-            }
-          >
-            {
-              saving
-                ? "Saving..."
-                : hasIngredientChanges
-                  ? "Save & Redo"
-                  : "Save"
-            }
-          </button>
-
-
-          <button
-            type="button"
-
-            disabled={
-              editorLocked
-            }
-
-            onClick={
-              commitAndRedo
-            }
-          >
-            {
-              recreating
-                ? "Recreating..."
-                : "Redo Video"
-            }
-          </button>
-
-
-          <button
-            type="button"
-
-            disabled={
-              editorLocked ||
-              approvalSaving ||
-              !isApproved
-            }
-
-            title={
-              isApproved
-                ? "Send this approved asset to Packaging."
-                : "Approve this asset before sending it to Packaging."
-            }
-
-            onClick={
-              handleSendToPackaging
-            }
-          >
-            {
-              sendingToPackaging
-                ? "Sending..."
-                : "Send to Packaging"
-            }
-          </button>
-        </div>
-      </form>
-
+        <AdminButton
+          type="button"
+          disabled={editorLocked || approvalSaving || !isApproved}
+          title={
+            isApproved
+              ? "Send this approved asset to Packaging."
+              : "Approve this asset before sending it to Packaging."
+          }
+          onClick={handleSendToPackaging}
+        >
+          {sendingToPackaging ? "Sending..." : "Send to Packaging"}
+        </AdminButton>
+      </AdminEditorFooter>
 
       {musicOpen ? (
         <PubMusicEditor
-          value={
-            insideValues
-              ?.music ||
-            null
-          }
-
-          disabled={
-            editorLocked
-          }
-
-          onApply={(
-            music
-          ) => {
-            setInsideValues(
-              (
-                current
-              ) => ({
-                ...current,
-
-                music:
-                  music,
-              })
-            );
-
-            setMusicOpen(
-              false
-            );
-
-            setSuccessMessage(
-              ""
-            );
+          value={insideValues?.music || null}
+          disabled={editorLocked}
+          onApply={(music) => {
+            setInsideValues((current) => ({
+              ...current,
+              music,
+            }));
+            setMusicOpen(false);
+            setSuccessMessage("");
           }}
-
-          onClose={() => {
-            setMusicOpen(
-              false
-            );
-          }}
+          onClose={() => setMusicOpen(false)}
         />
       ) : null}
 
-
-      {redoWarningOpen ? (
-        <div
-          style={
-            warningOverlayStyle
-          }
-
-          onMouseDown={(
-            event
-          ) => {
-            if (
-              event.target ===
-              event.currentTarget
-              &&
-              !busy
-            ) {
-              setRedoWarningOpen(
-                false
-              );
-            }
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Redo required"
-
-            style={
-              warningDialogStyle
-            }
-          >
-            <div
-              style={
-                warningHeaderStyle
-              }
-            >
-              <strong>
-                This change requires a new render
-              </strong>
-            </div>
-
-
-            <div
-              style={
-                warningBodyStyle
-              }
-            >
-              <div>
-                One or more edited values are part of the Creator ingredient box.
-                Saving them will queue a REDO. This editor will close immediately;
-                the asset table will show the video as creating while the render runs.
-              </div>
-
-              {redoReasons.length ? (
-                <div>
-                  <strong>
-                    Changed:
-                  </strong>
-
-                  <ul
-                    style={
-                      warningListStyle
-                    }
-                  >
-                    {redoReasons.map(
-                      (
-                        reason
-                      ) => (
-                        <li
-                          key={
-                            reason
-                          }
-                        >
-                          {reason}
-                        </li>
-                      )
-                    )}
-                  </ul>
-                </div>
-              ) : null}
-
-              <div
-                style={
-                  warningHintStyle
-                }
-              >
-                Choose Keep Editing if you want to make more changes before starting the render.
-              </div>
-            </div>
-
-
-            <div
-              style={
-                warningFooterStyle
-              }
-            >
-              <button
-                type="button"
-
-                style={
-                  quietButtonStyle
-                }
-
-                disabled={
-                  busy
-                }
-
-                onClick={() => {
-                  setRedoWarningOpen(
-                    false
-                  );
-                }}
-              >
-                Keep Editing
-              </button>
-
-              <button
-                type="button"
-
-                disabled={
-                  busy
-                }
-
-                onClick={
-                  commitAndRedo
-                }
-              >
-                {
-                  saving
-                    ? "Saving..."
-                    : recreating
-                      ? "Queueing..."
-                      : "Save & Redo"
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>,
-
-    document.body
+      <AdminDialog
+        open={redoWarningOpen}
+        title="This change requires a new render"
+        message={[
+          "One or more edited values are part of the Creator ingredient box. Saving them will queue a REDO. This editor will close immediately; the asset table will show the video as creating while the render runs.",
+          redoReasons.length ? `Changed: ${redoReasons.join(", ")}` : "",
+          "Choose Keep Editing if you want to make more changes before starting the render.",
+        ].filter(Boolean).join("\n\n")}
+        actions={[
+          {
+            key: "keep-editing",
+            label: "Keep Editing",
+            variant: "secondary",
+            disabled: busy,
+            onClick: () => setRedoWarningOpen(false),
+          },
+          {
+            key: "save-redo",
+            label: saving
+              ? "Saving..."
+              : recreating
+                ? "Queueing..."
+                : "Save & Redo",
+            disabled: busy,
+            autoFocus: true,
+            onClick: commitAndRedo,
+          },
+        ]}
+        dismissOnBackdrop={!busy}
+        onClose={() => setRedoWarningOpen(false)}
+      />
+    </AdminEditorForm>
   );
 }
 
@@ -3461,656 +2748,3 @@ function humanize(
     );
 }
 
-
-const overlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483647,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.55)",
-};
-
-
-const dialogStyle = {
-  width:
-    "min(1040px, 96vw)",
-
-  maxHeight:
-    "94vh",
-
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  background:
-    "#ffffff",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    5,
-
-  boxShadow:
-    "0 18px 50px rgba(0,0,0,0.28)",
-};
-
-
-const headerStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  justifyContent:
-    "space-between",
-
-  padding:
-    "10px 12px",
-
-  borderBottom:
-    "1px solid #d8dde3",
-};
-
-
-const headerRightStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  gap:
-    10,
-};
-
-
-const shippedBadgeStyle = {
-  padding:
-    "3px 7px",
-
-  border:
-    "1px solid #9bbda7",
-
-  borderRadius:
-    999,
-
-  background:
-    "#eef8f1",
-
-  color:
-    "#2f6b43",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    800,
-
-  letterSpacing:
-    "0.04em",
-
-  whiteSpace:
-    "nowrap",
-};
-
-
-const assetIdStyle = {
-  color:
-    "#586675",
-
-  fontSize:
-    12,
-
-  fontWeight:
-    600,
-
-  whiteSpace:
-    "nowrap",
-};
-
-
-const bodyStyle = {
-  display:
-    "grid",
-
-  gridTemplateColumns:
-    "minmax(320px, 1.15fr) minmax(0, 1fr)",
-
-  gap:
-    20,
-
-  padding:
-    16,
-
-  overflow:
-    "auto",
-};
-
-
-const playerColumnStyle = {
-  minWidth:
-    0,
-
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    14,
-};
-
-
-const fieldsStyle = {
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    14,
-
-  minWidth:
-    0,
-};
-
-
-const thumbnailBlockStyle = {
-  width:
-    "min(300px, 70%)",
-};
-
-
-const thumbnailColorEditorRightStyle = {
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    5,
-
-  padding:
-    "10px 12px",
-
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#f8fafc",
-
-  overflow:
-    "visible",
-};
-
-
-const thumbnailColorPickerWrapStyle = {
-  position:
-    "relative",
-
-  zIndex:
-    20,
-
-  width:
-    "100%",
-
-  overflow:
-    "visible",
-};
-
-
-const thumbnailColorLabelStyle = {
-  fontSize:
-    12,
-
-  fontWeight:
-    700,
-
-  color:
-    "#334155",
-};
-
-
-const thumbnailColorHintStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    11,
-
-  lineHeight:
-    1.35,
-};
-
-
-const thumbnailLabelStyle = {
-  marginBottom:
-    5,
-
-  fontSize:
-    12,
-
-  fontWeight:
-    700,
-
-  color:
-    "#334155",
-};
-
-
-const thumbnailPreviewStyle = {
-  display:
-    "block",
-
-  width:
-    "100%",
-
-  maxHeight:
-    170,
-
-  objectFit:
-    "contain",
-
-  background:
-    "#f4f5f6",
-
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    3,
-};
-
-
-const thumbnailEmptyStyle = {
-  minHeight:
-    72,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  background:
-    "#f8fafc",
-
-  border:
-    "1px dashed #cfd5dc",
-
-  borderRadius:
-    3,
-
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
-
-
-const descriptionHelpersStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  flexWrap:
-    "wrap",
-
-  gap:
-    7,
-
-  marginTop:
-    -6,
-};
-
-
-const descriptionHelperButtonStyle = (
-  added
-) => ({
-  ...quietButtonStyle,
-
-  background:
-    added
-      ? "#eef8f1"
-      : "#f8fafc",
-
-  borderColor:
-    added
-      ? "#9bbda7"
-      : "#cfd5dc",
-
-  color:
-    added
-      ? "#2f6b43"
-      : "#334155",
-
-  fontWeight:
-    added
-      ? 700
-      : 600,
-});
-
-
-const descriptionHelperNoteStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    11,
-};
-
-
-const descriptionHelperErrorStyle = {
-  color:
-    "#8a3b32",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    600,
-};
-
-
-const musicControlStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  justifyContent:
-    "space-between",
-
-  gap:
-    12,
-
-  padding:
-    "10px 12px",
-
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#f8fafc",
-};
-
-
-const musicLabelStyle = {
-  fontSize:
-    12,
-
-  fontWeight:
-    700,
-
-  color:
-    "#334155",
-};
-
-
-const musicValueStyle = {
-  marginTop:
-    3,
-
-  fontSize:
-    12,
-
-  color:
-    "#64748b",
-};
-
-
-const redoNoticeStyle = {
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #e5c07b",
-
-  background:
-    "#fffaf0",
-
-  color:
-    "#75530d",
-
-  fontSize:
-    12,
-};
-
-
-const approveAndCloseButtonStyle = {
-  marginRight:
-    "auto",
-};
-
-
-const footerSpacerStyle = {
-  marginRight:
-    "auto",
-};
-
-
-const footerStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  gap:
-    8,
-
-  padding:
-    "10px 12px",
-
-  borderTop:
-    "1px solid #d8dde3",
-};
-
-
-const successStyle = {
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #cfd5dc",
-
-  background:
-    "#f6f8f9",
-
-  fontSize:
-    12,
-};
-
-
-const actionErrorStyle = {
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const warningOverlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483647,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.45)",
-};
-
-
-const warningDialogStyle = {
-  width:
-    "min(520px, 94vw)",
-
-  background:
-    "#ffffff",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    5,
-
-  boxShadow:
-    "0 18px 50px rgba(0,0,0,0.28)",
-};
-
-
-const warningHeaderStyle = {
-  padding:
-    "12px 14px",
-
-  borderBottom:
-    "1px solid #d8dde3",
-};
-
-
-const warningBodyStyle = {
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    14,
-
-  padding:
-    16,
-
-  fontSize:
-    13,
-
-  lineHeight:
-    1.45,
-
-  color:
-    "#334155",
-};
-
-
-const warningListStyle = {
-  margin:
-    "7px 0 0 20px",
-
-  padding:
-    0,
-};
-
-
-const warningHintStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
-
-
-const warningFooterStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  gap:
-    8,
-
-  padding:
-    "10px 12px",
-
-  borderTop:
-    "1px solid #d8dde3",
-};
-
-
-const quietButtonStyle = {
-  padding:
-    "4px 8px",
-
-  minHeight:
-    0,
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#334155",
-
-  fontSize:
-    12,
-
-  lineHeight:
-    1.2,
-
-  fontWeight:
-    500,
-
-  cursor:
-    "pointer",
-};

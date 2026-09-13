@@ -1,0 +1,216 @@
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-field__label {
+  display: block;
+  margin: 0;
+  color: var(--admin-info);
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-field__control {
+  box-sizing: border-box;
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.admin-button--secondary {
+  border: 1px solid #c7d0d9;
+  background: var(--admin-surface-muted);
+  color: #334155;
+  box-shadow: none;
+}
+
+.admin-button--danger {
+  border-color: var(--admin-danger);
+  background: var(--admin-danger);
+  color: #fff;
+}
+
+.admin-button:disabled,
+.admin-button[disabled] {
+  border-color: #c7ccd2;
+  background: #d7dce2;
+  color: #7a8490;
+  cursor: not-allowed;
+  opacity: 1;
+  box-shadow: none;
+}
+
+/*
+ * Compatibility rule for existing admin pages. As those pages are migrated,
+ * prefer component-scoped/admin-button disabled styling instead of relying on
+ * a global button selector.
+ */
+button:disabled,
+button[disabled] {
+  border-color: #c7ccd2;
+  background: #d7dce2;
+  color: #7a8490;
+  cursor: not-allowed;
+  opacity: 1;
+  box-shadow: none;
+}
+
+.admin-button {
+  box-sizing: border-box;
+}
+
+.admin-button--full {
+  width: 100%;
+}
+
+.admin-field--compact {
+  flex: 0 0 220px;
+}
+
+.admin-field--grow {
+  flex: 1 1 360px;
+}
+
+.admin-field__control--full {
+  width: 100%;
+}
+
+.admin-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-field-row > .admin-field__control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-table-textarea {
+  box-sizing: border-box;
+  width: var(--admin-table-textarea-width, 100%);
+  max-width: 100%;
+  font-size: 13px;
+}
+
+.admin-eyebrow {
+  margin: 0 0 7px;
+  color: var(--admin-info);
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-summary-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.admin-summary-meta {
+  margin-top: 2px;
+  color: #586675;
+  font-size: 14px;
+}
+
+.admin-key-list {
+  border: 1px solid var(--admin-border);
+}
+
+.admin-key-list__item {
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--admin-border-soft);
+}
+
+.admin-key-list__item:last-child {
+  border-bottom: 0;
+}
+
+.admin-field__hint {
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+  background: var(--admin-surface-muted);
+  color: var(--admin-text);
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.admin-checkbox-row input {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+}
+
+.admin-checkbox-row.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.admin-checkbox-row__label {
+  min-width: 0;
+}
+
+.admin-meta-text {
+  color: var(--admin-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.admin-meta-text--danger {
+  color: #8a3b32;
+  font-weight: 600;
+}
+
+.admin-meta-text--success {
+  color: #2f6b43;
+  font-weight: 600;
+}
+
+.admin-meta-text--strong {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-button--sm {
+  min-height: 0;
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.admin-button--success {
+  border-color: #9bbda7;
+  background: #eef8f1;
+  color: #2f6b43;
+  box-shadow: none;
+}
+
+.admin-field__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.admin-field__textarea--fixed {
+  resize: none;
+}

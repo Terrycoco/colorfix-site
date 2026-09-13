@@ -1,12 +1,16 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
+  AdminButton,
+  AdminDialog,
+  AdminEditorBody,
+  AdminEditorFooter,
+  AdminEditorForm,
+  AdminEditorImage,
+  AdminEditorPane,
+  AdminField,
+  AdminNotice,
+} from "@components/AdminLayout";
 
 export default function PubAssetCopyEditor({
   asset,
@@ -19,6 +23,7 @@ export default function PubAssetCopyEditor({
   onSave,
   onRecreate,
   onSendToPackaging,
+  onPackagingComplete,
   onRefreshAsset,
   onClose,
 }) {
@@ -443,299 +448,86 @@ export default function PubAssetCopyEditor({
         result?.error ||
         "Could not send this asset to Packaging."
       );
+
+      return;
     }
+
+    onClose?.();
+    onPackagingComplete?.(result);
   }
 
 
-  return createPortal(
-    <div
-      style={
-        overlayStyle
-      }
-
-      onMouseDown={(
-        event
-      ) => {
-        if (
-          event.target ===
-          event.currentTarget
-          &&
-          !busy
-        ) {
-          onClose?.();
-        }
-      }}
-    >
-      <form
-        style={
-          dialogStyle
-        }
-
-        onSubmit={
-          handleSave
-        }
-      >
-        <div
-          style={
-            headerStyle
-          }
-        >
-          <strong>
-            Edit Asset Copy
-          </strong>
-
-          <div
-            style={
-              headerRightStyle
+  return (
+    <AdminEditorForm onSubmit={handleSave}>
+      <AdminEditorBody layout="split">
+        <AdminEditorPane kind="preview">
+          <AdminEditorImage
+            src={
+              asset.url
+                ? versionedPreviewUrl(asset.url, previewVersion)
+                : ""
             }
-          >
-            {isDispatchLocked ? (
-              <div
-                style={
-                  shippedBadgeStyle
-                }
-              >
-                {
-                  isShipping
-                    ? "SHIPPING"
-                    : "SHIPPED"
-                }
-              </div>
-            ) : null}
+            alt=""
+            placeholder="No preview"
+            variant="preview"
+          />
+        </AdminEditorPane>
 
-            <div
-              style={
-                assetIdStyle
-              }
-            >
-              Asset #
-              {
-                asset
-                  .pub_asset_id
-              }
-            </div>
+        <AdminEditorPane kind="fields">
+          <AdminField label="Title">
+            <input
+              className="admin-field__control admin-field__control--full"
+              type="text"
+              value={title}
+              disabled={editorLocked}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                setSuccessMessage("");
+                setActionError("");
+              }}
+            />
+          </AdminField>
 
-            <button
+          <AdminField label="Description">
+            <textarea
+              className="admin-field__control admin-field__control--full"
+              rows={9}
+              value={description}
+              disabled={editorLocked}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setSuccessMessage("");
+                setActionError("");
+              }}
+            />
+          </AdminField>
+
+          {successMessage ? (
+            <AdminNotice variant="success">
+              {successMessage}
+            </AdminNotice>
+          ) : null}
+
+          {actionError ? (
+            <AdminNotice variant="danger">
+              {actionError}
+            </AdminNotice>
+          ) : null}
+        </AdminEditorPane>
+      </AdminEditorBody>
+
+      <AdminEditorFooter
+        leading={
+          !isDispatchLocked ? (
+            <AdminButton
               type="button"
-
-              style={
-                quietButtonStyle
-              }
-
-              disabled={
-                busy
-              }
-
-              onClick={
-                onClose
-              }
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-
-        <div
-          style={
-            bodyStyle
-          }
-        >
-          <div
-            style={
-              previewColumnStyle
-            }
-          >
-            {asset.url ? (
-              <img
-                src={
-                  versionedPreviewUrl(
-                    asset.url,
-                    previewVersion
-                  )
-                }
-
-                alt=""
-
-                style={
-                  previewStyle
-                }
-              />
-            ) : (
-              <div
-                style={
-                  noPreviewStyle
-                }
-              >
-                No preview
-              </div>
-            )}
-          </div>
-
-
-          <div
-            style={
-              fieldsStyle
-            }
-          >
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Title
-              </span>
-
-              <input
-                className="admin-field__control"
-
-                type="text"
-
-                value={
-                  title
-                }
-
-                disabled={
-                  editorLocked
-                }
-
-                onChange={(
-                  event
-                ) => {
-                  setTitle(
-                    event
-                      .target
-                      .value
-                  );
-
-                  setSuccessMessage(
-                    ""
-                  );
-
-                  setActionError(
-                    ""
-                  );
-                }}
-
-                style={{
-                  width:
-                    "100%",
-                }}
-              />
-            </label>
-
-
-            <label
-              className="admin-field"
-            >
-              <span
-                className="admin-field__label"
-              >
-                Description
-              </span>
-
-              <textarea
-                className="admin-field__control"
-
-                rows={9}
-
-                value={
-                  description
-                }
-
-                disabled={
-                  editorLocked
-                }
-
-                onChange={(
-                  event
-                ) => {
-                  setDescription(
-                    event
-                      .target
-                      .value
-                  );
-
-                  setSuccessMessage(
-                    ""
-                  );
-
-                  setActionError(
-                    ""
-                  );
-                }}
-
-                style={{
-                  width:
-                    "100%",
-
-                  resize:
-                    "vertical",
-
-                  boxSizing:
-                    "border-box",
-                }}
-              />
-            </label>
-
-
-            {successMessage ? (
-              <div
-                style={
-                  successStyle
-                }
-              >
-                {
-                  successMessage
-                }
-              </div>
-            ) : null}
-
-
-            {actionError ? (
-              <div
-                style={
-                  errorStyle
-                }
-              >
-                {
-                  actionError
-                }
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-
-        <div
-          style={
-            footerStyle
-          }
-        >
-          {!isDispatchLocked ? (
-            <button
-              type="button"
-
-              style={
-                approveAndCloseButtonStyle
-              }
-
-              disabled={
-                !approvalEditable ||
-                approvalSaving ||
-                busy
-              }
-
+              disabled={!approvalEditable || approvalSaving || busy}
               title={
                 approvalEditable
                   ? "Save, approve, and close this asset."
                   : "Approval is locked after the asset leaves CREATED."
               }
-
-              onClick={
-                handleApproveAndClose
-              }
+              onClick={handleApproveAndClose}
             >
               {
                 approvalSaving
@@ -746,178 +538,68 @@ export default function PubAssetCopyEditor({
                       ? "Recreating..."
                       : "Approve & Close"
               }
-            </button>
-          ) : (
-            <div
-              style={
-                footerSpacerStyle
-              }
-            />
-          )}
-
-
-          <button
-            type="button"
-
-            style={
-              quietButtonStyle
-            }
-
-            disabled={
-              busy
-            }
-
-            onClick={
-              onClose
-            }
-          >
-            Close
-          </button>
-
-
-          {!isDispatchLocked ? (
-            <>
-              <button
-                type="submit"
-
-                style={
-                  quietButtonStyle
-                }
-
-                disabled={
-                  busy
-                }
-              >
-                {saving
-                  ? "Saving..."
-                  : "Save"}
-              </button>
-
-
-              <button
-                type="button"
-
-                disabled={
-                  busy
-                }
-
-                onClick={
-                  handleRecreate
-                }
-              >
-                {recreating
-                  ? "Recreating..."
-                  : "Redo Asset"}
-              </button>
-
-
-              <button
-                type="button"
-
-                disabled={
-                  busy ||
-                  approvalSaving ||
-                  !isApproved
-                }
-
-                title={
-                  isApproved
-                    ? "Send this approved asset to Packaging."
-                    : "Approve this asset before sending it to Packaging."
-                }
-
-                onClick={
-                  handleSendToPackaging
-                }
-              >
-                {
-                  sendingToPackaging
-                    ? "Sending..."
-                    : "Send to Packaging"
-                }
-              </button>
-            </>
-          ) : null}
-        </div>
-      </form>
-
-
-      {redoPromptOpen ? (
-        <div
-          style={
-            redoConfirmOverlayStyle
-          }
+            </AdminButton>
+          ) : null
+        }
+      >
+        <AdminButton
+          type="button"
+          variant="secondary"
+          disabled={busy}
+          onClick={onClose}
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Save changes and redo asset"
-            style={
-              redoConfirmDialogStyle
-            }
-          >
-            <div
-              style={
-                redoConfirmTitleStyle
-              }
+          Close
+        </AdminButton>
+
+        {!isDispatchLocked ? (
+          <>
+            <AdminButton
+              type="submit"
+              variant="secondary"
+              disabled={busy}
             >
-              This change requires a new render
-            </div>
+              {saving ? "Saving..." : "Save"}
+            </AdminButton>
 
-            <div
-              style={
-                redoConfirmBodyStyle
-              }
+            <AdminButton
+              type="button"
+              disabled={busy}
+              onClick={handleRecreate}
             >
-              One or more changed fields are baked into the physical asset.
-              Save the new values and redo this asset now?
-            </div>
+              {recreating ? "Recreating..." : "Redo Asset"}
+            </AdminButton>
 
-            <div
-              style={
-                redoConfirmActionsStyle
+            <AdminButton
+              type="button"
+              disabled={busy || approvalSaving || !isApproved}
+              title={
+                isApproved
+                  ? "Send this approved asset to Packaging."
+                  : "Approve this asset before sending it to Packaging."
               }
+              onClick={handleSendToPackaging}
             >
-              <button
-                type="button"
-                style={
-                  quietButtonStyle
-                }
-                disabled={
-                  busy
-                }
-                onClick={() =>
-                  setRedoPromptOpen(
-                    false
-                  )
-                }
-              >
-                Cancel
-              </button>
+              {sendingToPackaging ? "Sending..." : "Send to Packaging"}
+            </AdminButton>
+          </>
+        ) : null}
+      </AdminEditorFooter>
 
-              <button
-                type="button"
-                disabled={
-                  busy
-                }
-                onClick={
-                  saveAndRedo
-                }
-              >
-                {
-                  saving ||
-                  recreating
-                    ? "Saving & Redoing..."
-                    : "Save & Redo"
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </div>,
-
-    document.body
+      <AdminDialog
+        open={redoPromptOpen}
+        title="This change requires a new render"
+        message="One or more changed fields are baked into the physical asset. Save the new values and redo this asset now?"
+        confirmLabel={
+          saving || recreating
+            ? "Saving & Redoing..."
+            : "Save & Redo"
+        }
+        cancelLabel="Cancel"
+        onConfirm={saveAndRedo}
+        onCancel={() => setRedoPromptOpen(false)}
+        dismissOnBackdrop={!busy}
+      />
+    </AdminEditorForm>
   );
 }
 
@@ -960,395 +642,3 @@ function versionedPreviewUrl(
   )}`;
 }
 
-
-const redoConfirmOverlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483648,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.48)",
-};
-
-
-const redoConfirmDialogStyle = {
-  width:
-    "min(460px, 92vw)",
-
-  background:
-    "#ffffff",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    5,
-
-  boxShadow:
-    "0 18px 50px rgba(0,0,0,0.30)",
-};
-
-
-const redoConfirmTitleStyle = {
-  padding:
-    "13px 15px",
-
-  borderBottom:
-    "1px solid #d8dde3",
-
-  fontSize:
-    17,
-
-  fontWeight:
-    700,
-};
-
-
-const redoConfirmBodyStyle = {
-  padding:
-    16,
-
-  color:
-    "#334155",
-
-  fontSize:
-    13,
-
-  lineHeight:
-    1.5,
-};
-
-
-const redoConfirmActionsStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  gap:
-    8,
-
-  padding:
-    "11px 12px",
-
-  borderTop:
-    "1px solid #d8dde3",
-};
-
-
-const overlayStyle = {
-  position:
-    "fixed",
-
-  inset:
-    0,
-
-  zIndex:
-    2147483647,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  padding:
-    30,
-
-  background:
-    "rgba(0, 0, 0, 0.55)",
-};
-
-
-const dialogStyle = {
-  width:
-    "min(760px, 94vw)",
-
-  maxHeight:
-    "92vh",
-
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  background:
-    "#ffffff",
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    5,
-
-  boxShadow:
-    "0 18px 50px rgba(0,0,0,0.28)",
-};
-
-
-const headerStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  justifyContent:
-    "space-between",
-
-  padding:
-    "10px 12px",
-
-  borderBottom:
-    "1px solid #d8dde3",
-};
-
-
-const headerRightStyle = {
-  display:
-    "flex",
-
-  alignItems:
-    "center",
-
-  gap:
-    10,
-};
-
-
-const bodyStyle = {
-  display:
-    "grid",
-
-  gridTemplateColumns:
-    "220px minmax(0, 1fr)",
-
-  gap:
-    18,
-
-  padding:
-    16,
-
-  overflow:
-    "auto",
-};
-
-
-const previewColumnStyle = {
-  minWidth:
-    0,
-};
-
-
-const previewStyle = {
-  display:
-    "block",
-
-  width:
-    "100%",
-
-  maxHeight:
-    340,
-
-  objectFit:
-    "contain",
-
-  background:
-    "#f4f5f6",
-
-  border:
-    "1px solid #d8dde3",
-};
-
-
-const noPreviewStyle = {
-  height:
-    260,
-
-  display:
-    "grid",
-
-  placeItems:
-    "center",
-
-  background:
-    "#f4f5f6",
-
-  border:
-    "1px solid #d8dde3",
-
-  color:
-    "#6b7280",
-};
-
-
-const shippedBadgeStyle = {
-  padding:
-    "3px 7px",
-
-  border:
-    "1px solid #9bbda7",
-
-  borderRadius:
-    999,
-
-  background:
-    "#eef8f1",
-
-  color:
-    "#2f6b43",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    800,
-
-  letterSpacing:
-    "0.04em",
-
-  whiteSpace:
-    "nowrap",
-};
-
-
-const assetIdStyle = {
-  color:
-    "#586675",
-
-  fontSize:
-    12,
-
-  fontWeight:
-    600,
-
-  whiteSpace:
-    "nowrap",
-};
-
-
-const fieldsStyle = {
-  display:
-    "flex",
-
-  flexDirection:
-    "column",
-
-  gap:
-    14,
-
-  minWidth:
-    0,
-};
-
-
-const approveAndCloseButtonStyle = {
-  marginRight:
-    "auto",
-};
-
-
-const footerSpacerStyle = {
-  marginRight:
-    "auto",
-};
-
-
-const footerStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  gap:
-    8,
-
-  padding:
-    "10px 12px",
-
-  borderTop:
-    "1px solid #d8dde3",
-};
-
-
-const successStyle = {
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #cfd5dc",
-
-  background:
-    "#f6f8f9",
-
-  fontSize:
-    12,
-};
-
-
-const errorStyle = {
-  padding:
-    "8px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const quietButtonStyle = {
-  padding:
-    "4px 8px",
-
-  minHeight:
-    0,
-
-  border:
-    "1px solid #cfd5dc",
-
-  borderRadius:
-    3,
-
-  background:
-    "#ffffff",
-
-  color:
-    "#334155",
-
-  fontSize:
-    12,
-
-  lineHeight:
-    1.2,
-
-  fontWeight:
-    500,
-
-  cursor:
-    "pointer",
-};

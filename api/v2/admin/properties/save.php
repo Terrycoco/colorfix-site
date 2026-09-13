@@ -26,15 +26,17 @@ try {
         workflow_respond(['ok' => false, 'error' => 'Property name required'], 400);
     }
 
+    // Property owns location facts only. Client belongs to Project.
     $payload = [
         'name' => $name,
-        'client_id' => isset($data['client_id']) && (int)$data['client_id'] > 0 ? (int)$data['client_id'] : null,
-        'address_id' => isset($data['address_id']) && (int)$data['address_id'] > 0 ? (int)$data['address_id'] : null,
         'notes' => workflow_optional_string($data['notes'] ?? null),
     ];
 
     $repo = new PdoPropertyRepository($pdo);
     if ($id > 0) {
+        if (!$repo->findById($id)) {
+            workflow_respond(['ok' => false, 'error' => 'Property not found'], 404);
+        }
         $repo->update($id, $payload);
         workflow_respond(['ok' => true, 'id' => $id]);
     }

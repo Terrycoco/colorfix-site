@@ -3,11 +3,21 @@ import {
   useState,
 } from "react";
 
+import {
+  AdminBadge,
+  AdminButton,
+  AdminField,
+  AdminMetaText,
+  AdminNotice,
+  AdminPanel,
+  AdminStack,
+  AdminToolbar,
+} from "@components/AdminLayout";
+
 
 export default function PubPackageDrawer({
   asset,
-  loading = false,
-  error = "",
+  loadAsset,
   packing = false,
   savingPingback = false,
   sending = false,
@@ -17,39 +27,166 @@ export default function PubPackageDrawer({
   onEnqueue,
   onSend,
 }) {
-  const packageValue =
-    normalizePackage(
-      asset?.package
+  const [
+    detailAsset,
+    setDetailAsset,
+  ] = useState(
+    asset ||
+    null
+  );
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(
+    false
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState(
+    ""
+  );
+
+  const [
+    pingback,
+    setPingback,
+  ] = useState(
+    ""
+  );
+
+
+  async function refreshDetail() {
+    const id =
+      Number(
+        asset
+          ?.pub_asset_id ||
+        0
+      );
+
+    if (!id) {
+      setDetailAsset(
+        null
+      );
+
+      return;
+    }
+
+    if (
+      typeof loadAsset !==
+      "function"
+    ) {
+      setDetailAsset(
+        asset
+      );
+
+      return;
+    }
+
+    setLoading(
+      true
     );
 
+    setError(
+      ""
+    );
+
+    try {
+      const loaded =
+        await loadAsset(
+          id
+        );
+
+      setDetailAsset(
+        loaded ||
+        asset
+      );
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Could not load Package details."
+      );
+
+      setDetailAsset(
+        asset
+      );
+
+    } finally {
+      setLoading(
+        false
+      );
+    }
+  }
+
+
+  useEffect(() => {
+    setDetailAsset(
+      asset ||
+      null
+    );
+
+    refreshDetail();
+  }, [
+    asset?.pub_asset_id,
+    asset?.updated_at,
+  ]);
+
+
+  useEffect(() => {
+    setPingback(
+      String(
+        detailAsset
+          ?.pingback ||
+        ""
+      )
+    );
+  }, [
+    detailAsset
+      ?.pub_asset_id,
+    detailAsset
+      ?.pingback,
+  ]);
+
+
+  const currentAsset =
+    detailAsset ||
+    asset;
+
+  const packageValue =
+    normalizePackage(
+      currentAsset
+        ?.package
+    );
 
   const stage =
     String(
-      asset?.pipeline_stage ||
+      currentAsset
+        ?.pipeline_stage ||
       ""
     )
       .trim()
       .toLowerCase();
-
 
   const errorStage =
     String(
-      asset?.error_stage ||
+      currentAsset
+        ?.error_stage ||
       ""
     )
       .trim()
       .toLowerCase();
-
 
   const isApprovedCreated =
     stage ===
       "created"
     &&
     Number(
-      asset?.approved ||
+      currentAsset
+        ?.approved ||
       0
     ) === 1;
-
 
   const isPackageError =
     stage ===
@@ -57,7 +194,6 @@ export default function PubPackageDrawer({
     &&
     errorStage ===
       "package";
-
 
   const canPack =
     isApprovedCreated
@@ -70,7 +206,6 @@ export default function PubPackageDrawer({
     ||
     isPackageError;
 
-
   const canSendNow =
     stage ===
       "packed"
@@ -78,39 +213,20 @@ export default function PubPackageDrawer({
     packageValue !==
       null;
 
-
   const showDestination =
     String(
-      asset?.channel ||
+      currentAsset
+        ?.channel ||
       ""
     )
       .trim()
       .toLowerCase() ===
       "pinterest";
 
-
-  const [
-    pingback,
-    setPingback,
-  ] = useState("");
-
-
-  useEffect(() => {
-    setPingback(
-      String(
-        asset?.pingback ||
-        ""
-      )
-    );
-  }, [
-    asset?.pub_asset_id,
-    asset?.pingback,
-  ]);
-
-
   const savedPingback =
     String(
-      asset?.pingback ||
+      currentAsset
+        ?.pingback ||
       ""
     ).trim();
 
@@ -125,417 +241,518 @@ export default function PubPackageDrawer({
     savedPingback;
 
 
+  async function handlePack() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onPack?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Packaging failed."
+      );
+
+      return;
+    }
+
+    await refreshDetail();
+  }
+
+
+  async function handleSavePingback() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onSavePingback?.(
+        currentAsset
+          .pub_asset_id,
+        editedPingback
+      );
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Could not save destination."
+      );
+
+      return;
+    }
+
+    if (
+      result?.asset
+    ) {
+      setDetailAsset(
+        result.asset
+      );
+    } else {
+      await refreshDetail();
+    }
+  }
+
+
+  async function handleEnqueue() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onEnqueue?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Could not enqueue asset."
+      );
+    }
+  }
+
+
+  async function handleSend() {
+    if (!currentAsset) {
+      return;
+    }
+
+    setError(
+      ""
+    );
+
+    const result =
+      await onSend?.(
+        currentAsset
+          .pub_asset_id
+      );
+
+    if (
+      result?.cancelled
+    ) {
+      return;
+    }
+
+    if (
+      result?.ok ===
+      false
+    ) {
+      setError(
+        result.error ||
+        "Could not send asset."
+      );
+    }
+  }
+
+
+  if (
+    loading
+    &&
+    !currentAsset
+  ) {
+    return (
+      <AdminMetaText as="div">
+        Loading Package details...
+      </AdminMetaText>
+    );
+  }
+
+
+  if (!currentAsset) {
+    return (
+      <AdminMetaText as="div">
+        Select a Package row.
+      </AdminMetaText>
+    );
+  }
+
+
+  const displayedStage =
+    stage ===
+      "packing"
+    &&
+    String(
+      currentAsset
+        .stage_note ||
+      ""
+    ).trim()
+      ? "Waiting"
+      : humanize(
+          currentAsset
+            .display_stage ||
+          currentAsset
+            .pipeline_stage
+        );
+
+
   return (
-    <div
-      style={
-        bodyStyle
-      }
-    >
+    <AdminStack gap="lg">
       {loading ? (
-        <div
-          style={
-            mutedStyle
-          }
-        >
-          Loading Package details...
-        </div>
-      ) : error ? (
-        <div
-          style={
-            errorStyle
-          }
-        >
+        <AdminMetaText as="div">
+          Refreshing Package details...
+        </AdminMetaText>
+      ) : null}
+
+
+      {error ? (
+        <AdminNotice variant="danger">
           {error}
-        </div>
-      ) : asset ? (
-        <>
-          <Section
-            title="Asset"
-          >
-            <DetailRow
-              label="Channel"
-              value={
-                humanize(
-                  asset.channel
-                )
-              }
-            />
-
-            <DetailRow
-              label="Type"
-              value={
-                humanize(
-                  asset.asset_type
-                )
-              }
-            />
-
-            <DetailRow
-              label="Source"
-              value={
-                formatSource(
-                  asset
-                )
-              }
-            />
-
-            <DetailRow
-              label="Title"
-              value={
-                asset.search_title ||
-                "—"
-              }
-            />
-          </Section>
+        </AdminNotice>
+      ) : null}
 
 
-          <Section
-            title="Status"
-          >
-            <DetailRow
-              label="Stage"
-              value={
-                stage ===
-                  "packing"
-                &&
-                String(
-                  asset.stage_note ||
-                  ""
-                ).trim()
-                  ? "Waiting"
-                  : humanize(
-                      asset.display_stage ||
-                      asset.pipeline_stage
-                    )
-              }
-            />
+      <AdminPanel
+        title="Asset"
+        compact
+      >
+        <AdminStack gap="sm">
+          <DetailField
+            label="Channel"
+            value={
+              humanize(
+                currentAsset
+                  .channel
+              )
+            }
+          />
 
-            <DetailRow
-              label="Stage Note"
-              value={
-                asset.stage_note ||
-                "—"
-              }
-            />
+          <DetailField
+            label="Type"
+            value={
+              humanize(
+                currentAsset
+                  .asset_type
+              )
+            }
+          />
 
-            <DetailRow
-              label="Updated"
-              value={
-                asset.updated_at ||
-                "—"
-              }
-            />
+          <DetailField
+            label="Source"
+            value={
+              formatSource(
+                currentAsset
+              )
+            }
+          />
 
-            {canPack ? (
-              <div
-                style={
-                  actionStyle
+          <DetailField
+            label="Title"
+            value={
+              currentAsset
+                .search_title ||
+              "—"
+            }
+          />
+        </AdminStack>
+      </AdminPanel>
+
+
+      <AdminPanel
+        title="Status"
+        compact
+      >
+        <AdminStack gap="sm">
+          <AdminField label="Stage">
+            <div>
+              <AdminBadge
+                variant={
+                  stageVariant(
+                    stage,
+                    displayedStage
+                  )
                 }
               >
-                <button
-                  type="button"
+                {displayedStage}
+              </AdminBadge>
+            </div>
+          </AdminField>
 
-                  disabled={
-                    packing
-                  }
+          <DetailField
+            label="Stage Note"
+            value={
+              currentAsset
+                .stage_note ||
+              "—"
+            }
+          />
 
-                  onClick={() => {
-                    onPack?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    packing
-                      ? "Packing..."
-                      : stage ===
-                          "packing"
-                        || stage ===
-                          "pending"
-                          ? "Retry Packaging"
-                          : isPackageError
-                            ? "Retry Packaging"
-                            : "Pack"
-                  }
-                </button>
-              </div>
-            ) : null}
+          <DetailField
+            label="Updated"
+            value={
+              currentAsset
+                .updated_at ||
+              "—"
+            }
+          />
 
-            {canSendNow ? (
-              <div
-                style={
-                  packedActionStyle
+
+          {canPack ? (
+            <AdminToolbar compact>
+              <AdminButton
+                type="button"
+
+                disabled={
+                  packing
+                }
+
+                onClick={
+                  handlePack
                 }
               >
-                <button
-                  type="button"
-
-                  disabled={
-                    enqueueing ||
-                    sending
-                  }
-
-                  onClick={() => {
-                    onEnqueue?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    enqueueing
-                      ? "Enqueueing..."
-                      : "Enqueue"
-                  }
-                </button>
-
-                <button
-                  type="button"
-
-                  disabled={
-                    sending ||
-                    enqueueing
-                  }
-
-                  onClick={() => {
-                    onSend?.(
-                      asset.pub_asset_id
-                    );
-                  }}
-                >
-                  {
-                    sending
-                      ? "Sending..."
-                      : "Send Now"
-                  }
-                </button>
-              </div>
-            ) : null}
-          </Section>
-
-
-          {showDestination ? (
-            <Section
-              title="Destination"
-            >
-              <div
-                style={
-                  destinationStyle
-                }
-              >
-                <label
-                  className="admin-field"
-                >
-                  <span
-                    className="admin-field__label"
-                  >
-                    Pingback
-                  </span>
-
-                  <input
-                    className="admin-field__control"
-                    type="text"
-                    value={
-                      pingback
-                    }
-                    placeholder="Destination URL"
-                    onChange={(
-                      event
-                    ) =>
-                      setPingback(
-                        event
-                          .target
-                          .value
-                      )
-                    }
-                    style={{
-                      width:
-                        "100%",
-                      boxSizing:
-                        "border-box",
-                    }}
-                  />
-                </label>
-
-                <div
-                  style={
-                    destinationActionStyle
-                  }
-                >
-                  <button
-                    type="button"
-                    disabled={
-                      savingPingback
+                {
+                  packing
+                    ? "Packing..."
+                    : stage ===
+                        "packing"
                       ||
-                      !pingbackChanged
-                    }
-                    onClick={() => {
-                      onSavePingback?.(
-                        asset.pub_asset_id,
-                        editedPingback
-                      );
-                    }}
-                  >
-                    {
-                      savingPingback
-                        ? "Saving..."
-                        : "Save Pingback"
-                    }
-                  </button>
-                </div>
-              </div>
-            </Section>
+                      stage ===
+                        "pending"
+                      ||
+                      isPackageError
+                        ? "Retry Packaging"
+                        : "Pack"
+                }
+              </AdminButton>
+            </AdminToolbar>
           ) : null}
 
 
-          {
-            asset.error_stage
-            ||
-            asset.error_code
-            ||
-            asset.error_message
-              ? (
-                  <Section
-                    title="Error"
-                  >
-                    <DetailRow
-                      label="Stage"
-                      value={
-                        asset.error_stage ||
-                        "—"
-                      }
-                    />
+          {canSendNow ? (
+            <AdminToolbar compact>
+              <AdminButton
+                type="button"
 
-                    <DetailRow
-                      label="Code"
-                      value={
-                        asset.error_code ||
-                        "—"
-                      }
-                    />
+                disabled={
+                  enqueueing
+                  ||
+                  sending
+                }
 
-                    <DetailRow
-                      label="Message"
-                      value={
-                        asset.error_message ||
-                        "—"
-                      }
-                    />
+                onClick={
+                  handleEnqueue
+                }
+              >
+                {
+                  enqueueing
+                    ? "Enqueueing..."
+                    : "Enqueue"
+                }
+              </AdminButton>
 
-                    <DetailRow
-                      label="At"
-                      value={
-                        asset.errored_at ||
-                        "—"
-                      }
-                    />
-                  </Section>
-                )
-              : null
-          }
+              <AdminButton
+                type="button"
+
+                disabled={
+                  sending
+                  ||
+                  enqueueing
+                }
+
+                onClick={
+                  handleSend
+                }
+              >
+                {
+                  sending
+                    ? "Sending..."
+                    : "Send Now"
+                }
+              </AdminButton>
+            </AdminToolbar>
+          ) : null}
+        </AdminStack>
+      </AdminPanel>
 
 
-          <Section
-            title="Package"
-          >
-            {
-              packageValue === null
-                ? (
-                    <div
-                      style={
-                        noPackageStyle
-                      }
-                    >
-                      No package has been built.
-                    </div>
-                  )
-                : (
-                    <pre
-                      style={
-                        jsonStyle
-                      }
-                    >
-                      {
-                        JSON.stringify(
-                          packageValue,
-                          null,
-                          2
-                        )
-                      }
-                    </pre>
-                  )
-            }
-          </Section>
-        </>
-      ) : (
-        <div
-          style={
-            mutedStyle
-          }
+      {showDestination ? (
+        <AdminPanel
+          title="Destination"
+          compact
         >
-          Select a Package row.
-        </div>
-      )}
-    </div>
-  );
-}
+          <AdminStack gap="sm">
+            <AdminField label="Pingback">
+              <input
+                className="admin-field__control admin-field__control--full"
+
+                type="text"
+
+                value={
+                  pingback
+                }
+
+                placeholder="Destination URL"
+
+                onChange={(
+                  event
+                ) =>
+                  setPingback(
+                    event
+                      .target
+                      .value
+                  )
+                }
+              />
+            </AdminField>
+
+            <AdminToolbar compact>
+              <AdminButton
+                type="button"
+
+                variant="secondary"
+
+                disabled={
+                  savingPingback
+                  ||
+                  !pingbackChanged
+                }
+
+                onClick={
+                  handleSavePingback
+                }
+              >
+                {
+                  savingPingback
+                    ? "Saving..."
+                    : "Save Pingback"
+                }
+              </AdminButton>
+            </AdminToolbar>
+          </AdminStack>
+        </AdminPanel>
+      ) : null}
 
 
-function Section({
-  title,
-  children,
-}) {
-  return (
-    <section
-      style={
-        sectionStyle
+      {
+        currentAsset
+          .error_stage
+        ||
+        currentAsset
+          .error_code
+        ||
+        currentAsset
+          .error_message
+          ? (
+              <AdminPanel
+                title="Error"
+                compact
+              >
+                <AdminStack gap="sm">
+                  <DetailField
+                    label="Stage"
+                    value={
+                      currentAsset
+                        .error_stage ||
+                      "—"
+                    }
+                  />
+
+                  <DetailField
+                    label="Code"
+                    value={
+                      currentAsset
+                        .error_code ||
+                      "—"
+                    }
+                  />
+
+                  <DetailField
+                    label="Message"
+                    value={
+                      currentAsset
+                        .error_message ||
+                      "—"
+                    }
+                  />
+
+                  <DetailField
+                    label="At"
+                    value={
+                      currentAsset
+                        .errored_at ||
+                      "—"
+                    }
+                  />
+                </AdminStack>
+              </AdminPanel>
+            )
+          : null
       }
-    >
-      <div
-        style={
-          sectionTitleStyle
-        }
-      >
-        {title}
-      </div>
 
-      <div
-        style={
-          sectionBodyStyle
-        }
+
+      <AdminPanel
+        title="Package"
+        compact
       >
-        {children}
-      </div>
-    </section>
+        {
+          packageValue ===
+          null
+            ? (
+                <AdminMetaText as="div">
+                  No package has been built.
+                </AdminMetaText>
+              )
+            : (
+                <pre className="admin-code-block">
+                  {
+                    JSON.stringify(
+                      packageValue,
+                      null,
+                      2
+                    )
+                  }
+                </pre>
+              )
+        }
+      </AdminPanel>
+    </AdminStack>
   );
 }
 
 
-function DetailRow({
+function DetailField({
   label,
   value,
 }) {
   return (
-    <div
-      style={
-        detailRowStyle
+    <AdminField
+      label={
+        label
       }
     >
-      <div
-        style={
-          detailLabelStyle
+      <div>
+        {
+          value ||
+          "—"
         }
-      >
-        {label}
       </div>
-
-      <div
-        style={
-          detailValueStyle
-        }
-      >
-        {value || "—"}
-      </div>
-    </div>
+    </AdminField>
   );
 }
 
@@ -546,13 +763,13 @@ function normalizePackage(
   if (
     value === null
     ||
-    value === undefined
+    value ===
+      undefined
     ||
     value === ""
   ) {
     return null;
   }
-
 
   if (
     typeof value ===
@@ -560,7 +777,6 @@ function normalizePackage(
   ) {
     return value;
   }
-
 
   if (
     typeof value ===
@@ -575,7 +791,6 @@ function normalizePackage(
     }
   }
 
-
   return value;
 }
 
@@ -583,14 +798,26 @@ function normalizePackage(
 function formatSource(
   asset
 ) {
+  const title =
+    String(
+      asset
+        ?.source_title ||
+      ""
+    ).trim();
+
+  if (title) {
+    return title;
+  }
+
   const type =
-    asset?.source_type ||
+    asset
+      ?.source_type ||
     "";
 
   const id =
-    asset?.source_id ||
+    asset
+      ?.source_id ||
     "";
-
 
   if (
     !type
@@ -600,8 +827,49 @@ function formatSource(
     return "—";
   }
 
-
   return `${type} #${id}`;
+}
+
+
+function stageVariant(
+  stage,
+  displayedStage
+) {
+  if (
+    String(
+      displayedStage ||
+      ""
+    )
+      .trim()
+      .toLowerCase() ===
+    "waiting"
+  ) {
+    return "warning";
+  }
+
+  switch (
+    String(
+      stage ||
+      ""
+    )
+      .trim()
+      .toLowerCase()
+  ) {
+    case "packed":
+      return "success";
+
+    case "packing":
+      return "info";
+
+    case "pending":
+      return "warning";
+
+    case "error":
+      return "danger";
+
+    default:
+      return "neutral";
+  }
 }
 
 
@@ -615,11 +883,9 @@ function humanize(
     )
       .trim();
 
-
   if (!raw) {
     return "—";
   }
-
 
   return raw
     .replace(
@@ -639,212 +905,3 @@ function humanize(
           .toUpperCase()
     );
 }
-
-
-const bodyStyle = {
-  padding:
-    14,
-};
-
-
-const sectionStyle = {
-  marginBottom:
-    18,
-};
-
-
-const sectionTitleStyle = {
-  marginBottom:
-    7,
-
-  color:
-    "#526273",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    800,
-
-  letterSpacing:
-    "0.05em",
-
-  textTransform:
-    "uppercase",
-};
-
-
-const sectionBodyStyle = {
-  border:
-    "1px solid #d8dde3",
-
-  borderRadius:
-    4,
-
-  background:
-    "#ffffff",
-};
-
-
-const detailRowStyle = {
-  display:
-    "grid",
-
-  gridTemplateColumns:
-    "105px minmax(0, 1fr)",
-
-  gap:
-    10,
-
-  padding:
-    "8px 10px",
-
-  borderBottom:
-    "1px solid #edf0f2",
-};
-
-
-const detailLabelStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    11,
-
-  fontWeight:
-    700,
-};
-
-
-const detailValueStyle = {
-  minWidth:
-    0,
-
-  overflowWrap:
-    "anywhere",
-
-  color:
-    "#273444",
-
-  fontSize:
-    12,
-
-  lineHeight:
-    1.4,
-};
-
-
-const actionStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  padding:
-    "10px",
-
-  borderTop:
-    "1px solid #edf0f2",
-
-  background:
-    "#fafbfc",
-};
-
-
-const packedActionStyle = {
-  ...actionStyle,
-
-  gap:
-    8,
-};
-
-
-const destinationStyle = {
-  padding:
-    10,
-};
-
-
-const destinationActionStyle = {
-  display:
-    "flex",
-
-  justifyContent:
-    "flex-end",
-
-  marginTop:
-    8,
-};
-
-
-const jsonStyle = {
-  margin:
-    0,
-
-  padding:
-    12,
-
-  overflow:
-    "auto",
-
-  whiteSpace:
-    "pre-wrap",
-
-  overflowWrap:
-    "anywhere",
-
-  background:
-    "#f7f9fa",
-
-  color:
-    "#263443",
-
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-
-  fontSize:
-    11,
-
-  lineHeight:
-    1.5,
-};
-
-
-const noPackageStyle = {
-  padding:
-    12,
-
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
-
-
-const errorStyle = {
-  padding:
-    "9px 10px",
-
-  border:
-    "1px solid #e2baba",
-
-  background:
-    "#fff7f7",
-
-  color:
-    "#7d2e2e",
-
-  fontSize:
-    12,
-};
-
-
-const mutedStyle = {
-  color:
-    "#64748b",
-
-  fontSize:
-    12,
-};
