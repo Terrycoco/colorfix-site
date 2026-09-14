@@ -1,12 +1,10 @@
 -- Final legacy pre-PUB Publisher / Asset Creator table cleanup.
 --
--- DO NOT RUN until this file has been reviewed against production.
---
 -- Scope:
 --   - Drops only confirmed obsolete pre-PUB publishing tables.
 --   - Does not drop publishing_channels; current PUB OAuth/Auth still uses it.
 --   - Does not drop any pub_* tables.
---   - Does not alter historical migration files.
+--   - Leaves historical migration files unchanged.
 --
 -- Intentionally NOT dropped here:
 --   publishing_channels
