@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AdminBadge,
@@ -72,6 +72,14 @@ export default function PubAssetsTable({
 
   const [error, setError] =
     useState("");
+
+  const [
+    errorPopupAssetId,
+    setErrorPopupAssetId,
+  ] = useState(0);
+
+  const errorPopupRef =
+    useRef(null);
 
   const [editorOpen, setEditorOpen] = useState(false);
 
@@ -244,6 +252,38 @@ export default function PubAssetsTable({
     channelFilter,
     typeFilter,
     stageFilter,
+  ]);
+
+
+  useEffect(() => {
+    if (!errorPopupAssetId) {
+      return;
+    }
+
+    const closeOnOutsidePointer = (event) => {
+      if (
+        errorPopupRef.current &&
+        !errorPopupRef.current.contains(
+          event.target
+        )
+      ) {
+        setErrorPopupAssetId(0);
+      }
+    };
+
+    document.addEventListener(
+      "pointerdown",
+      closeOnOutsidePointer
+    );
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        closeOnOutsidePointer
+      );
+    };
+  }, [
+    errorPopupAssetId,
   ]);
 
 
@@ -1414,6 +1454,91 @@ async function recreateAsset(
                 return "—";
               }
 
+              if (stage === "error") {
+                const id =
+                  Number(
+                    asset
+                      ?.pub_asset_id ||
+                    0
+                  );
+
+                const popupOpen =
+                  errorPopupAssetId === id;
+
+                const message =
+                  assetErrorMessage(
+                    asset
+                  );
+
+                return (
+                  <span
+                    ref={
+                      popupOpen
+                        ? errorPopupRef
+                        : null
+                    }
+                    style={{
+                      position: "relative",
+                      display: "inline-flex",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={popupOpen}
+                      aria-label={`Show error for asset #${id}`}
+                      style={{
+                        border: 0,
+                        padding: 0,
+                        margin: 0,
+                        background: "transparent",
+                        cursor: "pointer",
+                        font: "inherit",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+
+                        setErrorPopupAssetId(
+                          popupOpen
+                            ? 0
+                            : id
+                        );
+                      }}
+                    >
+                      <AdminBadge variant="neutral">
+                        Error
+                      </AdminBadge>
+                    </button>
+
+                    {popupOpen ? (
+                      <div
+                        role="status"
+                        style={{
+                          position: "absolute",
+                          top: "calc(100% + 6px)",
+                          left: 0,
+                          zIndex: 1000,
+                          width: "min(320px, 70vw)",
+                          padding: "8px 10px",
+                          border: "1px solid rgba(0, 0, 0, 0.16)",
+                          borderRadius: 6,
+                          background: "#fff",
+                          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.16)",
+                          color: "#222",
+                          fontSize: 12,
+                          lineHeight: 1.4,
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
+                        {
+                          message ||
+                          "No error detail was returned for this asset."
+                        }
+                      </div>
+                    ) : null}
+                  </span>
+                );
+              }
+
               return (
                 <AdminBadge
                   variant={
@@ -1621,6 +1746,7 @@ async function recreateAsset(
         deletingAssetId,
         approvingAssetId,
         stageFilter,
+        errorPopupAssetId,
       ]
     );
 
@@ -1768,8 +1894,24 @@ async function recreateAsset(
           drawer={{
             title: (asset) => `Asset #${asset.pub_asset_id}`,
             width: 440,
-            render: ({ item }) => (
-              <PubAssetDetails asset={item} />
+            render: ({ item, openEditor }) => (
+              <PubAssetDetails
+                asset={item}
+                recreating={recreating}
+                onEdit={() => openEditor?.(item)}
+                onRedo={async (asset) => {
+                  const ok =
+                    await recreateAsset(
+                      asset?.pub_asset_id
+                    );
+
+                  if (ok) {
+                    await loadAssets();
+                  }
+
+                  return ok;
+                }}
+              />
             ),
           }}
           editable
@@ -1953,6 +2095,9 @@ async function recreateAsset(
 
 function PubAssetDetails({
   asset,
+  recreating = false,
+  onEdit,
+  onRedo,
 }) {
   const sourceType =
     String(
@@ -1991,6 +2136,17 @@ function PubAssetDetails({
       asset?.approved ||
       0
     ) === 1;
+
+  const pipelineStage =
+    normalizedStage(
+      asset
+    );
+
+  const redoLocked =
+    pipelineStage === "shipping" ||
+    isHistoricalStage(
+      pipelineStage
+    );
 
   return (
     <AdminStack gap="md">
@@ -2073,6 +2229,37 @@ function PubAssetDetails({
         </div>
       </AdminField>
 
+      {asset?.pingback ? (
+        <AdminField label="Pingback">
+          <AdminToolbar compact>
+            <a
+              href={asset.pingback}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {asset.pingback}
+            </a>
+
+            <AdminButton
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    asset.pingback
+                  );
+                } catch {
+                  // Keep the link usable even if clipboard permission fails.
+                }
+              }}
+            >
+              Copy
+            </AdminButton>
+          </AdminToolbar>
+        </AdminField>
+      ) : null}
+
       {asset?.url ? (
         <AdminField label="Asset URL">
           <a
@@ -2110,8 +2297,75 @@ function PubAssetDetails({
           {asset?.updated_at || "—"}
         </AdminMetaText>
       </AdminField>
+
+      <AdminToolbar compact>
+        <AdminButton
+          type="button"
+          variant="secondary"
+          disabled={
+            redoLocked ||
+            recreating
+          }
+          onClick={() => {
+            if (
+              redoLocked ||
+              recreating
+            ) {
+              return;
+            }
+
+            onEdit?.();
+          }}
+        >
+          Edit
+        </AdminButton>
+
+        <AdminButton
+          type="button"
+          disabled={
+            redoLocked ||
+            recreating
+          }
+          title={
+            redoLocked
+              ? "Shipped or Dispatch-owned assets cannot be redone."
+              : "Redo this asset using its current filed CREATE order."
+          }
+          onClick={() => {
+            if (
+              redoLocked ||
+              recreating
+            ) {
+              return;
+            }
+
+            onRedo?.(
+              asset
+            );
+          }}
+        >
+          {
+            recreating
+              ? "Redoing..."
+              : "Redo Asset"
+          }
+        </AdminButton>
+      </AdminToolbar>
     </AdminStack>
   );
+}
+
+
+function assetErrorMessage(
+  asset
+) {
+  return String(
+    asset?.error_message ||
+    asset?.last_error ||
+    asset?.failure_message ||
+    asset?.error ||
+    ""
+  ).trim();
 }
 
 

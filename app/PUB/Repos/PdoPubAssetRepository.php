@@ -5792,7 +5792,8 @@ public function updateOrder(
 
                 a.search_title,
                 a.description,
-
+                a.pingback,
+                
                 a.file_path,
                 a.url,
                 a.mime_type,

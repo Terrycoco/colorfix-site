@@ -295,6 +295,20 @@ export default function PubAnalyzeStage({
     {}
   );
 
+  /*
+   * Canonical public REX URL for the selected source playlist.
+   *
+   * Every playlist-sourced asset gets this pingback automatically,
+   * EXCEPT Pinterest YouTube teaser assets, whose pingback must stay
+   * blank until the related YouTube video has shipped.
+   */
+  const [
+    sourcePingback,
+    setSourcePingback,
+  ] = useState(
+    ""
+  );
+
   const [
     marketingOpen,
     setMarketingOpen,
@@ -342,6 +356,10 @@ export default function PubAnalyzeStage({
 
     setAnalyzeHandoffValues(
       {}
+    );
+
+    setSourcePingback(
+      ""
     );
 
     setAnalyzeExistingPolicy({
@@ -476,6 +494,10 @@ export default function PubAnalyzeStage({
       {}
     );
 
+    setSourcePingback(
+      ""
+    );
+
     setAnalyzeExistingPolicy({
       unshipped:
         "check",
@@ -589,6 +611,10 @@ export default function PubAnalyzeStage({
 
     setAnalyzeHandoffValues(
       {}
+    );
+
+    setSourcePingback(
+      ""
     );
 
     setAnalyzeExistingPolicy({
@@ -795,6 +821,46 @@ export default function PubAnalyzeStage({
       );
 
 
+      /*
+       * Resolve the source playlist REX automatically.
+       *
+       * This is the canonical pingback for every normal playlist-sourced
+       * asset. If it cannot be resolved, ANALYZE must not produce a CREATE
+       * handoff that could later publish assets with no source pingback.
+       */
+      let resolvedSourcePingback =
+        "";
+
+      try {
+        resolvedSourcePingback =
+          await fetchRex(
+            id,
+            "pinterest"
+          );
+      } catch (rexError) {
+        throw new Error(
+          `Could not resolve source playlist pingback: ${
+            rexError?.message ||
+            rexError
+          }`
+        );
+      }
+
+      if (
+        isEmptyValue(
+          resolvedSourcePingback
+        )
+      ) {
+        throw new Error(
+          "Source playlist REX returned no pingback URL."
+        );
+      }
+
+      setSourcePingback(
+        resolvedSourcePingback
+      );
+
+
       receivePubCom?.(
         data
       );
@@ -838,11 +904,24 @@ export default function PubAnalyzeStage({
               (
                 proposal,
                 index
-              ) =>
-                normalizeProposal(
-                  proposal,
-                  index
-                )
+              ) => {
+                const normalized =
+                  normalizeProposal(
+                    proposal,
+                    index
+                  );
+
+                return {
+                  ...normalized,
+
+                  pingback:
+                    isDeferredYoutubeTeaser(
+                      normalized
+                    )
+                      ? ""
+                      : resolvedSourcePingback,
+                };
+              }
             )
           : [];
 
@@ -1060,7 +1139,18 @@ export default function PubAnalyzeStage({
           description:
             "",
           pingback:
-            "",
+            isDeferredYoutubeTeaser({
+              channel:
+                String(
+                  analyzeOutputContract
+                    ?.channel ||
+                  ""
+                ),
+              asset_type:
+                createdAssetType,
+            })
+              ? ""
+              : sourcePingback,
           ingredients:
             {},
           is_manual:
@@ -1185,65 +1275,6 @@ export default function PubAnalyzeStage({
   }
 
 
-  async function handleAnalyzeHelper(
-    helperKey
-  ) {
-    if (
-      helperKey !==
-      "rex"
-    ) {
-      return;
-    }
-
-
-    const id =
-      Number(
-        playlistId ||
-        0
-      );
-
-
-    if (!id) {
-      setPubStageErrors({
-        stage:
-          "analyze",
-        code:
-          "missing_playlist",
-        message:
-          "Choose a playlist before fetching REX.",
-      });
-
-      return;
-    }
-
-
-    try {
-      const url =
-        await fetchRex(
-          id,
-          "pinterest"
-        );
-
-
-      updateAnalyzeHandoffValue(
-        "pingback",
-        url
-      );
-
-    } catch (err) {
-      setPubStageErrors({
-        stage:
-          "analyze",
-        code:
-          "rex_failed",
-        message:
-          err?.message ||
-          "Could not fetch REX.",
-      });
-    }
-  }
-
-
   const selectedProposals =
     useMemo(
       () =>
@@ -1299,6 +1330,31 @@ export default function PubAnalyzeStage({
 
 
               if (!key) {
+                continue;
+              }
+
+
+              /*
+               * Pingback is source identity, not a generic handoff override.
+               *
+               * Normal playlist-sourced assets always get the canonical
+               * source playlist REX. Pinterest YouTube teasers are the only
+               * exception and must remain blank until YouTube ships.
+               */
+              if (
+                key ===
+                "pingback"
+              ) {
+                box[key] =
+                  isDeferredYoutubeTeaser(
+                    proposal
+                  )
+                    ? ""
+                    : sourcePingback ||
+                      proposal[
+                        key
+                      ];
+
                 continue;
               }
 
@@ -1397,6 +1453,7 @@ export default function PubAnalyzeStage({
         selectedProposals,
         analyzeManagerOutputFields,
         analyzeHandoffValues,
+        sourcePingback,
         contractByCreatedAssetType,
       ]
     );
@@ -1469,11 +1526,50 @@ export default function PubAnalyzeStage({
     );
 
 
+  const pingbackInvariantSatisfied =
+    createHandoffBoxes.every(
+      (box) => {
+        const sourceType =
+          String(
+            box
+              ?.source_type ||
+            ""
+          )
+            .trim()
+            .toLowerCase();
+
+        if (
+          sourceType !==
+          "playlist"
+        ) {
+          return true;
+        }
+
+        if (
+          isDeferredYoutubeTeaser(
+            box
+          )
+        ) {
+          return isEmptyValue(
+            box
+              ?.pingback
+          );
+        }
+
+        return !isEmptyValue(
+          box
+            ?.pingback
+        );
+      }
+    );
+
+
   const canSendToCreate =
     createHandoffBoxes.length >
       0 &&
     requiredHandoffFieldNames.length >
       0 &&
+    pingbackInvariantSatisfied &&
     createHandoffBoxes.every(
       (box) =>
         requiredHandoffFieldNames.every(
@@ -1821,6 +1917,10 @@ export default function PubAnalyzeStage({
 
       setAnalyzeHandoffValues(
         {}
+      );
+
+      setSourcePingback(
+        ""
       );
 
       setAnalyzeExistingPolicy({
@@ -2512,14 +2612,10 @@ export default function PubAnalyzeStage({
             jobId={handoffJobId}
             boxes={createHandoffBoxes}
             fieldNames={handoffFieldNames}
-            pingback={analyzeHandoffValues.pingback || ""}
+            pingback={sourcePingback}
             showPingback={
               handoffFieldNames.includes("pingback")
             }
-            onChangePingback={(value) =>
-              updateAnalyzeHandoffValue("pingback", value)
-            }
-            onFetchRex={() => handleAnalyzeHelper("rex")}
           />
         </AdminStack>
       </AdminWorkbenchDrawer>
@@ -3090,6 +3186,42 @@ function hasOperationalPubCom(
 }
 
 
+function isDeferredYoutubeTeaser(
+  value
+) {
+  const channel =
+    String(
+      value
+        ?.channel ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const assetType =
+    String(
+      value
+        ?.asset_type ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const pinterestChannel =
+    channel ===
+      "pinterest" ||
+    channel ===
+      "pin";
+
+  return (
+    pinterestChannel &&
+    assetType.includes(
+      "teaser"
+    )
+  );
+}
+
+
 function isPlainObject(
   value
 ) {
@@ -3266,8 +3398,6 @@ function AnalyzeHandoffSummary({
   fieldNames,
   pingback,
   showPingback,
-  onChangePingback,
-  onFetchRex,
 }) {
   const boxCount =
     Array.isArray(boxes)
@@ -3293,26 +3423,15 @@ function AnalyzeHandoffSummary({
       {showPingback ? (
         <label className="admin-field">
           <span className="admin-field__label">
-            Pingback
+            Source Playlist Pingback
           </span>
 
-          <div className="admin-field-row">
-            <input
-              className="admin-field__control"
-              type="text"
-              value={pingback}
-              onChange={(event) =>
-                onChangePingback(event.target.value)
-              }
-            />
-
-            <AdminButton
-              type="button"
-              onClick={onFetchRex}
-            >
-              REX
-            </AdminButton>
-          </div>
+          <input
+            className="admin-field__control admin-field__control--full"
+            type="text"
+            value={pingback}
+            readOnly
+          />
         </label>
       ) : null}
 

@@ -34,23 +34,85 @@ function ensureDir(dir) {
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
+    let output = "";
+
     const child = spawn(command, args, {
       cwd: ROOT,
-      stdio: "inherit",
+      stdio: [
+        "inherit",
+        "pipe",
+        "pipe",
+      ],
       env: process.env,
     });
 
-    child.on("error", reject);
+    const capture = (chunk, stream) => {
+      const text =
+        chunk.toString();
 
-    child.on("exit", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(
-          new Error(`${command} exited with code ${code}`)
+      stream.write(
+        text
+      );
+
+      output += text;
+
+      if (output.length > 6000) {
+        output =
+          output.slice(
+            -6000
+          );
+      }
+    };
+
+    child.stdout.on(
+      "data",
+      (chunk) => {
+        capture(
+          chunk,
+          process.stdout
         );
       }
-    });
+    );
+
+    child.stderr.on(
+      "data",
+      (chunk) => {
+        capture(
+          chunk,
+          process.stderr
+        );
+      }
+    );
+
+    child.on(
+      "error",
+      reject
+    );
+
+    child.on(
+      "exit",
+      (code) => {
+        if (code === 0) {
+          resolve();
+          return;
+        }
+
+        const detail =
+          output
+            .replace(
+              /\x1b\[[0-9;]*m/g,
+              ""
+            )
+            .trim();
+
+        reject(
+          new Error(
+            detail ||
+            `${command} exited with code ${code}`
+          )
+        );
+      }
+    );
   });
 }
 
@@ -507,7 +569,7 @@ console.log(
         }`
       );
     }
-
+    cleanupJobFiles(jobId);
     console.log(
       `Worker recovered from PUB asset #${assetId}; returning to polling.`
     );

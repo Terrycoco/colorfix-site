@@ -83,6 +83,8 @@ export default function AdminSmartGrid({
   columns = null,
   getRowKey = (item) => item.id,
 
+  drawer = null,
+
   ...dataGridProps
 }) {
   const [editorSourceItem, setEditorSourceItem] = useState(null);
@@ -308,6 +310,31 @@ export default function AdminSmartGrid({
     return loadEditorData(editorSourceItem);
   }, [editorSourceItem, loadEditorData]);
 
+  /*
+   * Let a drawer offer another way into the SAME SmartGrid editor.
+   * This exposes openEditor() to drawer.render(); it does not create
+   * a second editor implementation.
+   */
+  const enhancedDrawer = useMemo(() => {
+    if (
+      !drawer ||
+      typeof drawer !== "object" ||
+      typeof drawer.render !== "function"
+    ) {
+      return drawer;
+    }
+
+    return {
+      ...drawer,
+      render: (context) =>
+        drawer.render({
+          ...context,
+          openEditor: (item = context?.item) =>
+            openEditor(item),
+        }),
+    };
+  }, [drawer, openEditor]);
+
   const enhancedColumns = useMemo(() => {
     if (!Array.isArray(columns)) return columns;
 
@@ -476,6 +503,7 @@ export default function AdminSmartGrid({
         items={items}
         columns={enhancedColumns}
         getRowKey={getRowKey}
+        drawer={enhancedDrawer}
       />
 
       <AdminEditor
