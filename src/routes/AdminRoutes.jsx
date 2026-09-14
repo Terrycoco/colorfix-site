@@ -42,14 +42,8 @@ const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
 const AdminPropertiesPage = lazy(() => import('@pages/AdminPropertiesPage'));
 const AdminSharePage = lazy(() => import('@pages/AdminSharePage'));
 const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'));
-const AdminAssetCreatorsPage = lazy(() => import('@pages/AdminAssetCreatorsPage'));
-const AdminPublishingDefaultsPage = lazy(() => import('@pages/AdminPublishingDefaultsPage'));
 const AdminAssetAnalyticsPage = lazy(() => import('@pages/AdminAssetAnalyticsPage'));
-const AdminPackagerPage = lazy(() => import('@pages/AdminPackagerPage'));
-const AdminPublishingPage = lazy(() => import('@pages/AdminPublishingPage'));
-const AdminPublicationSchedulerPage = lazy(() => import('@pages/AdminPublicationSchedulerPage'));
 const AdminLandingPagesPage = lazy(() => import('@pages/AdminLandingPagesPage'));
-const AdminPinterestPublisherPage = lazy(() => import('@pages/AdminPinterestPublisherPage'));
 const AdminUserEventsPage = lazy(() => import('@pages/AdminUserEventsPage'));
 const AdminQrSheetsPage = lazy(() => import('@pages/AdminQrSheetsPage'));
 const AdminUrlReservationsPage = lazy(() => import('@pages/AdminUrlReservationsPage'));
@@ -61,7 +55,7 @@ const AdminClientsPage = lazy(() => import('@pages/AdminClientsPage'));
 const AdminEmailTemplatesPage = lazy(() => import('@pages/AdminEmailTemplatesPage'));
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresenterPage'));
-
+const AdminPlaylistSetsPage = lazy(() => import('@pages/AdminPlaylistSetsPage'));
 
 const AdminPlayerExperiencesPage = lazy(() => import('@pages/AdminPlayerExperiencesPage'));
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
@@ -146,15 +140,8 @@ export default function AdminRoutes() {
         <Route path="share" element={renderWithSuspense(AdminSharePage, 'Loading admin share...')} />
         <Route path="library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
         <Route path="asset-library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />
-        <Route path="asset-creators" element={renderWithSuspense(AdminAssetCreatorsPage, 'Loading asset creator...')} />
-        <Route path="publishing-defaults" element={renderWithSuspense(AdminPublishingDefaultsPage, 'Loading publisher defaults...')} />
-        <Route path="packager" element={renderWithSuspense(AdminPackagerPage, 'Loading packager...')} />
-        <Route path="publishing" element={renderWithSuspense(AdminPublishingPage, 'Loading publishing...')} />
-        <Route path="publisher" element={renderWithSuspense(AdminPublishingPage, 'Loading publisher...')} />
-        <Route path="scheduler" element={renderWithSuspense(AdminPublicationSchedulerPage, 'Loading scheduler...')} />
         <Route path="landing-pages" element={renderWithSuspense(AdminLandingPagesPage, 'Loading landing pages...')} />
         <Route path="asset-analytics" element={renderWithSuspense(AdminAssetAnalyticsPage, 'Loading asset analytics...')} />
-        <Route path="pinterest-publisher" element={renderWithSuspense(AdminPinterestPublisherPage, 'Loading Pinterest publisher...')} />
         <Route path="user-events" element={renderWithSuspense(AdminUserEventsPage, 'Loading view counts...')} />
         <Route path="url-reservations" element={renderWithSuspense(AdminUrlReservationsPage, 'Loading URL reservations...')} />
         <Route path="rex-conversion" element={renderWithSuspense(AdminRexConversionPage, 'Loading REX conversion...')} />
@@ -167,6 +154,15 @@ export default function AdminRoutes() {
         <Route path="send-note" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="picker" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="p/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
+
+        <Route
+          path="playlist-sets"
+          element={renderWithSuspense(
+            AdminPlaylistSetsPage,
+            'Loading playlist sets...'
+          )}
+        />
+
         <Route path="p/:playlistId/:start" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="playlist/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="playlist/:playlistId/:start" element={<PublicPathRedirect stripPrefix="/admin" />} />

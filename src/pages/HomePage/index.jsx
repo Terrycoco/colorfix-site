@@ -513,7 +513,7 @@ const HomePage = () => {
 async function fetchFrontPagePlaylistInsert(signal) {
   try {
     const response = await fetch(
-      `${API_FOLDER}/v2/playlist-instance-sets/get.php?id=${FRONT_PAGE_SET_ID}&_=${Date.now()}`,
+      `${API_FOLDER}/v2/playlist-sets/get.php?id=${FRONT_PAGE_SET_ID}&_=${Date.now()}`,
       {
         headers: { Accept: 'application/json' },
         signal,

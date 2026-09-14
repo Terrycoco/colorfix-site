@@ -21,7 +21,7 @@ export default function PlayerExperience({ data }) {
   const { adminExitPath, clearAdminExitPath } = useAppState();
   const isFastPlayerShell = location.pathname === "/p" || location.pathname.startsWith("/p/");
   const ctaAudience = searchParams.get("aud") ?? "";
-  const psiParam = searchParams.get("psi") ?? "";
+  const psiParam = searchParams.get("set") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const sourceParam = searchParams.get("src") ?? "";

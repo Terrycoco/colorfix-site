@@ -262,7 +262,7 @@ export default function AdminCtaPagesPage() {
       <header className="cta-pages-header">
         <div>
           <h1>CTA Pages</h1>
-          <p>Reusable CTA groups for publisher instances and player experiences.</p>
+          <p>Reusable CTA groups for PUB-managed and player experiences.</p>
         </div>
         <div className="cta-pages-header-actions">
           <Link className="cta-page-btn" to="/admin/ctas">
@@ -439,7 +439,7 @@ export default function AdminCtaPagesPage() {
           </div>
 
           <div className="cta-page-note">
-            Publisher can attach this stable CTA Page ID to a playlist instance. The player resolves the current CTA list from that ID each time it serves the experience.
+            PUB can attach this stable CTA Page ID to a playlist instance. The player resolves the current CTA list from that ID each time it serves the experience.
           </div>
           {status && <div className="cta-page-status cta-page-status--success">{status}</div>}
           {error && <div className="cta-page-status cta-page-status--error">{error}</div>}

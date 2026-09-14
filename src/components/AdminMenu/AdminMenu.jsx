@@ -26,11 +26,7 @@ function shouldUseInboxBadge(currentPath) {
   return currentPath === "/admin/clients"
     || currentPath.startsWith("/admin/clients/")
     || currentPath.startsWith("/admin/asset-")
-    || currentPath === "/admin/library"
-    || currentPath === "/admin/publishing"
-    || currentPath === "/admin/publisher"
-    || currentPath === "/admin/scheduler"
-    || currentPath === "/admin/pinterest-publisher";
+    || currentPath === "/admin/library";
 }
 
 export default function AdminMenu() {

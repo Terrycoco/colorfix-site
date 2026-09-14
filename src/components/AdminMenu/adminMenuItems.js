@@ -53,9 +53,9 @@ export const adminMenuItems = [
   {
     label: "Player",
     items: [
-      { label: "All Playlists", href: "/picker?psi=1", adminExitPath: "/admin/" },
+      { label: "All Playlists", href: "/picker?set=1", adminExitPath: "/admin/" },
       { label: "Playlists", href: "/admin/playlists" },
-      { label: "Sets", href: "/admin/playlist-instance-sets" },
+      { label: "Sets", href: "/admin/playlist-sets" },
       { label: "Player Experiences", href: "/admin/player-experiences" },
       { label: "Kickers", href: "/admin/kickers" },
       { label: "CTAs", href: "/admin/ctas" },

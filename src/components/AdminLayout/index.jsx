@@ -41,5 +41,6 @@ export { default as AdminPanel } from "./AdminPanel.jsx";
 export { default as AdminMetaText } from "./AdminMetaText.jsx";
 export { default as AdminCheckboxRow } from "./AdminCheckboxRow.jsx";
 export { default as AdminEditorImage } from "./AdminEditorImage.jsx";
+export { default as AdminPhotoPickerField } from "./AdminPhotoPickerField.jsx";
 
 import "./styles/index.css";

@@ -18,7 +18,26 @@
 .admin-field__control {
   box-sizing: border-box;
   min-height: 34px;
+  max-width: 100%;
   font-size: 13px;
+}
+
+/*
+ * Selects are compact by default.
+ *
+ * A dropdown should never claim an entire work area just because its field
+ * happens to be wide. Long option text is clipped by the control instead of
+ * forcing the row wider. Use .admin-field__control--full only when a page
+ * deliberately needs a full-width select.
+ */
+select.admin-field__control {
+  width: auto;
+  max-width: min(100%, 28rem);
+}
+
+select.admin-field__control.admin-field__control--full {
+  width: 100%;
+  max-width: 100%;
 }
 
 .admin-button--secondary {
@@ -68,26 +87,78 @@ button[disabled] {
 }
 
 .admin-field--compact {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-field--grow {
-  flex: 0 0 auto;
-  width: 100%;
+  flex: 1 1 320px;
+  width: auto;
   min-width: 0;
 }
 
 /*
  * Width behavior only applies when fields are actually
  * inside a horizontal toolbar.
+ *
+ * Compact fields size to their content. Grow fields share the remaining
+ * room. Neither is allowed to force toolbar actions off-screen.
  */
 .admin-toolbar > .admin-field--compact {
-  flex: 0 1 220px;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .admin-toolbar > .admin-field--grow {
   flex: 1 1 360px;
-  min-width: 220px;
+  width: auto;
+  min-width: min(220px, 100%);
+}
+
+/*
+ * Compact toolbar controls share one rhythm.
+ *
+ * Matching control heights keeps field labels aligned across neighboring
+ * groups (for example INSERT and SELECTION), even when one field contains a
+ * select and another contains a nested button toolbar.
+ */
+.admin-toolbar--compact {
+  --admin-compact-control-height: 30px;
+}
+
+.admin-toolbar--compact > .admin-field > .admin-field__control {
+  min-height: var(--admin-compact-control-height);
+  height: var(--admin-compact-control-height);
+}
+
+.admin-toolbar--compact > .admin-field > select.admin-field__control {
+  padding-block: 2px;
+  font-size: 12px;
+}
+
+.admin-toolbar--compact > .admin-field > .admin-toolbar--compact {
+  min-height: var(--admin-compact-control-height);
+  align-items: stretch;
+}
+
+.admin-toolbar--compact > .admin-field > .admin-toolbar--compact > .admin-button {
+  min-height: var(--admin-compact-control-height);
+  height: var(--admin-compact-control-height);
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.admin-toolbar--compact > .admin-button {
+  min-height: var(--admin-compact-control-height);
+  height: var(--admin-compact-control-height);
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.2;
 }
 
 .admin-field__control--full {
@@ -96,14 +167,34 @@ button[disabled] {
 
 .admin-field-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+}
+
+.admin-field-row > .admin-field {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-field-row > .admin-field--compact {
+  flex: 0 1 auto;
+  width: auto;
+}
+
+.admin-field-row > .admin-field--grow {
+  flex: 1 1 320px;
+  width: auto;
 }
 
 .admin-field-row > .admin-field__control {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.admin-field-row > .admin-button {
+  flex: 0 0 auto;
 }
 
 .admin-table-textarea {

@@ -33,7 +33,7 @@ React then makes additional player-experience decisions after the API response: 
 | `cta_overrides._cta_exclude_ids` | Removes CTAs | `app/services/PlayerExperienceService.php:760` | CTA omitted | per-instance override | no | Keep as override capability. |
 | `cta_context_key` | Saved and returned | `app/services/PlayerExperienceService.php:141` | Not meaningfully used in service | possible legacy replacement by `experience_key` | no | Looks like an older abstraction. |
 | `palette_viewer_cta_group_id` | Added as `add_cta_group` when opening Palette Viewer | `src/helpers/ctaActions.js:196` | Palette Viewer gets a different CTA group | `palette_viewer_cta_group_id` | no | Good candidate field. |
-| Pinterest publishing destination | Adds `?src=pinterest` | `app/services/PinterestPublishingService.php:425` | Tracking source on generated URL | `default_source_key` maybe | mixed | Publishing source should stay explicit. |
+| Pinterest publishing destination | Adds `?src=pinterest` | PUB destination URL composition | Tracking source on generated URL | `default_source_key` maybe | mixed | Publishing source should stay explicit. |
 | Admin copy Pinterest URL | Adds `aud=pinterest`, not `src=pinterest` | `src/pages/AdminPlaylistInstancesPage/index.jsx:481` | Share URL has audience | likely legacy only | no | Inconsistent with `src`. |
 | URL `src` | Used for tracking | `src/pages/PlayerPage/index.jsx:29`, `src/helpers/userEvents.js:128` | Stored on user events | not experience | yes | Source means acquisition channel, not audience. |
 | Multiple palette targets | Enables thumbs flow | `app/services/PlayerExperienceService.php:639` | `thumbs_enabled = true` | `palette_access_mode`, `thumbs_mode` | no | Currently hard-coded auto behavior. |

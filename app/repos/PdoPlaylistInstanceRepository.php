@@ -378,44 +378,6 @@ final class PdoPlaylistInstanceRepository
             }
         }
 
-        if ($this->tableExists('package_batches') && $this->tableExists('packages')) {
-            $hasPublications = $this->tableExists('published_assets');
-            $publicationJoin = $hasPublications
-                ? 'LEFT JOIN published_assets pub ON pub.package_id = pa.package_id'
-                : '';
-            $publishedConditions = [];
-            if ($this->columnExists('package_batches', 'status')) {
-                $publishedConditions[] = "pj.status IN ('published', 'posted')";
-            }
-            if ($this->columnExists('packages', 'status')) {
-                $publishedConditions[] = "pa.status IN ('published', 'posted', 'test_published')";
-            }
-            if ($this->columnExists('packages', 'published_at')) {
-                $publishedConditions[] = 'pa.published_at IS NOT NULL';
-            }
-            if ($hasPublications) {
-                $publishedConditions[] = 'pub.published_asset_id IS NOT NULL';
-            }
-            if ($publishedConditions === []) {
-                $publishedConditions[] = '0 = 1';
-            }
-            $publishedWhere = implode(' OR ', $publishedConditions);
-            $stmt = $this->pdo->prepare(
-                "SELECT COUNT(DISTINCT pj.package_batch_id)
-                   FROM package_batches pj
-                   LEFT JOIN packages pa
-                     ON pa.package_batch_id = pj.package_batch_id
-                   {$publicationJoin}
-                  WHERE pj.playlist_instance_id = :id
-                    AND ({$publishedWhere})"
-            );
-            $stmt->execute(['id' => $instanceId]);
-            $count = (int)$stmt->fetchColumn();
-            if ($count > 0) {
-                $blockers[] = "Linked to {$count} published publishing job" . ($count === 1 ? '' : 's');
-            }
-        }
-
         if ($this->tableExists('playlist_instance_sets') && $this->columnExists('playlist_instance_sets', 'playlist_instance_id')) {
             $stmt = $this->pdo->prepare(
                 'SELECT COUNT(*)

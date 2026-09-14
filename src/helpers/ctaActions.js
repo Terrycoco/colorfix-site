@@ -365,7 +365,7 @@ function runToThumbs({
   }
 
   if (psi) {
-    params.set("psi", String(psi));
+    params.set("set", String(psi));
   }
 
   if (thumb) {
@@ -533,7 +533,7 @@ function runToPalette({
   }
 
   if (psi) {
-    params.set("psi", String(psi));
+    params.set("set", String(psi));
   }
 
   if (thumb) {

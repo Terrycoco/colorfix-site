@@ -234,7 +234,13 @@ export default function PubAnalyzeStage({
     playlistId,
     setPlaylistId,
   ] = useState(
-    ""
+    () =>
+      new URLSearchParams(
+        window.location.search
+      ).get(
+        "playlist_id"
+      ) ||
+      ""
   );
 
   const [

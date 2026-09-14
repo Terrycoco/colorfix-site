@@ -3,7 +3,7 @@
     "success": true,
     "variant": "public",
     "build_key": "public_home",
-    "generated_at": "2026-09-10T02:17:18+00:00",
+    "generated_at": "2026-09-14T01:14:43+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -350,35 +350,34 @@
         "items": [
             {
                 "id": 1028,
-                "title": "Where does the eye go?",
-                "subtitle": "Fixing the focal point with color",
-                "photo_url": "/photos/progressions/eye-go/progression_eye-go_012e5debfaf8.jpg?v=1782564056",
-                "photo_library_id": 574,
-                "player_url": "/p/where-does-the-eye-go"
+                "title": "Where Does Your Eye Go?",
+                "subtitle": "",
+                "photo_url": "/photos/progressions/ohn/progression_ohn_2485e192862d.jpg",
+                "photo_library_id": 160,
+                "player_url": "/t/qImfx-gDdycRA-RZ-EnkIPObykILWMD7l-XetxsQ1cE"
             },
             {
                 "id": 1029,
                 "title": "Orange Roof Makeovers",
-                "subtitle": "Taming the So Cal orange",
-                "photo_url": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_e56e1f90e1b1.jpg?v=1782564064",
-                "photo_library_id": 566,
-                "player_url": "/p/orange-roof-makeovers"
+                "subtitle": "",
+                "photo_url": "",
+                "photo_library_id": null,
+                "player_url": "/t/fTGrHwqqFNqihzTI5V6ru_-i3LCKFKG05meKyLvywZ0"
             },
             {
                 "id": 1030,
-                "title": "Door Fixes",
-                "subtitle": "Small change. Big impact.",
-                "photo_url": "/photos/articles/doors-fixed/article_doors-fixed_8cfe200f4f58.jpg?v=1782659036",
+                "title": "Front Door ColorFixes",
+                "subtitle": "",
+                "photo_url": "/photos/articles/doors-fixed/article_doors-fixed_8cfe200f4f58.jpg",
                 "photo_library_id": 581,
-                "player_url": "/p/door-fixes"
+                "player_url": "/t/f9vnX2UfipaLMqCY_d7ptRLDH-7H3Pi2yS5BUMvcGsE"
             }
         ]
     },
     "image_preloads": [
         "/api/v2/image-thumb.php?id=374&w=520&q=72",
         "/api/v2/image-thumb.php?id=375&w=520&q=72",
-        "/api/v2/image-thumb.php?id=574&w=520&q=72",
-        "/api/v2/image-thumb.php?id=566&w=520&q=72",
+        "/api/v2/image-thumb.php?id=160&w=520&q=72",
         "/api/v2/image-thumb.php?id=581&w=520&q=72"
     ],
     "rowCount": 1,

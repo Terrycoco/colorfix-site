@@ -7,14 +7,14 @@ import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
 import "./playlist-picker.css";
 
-const SET_URL = "/api/v2/playlist-instance-sets/get.php";
+const SET_URL = "/api/v2/playlist-sets/get.php";
 
 export default function PlaylistPickerPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { adminExitPath, clearAdminExitPath } = useAppState();
-  const setId = Number(searchParams.get("psi") || 0);
+const setId = Number(searchParams.get("set") || 0);
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
@@ -94,7 +94,7 @@ export default function PlaylistPickerPage() {
     if (effectiveSetVersion !== "") params.set("set_v", effectiveSetVersion);
     applySourceToParams(params, sourceParam);
     if (closeParam === "1") params.set("close", "1");
-    if (setId) params.set("psi", String(setId));
+    if (setId) params.set("set", String(setId));
     const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();
@@ -118,7 +118,7 @@ export default function PlaylistPickerPage() {
     if (tile?.target_set_version) params.set("set_v", tile.target_set_version);
     const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
-    params.set("psi", String(targetSetId));
+    params.set("set", String(targetSetId));
     const qs = params.toString();
     return withSourceParam(`/picker${qs ? `?${qs}` : ""}`, sourceParam);
   };
@@ -129,7 +129,7 @@ export default function PlaylistPickerPage() {
     if (demoParam !== "") params.set("demo", demoParam);
     if (includePrivateParam === "1") params.set("include_private", "1");
     applySourceToParams(params, sourceParam);
-    if (setId) params.set("psi", String(setId));
+    if (setId) params.set("set", String(setId));
     const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     const qs = params.toString();

@@ -24,7 +24,7 @@ export default function PlaylistThumbsPage() {
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const ctaAudience = searchParams.get("aud") ?? "";
   const startParam = searchParams.get("start") ?? "";
-  const psiParam = searchParams.get("psi") ?? "";
+  const psiParam = searchParams.get("set") ?? "";
   const thumbParam = searchParams.get("thumb") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
   const viewerParam = (searchParams.get("viewer") ?? "").toLowerCase();
@@ -309,7 +309,7 @@ export default function PlaylistThumbsPage() {
                 if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
                 else if (paletteViewerCtaGroupId !== "") params.set("add_cta_group", paletteViewerCtaGroupId);
                 if (ctaAudience !== "") params.set("aud", ctaAudience);
-                if (psiParam !== "") params.set("psi", psiParam);
+                if (psiParam !== "") params.set("set", psiParam);
                 if (thumbParam !== "") params.set("thumb", thumbParam);
                 if (demoParam !== "") params.set("demo", demoParam);
                 const returnTo = withSourceParam(buildReturnTo(location.pathname, location.search));

@@ -68,7 +68,7 @@ export default function LandingPage() {
           <h1 id="landing-unavailable-title">This playlist isn&rsquo;t available.</h1>
           <p>It may have been moved or taken offline.</p>
           <div className="landing-page__unavailable-actions">
-            <Link to="/picker?psi=11">Browse Playlists</Link>
+            <Link to="/picker?set=11">Browse Playlists</Link>
             <Link to="/">Go to ColorFix Home</Link>
           </div>
         </section>

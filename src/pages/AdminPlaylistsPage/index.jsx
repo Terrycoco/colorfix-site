@@ -44,6 +44,7 @@ import {
 } from "@helpers/assetImage";
 
 import PlaylistRecordEditor from "./PlaylistRecordEditor";
+import SlideDefaultsDialog from "./SlideDefaultsDialog";
 import PlaylistSlideEditor, {
   BRAND_BUMPER_BODY_TEMPLATE,
   HUE_WHEEL_BODY_TEMPLATE,
@@ -74,8 +75,14 @@ const SAVED_LIST_URL =
 const PHOTO_LIBRARY_LIST_URL =
   `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
+const SLIDE_PRESETS_LIST_URL =
+  `${API_FOLDER}/v2/admin/playlist-slide-presets/list.php`;
+
 const PERMISSION_STATUS_EVENT =
   "colorfix:photo-permission-status";
+
+const SLIDE_CLIPBOARD_KEY =
+  "colorfix:playlist-slide-clipboard";
 
 
 const DEFAULT_PLAYLIST_TYPES = [
@@ -280,6 +287,15 @@ export default function AdminPlaylistsPage() {
   ] = useState([]);
 
   const [
+    slideClipboardCount,
+    setSlideClipboardCount,
+  ] = useState(
+    () =>
+      readSlideClipboard()
+        .length
+  );
+
+  const [
     playlistEditorOpen,
     setPlaylistEditorOpen,
   ] = useState(false);
@@ -288,6 +304,27 @@ export default function AdminPlaylistsPage() {
     playlistDraft,
     setPlaylistDraft,
   ] = useState(emptyPlaylist);
+
+
+  const [
+    slidePresets,
+    setSlidePresets,
+  ] = useState([]);
+
+  const [
+    slidePresetsLoading,
+    setSlidePresetsLoading,
+  ] = useState(false);
+
+  const [
+    slidePresetsError,
+    setSlidePresetsError,
+  ] = useState("");
+
+  const [
+    slideDefaultsOpen,
+    setSlideDefaultsOpen,
+  ] = useState(false);
 
 
   const [
@@ -553,6 +590,65 @@ export default function AdminPlaylistsPage() {
     );
 
 
+  const fetchSlidePresets =
+    useCallback(
+      async () => {
+        setSlidePresetsLoading(
+          true
+        );
+
+        setSlidePresetsError(
+          ""
+        );
+
+        try {
+          const res =
+            await fetch(
+              `${SLIDE_PRESETS_LIST_URL}?_=${Date.now()}`,
+              {
+                credentials:
+                  "include",
+              }
+            );
+
+          const data =
+            await res.json();
+
+          if (
+            !res.ok
+            ||
+            !data?.ok
+          ) {
+            throw new Error(
+              data?.error ||
+              "Failed to load slide defaults."
+            );
+          }
+
+          setSlidePresets(
+            Array.isArray(
+              data.presets
+            )
+              ? data.presets
+              : []
+          );
+
+        } catch (err) {
+          setSlidePresetsError(
+            err?.message ||
+            "Failed to load slide defaults."
+          );
+
+        } finally {
+          setSlidePresetsLoading(
+            false
+          );
+        }
+      },
+      []
+    );
+
+
   async function fetchPlaylistTypes() {
     try {
       const params =
@@ -733,8 +829,10 @@ export default function AdminPlaylistsPage() {
     fetchPlaylists();
     fetchPlaylistTypes();
     fetchSavedPalettes();
+    fetchSlidePresets();
   }, [
     fetchPlaylists,
+    fetchSlidePresets,
   ]);
 
 
@@ -1602,13 +1700,41 @@ export default function AdminPlaylistsPage() {
 
 
   function addItem(
-    preset
+    presetKey
   ) {
+    const preset =
+      slidePresets.find(
+        (row) =>
+          row
+            ?.preset_key ===
+          presetKey
+      );
+
+    if (
+      !preset
+      ||
+      preset.is_enabled ===
+        false
+    ) {
+      setSlidePresetsError(
+        "That slide default is not available."
+      );
+
+      return;
+    }
+
     const item =
       buildPresetItem(
         preset,
         makeClientItemKey()
       );
+
+    const insertPosition =
+      String(
+        preset
+          .insert_position ||
+        "after_selected"
+      ).trim();
 
     setItems(
       (current) => {
@@ -1620,14 +1746,37 @@ export default function AdminPlaylistsPage() {
               selectedSlideKey
           );
 
+        let insertIndex =
+          current.length;
+
         if (
-          activeIndex <
-          0
+          insertPosition ===
+          "top"
         ) {
-          return [
-            ...current,
-            item,
-          ];
+          insertIndex =
+            0;
+
+        } else if (
+          insertPosition ===
+          "bottom"
+        ) {
+          insertIndex =
+            current.length;
+
+        } else if (
+          insertPosition ===
+          "before_selected"
+        ) {
+          insertIndex =
+            activeIndex >= 0
+              ? activeIndex
+              : 0;
+
+        } else if (
+          activeIndex >= 0
+        ) {
+          insertIndex =
+            activeIndex + 1;
         }
 
         const next = [
@@ -1635,7 +1784,7 @@ export default function AdminPlaylistsPage() {
         ];
 
         next.splice(
-          activeIndex + 1,
+          insertIndex,
           0,
           item
         );
@@ -1890,6 +2039,140 @@ export default function AdminPlaylistsPage() {
     );
 
     markDirty();
+  }
+
+
+  function copySelectedSlides() {
+    if (
+      batchSelectedKeys.length ===
+      0
+    ) {
+      return;
+    }
+
+    const selected =
+      new Set(
+        batchSelectedKeys
+      );
+
+    const copiedSlides =
+      items.filter(
+        (item) =>
+          selected.has(
+            item._clientKey
+          )
+      );
+
+    if (
+      copiedSlides.length ===
+      0
+    ) {
+      return;
+    }
+
+    const stored =
+      writeSlideClipboard(
+        copiedSlides,
+        playlist
+          ?.playlist_id
+        ||
+        null
+      );
+
+    setSlideClipboardCount(
+      stored.length
+    );
+
+    setSaveMessage(
+      `${stored.length} slide${stored.length === 1 ? "" : "s"} copied.`
+    );
+  }
+
+
+  function pasteCopiedSlides() {
+    const copiedSlides =
+      readSlideClipboard();
+
+    if (
+      copiedSlides.length ===
+      0
+    ) {
+      setSlideClipboardCount(
+        0
+      );
+
+      return;
+    }
+
+    const pastedSlides =
+      copiedSlides.map(
+        (item) =>
+          clonePlaylistItemForNewPlaylist(
+            item,
+            makeClientItemKey()
+          )
+      );
+
+    const pastedKeys =
+      pastedSlides.map(
+        (item) =>
+          item._clientKey
+      );
+
+    const anchorKey =
+      selectedSlideKey
+      ||
+      (
+        batchSelectedKeys.length ===
+        1
+          ? batchSelectedKeys[0]
+          : null
+      );
+
+    setItems(
+      (current) => {
+        const anchorIndex =
+          anchorKey
+            ? current.findIndex(
+                (item) =>
+                  item
+                    ._clientKey ===
+                  anchorKey
+              )
+            : -1;
+
+        const insertIndex =
+          anchorIndex >= 0
+            ? anchorIndex + 1
+            : current.length;
+
+        const next = [
+          ...current,
+        ];
+
+        next.splice(
+          insertIndex,
+          0,
+          ...pastedSlides
+        );
+
+        return next;
+      }
+    );
+
+    setBatchSelectedKeys(
+      pastedKeys
+    );
+
+    setSelectedSlideKey(
+      null
+    );
+
+    markDirty();
+
+    setSaveMessage(
+      `${pastedSlides.length} slide${pastedSlides.length === 1 ? "" : "s"} pasted. Save to keep ${pastedSlides.length === 1 ? "it" : "them"}.`
+    );
   }
 
 
@@ -2306,7 +2589,7 @@ export default function AdminPlaylistsPage() {
     }
 
     navigate(
-      `/admin/asset-creators?playlist_id=${encodeURIComponent(String(id))}&modal=1`
+      `/admin/pub?stage=analyze&playlist_id=${encodeURIComponent(String(id))}`
     );
   }
 
@@ -2986,6 +3269,24 @@ export default function AdminPlaylistsPage() {
                           type="button"
                           variant="secondary"
                           disabled={
+                            slidePresetsLoading
+                            ||
+                            slidePresets.length ===
+                            0
+                          }
+                          onClick={() =>
+                            setSlideDefaultsOpen(
+                              true
+                            )
+                          }
+                        >
+                          Slide Defaults
+                        </AdminButton>
+
+                        <AdminButton
+                          type="button"
+                          variant="secondary"
+                          disabled={
                             saving
                             ||
                             !items.length
@@ -3076,37 +3377,125 @@ export default function AdminPlaylistsPage() {
                             }}
                           >
                             <option value="">
-                              Insert New…
+                              {
+                                slidePresetsLoading
+                                  ? "Loading defaults…"
+                                  : "Insert New…"
+                              }
                             </option>
 
-                            <option value="normal">
-                              Slide
-                            </option>
-
-                            <option value="intro">
-                              Intro
-                            </option>
-
-                            <option value="text">
-                              Text
-                            </option>
-
-                            <option value="hue-wheel">
-                              Hue Wheel
-                            </option>
-
-                            <option value="brand-bumper">
-                              Brand Bumper
-                            </option>
-
-                            <option value="cover-image">
-                              Cover Image
-                            </option>
-
-                            <option value="teaser">
-                              Teaser
-                            </option>
+                            {
+                              slidePresets
+                                .filter(
+                                  (preset) =>
+                                    preset
+                                      ?.is_enabled !==
+                                    false
+                                )
+                                .map(
+                                  (preset) => (
+                                    <option
+                                      key={
+                                        preset.preset_key
+                                      }
+                                      value={
+                                        preset.preset_key
+                                      }
+                                    >
+                                      {
+                                        preset.label
+                                        ||
+                                        preset.preset_key
+                                      }
+                                    </option>
+                                  )
+                                )
+                            }
                           </select>
+                        </AdminField>
+
+                        <AdminField
+                          label="Selection"
+                          compact
+                        >
+                          <AdminToolbar compact>
+                            <AdminButton
+                              type="button"
+                              variant="secondary"
+                              disabled={
+                                batchSelectedKeys.length ===
+                                0
+                              }
+                              onClick={
+                                copySelectedSlides
+                              }
+                            >
+                              Copy
+                            </AdminButton>
+
+                            <AdminButton
+                              type="button"
+                              variant="secondary"
+                              disabled={
+                                slideClipboardCount ===
+                                0
+                                ||
+                                saving
+                              }
+                              onClick={
+                                pasteCopiedSlides
+                              }
+                            >
+                              Paste
+                              {
+                                slideClipboardCount
+                                  ? ` (${slideClipboardCount})`
+                                  : ""
+                              }
+                            </AdminButton>
+
+                            <AdminButton
+                              type="button"
+                              variant="secondary"
+                              disabled={
+                                batchSelectedKeys.length ===
+                                0
+                              }
+                              onClick={
+                                createPlaylistFromSelected
+                              }
+                            >
+                              New Playlist
+                            </AdminButton>
+
+                            <AdminButton
+                              type="button"
+                              variant="secondary"
+                              disabled={
+                                batchSelectedKeys.length ===
+                                0
+                                ||
+                                saving
+                              }
+                              onClick={
+                                deleteSelectedSlides
+                              }
+                            >
+                              Delete
+                            </AdminButton>
+
+                            {
+                              batchSelectedKeys.length
+                                ? (
+                                    <AdminMetaText as="div">
+                                      {
+                                        batchSelectedKeys.length
+                                      } selected
+                                    </AdminMetaText>
+                                  )
+                                : null
+                            }
+                          </AdminToolbar>
                         </AdminField>
 
                         <AdminMetaText as="div">
@@ -3120,48 +3509,6 @@ export default function AdminPlaylistsPage() {
                               : "s"
                           }
                         </AdminMetaText>
-
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            batchSelectedKeys.length ===
-                            0
-                          }
-                          onClick={
-                            createPlaylistFromSelected
-                          }
-                        >
-                          Create Playlist from Selected
-                        </AdminButton>
-
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            batchSelectedKeys.length ===
-                            0
-                            ||
-                            saving
-                          }
-                          onClick={
-                            deleteSelectedSlides
-                          }
-                        >
-                          Delete Selected
-                        </AdminButton>
-
-                        {
-                          batchSelectedKeys.length
-                            ? (
-                                <AdminMetaText as="div">
-                                  {
-                                    batchSelectedKeys.length
-                                  } selected
-                                </AdminMetaText>
-                              )
-                            : null
-                        }
 
                         <AdminToolbarSpacer />
 
@@ -3183,6 +3530,17 @@ export default function AdminPlaylistsPage() {
                             : null
                         }
                       </AdminToolbar>
+
+
+                      {
+                        slidePresetsError
+                          ? (
+                              <AdminNotice variant="danger">
+                                {slidePresetsError}
+                              </AdminNotice>
+                            )
+                          : null
+                      }
 
 
                       {
@@ -3515,6 +3873,103 @@ export default function AdminPlaylistsPage() {
           }
         />
       </AdminEditor>
+
+
+      <SlideDefaultsDialog
+        open={
+          slideDefaultsOpen
+        }
+
+        presets={
+          slidePresets
+        }
+
+        onClose={() =>
+          setSlideDefaultsOpen(
+            false
+          )
+        }
+
+        onSaved={(
+          saved
+        ) => {
+          setSlidePresets(
+            (current) => {
+              const exists =
+                current.some(
+                  (row) =>
+                    row
+                      ?.preset_key ===
+                    saved
+                      ?.preset_key
+                );
+
+              const next =
+                exists
+                  ? current.map(
+                      (row) =>
+                        row
+                          ?.preset_key ===
+                        saved
+                          ?.preset_key
+                          ? saved
+                          : row
+                    )
+                  : [
+                      ...current,
+                      saved,
+                    ];
+
+              return next.sort(
+                (
+                  a,
+                  b
+                ) => {
+                  const byOrder =
+                    Number(
+                      a
+                        ?.sort_order ||
+                      0
+                    )
+                    -
+                    Number(
+                      b
+                        ?.sort_order ||
+                      0
+                    );
+
+                  if (
+                    byOrder !==
+                    0
+                  ) {
+                    return byOrder;
+                  }
+
+                  return String(
+                    a
+                      ?.label ||
+                    a
+                      ?.preset_key ||
+                    ""
+                  ).localeCompare(
+                    String(
+                      b
+                        ?.label ||
+                      b
+                        ?.preset_key ||
+                      ""
+                    )
+                  );
+                }
+              );
+            }
+          );
+
+          setSlidePresetsError(
+            ""
+          );
+        }}
+      />
 
 
       <PhotoPickerModal
@@ -4082,19 +4537,14 @@ function buildPresetItem(
   preset,
   clientKey
 ) {
-  const isTeaser =
-    preset ===
-    "teaser";
-
   const itemType =
-    isTeaser
-      ? "non-palette"
-      : (
-          preset ===
-            "normal"
-            ? "non-palette"
-            : preset
-        );
+    String(
+      preset
+        ?.item_type ||
+      "non-palette"
+    ).trim()
+    ||
+    "non-palette";
 
   return {
     ...emptyItem,
@@ -4115,80 +4565,217 @@ function buildPresetItem(
           : "",
 
     title:
-      itemType ===
-        "brand-bumper"
-        ? "ColorFix"
-        : "",
+      preset
+        ?.default_title
+      ??
+      "",
 
     subtitle:
-      itemType ===
-        "brand-bumper"
-        ? "by Terry"
-        : "",
+      preset
+        ?.default_subtitle
+      ??
+      "",
+
+    subtitle_2:
+      preset
+        ?.default_subtitle_2
+      ??
+      "",
+
+    layout:
+      preset
+        ?.default_layout
+      ||
+      "default",
+
+    title_mode:
+      preset
+        ?.default_title_mode
+      ??
+      "",
 
     star:
-      [
-        "hue-wheel",
-        "brand-bumper",
-        "cover-image",
-      ].includes(
-        itemType
-      )
-        ? false
-        : true,
+      preset
+        ?.default_star
+      ??
+      true,
 
-    site:
-      itemType ===
-        "brand-bumper"
-        ? true
-        : isTeaser
-          ? false
-          : true,
-
-    yt:
-      itemType ===
-        "brand-bumper"
-        ? true
-        : isTeaser
-          ? false
-          : true,
-
-    concept:
-      itemType ===
-        "brand-bumper"
-        ? true
-        : isTeaser
-          ? false
-          : true,
-
-    client:
-      itemType ===
-        "brand-bumper"
-        ? true
-        : isTeaser
-          ? false
-          : true,
-
-    pin:
-      itemType ===
-        "brand-bumper"
-        ? false
-        : true,
-
-    analyzer_role:
-      itemType ===
-        "brand-bumper"
-        ? "single"
-        : isTeaser
-          ? "teaser"
-          : "ignore",
+    transition:
+      preset
+        ?.default_transition
+      ??
+      "",
 
     duration_ms:
-      itemType ===
-        "brand-bumper"
-        ? "4200"
-        : "",
+      preset
+        ?.default_duration_ms
+      ??
+      "",
+
+    is_active:
+      preset
+        ?.default_is_active
+      ??
+      true,
+
+    exclude_from_thumbs:
+      preset
+        ?.default_exclude_from_thumbs
+      ??
+      false,
+
+    is_share_image:
+      preset
+        ?.default_is_share_image
+      ??
+      false,
+
+    site:
+      preset
+        ?.default_site
+      ??
+      true,
+
+    yt:
+      preset
+        ?.default_yt
+      ??
+      true,
+
+    pin:
+      preset
+        ?.default_pin
+      ??
+      true,
+
+    concept:
+      preset
+        ?.default_concept
+      ??
+      true,
+
+    client:
+      preset
+        ?.default_client
+      ??
+      true,
+
+    analyzer_role:
+      preset
+        ?.default_analyzer_role
+      ||
+      "ignore",
+
+    finder_start:
+      preset
+        ?.default_finder_start
+      ||
+      "auto",
+
+    version_number:
+      Math.max(
+        1,
+        Number(
+          preset
+            ?.default_version_number
+          ||
+          1
+        )
+      ),
+
+    is_final:
+      preset
+        ?.default_is_final
+      ??
+      false,
   };
+}
+
+
+function readSlideClipboard() {
+  try {
+    const raw =
+      window
+        .sessionStorage
+        .getItem(
+          SLIDE_CLIPBOARD_KEY
+        );
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed =
+      JSON.parse(
+        raw
+      );
+
+    return Array.isArray(
+      parsed
+        ?.slides
+    )
+      ? parsed.slides
+      : [];
+
+  } catch {
+    return [];
+  }
+}
+
+
+function writeSlideClipboard(
+  slides,
+  sourcePlaylistId
+) {
+  const cleanSlides =
+    (
+      Array.isArray(
+        slides
+      )
+        ? slides
+        : []
+    ).map(
+      (item) => {
+        const {
+          _clientKey,
+          playlist_item_id,
+          playlist_id,
+          sort_order,
+          position,
+          ...copy
+        } = item || {};
+
+        void _clientKey;
+        void playlist_item_id;
+        void playlist_id;
+        void sort_order;
+        void position;
+
+        return copy;
+      }
+    );
+
+  try {
+    window
+      .sessionStorage
+      .setItem(
+        SLIDE_CLIPBOARD_KEY,
+        JSON.stringify({
+          version:
+            1,
+
+          source_playlist_id:
+            sourcePlaylistId,
+
+          slides:
+            cleanSlides,
+        })
+      );
+  } catch {
+    // Keep the editor usable even if browser storage is unavailable.
+  }
+
+  return cleanSlides;
 }
 
 

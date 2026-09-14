@@ -35,7 +35,7 @@ if (empty($runQuery['success'])) {
     exit(1);
 }
 
-$playlistSet = httpJson("{$baseUrl}/api/v2/playlist-instance-sets/get.php?id={$setId}&_=" . time());
+$playlistSet = httpJson("{$baseUrl}/api/v2/playlist-sets/get.php?id={$setId}&_=" . time());
 if (empty($playlistSet['ok']) || empty($playlistSet['set']['items']) || !is_array($playlistSet['set']['items'])) {
     fwrite(STDERR, "Front-page playlist set failed from {$baseUrl}\n");
     exit(1);
