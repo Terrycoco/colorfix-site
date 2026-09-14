@@ -27,6 +27,10 @@ interface RexReservationRepositoryInterface
      */
     public function findByResource(string $resourceType, int $resourceId, int $limit = 100): array;
 
+
+
+
+
     /**
      * @return RexReservation[]
      */
@@ -117,4 +121,12 @@ interface RexReservationRepositoryInterface
         int $reservationId,
         ?int $fallbackRexId,
     ): RexReservation;
+
+
+    public function deleteByResource(
+        string $resourceType,
+        int $resourceId,
+    ): int;
+
+
 }

@@ -126,6 +126,103 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         ));
     }
 
+public function deleteByResource(
+    string $resourceType,
+    int $resourceId,
+): int {
+    $resourceType = trim($resourceType);
+
+    if ($resourceType === '' || $resourceId <= 0) {
+        return 0;
+    }
+
+    $stmt = $this->pdo->prepare(
+        'SELECT id
+           FROM rex_reservations
+          WHERE resource_type = :resource_type
+            AND resource_id = :resource_id
+          ORDER BY id ASC'
+    );
+
+    $stmt->execute([
+        ':resource_type' => $resourceType,
+        ':resource_id' => $resourceId,
+    ]);
+
+    $reservationIds = array_values(array_filter(
+        array_map(
+            'intval',
+            $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [],
+        ),
+        static fn(int $id): bool => $id > 0,
+    ));
+
+    if ($reservationIds === []) {
+        return 0;
+    }
+
+    $placeholders = [];
+    $params = [];
+
+    foreach ($reservationIds as $index => $reservationId) {
+        $placeholder = ':rex_id_' . $index;
+        $placeholders[] = $placeholder;
+        $params[$placeholder] = $reservationId;
+    }
+
+    $in = implode(', ', $placeholders);
+
+    /*
+     * Other REX reservations may point at one of these reservations
+     * as a fallback. Clear those references before deleting.
+     */
+    $stmt = $this->pdo->prepare(
+        "UPDATE rex_reservations
+            SET fallback_rex_id = NULL,
+                updated_at = NOW()
+          WHERE fallback_rex_id IN ({$in})"
+    );
+    $stmt->execute($params);
+
+    /*
+     * Delete relationship edges in both directions.
+     */
+    $stmt = $this->pdo->prepare(
+        "DELETE FROM rex_reservation_links
+          WHERE parent_reservation_id IN ({$in})"
+    );
+    $stmt->execute($params);
+
+    $stmt = $this->pdo->prepare(
+        "DELETE FROM rex_reservation_links
+          WHERE child_reservation_id IN ({$in})"
+    );
+    $stmt->execute($params);
+
+    /*
+     * Aliases are owned by the reservation.
+     */
+    $stmt = $this->pdo->prepare(
+        "DELETE FROM rex_aliases
+          WHERE reservation_id IN ({$in})"
+    );
+    $stmt->execute($params);
+
+    /*
+     * Finally delete the reservations themselves.
+     */
+    $stmt = $this->pdo->prepare(
+        "DELETE FROM rex_reservations
+          WHERE id IN ({$in})"
+    );
+    $stmt->execute($params);
+
+    return $stmt->rowCount();
+}
+
+
+
+
     public function search(RexReservationSearchCriteria $criteria): array
     {
         $where = [];

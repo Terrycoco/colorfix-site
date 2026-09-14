@@ -20,7 +20,7 @@ const TEXT_AFTER_IMAGE_TITLE_DELAY_MS = 650;
 const Player = forwardRef(function Player({
   slides = [],
   startIndex = 0,
-  playlistInstanceId,
+  playlistId,
   onAbort,
   onLikeChange,
   onPlaybackEnd,
@@ -143,17 +143,17 @@ function queueFadeReady(img, stageEl) {
     setPrevIndex(null);
     setIsFading(false);
     setTitleFull(false);
-    setLikedSet(readLikedSet(playlistInstanceId));
+    setLikedSet(readLikedSet(playlistId));
     setShowAdvanceHint(true);
     didLikeInteractRef.current = false;
-  }, [safeStart, playlistInstanceId]);
+  }, [safeStart, playlistId]);
 
   useEffect(() => {
     setCacheBustEnabled(getImageRefreshEnabled());
-    setLikedSet(readLikedSet(playlistInstanceId));
+    setLikedSet(readLikedSet(playlistId));
     setShowAdvanceHint(true);
     didLikeInteractRef.current = false;
-  }, [slides, playlistInstanceId]);
+  }, [slides, playlistId]);
 
   const isPaletteItem = (item) => {
     if (!item) return false;
@@ -200,8 +200,8 @@ function queueFadeReady(img, stageEl) {
 
 
   useEffect(() => {
-    writeLikedSet(playlistInstanceId, likedSet);
-  }, [likedSet, playlistInstanceId]);
+    writeLikedSet(playlistId, likedSet);
+  }, [likedSet, playlistId]);
 
   function isItemStarrable(item) {
     if (hideStars) return false;
@@ -828,15 +828,15 @@ function startPlayback(nextMode, nextIndex = 0) {
   );
 });
 
-function getLikeStorageKey(playlistInstanceId) {
-  const id = playlistInstanceId ?? "";
+function getLikeStorageKey(playlistId) {
+  const id = playlistId ?? "";
   if (!id) return "";
   return `playlist-liked:${id}`;
 }
 
-function readLikedSet(playlistInstanceId) {
+function readLikedSet(playlistId) {
   if (typeof window === "undefined") return new Set();
-  const key = getLikeStorageKey(playlistInstanceId);
+  const key = getLikeStorageKey(playlistId);
   if (!key) return new Set();
   try {
     const raw = window.localStorage.getItem(key);
@@ -880,9 +880,9 @@ function findLastReplayableIndex(items) {
   return Math.max(0, list.length - 1);
 }
 
-function writeLikedSet(playlistInstanceId, likedSet) {
+function writeLikedSet(playlistId, likedSet) {
   if (typeof window === "undefined") return;
-  const key = getLikeStorageKey(playlistInstanceId);
+  const key = getLikeStorageKey(playlistId);
   if (!key) return;
   try {
     window.localStorage.setItem(key, JSON.stringify(Array.from(likedSet)));

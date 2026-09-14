@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Entities\PlaylistItem;
+use App\PLAYLISTS\Entities\PlaylistItem;
 use App\Repos\PdoProjectRepository;
 use DomainException;
 use RuntimeException;

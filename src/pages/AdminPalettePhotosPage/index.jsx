@@ -107,27 +107,54 @@ function entryToSwatch(entry) {
 }
 
 function playlistShareUrl(playlist) {
-  const prospectId = Number(playlist?.prospect_playlist_instance_id || 0);
-  if (prospectId > 0) {
-    return `/share/playlist.php?id=${prospectId}`;
-  }
-  const id = Number(playlist?.playlist_id || 0);
-  return id > 0 ? `/playlist/share/id=${id}` : "";
+  const id =
+    Number(
+      playlist?.playlist_id || 0
+    );
+
+  return id > 0
+    ? `/playlist/share/id=${id}`
+    : "";
 }
 
 function playlistLabel(playlist) {
-  const id = Number(playlist?.playlist_id || 0);
-  const title = String(playlist?.title || playlist?.headline || "").trim();
-  const type = String(playlist?.type || "").trim();
-  const prospectId = Number(playlist?.prospect_playlist_instance_id || 0);
-  const parts = [];
-  if (title) parts.push(title);
-  if (type) parts.push(type);
-  if (id > 0) parts.push(`#${id}`);
-  if (prospectId > 0) parts.push(`prospect instance #${prospectId}`);
-  return parts.join(" - ") || "Untitled playlist";
-}
+  const id =
+    Number(
+      playlist?.playlist_id || 0
+    );
 
+  const title =
+    String(
+      playlist?.title ||
+      playlist?.headline ||
+      ""
+    ).trim();
+
+  const type =
+    String(
+      playlist?.type || ""
+    ).trim();
+
+  const parts = [];
+
+  if (title) {
+    parts.push(title);
+  }
+
+  if (type) {
+    parts.push(type);
+  }
+
+  if (id > 0) {
+    parts.push(`#${id}`);
+  }
+
+  return (
+    parts.join(" - ")
+    ||
+    "Untitled playlist"
+  );
+}
 function parseJsonObject(value) {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
   if (typeof value !== "string" || !value.trim()) return {};

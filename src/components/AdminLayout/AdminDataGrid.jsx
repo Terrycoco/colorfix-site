@@ -62,7 +62,8 @@ export default function AdminDataGrid({
    * drawer={{
    *   title: (item) => "...",
    *   render: ({ item, close }) => <... />,
-   *   footer: ({ item, close }) => <... />,
+   *   footer: ({ item, close, closing }) => <... />,
+   *   beforeClose: async ({ item }) => true,
    *   width: 380,
    *   padded: true,
    *   portal: true,
@@ -111,6 +112,13 @@ export default function AdminDataGrid({
     setDrawerItemKey,
   ] = useState(
     null
+  );
+
+  const [
+    drawerClosing,
+    setDrawerClosing,
+  ] = useState(
+    false
   );
 
 
@@ -410,10 +418,55 @@ export default function AdminDataGrid({
   }
 
 
-  function closeDrawer() {
-    setDrawerOpen(
-      false
+  async function requestCloseDrawer() {
+    if (
+      !drawerOpen ||
+      drawerClosing
+    ) {
+      return false;
+    }
+
+    setDrawerClosing(
+      true
     );
+
+    try {
+      if (
+        typeof drawer?.beforeClose ===
+        "function"
+      ) {
+        const result =
+          await drawer.beforeClose({
+            item:
+              drawerItem,
+          });
+
+        if (
+          result ===
+          false
+        ) {
+          return false;
+        }
+      }
+
+      setDrawerOpen(
+        false
+      );
+
+      return true;
+
+    } catch (error) {
+      drawer?.onCloseError?.(
+        error
+      );
+
+      return false;
+
+    } finally {
+      setDrawerClosing(
+        false
+      );
+    }
   }
 
 
@@ -446,9 +499,7 @@ export default function AdminDataGrid({
       );
 
       if (drawerOpen) {
-        setDrawerOpen(
-          false
-        );
+        void requestCloseDrawer();
 
         return;
       }
@@ -649,7 +700,7 @@ export default function AdminDataGrid({
             drawerTitle
           }
           onClose={
-            closeDrawer
+            requestCloseDrawer
           }
           footer={
             typeof drawer
@@ -659,7 +710,10 @@ export default function AdminDataGrid({
                   item:
                     drawerItem,
                   close:
-                    closeDrawer,
+                    requestCloseDrawer,
+
+                  closing:
+                    drawerClosing,
                 })
               : drawer
                   ?.footer ??
@@ -685,7 +739,10 @@ export default function AdminDataGrid({
             item:
               drawerItem,
             close:
-              closeDrawer,
+              requestCloseDrawer,
+
+            closing:
+              drawerClosing,
           })}
         </AdminWorkbenchDrawer>
       ) : null}

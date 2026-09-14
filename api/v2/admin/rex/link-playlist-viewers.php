@@ -21,7 +21,7 @@ use App\REX\Services\RexReservationRelationships;
 use App\REX\Services\RexReserver;
 use App\REX\Services\RexTokenGenerator;
 use App\Repos\PdoPaletteViewerRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {

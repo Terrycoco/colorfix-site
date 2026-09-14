@@ -114,6 +114,53 @@
   border-bottom: 1px solid var(--admin-border-soft);
 }
 
+.admin-list-pane__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+.admin-list-pane__sort-button {
+  appearance: none;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+  color: var(--admin-muted);
+  border-radius: 5px;
+  padding: 4px 9px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.admin-list-pane__sort-button:hover {
+  color: var(--admin-text);
+  border-color: var(--admin-selected);
+}
+
+.admin-list-pane__sort-button.is-active {
+  background:
+    color-mix(
+      in srgb,
+      var(--admin-selected) 18%,
+      var(--admin-bg)
+    );
+  border-color:
+    color-mix(
+      in srgb,
+      var(--admin-selected) 55%,
+      var(--admin-border)
+    );
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.admin-list-pane__sort-button:focus-visible {
+  outline: 2px solid var(--admin-selected);
+  outline-offset: 2px;
+}
+
 .admin-list-pane__body {
   flex: 1;
   min-height: 0;

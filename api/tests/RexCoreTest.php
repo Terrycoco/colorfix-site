@@ -25,7 +25,7 @@ use App\REX\Services\RexReservationRelationships;
 use App\REX\Services\RexTokenGenerator;
 use App\REX\DTO\RexReservationDescriptor;
 use App\Services\ProjectReleaseSelectionService;
-use App\Entities\PlaylistItem;
+use App\PLAYLISTS\Entities\PlaylistItem;
 
 final class RexCoreTestRepository implements RexReservationRepositoryInterface
 {

@@ -1,8 +1,14 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 
 function cssSize(value, fallback) {
-  if (value === null || value === undefined || value === "") return fallback;
-  return typeof value === "number" ? `${value}px` : String(value);
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  return typeof value === "number"
+    ? `${value}px`
+    : String(value);
 }
 
 export default function AdminWorkbenchDrawer({
@@ -10,30 +16,57 @@ export default function AdminWorkbenchDrawer({
   width = 380,
   title = "",
   onClose,
+  beforeClose = null,
   children,
   footer = null,
   portal = false,
   padded = false,
   className = "",
 }) {
+  const [closing, setClosing] = useState(false);
+
   if (!open) return null;
 
   const cssWidth = cssSize(width, "380px");
 
+  async function requestClose() {
+    if (!onClose || closing) return;
+
+    setClosing(true);
+
+    try {
+      if (typeof beforeClose === "function") {
+        const result = await beforeClose();
+
+        if (result === false) {
+          return;
+        }
+      }
+
+      onClose();
+    } finally {
+      setClosing(false);
+    }
+  }
+
   function handleDrawerDoubleClick(event) {
-    if (!onClose) return;
+    if (!onClose || closing) return;
 
     /*
      * Use capture so the drawer always receives the double-click,
      * even if something inside the drawer stops propagation.
      */
     event.preventDefault();
-    onClose();
+    requestClose();
   }
 
   const drawer = (
     <aside
-      className={["admin-workbench-drawer", className].filter(Boolean).join(" ")}
+      className={[
+        "admin-workbench-drawer",
+        closing ? "is-closing" : "",
+        className,
+      ].filter(Boolean).join(" ")}
       style={{
         "--admin-workbench-drawer-width": cssWidth,
       }}
@@ -48,7 +81,8 @@ export default function AdminWorkbenchDrawer({
           <button
             type="button"
             className="admin-workbench-drawer__close"
-            onClick={onClose}
+            disabled={closing}
+            onClick={requestClose}
             aria-label="Close drawer"
             title="Close"
           >
@@ -79,7 +113,9 @@ export default function AdminWorkbenchDrawer({
   return createPortal(
     <div
       className="admin-workbench-drawer-host"
-      style={{ "--admin-workbench-drawer-width": cssWidth }}
+      style={{
+        "--admin-workbench-drawer-width": cssWidth,
+      }}
     >
       {drawer}
     </div>,

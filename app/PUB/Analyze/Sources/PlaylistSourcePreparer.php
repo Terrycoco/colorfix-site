@@ -5,7 +5,7 @@ namespace App\PUB\Analyze\Sources;
 
 use App\PUB\Entities\PhotoEntity;
 use App\PV\PVService;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use RuntimeException;
 
 /**

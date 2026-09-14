@@ -16,7 +16,7 @@ require_once __DIR__ . '/../auth.php';
 
 use App\REX\DTO\RexReservationSearchCriteria;
 use App\REX\Repos\PdoRexReservationRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {

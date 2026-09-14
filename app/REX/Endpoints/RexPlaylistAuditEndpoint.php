@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace App\REX\Endpoints;
 
 use App\PV\Repos\PdoPVRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexPlaylistAudit;
 use InvalidArgumentException;

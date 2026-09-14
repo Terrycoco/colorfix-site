@@ -1,11 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\PLAYLISTS\Services;
 
+
+use App\Services\PhotoLibraryService;
+use App\Services\PhotoRenderingService;
 use App\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoPhotoRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use PDO;
 use Throwable;
 
@@ -505,13 +508,13 @@ final class PlaylistPhotoLibrarySyncService
             return false;
         }
 
-        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 2)), '/');
+        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? dirname(__DIR__, 3)), '/');
         $primary = $docRoot . $cleanPath;
         if (is_file($primary)) {
             return true;
         }
 
-        $fallback = dirname(__DIR__, 2) . $cleanPath;
+        $fallback = dirname(__DIR__, 3) . $cleanPath;
         return is_file($fallback);
     }
 

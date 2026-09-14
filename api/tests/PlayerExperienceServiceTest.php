@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
 
-use App\Services\PlayerExperienceService;
-use App\Entities\PlaylistItem;
+use App\PLAYLISTS\Services\PlaylistExperienceService;
+use App\PLAYLISTS\Entities\PlaylistItem;
 
 test('player-experience builds playback plan', function () {
 
-    $svc = new PlayerExperienceService();
+    $svc = new PlaylistExperienceService();
 
     // must exist in PdoPlaylistRepository
     $playlistId = 'cottage_makeover_01';
@@ -52,7 +52,7 @@ test('player-experience builds playback plan', function () {
 
 test('player-experience applies start offset', function () {
 
-    $svc = new PlayerExperienceService();
+    $svc = new PlaylistExperienceService();
     $playlistId = 'cottage_makeover_01';
 
     $full = $svc->buildPlaybackPlan($playlistId, null);
@@ -76,7 +76,7 @@ test('player-experience applies start offset', function () {
 
 test('player-experience normalizes invalid start offset', function () {
 
-    $svc = new PlayerExperienceService();
+    $svc = new PlaylistExperienceService();
     $playlistId = 'cottage_makeover_01';
 
     $full = $svc->buildPlaybackPlan($playlistId, null);
@@ -96,7 +96,7 @@ test('player-experience normalizes invalid start offset', function () {
 
 test('player-experience throws for unknown playlist', function () {
 
-    $svc = new PlayerExperienceService();
+    $svc = new PlaylistExperienceService();
 
     try {
         $svc->buildPlaybackPlan('does_not_exist_123');

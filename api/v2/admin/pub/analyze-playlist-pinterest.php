@@ -17,7 +17,7 @@ use App\PUB\Analyze\Pinterest\PaletteAnalyzer;
 use App\PUB\Analyze\Pinterest\PlaylistPinterestAnalyzer;
 use App\PUB\Analyze\Pinterest\Support\PlaylistPaletteResolver;
 
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;

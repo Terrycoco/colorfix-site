@@ -1,10 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\PLAYLISTS\Services;
 
-use App\Repos\PdoPlaylistRepository;
-use App\Repos\PdoPlaylistInstanceRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
@@ -14,233 +13,25 @@ use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
-use App\Entities\Playlist;
-use App\Entities\PlaylistItem;
-use App\Entities\PlaylistInstance;
+use App\PLAYLISTS\Entities\Playlist;
+use App\PLAYLISTS\Entities\PlaylistItem;
+use App\Services\ProjectReleaseSelectionService;
+use App\Services\PaletteViewerTokenService;
 use App\Entities\PlayerExperience;
 use DomainException;
 use PDO;
 use RuntimeException;
 use App\PV\PVService;
 
-class PlayerExperienceService
+class PlaylistExperienceService
 {
     /** @var array<string, float> */
     private array $lastTiming = [];
-    private ?string $resolvedProjectExperienceKey = null;
-    private ?int $resolvedProjectId = null;
-    private ?string $resolvedProjectCurrentRelease = null;
     private ?ProjectReleaseSelectionService $projectReleaseSelection = null;
 
     public function __construct(
         protected PDO $pdo
     ) {}
-
-    public function buildPlaybackPlanFromInstance(
-        int $playlistInstanceId,
-        ?int $start = null,
-        ?string $ctaContext = null,
-        ?int $addCtaGroupId = null,
-        ?array $startTarget = null
-    ): array {
-        $startedAt = microtime(true);
-
-        // 1. Load playlist instance
-        $instanceRepo = new PdoPlaylistInstanceRepository($this->pdo);
-        $instance = $instanceRepo->getById($playlistInstanceId);
-        $this->markTiming('load_instance', $startedAt);
-
-        if (!$instance instanceof PlaylistInstance) {
-            throw new RuntimeException("Playlist instance not found: {$playlistInstanceId}");
-        }
-
-        $experienceSource = 'default_public';
-        $this->resolvedProjectExperienceKey = null;
-        $this->resolvedProjectId = null;
-        $this->resolvedProjectCurrentRelease = null;
-        $projectExperience = $this->resolveProjectPlayerExperience((int)$instance->playlistId);
-        if ($projectExperience instanceof PlayerExperience) {
-            $experience = $projectExperience;
-            $experienceSource = 'project';
-        } else {
-            $experience = $this->resolvePlaylistInstancePlayerExperience($instance);
-            if ($experience instanceof PlayerExperience) {
-                $experienceSource = 'playlist_instance';
-            }
-        }
-        $experienceBacked = $experience instanceof PlayerExperience;
-        $slideFlag = $experienceBacked ? $this->normalizeSlideFlag($experience->slideFlag) : 'site';
-
-        // 2. Load playlist
-        $playlistStartedAt = microtime(true);
-        $playlistRepo = new PdoPlaylistRepository($this->pdo);
-        $playlist = $playlistRepo->getById((string)$instance->playlistId, $slideFlag);
-        $this->markTiming('load_playlist', $playlistStartedAt);
-
-        if (!$playlist instanceof Playlist) {
-            throw new RuntimeException(
-                "Playlist {$instance->playlistId} not found for instance {$playlistInstanceId}"
-            );
-        }
-
-        // 3. Flatten playlist source items.
-        //
-        // cover-image is authored source material, not a playable slide.
-        // Keep it long enough to resolve the playlist's canonical public
-        // representation, then remove it before Player-specific work.
-        $itemsStartedAt = microtime(true);
-        $sourceItems = $this->flattenItems($playlist);
-        if (
-            $experienceSource === 'project'
-            && $this->resolvedProjectId !== null
-            && $this->resolvedProjectExperienceKey !== null
-            && $this->resolvedProjectCurrentRelease !== null
-        ) {
-            $sourceItems = $this->filterProjectItemsForRelease(
-                $sourceItems,
-                $this->resolvedProjectExperienceKey,
-                $this->resolvedProjectCurrentRelease
-            );
-        }
-        $this->hydrateItemImages($sourceItems);
-
-        $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
-        $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
-
-        $items = $this->filterPlayableItems($sourceItems);
-
-        $paletteViewerKey = $experienceBacked ? $experience->paletteViewerKey : 'full_palette';
-        $showSlidePalettePrompt = $experienceBacked
-            ? $this->shouldShowSlidePalettePrompt($experience)
-            : true;
-        $this->hydratePaletteViewerUrls($items, $paletteViewerKey, (int)($instance->id ?? 0));
-        $this->markTiming('hydrate_items', $itemsStartedAt);
-        $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
-
-        // 4. Load CTAs for this instance (optionally scoped by context) + optional add-on group.
-        $ctaStartedAt = microtime(true);
-        if ($experienceBacked) {
-            $ctaRepo = new PdoCtaRepository($this->pdo);
-            $ctas = $ctaRepo->getByGroupId($experience->ctaPageId);
-        } else {
-            $overrides = [];
-            if (!empty($instance->ctaOverrides)) {
-                $decoded = json_decode($instance->ctaOverrides, true);
-                if (is_array($decoded)) {
-                    $overrides = $decoded;
-                }
-            }
-
-            $ctas = [];
-            $ctaRepo = null;
-
-            $overrideIds = $overrides['_cta_ids'] ?? null;
-            if (is_array($overrideIds)) {
-                // If explicit CTA ids are provided, use only those.
-                $ctaRepo = new PdoCtaRepository($this->pdo);
-                $ctas = $ctaRepo->getByIds($overrideIds);
-            } else {
-                if ($instance->ctaGroupId !== null) {
-                    $ctaRepo = new PdoCtaRepository($this->pdo);
-                    $ctas = $ctaRepo->getByGroupId($instance->ctaGroupId);
-                }
-                if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
-                    if ($instance->ctaGroupId !== null && (int)$instance->ctaGroupId === (int)$addCtaGroupId) {
-                        // Avoid re-adding the same default group.
-                        $addCtaGroupId = null;
-                    }
-                }
-                if ($addCtaGroupId !== null && $addCtaGroupId > 0) {
-                    if ($ctaRepo === null) $ctaRepo = new PdoCtaRepository($this->pdo);
-                    $extra = $ctaRepo->getByGroupId($addCtaGroupId);
-                    if ($extra) {
-                        $ctas = $this->mergeCtas($ctas, $extra);
-                    }
-                }
-                $ctas = $this->applyCtaInclusions($ctas, $overrides);
-            }
-
-            if (!empty($ctas)) {
-                $ctas = $this->applyCtaExclusions($ctas, $overrides);
-                $ctas = $this->applyCtaOverrides($ctas, $overrides);
-            }
-        }
-        if (!empty($ctas)) {
-            $ctas = $this->hydrateArticleCtas($ctas);
-        }
-        $this->markTiming('load_ctas', $ctaStartedAt);
-
-        $setsStartedAt = microtime(true);
-        $thumbsEnabled = $this->shouldUseThumbs($items);
-        $setIds = $this->findPlaylistInstanceSetIds($instance->id ?? 0);
-        $this->markTiming('load_sets', $setsStartedAt);
-        $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
-
-        // 5. Return full playback plan
-        $displayTitle = $instance->displayTitle ?? $instance->instanceName ?? $playlist->title;
-        $pageH1 = $this->firstNonEmpty([
-            $playlist->meta['headline'] ?? null,
-            $displayTitle,
-            $playlist->title,
-        ]);
-        $projectSummary = $this->firstNonEmpty([
-            $playlist->meta['dek'] ?? null,
-            $playlist->meta['meta_description'] ?? null,
-            $instance->shareDescription,
-        ]);
-        $plan = [
-            'playlist_instance_id' => $instance->id,
-            'playlist_id'          => $playlist->playlist_id,
-            'title'                => $playlist->title,
-            'display_title'        => $displayTitle,
-            'slug'                 => $instance->slug,
-            'page_h1'              => $pageH1,
-            'project_summary'      => $projectSummary,
-            'type'                 => $playlist->type,
-            'total_items'          => count($items),
-            'start_index'          => $startIndex,
-            'start_target'         => $this->startTargetSummary($startTarget, $startIndex),
-            'items'                => $items,
-            'ctas'                 => $ctas,
-            'cta_context_key'      => $instance->ctaContextKey,
-            'audience'             => $instance->audience,
-            'palette_viewer_cta_group_id' => $instance->paletteViewerCtaGroupId,
-            'show_slide_palette_prompt' => $showSlidePalettePrompt,
-            'thumbs_enabled'       => $thumbsEnabled,
-            'demo_enabled'         => $instance->demoEnabled,
-            'share_enabled'        => $instance->shareEnabled,
-            'share_title'          => $this->firstNonEmpty([
-                $instance->shareTitle,
-                $resolvedShareTitle,
-                $displayTitle,
-            ]),
-            'share_description'    => $instance->shareDescription,
-            'share_image_url'      => $instance->shareImageUrl ?: $resolvedShareImageUrl,
-            'skip_intro_on_replay' => $instance->skipIntroOnReplay,
-            'hide_stars'           => $instance->hideStars,
-            'playlist_instance_set_ids' => $setIds,
-        ];
-        if ($experienceBacked) {
-            $plan['player_experience_id'] = $experience->playerExperienceId;
-            $plan['experience_key'] = $experienceSource === 'project' && $this->resolvedProjectExperienceKey !== null
-                ? $this->resolvedProjectExperienceKey
-                : $experience->experienceKey;
-            $plan['player_experience_config_key'] = $experience->experienceKey;
-            $plan['experience_name'] = $experience->name;
-            $plan['slide_flag'] = $slideFlag;
-            $plan['palette_viewer_key'] = $paletteViewerKey;
-            $plan['cta_page_id'] = $experience->ctaPageId;
-            $plan['experience_source'] = $experienceSource;
-        } else {
-            $plan['experience_key'] = 'public';
-            $plan['experience_name'] = 'Public';
-            $plan['slide_flag'] = $slideFlag;
-            $plan['palette_viewer_key'] = $paletteViewerKey;
-            $plan['experience_source'] = 'default_public';
-        }
-
-        return $plan;
-    }
 
 public function buildPlaybackPlanFromPlaylistExperience(
     int $playlistId,
@@ -830,17 +621,6 @@ public function buildPlaybackPlanFromProjectExperience(
         return $flat;
     }
 
-    private function resolvePlaylistInstancePlayerExperience(PlaylistInstance $instance): ?PlayerExperience
-    {
-        $id = (int)($instance->playerExperienceId ?? 0);
-        $repo = new PdoPlayerExperienceRepository($this->pdo);
-        if ($id <= 0) {
-            return $this->validateResolvedExperience($repo->getByExperienceKey('public'), 'default Public experience');
-        }
-        $experience = $repo->getById($id);
-        return $this->validateResolvedExperience($experience, "referenced experience {$id}");
-    }
-
     private function resolveExperienceByKey(string $experienceKey, string $label): PlayerExperience
     {
         $repo = new PdoPlayerExperienceRepository($this->pdo);
@@ -852,51 +632,9 @@ public function buildPlaybackPlanFromProjectExperience(
         return $resolved;
     }
 
-    private function resolveProjectPlayerExperience(int $playlistId): ?PlayerExperience
-    {
-        if ($playlistId <= 0 || !$this->tableExists('project_playlists') || !$this->columnExists('projects', 'experience_key')) {
-            return null;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                p.id AS project_id,
-                p.experience_key,
-                p.current_release
-             FROM project_playlists pp
-             JOIN projects p
-               ON p.id = pp.project_id
-             WHERE pp.playlist_id = :playlist_id
-             ORDER BY pp.updated_at DESC, pp.project_playlist_id DESC
-             LIMIT 1"
-        );
-        $stmt->execute(['playlist_id' => $playlistId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $experienceKey = strtolower(trim((string)($row['experience_key'] ?? '')));
-        if ($experienceKey === '') {
-            return null;
-        }
-        $currentRelease = $this->normalizeProjectCurrentRelease((string)($row['current_release'] ?? '1'));
-        $this->resolvedProjectExperienceKey = $experienceKey;
-        $this->resolvedProjectId = isset($row['project_id']) ? (int)$row['project_id'] : null;
-        $this->resolvedProjectCurrentRelease = $currentRelease;
-        $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
-
-        $repo = new PdoPlayerExperienceRepository($this->pdo);
-        $experience = $repo->getByExperienceKey($experienceKey);
-  
-
-        return $this->validateResolvedExperience($experience, "project experience '{$experienceKey}'");
-    }
-
     private function loadProjectCurrentRelease(int $projectId): string
     {
         return $this->projectReleaseSelection()->currentReleaseForProject($projectId);
-    }
-
-    private function normalizeProjectCurrentRelease(string $value): string
-    {
-        return $this->projectReleaseSelection()->normalizeCurrentRelease($value);
     }
 
     private function assertProjectExperienceAllowedForRelease(string $experienceKey, string $currentRelease): void
@@ -1017,34 +755,6 @@ public function buildPlaybackPlanFromProjectExperience(
         }
         return strtolower(trim($experience->experienceKey)) !== 'concept'
             && strtolower(trim($experience->slideFlag)) !== 'concept';
-    }
-
-    private function tableExists(string $table): bool
-    {
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*)
-             FROM INFORMATION_SCHEMA.TABLES
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = :table"
-        );
-        $stmt->execute(['table' => $table]);
-        return (int)$stmt->fetchColumn() > 0;
-    }
-
-    private function columnExists(string $table, string $column): bool
-    {
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*)
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = :table
-               AND COLUMN_NAME = :column"
-        );
-        $stmt->execute([
-            'table' => $table,
-            'column' => $column,
-        ]);
-        return (int)$stmt->fetchColumn() > 0;
     }
 
     private function normalizeStartIndex(?int $start, int $count): int
@@ -1337,39 +1047,6 @@ public function buildPlaybackPlanFromProjectExperience(
     /**
      * @param PlaylistItem[] $items
      */
-    private function hydratePaletteViewerUrls(array $items, string $paletteViewerKey, int $playlistInstanceId): void
-    {
-        $paletteViewerKey = strtolower(trim($paletteViewerKey));
-        if ($paletteViewerKey === 'none') {
-            return;
-        }
-
-        $tokenService = new PaletteViewerTokenService($this->pdo);
-        foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) continue;
-            if (!$this->isPaletteViewerEligibleItem($item)) continue;
-
-            $paletteHash = trim((string)($item->palette_hash ?? ''));
-            if ($paletteHash === '') continue;
-
-            $setId = (int)($item->saved_palette_set_id ?? 0);
-            $item->palette_viewer_url = $tokenService->createSavedPaletteUrl(
-                $paletteHash,
-                $setId > 0 ? $setId : null,
-                $paletteViewerKey,
-                $playlistInstanceId
-            );
-            if (in_array($paletteViewerKey, ['concept', 'client'], true)) {
-                $item->painter_palette_viewer_url = $tokenService->createSavedPaletteUrl(
-                    $paletteHash,
-                    $setId > 0 ? $setId : null,
-                    'painter',
-                    $playlistInstanceId
-                );
-            }
-        }
-    }
-
     /**
      * @param PlaylistItem[] $items
      */
@@ -1681,138 +1358,6 @@ public function buildPlaybackPlanFromProjectExperience(
     /**
      * @param PlaylistItem[] $items
      */
-    private function shouldUseThumbs(array $items): bool
-    {
-        $seen = [];
-        foreach ($items as $item) {
-            $type = strtolower((string)($item->type ?? 'normal'));
-            if (in_array($type, ['intro', 'before', 'text', 'hue-wheel', 'brand-bumper', 'cover-image', 'non-palette'], true)) {
-                continue;
-            }
-            if (!empty($item->exclude_from_thumbs)) continue;
-            if (strtolower((string)($item->saved_palette_photo_type ?? '')) === 'before') continue;
-            $paletteHash = trim((string)($item->palette_hash ?? ''));
-            $savedPaletteSetId = (int)($item->saved_palette_set_id ?? 0);
-            $apId = (int)($item->ap_id ?? 0);
-            if ($paletteHash !== '') {
-                $key = 'saved:' . $paletteHash . ':' . ($savedPaletteSetId > 0 ? (string)$savedPaletteSetId : 'default');
-            } elseif ($savedPaletteSetId > 0) {
-                $key = 'saved-set:' . $savedPaletteSetId;
-            } elseif ($apId > 0) {
-                $key = 'applied:' . $apId;
-            } else {
-                continue;
-            }
-            $seen[$key] = true;
-            if (count($seen) > 1) return true;
-        }
-        return false;
-    }
-
-    /**
-     * @return int[]
-     */
-    private function findPlaylistInstanceSetIds(int $playlistInstanceId): array
-    {
-        if ($playlistInstanceId <= 0) return [];
-        $stmt = $this->pdo->prepare(
-            "SELECT DISTINCT playlist_instance_set_id
-             FROM playlist_instance_set_items
-             WHERE playlist_instance_id = :pid
-             ORDER BY playlist_instance_set_id ASC"
-        );
-        $stmt->execute(['pid' => $playlistInstanceId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
-        return array_values(array_map('intval', $rows));
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $ctas
-     * @param array<string, array<string, mixed>> $overrides
-     * @return array<int, array<string, mixed>>
-     */
-    private function applyCtaOverrides(array $ctas, array $overrides): array
-    {
-        foreach ($ctas as $idx => $cta) {
-            $ctaId = $cta['cta_id'] ?? null;
-            if ($ctaId === null) continue;
-            $key = (string)$ctaId;
-            if (!isset($overrides[$key]) || !is_array($overrides[$key])) continue;
-
-            $base = [];
-            if (!empty($cta['params'])) {
-                $decoded = json_decode((string)$cta['params'], true);
-                if (is_array($decoded)) $base = $decoded;
-            }
-            $merged = array_merge($base, $overrides[$key]);
-            $cta['params'] = json_encode($merged, JSON_UNESCAPED_SLASHES);
-            $ctas[$idx] = $cta;
-        }
-
-        return $ctas;
-    }
-
-    /**
-     * @param array<int, array<string, mixed>> $base
-     * @param array<int, array<string, mixed>> $extra
-     * @return array<int, array<string, mixed>>
-     */
-    private function mergeCtas(array $base, array $extra): array
-    {
-        if (empty($base)) return $extra;
-        if (empty($extra)) return $base;
-
-        $seen = [];
-        foreach ($base as $cta) {
-            if (isset($cta['cta_id'])) $seen[(string)$cta['cta_id']] = true;
-        }
-        foreach ($extra as $cta) {
-            $id = $cta['cta_id'] ?? null;
-            if ($id === null) {
-                $base[] = $cta;
-                continue;
-            }
-            $key = (string)$id;
-            if (isset($seen[$key])) continue;
-            $seen[$key] = true;
-            $base[] = $cta;
-        }
-
-        return $base;
-    }
-
-    private function applyCtaInclusions(array $ctas, array $overrides): array
-    {
-        $extra = $overrides['_cta_ids'] ?? [];
-        if (!is_array($extra) || !$extra) return $ctas;
-        $repo = new PdoCtaRepository($this->pdo);
-        $rows = $repo->getByIds($extra);
-        if (!$rows) return $ctas;
-        $seen = [];
-        foreach ($ctas as $cta) {
-            $id = $cta['cta_id'] ?? null;
-            if ($id !== null) $seen[(string)$id] = true;
-        }
-        foreach ($rows as $row) {
-            $id = $row['cta_id'] ?? null;
-            if ($id !== null && isset($seen[(string)$id])) continue;
-            if ($id !== null) $seen[(string)$id] = true;
-            $ctas[] = $row;
-        }
-        return $ctas;
-    }
-
-    private function applyCtaExclusions(array $ctas, array $overrides): array
-    {
-        $exclude = $overrides['_cta_exclude_ids'] ?? [];
-        if (!is_array($exclude) || !$exclude) return $ctas;
-        $set = array_fill_keys(array_map('strval', $exclude), true);
-        return array_values(array_filter($ctas, function ($cta) use ($set) {
-            $id = $cta['cta_id'] ?? null;
-            return $id === null ? true : !isset($set[(string)$id]);
-        }));
-    }
-
     private function hydrateArticleCtas(array $ctas): array
     {
         $repo = new PdoArticleRepository($this->pdo);

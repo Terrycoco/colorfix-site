@@ -68,11 +68,26 @@ button[disabled] {
 }
 
 .admin-field--compact {
-  flex: 0 0 220px;
+  flex: 0 0 auto;
 }
 
 .admin-field--grow {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+/*
+ * Width behavior only applies when fields are actually
+ * inside a horizontal toolbar.
+ */
+.admin-toolbar > .admin-field--compact {
+  flex: 0 1 220px;
+}
+
+.admin-toolbar > .admin-field--grow {
   flex: 1 1 360px;
+  min-width: 220px;
 }
 
 .admin-field__control--full {

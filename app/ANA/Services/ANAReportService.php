@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace App\ANA\Services;
 
 use App\ANA\Contracts\ANAReportRepositoryInterface;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\Repos\PdoArticleRepository;
 use App\REX\Resources\RexRouteCatalog;
 

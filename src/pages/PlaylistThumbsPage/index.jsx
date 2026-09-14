@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import "./playlist-thumbs.css";
-import { getLastPlaylistInstanceId, recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
+import { getLastPlaylistId, recordLastPlaylistId } from "@helpers/playlistHistory";
 import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 
 export default function PlaylistThumbsPage() {
@@ -36,7 +36,7 @@ export default function PlaylistThumbsPage() {
     : "";
   const originPlaylistUrl = withSourceParam(normalizeInternalRexPath(originPlaylistParam) || rexPlaylistUrl);
   const isHoaView = ctaAudience.toLowerCase() === "hoa";
-  const [lastPlaylistInstanceId, setLastPlaylistInstanceId] = useState(() => getLastPlaylistInstanceId());
+  const [lastPlaylistId, setLastPlaylistId] = useState(() => getLastPlaylistId());
 
   useEffect(() => {
     if (!playlistId && !reservationToken) {
@@ -48,7 +48,7 @@ export default function PlaylistThumbsPage() {
     if (reservationToken) {
       params.set("reservation_token", reservationToken);
     } else {
-      params.set("playlist_instance_id", playlistId);
+      params.set("playlist_id", playlistId);
     }
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     applySourceToParams(params);
@@ -96,8 +96,8 @@ export default function PlaylistThumbsPage() {
 
   useEffect(() => {
     if (!playlistId || reservationToken) return;
-    recordLastPlaylistInstanceId(playlistId);
-    setLastPlaylistInstanceId(String(playlistId));
+    recordLastPlaylistId(playlistId);
+    setLastPlaylistId(String(playlistId));
   }, [playlistId]);
 
   useEffect(() => {
@@ -221,7 +221,7 @@ export default function PlaylistThumbsPage() {
   const [thumbUrlByKey, setThumbUrlByKey] = useState({});
   const shouldShowBackToPlaylist = reservationToken
     ? Boolean(rexPlaylistUrl)
-    : Boolean(lastPlaylistInstanceId) && Boolean(playlistId) && String(lastPlaylistInstanceId) === String(playlistId);
+    : Boolean(lastPlaylistId) && Boolean(playlistId) && String(lastPlaylistId) === String(playlistId);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,7 +252,7 @@ export default function PlaylistThumbsPage() {
       navigate(withSourceParam(rexPlaylistUrl));
       return;
     }
-    const targetId = lastPlaylistInstanceId || playlistId;
+    const targetId = lastPlaylistId || playlistId;
     if (!targetId) return;
     navigate(withSourceParam(`/p/${targetId}`));
   };

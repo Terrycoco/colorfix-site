@@ -5,7 +5,7 @@ namespace App\REX\Services;
 
 use App\PV\Repos\PdoPVRepository;
 use App\Repos\PdoPaletteViewerRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
 use App\REX\Repos\PdoRexReservationRepository;

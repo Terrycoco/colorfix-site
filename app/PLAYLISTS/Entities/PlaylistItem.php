@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Entities;
+namespace App\PLAYLISTS\Entities;
 
 class PlaylistItem
 {

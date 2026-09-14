@@ -7,7 +7,7 @@ import { useAppState } from "@context/AppStateContext";
 import { SHARE_FOLDER } from "@helpers/config";
 import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
 import { getPaletteTargets } from "@helpers/playerPaletteItems";
-import { recordLastPlaylistInstanceId } from "@helpers/playlistHistory";
+import { recordLastPlaylistId } from "@helpers/playlistHistory";
 import { withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlayerPage/playerpage.css";
 
@@ -73,16 +73,16 @@ export default function PlayerExperience({ data }) {
   }, [data, demoParam, location.pathname, navigate, searchParams, thumbParam, ctaAudience]);
 
   useEffect(() => {
-    if (!data?.playlist_instance_id) return;
-    recordLastPlaylistInstanceId(data.playlist_instance_id);
-  }, [data?.playlist_instance_id]);
+    if (!data?.playlist_id) return;
+    recordLastPlaylistId(data.playlist_id);
+  }, [data?.playlist_id]);
 
   useEffect(() => {
     if (!data) return;
     const title = data?.page_h1 || data?.display_title || data?.title || "ColorFix Playlist";
     const description = data?.project_summary || data?.share_description || "";
     const image = String(data?.share_image_url || "").trim();
-    const slugOrId = data?.slug || data?.playlist_instance_id || playlistId;
+    const slugOrId = data?.slug || data?.playlist_id || playlistId;
     const canonicalPath = slugOrId ? `/playlist/${slugOrId}` : location.pathname;
     const canonicalUrl = `${window.location.origin}${canonicalPath}`;
     const absoluteImage = image.startsWith("http://") || image.startsWith("https://")
@@ -106,7 +106,7 @@ export default function PlayerExperience({ data }) {
     setPlaybackEnded(endParam);
     setLikedCount(0);
     setWatchNextCta(null);
-  }, [data?.playlist_instance_id, endParam]);
+  }, [data?.playlist_id, endParam]);
 
   function handleExit() {
     if (shouldCloseOnExit) {
@@ -292,35 +292,7 @@ export default function PlayerExperience({ data }) {
     ctaAudience,
   ]);
 
-  useEffect(() => {
-    const fromPicker = returnTo.startsWith("/picker");
-    if (!fromPicker) return;
-    if (sourceParam === "watch_next") return;
-
-    const setIds = new Set();
-    const pickerSetId = Number(psiParam || 0);
-    if (pickerSetId > 0) setIds.add(pickerSetId);
-
-    for (const setId of data?.playlist_instance_set_ids || []) {
-      const normalized = Number(setId || 0);
-      if (normalized > 0) setIds.add(normalized);
-    }
-
-    for (const cta of ctas || []) {
-      if ((cta?.key || "") !== "watch_next") continue;
-      const normalized = Number(
-        cta?.params?.playlist_instance_set_id ||
-        cta?.params?.set_id ||
-        0
-      );
-      if (normalized > 0) setIds.add(normalized);
-    }
-
-    for (const setId of setIds) {
-      clearWatchNextSeen(setId);
-      clearWatchNextSeenPlaylists(setId);
-    }
-  }, [ctas, data?.playlist_instance_id, data?.playlist_instance_set_ids, psiParam, returnTo, sourceParam]);
+  
 
   const visibleCTAs = useMemo(
     () => ctas.filter(isCtaVisible),
@@ -337,154 +309,7 @@ export default function PlayerExperience({ data }) {
     return baseVisibleCTAs;
   }, [baseVisibleCTAs, watchNextCta]);
 
-  useEffect(() => {
-    if (!data) {
-      setWatchNextCta(null);
-      return;
-    }
-    const baseCta = visibleCTAs.find((cta) => (cta?.key || "") === "watch_next");
-    const ctaSetId = Number(baseCta?.params?.playlist_instance_set_id || baseCta?.params?.set_id || 0);
-    const explicitSetId =
-      ctaSetId ||
-      Number(psiParam || 0);
-    const storedJourneySetId = readActiveWatchNextSetId();
-    const isWatchNextNavigation = sourceParam === "watch_next";
-
-    const setId =
-      (isWatchNextNavigation && storedJourneySetId ? storedJourneySetId : 0) ||
-      explicitSetId ||
-      (isWatchNextNavigation ? storedJourneySetId : 0) ||
-      (baseCta ? 3 : 0);
-    if (!setId) {
-      setWatchNextCta(baseCta || null);
-      return;
-    }
-
-    const playlistInstanceId = Number(data?.playlist_instance_id || 0);
-    const journeyKey = `${playlistInstanceId}:${setId}:${isWatchNextNavigation ? "watch_next" : "entry"}`;
-    if (initializedWatchNextJourneyRef.current !== journeyKey) {
-      initializedWatchNextJourneyRef.current = journeyKey;
-      writeActiveWatchNextSetId(setId);
-      if (!isWatchNextNavigation) {
-        clearWatchNextSeen(setId);
-      }
-    }
-
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const setParams = new URLSearchParams({
-          id: String(setId),
-        });
-        if (ctaAudience) {
-          setParams.set("aud", ctaAudience);
-        }
-        if (adminExitPath || includePrivateParam === "1") {
-          setParams.set("include_private", "1");
-        }
-        const res = await fetch(`/api/v2/playlist-instance-sets/get.php?${setParams.toString()}`, {
-          credentials: "include",
-          headers: { Accept: "application/json" },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload?.ok) {
-          throw new Error(payload?.error || "Failed to load playlist set");
-        }
-        if (cancelled) return;
-        const items = Array.isArray(payload?.set?.items) ? payload.set.items : [];
-        const playlistItems = items
-          .filter((item) => (item?.item_type || "instance") !== "set")
-          .filter((item) => item?.playlist_instance_id);
-
-        const setItemIds = playlistItems.map((item) => Number(item.playlist_instance_id));
-        const currentId = Number(data?.playlist_instance_id);
-        const currentPlaylistId = Number(data?.playlist_id);
-        const seen = readWatchNextSeen(setId);
-        const globalSeen = readGlobalWatchNextSeen();
-        const globalSeenPlaylistIds = readGlobalWatchNextSeenPlaylists();
-
-        const isEligibleNextItem = (item, { ignoreSeen = false } = {}) => {
-          const pid = Number(item?.playlist_instance_id);
-          const playlistItemId = Number(item?.playlist_id);
-          if (!pid || pid === currentId) return false;
-          if (ignoreSeen) return true;
-          if (playlistItemId && currentPlaylistId && playlistItemId === currentPlaylistId) return false;
-          if (playlistItemId && globalSeenPlaylistIds.includes(playlistItemId)) return false;
-          if (globalSeen.includes(pid)) return false;
-          return !seen.includes(pid);
-        };
-
-        const nextItem = playlistItems.find((item) => isEligibleNextItem(item))
-          || playlistItems.find((item) => isEligibleNextItem(item, { ignoreSeen: true }));
-
-        if (!nextItem) {
-          if (playbackEnded && currentId) {
-            if (setItemIds.includes(currentId)) {
-              markWatchNextSeen(setId, currentId);
-            }
-            markGlobalWatchNextSeen(currentId);
-            if (currentPlaylistId) {
-              markGlobalWatchNextSeenPlaylist(currentPlaylistId);
-            }
-          }
-          const endSetCta = buildEndSetCta(payload?.set?.end_cta, setId);
-          clearActiveWatchNextSetId();
-          setWatchNextCta(endSetCta);
-          return;
-        }
-
-        const resolvedTitle = nextItem.title || baseCta?.params?.title || "Suggested Playlists";
-        const resolvedSubtitle = baseCta?.params?.subtitle || baseCta?.params?.dek || "";
-        const resolvedThumb = nextItem.photo_url || "";
-        const resolved = {
-          ...baseCta,
-          key: "watch_next",
-          params: {
-            ...(baseCta?.params || {}),
-            playlist_instance_id: Number(nextItem.playlist_instance_id),
-            url: nextItem.player_url ? appendUrlParams(normalizePlayerUrlForShell(nextItem.player_url, isFastPlayerShell), {
-              psi: setId,
-              include_private: includePrivateParam === "1" ? "1" : undefined,
-              close: shouldCloseOnExit ? "1" : undefined,
-              return_to: returnTo || undefined,
-            }) : undefined,
-            audience: ctaAudience || data?.audience || undefined,
-            title: resolvedTitle,
-            subtitle: resolvedSubtitle,
-            thumbnail_url: resolvedThumb,
-            photo_library_id: nextItem.photo_library_id || undefined,
-          },
-          data: {
-            ...(baseCta?.data || {}),
-            playlist_instance_id: Number(nextItem.playlist_instance_id),
-            playlist_id: Number(nextItem.playlist_id) || undefined,
-            playlist_instance_slug: nextItem.playlist_slug || undefined,
-            slug: nextItem.playlist_slug || undefined,
-            player_url: nextItem.player_url || undefined,
-          },
-        };
-        setWatchNextCta(resolved);
-
-        if (playbackEnded && currentId) {
-          if (setItemIds.includes(currentId)) {
-            markWatchNextSeen(setId, currentId);
-          }
-          markGlobalWatchNextSeen(currentId);
-          if (currentPlaylistId) {
-            markGlobalWatchNextSeenPlaylist(currentPlaylistId);
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setWatchNextCta(baseCta || null);
-        }
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [adminExitPath, ctaAudience, data, includePrivateParam, shouldCloseOnExit, visibleCTAs, playbackEnded, psiParam, sourceParam]);
+  
 
   return (
     <div className="player-page">
@@ -493,7 +318,7 @@ export default function PlayerExperience({ data }) {
           ref={playerRef}
           slides={data?.items || []}
           startIndex={data?.start_index ?? 0}
-          playlistInstanceId={data?.playlist_instance_id || playlistId}
+          playlistId={data?.playlist_id || playlistId}
           hideStars={Boolean(data?.hide_stars)}
           showSlidePalettePrompt={data?.show_slide_palette_prompt !== false}
           galleryName={data?.page_h1 || data?.display_title || data?.title || ""}
@@ -552,7 +377,7 @@ function resolveReturnTo(value) {
 }
 
 function buildSlideReturnTo({ data, playlistId, item, location, searchParams, isFastPlayerShell }) {
-  const pathId = data?.slug || data?.playlist_instance_slug || data?.playlist_instance_id || playlistId;
+  const pathId = data?.slug || data?.playlist_id || playlistId;
   const fallbackPath = location?.pathname || "/";
   const basePath = pathId
     ? `${isFastPlayerShell ? "/p" : "/playlist"}/${encodeURIComponent(String(pathId))}`
@@ -674,11 +499,11 @@ function readWatchNextSeen(setId) {
   }
 }
 
-function markWatchNextSeen(setId, playlistInstanceId) {
+function markWatchNextSeen(setId, playlistId) {
   if (typeof sessionStorage === "undefined") return;
   const current = readWatchNextSeen(setId);
-  if (current.includes(playlistInstanceId)) return;
-  const next = [...current, playlistInstanceId];
+  if (current.includes(playlistId)) return;
+  const next = [...current, playlistId];
   try {
     sessionStorage.setItem(`cf_watch_next_seen_${setId}`, JSON.stringify(next));
   } catch {
@@ -697,12 +522,12 @@ function readGlobalWatchNextSeen() {
   }
 }
 
-function markGlobalWatchNextSeen(playlistInstanceId) {
-  if (typeof sessionStorage === "undefined" || !playlistInstanceId) return;
+function markGlobalWatchNextSeen(playlistId) {
+  if (typeof sessionStorage === "undefined" || !playlistId) return;
   const current = readGlobalWatchNextSeen();
-  if (current.includes(playlistInstanceId)) return;
+  if (current.includes(playlistId)) return;
   try {
-    sessionStorage.setItem("cf_watch_next_seen_global", JSON.stringify([...current, playlistInstanceId]));
+    sessionStorage.setItem("cf_watch_next_seen_global", JSON.stringify([...current, playlistId]));
   } catch {
     // ignore
   }

@@ -7,7 +7,7 @@ use App\REX\Contracts\RexReservationRepositoryInterface;
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
 use App\Repos\PdoPaletteViewerRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use InvalidArgumentException;
 
 final class RexPlaylistViewerLinker

@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Repos;
+namespace App\PLAYLISTS\Repos;
 
-use App\Entities\Playlist;
-use App\Entities\PlaylistItem;
-use App\Entities\PlaylistStep;
+use App\PLAYLISTS\Entities\Playlist;
+use App\PLAYLISTS\Entities\PlaylistItem;
+use App\PLAYLISTS\Entities\PlaylistStep;
 use PDO;
 
 class PdoPlaylistRepository
@@ -88,6 +88,175 @@ class PdoPlaylistRepository
 
         return $this->hydrateSeoRow($row);
     }
+
+    /**
+ * @return array<int, array<string, mixed>>
+ */
+public function listAdminRows(): array
+{
+    $sql = <<<SQL
+        SELECT
+            p.playlist_id,
+            p.title,
+            p.type,
+            p.is_active,
+            p.is_public,
+            p.slug,
+            p.headline,
+            p.indexable,
+            p.published_at,
+            p.updated_at
+        FROM playlists p
+        WHERE COALESCE(p.is_retired, 0) = 0
+        ORDER BY p.playlist_id ASC
+        SQL;
+
+    $stmt =
+        $this->pdo->query(
+            $sql
+        );
+
+    return $stmt->fetchAll(
+        PDO::FETCH_ASSOC
+    ) ?: [];
+}
+
+
+/**
+ * Set the playlist's public discovery state.
+ */
+public function setPublic(
+    int $playlistId,
+    bool $isPublic
+): void {
+    $stmt =
+        $this->pdo->prepare(
+            'UPDATE playlists
+                SET is_public = :is_public,
+                    updated_at = NOW()
+              WHERE playlist_id = :playlist_id'
+        );
+
+    $stmt->execute([
+        'playlist_id' =>
+            $playlistId,
+
+        'is_public' =>
+            $isPublic
+                ? 1
+                : 0,
+    ]);
+
+}
+
+
+
+
+
+
+
+/**
+ * @param array<string, mixed> $row
+ */
+public function saveAdminRow(
+    int $playlistId,
+    array $row
+): int {
+    if ($playlistId > 0) {
+        $sql = <<<SQL
+            UPDATE playlists
+            SET title = :title,
+                type = :type,
+                is_active = :is_active,
+                is_public = :is_public,
+                slug = :slug,
+                headline = :headline,
+                page_title = :page_title,
+                meta_description = :meta_description,
+                dek = :dek,
+                intro_html = :intro_html,
+                body_html = :body_html,
+                hero_image_id = :hero_image_id,
+                hero_image_url = :hero_image_url,
+                hero_alt = :hero_alt,
+                indexable = :indexable,
+                published_at = :published_at,
+                updated_at = NOW()
+            WHERE playlist_id = :playlist_id
+            SQL;
+
+        $stmt =
+            $this->pdo->prepare(
+                $sql
+            );
+
+        $stmt->execute([
+            ...$row,
+            'playlist_id' =>
+                $playlistId,
+        ]);
+
+        return $playlistId;
+    }
+
+    $sql = <<<SQL
+        INSERT INTO playlists (
+            title,
+            type,
+            is_active,
+            is_public,
+            slug,
+            headline,
+            page_title,
+            meta_description,
+            dek,
+            intro_html,
+            body_html,
+            hero_image_id,
+            hero_image_url,
+            hero_alt,
+            indexable,
+            published_at,
+            updated_at
+        )
+        VALUES (
+            :title,
+            :type,
+            :is_active,
+            :is_public,
+            :slug,
+            :headline,
+            :page_title,
+            :meta_description,
+            :dek,
+            :intro_html,
+            :body_html,
+            :hero_image_id,
+            :hero_image_url,
+            :hero_alt,
+            :indexable,
+            :published_at,
+            NOW()
+        )
+        SQL;
+
+    $stmt =
+        $this->pdo->prepare(
+            $sql
+        );
+
+    $stmt->execute(
+        $row
+    );
+
+    return (int)$this->pdo
+        ->lastInsertId();
+}
+
+
+
+
+
 
     public function findSeoLandingBySlug(string $slug): ?array
     {
@@ -1567,4 +1736,76 @@ public function getPublicActiveSlides(
                 : null,
         ];
     }
+
+
+public function deleteItemsByPlaylistId(
+    int $playlistId
+): int {
+    $stmt = $this->pdo->prepare(
+        'DELETE FROM playlist_items
+          WHERE playlist_id = :playlist_id'
+    );
+
+    $stmt->execute([
+        ':playlist_id' => $playlistId,
+    ]);
+
+    return $stmt->rowCount();
+}
+
+public function deleteById(
+    int $playlistId
+): int {
+    $stmt = $this->pdo->prepare(
+        'DELETE FROM playlists
+          WHERE playlist_id = :playlist_id'
+    );
+
+    $stmt->execute([
+        ':playlist_id' => $playlistId,
+    ]);
+
+    return $stmt->rowCount();
+}
+
+
+
+public function findIdBySlug(
+    string $slug
+): ?int {
+    $slug =
+        trim(
+            $slug
+        );
+
+    if ($slug === '') {
+        return null;
+    }
+
+    $stmt =
+        $this->pdo->prepare(
+            'SELECT playlist_id
+               FROM playlists
+              WHERE slug = :slug
+                AND COALESCE(is_retired, 0) = 0
+              LIMIT 1'
+        );
+
+    $stmt->execute([
+        ':slug' =>
+            $slug,
+    ]);
+
+    $playlistId =
+        $stmt->fetchColumn();
+
+    return $playlistId !== false
+        ? (int)$playlistId
+        : null;
+}
+
+
+
+
+
 }

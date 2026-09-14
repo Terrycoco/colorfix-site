@@ -40,10 +40,10 @@ export default function ArticlePage() {
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const playlistInstanceId = searchParams.get("playlist_instance_id") ?? "";
+  const playlistId = searchParams.get("playlist_id") ?? "";
   const playlistTitle = searchParams.get("playlist_title") ?? "";
   const returnToParam = searchParams.get("return_to") ?? "";
-  const playlistUrl = withSourceParam(returnToParam || (playlistInstanceId ? `/p/${playlistInstanceId}` : ""));
+  const playlistUrl = withSourceParam(returnToParam || (playlistId ? `/p/${playlistId}` : ""));
 
   useEffect(() => {
     let active = true;
@@ -126,7 +126,7 @@ export default function ArticlePage() {
     const key = (cta?.key || "").toLowerCase();
     const params = cta?.params || {};
     if (key === "playlist_link") {
-      const pid = params.playlist_instance_id || params.playlistInstanceId;
+      const pid = params.playlist_id || params.playlistId;
       const url = withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
       if (url) {
         if (url.startsWith("/")) navigate(url);
@@ -162,7 +162,7 @@ export default function ArticlePage() {
 
   function resolvePlaylistLink(cta) {
     const params = cta?.params || {};
-    const pid = params.playlist_instance_id || params.playlistInstanceId;
+    const pid = params.playlist_id || params.playlistId;
     return withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
   }
 

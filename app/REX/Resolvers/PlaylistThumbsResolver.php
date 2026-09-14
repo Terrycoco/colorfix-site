@@ -12,7 +12,7 @@ use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
 use App\REX\DTO\RexShareMetadata;
 use App\REX\Repos\PdoRexReservationRepository;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use PDO;
 use RuntimeException;
 

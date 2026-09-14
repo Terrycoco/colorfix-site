@@ -10,8 +10,8 @@ use App\REX\DTO\RexResolutionBehavior;
 use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
 use App\REX\DTO\RexShareMetadata;
-use App\Repos\PdoPlaylistRepository;
-use App\Services\PlayerExperienceService;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Services\PlaylistExperienceService;
 use DomainException;
 use PDO;
 use RuntimeException;
@@ -65,7 +65,7 @@ final class PlaylistExperienceResolver implements RexResolverInterface
             ? $request->requestMetadata['start_target']
             : null;
 
-        $service = new PlayerExperienceService($this->pdo);
+        $service = new PlaylistExperienceService($this->pdo);
 
         $sourceAttribution = $this->cleanSourceAttribution(
             $request->requestMetadata['src'] ?? null

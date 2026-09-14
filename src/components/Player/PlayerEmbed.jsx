@@ -15,7 +15,7 @@ export default function PlayerEmbed({
       <Player
         slides={slides}
         startIndex={startIndex}
-        playlistInstanceId={`embed:${embedId}`}
+        playlistId={`embed:${embedId}`}
         embedded={true}
         hideStars={true}
         onPlaybackEnd={onPlaybackEnd}

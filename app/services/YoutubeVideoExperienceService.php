@@ -3,12 +3,14 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Entities\Playlist;
-use App\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Services\PlaylistExperienceService;
+
+use App\PLAYLISTS\Entities\Playlist;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use PDO;
 use RuntimeException;
 
-final class YoutubeVideoExperienceService extends PlayerExperienceService
+final class YoutubeVideoExperienceService extends PlaylistExperienceService
 {
     private const DEFAULT_SLIDE_DURATION_MS = 4200;
     private const DEFAULT_INTRO_DURATION_MS = 3600;
