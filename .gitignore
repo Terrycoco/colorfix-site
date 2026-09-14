@@ -35,3 +35,6 @@ tmp_partial.jsx
 # Local secrets
 config/mail.local.php
 api/worker-token.php
+.env.local
+.history/
+apikey.txt
