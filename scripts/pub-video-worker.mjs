@@ -441,26 +441,28 @@ async function processVideoJob(job) {
       );
     }
 
-    await postJson(
-      `${BASE_URL}/api/v2/admin/pub/video-jobs/complete.php`,
-      {
-        pub_video_job_id:
-          jobId,
+await postJson(
+  `${BASE_URL}/api/v2/admin/pub/video-jobs/complete.php`,
+  {
+    pub_video_job_id:
+      jobId,
 
-        status:
-          "complete",
+    status:
+      "complete",
 
-        output_rel_path:
-          uploaded.rel_path,
+    output_rel_path:
+      uploaded.rel_path,
 
-        output_file_size_bytes:
-          uploaded.file_size_bytes,
-      }
-    );
+    output_file_size_bytes:
+      uploaded.file_size_bytes,
+  }
+);
 
-    console.log(
-      `Completed PUB asset #${assetId}`
-    );
+cleanupJobFiles(jobId);
+
+console.log(
+  `Completed PUB asset #${assetId}`
+);
 
   } catch (error) {
     const message =
@@ -623,6 +625,36 @@ async function main() {
     );
   }
 }
+
+
+function cleanupJobFiles(jobId) {
+  const dir = path.join(
+    ROOT,
+    "exports",
+    "pub-video-jobs",
+    String(jobId)
+  );
+
+  try {
+    fs.rmSync(dir, {
+      recursive: true,
+      force: true,
+    });
+
+    console.log(
+      `Cleaned local files for video job #${jobId}`
+    );
+  } catch (error) {
+    console.error(
+      `Could not clean local files for video job #${jobId}:`,
+      error?.message || error
+    );
+  }
+}
+
+
+
+
 
 main().catch((error) => {
   console.error(

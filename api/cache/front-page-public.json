@@ -3,7 +3,7 @@
     "success": true,
     "variant": "public",
     "build_key": "public_home",
-    "generated_at": "2026-09-14T01:14:43+00:00",
+    "generated_at": "2026-09-14T17:51:16+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -142,7 +142,7 @@
             "description": "View makeovers, fixes, and ideas",
             "image_url": "",
             "body": "",
-            "target_url": "/picker?psi=11",
+            "target_url": "/picker?set=11",
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
@@ -358,10 +358,10 @@
             },
             {
                 "id": 1029,
-                "title": "Orange Roof Makeovers",
+                "title": "Makeovers for Orange Roofs",
                 "subtitle": "",
-                "photo_url": "",
-                "photo_library_id": null,
+                "photo_url": "/photos/clients/client-31-wooten/client_client-31-wooten_534ce16700f5.jpg",
+                "photo_library_id": 589,
                 "player_url": "/t/fTGrHwqqFNqihzTI5V6ru_-i3LCKFKG05meKyLvywZ0"
             },
             {
@@ -378,6 +378,7 @@
         "/api/v2/image-thumb.php?id=374&w=520&q=72",
         "/api/v2/image-thumb.php?id=375&w=520&q=72",
         "/api/v2/image-thumb.php?id=160&w=520&q=72",
+        "/api/v2/image-thumb.php?id=589&w=520&q=72",
         "/api/v2/image-thumb.php?id=581&w=520&q=72"
     ],
     "rowCount": 1,

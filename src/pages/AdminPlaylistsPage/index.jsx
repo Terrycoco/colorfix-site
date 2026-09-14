@@ -66,8 +66,8 @@ const SAVE_ITEMS_URL =
 const DELETE_URL =
   `${API_FOLDER}/v2/admin/playlists/delete.php`;
 
-const INSTANCES_URL =
-  `${API_FOLDER}/v2/admin/playlist-instances/list.php`;
+const REX_PLAYLIST_URL =
+  `${API_FOLDER}/v2/admin/rex/playlist-url.php`;
 
 const SAVED_LIST_URL =
   `${API_FOLDER}/v2/admin/saved-palettes.php`;
@@ -269,12 +269,6 @@ export default function AdminPlaylistsPage() {
     savedOptions,
     setSavedOptions,
   ] = useState([]);
-
-  const [
-    instances,
-    setInstances,
-  ] = useState([]);
-
 
   const [
     selectedSlideKey,
@@ -518,75 +512,6 @@ export default function AdminPlaylistsPage() {
       [
         makeClientItemKey,
       ]
-    );
-
-
-  const fetchInstances =
-    useCallback(
-      async (
-        id
-      ) => {
-        if (!id) {
-          setInstances([]);
-          return [];
-        }
-
-        try {
-          const params =
-            new URLSearchParams({
-              playlist_id:
-                String(
-                  id
-                ),
-
-              _:
-                String(
-                  Date.now()
-                ),
-            });
-
-          const res =
-            await fetch(
-              `${INSTANCES_URL}?${params.toString()}`,
-              {
-                credentials:
-                  "include",
-              }
-            );
-
-          const data =
-            await res.json();
-
-          if (
-            !res.ok
-            ||
-            !data?.ok
-          ) {
-            throw new Error(
-              data?.error ||
-              "Failed to load playlist instances."
-            );
-          }
-
-          const rows =
-            Array.isArray(
-              data.items
-            )
-              ? data.items
-              : [];
-
-          setInstances(
-            rows
-          );
-
-          return rows;
-
-        } catch {
-          setInstances([]);
-          return [];
-        }
-      },
-      []
     );
 
 
@@ -864,8 +789,6 @@ export default function AdminPlaylistsPage() {
 
       setBatchSelectedKeys([]);
 
-      setInstances([]);
-
       setSelectedSlideKey(
         null
       );
@@ -904,15 +827,11 @@ export default function AdminPlaylistsPage() {
         routePlaylistId
       );
 
-      fetchInstances(
-        routePlaylistId
-      );
     }
   }, [
     isNewRoute,
     routePlaylistId,
     fetchPlaylist,
-    fetchInstances,
     location.state,
     makeClientItemKey,
   ]);
@@ -1306,86 +1225,6 @@ export default function AdminPlaylistsPage() {
         onPermissionChange
       );
   }, []);
-
-
-  const linkedInstances =
-    useMemo(
-      () => {
-        const id =
-          Number(
-            playlist
-              ?.playlist_id ||
-            routePlaylistId ||
-            0
-          );
-
-        if (!id) {
-          return [];
-        }
-
-        return instances
-          .filter(
-            (instance) =>
-              Number(
-                instance
-                  ?.playlist_id ||
-                0
-              ) === id
-          )
-          .sort(
-            (
-              a,
-              b
-            ) =>
-              String(
-                a?.instance_name
-                ||
-                a?.display_title
-                ||
-                a?.playlist_instance_id
-                ||
-                ""
-              ).localeCompare(
-                String(
-                  b?.instance_name
-                  ||
-                  b?.display_title
-                  ||
-                  b?.playlist_instance_id
-                  ||
-                  ""
-                )
-              )
-          );
-      },
-      [
-        instances,
-        playlist,
-        routePlaylistId,
-      ]
-    );
-
-
-  const viewInstance =
-    useMemo(
-      () =>
-        linkedInstances.find(
-          (instance) =>
-            Number(
-              instance
-                ?.is_active ||
-              0
-            ) ===
-            1
-        )
-        ||
-        linkedInstances[0]
-        ||
-        null,
-      [
-        linkedInstances,
-      ]
-    );
 
 
   const resolvedShareItemKey =
@@ -2553,10 +2392,6 @@ export default function AdminPlaylistsPage() {
           id
         );
 
-        await fetchInstances(
-          id
-        );
-
         setSaveMessage(
           "Saved"
         );
@@ -2602,45 +2437,92 @@ export default function AdminPlaylistsPage() {
       return;
     }
 
-    const nextInstances =
-      await fetchInstances(
-        id
+    try {
+      const res =
+        await fetch(
+          `${REX_PLAYLIST_URL}?playlist_id=${encodeURIComponent(String(id))}&_=${Date.now()}`,
+          {
+            credentials:
+              "include",
+          }
+        );
+
+      const data =
+        await res.json();
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error
+          ||
+          "Could not load the playlist REX."
+        );
+      }
+
+      const publicUrl =
+        String(
+          data
+            ?.item
+            ?.public_url
+          ||
+          ""
+        ).trim();
+
+      if (!publicUrl) {
+        throw new Error(
+          "Saved, but this playlist has no Public REX URL."
+        );
+      }
+
+      const playerUrl =
+        new URL(
+          publicUrl,
+          window.location.origin
+        );
+
+      playerUrl.searchParams.set(
+        "fresh",
+        "1"
       );
 
-    const instance =
-      nextInstances.find(
-        (row) =>
-          Number(
-            row
-              ?.is_active ||
-            0
-          ) ===
-          1
-      )
-      ||
-      nextInstances[0]
-      ||
-      null;
+      playerUrl.searchParams.set(
+        "src",
+        "admin"
+      );
 
-    if (
-      !instance
-        ?.playlist_instance_id
-    ) {
+      playerUrl.searchParams.set(
+        "close",
+        "1"
+      );
+
+      playerUrl.searchParams.set(
+        "_",
+        String(
+          Date.now()
+        )
+      );
+
+      playerUrl.searchParams.set(
+        "return_to",
+        `/admin/playlists/${id}`
+      );
+
+      window.open(
+        playerUrl.toString(),
+        "_blank",
+        "noopener"
+      );
+
+    } catch (err) {
       setDetailError(
-        "Saved, but this playlist has no playlist instance to run yet."
+        err?.message
+        ||
+        "Saved, but the playlist could not be opened."
       );
-
-      return;
     }
-
-    window.open(
-      buildPlayerUrl(
-        instance,
-        id
-      ),
-      "_blank",
-      "noopener"
-    );
   }
 
 
@@ -3511,24 +3393,6 @@ export default function AdminPlaylistsPage() {
                         </AdminMetaText>
 
                         <AdminToolbarSpacer />
-
-                        {
-                          viewInstance
-                            ? (
-                                <AdminMetaText as="div">
-                                  {
-                                    linkedInstances.length
-                                  } instance
-                                  {
-                                    linkedInstances.length ===
-                                    1
-                                      ? ""
-                                      : "s"
-                                  }
-                                </AdminMetaText>
-                              )
-                            : null
-                        }
                       </AdminToolbar>
 
 
@@ -4964,67 +4828,6 @@ function upsertPlaylistSummary(
     ...current,
     row,
   ];
-}
-
-
-function buildPlayerUrl(
-  instance,
-  playlistId
-) {
-  const slug =
-    String(
-      instance
-        ?.playlist_slug
-      ||
-      instance
-        ?.slug
-      ||
-      ""
-    ).trim();
-
-  const pathId =
-    slug
-    ||
-    instance
-      ?.playlist_instance_id;
-
-  if (!pathId) {
-    return "";
-  }
-
-  const params =
-    new URLSearchParams({
-      fresh:
-        "1",
-      src:
-        "admin",
-      close:
-        "1",
-      _:
-        String(
-          Date.now()
-        ),
-      return_to:
-        `/admin/playlists/${playlistId}`,
-    });
-
-  if (
-    instance.audience
-    &&
-    instance.audience !==
-      "any"
-  ) {
-    params.set(
-      "aud",
-      instance.audience
-    );
-  }
-
-  return (
-    `${window.location.origin}/p/${encodeURIComponent(String(pathId))}`
-    +
-    `?${params.toString()}`
-  );
 }
 
 
