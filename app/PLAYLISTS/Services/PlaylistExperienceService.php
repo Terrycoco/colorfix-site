@@ -21,7 +21,7 @@ use App\Entities\PlayerExperience;
 use DomainException;
 use PDO;
 use RuntimeException;
-use App\PV\PVService;
+use App\PALETTES\PV\PVService;
 
 class PlaylistExperienceService
 {
@@ -270,7 +270,7 @@ private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination)
 /** new modern PV call */
 private function getLinkedPVs(int $playlistId): array
 {
-    return (new \App\PV\PVService($this->pdo))
+    return (new \App\PALETTES\PV\PVService($this->pdo))
         ->getLinkedPVs($playlistId);
 }
 

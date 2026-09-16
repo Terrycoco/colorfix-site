@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace App\PV\Repos;
+namespace App\PALETTES\Repos;
 
-use App\PV\PV;
+
 use PDO;
-use RuntimeException;
+
 
 final class PdoPVRepository
 {
@@ -13,167 +13,53 @@ final class PdoPVRepository
         private PDO $pdo
     ) {}
 
-    public function findById(int $pvId): ?PV
-    {
-        if ($pvId <= 0) {
-            return null;
-        }
-
-        $base = $this->loadBase($pvId);
-        if (!$base) {
-            return null;
-        }
-
-        $savedPaletteId = (int)($base['saved_palette_id'] ?? 0);
-        $paletteId = (int)($base['palette_id'] ?? 0);
-
-        if ($savedPaletteId <= 0 || $paletteId <= 0) {
-            throw new RuntimeException(
-                "Saved Palette {$savedPaletteId} not found"
-            );
-        }
-
-        $photos = $this->loadPhotos($pvId);
-        $swatches = $this->loadSwatches($savedPaletteId);
-
-        $fullPhoto = null;
-        $insets = [];
-
-        foreach ($photos as $photo) {
-            $type = strtolower(trim((string)($photo['photo_type'] ?? '')));
-            $url = trim((string)($photo['url'] ?? ''));
-
-            if ($url === '') {
-                continue;
-            }
-
-            if ($fullPhoto === null && $type === 'full') {
-                $fullPhoto = $photo;
-                continue;
-            }
-
-            if ($type === 'before') {
-                $insets[] = [
-                    'url' => $url,
-                    'alt_text' => $photo['alt_text'] ?? null,
-                    'caption' => 'Before',
-                ];
-                continue;
-            }
-
-            if (in_array($type, ['zoom', 'inset'], true)) {
-                $insets[] = [
-                    'url' => $url,
-                    'alt_text' => $photo['alt_text'] ?? null,
-                    'caption' => $photo['caption'] ?? null,
-                ];
-            }
-        }
-
-        // Preserve current canonical behavior:
-        // if no FULL photo exists, use the first usable photo.
-        if ($fullPhoto === null) {
-            foreach ($photos as $photo) {
-                if (trim((string)($photo['url'] ?? '')) !== '') {
-                    $fullPhoto = $photo;
-                    break;
-                }
-            }
-        }
-
-        $title = $this->firstNonEmpty([
-            $base['viewer_title'] ?? null,
-            $base['palette_display_title'] ?? null,
-            $base['nickname'] ?? null,
-            'ColorFix Palette',
-        ]);
-
-        $format = strtolower(trim((string)($base['format'] ?? 'public')));
-
-        $paletteViewerKey = $format === 'public'
-            ? 'full_palette'
-            : $format;
-
-        $templateKey = trim((string)($base['template_key'] ?? ''));
-        if ($templateKey === '') {
-            $templateKey = $paletteViewerKey;
-        }
-
-        $meta = [
-            'source' => 'saved',
-            'palette_viewer_id' => $pvId,
-            'palette_viewer_key' => $paletteViewerKey,
-            'template_key' => $templateKey,
-            'format' => $format,
-            'saved_palette_id' => $savedPaletteId,
-            'id' => $paletteId,
-            'hash' => (string)($base['palette_hash'] ?? ''),
-            'title' => $title,
-            'nickname' => $base['nickname'] ?? null,
-            'display_title' => $title,
-            'intro' => $base['intro'] ?? '',
-            'notes' => $base['viewer_notes']
-                ?? $base['palette_notes']
-                ?? '',
-            'cta_label' => $base['cta_label'] ?? '',
-            'playlist_url' => '',
-            'photo_url' => $fullPhoto['url'] ?? '',
-            'photo_alt' => $fullPhoto['alt_text'] ?? null,
-            'inset_photos' => $insets,
-            'kicker_text' => $base['kicker_text'] ?? '',
-            'palette_type' => $base['palette_type'] ?? null,
-            'set_id' => null,
-            'available_sets' => [],
-        ];
-
-        return new PV(
-            pvId: $pvId,
-            savedPaletteId: $savedPaletteId,
-            isActive: (bool)($base['is_active'] ?? false),
-            meta: $meta,
-            swatches: $swatches
-        );
+ public function findById(int $pvId): ?array
+{
+    if ($pvId <= 0) {
+        return null;
     }
 
-    private function loadBase(int $pvId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                pv.palette_viewer_id,
-                pv.saved_palette_id,
-                pv.format,
-                NULLIF(TRIM(pv.template_key), '') AS template_key,
-                NULLIF(TRIM(pv.kicker_text), '') AS kicker_text,
-                NULLIF(TRIM(pv.title), '') AS viewer_title,
-                NULLIF(TRIM(pv.intro), '') AS intro,
-                NULLIF(TRIM(pv.notes), '') AS viewer_notes,
-                NULLIF(TRIM(pv.cta_label), '') AS cta_label,
-                pv.is_active,
+    $base = $this->loadBase($pvId);
 
-                sp.id AS palette_id,
-                sp.palette_hash,
-                sp.nickname,
-                sp.display_title AS palette_display_title,
-                sp.notes AS palette_notes,
-                sp.palette_type
-
-             FROM palette_viewers pv
-
-             LEFT JOIN saved_palettes sp
-               ON sp.id = pv.saved_palette_id
-
-             WHERE pv.palette_viewer_id = :pv_id
-             LIMIT 1"
-        );
-
-        $stmt->execute([
-            ':pv_id' => $pvId,
-        ]);
-
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row !== false ? $row : null;
+    if (!$base) {
+        return null;
     }
+
+    $base['photos'] = $this->loadPhotos($pvId);
+
+    return $base;
+}
+
+private function loadBase(int $pvId): ?array
+{
+    $stmt = $this->pdo->prepare(
+        "SELECT
+            pv.palette_viewer_id,
+            pv.saved_palette_id,
+            pv.format,
+            NULLIF(TRIM(pv.template_key), '') AS template_key,
+            NULLIF(TRIM(pv.kicker_text), '') AS kicker_text,
+            NULLIF(TRIM(pv.title), '') AS viewer_title,
+            NULLIF(TRIM(pv.intro), '') AS intro,
+            NULLIF(TRIM(pv.notes), '') AS viewer_notes,
+            NULLIF(TRIM(pv.cta_label), '') AS cta_label,
+            pv.is_active
+
+         FROM palette_viewers pv
+
+         WHERE pv.palette_viewer_id = :pv_id
+
+         LIMIT 1"
+    );
+
+    $stmt->execute([
+        ':pv_id' => $pvId,
+    ]);
+
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row !== false ? $row : null;
+}
 
     private function loadPhotos(int $pvId): array
     {
@@ -239,72 +125,8 @@ final class PdoPVRepository
         return $photos;
     }
 
-    private function loadSwatches(int $savedPaletteId): array
-    {
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                m.color_id,
-                m.role_name AS role,
+ 
 
-                c.name AS color_name,
-                c.brand AS color_brand,
-                c.brand_name AS color_brand_name,
-                c.code AS color_code,
-                c.hex6 AS color_hex6,
-                c.int_only AS color_int_only
-
-             FROM saved_palette_members m
-
-             LEFT JOIN swatch_view c
-               ON c.id = m.color_id
-
-             WHERE m.saved_palette_id = :saved_palette_id
-
-             ORDER BY
-                m.order_index ASC,
-                m.id ASC"
-        );
-
-        $stmt->execute([
-            ':saved_palette_id' => $savedPaletteId,
-        ]);
-
-        $swatches = [];
-
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
-            $swatches[] = [
-                'id' => isset($row['color_id'])
-                    ? (int)$row['color_id']
-                    : null,
-
-                'name' => $row['color_name'] ?? null,
-                'code' => $row['color_code'] ?? null,
-                'brand' => $row['color_brand'] ?? null,
-                'brand_name' => $row['color_brand_name'] ?? null,
-                'hex6' => $row['color_hex6'] ?? null,
-                'role' => $row['role'] ?? null,
-
-                'int_only' => isset($row['color_int_only'])
-                    ? (int)$row['color_int_only']
-                    : 0,
-            ];
-        }
-
-        return $swatches;
-    }
-
-    private function firstNonEmpty(array $values): string
-    {
-        foreach ($values as $value) {
-            $text = trim((string)($value ?? ''));
-
-            if ($text !== '') {
-                return $text;
-            }
-        }
-
-        return 'ColorFix Palette';
-    }
 
     private function nullableText(mixed $value): ?string
     {

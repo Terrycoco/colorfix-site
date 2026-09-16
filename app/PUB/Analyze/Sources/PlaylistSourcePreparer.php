@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace App\PUB\Analyze\Sources;
 
 use App\PUB\Entities\PhotoEntity;
-use App\PV\PVService;
+use App\PALETTES\PV\PVService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use RuntimeException;
 

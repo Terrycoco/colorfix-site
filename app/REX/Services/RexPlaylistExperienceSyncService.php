@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\REX\Services;
 
-use App\PV\Repos\PdoPVRepository;
+use App\PALETTES\Repos\PdoPVRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\REX\DTO\RexCreateReservationRequest;

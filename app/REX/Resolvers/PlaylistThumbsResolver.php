@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\REX\Resolvers;
 
-use App\PV\Repos\PdoPVRepository;
+use App\PALETTES\Repos\PdoPVRepository;
 use App\REX\Contracts\RexResolverInterface;
 use App\REX\DTO\RexReservation;
 use App\REX\DTO\RexReservationDescriptor;

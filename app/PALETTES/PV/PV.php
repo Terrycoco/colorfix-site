@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\PV;
+namespace App\PALETTES\PV;
 
 final class PV
 {

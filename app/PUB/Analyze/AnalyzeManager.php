@@ -16,7 +16,7 @@ use App\PUB\Services\PubRunService;
 use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\PV\PVService;
+use App\PALETTES\PV\PVService;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
