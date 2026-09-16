@@ -70,7 +70,7 @@ export default function PlaylistSlideEditor({
   onSetShareImage,
   onPickColorPlan,
   onRemove,
-  onDone,
+  onSave,
 }) {
   const photoId = item?.photo_library_id || "";
   const hueConfig =
@@ -85,6 +85,17 @@ export default function PlaylistSlideEditor({
           {saveError}
         </AdminNotice>
       ) : null}
+
+      <AdminToolbar compact>
+        <AdminToolbarSpacer />
+        <AdminButton
+          type="button"
+          disabled={saving}
+          onClick={onSave}
+        >
+          {saving ? "Saving..." : "Save"}
+        </AdminButton>
+      </AdminToolbar>
 
       <AdminPanel title={`Slide ${slideNumber}`} compact>
         <AdminStack gap="sm">
@@ -453,9 +464,9 @@ export default function PlaylistSlideEditor({
         <AdminButton
           type="button"
           disabled={saving}
-          onClick={onDone}
+          onClick={onSave}
         >
-          {saving ? "Saving..." : "Save & Close"}
+          {saving ? "Saving..." : "Save"}
         </AdminButton>
       </AdminToolbar>
     </AdminStack>

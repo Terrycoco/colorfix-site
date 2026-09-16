@@ -300,6 +300,12 @@ export default function PubScheduleControls() {
                     rule.enabled
                   ),
 
+                notify_on_publish:
+                  Boolean(
+                    rule
+                      .notify_on_publish
+                  ),
+
                 release_interval_minutes:
                   Number(
                     rule
@@ -592,27 +598,53 @@ export default function PubScheduleControls() {
                 }
               >
                 <AdminStack gap="sm">
-                  <AdminCheckboxRow
-                    checked={
-                      Boolean(
-                        rule.enabled
-                      )
-                    }
+                  <AdminToolbar compact>
+                    <AdminCheckboxRow
+                      checked={
+                        Boolean(
+                          rule.enabled
+                        )
+                      }
 
-                    onChange={(
-                      event
-                    ) =>
-                      updateChannelRule(
-                        rule.channel,
-                        "enabled",
+                      onChange={(
                         event
-                          .target
-                          .checked
-                      )
-                    }
-                  >
-                    Channel Enabled
-                  </AdminCheckboxRow>
+                      ) =>
+                        updateChannelRule(
+                          rule.channel,
+                          "enabled",
+                          event
+                            .target
+                            .checked
+                        )
+                      }
+                    >
+                      Channel Enabled
+                    </AdminCheckboxRow>
+
+
+                    <AdminCheckboxRow
+                      checked={
+                        Boolean(
+                          rule
+                            .notify_on_publish
+                        )
+                      }
+
+                      onChange={(
+                        event
+                      ) =>
+                        updateChannelRule(
+                          rule.channel,
+                          "notify_on_publish",
+                          event
+                            .target
+                            .checked
+                        )
+                      }
+                    >
+                      Notify on publish
+                    </AdminCheckboxRow>
+                  </AdminToolbar>
 
 
                   <AdminToolbar compact>
@@ -778,6 +810,12 @@ function normalizeConfig(
             Boolean(
               rule
                 ?.enabled
+            ),
+
+          notify_on_publish:
+            Boolean(
+              rule
+                ?.notify_on_publish
             ),
 
           release_interval_minutes:

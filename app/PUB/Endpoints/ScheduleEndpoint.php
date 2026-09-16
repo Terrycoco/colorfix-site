@@ -60,6 +60,7 @@ use Throwable;
  *       "action": "save_channel_rule",
  *       "channel": "pinterest",
  *       "enabled": true,
+ *       "notify_on_publish": false,
  *       "release_interval_minutes": 360,
  *       "same_source_max": 1,
  *       "same_source_window_minutes": 1440
@@ -706,6 +707,13 @@ final class ScheduleEndpoint
                                     'same_source_window_minutes'
                                 ]
                                 ?? 0
+                            ),
+
+                            self::toBool(
+                                $data[
+                                    'notify_on_publish'
+                                ]
+                                ?? false
                             )
                         );
 

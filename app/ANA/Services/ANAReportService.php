@@ -109,4 +109,23 @@ final class ANAReportService
 
         return $rows;
     }
+
+    public function listEventsForResource(
+        string $resourceType,
+        int $resourceId,
+        string $eventKey,
+        ?string $sourceKey
+    ): array {
+        return $this->reports->listEventsForResource(
+            $resourceType,
+            $resourceId,
+            $eventKey,
+            $sourceKey
+        );
+    }
+
+    public function deleteEventById(int $id): bool
+    {
+        return $this->reports->deleteEventById($id);
+    }
 }

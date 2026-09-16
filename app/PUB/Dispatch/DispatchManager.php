@@ -431,7 +431,8 @@ final class DispatchManager implements PubComManagerContract
      *   getShippingById(pub_asset_id)
      */
     public function shipOne(
-        int $pubAssetId
+        int $pubAssetId,
+        bool $notifyOnPublish = false
     ): array {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -555,7 +556,8 @@ final class DispatchManager implements PubComManagerContract
             $this->processOneAsset(
                 $asset,
                 0,
-                $stoppedLines
+                $stoppedLines,
+                $notifyOnPublish
             );
 
 
@@ -585,7 +587,8 @@ final class DispatchManager implements PubComManagerContract
      */
     public function completeShipment(
         int $pubAssetId,
-        array $receipt
+        array $receipt,
+        bool $notifyOnPublish = false
     ): array {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -597,6 +600,20 @@ final class DispatchManager implements PubComManagerContract
         if ($receipt === []) {
             throw new RuntimeException(
                 'Dispatch completion requires a shipping receipt.'
+            );
+        }
+
+
+        $asset =
+            $this->assets
+                ->getById(
+                    $pubAssetId
+                );
+
+
+        if ($asset === null) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} was not found while completing Dispatch."
             );
         }
 
@@ -643,12 +660,75 @@ final class DispatchManager implements PubComManagerContract
             );
 
 
-        return $this->assets
-            ->finalizeShipment(
-                $pubAssetId,
-                $receipt,
-                $productionSignature
-            );
+        $state =
+            $this->assets
+                ->finalizeShipment(
+                    $pubAssetId,
+                    $receipt,
+                    $productionSignature
+                );
+
+
+        /*
+         * notify_on_publish is a generic Scheduler instruction.
+         *
+         * The shipment is already durably SHIPPED before notification is
+         * attempted. Mail trouble must never turn a successful shipment
+         * into a Dispatch failure.
+         */
+        if ($notifyOnPublish) {
+            try {
+                $notifier =
+                    new PublishNotifier(
+                        $this->projectRoot
+                    );
+
+
+                $notifier->send(
+                    (string)(
+                        $asset[
+                            'search_title'
+                        ]
+                        ?? ''
+                    ),
+                    (string)(
+                        $asset[
+                            'channel'
+                        ]
+                        ?? ''
+                    )
+                );
+
+            } catch (Throwable $e) {
+                try {
+                    $this->errors
+                        ->report(
+                            $e,
+                            [
+                                'stage' =>
+                                    'dispatch',
+
+                                'pub_asset_id' =>
+                                    $pubAssetId,
+
+                                'code' =>
+                                    'publish_notification_failure',
+                            ]
+                        );
+
+                } catch (Throwable) {
+                    error_log(
+                        '[PUB Dispatch] Publish notification failed for asset #'
+                        . $pubAssetId
+                        . ': '
+                        . $e->getMessage()
+                    );
+                }
+            }
+        }
+
+
+        return $state;
     }
 
 
@@ -802,7 +882,8 @@ final class DispatchManager implements PubComManagerContract
     private function processOneAsset(
         array $asset,
         int $index,
-        array &$stoppedLines
+        array &$stoppedLines,
+        bool $notifyOnPublish = false
     ): array {
         $pubAssetId =
             (int)(
@@ -993,7 +1074,8 @@ final class DispatchManager implements PubComManagerContract
                     $shipper
                         ->ship(
                             $pubAssetId,
-                            $package
+                            $package,
+                            $notifyOnPublish
                         )
                 );
 
@@ -1056,7 +1138,8 @@ final class DispatchManager implements PubComManagerContract
             $state =
                 $this->completeShipment(
                     $pubAssetId,
-                    $receipt
+                    $receipt,
+                    $notifyOnPublish
                 );
 
 

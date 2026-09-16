@@ -170,7 +170,8 @@ final class PinterestVideoShipper implements
      */
     public function ship(
         int $pubAssetId,
-        array $package
+        array $package,
+        bool $notifyOnPublish = false
     ): array {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -188,7 +189,8 @@ final class PinterestVideoShipper implements
             new DispatchDriverJob(
                 $pubAssetId,
                 self::class,
-                self::DRIVER_TIMEOUT_SECONDS
+                self::DRIVER_TIMEOUT_SECONDS,
+                $notifyOnPublish
             );
 
 

@@ -144,7 +144,8 @@ final class PinterestImageShipper implements PubComWorkerContract
      */
     public function ship(
         int $pubAssetId,
-        array $package
+        array $package,
+        bool $notifyOnPublish = false
     ): array {
         $this->assertPackage(
             $package

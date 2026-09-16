@@ -234,6 +234,7 @@ final class PdoPubScheduleRepository
      * @return array<int, array{
      *   channel: string,
      *   enabled: bool,
+     *   notify_on_publish: bool,
      *   release_interval_minutes: int,
      *   same_source_max: int,
      *   same_source_window_minutes: int,
@@ -249,6 +250,7 @@ final class PdoPubScheduleRepository
                 SELECT
                     channel,
                     enabled,
+                    notify_on_publish,
                     release_interval_minutes,
                     same_source_max,
                     same_source_window_minutes,
@@ -301,6 +303,7 @@ final class PdoPubScheduleRepository
                 SELECT
                     channel,
                     enabled,
+                    notify_on_publish,
                     release_interval_minutes,
                     same_source_max,
                     same_source_window_minutes,
@@ -348,7 +351,8 @@ final class PdoPubScheduleRepository
         bool $enabled,
         int $releaseIntervalMinutes,
         int $sameSourceMax,
-        int $sameSourceWindowMinutes
+        int $sameSourceWindowMinutes,
+        ?bool $notifyOnPublish = null
     ): array {
         $channel =
             $this->normalizeChannel(
@@ -372,18 +376,36 @@ final class PdoPubScheduleRepository
         );
 
 
+        if ($notifyOnPublish === null) {
+            $existingRule =
+                $this->getChannelRule(
+                    $channel
+                );
+
+            $notifyOnPublish =
+                (bool)(
+                    $existingRule[
+                        'notify_on_publish'
+                    ]
+                    ?? false
+                );
+        }
+
+
         $stmt =
             $this->pdo->prepare(
                 <<<SQL
                 INSERT INTO pub_schedule_channel_rules (
                     channel,
                     enabled,
+                    notify_on_publish,
                     release_interval_minutes,
                     same_source_max,
                     same_source_window_minutes
                 ) VALUES (
                     :channel,
                     :enabled,
+                    :notify_on_publish,
                     :release_interval_minutes,
                     :same_source_max,
                     :same_source_window_minutes
@@ -392,6 +414,9 @@ final class PdoPubScheduleRepository
                 ON DUPLICATE KEY UPDATE
                     enabled =
                         VALUES(enabled),
+
+                    notify_on_publish =
+                        VALUES(notify_on_publish),
 
                     release_interval_minutes =
                         VALUES(release_interval_minutes),
@@ -411,6 +436,11 @@ final class PdoPubScheduleRepository
 
             'enabled' =>
                 $enabled
+                    ? 1
+                    : 0,
+
+            'notify_on_publish' =>
+                $notifyOnPublish
                     ? 1
                     : 0,
 
@@ -479,6 +509,9 @@ final class PdoPubScheduleRepository
             ],
             (int)$rule[
                 'same_source_window_minutes'
+            ],
+            (bool)$rule[
+                'notify_on_publish'
             ]
         );
     }
@@ -574,6 +607,14 @@ final class PdoPubScheduleRepository
                 (int)(
                     $row[
                         'enabled'
+                    ]
+                    ?? 0
+                ) === 1,
+
+            'notify_on_publish' =>
+                (int)(
+                    $row[
+                        'notify_on_publish'
                     ]
                     ?? 0
                 ) === 1,

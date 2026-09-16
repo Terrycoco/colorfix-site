@@ -2164,11 +2164,15 @@ export default function PubAnalyzeStage({
       return;
     }
 
+console.log(
+  "CREATE BOXES",
+  JSON.parse(JSON.stringify(createHandoffBoxes))
+);
 
-    await submitCreate(
-      createHandoffBoxes,
-      analyzeExistingPolicy
-    );
+await submitCreate(
+  createHandoffBoxes,
+  analyzeExistingPolicy
+);
   }
 
 

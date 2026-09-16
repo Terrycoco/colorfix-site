@@ -4347,8 +4347,8 @@ final class PubContract
              * Scheduler NEVER publishes and NEVER writes shipping itself.
              * Its successful output is only a release decision:
              *
-             *   queued asset ID
-             *       -> DispatchManager::shipOne(pub_asset_id)
+             *   queued asset ID + release instructions
+             *       -> DispatchManager::shipOne(pub_asset_id, notify_on_publish)
              *
              * DispatchManager owns:
              *
@@ -4528,6 +4528,20 @@ final class PubContract
 
                                     'required' =>
                                         true,
+                                ],
+
+                                [
+                                    'key' =>
+                                        'notify_on_publish',
+
+                                    'type' =>
+                                        'boolean',
+
+                                    'required' =>
+                                        true,
+
+                                    'note' =>
+                                        'Channel-specific automatic notification instruction. When true, Scheduler tells Dispatch to notify Terry after the selected asset has shipped successfully.',
                                 ],
 
                                 [
@@ -4824,6 +4838,17 @@ final class PubContract
 
                                 [
                                     'key' =>
+                                        'notify_on_publish',
+
+                                    'type' =>
+                                        'boolean',
+
+                                    'note' =>
+                                        'Channel notification instruction in effect for this lane. When true and the lane releases an asset, Dispatch must notify Terry after successful shipment.',
+                                ],
+
+                                [
+                                    'key' =>
                                         'action',
 
                                     'note' =>
@@ -4853,7 +4878,21 @@ final class PubContract
                                 true,
 
                             'note' =>
-                                'Only the selected queued asset ID is handed to DispatchManager::shipOne(). Dispatch owns queued -> shipping.',
+                                'Selected QUEUED asset released to Dispatch. Dispatch owns queued -> shipping.',
+                        ],
+
+                        [
+                            'key' =>
+                                'notify_on_publish',
+
+                            'type' =>
+                                'boolean',
+
+                            'required' =>
+                                true,
+
+                            'note' =>
+                                'Copied from the selected channel rule at release time. This is a Dispatch instruction, not package data: when true, Dispatch notifies Terry only after the external shipment succeeds.',
                         ],
                     ],
                 ],
@@ -4899,6 +4938,20 @@ final class PubContract
                         [
                             'key' =>
                                 'pub_asset_id',
+                        ],
+
+                        [
+                            'key' =>
+                                'notify_on_publish',
+
+                            'type' =>
+                                'boolean',
+
+                            'value' =>
+                                false,
+
+                            'note' =>
+                                'Manual Send Now does not inherit Scheduler channel notification settings.',
                         ],
                     ],
 
@@ -4950,8 +5003,9 @@ final class PubContract
              *
              * DISPATCH is Shipping.
              *
-             * DispatchManager receives an explicit pub_asset_id released
-             * either by Scheduler or by Manual Send Now, accepts custody,
+             * DispatchManager receives an explicit pub_asset_id plus the
+             * caller's per-dispatch notification instruction, accepts custody,
+             * whether released by Scheduler or by Manual Send Now,
              * routes only far enough to choose the correct Shipper, and
              * persists the Shipper's returned receipt.
              *
@@ -5022,6 +5076,20 @@ final class PubContract
 
                             'note' =>
                                 'Canonical department handoff. Normal automatic entry is a QUEUED asset selected by Scheduler; explicit Dispatch recovery may re-enter from a Dispatch-stage error.',
+                        ],
+
+                        [
+                            'key' =>
+                                'notify_on_publish',
+
+                            'type' =>
+                                'boolean',
+
+                            'required' =>
+                                true,
+
+                            'note' =>
+                                'Per-dispatch instruction supplied by the caller. When true, Dispatch sends Terry a notification only after the Shipper succeeds and the shipment is being completed as SHIPPED. It is not persisted in or read from the sealed package.',
                         ],
                     ],
 
@@ -5731,10 +5799,10 @@ final class PubContract
                  * department itself. These are configuration, not rotation
                  * memory.
                  */
-                'pub_scheduler_settings' => [
+                'pub_schedule_settings' => [
 
                     'label' =>
-                        'PUB Scheduler Settings',
+                        'PUB Schedule Settings',
 
                     'fields' => [
 
@@ -5778,10 +5846,10 @@ final class PubContract
                  *
                  * These values may change without code or cron changes.
                  */
-                'pub_scheduler_channel_rules' => [
+                'pub_schedule_channel_rules' => [
 
                     'label' =>
-                        'PUB Scheduler Channel Rules',
+                        'PUB Schedule Channel Rules',
 
                     'fields' => [
 
@@ -5805,6 +5873,17 @@ final class PubContract
 
                             'note' =>
                                 'channel-specific automatic Scheduler ON/OFF',
+                        ],
+
+                        [
+                            'key' =>
+                                'notify_on_publish',
+
+                            'type' =>
+                                'tinyint(1)',
+
+                            'note' =>
+                                'channel-specific automatic preference: when true, Scheduler tells Dispatch to notify Terry after a successful shipment; false by default',
                         ],
 
                         [

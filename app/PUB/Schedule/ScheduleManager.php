@@ -27,7 +27,7 @@ use Throwable;
  *   - applies hard eligibility rules
  *   - ranks viable candidates using soft diversity rules
  *   - releases at most one asset per due channel per run
- *   - hands only the selected pub_asset_id to DispatchManager::shipOne()
+ *   - hands the selected pub_asset_id plus channel notification instruction to DispatchManager::shipOne()
  *
  * It does NOT:
  *   - create or package assets
@@ -113,7 +113,8 @@ final class ScheduleManager
         bool $enabled,
         int $releaseIntervalMinutes,
         int $sameSourceMax,
-        int $sameSourceWindowMinutes
+        int $sameSourceWindowMinutes,
+        bool $notifyOnPublish = false
     ): array {
         return $this->schedule
             ->saveChannelRule(
@@ -121,7 +122,8 @@ final class ScheduleManager
                 $enabled,
                 $releaseIntervalMinutes,
                 $sameSourceMax,
-                $sameSourceWindowMinutes
+                $sameSourceWindowMinutes,
+                $notifyOnPublish
             );
     }
 
@@ -247,7 +249,8 @@ final class ScheduleManager
         try {
             return $dispatch
                 ->shipOne(
-                    $pubAssetId
+                    $pubAssetId,
+                    false
                 );
 
         } catch (Throwable $e) {
@@ -492,6 +495,15 @@ final class ScheduleManager
                 'Schedule channel rule is missing channel.'
             );
         }
+
+
+        $notifyOnPublish =
+            (bool)(
+                $rule[
+                    'notify_on_publish'
+                ]
+                ?? false
+            );
 
 
         if (
@@ -747,7 +759,8 @@ final class ScheduleManager
         $dispatchResult =
             $this->dispatch()
                 ->shipOne(
-                    $pubAssetId
+                    $pubAssetId,
+                    $notifyOnPublish
                 );
 
 

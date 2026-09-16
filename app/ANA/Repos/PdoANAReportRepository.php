@@ -21,19 +21,19 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
             return [];
         }
 
-$stmt = $this->pdo->prepare(
-    "SELECT
-        resource_id,
-        source_key,
-        COUNT(*) AS event_count,
-        MAX(created_at) AS last_visit
-    FROM analytics_events
-    WHERE resource_type = :resource_type
-    AND event_key = :event_key
-    AND resource_id IS NOT NULL
-    GROUP BY resource_id, source_key
-    ORDER BY last_visit DESC, resource_id ASC"
-);
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                resource_id,
+                source_key,
+                COUNT(*) AS event_count,
+                MAX(created_at) AS last_visit
+            FROM analytics_events
+            WHERE resource_type = :resource_type
+            AND event_key = :event_key
+            AND resource_id IS NOT NULL
+            GROUP BY resource_id, source_key
+            ORDER BY last_visit DESC, resource_id ASC"
+        );
 
         $stmt->execute([
             ':resource_type' => $resourceType,
@@ -73,5 +73,73 @@ $stmt = $this->pdo->prepare(
         );
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function listEventsForResource(
+        string $resourceType,
+        int $resourceId,
+        string $eventKey,
+        ?string $sourceKey
+    ): array {
+        $resourceType = trim($resourceType);
+        $eventKey = trim($eventKey);
+
+        if ($resourceType === '' || $resourceId <= 0 || $eventKey === '') {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                id,
+                event_key,
+                reservation_id,
+                reservation_token,
+                resolver_key,
+                resource_type,
+                resource_id,
+                experience_key,
+                source_key,
+                session_id,
+                referrer,
+                viewer_id,
+                is_test,
+                path,
+                payload_json,
+                created_at
+            FROM analytics_events
+            WHERE resource_type = :resource_type
+            AND resource_id = :resource_id
+            AND event_key = :event_key
+            AND source_key <=> :source_key
+            ORDER BY created_at DESC, id DESC"
+        );
+
+        $stmt->execute([
+            ':resource_type' => $resourceType,
+            ':resource_id' => $resourceId,
+            ':event_key' => $eventKey,
+            ':source_key' => $sourceKey,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function deleteEventById(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM analytics_events
+            WHERE id = :id
+            LIMIT 1"
+        );
+
+        $stmt->execute([
+            ':id' => $id,
+        ]);
+
+        return $stmt->rowCount() > 0;
     }
 }

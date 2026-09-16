@@ -13,4 +13,13 @@ interface ANAReportRepositoryInterface
     public function listResourceTypes(): array;
 
     public function countPlaylistEngagement(): array;
+
+    public function listEventsForResource(
+        string $resourceType,
+        int $resourceId,
+        string $eventKey,
+        ?string $sourceKey
+    ): array;
+
+    public function deleteEventById(int $id): bool;
 }

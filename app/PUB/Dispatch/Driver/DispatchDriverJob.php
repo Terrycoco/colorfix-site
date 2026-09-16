@@ -11,6 +11,10 @@ use RuntimeException;
  * The ticket deliberately does NOT contain the sealed package.
  * pub_asset_id is the durable reference to the box already sitting at
  * pipeline_stage=shipping. The driver reloads that exact box from PUB.
+ *
+ * notify_on_publish is a Schedule/Dispatch instruction. It travels with
+ * the one-shot assignment so it survives an asynchronous shipment and
+ * can be honored only after Dispatch receives a successful final result.
  */
 final class DispatchDriverJob
 {
@@ -22,6 +26,7 @@ final class DispatchDriverJob
         private int $pubAssetId,
         private string $routeClass,
         private int $timeoutSeconds = 300,
+        private bool $notifyOnPublish = false,
     ) {
         if ($this->pubAssetId <= 0) {
             throw new RuntimeException(
@@ -76,6 +81,12 @@ final class DispatchDriverJob
     }
 
 
+    public function notifyOnPublish(): bool
+    {
+        return $this->notifyOnPublish;
+    }
+
+
     public function toArray(): array
     {
         return [
@@ -87,6 +98,9 @@ final class DispatchDriverJob
 
             'timeout_seconds' =>
                 $this->timeoutSeconds,
+
+            'notify_on_publish' =>
+                $this->notifyOnPublish,
         ];
     }
 
@@ -202,6 +216,12 @@ final class DispatchDriverJob
                     'timeout_seconds'
                 ]
                 ?? 300
+            ),
+            (bool)(
+                $data[
+                    'notify_on_publish'
+                ]
+                ?? false
             )
         );
     }

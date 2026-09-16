@@ -129,7 +129,8 @@ final class YouTubeVideoShipper implements
 
     public function ship(
         int $pubAssetId,
-        array $package
+        array $package,
+        bool $notifyOnPublish = false
     ): array {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -145,7 +146,8 @@ final class YouTubeVideoShipper implements
             new DispatchDriverJob(
                 $pubAssetId,
                 self::class,
-                self::DRIVER_TIMEOUT_SECONDS
+                self::DRIVER_TIMEOUT_SECONDS,
+                $notifyOnPublish
             );
 
         $handle =
