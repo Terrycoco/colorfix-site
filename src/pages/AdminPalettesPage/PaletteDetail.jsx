@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import EditableSwatch from "@components/EditableSwatch";
+import KickerDropdown from "@components/KickerDropdown";
 
 function cleanText(value) {
   return String(value ?? "").trim();
@@ -60,6 +61,7 @@ function editorValue(form, members) {
     palette_type: cleanText(form?.palette_type) || "exterior",
     is_public: Boolean(form?.is_public),
     private_notes: cleanText(form?.private_notes),
+    pv_kicker_text: cleanText(form?.pv_kicker_text),
     pv_title: cleanText(form?.pv_title),
     pv_description: cleanText(form?.pv_description),
     members: (Array.isArray(members) ? members : []).map(
@@ -89,6 +91,7 @@ export default function PaletteDetail({
     palette_type: "exterior",
     is_public: true,
     private_notes: "",
+    pv_kicker_text: "",
     pv_title: "",
     pv_description: "",
   });
@@ -105,6 +108,7 @@ export default function PaletteDetail({
       is_public:
         Number(palette?.is_public ?? 1) === 1,
       private_notes: cleanText(palette?.private_notes),
+      pv_kicker_text: cleanText(palette?.pv_kicker_text),
       pv_title: cleanText(palette?.pv_title),
       pv_description: cleanText(palette?.pv_description),
     };
@@ -217,6 +221,23 @@ export default function PaletteDetail({
         </div>
 
         <div className="admin-palette-detail__field">
+          <label htmlFor="palette-pv-kicker">
+            Kicker for Public PV
+          </label>
+
+          <KickerDropdown
+            textValue={form.pv_kicker_text}
+            blankLabel="Choose kicker"
+            onChange={(_, kicker) =>
+              setField(
+                "pv_kicker_text",
+                kicker?.display_text || ""
+              )
+            }
+          />
+        </div>
+
+        <div className="admin-palette-detail__field">
           <label htmlFor="palette-pv-title">
             Title for Public PV
           </label>
@@ -256,19 +277,37 @@ export default function PaletteDetail({
         </div>
 
         <div className="admin-palette-detail__field admin-palette-detail__field--check">
-          <label>
-            <input
-              type="checkbox"
-              checked={form.is_public}
-              onChange={(event) =>
-                setField(
-                  "is_public",
-                  event.target.checked
-                )
-              }
-            />
-            Public
-          </label>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <label style={{ margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={form.is_public}
+                onChange={(event) =>
+                  setField(
+                    "is_public",
+                    event.target.checked
+                  )
+                }
+              />
+              Public
+            </label>
+
+            <span
+              style={{
+                color: "var(--admin-muted)",
+                fontSize: "12px",
+                lineHeight: 1.35,
+              }}
+            >
+              ID: {palette?.id ?? "not saved yet"}
+            </span>
+          </div>
         </div>
 
         <div className="admin-palette-detail__field admin-palette-detail__field--wide">

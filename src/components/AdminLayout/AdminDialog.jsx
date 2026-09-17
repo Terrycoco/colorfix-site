@@ -26,24 +26,55 @@ export default function AdminDialog({
   const confirmButtonRef = useRef(null);
   const cancel = onCancel || onClose;
 
+  const onConfirmRef = useRef(onConfirm);
+  const cancelRef = useRef(cancel);
+  const modeRef = useRef(mode);
+
+  onConfirmRef.current = onConfirm;
+  cancelRef.current = cancel;
+  modeRef.current = mode;
+
   useEffect(() => {
     if (!open) return undefined;
 
     const previousActiveElement = document.activeElement;
 
     window.requestAnimationFrame(() => {
-      const target = confirmButtonRef.current || dialogRef.current;
+      const dialog = dialogRef.current;
+
+      const firstFormControl = dialog?.querySelector(
+        [
+          "input:not([disabled])",
+          "select:not([disabled])",
+          "textarea:not([disabled])",
+        ].join(",")
+      );
+
+      const target =
+        firstFormControl
+        || confirmButtonRef.current
+        || dialog;
+
       target?.focus?.();
+
+      if (
+        firstFormControl
+        && firstFormControl instanceof HTMLInputElement
+        && ["text", "search", "email", "url", "tel"].includes(firstFormControl.type)
+      ) {
+        const length = firstFormControl.value.length;
+        firstFormControl.setSelectionRange?.(length, length);
+      }
     });
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
 
-        if (mode === "alert") {
-          onConfirm?.();
+        if (modeRef.current === "alert") {
+          onConfirmRef.current?.();
         } else {
-          cancel?.();
+          cancelRef.current?.();
         }
         return;
       }
@@ -89,7 +120,7 @@ export default function AdminDialog({
       document.removeEventListener("keydown", handleKeyDown);
       previousActiveElement?.focus?.();
     };
-  }, [open, mode, onConfirm, cancel]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -189,7 +220,6 @@ export default function AdminDialog({
                         ? "admin-dialog__button--danger"
                         : "",
                     ].filter(Boolean).join(" ")}
-                    autoFocus={Boolean(action.autoFocus)}
                     disabled={Boolean(action.disabled)}
                     onClick={action.onClick}
                   >

@@ -9,6 +9,7 @@ import {
 import { API_FOLDER } from "@helpers/config";
 import {
   AdminButton,
+  AdminDialog,
   AdminDetailPane,
   AdminEmptyState,
   AdminListPane,
@@ -211,6 +212,46 @@ export default function AdminPalettesPage() {
   const [saving, setSaving] = useState(false);
 
   const [
+    saveAsNewOpen,
+    setSaveAsNewOpen,
+  ] = useState(false);
+
+  const [
+    saveAsNewName,
+    setSaveAsNewName,
+  ] = useState("");
+
+  const [
+    saveAsNewError,
+    setSaveAsNewError,
+  ] = useState("");
+
+  const [
+    saveAsNewCopyPhotos,
+    setSaveAsNewCopyPhotos,
+  ] = useState(true);
+
+  const [
+    saveAsNewNameStatus,
+    setSaveAsNewNameStatus,
+  ] = useState("idle");
+
+  const [
+    saveAsNewSaving,
+    setSaveAsNewSaving,
+  ] = useState(false);
+
+  const [
+    deleteOpen,
+    setDeleteOpen,
+  ] = useState(false);
+
+  const [
+    deleting,
+    setDeleting,
+  ] = useState(false);
+
+  const [
     detailDirty,
     setDetailDirty,
   ] = useState(false);
@@ -242,6 +283,56 @@ export default function AdminPalettesPage() {
     colorFamily,
     setColorFamily,
   ] = useState("");
+
+  useEffect(() => {
+    if (!saveAsNewOpen) {
+      return undefined;
+    }
+
+    const nickname = cleanText(saveAsNewName);
+
+    if (!nickname) {
+      setSaveAsNewNameStatus("idle");
+      return undefined;
+    }
+
+    setSaveAsNewNameStatus("checking");
+    setSaveAsNewError("");
+
+    const timer = window.setTimeout(
+      async () => {
+        try {
+          const data = await readJson(
+            await fetch(
+              `${API_FOLDER}/v2/admin/palettes/check-name.php?nickname=${encodeURIComponent(nickname)}&_=${Date.now()}`,
+              {
+                credentials: "include",
+                cache: "no-store",
+              }
+            ),
+            "Failed to check Internal Palette Name"
+          );
+
+          setSaveAsNewNameStatus(
+            data?.available
+              ? "available"
+              : "duplicate"
+          );
+        } catch (error) {
+          setSaveAsNewNameStatus("error");
+          setSaveAsNewError(
+            error?.message
+            || "Could not check that name."
+          );
+        }
+      },
+      300
+    );
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [saveAsNewOpen, saveAsNewName]);
 
   const loadPalettes = useCallback(
     async () => {
@@ -453,6 +544,194 @@ export default function AdminPalettesPage() {
     setColorFamily("");
   }
 
+  function openSaveAsNewDialog() {
+    setSaveAsNewName("");
+    setSaveAsNewError("");
+    setSaveAsNewCopyPhotos(true);
+    setSaveAsNewNameStatus("idle");
+    setSaveAsNewOpen(true);
+  }
+
+  function closeSaveAsNewDialog() {
+    if (saveAsNewSaving) {
+      return;
+    }
+
+    setSaveAsNewOpen(false);
+    setSaveAsNewError("");
+    setSaveAsNewNameStatus("idle");
+  }
+
+  async function continueSaveAsNew() {
+    const name = cleanText(saveAsNewName);
+
+    if (
+      saveAsNewSaving
+      || !editorValue
+      || !selectedPaletteId
+    ) {
+      return;
+    }
+
+    if (!name) {
+      setSaveAsNewError(
+        "Enter a new Internal Palette Name."
+      );
+      return;
+    }
+
+    if (saveAsNewNameStatus === "duplicate") {
+      setSaveAsNewError(
+        "That Internal Palette Name is already in use."
+      );
+      return;
+    }
+
+    if (saveAsNewNameStatus !== "available") {
+      return;
+    }
+
+    setSaveAsNewSaving(true);
+    setSaveAsNewError("");
+
+    try {
+      const data = await readJson(
+        await fetch(
+          `${API_FOLDER}/v2/admin/palettes/save-as-new.php`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              ...editorValue,
+              source_palette_id:
+                Number(selectedPaletteId),
+              new_nickname: name,
+              copy_photos:
+                Boolean(saveAsNewCopyPhotos),
+            }),
+          }
+        ),
+        "Failed to save as new"
+      );
+
+      const saved = data?.item;
+
+      if (!saved?.id) {
+        throw new Error(
+          "Save as New did not return a Palette ID."
+        );
+      }
+
+      setSaveAsNewOpen(false);
+      setSaveAsNewName("");
+      setSaveAsNewError("");
+      setSaveAsNewNameStatus("idle");
+
+      setSelectedPaletteId(
+        Number(saved.id)
+      );
+      setSelectedDetail(saved);
+      setEditorValue(null);
+      setMode("edit");
+      setDetailDirty(false);
+      setPhotosDirty(false);
+
+      await loadPalettes();
+    } catch (error) {
+      const message =
+        error?.message
+        || "Failed to save as new.";
+
+      setSaveAsNewError(message);
+
+      if (
+        message
+          .toLowerCase()
+          .includes("already in use")
+      ) {
+        setSaveAsNewNameStatus("duplicate");
+      }
+    } finally {
+      setSaveAsNewSaving(false);
+    }
+  }
+
+  function openDeleteDialog() {
+    if (
+      mode !== "edit"
+      || !selectedPaletteId
+      || deleting
+    ) {
+      return;
+    }
+
+    setActionError("");
+    setDeleteOpen(true);
+  }
+
+  function closeDeleteDialog() {
+    if (deleting) {
+      return;
+    }
+
+    setDeleteOpen(false);
+  }
+
+  async function confirmDeletePalette() {
+    const paletteId = Number(
+      selectedPaletteId
+    );
+
+    if (!paletteId || deleting) {
+      return;
+    }
+
+    setDeleting(true);
+    setActionError("");
+
+    try {
+      await readJson(
+        await fetch(
+          `${API_FOLDER}/v2/admin/palettes/delete.php`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              palette_id: paletteId,
+            }),
+          }
+        ),
+        "Failed to delete Palette"
+      );
+
+      setDeleteOpen(false);
+      setSelectedPaletteId(null);
+      setSelectedDetail(null);
+      setEditorValue(null);
+      setMode("empty");
+      setDetailDirty(false);
+      setPhotosDirty(false);
+
+      await loadPalettes();
+    } catch (error) {
+      setDeleteOpen(false);
+      setActionError(
+        error?.message
+        || "Failed to delete Palette."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleSave() {
     if (
       saving
@@ -533,14 +812,15 @@ export default function AdminPalettesPage() {
   }
 
   async function openPV() {
-    const viewerId = Number(
-      selectedPalette?.palette_viewer_id
+    const paletteId = Number(
+      selectedPaletteId
+      || selectedPalette?.id
       || 0
     );
 
-    if (!viewerId) {
+    if (!paletteId) {
       setActionError(
-        "This palette does not have a PV yet."
+        "Save this Palette before opening its PV."
       );
       return;
     }
@@ -548,28 +828,48 @@ export default function AdminPalettesPage() {
     setActionError("");
 
     try {
-      const response = await fetch(
-        `${API_FOLDER}/v2/admin/palette-viewers.php?id=${encodeURIComponent(viewerId)}&_=${Date.now()}`,
-        {
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
-
       const data = await readJson(
-        response,
-        "Failed to load PV"
+        await fetch(
+          `${API_FOLDER}/v2/admin/palettes/open-pv.php`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              palette_id: paletteId,
+            }),
+          }
+        ),
+        "Could not open PV"
       );
 
       const rexUrl =
-        data?.item?.rex?.public_url
-        || data?.item?.rex?.url
-        || data?.item?.rex?.href
+        data?.item?.public_url
         || "";
 
       if (!rexUrl) {
         throw new Error(
-          "This PV does not currently have a REX URL."
+          "Open PV did not return a REX URL."
+        );
+      }
+
+      if (
+        data?.item?.palette_viewer_id
+        && selectedPalette
+      ) {
+        setSelectedDetail((current) =>
+          current
+            ? {
+                ...current,
+                palette_viewer_id:
+                  Number(
+                    data.item.palette_viewer_id
+                  ),
+              }
+            : current
         );
       }
 
@@ -600,7 +900,8 @@ export default function AdminPalettesPage() {
         || "Palette";
 
   return (
-    <AdminMasterDetail
+    <>
+      <AdminMasterDetail
       selectedId={selectedPaletteId}
       drawer={
         <PalettePhotosDrawer
@@ -711,7 +1012,17 @@ export default function AdminPalettesPage() {
                   {mode === "edit" ? (
                     <AdminButton
                       type="button"
-                      disabled
+                      onClick={openSaveAsNewDialog}
+                    >
+                      Save as New
+                    </AdminButton>
+                  ) : null}
+
+                  {mode === "edit" ? (
+                    <AdminButton
+                      type="button"
+                      onClick={openDeleteDialog}
+                      disabled={deleting}
                     >
                       Delete
                     </AdminButton>
@@ -762,5 +1073,153 @@ export default function AdminPalettesPage() {
         </AdminDetailPane>
       }
     />
+
+      <AdminDialog
+        open={saveAsNewOpen}
+        title="Save as New"
+        onCancel={closeSaveAsNewDialog}
+        onClose={closeSaveAsNewDialog}
+        width={460}
+        actions={[
+          {
+            key: "cancel",
+            label: "Cancel",
+            variant: "secondary",
+            onClick: closeSaveAsNewDialog,
+          },
+          {
+            key: "continue",
+            label: saveAsNewSaving
+              ? "Saving…"
+              : "Continue",
+            variant: "primary",
+            autoFocus: true,
+            disabled:
+              saveAsNewSaving
+              || saveAsNewNameStatus !== "available",
+            onClick: continueSaveAsNew,
+          },
+        ]}
+      >
+        <div className="admin-palette-save-as-new">
+          <label htmlFor="save-as-new-palette-name">
+            New Internal Palette Name
+          </label>
+
+          <input
+            id="save-as-new-palette-name"
+            type="text"
+            value={saveAsNewName}
+            onChange={(event) => {
+              setSaveAsNewName(event.target.value);
+              setSaveAsNewNameStatus("idle");
+
+              if (saveAsNewError) {
+                setSaveAsNewError("");
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                continueSaveAsNew();
+              }
+            }}
+            placeholder="Enter a unique internal name"
+          />
+
+          <div className="admin-palette-save-as-new__help">
+            Used only inside ColorFix to identify this palette.
+            Clients will not see this name.
+          </div>
+
+          {saveAsNewNameStatus === "checking" ? (
+            <div className="admin-palette-save-as-new__status">
+              Checking name…
+            </div>
+          ) : null}
+
+          {saveAsNewNameStatus === "available" ? (
+            <div className="admin-palette-save-as-new__status admin-palette-save-as-new__status--available">
+              Name is available.
+            </div>
+          ) : null}
+
+          {saveAsNewNameStatus === "duplicate" ? (
+            <div className="admin-palette-save-as-new__error">
+              That Internal Palette Name is already in use.
+            </div>
+          ) : null}
+
+          <label className="admin-palette-save-as-new__copy-photos">
+            <input
+              type="checkbox"
+              checked={saveAsNewCopyPhotos}
+              onChange={(event) =>
+                setSaveAsNewCopyPhotos(
+                  event.target.checked
+                )
+              }
+            />
+            <span>Copy photos also</span>
+          </label>
+
+          {saveAsNewError ? (
+            <div className="admin-palette-save-as-new__error">
+              {saveAsNewError}
+            </div>
+          ) : null}
+        </div>
+      </AdminDialog>
+
+      <AdminDialog
+        open={deleteOpen}
+        mode="danger"
+        title="Delete Palette?"
+        onCancel={closeDeleteDialog}
+        onClose={closeDeleteDialog}
+        width={460}
+        dismissOnBackdrop={!deleting}
+        actions={[
+          {
+            key: "cancel",
+            label: "Cancel",
+            variant: "secondary",
+            autoFocus: true,
+            disabled: deleting,
+            onClick: closeDeleteDialog,
+          },
+          {
+            key: "confirm",
+            label: deleting
+              ? "Deleting…"
+              : "Confirm",
+            variant: "danger",
+            disabled: deleting,
+            onClick: confirmDeletePalette,
+          },
+        ]}
+      >
+        <div>
+          <p>
+            Permanently delete
+            {" "}
+            <strong>
+              {selectedPalette?.nickname || "this Palette"}
+            </strong>
+            {" "}
+            and all of its PVs?
+          </p>
+
+          <p>
+            PV photo links and REX reservations will also be removed.
+            Photo Library images themselves will not be deleted.
+          </p>
+
+          <p>
+            This cannot be undone.
+          </p>
+        </div>
+      </AdminDialog>
+    </>
   );
 }

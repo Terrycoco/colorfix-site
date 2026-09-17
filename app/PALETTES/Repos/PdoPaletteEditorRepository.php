@@ -218,6 +218,7 @@ final class PdoPaletteEditorRepository
 
     public function createPublicPV(
         int $paletteId,
+        ?string $kickerText,
         ?string $title,
         ?string $description
     ): int {
@@ -241,7 +242,7 @@ final class PdoPaletteEditorRepository
                     :saved_palette_id,
                     'public',
                     'full_palette',
-                    NULL,
+                    :kicker_text,
                     :title,
                     :intro,
                     NULL,
@@ -254,6 +255,7 @@ final class PdoPaletteEditorRepository
 
         $stmt->execute([
             ':saved_palette_id' => $paletteId,
+            ':kicker_text' => $this->nullableText($kickerText),
             ':title' => $this->nullableText($title),
             ':intro' => $this->nullableText($description),
         ]);
@@ -263,6 +265,7 @@ final class PdoPaletteEditorRepository
 
     public function updatePublicPV(
         int $pvId,
+        ?string $kickerText,
         ?string $title,
         ?string $description
     ): void {
@@ -272,17 +275,263 @@ final class PdoPaletteEditorRepository
 
         $stmt = $this->pdo->prepare(
             "UPDATE palette_viewers
-                SET title = :title,
+                SET kicker_text = :kicker_text,
+                    title = :title,
                     intro = :intro,
                     updated_at = NOW()
               WHERE palette_viewer_id = :pv_id"
         );
 
         $stmt->execute([
+            ':kicker_text' => $this->nullableText($kickerText),
             ':title' => $this->nullableText($title),
             ':intro' => $this->nullableText($description),
             ':pv_id' => $pvId,
         ]);
+    }
+
+    public function clonePublicPV(
+        int $sourcePvId,
+        int $targetPaletteId,
+        ?string $kickerText,
+        ?string $title,
+        ?string $description
+    ): int {
+        if ($sourcePvId <= 0) {
+            throw new \InvalidArgumentException(
+                'Valid source PV ID is required.'
+            );
+        }
+
+        if ($targetPaletteId <= 0) {
+            throw new \InvalidArgumentException(
+                'Valid target Palette ID is required.'
+            );
+        }
+
+        $sourceStmt = $this->pdo->prepare(
+            "SELECT
+                format,
+                template_key,
+                notes,
+                cta_label,
+                is_active
+               FROM palette_viewers
+              WHERE palette_viewer_id = :pv_id
+              LIMIT 1"
+        );
+
+        $sourceStmt->execute([
+            ':pv_id' => $sourcePvId,
+        ]);
+
+        $source = $sourceStmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($source === false) {
+            throw new \RuntimeException(
+                'Source PV was not found.'
+            );
+        }
+
+        $insert = $this->pdo->prepare(
+            "INSERT INTO palette_viewers
+                (
+                    saved_palette_id,
+                    format,
+                    template_key,
+                    kicker_text,
+                    title,
+                    intro,
+                    notes,
+                    cta_label,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+             VALUES
+                (
+                    :saved_palette_id,
+                    :format,
+                    :template_key,
+                    :kicker_text,
+                    :title,
+                    :intro,
+                    :notes,
+                    :cta_label,
+                    :is_active,
+                    NOW(),
+                    NOW()
+                )"
+        );
+
+        $insert->execute([
+            ':saved_palette_id' => $targetPaletteId,
+            ':format' => $source['format'] ?: 'public',
+            ':template_key' => $this->nullableText(
+                $source['template_key'] ?? null
+            ),
+            ':kicker_text' => $this->nullableText($kickerText),
+            ':title' => $this->nullableText($title),
+            ':intro' => $this->nullableText($description),
+            ':notes' => $this->nullableText(
+                $source['notes'] ?? null
+            ),
+            ':cta_label' => $this->nullableText(
+                $source['cta_label'] ?? null
+            ),
+            ':is_active' => (int)($source['is_active'] ?? 1),
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function copyPVPhotos(
+        int $sourcePvId,
+        int $targetPvId
+    ): void {
+        if ($sourcePvId <= 0 || $targetPvId <= 0) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO palette_viewer_photos
+                (
+                    palette_viewer_id,
+                    photo_library_id,
+                    rel_path,
+                    photo_type,
+                    trigger_mode,
+                    trigger_color_id,
+                    caption,
+                    alt_text,
+                    order_index,
+                    created_at,
+                    updated_at
+                )
+             SELECT
+                    :target_pv_id,
+                    photo_library_id,
+                    rel_path,
+                    photo_type,
+                    trigger_mode,
+                    trigger_color_id,
+                    caption,
+                    alt_text,
+                    order_index,
+                    NOW(),
+                    NOW()
+               FROM palette_viewer_photos
+              WHERE palette_viewer_id = :source_pv_id
+           ORDER BY order_index ASC, palette_viewer_photo_id ASC"
+        );
+
+        $stmt->execute([
+            ':target_pv_id' => $targetPvId,
+            ':source_pv_id' => $sourcePvId,
+        ]);
+    }
+
+    /**
+     * @return int[]
+     */
+    public function findPVIdsByPaletteId(int $paletteId): array
+    {
+        if ($paletteId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT palette_viewer_id
+               FROM palette_viewers
+              WHERE saved_palette_id = :palette_id
+           ORDER BY palette_viewer_id ASC"
+        );
+
+        $stmt->execute([
+            ':palette_id' => $paletteId,
+        ]);
+
+        return array_values(
+            array_filter(
+                array_map(
+                    'intval',
+                    $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []
+                ),
+                static fn(int $id): bool => $id > 0
+            )
+        );
+    }
+
+    public function deletePVPhotos(int $pvId): int
+    {
+        if ($pvId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM palette_viewer_photos
+              WHERE palette_viewer_id = :pv_id"
+        );
+
+        $stmt->execute([
+            ':pv_id' => $pvId,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+    public function deletePV(int $pvId): int
+    {
+        if ($pvId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM palette_viewers
+              WHERE palette_viewer_id = :pv_id"
+        );
+
+        $stmt->execute([
+            ':pv_id' => $pvId,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+    public function deleteMembersForPalette(int $paletteId): int
+    {
+        if ($paletteId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM saved_palette_members
+              WHERE saved_palette_id = :palette_id"
+        );
+
+        $stmt->execute([
+            ':palette_id' => $paletteId,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+    public function deletePalette(int $paletteId): int
+    {
+        if ($paletteId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "DELETE FROM saved_palettes
+              WHERE id = :palette_id"
+        );
+
+        $stmt->execute([
+            ':palette_id' => $paletteId,
+        ]);
+
+        return $stmt->rowCount();
     }
 
     public function getEditorItem(int $paletteId): ?array

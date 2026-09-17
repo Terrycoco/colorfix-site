@@ -49,8 +49,13 @@
   grid-template-columns: 118px 90px 100px 30px;
   gap: 0.8rem;
   align-items: center;
-  padding: 0.65rem 0;
+  padding: 0.65rem 0.5rem;
   border-bottom: 1px solid var(--admin-border-soft);
+  cursor: pointer;
+}
+
+.palette-photo-manager__row--selected {
+  background: var(--admin-selected);
 }
 
 .palette-photo-manager__thumb {

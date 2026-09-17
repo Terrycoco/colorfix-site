@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PALETTES\Managers;
 
 use App\PALETTES\Repos\PdoPaletteEditorRepository;
+use App\REX\Repos\PdoRexReservationRepository;
 use DomainException;
 use InvalidArgumentException;
 use PDO;
@@ -35,6 +36,242 @@ final class PaletteManager
         }
 
         return $item;
+    }
+
+    public function checkInternalName(string $nickname): array
+    {
+        $nickname = trim($nickname);
+
+        if ($nickname === '') {
+            throw new InvalidArgumentException(
+                'Internal Palette Name is required.'
+            );
+        }
+
+        return [
+            'nickname' => $nickname,
+            'available' => !$this->editor->nicknameInUse($nickname),
+        ];
+    }
+
+    public function saveAsNew(array $input): array
+    {
+        $sourcePaletteId = (int)(
+            $input['source_palette_id'] ?? 0
+        );
+
+        $newNickname = trim(
+            (string)($input['new_nickname'] ?? '')
+        );
+
+        if ($sourcePaletteId <= 0) {
+            throw new InvalidArgumentException(
+                'Valid source Palette ID is required.'
+            );
+        }
+
+        if (!$this->editor->paletteExists($sourcePaletteId)) {
+            throw new RuntimeException(
+                "Palette {$sourcePaletteId} was not found."
+            );
+        }
+
+        if ($newNickname === '') {
+            throw new InvalidArgumentException(
+                'New Internal Palette Name is required.'
+            );
+        }
+
+        if ($this->editor->nicknameInUse($newNickname)) {
+            throw new DomainException(
+                'That Internal Palette Name is already in use.'
+            );
+        }
+
+        $members = $this->normalizeMembers(
+            is_array($input['members'] ?? null)
+                ? $input['members']
+                : []
+        );
+
+        $paletteFields = [
+            'nickname' => $newNickname,
+            'palette_type' => trim(
+                (string)($input['palette_type'] ?? 'exterior')
+            ) ?: 'exterior',
+
+            /*
+             * A branch starts private intentionally.
+             * It can be made public later after review.
+             */
+            'is_public' => false,
+
+            'private_notes' => $this->nullableText(
+                $input['private_notes'] ?? null
+            ),
+        ];
+
+        $pvKickerText = $this->nullableText(
+            $input['pv_kicker_text'] ?? null
+        );
+
+        $pvTitle = $this->nullableText(
+            $input['pv_title'] ?? null
+        );
+
+        $pvDescription = $this->nullableText(
+            $input['pv_description'] ?? null
+        );
+
+        $copyPhotos = (bool)(
+            $input['copy_photos'] ?? true
+        );
+
+        $sourcePv = $this->editor
+            ->findPublicPVByPaletteId($sourcePaletteId);
+
+        $this->pdo->beginTransaction();
+
+        try {
+            $newPaletteId = $this->editor->createPalette(
+                $paletteFields
+            );
+
+            $this->editor->replaceMembers(
+                $newPaletteId,
+                $members
+            );
+
+            $newPvId = null;
+
+            if ($sourcePv) {
+                $newPvId = $this->editor->clonePublicPV(
+                    (int)$sourcePv['palette_viewer_id'],
+                    $newPaletteId,
+                    $pvKickerText,
+                    $pvTitle,
+                    $pvDescription
+                );
+
+                if ($copyPhotos) {
+                    $this->editor->copyPVPhotos(
+                        (int)$sourcePv['palette_viewer_id'],
+                        $newPvId
+                    );
+                }
+            } elseif (
+                $pvKickerText !== null
+                || $pvTitle !== null
+                || $pvDescription !== null
+            ) {
+                $newPvId = $this->editor->createPublicPV(
+                    $newPaletteId,
+                    $pvKickerText,
+                    $pvTitle,
+                    $pvDescription
+                );
+            }
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+
+        /*
+         * Deliberately no REX work here.
+         * The new branch is independent and gets its own
+         * reservation only when Open PV / publishing needs it.
+         */
+        return $this->getEditorItem($newPaletteId);
+    }
+
+    public function deletePaletteCombo(int $paletteId): array
+    {
+        if ($paletteId <= 0) {
+            throw new InvalidArgumentException(
+                'Valid Palette ID is required.'
+            );
+        }
+
+        $palette = $this->editor->getEditorItem($paletteId);
+
+        if (!$palette) {
+            throw new RuntimeException(
+                "Palette {$paletteId} was not found."
+            );
+        }
+
+        $pvIds = $this->editor
+            ->findPVIdsByPaletteId($paletteId);
+
+        $this->pdo->beginTransaction();
+
+        try {
+            $rex = new PdoRexReservationRepository(
+                $this->pdo
+            );
+
+            /*
+             * Reservations follow object lifetime.
+             * Delete every REX reservation owned by every PV first.
+             * deleteByResource() also removes aliases / relationship edges.
+             */
+            foreach ($pvIds as $pvId) {
+                $rex->deleteByResource(
+                    'palette_viewer',
+                    $pvId
+                );
+            }
+
+            /*
+             * Delete PV-owned relationship rows, then the PVs themselves.
+             * Photo Library source images are NOT deleted.
+             */
+            foreach ($pvIds as $pvId) {
+                $this->editor->deletePVPhotos($pvId);
+
+                $deletedPv = $this->editor->deletePV(
+                    $pvId
+                );
+
+                if ($deletedPv !== 1) {
+                    throw new RuntimeException(
+                        "PV {$pvId} was not deleted."
+                    );
+                }
+            }
+
+            $this->editor
+                ->deleteMembersForPalette($paletteId);
+
+            $deletedPalette =
+                $this->editor->deletePalette($paletteId);
+
+            if ($deletedPalette !== 1) {
+                throw new RuntimeException(
+                    "Palette {$paletteId} was not deleted."
+                );
+            }
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+
+        return [
+            'palette_id' => $paletteId,
+            'nickname' => $palette['nickname'] ?? null,
+            'deleted_pv_ids' => $pvIds,
+            'deleted_pv_count' => count($pvIds),
+        ];
     }
 
     public function saveEditorItem(array $input): array
@@ -85,6 +322,10 @@ final class PaletteManager
             ),
         ];
 
+        $pvKickerText = $this->nullableText(
+            $input['pv_kicker_text'] ?? null
+        );
+
         $pvTitle = $this->nullableText(
             $input['pv_title'] ?? null
         );
@@ -118,15 +359,18 @@ final class PaletteManager
             if ($publicPv) {
                 $this->editor->updatePublicPV(
                     (int)$publicPv['palette_viewer_id'],
+                    $pvKickerText,
                     $pvTitle,
                     $pvDescription
                 );
             } elseif (
-                $pvTitle !== null
+                $pvKickerText !== null
+                || $pvTitle !== null
                 || $pvDescription !== null
             ) {
                 $this->editor->createPublicPV(
                     $paletteId,
+                    $pvKickerText,
                     $pvTitle,
                     $pvDescription
                 );

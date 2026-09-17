@@ -1,0 +1,153 @@
+.admin-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--admin-z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(18, 23, 21, 0.52);
+}
+
+.admin-dialog {
+  width: min(var(--admin-dialog-width, 520px), 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+  animation: admin-dialog-in 120ms ease-out;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-dialog__body {
+  padding: 18px 20px;
+}
+
+.admin-dialog__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.admin-dialog__message {
+  margin: 0 0 12px;
+  white-space: pre-line;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-dialog__content {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-dialog__content:not(:first-child) {
+  margin-top: 12px;
+}
+
+/* Shared dialog-form defaults */
+.admin-dialog__content label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-dialog__content input:not([type="checkbox"]):not([type="radio"]),
+.admin-dialog__content select,
+.admin-dialog__content textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-dialog__content input[type="checkbox"],
+.admin-dialog__content input[type="radio"] {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-dialog__content label:has(> input[type="checkbox"]),
+.admin-dialog__content label:has(> input[type="radio"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.admin-dialog__content > :last-child {
+  margin-bottom: 0;
+}
+
+.admin-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-surface-muted);
+}
+
+.admin-dialog__button {
+  min-width: 90px;
+  font-size: 13px;
+}
+
+.admin-dialog__button:focus-visible {
+  outline: 3px solid rgba(228, 101, 142, 0.28);
+  outline-offset: 2px;
+}
+
+.admin-dialog__button--confirm {
+  border-color: var(--admin-accent);
+  background: var(--admin-accent);
+  color: #fff;
+}
+
+.admin-dialog__button--cancel,
+.admin-dialog__button--secondary {
+  border-color: var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+}
+
+.admin-dialog__button--danger {
+  border-color: var(--admin-danger);
+  background: var(--admin-danger);
+  color: #fff;
+}
+
+@keyframes admin-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.992);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-dialog {
+    animation: none;
+  }
+}

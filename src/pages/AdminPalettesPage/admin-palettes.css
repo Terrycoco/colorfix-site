@@ -1,5 +1,7 @@
 .admin-palette-list {
+  box-sizing: border-box;
   width: 100%;
+  padding: 0.35rem 0.65rem 0.8rem;
 }
 
 .admin-palette-list__status {
@@ -125,7 +127,7 @@
 }
 
 .admin-palette-filters {
-  padding: 0.6rem;
+  padding: 0.75rem 0.65rem 0.7rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
 
@@ -532,3 +534,69 @@
     width: 92px;
   }
 }
+
+.admin-palette-save-as-new {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.admin-palette-save-as-new label {
+  display: block;
+  width: 100%;
+}
+
+.admin-palette-save-as-new input:not([type="checkbox"]):not([type="radio"]) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.admin-palette-save-as-new__help {
+  margin-top: 2px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-palette-save-as-new__error {
+  color: var(--admin-danger);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-palette-save-as-new__status {
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-palette-save-as-new__status--available {
+  color: var(--admin-success);
+}
+
+.admin-palette-save-as-new__copy-photos {
+  display: grid;
+  grid-template-columns: 16px auto;
+  align-items: center;
+  column-gap: 7px;
+  width: fit-content;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.admin-palette-save-as-new__copy-photos input[type="checkbox"] {
+  appearance: auto;
+  box-sizing: border-box;
+  inline-size: 16px;
+  block-size: 16px;
+  min-inline-size: 16px;
+  max-inline-size: 16px;
+  min-block-size: 16px;
+  max-block-size: 16px;
+  margin: 0;
+  padding: 0;
+}
+

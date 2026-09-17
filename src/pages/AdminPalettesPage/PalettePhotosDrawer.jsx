@@ -213,6 +213,8 @@ const PalettePhotosDrawer = forwardRef(
     const [error, setError] = useState("");
     const [status, setStatus] = useState("");
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [pickerMode, setPickerMode] = useState("add");
+    const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null);
     const [previewPhoto, setPreviewPhoto] = useState(null);
 
     const baselinePhotosRef = useRef("");
@@ -222,6 +224,7 @@ const PalettePhotosDrawer = forwardRef(
         setDetail(null);
         setError("");
         setStatus("");
+        setSelectedPhotoIndex(null);
         setPreviewPhoto(null);
         baselinePhotosRef.current = "";
         onDirtyChange?.(false);
@@ -299,6 +302,7 @@ const PalettePhotosDrawer = forwardRef(
                 );
 
               setDetail(nextDetail);
+              setSelectedPhotoIndex(null);
               onDirtyChange?.(false);
             }
 
@@ -326,6 +330,7 @@ const PalettePhotosDrawer = forwardRef(
               );
 
             setDetail(nextDetail);
+            setSelectedPhotoIndex(null);
             onDirtyChange?.(false);
           }
         } catch (err) {
@@ -444,10 +449,87 @@ const PalettePhotosDrawer = forwardRef(
           photos,
         };
       });
+
+      setSelectedPhotoIndex((current) => {
+        if (current === null) return null;
+        if (current === index) return null;
+        if (current > index) return current - 1;
+        return current;
+      });
+    }
+
+    function openAddPhotoPicker() {
+      setPickerMode("add");
+      setPickerOpen(true);
+      setError("");
+      setStatus("");
+    }
+
+    function openReplacePhotoPicker() {
+      if (
+        selectedPhotoIndex === null
+        || !detail?.photos?.[selectedPhotoIndex]
+      ) {
+        return;
+      }
+
+      setPickerMode("replace");
+      setPickerOpen(true);
+      setError("");
+      setStatus("");
     }
 
     function handlePhotoPick(photo) {
       setPickerOpen(false);
+
+      const pickedPhoto = {
+        photo_library_id:
+          photo?.photo_library_id
+          || photo?.id
+          || null,
+        rel_path:
+          photo?.raw_rel_path
+          || photo?.rel_path
+          || photo?.image_url
+          || "",
+        caption: "",
+        alt_text:
+          photo?.title
+          || photo?.alt_text
+          || "",
+      };
+
+      if (
+        pickerMode === "replace"
+        && selectedPhotoIndex !== null
+      ) {
+        setDetail((current) => {
+          if (
+            !current
+            || !current.photos[selectedPhotoIndex]
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            photos: current.photos.map(
+              (existingPhoto, photoIndex) =>
+                photoIndex === selectedPhotoIndex
+                  ? {
+                      ...existingPhoto,
+                      ...pickedPhoto,
+                      palette_viewer_photo_id: null,
+                    }
+                  : existingPhoto
+            ),
+          };
+        });
+
+        setPickerMode("add");
+        setStatus("Photo replaced. Save Photos to keep the change.");
+        return;
+      }
 
       setDetail((current) => {
         if (!current) return current;
@@ -461,20 +543,7 @@ const PalettePhotosDrawer = forwardRef(
           palette_viewer_id:
             current.viewer.palette_viewer_id
             || null,
-          photo_library_id:
-            photo?.photo_library_id
-            || photo?.id
-            || null,
-          rel_path:
-            photo?.raw_rel_path
-            || photo?.rel_path
-            || photo?.image_url
-            || "",
-          caption: "",
-          alt_text:
-            photo?.title
-            || photo?.alt_text
-            || "",
+          ...pickedPhoto,
           trigger_mode: "any",
           trigger_color_id: null,
           order_index:
@@ -491,6 +560,8 @@ const PalettePhotosDrawer = forwardRef(
           ],
         };
       });
+
+      setPickerMode("add");
     }
 
     function openPV() {
@@ -659,12 +730,23 @@ const PalettePhotosDrawer = forwardRef(
               <button
                 type="button"
                 className="palette-photo-manager__button"
-                onClick={() =>
-                  setPickerOpen(true)
-                }
+                onClick={openAddPhotoPicker}
                 disabled={loading || saving}
               >
                 Pick from Library
+              </button>
+
+              <button
+                type="button"
+                className="palette-photo-manager__button"
+                onClick={openReplacePhotoPicker}
+                disabled={
+                  loading
+                  || saving
+                  || selectedPhotoIndex === null
+                }
+              >
+                Replace Photo
               </button>
 
               <button
@@ -737,19 +819,27 @@ const PalettePhotosDrawer = forwardRef(
 
                     return (
                       <div
-                        className="palette-photo-manager__row"
+                        className={[
+                          "palette-photo-manager__row",
+                          selectedPhotoIndex === index
+                            ? "palette-photo-manager__row--selected"
+                            : "",
+                        ].filter(Boolean).join(" ")}
                         key={`${photo.palette_viewer_photo_id || "new"}-${photo.photo_library_id || "photo"}-${index}`}
+                        onClick={() =>
+                          setSelectedPhotoIndex(index)
+                        }
                       >
                         <div
                           className="palette-photo-manager__thumb"
                           role="button"
                           tabIndex={0}
                           title="Click to view full screen"
-                          onClick={() =>
-                            setPreviewPhoto(
-                              photo
-                            )
-                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedPhotoIndex(index);
+                            setPreviewPhoto(photo);
+                          }}
                           onKeyDown={(
                             event
                           ) => {
@@ -761,6 +851,7 @@ const PalettePhotosDrawer = forwardRef(
                             ) {
                               event.preventDefault();
 
+                              setSelectedPhotoIndex(index);
                               setPreviewPhoto(
                                 photo
                               );
@@ -820,9 +911,10 @@ const PalettePhotosDrawer = forwardRef(
                         <button
                           type="button"
                           className="palette-photo-manager__remove"
-                          onClick={() =>
-                            removePhoto(index)
-                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            removePhoto(index);
+                          }}
                           title="Remove photo"
                           aria-label="Remove photo"
                         >
@@ -849,10 +941,15 @@ const PalettePhotosDrawer = forwardRef(
 
         <PhotoPickerModal
           open={pickerOpen}
-          title="Add Viewer Photo"
-          onClose={() =>
-            setPickerOpen(false)
+          title={
+            pickerMode === "replace"
+              ? "Replace Viewer Photo"
+              : "Add Viewer Photo"
           }
+          onClose={() => {
+            setPickerOpen(false);
+            setPickerMode("add");
+          }}
           onPick={handlePhotoPick}
         />
 
