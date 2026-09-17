@@ -1043,7 +1043,7 @@ const activeBrandCodes = useMemo(() => {
               </button>
             )}
             {adminMode && (
-              <button className="myp-clear-btn" type="button" onClick={() => navigate(`/admin/saved-palettes`)}>
+              <button className="myp-clear-btn" type="button" onClick={() => window.location.assign("/saved-palettes")}>
                 Saved Palettes
               </button>
             )}

@@ -44,6 +44,7 @@ final class PdoSavedPaletteRepository
                     notes,
                     private_notes,
                     terry_fav,
+                    is_public,
                     kicker_id,
                     palette_type,
                     created_at
@@ -57,6 +58,7 @@ final class PdoSavedPaletteRepository
                     :notes,
                     :private_notes,
                     :terry_fav,
+                    :is_public,
                     :kicker_id,
                     :palette_type,
                     NOW()
@@ -73,6 +75,9 @@ final class PdoSavedPaletteRepository
             ':private_notes' => $data['private_notes'] ?? null,
             ':terry_fav'     => isset($data['terry_fav'])
                 ? (int)(bool)$data['terry_fav']
+                : 0,
+            ':is_public'     => isset($data['is_public'])
+                ? (int)(bool)$data['is_public']
                 : 0,
             ':kicker_id'     => isset($data['kicker_id']) && (int)$data['kicker_id'] > 0
                 ? (int)$data['kicker_id']
@@ -97,6 +102,7 @@ final class PdoSavedPaletteRepository
             'notes',
             'private_notes',
             'terry_fav',
+            'is_public',
             'kicker_id',
             'palette_type',
         ];
@@ -109,7 +115,7 @@ final class PdoSavedPaletteRepository
                 continue;
             }
 
-            if ($column === 'terry_fav') {
+            if ($column === 'terry_fav' || $column === 'is_public') {
                 $value = (int)(bool)$value;
             }
 
@@ -434,10 +440,29 @@ public function replaceMembers(int $savedPaletteId, array $members): void
         ]);
     }
 
+    public function setPublic(int $id, bool $isPublic): void
+    {
+        if ($id <= 0) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "UPDATE saved_palettes
+                SET is_public = :is_public,
+                    updated_at = NOW()
+              WHERE id = :id"
+        );
+        $stmt->execute([
+            ':is_public' => (int)$isPublic,
+            ':id' => $id,
+        ]);
+    }
+
     /**
      * Supported filters:
      *   - brand
      *   - terry_fav
+     *   - is_public
      *   - palette_type
      *   - color_family
      *   - q
@@ -458,6 +483,11 @@ public function replaceMembers(int $savedPaletteId, array $members): void
         if (array_key_exists('terry_fav', $filters)) {
             $where[] = 'p.terry_fav = :terry_fav';
             $params[':terry_fav'] = (int)(bool)$filters['terry_fav'];
+        }
+
+        if (array_key_exists('is_public', $filters)) {
+            $where[] = 'p.is_public = :is_public';
+            $params[':is_public'] = (int)(bool)$filters['is_public'];
         }
 
         if (!empty($filters['palette_type'])) {

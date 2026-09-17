@@ -1,6 +1,12 @@
 function normalizeMeta(meta) {
   if (!Array.isArray(meta)) return [];
-  return meta.filter((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+  return meta.filter(
+    (value) =>
+      value !== null
+      && value !== undefined
+      && String(value).trim() !== ""
+  );
 }
 
 export default function AdminObjectListItem({
@@ -17,10 +23,12 @@ export default function AdminObjectListItem({
   const statusActive = Boolean(status?.active);
   const statusCount = Number(status?.count || 0);
   const statusLabel =
-    status?.label ||
-    (statusCount > 0
-      ? `${statusCount} active reservation${statusCount === 1 ? "" : "s"}`
-      : "No active reservations");
+    status?.label
+    || (
+      statusCount > 0
+        ? `${statusCount} active reservation${statusCount === 1 ? "" : "s"}`
+        : "No active reservations"
+    );
 
   function handleKeyDown(event) {
     if (event.key === "Enter" || event.key === " ") {
@@ -43,14 +51,20 @@ export default function AdminObjectListItem({
         role="button"
         tabIndex={0}
         aria-current={selected ? "true" : undefined}
+        data-admin-object-id={id}
         onClick={onSelect}
         onKeyDown={handleKeyDown}
       >
         <div className="admin-object-list-item__topline">
           <div className="admin-object-list-item__title-wrap">
-            <span className="admin-object-list-item__title">{title}</span>
+            <span className="admin-object-list-item__title">
+              {title}
+            </span>
+
             {id !== null && id !== undefined && id !== "" ? (
-              <span className="admin-object-list-item__id">#{id}</span>
+              <span className="admin-object-list-item__id">
+                #{id}
+              </span>
             ) : null}
           </div>
 
@@ -64,10 +78,19 @@ export default function AdminObjectListItem({
                 event.stopPropagation();
                 onStatusClick?.();
               }}
+              onDoubleClick={(event) => {
+                event.stopPropagation();
+              }}
             >
-              <span className="admin-object-list-item__dot" aria-hidden="true" />
+              <span
+                className="admin-object-list-item__dot"
+                aria-hidden="true"
+              />
+
               {statusCount > 0 ? (
-                <span className="admin-object-list-item__status-count">{statusCount}</span>
+                <span className="admin-object-list-item__status-count">
+                  {statusCount}
+                </span>
               ) : null}
             </button>
           ) : null}
@@ -76,7 +99,10 @@ export default function AdminObjectListItem({
         {metaLines.length > 0 ? (
           <div className="admin-object-list-item__meta">
             {metaLines.map((line, index) => (
-              <div className="admin-object-list-item__meta-line" key={`${id ?? title}-meta-${index}`}>
+              <div
+                className="admin-object-list-item__meta-line"
+                key={`${id ?? title}-meta-${index}`}
+              >
                 {line}
               </div>
             ))}

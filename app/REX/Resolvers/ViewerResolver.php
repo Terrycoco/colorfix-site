@@ -138,7 +138,7 @@ final class ViewerResolver implements RexResolverInterface
      *
      * Precedence:
      * 1. trusted REX request metadata from the current request
-     * 2. any linked parent reservation
+     * 2. matching active Playlist-experience parent reservation
      * 3. the ColorFix home page
      *
      * @return array{label:string,url:string}
@@ -179,6 +179,24 @@ final class ViewerResolver implements RexResolverInterface
             );
         }
 
+        $viewerExperienceKey = strtolower(trim(
+            (string)($reservation->experienceKey ?? '')
+        ));
+
+        if ($viewerExperienceKey === '') {
+            $viewerFormat = strtolower(trim(
+                (string)($reservation->context['format'] ?? '')
+            ));
+
+            $viewerExperienceKey = match ($viewerFormat) {
+                'concept' => 'concept',
+                'client' => 'client',
+                'painter' => 'painter',
+                'full_palette', 'public' => 'public',
+                default => 'public',
+            };
+        }
+
         $parents = $this->relationships->parents(
             $reservation->id,
             'viewer'
@@ -186,6 +204,26 @@ final class ViewerResolver implements RexResolverInterface
 
         foreach ($parents as $parent) {
             if (!$parent instanceof RexReservation) {
+                continue;
+            }
+
+            if (strtolower(trim($parent->status)) !== 'active') {
+                continue;
+            }
+
+            if (strtolower(trim($parent->resolverKey)) !== 'playlist_experience') {
+                continue;
+            }
+
+            if (strtolower(trim($parent->resourceType)) !== 'playlist') {
+                continue;
+            }
+
+            $parentExperienceKey = strtolower(trim(
+                (string)($parent->experienceKey ?? '')
+            ));
+
+            if ($parentExperienceKey !== $viewerExperienceKey) {
                 continue;
             }
 

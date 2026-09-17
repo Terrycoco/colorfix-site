@@ -30,6 +30,7 @@ const AdvancedResultsPage = lazy(() => import('@pages/AdvancedResultsPage'));
 const MatchResultsPage = lazy(() => import('@pages/MatchResultsPage'));
 const QuickFindPage = lazy(() => import('@pages/QuickFindPage'));
 const BrowsePalettesPage = lazy(() => import('@pages/BrowsePalettesPage'));
+const SavedPalettesPage = lazy(() => import('@pages/SavedPalettesPage'));
 const PaletteTranslationPage = lazy(() => import('@pages/PaletteTranslationPage'));
 const PrintMyPalettePage = lazy(() => import('@pages/PrintMyPalettePage'));
 const PlaylistThumbsPage = lazy(() => import('@pages/PlaylistThumbsPage'));
@@ -110,6 +111,7 @@ function AppRouter() {
               <Route path="matches" element={renderWithSuspense(MatchResultsPage, 'Loading matches…')} />
               <Route path="quick-find" element={renderWithSuspense(QuickFindPage, 'Loading quick find…')} />
               <Route path="browse-palettes" element={renderWithSuspense(BrowsePalettesPage, 'Loading palettes…')} />
+              <Route path="saved-palettes" element={renderWithSuspense(SavedPalettesPage, 'Loading saved palettes…')} />
               <Route path="palette/:id/brands" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
               <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
               <Route path="articles/:id" element={<ArticleRoute />} />

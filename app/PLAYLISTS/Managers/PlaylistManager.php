@@ -6,9 +6,11 @@ namespace App\PLAYLISTS\Managers;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PLAYLISTS\Services\PlaylistLandingService;
 use App\PLAYLISTS\Services\PlaylistPhotoLibrarySyncService;
+use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexPlaylistExperienceSyncService;
 use InvalidArgumentException;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 final class PlaylistManager
@@ -344,6 +346,137 @@ final class PlaylistManager
         }
     }
 
+    /**
+     * Permanently delete one Playlist and its Playlist-owned rows.
+     *
+     * Reservations follow object lifetime; links follow relationships.
+     * Deleting the Playlist removes its REX reservations and their links.
+     * PV reservations remain because the PV objects still exist.
+     */
+    public function deletePlaylist(
+        int $playlistId
+    ): bool {
+        if ($playlistId <= 0) {
+            throw new InvalidArgumentException(
+                'playlist_id required'
+            );
+        }
+
+        $existing =
+            $this->playlists
+                ->getAdminRowById(
+                    $playlistId
+                );
+
+        if ($existing === null) {
+            return false;
+        }
+
+        $ownsTransaction =
+            !$this->pdo
+                ->inTransaction();
+
+        if ($ownsTransaction) {
+            $this->pdo
+                ->beginTransaction();
+        }
+
+        try {
+            $rex =
+                new PdoRexReservationRepository(
+                    $this->pdo
+                );
+
+            $rex->deleteByResource(
+                'playlist',
+                $playlistId
+            );
+
+            $this->playlists
+                ->deleteItemsByPlaylistId(
+                    $playlistId
+                );
+
+            $deleted =
+                $this->playlists
+                    ->deleteById(
+                        $playlistId
+                    );
+
+            if ($deleted !== 1) {
+                throw new RuntimeException(
+                    "Playlist {$playlistId} was not deleted."
+                );
+            }
+
+            if (
+                $ownsTransaction
+                &&
+                $this->pdo
+                    ->inTransaction()
+            ) {
+                $this->pdo
+                    ->commit();
+            }
+
+            return true;
+
+        } catch (Throwable $e) {
+            if (
+                $ownsTransaction
+                &&
+                $this->pdo
+                    ->inTransaction()
+            ) {
+                $this->pdo
+                    ->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function setPublic(
+        int $playlistId
+    ): ?array {
+        if ($playlistId <= 0) {
+            return null;
+        }
+
+        $row =
+            $this->playlists
+                ->getAdminRowById(
+                    $playlistId
+                );
+
+        if ($row === null) {
+            return null;
+        }
+
+        $this->playlists
+            ->setPublic(
+                $playlistId,
+                true
+            );
+
+        return [
+            'playlist_id' =>
+                $playlistId,
+
+            'title' =>
+                (string)($row['title'] ?? ''),
+
+            'is_active' =>
+                (int)($row['is_active'] ?? 0),
+
+            'is_public' =>
+                1,
+        ];
+    }
+
     private function nullableString(
         string $value
     ): ?string {
@@ -382,51 +515,4 @@ final class PlaylistManager
 
         return $value;
     }
-
-
-/**
- * @return array<string, mixed>|null
- */
-public function setPublic(
-    int $playlistId
-): ?array {
-    if ($playlistId <= 0) {
-        return null;
-    }
-
-    $row =
-        $this->playlists
-            ->getAdminRowById(
-                $playlistId
-            );
-
-    if ($row === null) {
-        return null;
-    }
-
-    $this->playlists
-        ->setPublic(
-            $playlistId,
-            true
-        );
-
-    return [
-        'playlist_id' =>
-            $playlistId,
-
-        'title' =>
-            (string)($row['title'] ?? ''),
-
-        'is_active' =>
-            (int)($row['is_active'] ?? 0),
-
-        'is_public' =>
-            1,
-    ];
-}
-
-
-
-
-
 }

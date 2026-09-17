@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\REX\Endpoints;
@@ -38,6 +39,7 @@ final class RexPublicEntryEndpoint
                 'ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
                 'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
             ]);
+
         } catch (Throwable) {
             self::notFound();
         }
@@ -85,6 +87,7 @@ final class RexPublicEntryEndpoint
     private static function notFound(): never
     {
         http_response_code(404);
+
         header('Content-Type: text/html; charset=utf-8');
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('X-Robots-Tag: noindex, noarchive');

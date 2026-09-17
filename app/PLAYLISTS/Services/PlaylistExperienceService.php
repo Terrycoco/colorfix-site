@@ -110,7 +110,10 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
 
     /* $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken); */
-    $viewerRex = $this->buildLinkedPVData($playlistId);
+    $viewerRex = $this->buildLinkedPVData(
+        $playlistId,
+        $experience->experienceKey
+    );
     $viewerRexCount = $viewerRex['count'];
     if ($viewerRexCount === 0) {
         $showSlidePalettePrompt = false;
@@ -268,15 +271,77 @@ private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination)
 
 
 /** new modern PV call */
-private function getLinkedPVs(int $playlistId): array
-{
-    return (new \App\PALETTES\PV\PVService($this->pdo))
-        ->getLinkedPVs($playlistId);
+private function getLinkedPVs(
+    int $playlistId,
+    string $experienceKey
+): array {
+    if ($playlistId <= 0) {
+        return [];
+    }
+
+    $experienceKey = strtolower(trim($experienceKey));
+
+    if ($experienceKey === '') {
+        return [];
+    }
+
+    $rexRepo = new PdoRexReservationRepository($this->pdo);
+    $relationships = new RexReservationRelationships($rexRepo);
+    $pvService = new PVService($this->pdo);
+
+    $linkedPVs = [];
+
+    foreach (
+        $relationships->childrenForResourceExperience(
+            'playlist_experience',
+            'playlist',
+            $playlistId,
+            $experienceKey,
+            'viewer'
+        ) as $relationship
+    ) {
+        $reservation = $relationship->reservation;
+
+        if (
+            strtolower(trim($reservation->status)) !== 'active'
+            || strtolower(trim($reservation->resolverKey)) !== 'viewer'
+            || strtolower(trim($reservation->resourceType)) !== 'palette_viewer'
+        ) {
+            continue;
+        }
+
+        $pvId = (int)$reservation->resourceId;
+
+        if ($pvId <= 0) {
+            continue;
+        }
+
+        try {
+    $pv = $pvService->getPV($pvId);
+} catch (RuntimeException $e) {
+    if ($e->getMessage() === "Palette Viewer {$pvId} is inactive") {
+        continue;
+    }
+
+    throw $e;
+}
+        $pv['rex_url'] = $relationships->publicUrl($reservation);
+        $pv['rex_reservation_id'] = $reservation->id;
+
+        $linkedPVs[] = $pv;
+    }
+
+    return $linkedPVs;
 }
 
-private function buildLinkedPVData(int $playlistId): array
-{
-    $linkedPVs = $this->getLinkedPVs($playlistId);
+private function buildLinkedPVData(
+    int $playlistId,
+    string $experienceKey
+): array {
+    $linkedPVs = $this->getLinkedPVs(
+        $playlistId,
+        $experienceKey
+    );
 
     $urls = [];
     $targets = [];
@@ -308,8 +373,6 @@ private function buildLinkedPVData(int $playlistId): array
         'targets' => $targets,
     ];
 }
-
-
 
 
 /**
@@ -964,89 +1027,105 @@ public function buildPlaybackPlanFromProjectExperience(
         $photoIds = [];
         $assetIds = [];
         $savedPaletteHashes = [];
+
         foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) continue;
-            $photoId = $item->photo_library_id ?? null;
+            if (!$item instanceof PlaylistItem) {
+                continue;
+            }
+
+            $photoId = (int)($item->photo_library_id ?? 0);
             $imageUrl = (string)($item->image_url ?? '');
             $paletteHash = trim((string)($item->palette_hash ?? ''));
+
             if ($paletteHash !== '') {
                 $savedPaletteHashes[$paletteHash] = true;
             }
-            if ($photoId) {
+
+            if ($photoId > 0) {
                 $photoIds[$photoId] = true;
                 continue;
             }
+
             $assetId = $this->extractAssetId($imageUrl);
+
             if ($assetId !== '') {
                 $assetIds[$assetId] = true;
             }
         }
 
-        $photoMetaMap = $this->loadPhotoLibraryMeta(array_keys($photoIds));
-        $assetUrlMap = $this->loadAssetVariantUrls(array_keys($assetIds));
-        $savedPaletteTitleMap = $this->loadSavedPaletteTitles(array_keys($savedPaletteHashes));
+        $photoMetaMap = $this->loadPhotoLibraryMeta(
+            array_keys($photoIds)
+        );
+
+        $assetUrlMap = $this->loadAssetVariantUrls(
+            array_keys($assetIds)
+        );
+
+        $savedPaletteTitleMap = $this->loadSavedPaletteTitles(
+            array_keys($savedPaletteHashes)
+        );
 
         foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) continue;
-            $imageUrl = (string)($item->image_url ?? '');
-            $photoId = $item->photo_library_id ?? null;
-            $apId = (int)($item->ap_id ?? 0);
-            $paletteHash = trim((string)($item->palette_hash ?? ''));
-            if (empty($item->palette_title) && $paletteHash !== '' && !empty($savedPaletteTitleMap[$paletteHash])) {
-                $item->palette_title = $savedPaletteTitleMap[$paletteHash];
+            if (!$item instanceof PlaylistItem) {
+                continue;
             }
-            if ($photoId) {
-                $meta = $photoMetaMap[(int)$photoId] ?? null;
-                $resolved = (string)($meta['url'] ?? '');
-                if ($resolved !== '') {
-                    $item->image_url = "photo:{$photoId}|{$resolved}";
-                }
-                if (empty($item->alt_tag) && !empty($meta['alt_tag'])) {
-                    $item->alt_tag = (string)$meta['alt_tag'];
-                }
-                $resolvedSetMeta = null;
-                if (empty($item->saved_palette_set_id) && !empty($item->palette_hash)) {
-                    $resolvedSetMeta = $this->resolveSavedPaletteSetForPhoto(
-                        (int)$photoId,
-                        (string)$item->palette_hash
+
+            $imageUrl = (string)($item->image_url ?? '');
+            $photoId = (int)($item->photo_library_id ?? 0);
+            $paletteHash = trim((string)($item->palette_hash ?? ''));
+
+            /*
+             * PLAYLISTS owns palette identity.
+             * Photo Library may hydrate image URL and alt text only.
+             */
+            if (
+                empty($item->palette_title)
+                && $paletteHash !== ''
+                && !empty($savedPaletteTitleMap[$paletteHash])
+            ) {
+                $item->palette_title =
+                    $savedPaletteTitleMap[$paletteHash];
+            }
+
+            if ($photoId > 0) {
+                $meta = $photoMetaMap[$photoId] ?? null;
+
+                if (is_array($meta)) {
+                    $resolved = trim(
+                        (string)($meta['url'] ?? '')
                     );
+
+                    if ($resolved !== '') {
+                        $item->image_url =
+                            "photo:{$photoId}|{$resolved}";
+                    }
+
+                    if (
+                        empty($item->alt_tag)
+                        && !empty($meta['alt_tag'])
+                    ) {
+                        $item->alt_tag =
+                            (string)$meta['alt_tag'];
+                    }
                 }
 
-                // The photo library attachment is the source of truth for player palette data.
-                // A playlist item can keep stale palette_hash values after its photo is replaced.
-                if (!empty($meta['palette_hash'])) {
-                    $item->palette_hash = (string)$meta['palette_hash'];
-                }
-                if (!empty($meta['saved_palette_set_id'])) {
-                    $item->saved_palette_set_id = (int)$meta['saved_palette_set_id'];
-                } elseif (empty($item->saved_palette_set_id) && !empty($resolvedSetMeta['saved_palette_set_id'])) {
-                    $item->saved_palette_set_id = (int)$resolvedSetMeta['saved_palette_set_id'];
-                }
-                if (!empty($meta['saved_palette_photo_type'])) {
-                    $item->saved_palette_photo_type = (string)$meta['saved_palette_photo_type'];
-                } elseif (empty($item->saved_palette_photo_type) && !empty($resolvedSetMeta['saved_palette_photo_type'])) {
-                    $item->saved_palette_photo_type = (string)$resolvedSetMeta['saved_palette_photo_type'];
-                }
-                if (!empty($meta['palette_title'])) {
-                    $item->palette_title = (string)$meta['palette_title'];
-                } elseif (empty($item->palette_title) && !empty($resolvedSetMeta['palette_title'])) {
-                    $item->palette_title = (string)$resolvedSetMeta['palette_title'];
-                }
                 continue;
             }
 
             $assetId = $this->extractAssetId($imageUrl);
-            if ($assetId === '') continue;
+
+            if ($assetId === '') {
+                continue;
+            }
+
             $resolved = $assetUrlMap[$assetId] ?? '';
+
             if ($resolved !== '') {
                 $item->image_url = $resolved;
             }
         }
     }
 
-    /**
-     * @param PlaylistItem[] $items
-     */
     /**
      * @param PlaylistItem[] $items
      */
@@ -1134,141 +1213,62 @@ public function buildPlaybackPlanFromProjectExperience(
      */
     private function loadPhotoLibraryMeta(array $photoIds): array
     {
-        $ids = array_values(array_filter(array_map('intval', $photoIds)));
-        if (!$ids) return [];
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $ids = array_values(
+            array_unique(
+                array_filter(
+                    array_map('intval', $photoIds),
+                    static fn(int $id): bool => $id > 0
+                )
+            )
+        );
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = implode(
+            ',',
+            array_fill(0, count($ids), '?')
+        );
+
         $stmt = $this->pdo->prepare(
             "SELECT
-                pl.photo_library_id,
-                pl.rel_path,
-                pl.updated_at,
-                pl.ai_alt_text,
-                pl.alt_text,
-                (
-                  SELECT spalette.palette_hash
-                    FROM saved_palette_set_photos spsp
-                    JOIN saved_palette_sets sps
-                      ON sps.id = spsp.saved_palette_set_id
-                    JOIN saved_palettes spalette
-                      ON spalette.id = sps.saved_palette_id
-                   WHERE spsp.photo_library_id = pl.photo_library_id
-                   ORDER BY sps.is_default DESC, spsp.id ASC
-                   LIMIT 1
-                ) AS palette_hash,
-                (
-                  SELECT COALESCE(
-                      NULLIF(TRIM(spalette.display_title), ''),
-                      NULLIF(TRIM(spalette.nickname), ''),
-                      spalette.palette_hash
-                    )
-                    FROM saved_palette_set_photos spsp
-                    JOIN saved_palette_sets sps
-                      ON sps.id = spsp.saved_palette_set_id
-                    JOIN saved_palettes spalette
-                      ON spalette.id = sps.saved_palette_id
-                   WHERE spsp.photo_library_id = pl.photo_library_id
-                   ORDER BY sps.is_default DESC, spsp.id ASC
-                   LIMIT 1
-                ) AS palette_title,
-                (
-                  SELECT sps.id
-                    FROM saved_palette_set_photos spsp
-                    JOIN saved_palette_sets sps
-                      ON sps.id = spsp.saved_palette_set_id
-                   WHERE spsp.photo_library_id = pl.photo_library_id
-                   ORDER BY sps.is_default DESC, spsp.id ASC
-                   LIMIT 1
-                ) AS saved_palette_set_id,
-                (
-                  SELECT spsp.photo_type
-                    FROM saved_palette_set_photos spsp
-                    JOIN saved_palette_sets sps
-                      ON sps.id = spsp.saved_palette_set_id
-                   WHERE spsp.photo_library_id = pl.photo_library_id
-                   ORDER BY sps.is_default DESC, spsp.id ASC
-                   LIMIT 1
-                ) AS saved_palette_photo_type
-             FROM photo_library pl
-             WHERE pl.photo_library_id IN ({$placeholders})"
+                photo_library_id,
+                rel_path,
+                updated_at,
+                ai_alt_text,
+                alt_text
+             FROM photo_library
+             WHERE photo_library_id IN ({$placeholders})"
         );
+
         $stmt->execute($ids);
+
         $map = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $relPath = (string)($row['rel_path'] ?? '');
-            $updatedAt = (string)($row['updated_at'] ?? '');
-            $map[(int)$row['photo_library_id']] = [
-                'url' => $this->appendCacheBuster($relPath, $updatedAt),
-                'palette_hash' => isset($row['palette_hash']) && $row['palette_hash'] !== '' ? (string)$row['palette_hash'] : null,
-                'palette_title' => isset($row['palette_title']) && trim((string)$row['palette_title']) !== '' ? trim((string)$row['palette_title']) : null,
-                'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0 ? (int)$row['saved_palette_set_id'] : null,
-                'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== '' ? strtolower((string)$row['saved_palette_photo_type']) : null,
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $photoLibraryId = (int)(
+                $row['photo_library_id']
+                ?? 0
+            );
+
+            if ($photoLibraryId <= 0) {
+                continue;
+            }
+
+            $map[$photoLibraryId] = [
+                'url' => $this->appendCacheBuster(
+                    (string)($row['rel_path'] ?? ''),
+                    (string)($row['updated_at'] ?? '')
+                ),
                 'alt_tag' => $this->firstNonEmpty([
                     $row['ai_alt_text'] ?? null,
                     $row['alt_text'] ?? null,
                 ]) ?: null,
             ];
         }
+
         return $map;
-    }
-
-    /**
-     * @return array{saved_palette_set_id:?int,saved_palette_photo_type:?string,palette_title:?string}|null
-     */
-    private function resolveSavedPaletteSetForPhoto(int $photoLibraryId, string $paletteHash): ?array
-    {
-        $photoLibraryId = (int)$photoLibraryId;
-        $paletteHash = trim($paletteHash);
-        if ($photoLibraryId <= 0 || $paletteHash === '') {
-            return null;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                sps.id AS saved_palette_set_id,
-                spsp.photo_type AS saved_palette_photo_type,
-                COALESCE(
-                    NULLIF(TRIM(sp.display_title), ''),
-                    NULLIF(TRIM(sp.nickname), ''),
-                    sp.palette_hash
-                ) AS palette_title
-             FROM saved_palette_set_photos spsp
-             JOIN saved_palette_sets sps
-               ON sps.id = spsp.saved_palette_set_id
-             JOIN saved_palettes sp
-               ON sp.id = sps.saved_palette_id
-             WHERE spsp.photo_library_id = :photo_library_id
-               AND sp.palette_hash = :palette_hash
-             ORDER BY
-               CASE
-                 WHEN spsp.photo_type = 'full' THEN 0
-                 WHEN spsp.photo_type = 'zoom' THEN 1
-                 WHEN spsp.photo_type = 'before' THEN 2
-                 ELSE 3
-               END ASC,
-               sps.is_default DESC,
-               spsp.id ASC
-             LIMIT 1"
-        );
-        $stmt->execute([
-            ':photo_library_id' => $photoLibraryId,
-            ':palette_hash' => $paletteHash,
-        ]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            return null;
-        }
-
-        return [
-            'saved_palette_set_id' => isset($row['saved_palette_set_id']) && (int)$row['saved_palette_set_id'] > 0
-                ? (int)$row['saved_palette_set_id']
-                : null,
-            'saved_palette_photo_type' => isset($row['saved_palette_photo_type']) && $row['saved_palette_photo_type'] !== ''
-                ? strtolower((string)$row['saved_palette_photo_type'])
-                : null,
-            'palette_title' => isset($row['palette_title']) && trim((string)$row['palette_title']) !== ''
-                ? trim((string)$row['palette_title'])
-                : null,
-        ];
     }
 
     /**

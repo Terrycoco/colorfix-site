@@ -1,0 +1,105 @@
+.admin-detail-pane {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  background: var(--admin-bg);
+}
+
+.admin-detail-pane > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-detail-pane__chrome {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  flex: 0 0 auto;
+  background: var(--admin-surface);
+}
+
+.admin-detail-pane__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0.45rem 18px;
+  border-bottom: 1px solid var(--admin-border-soft);
+  background: var(--admin-surface);
+}
+
+.admin-detail-pane__titlebar {
+  padding: 0.5rem 18px;
+  background: var(--admin-selected);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-detail-pane__title {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.admin-detail-pane__body {
+  min-width: 0;
+  padding: 16px 18px 24px;
+}
+
+/*
+ * Legacy/shared detail-header classes.
+ * Keep these here because existing admin screens may still use them.
+ */
+.admin-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-detail-header__title {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.admin-detail-header__description {
+  margin: 0;
+  max-width: 760px;
+  color: var(--admin-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-detail-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+  .admin-detail-pane {
+    height: auto;
+    overflow: visible;
+  }
+
+  .admin-detail-header {
+    display: block;
+    padding: 14px;
+  }
+
+  .admin-detail-header__actions {
+    margin-top: 10px;
+  }
+}

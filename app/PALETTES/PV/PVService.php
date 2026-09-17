@@ -20,253 +20,268 @@ final class PVService
         $this->savedPaletteRepo = new PdoSavedPaletteRepository($pdo);
     }
 
-public function getPV(int $pvId): array
-{
-    if ($pvId <= 0) {
-        throw new InvalidArgumentException(
-            'palette viewer id required'
-        );
-    }
-
-    $record = $this->repo->findById($pvId);
-
-    if (!$record) {
-        throw new RuntimeException(
-            "Palette Viewer {$pvId} not found"
-        );
-    }
-
-    if (!(bool)($record['is_active'] ?? false)) {
-        throw new RuntimeException(
-            "Palette Viewer {$pvId} is inactive"
-        );
-    }
-
-    $savedPaletteId = (int)($record['saved_palette_id'] ?? 0);
-
-    if ($savedPaletteId <= 0) {
-        throw new RuntimeException(
-            "Palette Viewer {$pvId} has no Saved Palette"
-        );
-    }
-
-    $savedPalette = $this->savedPaletteRepo->getFullPalette(
-        $savedPaletteId
-    );
-
-    if ($savedPalette === null) {
-        throw new RuntimeException(
-            "Saved Palette {$savedPaletteId} not found"
-        );
-    }
-
-    $palette = $savedPalette['palette'] ?? [];
-    $members = $savedPalette['members'] ?? [];
-    $photos = $record['photos'] ?? [];
-
-    $fullPhoto = null;
-    $insets = [];
-
-    foreach ($photos as $photo) {
-        $type = strtolower(
-            trim((string)($photo['photo_type'] ?? ''))
-        );
-
-        $url = trim(
-            (string)($photo['url'] ?? '')
-        );
-
-        if ($url === '') {
-            continue;
+    public function getPV(int $pvId): array
+    {
+        if ($pvId <= 0) {
+            throw new InvalidArgumentException(
+                'palette viewer id required'
+            );
         }
 
-        if ($fullPhoto === null && $type === 'full') {
-            $fullPhoto = $photo;
-            continue;
+        $record = $this->repo->findById($pvId);
+
+        if (!$record) {
+            throw new RuntimeException(
+                "Palette Viewer {$pvId} not found"
+            );
         }
 
-        if ($type === 'before') {
-            $insets[] = [
-                'url' => $url,
-                'alt_text' => $photo['alt_text'] ?? null,
-                'caption' => 'Before',
-            ];
-
-            continue;
+        if (!(bool)($record['is_active'] ?? false)) {
+            throw new RuntimeException(
+                "Palette Viewer {$pvId} is inactive"
+            );
         }
 
-        if (in_array($type, ['zoom', 'inset'], true)) {
-            $insets[] = [
-                'url' => $url,
-                'alt_text' => $photo['alt_text'] ?? null,
-                'caption' => $photo['caption'] ?? null,
-            ];
-        }
-    }
+        $savedPaletteId = (int)($record['saved_palette_id'] ?? 0);
 
-    if ($fullPhoto === null) {
+        if ($savedPaletteId <= 0) {
+            throw new RuntimeException(
+                "Palette Viewer {$pvId} has no Saved Palette"
+            );
+        }
+
+        $savedPalette = $this->savedPaletteRepo->getFullPalette(
+            $savedPaletteId
+        );
+
+        if ($savedPalette === null) {
+            throw new RuntimeException(
+                "Saved Palette {$savedPaletteId} not found"
+            );
+        }
+
+        $palette = $savedPalette['palette'] ?? [];
+        $members = $savedPalette['members'] ?? [];
+        $photos = $record['photos'] ?? [];
+
+        $fullPhoto = null;
+        $insets = [];
+        $photoLibraryIds = [];
+
         foreach ($photos as $photo) {
-            if (trim((string)($photo['url'] ?? '')) !== '') {
+            $photoLibraryId = (int)($photo['photo_library_id'] ?? 0);
+
+            if (
+                $photoLibraryId > 0
+                && !in_array($photoLibraryId, $photoLibraryIds, true)
+            ) {
+                $photoLibraryIds[] = $photoLibraryId;
+            }
+
+            $type = strtolower(
+                trim((string)($photo['photo_type'] ?? ''))
+            );
+
+            $url = trim(
+                (string)($photo['url'] ?? '')
+            );
+
+            if ($url === '') {
+                continue;
+            }
+
+            if ($fullPhoto === null && $type === 'full') {
                 $fullPhoto = $photo;
-                break;
+                continue;
+            }
+
+            if ($type === 'before') {
+                $insets[] = [
+                    'photo_library_id' => $photoLibraryId > 0
+                        ? $photoLibraryId
+                        : null,
+                    'url' => $url,
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => 'Before',
+                ];
+
+                continue;
+            }
+
+            if (in_array($type, ['zoom', 'inset'], true)) {
+                $insets[] = [
+                    'photo_library_id' => $photoLibraryId > 0
+                        ? $photoLibraryId
+                        : null,
+                    'url' => $url,
+                    'alt_text' => $photo['alt_text'] ?? null,
+                    'caption' => $photo['caption'] ?? null,
+                ];
             }
         }
-    }
 
-    $title = trim(
-        (string)($record['viewer_title'] ?? '')
-    );
+        if ($fullPhoto === null) {
+            foreach ($photos as $photo) {
+                if (trim((string)($photo['url'] ?? '')) !== '') {
+                    $fullPhoto = $photo;
+                    break;
+                }
+            }
+        }
 
-    if ($title === '') {
         $title = trim(
-            (string)($palette['display_title'] ?? '')
+            (string)($record['viewer_title'] ?? '')
         );
-    }
 
-    if ($title === '') {
-        $title = trim(
-            (string)($palette['nickname'] ?? '')
+        if ($title === '') {
+            $title = trim(
+                (string)($palette['display_title'] ?? '')
+            );
+        }
+
+        if ($title === '') {
+            $title = trim(
+                (string)($palette['nickname'] ?? '')
+            );
+        }
+
+        if ($title === '') {
+            $title = 'ColorFix Palette';
+        }
+
+        /*
+         * Legacy PV format/template fields are preserved for now
+         * so this move does not change rendering behavior.
+         *
+         * Experience ownership will be cleaned up separately;
+         * REX is authoritative for experience.
+         */
+        $format = strtolower(
+            trim((string)($record['format'] ?? 'public'))
         );
-    }
 
-    if ($title === '') {
-        $title = 'ColorFix Palette';
-    }
+        $paletteViewerKey = $format === 'public'
+            ? 'full_palette'
+            : $format;
 
-    /*
-     * Legacy PV format/template fields are preserved for now
-     * so this move does not change rendering behavior.
-     *
-     * Experience ownership will be cleaned up separately;
-     * REX is authoritative for experience.
-     */
-    $format = strtolower(
-        trim((string)($record['format'] ?? 'public'))
-    );
+        $templateKey = trim(
+            (string)($record['template_key'] ?? '')
+        );
 
-    $paletteViewerKey = $format === 'public'
-        ? 'full_palette'
-        : $format;
+        if ($templateKey === '') {
+            $templateKey = $paletteViewerKey;
+        }
 
-    $templateKey = trim(
-        (string)($record['template_key'] ?? '')
-    );
+        $swatches = [];
 
-    if ($templateKey === '') {
-        $templateKey = $paletteViewerKey;
-    }
+        foreach ($members as $member) {
+            $swatches[] = [
+                'id' => isset($member['color_id'])
+                    ? (int)$member['color_id']
+                    : null,
 
-    $swatches = [];
+                'name' => $member['color_name'] ?? null,
+                'code' => $member['color_code'] ?? null,
+                'brand' => $member['color_brand'] ?? null,
+                'brand_name' => $member['color_brand_name'] ?? null,
+                'hex6' => $member['color_hex6'] ?? null,
+                'role' => $member['role'] ?? null,
+                'sheen' => $member['sheen'] ?? null,
+                'note' => $member['note'] ?? null,
 
-    foreach ($members as $member) {
-        $swatches[] = [
-            'id' => isset($member['color_id'])
-                ? (int)$member['color_id']
+                'int_only' => isset($member['color_int_only'])
+                    ? (int)$member['color_int_only']
+                    : 0,
+            ];
+        }
+
+        $mainPhotoLibraryId = (int)($fullPhoto['photo_library_id'] ?? 0);
+
+        $meta = [
+            'source' => 'saved',
+            'palette_viewer_id' => $pvId,
+            'palette_viewer_key' => $paletteViewerKey,
+            'template_key' => $templateKey,
+            'format' => $format,
+
+            'saved_palette_id' => $savedPaletteId,
+            'id' => $savedPaletteId,
+            'hash' => (string)($palette['palette_hash'] ?? ''),
+
+            'title' => $title,
+            'nickname' => $palette['nickname'] ?? null,
+            'display_title' => $title,
+
+            'intro' => $record['intro'] ?? '',
+
+            'notes' =>
+                $record['viewer_notes']
+                ?? $palette['notes']
+                ?? '',
+
+            'cta_label' => $record['cta_label'] ?? '',
+            'playlist_url' => '',
+
+            'photo_library_id' => $mainPhotoLibraryId > 0
+                ? $mainPhotoLibraryId
                 : null,
+            'photo_library_ids' => $photoLibraryIds,
+            'photo_url' => $fullPhoto['url'] ?? '',
+            'photo_alt' => $fullPhoto['alt_text'] ?? null,
+            'inset_photos' => $insets,
 
-            'name' => $member['color_name'] ?? null,
-            'code' => $member['color_code'] ?? null,
-            'brand' => $member['color_brand'] ?? null,
-            'brand_name' => $member['color_brand_name'] ?? null,
-            'hex6' => $member['color_hex6'] ?? null,
-            'role' => $member['role'] ?? null,
-            'sheen' => $member['sheen'] ?? null,
-            'note' => $member['note'] ?? null,
+            'kicker_text' => $record['kicker_text'] ?? '',
+            'palette_type' => $palette['palette_type'] ?? null,
 
-            'int_only' => isset($member['color_int_only'])
-                ? (int)$member['color_int_only']
-                : 0,
+            'set_id' => null,
+            'available_sets' => [],
         ];
-    }
 
-    $meta = [
-        'source' => 'saved',
-        'palette_viewer_id' => $pvId,
-        'palette_viewer_key' => $paletteViewerKey,
-        'template_key' => $templateKey,
-        'format' => $format,
-
-        'saved_palette_id' => $savedPaletteId,
-        'id' => $savedPaletteId,
-        'hash' => (string)($palette['palette_hash'] ?? ''),
-
-        'title' => $title,
-        'nickname' => $palette['nickname'] ?? null,
-        'display_title' => $title,
-
-        'intro' => $record['intro'] ?? '',
-
-        'notes' =>
-            $record['viewer_notes']
-            ?? $palette['notes']
-            ?? '',
-
-        'cta_label' => $record['cta_label'] ?? '',
-        'playlist_url' => '',
-
-        'photo_url' => $fullPhoto['url'] ?? '',
-        'photo_alt' => $fullPhoto['alt_text'] ?? null,
-        'inset_photos' => $insets,
-
-        'kicker_text' => $record['kicker_text'] ?? '',
-        'palette_type' => $palette['palette_type'] ?? null,
-
-        'set_id' => null,
-        'available_sets' => [],
-    ];
-
-    $pv = new PV(
-        pvId: $pvId,
-        savedPaletteId: $savedPaletteId,
-        isActive: true,
-        meta: $meta,
-        swatches: $swatches
-    );
-
-    return $pv->toArray();
-}
-
-
-public function getLinkedPVs(int $playlistId): array
-{
-    if ($playlistId <= 0) {
-        throw new InvalidArgumentException(
-            'playlist id required'
+        $pv = new PV(
+            pvId: $pvId,
+            savedPaletteId: $savedPaletteId,
+            isActive: true,
+            meta: $meta,
+            swatches: $swatches
         );
+
+        return $pv->toArray();
     }
 
-    $links = $this->repo->findLinkedByPlaylistId($playlistId);
+    public function getLinkedPVs(int $playlistId): array
+    {
+        if ($playlistId <= 0) {
+            throw new InvalidArgumentException(
+                'playlist id required'
+            );
+        }
 
-    $linkedPVs = [];
+        $links = $this->repo->findLinkedByPlaylistId($playlistId);
 
-    foreach ($links as $link) {
-        $pvId = (int)$link['pv_id'];
+        $linkedPVs = [];
 
-        // Important: one canonical definition of a complete PV.
-        $pv = $this->getPV($pvId);
+        foreach ($links as $link) {
+            $pvId = (int)$link['pv_id'];
+            $pv = $this->getPV($pvId);
 
-        // Relationship data belongs to getLinkedPVs(), not getPV().
-        $pv['rex_url'] = $link['rex_url'];
-        $pv['rex_reservation_id'] = $link['rex_reservation_id'];
-        $pv['rex_sort_order'] = $link['sort_order'];
+            $pv['rex_url'] = $link['rex_url'];
+            $pv['rex_reservation_id'] = $link['rex_reservation_id'];
+            $pv['rex_sort_order'] = $link['sort_order'];
 
-        $linkedPVs[] = $pv;
+            $linkedPVs[] = $pv;
+        }
+
+        return $linkedPVs;
     }
 
-    return $linkedPVs;
-}
+    public function getLinkedPubData(int $playlistId): array
+    {
+        if ($playlistId <= 0) {
+            throw new InvalidArgumentException(
+                'playlist id required'
+            );
+        }
 
-public function getLinkedPubData(int $playlistId): array
-{
-    if ($playlistId <= 0) {
-        throw new InvalidArgumentException(
-            'playlist id required'
-        );
+        return $this->repo->findLinkedPubData($playlistId);
     }
-
-    return $this->repo->findLinkedPubData($playlistId);
-}
-
-
-
 }

@@ -82,6 +82,55 @@ final class RexReservationRelationships
     }
 
     /**
+     * Return child relationships for one active
+     * resource + experience reservation.
+     *
+     * @return RexReservationRelationship[]
+     */
+    public function childrenForResourceExperience(
+        string $resolverKey,
+        string $resourceType,
+        int $resourceId,
+        string $experienceKey,
+        ?string $relationshipKey = null,
+    ): array {
+        if ($resourceId <= 0) {
+            throw new InvalidArgumentException(
+                'Resource ID must be positive.'
+            );
+        }
+
+        $experienceKey = strtolower(trim($experienceKey));
+
+        if ($experienceKey === '') {
+            throw new InvalidArgumentException(
+                'Experience key is required.'
+            );
+        }
+
+        $reservations =
+            $this->reservations->findActiveByResourceIdsAndExperience(
+                $resolverKey,
+                $resourceType,
+                [$resourceId],
+                $experienceKey,
+            );
+
+        $parent = $reservations[$resourceId] ?? null;
+
+        if (!$parent instanceof RexReservation) {
+            return [];
+        }
+
+        return $this->reservations->findChildRelationships(
+            $parent->id,
+            $this->normalizeOptionalRelationshipKey(
+                $relationshipKey
+            ),
+        );
+    }
+
+    /**
      * @return RexReservation[]
      */
     public function parents(int $childReservationId, ?string $relationshipKey = null): array

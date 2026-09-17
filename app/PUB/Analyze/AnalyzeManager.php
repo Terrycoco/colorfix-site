@@ -17,6 +17,8 @@ use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PALETTES\PV\PVService;
+use App\REX\Repos\PdoRexReservationRepository;
+use App\REX\Services\RexReservationRelationships;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
@@ -917,14 +919,19 @@ final class AnalyzeManager implements PubComManagerContract
     {
         if ($this->playlistSourcePreparer === null) {
             $this->playlistSourcePreparer =
-                new PlaylistSourcePreparer(
-                    new PdoPlaylistRepository(
-                        $this->pdo
-                    ),
-                    new PVService(
-                        $this->pdo
-                    )
-                );
+               new PlaylistSourcePreparer(
+    new PdoPlaylistRepository(
+        $this->pdo
+    ),
+    new PVService(
+        $this->pdo
+    ),
+    new RexReservationRelationships(
+        new PdoRexReservationRepository(
+            $this->pdo
+        )
+    )
+);
         }
 
         return $this->playlistSourcePreparer;
