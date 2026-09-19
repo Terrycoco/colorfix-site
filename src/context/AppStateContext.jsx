@@ -11,6 +11,7 @@ const AppStateContext = createContext();
 const PALETTE_STORAGE_KEY = "pals.palette.v1";
 const BRAND_FILTERS_STORAGE_KEY = "pals.brand_filters.v1";
 const ADMIN_EXIT_PATH_STORAGE_KEY = "cf.admin_exit_path.v1";
+const ACTIVE_PROJECT_STORAGE_KEY = "cf.active_project_id.v1";
 //import mockBoards from '@test/mockBoards';
 
 
@@ -221,6 +222,21 @@ export function AppStateProvider({ children }) {
       return sessionStorage.getItem(ADMIN_EXIT_PATH_STORAGE_KEY) || '';
     } catch {
       return '';
+    }
+  });
+
+  const [activeProjectId, setActiveProjectIdState] = useState(() => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const raw = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
+      const id = Number(raw || 0);
+
+      return id > 0
+        ? id
+        : null;
+    } catch {
+      return null;
     }
   });
 
@@ -641,6 +657,36 @@ function clearAdminExitPath() {
   setAdminExitPath('');
 }
 
+
+function setActiveProjectId(projectId = null) {
+  const id = Number(projectId || 0);
+  const next = id > 0
+    ? id
+    : null;
+
+  setActiveProjectIdState(next);
+
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (next) {
+      localStorage.setItem(
+        ACTIVE_PROJECT_STORAGE_KEY,
+        String(next)
+      );
+    } else {
+      localStorage.removeItem(
+        ACTIVE_PROJECT_STORAGE_KEY
+      );
+    }
+  } catch {}
+}
+
+function clearActiveProjectId() {
+  setActiveProjectId(null);
+}
+
+
   //EXPORTS
   const state = {
     loggedIn, setLoggedIn,
@@ -656,6 +702,7 @@ function clearAdminExitPath() {
     selectedCategory, setSelectedCategory,
     showBack, setShowBack,
     adminExitPath, setAdminExitPath, clearAdminExitPath,
+    activeProjectId, setActiveProjectId, clearActiveProjectId,
     recentSwatches, setRecentSwatches,
     searchFilters, setSearchFilters, clearSearchFilters,
        toggleFilter, clearFilter, setFilterValues, isFilterChecked,

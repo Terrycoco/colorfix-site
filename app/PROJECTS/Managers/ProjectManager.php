@@ -12,7 +12,7 @@ final class ProjectManager
     private PdoProjectRepository $projects;
 
     public function __construct(
-        private PDO $pdo a
+        private PDO $pdo
     ) {
         $this->projects =
             new PdoProjectRepository(
@@ -45,41 +45,37 @@ final class ProjectManager
         array $payload
     ): int {
         $projectId =
-            isset(
-                $payload[
-                    'project_id'
-                ]
-            )
-                ? (int)$payload[
-                    'project_id'
-                ]
+            isset($payload['project_id'])
+                ? (int)$payload['project_id']
                 : 0;
 
+        $projectName =
+            self::nullableString(
+                $payload['project_name']
+                ?? null
+            );
+
         $clientId =
-            (int)(
-                $payload[
-                    'client_id'
-                ]
-                ?? 0
+            self::nullableId(
+                $payload['client_id']
+                ?? null
             );
 
         $propertyId =
-            (int)(
-                $payload[
-                    'property_id'
-                ]
-                ?? 0
+            self::nullableId(
+                $payload['property_id']
+                ?? null
             );
 
         $playlistId =
-            (int)(
-                $payload[
-                    'playlist_id'
-                ]
-                ?? 0
+            self::nullableId(
+                $payload['playlist_id']
+                ?? null
             );
 
         if (
+            $playlistId !== null
+            &&
             $this->projects
                 ->playlistInUseByAnotherProject(
                     $playlistId,
@@ -109,6 +105,7 @@ final class ProjectManager
             $this->projects
                 ->update(
                     $projectId,
+                    $projectName,
                     $clientId,
                     $propertyId,
                     $playlistId
@@ -119,6 +116,7 @@ final class ProjectManager
 
         return $this->projects
             ->create(
+                $projectName,
                 $clientId,
                 $propertyId,
                 $playlistId
@@ -136,5 +134,43 @@ final class ProjectManager
             ->deleteById(
                 $projectId
             ) === 1;
+    }
+
+    private static function nullableId(
+        mixed $value
+    ): ?int {
+        if (
+            $value === null
+            ||
+            $value === ''
+            ||
+            $value === false
+        ) {
+            return null;
+        }
+
+        $id =
+            (int)$value;
+
+        return $id > 0
+            ? $id
+            : null;
+    }
+
+    private static function nullableString(
+        mixed $value
+    ): ?string {
+        if ($value === null) {
+            return null;
+        }
+
+        $text =
+            trim(
+                (string)$value
+            );
+
+        return $text !== ''
+            ? $text
+            : null;
     }
 }

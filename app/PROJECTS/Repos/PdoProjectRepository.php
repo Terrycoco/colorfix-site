@@ -20,6 +20,7 @@ final class PdoProjectRepository
         $stmt = $this->pdo->query(
             'SELECT
                 p.id,
+                p.project_name,
                 p.client_id,
                 p.property_id,
                 p.playlist_id,
@@ -27,11 +28,11 @@ final class PdoProjectRepository
                 pr.name AS property_name,
                 pl.title AS playlist_title
              FROM projects p
-             INNER JOIN clients c
+             LEFT JOIN clients c
                ON c.id = p.client_id
-             INNER JOIN properties pr
+             LEFT JOIN properties pr
                ON pr.id = p.property_id
-             INNER JOIN playlists pl
+             LEFT JOIN playlists pl
                ON pl.playlist_id = p.playlist_id
              ORDER BY p.id DESC'
         );
@@ -52,6 +53,7 @@ final class PdoProjectRepository
         $stmt = $this->pdo->prepare(
             'SELECT
                 p.id,
+                p.project_name,
                 p.client_id,
                 p.property_id,
                 p.playlist_id,
@@ -59,11 +61,11 @@ final class PdoProjectRepository
                 pr.name AS property_name,
                 pl.title AS playlist_title
              FROM projects p
-             INNER JOIN clients c
+             LEFT JOIN clients c
                ON c.id = p.client_id
-             INNER JOIN properties pr
+             LEFT JOIN properties pr
                ON pr.id = p.property_id
-             INNER JOIN playlists pl
+             LEFT JOIN playlists pl
                ON pl.playlist_id = p.playlist_id
              WHERE p.id = :project_id
              LIMIT 1'
@@ -79,22 +81,19 @@ final class PdoProjectRepository
     }
 
     public function create(
-        int $clientId,
-        int $propertyId,
-        int $playlistId
+        ?string $projectName,
+        ?int $clientId,
+        ?int $propertyId,
+        ?int $playlistId
     ): int {
-        $this->validateIds(
-            $clientId,
-            $propertyId,
-            $playlistId
-        );
-
         $stmt = $this->pdo->prepare(
             'INSERT INTO projects (
+                project_name,
                 client_id,
                 property_id,
                 playlist_id
              ) VALUES (
+                :project_name,
                 :client_id,
                 :property_id,
                 :playlist_id
@@ -102,6 +101,7 @@ final class PdoProjectRepository
         );
 
         $stmt->execute([
+            ':project_name' => $projectName,
             ':client_id' => $clientId,
             ':property_id' => $propertyId,
             ':playlist_id' => $playlistId,
@@ -112,9 +112,10 @@ final class PdoProjectRepository
 
     public function update(
         int $projectId,
-        int $clientId,
-        int $propertyId,
-        int $playlistId
+        ?string $projectName,
+        ?int $clientId,
+        ?int $propertyId,
+        ?int $playlistId
     ): bool {
         if ($projectId <= 0) {
             throw new RuntimeException(
@@ -122,15 +123,10 @@ final class PdoProjectRepository
             );
         }
 
-        $this->validateIds(
-            $clientId,
-            $propertyId,
-            $playlistId
-        );
-
         $stmt = $this->pdo->prepare(
             'UPDATE projects
-                SET client_id = :client_id,
+                SET project_name = :project_name,
+                    client_id = :client_id,
                     property_id = :property_id,
                     playlist_id = :playlist_id
               WHERE id = :project_id'
@@ -138,12 +134,13 @@ final class PdoProjectRepository
 
         $stmt->execute([
             ':project_id' => $projectId,
+            ':project_name' => $projectName,
             ':client_id' => $clientId,
             ':property_id' => $propertyId,
             ':playlist_id' => $playlistId,
         ]);
 
-        return $stmt->rowCount() >= 0;
+        return true;
     }
 
     public function deleteById(
@@ -184,7 +181,8 @@ final class PdoProjectRepository
 
         if (
             $excludeProjectId !== null
-            && $excludeProjectId > 0
+            &&
+            $excludeProjectId > 0
         ) {
             $sql .=
                 ' AND id <> :exclude_project_id';
@@ -196,38 +194,16 @@ final class PdoProjectRepository
 
         $sql .= ' LIMIT 1';
 
-        $stmt = $this->pdo->prepare(
-            $sql
-        );
+        $stmt =
+            $this->pdo
+                ->prepare(
+                    $sql
+                );
 
         $stmt->execute(
             $params
         );
 
         return (bool)$stmt->fetchColumn();
-    }
-
-    private function validateIds(
-        int $clientId,
-        int $propertyId,
-        int $playlistId
-    ): void {
-        if ($clientId <= 0) {
-            throw new RuntimeException(
-                'Valid client ID required.'
-            );
-        }
-
-        if ($propertyId <= 0) {
-            throw new RuntimeException(
-                'Valid property ID required.'
-            );
-        }
-
-        if ($playlistId <= 0) {
-            throw new RuntimeException(
-                'Valid playlist ID required.'
-            );
-        }
     }
 }

@@ -1,12 +1,15 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import {
   useParams,
 } from "react-router-dom";
+
+import {
+  useAppState,
+} from "@context/AppStateContext.jsx";
 
 import {
   AdminEmptyState,
@@ -22,6 +25,7 @@ import {
 } from "@helpers/config";
 
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
+import ProjectSetup from "./ProjectSetup";
 
 import "./admin-project.css";
 
@@ -29,28 +33,42 @@ import "./admin-project.css";
 const GET_URL =
   `${API_FOLDER}/v2/admin/projects/get.php`;
 
+const LIST_URL =
+  `${API_FOLDER}/v2/admin/projects/list.php`;
+
 
 export default function AdminProjectPage() {
   const {
     projectId,
   } = useParams();
 
-  const numericProjectId =
+  const {
+    activeProjectId,
+    setActiveProjectId,
+  } = useAppState();
+
+  const routeProjectId =
     /^\d+$/.test(
-      String(
-        projectId ||
-        ""
-      )
+      String(projectId || "")
     )
-      ? Number(
-          projectId
-        )
+      ? Number(projectId)
       : 0;
+
+  const numericProjectId =
+    routeProjectId
+    ||
+    Number(activeProjectId || 0);
 
   const [
     project,
     setProject,
   ] = useState(null);
+
+
+  const [
+    projects,
+    setProjects,
+  ] = useState([]);
 
   const [
     loading,
@@ -65,54 +83,153 @@ export default function AdminProjectPage() {
   const [
     activeSection,
     setActiveSection,
-  ] = useState("playlist");
+  ] = useState("setup");
 
 
   useEffect(() => {
-    let cancelled =
-      false;
+    let cancelled = false;
 
-    async function loadProject() {
-      if (
-        numericProjectId <= 0
-      ) {
-        setProject(
-          null
-        );
-
-        setError(
-          "Valid project ID required."
-        );
-
-        setLoading(
-          false
-        );
-
-        return;
-      }
-
-      setLoading(
-        true
-      );
-
-      setError(
-        ""
-      );
-
+    async function loadProjects() {
       try {
         const res =
           await fetch(
-            `${GET_URL}?project_id=${encodeURIComponent(
-              numericProjectId
-            )}`,
+            `${LIST_URL}?_=${Date.now()}`,
             {
-              credentials:
-                "include",
+              credentials: "include",
             }
           );
 
         const data =
           await res.json();
+
+        if (
+          !res.ok
+          ||
+          !data?.ok
+        ) {
+          throw new Error(
+            data?.error ||
+            "Failed to load projects."
+          );
+        }
+
+        if (!cancelled) {
+          setProjects(
+            Array.isArray(data.items)
+              ? data.items
+              : []
+          );
+        }
+
+      } catch {
+        if (!cancelled) {
+          setProjects([]);
+        }
+      }
+    }
+
+    loadProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProject() {
+      setLoading(true);
+      setError("");
+
+      try {
+        let resolvedProjectId =
+          numericProjectId;
+
+        if (
+          resolvedProjectId <= 0
+        ) {
+          const listRes =
+            await fetch(
+              `${LIST_URL}?_=${Date.now()}`,
+              {
+                credentials: "include",
+              }
+            );
+
+          const listText =
+            await listRes.text();
+
+          let listData = null;
+
+          try {
+            listData =
+              JSON.parse(
+                listText
+              );
+          } catch {
+            throw new Error(
+              `HTTP ${listRes.status}: ${listText.slice(0, 250)}`
+            );
+          }
+
+          if (
+            !listRes.ok
+            ||
+            !listData?.ok
+          ) {
+            throw new Error(
+              listData?.error ||
+              "Failed to load projects."
+            );
+          }
+
+          const firstProject =
+            Array.isArray(
+              listData.items
+            )
+              ? listData.items[0]
+              : null;
+
+          resolvedProjectId =
+            Number(
+              firstProject?.id ||
+              0
+            );
+
+          if (
+            resolvedProjectId <= 0
+          ) {
+            throw new Error(
+              "No projects found."
+            );
+          }
+        }
+
+        const res =
+          await fetch(
+            `${GET_URL}?project_id=${encodeURIComponent(
+              resolvedProjectId
+            )}&_=${Date.now()}`,
+            {
+              credentials: "include",
+            }
+          );
+
+        const text =
+          await res.text();
+
+        let data = null;
+
+        try {
+          data =
+            JSON.parse(text);
+        } catch {
+          throw new Error(
+            `HTTP ${res.status}: ${text.slice(0, 250)}`
+          );
+        }
 
         if (
           !res.ok
@@ -128,17 +245,18 @@ export default function AdminProjectPage() {
         }
 
         if (!cancelled) {
-          setProject(
-            data.project
+          setProject(data.project);
+
+          setActiveProjectId(
+            Number(
+              data.project.id
+            )
           );
         }
 
       } catch (err) {
         if (!cancelled) {
-          setProject(
-            null
-          );
-
+          setProject(null);
           setError(
             err?.message ||
             "Failed to load project."
@@ -147,9 +265,7 @@ export default function AdminProjectPage() {
 
       } finally {
         if (!cancelled) {
-          setLoading(
-            false
-          );
+          setLoading(false);
         }
       }
     }
@@ -157,73 +273,85 @@ export default function AdminProjectPage() {
     loadProject();
 
     return () => {
-      cancelled =
-        true;
+      cancelled = true;
     };
   }, [
     numericProjectId,
+    routeProjectId,
   ]);
-
-
-  const projectLabel =
-    useMemo(
-      () => {
-        if (!project) {
-          return "Project";
-        }
-
-        const clientName =
-          String(
-            project.client_name ||
-            ""
-          ).trim();
-
-        const propertyName =
-          String(
-            project.property_name ||
-            ""
-          ).trim();
-
-        if (
-          clientName
-          &&
-          propertyName
-        ) {
-          return `${clientName} · ${propertyName}`;
-        }
-
-        return (
-          clientName
-          ||
-          propertyName
-          ||
-          `Project #${project.id}`
-        );
-      },
-      [
-        project,
-      ]
-    );
 
 
   const list =
     (
       <AdminListPane
         title={
-          projectLabel
+          <select
+            className="admin-field__control"
+            value={
+              project?.id
+                ? String(project.id)
+                : ""
+            }
+            onChange={
+              (event) => {
+                const nextId =
+                  Number(
+                    event.target.value || 0
+                  );
+
+                if (
+                  nextId > 0
+                  &&
+                  nextId !==
+                    Number(project?.id || 0)
+                ) {
+                  setActiveProjectId(
+                    nextId
+                  );
+
+                  setActiveSection(
+                    "setup"
+                  );
+                }
+              }
+            }
+          >
+            {
+              projects.map(
+                (row) => {
+                  const label =
+                    String(
+                      row?.project_name ||
+                      ""
+                    ).trim()
+                    ||
+                    `Project #${row.id}`;
+
+                  return (
+                    <option
+                      key={row.id}
+                      value={row.id}
+                    >
+                      {label}
+                    </option>
+                  );
+                }
+              )
+            }
+          </select>
         }
       >
         <AdminObjectList ariaLabel="Project">
           <AdminObjectListItem
-            id="overview"
-            title="Overview"
+            id="setup"
+            title="Setup"
             selected={
               activeSection ===
-              "overview"
+              "setup"
             }
             onSelect={() =>
               setActiveSection(
-                "overview"
+                "setup"
               )
             }
           />
@@ -231,6 +359,14 @@ export default function AdminProjectPage() {
           <AdminObjectListItem
             id="playlist"
             title="Playlist"
+            meta={[
+              project?.playlist_id
+                ? (
+                    project.playlist_title
+                    || `Playlist #${project.playlist_id}`
+                  )
+                : "Not assigned",
+            ]}
             selected={
               activeSection ===
               "playlist"
@@ -246,8 +382,7 @@ export default function AdminProjectPage() {
     );
 
 
-  let detail =
-    null;
+  let detail = null;
 
   if (loading) {
     detail =
@@ -277,7 +412,38 @@ export default function AdminProjectPage() {
 
   } else if (
     activeSection ===
-    "playlist"
+    "setup"
+  ) {
+    detail =
+      (
+        <ProjectSetup
+          project={project}
+          onSaved={
+            (savedProject) => {
+              setProject(
+                savedProject
+              );
+
+              setProjects(
+                (current) =>
+                  current.map(
+                    (row) =>
+                      Number(row.id) ===
+                      Number(savedProject.id)
+                        ? {
+                            ...row,
+                            ...savedProject,
+                          }
+                        : row
+                  )
+              );
+            }
+          }
+        />
+      );
+
+  } else if (
+    project.playlist_id
   ) {
     detail =
       (
@@ -293,10 +459,9 @@ export default function AdminProjectPage() {
   } else {
     detail =
       (
-        <ProjectOverview
-          project={
-            project
-          }
+        <AdminEmptyState
+          title="No playlist assigned"
+          message="Choose a Playlist in Setup first."
         />
       );
   }
@@ -305,80 +470,9 @@ export default function AdminProjectPage() {
   return (
     <AdminMasterDetail
       storageKey="admin-project-list-width"
-      defaultListWidth={
-        240
-      }
-      list={
-        list
-      }
-      detail={
-        detail
-      }
+      defaultListWidth={240}
+      list={list}
+      detail={detail}
     />
-  );
-}
-
-
-function ProjectOverview({
-  project,
-}) {
-  return (
-    <section className="admin-project-overview">
-      <header className="admin-project-overview__header">
-        <div>
-          <h1>
-            Project #{project.id}
-          </h1>
-
-          <p>
-            Project workspace
-          </p>
-        </div>
-      </header>
-
-      <dl className="admin-project-overview__facts">
-        <div>
-          <dt>
-            Client
-          </dt>
-
-          <dd>
-            {
-              project.client_name
-              ||
-              `Client #${project.client_id}`
-            }
-          </dd>
-        </div>
-
-        <div>
-          <dt>
-            Property
-          </dt>
-
-          <dd>
-            {
-              project.property_name
-              ||
-              `Property #${project.property_id}`
-            }
-          </dd>
-        </div>
-
-        <div>
-          <dt>
-            Playlist
-          </dt>
-
-          <dd>
-            {
-              project.playlist_title
-              ||
-              `Playlist #${project.playlist_id}`
-            }
-          </dd>
-        </div>
-      </dl>
-    </section>
   );
 }

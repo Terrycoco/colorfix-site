@@ -80,6 +80,8 @@ const PERMISSION_STATUS_EVENT =
 const SLIDE_CLIPBOARD_KEY =
   "colorfix:playlist-slide-clipboard";
 
+const EMPTY_COPIED_SLIDES = [];
+
 
 const DEFAULT_PLAYLIST_TYPES = [
   "teaching",
@@ -158,7 +160,7 @@ const emptyItem = {
 const PlaylistEditor = forwardRef(function PlaylistEditor(
   {
     playlistId,
-    initialCopiedSlides = [],
+    initialCopiedSlides = EMPTY_COPIED_SLIDES,
     onSaved = null,
     onDeleted = null,
   },
@@ -3963,6 +3965,115 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
 export default PlaylistEditor;
 
+
+
+function normalizePlaylist(
+  raw = {}
+) {
+  return {
+    ...emptyPlaylist,
+    ...raw,
+
+    playlist_id:
+      raw.playlist_id
+      ??
+      null,
+
+    title:
+      raw.title
+      ??
+      "",
+
+    type:
+      raw.type
+      ??
+      "",
+
+    is_active:
+      raw.is_active == null
+        ? true
+        : Boolean(
+            Number(
+              raw.is_active
+            )
+          ),
+
+    is_public:
+      raw.is_public == null
+        ? false
+        : Boolean(
+            Number(
+              raw.is_public
+            )
+          ),
+
+    slug:
+      raw.slug
+      ??
+      "",
+
+    headline:
+      raw.headline
+      ??
+      "",
+
+    page_title:
+      raw.page_title
+      ??
+      "",
+
+    meta_description:
+      raw.meta_description
+      ??
+      "",
+
+    dek:
+      raw.dek
+      ??
+      "",
+
+    intro_html:
+      raw.intro_html
+      ??
+      "",
+
+    body_html:
+      raw.body_html
+      ??
+      "",
+
+    hero_image_id:
+      raw.hero_image_id
+      ??
+      "",
+
+    hero_image_url:
+      raw.hero_image_url
+      ??
+      "",
+
+    hero_alt:
+      raw.hero_alt
+      ??
+      "",
+
+    indexable:
+      raw.indexable == null
+        ? true
+        : Boolean(
+            Number(
+              raw.indexable
+            )
+          ),
+
+    published_at:
+      toDatetimeLocal(
+        raw.published_at
+        ??
+        ""
+      ),
+  };
+}
 
 
 function normalizePlaylistItem(

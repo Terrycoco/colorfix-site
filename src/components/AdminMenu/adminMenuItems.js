@@ -35,7 +35,7 @@ export const adminMenuItems = [
   {
     label: "Clients & Projects",
     items: [
-      { label: "Projects", href: "/admin/projects" },
+      { label: "Project", href: "/admin/project" },
       { label: "Clients", href: "/admin/clients" },
       { label: "Properties", href: "/admin/properties" },
       { label: "Email Templates", href: "/admin/email-templates" },
