@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace App\PALETTES\Managers;
 
 use App\PALETTES\Repos\PdoPaletteEditorRepository;
-use App\REX\Repos\PdoRexReservationRepository;
 use DomainException;
 use InvalidArgumentException;
 use PDO;
@@ -211,40 +210,39 @@ final class PaletteManager
         $this->pdo->beginTransaction();
 
         try {
-            $rex = new PdoRexReservationRepository(
-                $this->pdo
-            );
-
             /*
-             * Reservations follow object lifetime.
-             * Delete every REX reservation owned by every PV first.
-             * deleteByResource() also removes aliases / relationship edges.
+             * PV owns:
+             * - its REX identity
+             * - its Palette <-> Photo presentation relationships
+             * - its own lifetime
+             *
+             * Do not duplicate that deletion logic here.
+             *
+             * PVManager detects this existing transaction, so a locked REX
+             * aborts the entire Palette + PV delete and rolls everything back.
              */
-            foreach ($pvIds as $pvId) {
-                $rex->deleteByResource(
-                    'palette_viewer',
-                    $pvId
-                );
-            }
-
-            /*
-             * Delete PV-owned relationship rows, then the PVs themselves.
-             * Photo Library source images are NOT deleted.
-             */
-            foreach ($pvIds as $pvId) {
-                $this->editor->deletePVPhotos($pvId);
-
-                $deletedPv = $this->editor->deletePV(
-                    $pvId
+            $pvManager =
+                new PVManager(
+                    $this->pdo
                 );
 
-                if ($deletedPv !== 1) {
+            foreach ($pvIds as $pvId) {
+                $deletedPv =
+                    $pvManager->deletePV(
+                        (int)$pvId
+                    );
+
+                if (!$deletedPv) {
                     throw new RuntimeException(
-                        "PV {$pvId} was not deleted."
+                        "PV {$pvId} was not found for Palette {$paletteId}."
                     );
                 }
             }
 
+            /*
+             * Only after every PV has passed its REX deletion gate do we
+             * remove the Palette-owned rows.
+             */
             $this->editor
                 ->deleteMembersForPalette($paletteId);
 

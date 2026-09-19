@@ -387,10 +387,44 @@ final class PlaylistManager
                     $this->pdo
                 );
 
-            $rex->deleteByResource(
-                'playlist',
-                $playlistId
-            );
+            /*
+             * REX is the deletion gate.
+             *
+             * A Playlist may own several permanent REX identities:
+             * Public, Concept, Client, Thumbs, etc.
+             *
+             * Delete each specific Playlist-owned REX reservation first.
+             * If ANY reservation is locked, deleteREX() refuses it and this
+             * outer transaction rolls every earlier REX deletion back.
+             *
+             * No Playlist-owned rows are touched until every applicable
+             * REX identity has passed the gate.
+             */
+            $reservations =
+                $rex->findByResource(
+                    'playlist',
+                    $playlistId,
+                    500
+                );
+
+            foreach ($reservations as $reservation) {
+                $rexDelete =
+                    $rex->deleteREX(
+                        (int)$reservation->id
+                    );
+
+                if (
+                    ($rexDelete['ok'] ?? false)
+                    !== true
+                ) {
+                    throw new RuntimeException(
+                        (string)(
+                            $rexDelete['message']
+                            ?? "Playlist {$playlistId} cannot be deleted because its REX identity is protected."
+                        )
+                    );
+                }
+            }
 
             $this->playlists
                 ->deleteItemsByPlaylistId(

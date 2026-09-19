@@ -417,6 +417,434 @@ public function deleteByResource(
         return $stmt->rowCount() > 0;
     }
 
+
+    /**
+     * Set the lock state for one REX reservation and all descendant
+     * reservations in its relationship tree.
+     *
+     * Allowed transitions:
+     * - unlocked -> dispatched
+     * - dispatched -> unlocked
+     * - dispatched -> published
+     * - published -> published
+     *
+     * Forbidden transitions:
+     * - published -> unlocked
+     * - published -> dispatched
+     *
+     * @return array{
+     *   ok: bool,
+     *   reason: ?string,
+     *   message: string,
+     *   affected_ids: int[]
+     * }
+     */
+    /**
+     * Set the lock state for one REX reservation and all descendant
+     * reservations in its relationship tree.
+     *
+     * "published" is sticky:
+     * - dispatch may temporarily lock previously-unpublished rows
+     * - a failed dispatch may unlock only rows that are not already published
+     * - a published row is never downgraded or unlocked by this method
+     * - publishing promotes every row in the current tree to published
+     *
+     * This lets an already-published parent keep its permanent lock while
+     * newly-added descendants participate safely in later dispatch attempts.
+     *
+     * @return array{
+     *   ok: bool,
+     *   reason: ?string,
+     *   message: string,
+     *   affected_ids: int[]
+     * }
+     */
+    public function setREXLock(
+        int $reservationId,
+        bool $locked,
+        ?string $reason = null,
+    ): array {
+        if ($reservationId <= 0) {
+            return [
+                'ok' => false,
+                'reason' => 'invalid_reservation',
+                'message' => 'Valid REX reservation ID required.',
+                'affected_ids' => [],
+            ];
+        }
+
+        $normalizedReason = $reason !== null
+            ? strtolower(trim($reason))
+            : null;
+
+        if ($locked) {
+            if (!in_array($normalizedReason, ['dispatched', 'published'], true)) {
+                return [
+                    'ok' => false,
+                    'reason' => 'invalid_lock_reason',
+                    'message' => 'Locked REX must use lock reason dispatched or published.',
+                    'affected_ids' => [],
+                ];
+            }
+        } else {
+            $normalizedReason = null;
+        }
+
+        if ($this->findById($reservationId) === null) {
+            return [
+                'ok' => false,
+                'reason' => 'not_found',
+                'message' => "REX reservation {$reservationId} was not found.",
+                'affected_ids' => [],
+            ];
+        }
+
+        $ownsTransaction = !$this->pdo->inTransaction();
+
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            /*
+             * Gather the selected reservation and every descendant.
+             * A visited map protects against accidental cycles.
+             */
+            $visited = [];
+            $queue = [$reservationId];
+
+            while ($queue !== []) {
+                $currentId = array_shift($queue);
+
+                if (
+                    $currentId <= 0
+                    || isset($visited[$currentId])
+                ) {
+                    continue;
+                }
+
+                $visited[$currentId] = true;
+
+                $stmt = $this->pdo->prepare(
+                    'SELECT child_reservation_id
+                       FROM rex_reservation_links
+                      WHERE parent_reservation_id = :parent_id
+                      ORDER BY id ASC'
+                );
+
+                $stmt->execute([
+                    ':parent_id' => $currentId,
+                ]);
+
+                foreach (
+                    $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []
+                    as $childId
+                ) {
+                    $childId = (int)$childId;
+
+                    if (
+                        $childId > 0
+                        && !isset($visited[$childId])
+                    ) {
+                        $queue[] = $childId;
+                    }
+                }
+            }
+
+            $ids = array_map(
+                'intval',
+                array_keys($visited)
+            );
+
+            $placeholders = [];
+            $params = [];
+
+            foreach ($ids as $index => $id) {
+                $placeholder = ':rex_id_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $id;
+            }
+
+            $in = implode(', ', $placeholders);
+
+            if ($locked && $normalizedReason === 'published') {
+                /*
+                 * Confirmed publication makes the entire CURRENT tree
+                 * permanently published.
+                 */
+                $stmt = $this->pdo->prepare(
+                    "UPDATE rex_reservations
+                        SET locked = 1,
+                            lock_reason = 'published',
+                            updated_at = NOW()
+                      WHERE id IN ({$in})"
+                );
+
+                $stmt->execute($params);
+
+            } elseif ($locked && $normalizedReason === 'dispatched') {
+                /*
+                 * Start a dispatch attempt.
+                 *
+                 * Already-published rows remain published.
+                 * Anything else becomes temporarily dispatched.
+                 */
+                $stmt = $this->pdo->prepare(
+                    "UPDATE rex_reservations
+                        SET locked = 1,
+                            lock_reason =
+                                CASE
+                                    WHEN locked = 1
+                                     AND lock_reason = 'published'
+                                        THEN 'published'
+                                    ELSE 'dispatched'
+                                END,
+                            updated_at = NOW()
+                      WHERE id IN ({$in})"
+                );
+
+                $stmt->execute($params);
+
+            } else {
+                /*
+                 * Confirmed dispatch failure.
+                 *
+                 * Published rows are permanent and remain untouched.
+                 * Only non-published rows lose the temporary dispatch lock.
+                 */
+                $stmt = $this->pdo->prepare(
+                    "UPDATE rex_reservations
+                        SET locked =
+                                CASE
+                                    WHEN locked = 1
+                                     AND lock_reason = 'published'
+                                        THEN 1
+                                    ELSE 0
+                                END,
+                            lock_reason =
+                                CASE
+                                    WHEN locked = 1
+                                     AND lock_reason = 'published'
+                                        THEN 'published'
+                                    ELSE NULL
+                                END,
+                            updated_at = NOW()
+                      WHERE id IN ({$in})"
+                );
+
+                $stmt->execute($params);
+            }
+
+            if (
+                $ownsTransaction
+                && $this->pdo->inTransaction()
+            ) {
+                $this->pdo->commit();
+            }
+
+            return [
+                'ok' => true,
+                'reason' => null,
+                'message' =>
+                    $locked
+                        ? "REX tree lock reconciled as {$normalizedReason}."
+                        : 'Temporary REX dispatch locks cleared; published locks preserved.',
+                'affected_ids' => $ids,
+            ];
+
+        } catch (\Throwable $e) {
+            if (
+                $ownsTransaction
+                && $this->pdo->inTransaction()
+            ) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+
+    /**
+     * Delete one specific REX reservation.
+     *
+     * This deletes only the selected REX identity and its owned REX metadata:
+     * - fallback references pointing to it are cleared
+     * - parent/child relationship edges touching it are removed
+     * - aliases owned by it are removed
+     * - the reservation itself is removed
+     *
+     * Child reservations themselves are NOT deleted.
+     *
+     * A locked reservation is permanent from the application's point of view
+     * and cannot be deleted here.
+     *
+     * @return array{
+     *   ok: bool,
+     *   reason: ?string,
+     *   message: string,
+     *   reservation_id: int
+     * }
+     */
+    public function deleteREX(
+        int $reservationId,
+    ): array {
+        if ($reservationId <= 0) {
+            return [
+                'ok' => false,
+                'reason' => 'invalid_reservation',
+                'message' => 'Valid REX reservation ID required.',
+                'reservation_id' => $reservationId,
+            ];
+        }
+
+        /*
+         * Read the lock directly from the table so deletion protection does
+         * not depend on the DTO having lock fields.
+         */
+        $stmt = $this->pdo->prepare(
+            'SELECT id, locked, lock_reason
+               FROM rex_reservations
+              WHERE id = :id
+              LIMIT 1'
+        );
+
+        $stmt->execute([
+            ':id' => $reservationId,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            return [
+                'ok' => false,
+                'reason' => 'not_found',
+                'message' => "REX reservation {$reservationId} was not found.",
+                'reservation_id' => $reservationId,
+            ];
+        }
+
+        $locked =
+            (int)($row['locked'] ?? 0) === 1;
+
+        $lockReason =
+            isset($row['lock_reason'])
+            && $row['lock_reason'] !== null
+                ? trim((string)$row['lock_reason'])
+                : null;
+
+        if ($locked) {
+            $suffix =
+                $lockReason !== null
+                && $lockReason !== ''
+                    ? " ({$lockReason})"
+                    : '';
+
+            return [
+                'ok' => false,
+                'reason' => 'locked',
+                'message' =>
+                    "REX reservation {$reservationId} is locked{$suffix} and cannot be deleted.",
+                'reservation_id' => $reservationId,
+            ];
+        }
+
+        $ownsTransaction =
+            !$this->pdo->inTransaction();
+
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            /*
+             * Other reservations may use this reservation as fallback.
+             * Clear those references before deleting the target.
+             */
+            $stmt = $this->pdo->prepare(
+                "UPDATE rex_reservations
+                    SET fallback_rex_id = NULL,
+                        updated_at = NOW()
+                  WHERE fallback_rex_id = :reservation_id"
+            );
+
+            $stmt->execute([
+                ':reservation_id' => $reservationId,
+            ]);
+
+            /*
+             * Remove topology edges in both directions.
+             * The linked child/parent reservations remain intact.
+             */
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM rex_reservation_links
+                  WHERE parent_reservation_id = :reservation_id
+                     OR child_reservation_id = :reservation_id'
+            );
+
+            $stmt->execute([
+                ':reservation_id' => $reservationId,
+            ]);
+
+            /*
+             * Aliases belong to the reservation itself.
+             */
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM rex_aliases
+                  WHERE reservation_id = :reservation_id'
+            );
+
+            $stmt->execute([
+                ':reservation_id' => $reservationId,
+            ]);
+
+            /*
+             * Finally remove the specific REX reservation.
+             */
+            $stmt = $this->pdo->prepare(
+                'DELETE FROM rex_reservations
+                  WHERE id = :reservation_id
+                    AND locked = 0'
+            );
+
+            $stmt->execute([
+                ':reservation_id' => $reservationId,
+            ]);
+
+            if ($stmt->rowCount() !== 1) {
+                throw new RuntimeException(
+                    "REX reservation {$reservationId} could not be deleted."
+                );
+            }
+
+            if (
+                $ownsTransaction
+                && $this->pdo->inTransaction()
+            ) {
+                $this->pdo->commit();
+            }
+
+            return [
+                'ok' => true,
+                'reason' => null,
+                'message' =>
+                    "REX reservation {$reservationId} was deleted.",
+                'reservation_id' => $reservationId,
+            ];
+
+        } catch (\Throwable $e) {
+            if (
+                $ownsTransaction
+                && $this->pdo->inTransaction()
+            ) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+
     public function findChildReservations(
         int $parentReservationId,
         ?string $relationshipKey = null,

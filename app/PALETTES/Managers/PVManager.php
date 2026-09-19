@@ -73,16 +73,45 @@ final class PVManager
                 );
 
             /*
-             * REX cleanup comes first.
+             * REX is the deletion gate.
              *
-             * deleteByResource() removes relationship edges in BOTH
-             * directions before deleting the reservation itself.
+             * A PV may own more than one REX reservation over its lifetime.
+             * Every specific reservation must pass deleteREX() before any
+             * PV-owned rows are touched.
+             *
+             * If any reservation is locked, deleteREX() refuses it and this
+             * outer transaction rolls back any earlier REX deletions.
              */
-            $rex->deleteByResource(
-                'palette_viewer',
-                $pvId
-            );
+            $reservations =
+                $rex->findByResource(
+                    'palette_viewer',
+                    $pvId,
+                    500
+                );
 
+            foreach ($reservations as $reservation) {
+                $rexDelete =
+                    $rex->deleteREX(
+                        (int)$reservation->id
+                    );
+
+                if (
+                    ($rexDelete['ok'] ?? false)
+                    !== true
+                ) {
+                    throw new RuntimeException(
+                        (string)(
+                            $rexDelete['message']
+                            ?? "Palette Viewer {$pvId} cannot be deleted because its REX identity is protected."
+                        )
+                    );
+                }
+            }
+
+            /*
+             * The PV owns these presentation relationships.
+             * Photo Library source images are preserved.
+             */
             $this->pvs
                 ->deletePhotosByPVId(
                     $pvId

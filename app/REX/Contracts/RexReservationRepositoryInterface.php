@@ -128,5 +128,33 @@ interface RexReservationRepositoryInterface
         int $resourceId,
     ): int;
 
+/**
+ * Set the lock state for one REX reservation and its descendants.
+ *
+ * Allowed transitions:
+ * - unlocked -> dispatched
+ * - dispatched -> unlocked
+ * - dispatched -> published
+ * - published -> published
+ *
+ * Forbidden:
+ * - published -> unlocked
+ * - published -> dispatched
+ *
+ * @return array{
+ *   ok: bool,
+ *   reason: ?string,
+ *   message: string,
+ *   affected_ids: int[]
+ * }
+ */
+public function setREXLock(
+    int $reservationId,
+    bool $locked,
+    ?string $reason = null,
+): array;
+
+
+
 
 }

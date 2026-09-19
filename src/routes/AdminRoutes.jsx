@@ -40,6 +40,7 @@ const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
 const AdminProjectsPage = lazy(() => import('@pages/AdminProjectsPage'));
+const AdminProjectPage = lazy(() => import('@pages/AdminProjectPage'));
 const AdminPropertiesPage = lazy(() => import('@pages/AdminPropertiesPage'));
 const AdminSharePage = lazy(() => import('@pages/AdminSharePage'));
 const AdminAssetLibraryPage = lazy(() => import('@pages/AdminAssetLibraryPage'));
@@ -138,6 +139,7 @@ export default function AdminRoutes() {
         <Route path="milestones" element={<Navigate to="/admin/ideas?tab=milestones" replace />} />
         <Route path="articles" element={renderWithSuspense(AdminArticlesPage, 'Loading articles...')} />
         <Route path="projects" element={renderWithSuspense(AdminProjectsPage, 'Loading projects...')} />
+        <Route path="project/:projectId" element={renderWithSuspense(AdminProjectPage, 'Loading project...')} />
         <Route path="properties" element={renderWithSuspense(AdminPropertiesPage, 'Loading properties...')} />
         <Route path="share" element={renderWithSuspense(AdminSharePage, 'Loading admin share...')} />
         <Route path="library" element={renderWithSuspense(AdminAssetLibraryPage, 'Loading library...')} />

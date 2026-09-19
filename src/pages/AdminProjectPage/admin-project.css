@@ -1,0 +1,41 @@
+.admin-project-overview {
+  padding: 18px;
+}
+
+.admin-project-overview__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-project-overview__header h1 {
+  margin: 0;
+}
+
+.admin-project-overview__header p {
+  margin: 4px 0 0;
+  opacity: 0.7;
+}
+
+.admin-project-overview__facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.admin-project-overview__facts > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 130px) 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.admin-project-overview__facts dt {
+  font-weight: 700;
+}
+
+.admin-project-overview__facts dd {
+  margin: 0;
+}

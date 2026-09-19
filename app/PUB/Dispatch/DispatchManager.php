@@ -18,6 +18,7 @@ use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Support\ProductionSignature;
+use App\REX\Repos\PdoRexReservationRepository;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -64,6 +65,7 @@ final class DispatchManager implements PubComManagerContract
 
     private PubErrorReporter $errors;
     private PdoPubAssetRepository $assets;
+    private PdoRexReservationRepository $rex;
 
     /**
      * Lazily awakened shipping specialists.
@@ -100,6 +102,12 @@ final class DispatchManager implements PubComManagerContract
 
         $this->assets =
             new PdoPubAssetRepository(
+                $this->pdo
+            );
+
+
+        $this->rex =
+            new PdoRexReservationRepository(
                 $this->pdo
             );
 
@@ -670,6 +678,50 @@ final class DispatchManager implements PubComManagerContract
 
 
         /*
+         * The external publication is now durably confirmed.
+         *
+         * Promote the PUBLIC Playlist REX tree from its temporary
+         * DISPATCHED lock to permanent PUBLISHED protection.
+         *
+         * If this maintenance write ever fails, the prior DISPATCHED lock
+         * remains in place, so the public URL is still protected. Do not
+         * turn a successful shipment into a failed PUB asset merely because
+         * the lock reason could not be promoted.
+         */
+        try {
+            $this->setPublicPlaylistRexLockForAsset(
+                $asset,
+                true,
+                'published'
+            );
+        } catch (Throwable $e) {
+            try {
+                $this->errors
+                    ->report(
+                        $e,
+                        [
+                            'stage' =>
+                                'dispatch',
+
+                            'pub_asset_id' =>
+                                $pubAssetId,
+
+                            'code' =>
+                                'rex_publish_lock_promotion_failure',
+                        ]
+                    );
+            } catch (Throwable) {
+                error_log(
+                    '[PUB Dispatch] Could not promote Public Playlist REX lock to published for asset #'
+                    . $pubAssetId
+                    . ': '
+                    . $e->getMessage()
+                );
+            }
+        }
+
+
+        /*
          * notify_on_publish is a generic Scheduler instruction.
          *
          * The shipment is already durably SHIPPED before notification is
@@ -858,6 +910,46 @@ final class DispatchManager implements PubComManagerContract
                 $code,
                 $message
             );
+
+
+        /*
+         * This dispatch definitively failed.
+         *
+         * Clear only temporary DISPATCHED locks. setREXLock() preserves
+         * any rows that were already permanently PUBLISHED by an earlier
+         * asset from this same Playlist experience.
+         */
+        try {
+            $this->setPublicPlaylistRexLockForAsset(
+                $asset,
+                false,
+                null
+            );
+        } catch (Throwable $e) {
+            try {
+                $this->errors
+                    ->report(
+                        $e,
+                        [
+                            'stage' =>
+                                'dispatch',
+
+                            'pub_asset_id' =>
+                                $pubAssetId,
+
+                            'code' =>
+                                'rex_dispatch_unlock_failure',
+                        ]
+                    );
+            } catch (Throwable) {
+                error_log(
+                    '[PUB Dispatch] Could not clear temporary Public Playlist REX dispatch lock for asset #'
+                    . $pubAssetId
+                    . ': '
+                    . $e->getMessage()
+                );
+            }
+        }
 
 
         return [
@@ -1065,6 +1157,24 @@ final class DispatchManager implements PubComManagerContract
 
 
             /*
+             * PUBLIC URL SAFETY BOUNDARY.
+             *
+             * We are about to hand the sealed package to an external
+             * provider. Protect the specific PUBLIC Playlist REX experience
+             * and its current descendant REX tree before that can happen.
+             *
+             * If the Playlist was already published by an earlier asset,
+             * setREXLock() preserves those permanent PUBLISHED locks while
+             * temporarily protecting any newly-added descendants.
+             */
+            $this->setPublicPlaylistRexLockForAsset(
+                $asset,
+                true,
+                'dispatched'
+            );
+
+
+            /*
              * SEALED PACKAGE BOUNDARY.
              *
              * DispatchManager does not open or map the package.
@@ -1180,6 +1290,43 @@ final class DispatchManager implements PubComManagerContract
                     /*
                      * Preserve the original DISPATCH exception.
                      */
+                }
+
+
+                /*
+                 * If the exception happened after the external-dispatch
+                 * safety lock was applied, clear only temporary DISPATCHED
+                 * locks. Permanent PUBLISHED locks remain untouched.
+                 *
+                 * Calling this when no temporary lock was created is safe.
+                 */
+                try {
+                    $this->setPublicPlaylistRexLockForAsset(
+                        $asset,
+                        false,
+                        null
+                    );
+                } catch (Throwable $unlockError) {
+                    try {
+                        $this->errors
+                            ->report(
+                                $unlockError,
+                                [
+                                    'stage' =>
+                                        'dispatch',
+
+                                    'pub_asset_id' =>
+                                        $pubAssetId,
+
+                                    'code' =>
+                                        'rex_dispatch_unlock_failure',
+                                ]
+                            );
+                    } catch (Throwable) {
+                        /*
+                         * Preserve the original DISPATCH exception.
+                         */
+                    }
                 }
             }
 
@@ -1497,6 +1644,101 @@ final class DispatchManager implements PubComManagerContract
 
 
         return $this->youtubeAuth;
+    }
+
+
+    /**
+     * Resolve the one PUBLIC Playlist REX experience for this PUB asset and
+     * reconcile its lock state.
+     *
+     * PUB owns the decision to lock. REX owns the mechanics and descendant
+     * propagation.
+     *
+     * Assets whose source is not a Playlist currently have no Playlist REX
+     * tree to manage here.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function setPublicPlaylistRexLockForAsset(
+        array $asset,
+        bool $locked,
+        ?string $reason
+    ): ?array {
+        $sourceType =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'source_type'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $sourceId =
+            (int)(
+                $asset[
+                    'source_id'
+                ]
+                ?? 0
+            );
+
+        if (
+            $sourceType !== 'playlist'
+            || $sourceId <= 0
+        ) {
+            return null;
+        }
+
+        /*
+         * Each Playlist experience owns a distinct REX reservation.
+         * We explicitly resolve PUBLIC; Concept and Client are not part of
+         * PUB's permanence policy.
+         */
+        $matches =
+            $this->rex
+                ->findActiveByResourceIdsAndExperience(
+                    'playlist_experience',
+                    'playlist',
+                    [$sourceId],
+                    'public'
+                );
+
+        $reservation =
+            $matches[
+                $sourceId
+            ]
+            ?? null;
+
+        if ($reservation === null) {
+            throw new RuntimeException(
+                "Playlist #{$sourceId} has no active Public Playlist REX reservation."
+            );
+        }
+
+        $result =
+            $this->rex
+                ->setREXLock(
+                    (int)$reservation->id,
+                    $locked,
+                    $reason
+                );
+
+        if (($result['ok'] ?? false) !== true) {
+            throw new RuntimeException(
+                trim(
+                    (string)(
+                        $result[
+                            'message'
+                        ]
+                        ?? 'REX lock operation failed.'
+                    )
+                )
+            );
+        }
+
+        return $result;
     }
 
 
