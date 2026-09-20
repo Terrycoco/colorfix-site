@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import {
   AdminButton,
   AdminCheckboxRow,
@@ -11,6 +13,7 @@ import {
 } from "@components/AdminLayout";
 
 import PermissionStatus from "@components/PermissionStatus";
+import UploadPhotoDialog from "@components/Dialogs/UploadPhotoDialog";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import fetchColorDetail from "@data/fetchColorDetail";
 
@@ -61,17 +64,21 @@ export default function PlaylistSlideEditor({
   photoThumb = "",
   photoInfo = null,
   attachedPalette = null,
-  shareImageActive = false,
   saving = false,
   saveError = "",
   onUpdate,
   onPickPhoto,
+  onUploadPhoto,
   onClearPhoto,
-  onSetShareImage,
-  onPickColorPlan,
+  onPickPalette,
   onRemove,
   onSave,
 }) {
+  const [
+    uploadOpen,
+    setUploadOpen,
+  ] = useState(false);
+
   const photoId = item?.photo_library_id || "";
   const hueConfig =
     item?.item_type === "hue-wheel"
@@ -180,76 +187,103 @@ export default function PlaylistSlideEditor({
 
       <AdminPanel title="Photo / Palette" compact>
         <AdminStack gap="sm">
-          {photoThumb ? (
-            <img src={photoThumb} alt="" width="360" loading="lazy" />
-          ) : null}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) 132px",
+              gap: "12px",
+              alignItems: "start",
+            }}
+          >
+            <div>
+              {photoThumb ? (
+                <img
+                  src={photoThumb}
+                  alt=""
+                  loading="lazy"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    maxWidth: "360px",
+                    height: "auto",
+                  }}
+                />
+              ) : (
+                <AdminMetaText as="div">
+                  No photo
+                </AdminMetaText>
+              )}
+            </div>
 
-          <AdminField label="Photo Library ID" compact>
-            <input
-              className="admin-field__control"
-              type="text"
-              value={photoId}
-              placeholder="Pick a photo"
-              onChange={(event) =>
-                onUpdate("photo_library_id", event.target.value)
-              }
-            />
-          </AdminField>
+            <AdminStack gap="sm">
+              <AdminToolbar compact>
+                <AdminMetaText as="span">
+                  Photo #{photoId || "—"}
+                </AdminMetaText>
+
+                {photoId ? (
+                  <PermissionStatus
+                    status={photoInfo?.photoPermissionStatus || "unknown"}
+                    photoLibraryId={photoId}
+                    clientId={photoInfo?.clientId}
+                    clientName={photoInfo?.clientName || ""}
+                    clientEmail={photoInfo?.clientEmail || ""}
+                  />
+                ) : null}
+              </AdminToolbar>
+
+              <AdminButton
+                type="button"
+                variant="secondary"
+                onClick={onPickPhoto}
+                style={{ width: "100%" }}
+              >
+                Picker
+              </AdminButton>
+
+              <AdminButton
+                type="button"
+                variant="secondary"
+                onClick={() => setUploadOpen(true)}
+                style={{ width: "100%" }}
+              >
+                Upload
+              </AdminButton>
+
+              <AdminButton
+                type="button"
+                variant="secondary"
+                disabled={!photoId && !item.image_url}
+                onClick={onClearPhoto}
+                style={{ width: "100%" }}
+              >
+                Remove
+              </AdminButton>
+            </AdminStack>
+          </div>
 
           <AdminToolbar compact>
-            <AdminMetaText as="div">
-              {photoId ? `Photo Library #${photoId}` : "No photo"}
-            </AdminMetaText>
+            <AdminField label="Palette" compact>
+              <input
+                className="admin-field__control"
+                type="text"
+                readOnly
+                value={attachedPalette?.attachedSavedPaletteLabel || ""}
+                placeholder="No palette attached"
+              />
+            </AdminField>
 
             <AdminButton
               type="button"
               variant="secondary"
-              onClick={onPickPhoto}
+              disabled={typeof onPickPalette !== "function"}
+              onClick={onPickPalette}
             >
-              Pick Photo
-            </AdminButton>
-
-            <AdminButton
-              type="button"
-              variant="secondary"
-              disabled={!photoId && !item.image_url}
-              onClick={onClearPhoto}
-            >
-              Remove Photo
+              {attachedPalette?.attachedSavedPaletteLabel
+                ? "Change Palette"
+                : "Attach Palette"}
             </AdminButton>
           </AdminToolbar>
-
-          {photoId ? (
-            <PermissionStatus
-              status={photoInfo?.photoPermissionStatus || "unknown"}
-              photoLibraryId={photoId}
-              clientId={photoInfo?.clientId}
-              clientName={photoInfo?.clientName || ""}
-              clientEmail={photoInfo?.clientEmail || ""}
-            />
-          ) : null}
-
-          <AdminField label="Palette" compact>
-            <input
-              className="admin-field__control"
-              type="text"
-              readOnly
-              value={attachedPalette?.attachedSavedPaletteLabel || ""}
-              placeholder={
-                photoId
-                  ? "No palette attached to this photo"
-                  : "Pick a photo first"
-              }
-            />
-          </AdminField>
-
-          <AdminCheckboxRow
-            checked={Boolean(shareImageActive)}
-            disabled={!photoId && !item.image_url}
-            onChange={onSetShareImage}
-          >
-            Use as playlist peek photo
-          </AdminCheckboxRow>
         </AdminStack>
       </AdminPanel>
 
@@ -407,19 +441,6 @@ export default function PlaylistSlideEditor({
             </AdminCheckboxRow>
           </AdminToolbar>
 
-          <AdminToolbar compact>
-            <AdminMetaText as="div">
-              Color Plan: {item.color_plan_id || "—"}
-            </AdminMetaText>
-
-            <AdminButton
-              type="button"
-              variant="secondary"
-              onClick={onPickColorPlan}
-            >
-              Choose Color Plan
-            </AdminButton>
-          </AdminToolbar>
         </AdminStack>
       </AdminPanel>
 
@@ -441,9 +462,9 @@ export default function PlaylistSlideEditor({
             />
           </AdminField>
         </AdminPanel>
-      ) : (
-        <AdminPanel title="Body" compact>
-          <AdminField label="Body" compact>
+      ) : item.item_type === "text" ? (
+        <AdminPanel title="Text Content" compact>
+          <AdminField label="Text" compact>
             <textarea
               className="admin-field__control"
               rows={5}
@@ -452,7 +473,7 @@ export default function PlaylistSlideEditor({
             />
           </AdminField>
         </AdminPanel>
-      )}
+      ) : null}
 
       <AdminToolbar>
         <AdminButton type="button" variant="danger" onClick={onRemove}>
@@ -469,6 +490,17 @@ export default function PlaylistSlideEditor({
           {saving ? "Saving..." : "Save"}
         </AdminButton>
       </AdminToolbar>
+
+      <UploadPhotoDialog
+        open={uploadOpen}
+        onClose={() =>
+          setUploadOpen(false)
+        }
+        onUploaded={(photo) => {
+          onUploadPhoto?.(photo);
+          setUploadOpen(false);
+        }}
+      />
     </AdminStack>
   );
 }

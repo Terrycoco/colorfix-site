@@ -26,7 +26,7 @@ import {
   useAdminDialog,
 } from "@components/AdminLayout";
 
-import PhotoPickerModal from "@components/PhotoPickerModal";
+import PhotoPickerDialog from "@components/Dialogs/PhotoPickerDialog";
 import ColorPlanPickerModal from "@components/ColorPlanPickerModal";
 
 import {
@@ -2005,6 +2005,89 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   }
 
 
+  function applyPhotoToItem(
+    clientKey,
+    photo
+  ) {
+    if (
+      !clientKey
+      ||
+      !photo
+        ?.photo_library_id
+    ) {
+      return;
+    }
+
+    const pid =
+      String(
+        photo
+          .photo_library_id
+      );
+
+    const imageUrl =
+      String(
+        photo
+          .image_url
+        ||
+        photo
+          .file_path
+        ||
+        photo
+          .raw_rel_path
+        ||
+        ""
+      );
+
+    const info =
+      photoInfoFromRow(
+        photo
+      );
+
+    setPhotoInfo(
+      (current) => ({
+        ...current,
+
+        [pid]:
+          info,
+      })
+    );
+
+    updateItem(
+      clientKey,
+      "photo_library_id",
+      pid
+    );
+
+    updateItem(
+      clientKey,
+      "image_url",
+      makePhotoRef(
+        pid,
+        imageUrl
+      )
+    );
+
+    applyAttachedPaletteFromPhoto(
+      clientKey,
+      pid,
+      info
+    );
+
+    if (
+      imageUrl
+    ) {
+      setPhotoThumbs(
+        (current) => ({
+          ...current,
+
+          [pid]:
+            imageUrl,
+        })
+      );
+    }
+  }
+
+
   function copySelectedSlides() {
     if (
       batchSelectedKeys.length ===
@@ -3550,6 +3633,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                         )
                                       }
 
+                                      onUploadPhoto={(photo) =>
+                                        applyPhotoToItem(
+                                          liveItem
+                                            ._clientKey,
+                                          photo
+                                        )
+                                      }
+
                                       onClearPhoto={() =>
                                         clearItemPhoto(
                                           liveItem
@@ -3822,7 +3913,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       />
 
 
-      <PhotoPickerModal
+      <PhotoPickerDialog
         open={
           photoPickerKey !=
           null
@@ -3834,75 +3925,17 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           )
         }
 
-        onPick={(
-          picked
-        ) => {
+        onPick={(picked) => {
           if (
             !photoPickerKey
-            ||
-            !picked
-              ?.photo_library_id
           ) {
             return;
           }
 
-          const pid =
-            String(
-              picked
-                .photo_library_id
-            );
-
-          const info =
-            photoInfoFromRow(
-              picked
-            );
-
-          setPhotoInfo(
-            (current) => ({
-              ...current,
-
-              [pid]:
-                info,
-            })
-          );
-
-          updateItem(
+          applyPhotoToItem(
             photoPickerKey,
-            "photo_library_id",
-            pid
-          );
-
-          updateItem(
-            photoPickerKey,
-            "image_url",
-            makePhotoRef(
-              pid,
-              picked
-                .image_url ||
-              ""
-            )
-          );
-
-          applyAttachedPaletteFromPhoto(
-            photoPickerKey,
-            pid,
-            info
-          );
-
-          if (
             picked
-              .image_url
-          ) {
-            setPhotoThumbs(
-              (current) => ({
-                ...current,
-
-                [pid]:
-                  picked
-                    .image_url,
-              })
-            );
-          }
+          );
 
           setPhotoPickerKey(
             null
@@ -3911,7 +3944,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       />
 
 
-      <PhotoPickerModal
+
+      <PhotoPickerDialog
         open={
           heroPickerOpen
         }

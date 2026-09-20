@@ -1,0 +1,152 @@
+.dialog-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dialog-search-row .admin-field__control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dialog-layout {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+}
+
+.dialog-layout--preview-form {
+  grid-template-columns: 180px minmax(0, 1fr);
+}
+
+.dialog-fields {
+  min-width: 0;
+}
+
+.dialog-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: var(--admin-surface-muted);
+}
+
+.dialog-preview img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+}
+
+.dialog-preview__placeholder,
+.dialog-thumbnail__placeholder {
+  padding: 18px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.dialog-error {
+  margin: 0 0 12px;
+  padding: 9px 10px;
+  border: 1px solid var(--admin-danger);
+  border-radius: 5px;
+  background: var(--admin-surface);
+  color: var(--admin-danger);
+  font-size: 12px;
+}
+
+.dialog-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.dialog-grid--photos {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dialog-card {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialog-card:hover {
+  border-color: var(--admin-selected);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.dialog-card:focus-visible {
+  outline: 2px solid var(--admin-selected);
+  outline-offset: 2px;
+}
+
+.dialog-thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 3 / 2;
+  background: var(--admin-surface-muted);
+}
+
+.dialog-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dialog-card__meta {
+  padding: 7px 9px;
+}
+
+.dialog-card__title {
+  margin-bottom: 3px;
+  color: var(--admin-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dialog-card__sub {
+  color: var(--admin-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .dialog-grid--photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .dialog-layout--preview-form {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-search-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dialog-preview {
+    min-height: 140px;
+  }
+
+  .dialog-preview img {
+    height: 160px;
+  }
+
+  .dialog-grid--photos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}

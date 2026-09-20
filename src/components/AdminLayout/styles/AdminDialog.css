@@ -13,7 +13,7 @@
   width: min(var(--admin-dialog-width, 520px), 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
-  border: 1px solid var(--admin-border);
+  border: 3px solid var(--admin-accent);
   border-radius: 8px;
   background: var(--admin-surface);
   color: var(--admin-text);

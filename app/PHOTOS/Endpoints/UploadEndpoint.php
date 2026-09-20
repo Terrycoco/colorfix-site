@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PHOTOS\Endpoints;
 
 use App\PHOTOS\Services\PhotoUploadService;
+use InvalidArgumentException;
 use PDO;
 use Throwable;
 
@@ -41,12 +42,8 @@ final class UploadEndpoint
                 empty($_FILES['photo'])
                 || !is_array($_FILES['photo'])
             ) {
-                self::respond(
-                    400,
-                    [
-                        'ok' => false,
-                        'error' => 'photo required',
-                    ]
+                throw new InvalidArgumentException(
+                    'Photo required.'
                 );
             }
 
@@ -55,12 +52,8 @@ final class UploadEndpoint
             );
 
             if ($tags === '') {
-                self::respond(
-                    400,
-                    [
-                        'ok' => false,
-                        'error' => 'At least one tag is required.',
-                    ]
+                throw new InvalidArgumentException(
+                    'At least one tag is required.'
                 );
             }
 
@@ -103,9 +96,18 @@ final class UploadEndpoint
                 ]
             );
 
-        } catch (Throwable $e) {
+        } catch (InvalidArgumentException $e) {
             self::respond(
                 400,
+                [
+                    'ok' => false,
+                    'error' => $e->getMessage(),
+                ]
+            );
+
+        } catch (Throwable $e) {
+            self::respond(
+                500,
                 [
                     'ok' => false,
                     'error' => $e->getMessage(),

@@ -5,3 +5,26 @@
 .admin-project-setup .admin-panel {
   max-width: 760px;
 }
+.admin-project-palettes__swatches {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-height: 30px;
+}
+
+.admin-project-palettes__swatch {
+  display: block;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 30px;
+  border: 1px solid var(--admin-border);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .admin-project-palettes__swatch {
+    flex-basis: 38px;
+    width: 38px;
+  }
+}

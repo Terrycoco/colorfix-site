@@ -14,7 +14,6 @@ import {
 
 import {
   AdminButton,
-  AdminDetailPane,
   AdminEmptyState,
   AdminListPane,
   AdminMasterDetail,
@@ -29,8 +28,8 @@ import {
   API_FOLDER,
 } from "@helpers/config";
 
-import DumbContainer from "@components/AdminLayout/DumbContainer";
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
+import ProjectPalettes from "./ProjectPalettes";
 import ProjectSetup from "./ProjectSetup";
 
 import "./admin-project.css";
@@ -403,6 +402,20 @@ export default function AdminProjectPage() {
   }
 
 
+  function beginNewPalette() {
+    /*
+     * Next step: open Project Palette drawer in create mode.
+     */
+  }
+
+
+  function openPalette() {
+    /*
+     * Next step: open Project Palette drawer for the double-clicked row.
+     */
+  }
+
+
   const list =
     (
       <AdminListPane
@@ -465,6 +478,20 @@ export default function AdminProjectPage() {
           />
 
           <AdminObjectListItem
+            id="palettes"
+            title="Palettes"
+            selected={
+              activeSection ===
+              "palettes"
+            }
+            onSelect={() =>
+              setActiveSection(
+                "palettes"
+              )
+            }
+          />
+
+          <AdminObjectListItem
             id="playlist"
             title="Playlist"
             meta={[
@@ -493,6 +520,8 @@ export default function AdminProjectPage() {
 
 
   let detail = null;
+  let detailTitle = "";
+  let detailActions = null;
 
   if (loading) {
     detail =
@@ -524,44 +553,69 @@ export default function AdminProjectPage() {
     activeSection ===
     "setup"
   ) {
+    detailTitle =
+      `Project #${project.id} Setup`;
+
+    detailActions =
+      (
+        <AdminButton
+          type="submit"
+          form="admin-project-setup-form"
+        >
+          Save
+        </AdminButton>
+      );
+
     detail =
       (
-        <AdminDetailPane
-          title={`Project #${project.id} Setup`}
-          actions={
-            <AdminButton
-              type="submit"
-              form="admin-project-setup-form"
-            >
-              Save
-            </AdminButton>
+        <ProjectSetup
+          project={project}
+          onNewPlaylist={
+            beginNewPlaylist
           }
-        >
-          <ProjectSetup
-            project={project}
-            onNewPlaylist={
-              beginNewPlaylist
-            }
-            onSaved={
-              (savedProject) => {
-                setProject(
-                  savedProject
-                );
+          onSaved={
+            (savedProject) => {
+              setProject(
+                savedProject
+              );
 
-                setWorkingPlaylistId(
-                  Number(
-                    savedProject?.playlist_id ||
-                    0
-                  ) > 0
-                    ? Number(
-                        savedProject.playlist_id
-                      )
-                    : null
-                );
-              }
+              setWorkingPlaylistId(
+                Number(
+                  savedProject?.playlist_id ||
+                  0
+                ) > 0
+                  ? Number(
+                      savedProject.playlist_id
+                    )
+                  : null
+              );
             }
-          />
-        </AdminDetailPane>
+          }
+        />
+      );
+
+  } else if (
+    activeSection ===
+    "palettes"
+  ) {
+    detailTitle =
+      "Palettes";
+
+    detail =
+      (
+        <ProjectPalettes
+          projectId={
+            Number(
+              project.id
+            )
+          }
+          onNewPalette={
+            beginNewPalette
+          }
+          onOpenPalette={
+            openPalette
+          }
+        />
       );
 
   } else if (
@@ -569,21 +623,19 @@ export default function AdminProjectPage() {
   ) {
     detail =
       (
-        <DumbContainer ariaLabel="Playlist">
-          <PlaylistEditor
-            playlistId={
-              null
-            }
-            initialProjectId={
-              Number(
-                project.id
-              )
-            }
-            onSaved={
-              handleNewPlaylistSaved
-            }
-          />
-        </DumbContainer>
+        <PlaylistEditor
+          playlistId={
+            null
+          }
+          initialProjectId={
+            Number(
+              project.id
+            )
+          }
+          onSaved={
+            handleNewPlaylistSaved
+          }
+        />
       );
 
   } else if (
@@ -591,23 +643,21 @@ export default function AdminProjectPage() {
   ) {
     detail =
       (
-        <DumbContainer ariaLabel="Playlist">
-          <PlaylistEditor
-            playlistId={
-              Number(
-                project.playlist_id
-              )
-            }
-            onSaved={
-              (playlistId) =>
-                setWorkingPlaylistId(
-                  Number(
-                    playlistId
-                  )
+        <PlaylistEditor
+          playlistId={
+            Number(
+              project.playlist_id
+            )
+          }
+          onSaved={
+            (playlistId) =>
+              setWorkingPlaylistId(
+                Number(
+                  playlistId
                 )
-            }
-          />
-        </DumbContainer>
+              )
+          }
+        />
       );
 
   } else {
@@ -627,6 +677,8 @@ export default function AdminProjectPage() {
       defaultListWidth={240}
       list={list}
       detail={detail}
+      detailTitle={detailTitle}
+      detailActions={detailActions}
     />
   );
 }
