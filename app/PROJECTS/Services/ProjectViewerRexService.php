@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\PROJECTS\Services;
 
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
@@ -9,8 +9,8 @@ use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
 use App\REX\Services\RexReserver;
 use App\REX\Services\RexTokenGenerator;
-use App\Repos\PdoProjectColorPlanRepository;
-use App\Repos\PdoProjectRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use App\Repos\PdoPlayerExperienceRepository;
 use PDO;
 use RuntimeException;
@@ -144,7 +144,7 @@ final class ProjectViewerRexService
             ];
         }
 
-        $playlistId = (int)($project['current_playlist_id'] ?? 0);
+        $playlistId = (int)($project['playlist_id'] ?? 0);
         if ($playlistId <= 0) {
             return [
                 'status' => 'warning',
@@ -273,7 +273,7 @@ final class ProjectViewerRexService
     private function viewerLabel(array $project, array $plan, string $viewerKey): string
     {
         $projectTitle = $this->firstNonEmpty([
-            $project['name'] ?? null,
+            $project['project_name'] ?? null,
             'Project #' . (int)($project['id'] ?? 0),
         ]);
         $planTitle = $this->firstNonEmpty([

@@ -12,6 +12,7 @@ import {
   AdminWorkbenchAddButton,
 } from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
+import { useAppState } from "@context/AppStateContext";
 import { copyShareText, openTextShare } from "@helpers/shareUrls";
 import { BRAND } from "@config/brand";
 import "./admin-clients.css";
@@ -362,6 +363,21 @@ function writeStoredDrafts(nextDrafts) {
 }
 
 export default function AdminClientsPage() {
+  const {
+    adminExitPath,
+    clearAdminExitPath,
+  } = useAppState();
+
+  const initialRouteRef = useRef(
+    typeof window === "undefined"
+      ? { clientId: "", action: "" }
+      : {
+          clientId: new URLSearchParams(window.location.search).get("client_id") || "",
+          action: new URLSearchParams(window.location.search).get("action") || "",
+        }
+  );
+  const routeConsumedRef = useRef(false);
+
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState("");
@@ -398,6 +414,22 @@ export default function AdminClientsPage() {
   const plainTextBodyRef = useRef(null);
   const textBodyRef = useRef(null);
   const linkSelectionRef = useRef({ target: "email", start: null, end: null });
+
+  function handleBack() {
+    const target =
+      String(
+        adminExitPath ||
+        ""
+      ).trim();
+
+    if (target) {
+      clearAdminExitPath();
+      window.location.assign(target);
+      return;
+    }
+
+    window.history.back();
+  }
 
   const templateOptions = useMemo(() => {
     const activeTemplates = templates.filter((template) => template.isActive);
@@ -628,6 +660,34 @@ export default function AdminClientsPage() {
 
         const nextItems = Array.isArray(data.items) ? data.items : [];
         setItems(nextItems);
+
+        if (!routeConsumedRef.current) {
+          routeConsumedRef.current = true;
+
+          const requestedAction =
+            String(
+              initialRouteRef.current.action ||
+              ""
+            ).trim().toLowerCase();
+
+          const requestedClientId =
+            String(
+              initialRouteRef.current.clientId ||
+              ""
+            ).trim();
+
+          if (requestedAction === "new") {
+            startNew();
+            return;
+          }
+
+          if (requestedClientId) {
+            await selectClient({
+              id: requestedClientId,
+            });
+            return;
+          }
+        }
 
         const targetId = selectedId;
         const target = nextItems.find((item) => String(item.id) === String(targetId));
@@ -1154,10 +1214,27 @@ export default function AdminClientsPage() {
           <AdminListPane
             title="Clients"
             actions={
-              <AdminWorkbenchAddButton
-                onClick={startNew}
-                title="New Client"
-              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <button
+                  type="button"
+                  className="admin-clients__secondary"
+                  onClick={handleBack}
+                  title="Back"
+                >
+                  ← Back
+                </button>
+
+                <AdminWorkbenchAddButton
+                  onClick={startNew}
+                  title="New Client"
+                />
+              </div>
             }
             toolbar={
               <input

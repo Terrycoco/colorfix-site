@@ -9,7 +9,7 @@ use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
-use App\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use RuntimeException;
 use InvalidArgumentException;
 

@@ -12,6 +12,7 @@ const PALETTE_STORAGE_KEY = "pals.palette.v1";
 const BRAND_FILTERS_STORAGE_KEY = "pals.brand_filters.v1";
 const ADMIN_EXIT_PATH_STORAGE_KEY = "cf.admin_exit_path.v1";
 const ACTIVE_PROJECT_STORAGE_KEY = "cf.active_project_id.v1";
+const WORKING_PLAYLIST_STORAGE_KEY = "cf.working_playlist_id.v1";
 //import mockBoards from '@test/mockBoards';
 
 
@@ -230,6 +231,21 @@ export function AppStateProvider({ children }) {
 
     try {
       const raw = localStorage.getItem(ACTIVE_PROJECT_STORAGE_KEY);
+      const id = Number(raw || 0);
+
+      return id > 0
+        ? id
+        : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [workingPlaylistId, setWorkingPlaylistIdState] = useState(() => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const raw = localStorage.getItem(WORKING_PLAYLIST_STORAGE_KEY);
       const id = Number(raw || 0);
 
       return id > 0
@@ -686,6 +702,34 @@ function clearActiveProjectId() {
   setActiveProjectId(null);
 }
 
+function setWorkingPlaylistId(playlistId = null) {
+  const id = Number(playlistId || 0);
+  const next = id > 0
+    ? id
+    : null;
+
+  setWorkingPlaylistIdState(next);
+
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (next) {
+      localStorage.setItem(
+        WORKING_PLAYLIST_STORAGE_KEY,
+        String(next)
+      );
+    } else {
+      localStorage.removeItem(
+        WORKING_PLAYLIST_STORAGE_KEY
+      );
+    }
+  } catch {}
+}
+
+function clearWorkingPlaylistId() {
+  setWorkingPlaylistId(null);
+}
+
 
   //EXPORTS
   const state = {
@@ -703,6 +747,7 @@ function clearActiveProjectId() {
     showBack, setShowBack,
     adminExitPath, setAdminExitPath, clearAdminExitPath,
     activeProjectId, setActiveProjectId, clearActiveProjectId,
+    workingPlaylistId, setWorkingPlaylistId, clearWorkingPlaylistId,
     recentSwatches, setRecentSwatches,
     searchFilters, setSearchFilters, clearSearchFilters,
        toggleFilter, clearFilter, setFilterValues, isFilterChecked,

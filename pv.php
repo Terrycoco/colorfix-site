@@ -7,7 +7,7 @@ require __DIR__ . '/api/db.php';
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\Services\PaletteViewerService;
 use App\Services\PaletteViewerTokenService;
 use App\Services\PhotoRenderingService;

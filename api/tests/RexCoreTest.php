@@ -24,8 +24,6 @@ use App\REX\Services\RexResolver;
 use App\REX\Services\RexReservationRelationships;
 use App\REX\Services\RexTokenGenerator;
 use App\REX\DTO\RexReservationDescriptor;
-use App\Services\ProjectReleaseSelectionService;
-use App\PLAYLISTS\Entities\PlaylistItem;
 
 final class RexCoreTestRepository implements RexReservationRepositoryInterface
 {
@@ -890,24 +888,4 @@ test('rex pdo relationship lookup returns child and parent reservations in link 
         static fn(RexReservation $reservation): int => $reservation->id,
         $repo->findChildReservations(1, 'related')
     ));
-});
-
-test('project release selection preserves concept public client and painter rules', function () {
-    $ref = new ReflectionClass(ProjectReleaseSelectionService::class);
-    $svc = $ref->newInstanceWithoutConstructor();
-
-    $v1 = new PlaylistItem(ap_id: 'v1', palette_hash: null, image_url: null, version_number: 1, is_final: false, color_plan_id: 101);
-    $v2 = new PlaylistItem(ap_id: 'v2', palette_hash: null, image_url: null, version_number: 2, is_final: false, color_plan_id: 102);
-    $final = new PlaylistItem(ap_id: 'final', palette_hash: null, image_url: null, version_number: 3, is_final: true, color_plan_id: 101);
-    $items = [$v1, $v2, $final];
-
-    assert_equals('FINAL', $svc->normalizeCurrentRelease(' final '));
-    assert_equals('2', $svc->normalizeCurrentRelease('02'));
-
-    assert_equals($items, $svc->filterItemsForRelease($items, 'concept', '1'));
-    assert_equals($items, $svc->filterItemsForRelease($items, 'public', '1'));
-    assert_equals([$v1, $v2], $svc->filterItemsForRelease($items, 'client', '2'));
-    assert_equals([$v1, $v2], $svc->filterItemsForRelease($items, 'painter', '2'));
-    assert_equals([$final], $svc->filterItemsForRelease($items, 'painter', 'FINAL'));
-    assert_equals([101, 102], $svc->collectColorPlanIds($items));
 });

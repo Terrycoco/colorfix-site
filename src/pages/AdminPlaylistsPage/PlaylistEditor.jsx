@@ -23,7 +23,6 @@ import {
   AdminSmartGrid,
   AdminStack,
   AdminToolbar,
-  AdminToolbarSpacer,
   useAdminDialog,
 } from "@components/AdminLayout";
 
@@ -49,6 +48,9 @@ import PlaylistSlideEditor, {
 
 const LIST_URL =
   `${API_FOLDER}/v2/admin/playlists/list.php`;
+
+const PROJECTS_LIST_URL =
+  `${API_FOLDER}/v2/admin/projects/list.php`;
 
 const GET_URL =
   `${API_FOLDER}/v2/admin/playlists/get.php`;
@@ -104,6 +106,7 @@ const FINDER_START_VALUES = [
 
 const emptyPlaylist = {
   playlist_id: null,
+  project_id: "",
   title: "",
   type: "",
   is_active: true,
@@ -160,6 +163,7 @@ const emptyItem = {
 const PlaylistEditor = forwardRef(function PlaylistEditor(
   {
     playlistId,
+    initialProjectId = null,
     initialCopiedSlides = EMPTY_COPIED_SLIDES,
     onSaved = null,
     onDeleted = null,
@@ -201,6 +205,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   const [
     playlists,
     setPlaylists,
+  ] = useState([]);
+
+
+  const [
+    projects,
+    setProjects,
   ] = useState([]);
 
   const [
@@ -415,6 +425,74 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           setListLoading(
             false
           );
+        }
+      },
+      []
+    );
+
+
+  const fetchProjects =
+    useCallback(
+      async () => {
+        try {
+          const res =
+            await fetch(
+              `${PROJECTS_LIST_URL}?_=${Date.now()}`,
+              {
+                credentials:
+                  "include",
+              }
+            );
+
+          const data =
+            await res.json();
+
+          if (
+            !res.ok
+            ||
+            data?.ok === false
+          ) {
+            return;
+          }
+
+          const rows =
+            Array.isArray(
+              data?.projects
+            )
+              ? data.projects
+              : Array.isArray(
+                  data?.items
+                )
+                ? data.items
+                : Array.isArray(
+                    data?.rows
+                  )
+                  ? data.rows
+                  : [];
+
+          setProjects(
+            [...rows].sort(
+              (a, b) =>
+                String(
+                  a?.project_name ||
+                  a?.name ||
+                  ""
+                ).localeCompare(
+                  String(
+                    b?.project_name ||
+                    b?.name ||
+                    ""
+                  ),
+                  undefined,
+                  {
+                    sensitivity:
+                      "base",
+                  }
+                )
+            )
+          );
+        } catch {
+          // Project assignment is optional convenience data.
         }
       },
       []
@@ -812,8 +890,10 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     fetchPlaylistTypes();
     fetchSavedPalettes();
     fetchSlidePresets();
+    fetchProjects();
   }, [
     fetchSlidePresets,
+    fetchProjects,
   ]);
 
 
@@ -821,8 +901,23 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     if (
       isNewRoute
     ) {
+      const newPlaylist =
+        {
+          ...emptyPlaylist,
+
+          project_id:
+            Number(
+              initialProjectId ||
+              0
+            ) > 0
+              ? String(
+                  initialProjectId
+                )
+              : "",
+        };
+
       setPlaylist({
-        ...emptyPlaylist,
+        ...newPlaylist,
       });
 
       const copiedSlides =
@@ -861,7 +956,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       );
 
       setPlaylistDraft({
-        ...emptyPlaylist,
+        ...newPlaylist,
       });
 
       setPlaylistEditorOpen(
@@ -888,6 +983,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     routePlaylistId,
     fetchPlaylist,
     initialCopiedSlides,
+    initialProjectId,
     makeClientItemKey,
   ]);
 
@@ -2272,6 +2368,13 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                 playlist_id:
                   playlistToSave.playlist_id,
 
+                project_id:
+                  playlistToSave.project_id
+                    ? Number(
+                        playlistToSave.project_id
+                      )
+                    : null,
+
                 title:
                   playlistToSave.title,
 
@@ -2415,6 +2518,13 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             {
               playlist_id:
                 id,
+
+              project_id:
+                playlistToSave.project_id
+                  ? Number(
+                      playlistToSave.project_id
+                    )
+                  : null,
 
               title:
                 playlistToSave.title,
@@ -2986,9 +3096,243 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   );
 
 
+  const detailMeta = (
+    <>
+      {playlist.playlist_id ? (
+        <AdminMetaText as="span">
+          #{playlist.playlist_id}
+        </AdminMetaText>
+      ) : null}
+
+      {playlist.type ? (
+        <AdminBadge variant="neutral">
+          {playlist.type}
+        </AdminBadge>
+      ) : null}
+
+      <AdminBadge
+        variant={
+          playlist.is_active
+            ? "success"
+            : "neutral"
+        }
+      >
+        {
+          playlist.is_active
+            ? "Active"
+            : "Inactive"
+        }
+      </AdminBadge>
+
+      {dirty ? (
+        <AdminBadge variant="warning">
+          Unsaved
+        </AdminBadge>
+      ) : null}
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        title="Edit playlist"
+        aria-label="Edit playlist"
+        onClick={openPlaylistEditor}
+      >
+        ✎
+      </AdminButton>
+    </>
+  );
+
+  const primaryActions = (
+    <AdminToolbar>
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={saving}
+        onClick={beginNewPlaylist}
+      >
+        New
+      </AdminButton>
+
+      <AdminButton
+        type="button"
+        disabled={saving}
+        onClick={() => savePlaylist()}
+      >
+        {saving ? "Saving..." : "Save"}
+      </AdminButton>
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={saving}
+        onClick={saveAndPlay}
+      >
+        Save & Play
+      </AdminButton>
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={saving || !items.length}
+        onClick={analyzePlaylist}
+      >
+        Analyzer
+      </AdminButton>
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={
+          slidePresetsLoading ||
+          slidePresets.length === 0
+        }
+        onClick={() =>
+          setSlideDefaultsOpen(true)
+        }
+      >
+        Slide Defaults
+      </AdminButton>
+    </AdminToolbar>
+  );
+
+  const secondaryActions = (
+    <AdminToolbar compact>
+      <AdminField
+        label="Insert"
+        compact
+      >
+        <select
+          className="admin-field__control"
+          value=""
+          onChange={(event) => {
+            const preset =
+              event.target.value;
+
+            if (preset) {
+              addItem(preset);
+            }
+          }}
+        >
+          <option value="">
+            {
+              slidePresetsLoading
+                ? "Loading defaults…"
+                : "Insert New…"
+            }
+          </option>
+
+          {
+            slidePresets
+              .filter(
+                (preset) =>
+                  preset?.is_enabled !== false
+              )
+              .map(
+                (preset) => (
+                  <option
+                    key={preset.preset_key}
+                    value={preset.preset_key}
+                  >
+                    {
+                      preset.label ||
+                      preset.preset_key
+                    }
+                  </option>
+                )
+              )
+          }
+        </select>
+      </AdminField>
+
+      <AdminField
+        label="Selection"
+        compact
+      >
+        <AdminToolbar compact>
+          <AdminButton
+            type="button"
+            variant="secondary"
+            disabled={
+              batchSelectedKeys.length === 0
+            }
+            onClick={copySelectedSlides}
+          >
+            Copy
+          </AdminButton>
+
+          <AdminButton
+            type="button"
+            variant="secondary"
+            disabled={
+              slideClipboardCount === 0 ||
+              saving
+            }
+            onClick={pasteCopiedSlides}
+          >
+            Paste
+            {
+              slideClipboardCount
+                ? ` (${slideClipboardCount})`
+                : ""
+            }
+          </AdminButton>
+
+          <AdminButton
+            type="button"
+            variant="secondary"
+            disabled={
+              batchSelectedKeys.length === 0
+            }
+            onClick={createPlaylistFromSelected}
+          >
+            New Playlist
+          </AdminButton>
+
+          <AdminButton
+            type="button"
+            variant="secondary"
+            disabled={
+              batchSelectedKeys.length === 0 ||
+              saving
+            }
+            onClick={deleteSelectedSlides}
+          >
+            Delete
+          </AdminButton>
+
+          {batchSelectedKeys.length ? (
+            <AdminMetaText as="div">
+              {batchSelectedKeys.length} selected
+            </AdminMetaText>
+          ) : null}
+        </AdminToolbar>
+      </AdminField>
+
+      <AdminMetaText as="div">
+        {items.length} slide
+        {items.length === 1 ? "" : "s"}
+      </AdminMetaText>
+    </AdminToolbar>
+  );
+
+
   return (
     <>
-      <AdminDetailPane ariaLabel="Playlist">
+      <AdminDetailPane
+        ariaLabel="Playlist"
+        title={currentTitle}
+        meta={detailMeta}
+        actions={
+          detailLoading && !isNewRoute
+            ? null
+            : primaryActions
+        }
+        subActions={
+          detailLoading && !isNewRoute
+            ? null
+            : secondaryActions
+        }
+      >
         {
           detailLoading
           &&
@@ -3001,135 +3345,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               )
             : (
                 <AdminStack gap="sm">
-                  <AdminToolbar>
-                    <strong>
-                      {currentTitle}
-                    </strong>
 
-                    {
-                      playlist
-                        .playlist_id
-                        ? (
-                            <AdminMetaText as="span">
-                              #{playlist.playlist_id}
-                            </AdminMetaText>
-                          )
-                        : null
-                    }
-
-                    {
-                      playlist
-                        .type
-                        ? (
-                            <AdminBadge variant="neutral">
-                              {playlist.type}
-                            </AdminBadge>
-                          )
-                        : null
-                    }
-
-                    <AdminBadge
-                      variant={
-                        playlist
-                          .is_active
-                          ? "success"
-                          : "neutral"
-                      }
-                    >
-                      {
-                        playlist
-                          .is_active
-                          ? "Active"
-                          : "Inactive"
-                      }
-                    </AdminBadge>
-
-                    {
-                      dirty
-                        ? (
-                            <AdminBadge variant="warning">
-                              Unsaved
-                            </AdminBadge>
-                          )
-                        : null
-                    }
-
-                    <AdminButton
-                      type="button"
-                      variant="secondary"
-                      title="Edit playlist"
-                      aria-label="Edit playlist"
-                      onClick={
-                        openPlaylistEditor
-                      }
-                    >
-                      ✎
-                    </AdminButton>
-
-                    <AdminToolbarSpacer />
-
-                    <AdminButton
-                      type="button"
-                      variant="secondary"
-                      disabled={
-                        slidePresetsLoading
-                        ||
-                        slidePresets.length ===
-                        0
-                      }
-                      onClick={() =>
-                        setSlideDefaultsOpen(
-                          true
-                        )
-                      }
-                    >
-                      Slide Defaults
-                    </AdminButton>
-
-                    <AdminButton
-                      type="button"
-                      variant="secondary"
-                      disabled={
-                        saving
-                        ||
-                        !items.length
-                      }
-                      onClick={
-                        analyzePlaylist
-                      }
-                    >
-                      Analyzer
-                    </AdminButton>
-
-                    <AdminButton
-                      type="button"
-                      variant="secondary"
-                      disabled={
-                        saving
-                      }
-                      onClick={
-                        saveAndPlay
-                      }
-                    >
-                      Save & Play
-                    </AdminButton>
-
-                    <AdminButton
-                      type="button"
-                      disabled={
-                        saving
-                      }
-                      onClick={() =>
-                        savePlaylist()
-                      }
-                    >
-                      {
-                        saving
-                          ? "Saving..."
-                          : "Save"
-                      }
-                    </AdminButton>
-                  </AdminToolbar>
 
 
                   {
@@ -3154,167 +3370,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                   }
 
 
-                  <AdminToolbar compact>
-                    <AdminField
-                      label="Insert"
-                      compact
-                    >
-                      <select
-                        className="admin-field__control"
-                        value=""
-                        onChange={(
-                          event
-                        ) => {
-                          const preset =
-                            event
-                              .target
-                              .value;
 
-                          if (
-                            preset
-                          ) {
-                            addItem(
-                              preset
-                            );
-                          }
-                        }}
-                      >
-                        <option value="">
-                          {
-                            slidePresetsLoading
-                              ? "Loading defaults…"
-                              : "Insert New…"
-                          }
-                        </option>
-
-                        {
-                          slidePresets
-                            .filter(
-                              (preset) =>
-                                preset
-                                  ?.is_enabled !==
-                                false
-                            )
-                            .map(
-                              (preset) => (
-                                <option
-                                  key={
-                                    preset.preset_key
-                                  }
-                                  value={
-                                    preset.preset_key
-                                  }
-                                >
-                                  {
-                                    preset.label
-                                    ||
-                                    preset.preset_key
-                                  }
-                                </option>
-                              )
-                            )
-                        }
-                      </select>
-                    </AdminField>
-
-                    <AdminField
-                      label="Selection"
-                      compact
-                    >
-                      <AdminToolbar compact>
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            batchSelectedKeys.length ===
-                            0
-                          }
-                          onClick={
-                            copySelectedSlides
-                          }
-                        >
-                          Copy
-                        </AdminButton>
-
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            slideClipboardCount ===
-                            0
-                            ||
-                            saving
-                          }
-                          onClick={
-                            pasteCopiedSlides
-                          }
-                        >
-                          Paste
-                          {
-                            slideClipboardCount
-                              ? ` (${slideClipboardCount})`
-                              : ""
-                          }
-                        </AdminButton>
-
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            batchSelectedKeys.length ===
-                            0
-                          }
-                          onClick={
-                            createPlaylistFromSelected
-                          }
-                        >
-                          New Playlist
-                        </AdminButton>
-
-                        <AdminButton
-                          type="button"
-                          variant="secondary"
-                          disabled={
-                            batchSelectedKeys.length ===
-                            0
-                            ||
-                            saving
-                          }
-                          onClick={
-                            deleteSelectedSlides
-                          }
-                        >
-                          Delete
-                        </AdminButton>
-
-                        {
-                          batchSelectedKeys.length
-                            ? (
-                                <AdminMetaText as="div">
-                                  {
-                                    batchSelectedKeys.length
-                                  } selected
-                                </AdminMetaText>
-                              )
-                            : null
-                        }
-                      </AdminToolbar>
-                    </AdminField>
-
-                    <AdminMetaText as="div">
-                      {
-                        items.length
-                      } slide
-                      {
-                        items.length ===
-                        1
-                          ? ""
-                          : "s"
-                      }
-                    </AdminMetaText>
-
-                    <AdminToolbarSpacer />
-                  </AdminToolbar>
 
 
                   {
@@ -3604,6 +3660,10 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
           playlistTypes={
             playlistTypes
+          }
+
+          projects={
+            projects
           }
 
           busy={
@@ -3978,6 +4038,11 @@ function normalizePlaylist(
       raw.playlist_id
       ??
       null,
+
+    project_id:
+      raw.project_id
+      ??
+      "",
 
     title:
       raw.title

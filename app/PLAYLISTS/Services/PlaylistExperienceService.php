@@ -7,7 +7,7 @@ use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
-use App\Repos\PdoProjectRepository;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoSavedPaletteRepository;
@@ -15,7 +15,6 @@ use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
 use App\PLAYLISTS\Entities\Playlist;
 use App\PLAYLISTS\Entities\PlaylistItem;
-use App\Services\ProjectReleaseSelectionService;
 use App\Services\PaletteViewerTokenService;
 use App\Entities\PlayerExperience;
 use DomainException;
@@ -27,7 +26,6 @@ class PlaylistExperienceService
 {
     /** @var array<string, float> */
     private array $lastTiming = [];
-    private ?ProjectReleaseSelectionService $projectReleaseSelection = null;
 
     public function __construct(
         protected PDO $pdo
@@ -58,7 +56,7 @@ public function buildPlaybackPlanFromPlaylistExperience(
     }
 
     $projectRepo = new PdoProjectRepository($this->pdo);
-    $projectId = (int)($projectRepo->findMostRecentProjectIdByPlaylistId($playlistId) ?? 0);
+    $projectId = (int)($projectRepo->findProjectIdByPlaylistId($playlistId) ?? 0);
 
     if ($projectId <= 0) {
         throw new RuntimeException(
@@ -536,13 +534,10 @@ public function buildPlaybackPlanFromProjectExperience(
         if (!$project) {
             throw new RuntimeException("Project not found: {$projectId}");
         }
-        $currentRelease = $this->loadProjectCurrentRelease($projectId);
-        $this->assertProjectExperienceAllowedForRelease($experienceKey, $currentRelease);
-
-        $projectPlaylists = $projectRepo->listProjectPlaylists($projectId);
+        $projectPlaylists = $projectRepo->listPlaylists($projectId);
 
         if ($playlistId === null || $playlistId <= 0) {
-            $playlistId = (int)($projectPlaylists[0]['playlist_id'] ?? 0);
+            $playlistId = (int)($project['playlist_id'] ?? $projectPlaylists[0]['playlist_id'] ?? 0);
         }
 
         if ($playlistId <= 0) {
@@ -573,11 +568,6 @@ public function buildPlaybackPlanFromProjectExperience(
 
         $itemsStartedAt = microtime(true);
         $sourceItems = $this->flattenItems($playlist);
-        $sourceItems = $this->filterProjectItemsForRelease(
-            $sourceItems,
-            $experienceKey,
-            $currentRelease
-        );
         $this->hydrateItemImages($sourceItems);
 
         $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
@@ -604,7 +594,7 @@ public function buildPlaybackPlanFromProjectExperience(
         $thumbsEnabled = $experienceKey !== 'painter' && count($colorPlanIds) > 1;
         $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
 
-        $displayTitle = trim((string)($project['name'] ?? '')) ?: $playlist->title;
+        $displayTitle = trim((string)($project['project_name'] ?? '')) ?: $playlist->title;
         $pageH1 = $this->firstNonEmpty([
             $playlist->meta['headline'] ?? null,
             $displayTitle,
@@ -619,8 +609,6 @@ public function buildPlaybackPlanFromProjectExperience(
             'playlist_instance_id' => null,
             'playlist_id' => $playlist->playlist_id,
             'project_id' => $projectId,
-            'current_release' => $currentRelease,
-            'release_is_final' => $currentRelease === 'FINAL',
             'color_plan_ids' => $colorPlanIds,
             'color_plans' => $colorPlans,
             'title' => $playlist->title,
@@ -695,50 +683,25 @@ public function buildPlaybackPlanFromProjectExperience(
         return $resolved;
     }
 
-    private function loadProjectCurrentRelease(int $projectId): string
-    {
-        return $this->projectReleaseSelection()->currentReleaseForProject($projectId);
-    }
-
-    private function assertProjectExperienceAllowedForRelease(string $experienceKey, string $currentRelease): void
-    {
-        $this->projectReleaseSelection()->assertExperienceAllowed($experienceKey, $currentRelease);
-    }
-
-    /**
-     * @param PlaylistItem[] $items
-     * @return PlaylistItem[]
-     */
-    private function filterProjectItemsForRelease(
-        array $items,
-        string $experienceKey,
-        string $currentRelease
-    ): array {
-        return $this->projectReleaseSelection()->filterItemsForRelease(
-            $items,
-            $experienceKey,
-            $currentRelease
-        );
-    }
-
     /**
      * @param PlaylistItem[] $items
      * @return int[]
      */
     private function collectColorPlanIds(array $items): array
     {
-        return $this->projectReleaseSelection()->collectColorPlanIds($items);
-    }
-
-    private function projectReleaseSelection(): ProjectReleaseSelectionService
-    {
-        if (!$this->projectReleaseSelection instanceof ProjectReleaseSelectionService) {
-            $this->projectReleaseSelection = new ProjectReleaseSelectionService(
-                new PdoProjectRepository($this->pdo)
-            );
+        $ids = [];
+        foreach ($items as $item) {
+            if ($item instanceof PlaylistItem) {
+                $colorPlanId = (int)($item->color_plan_id ?? 0);
+                if ($colorPlanId > 0) {
+                    $ids[$colorPlanId] = true;
+                }
+            }
         }
 
-        return $this->projectReleaseSelection;
+        $result = array_map('intval', array_keys($ids));
+        sort($result, SORT_NUMERIC);
+        return array_values($result);
     }
 
     /**

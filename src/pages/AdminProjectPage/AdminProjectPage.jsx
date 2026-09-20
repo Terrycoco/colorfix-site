@@ -4,6 +4,7 @@ import {
 } from "react";
 
 import {
+  useLocation,
   useParams,
 } from "react-router-dom";
 
@@ -12,6 +13,8 @@ import {
 } from "@context/AppStateContext.jsx";
 
 import {
+  AdminButton,
+  AdminDetailPane,
   AdminEmptyState,
   AdminListPane,
   AdminMasterDetail,
@@ -20,10 +23,13 @@ import {
   AdminObjectListItem,
 } from "@components/AdminLayout";
 
+import ProjectSelect from "@components/Project/ProjectSelect";
+
 import {
   API_FOLDER,
 } from "@helpers/config";
 
+import DumbContainer from "@components/AdminLayout/DumbContainer";
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
 import ProjectSetup from "./ProjectSetup";
 
@@ -32,6 +38,9 @@ import "./admin-project.css";
 
 const GET_URL =
   `${API_FOLDER}/v2/admin/projects/get.php`;
+
+const SAVE_URL =
+  `${API_FOLDER}/v2/admin/projects/save.php`;
 
 const LIST_URL =
   `${API_FOLDER}/v2/admin/projects/list.php`;
@@ -42,9 +51,12 @@ export default function AdminProjectPage() {
     projectId,
   } = useParams();
 
+  const location = useLocation();
+
   const {
     activeProjectId,
     setActiveProjectId,
+    setWorkingPlaylistId,
   } = useAppState();
 
   const routeProjectId =
@@ -57,18 +69,14 @@ export default function AdminProjectPage() {
   const numericProjectId =
     routeProjectId
     ||
+    Number(new URLSearchParams(location.search).get("project_id") || 0)
+    ||
     Number(activeProjectId || 0);
 
   const [
     project,
     setProject,
   ] = useState(null);
-
-
-  const [
-    projects,
-    setProjects,
-  ] = useState([]);
 
   const [
     loading,
@@ -85,55 +93,10 @@ export default function AdminProjectPage() {
     setActiveSection,
   ] = useState("setup");
 
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProjects() {
-      try {
-        const res =
-          await fetch(
-            `${LIST_URL}?_=${Date.now()}`,
-            {
-              credentials: "include",
-            }
-          );
-
-        const data =
-          await res.json();
-
-        if (
-          !res.ok
-          ||
-          !data?.ok
-        ) {
-          throw new Error(
-            data?.error ||
-            "Failed to load projects."
-          );
-        }
-
-        if (!cancelled) {
-          setProjects(
-            Array.isArray(data.items)
-              ? data.items
-              : []
-          );
-        }
-
-      } catch {
-        if (!cancelled) {
-          setProjects([]);
-        }
-      }
-    }
-
-    loadProjects();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const [
+    creatingPlaylist,
+    setCreatingPlaylist,
+  ] = useState(false);
 
 
   useEffect(() => {
@@ -252,6 +215,21 @@ export default function AdminProjectPage() {
               data.project.id
             )
           );
+
+          setWorkingPlaylistId(
+            Number(
+              data.project.playlist_id ||
+              0
+            ) > 0
+              ? Number(
+                  data.project.playlist_id
+                )
+              : null
+          );
+
+          setCreatingPlaylist(
+            false
+          );
         }
 
       } catch (err) {
@@ -281,22 +259,166 @@ export default function AdminProjectPage() {
   ]);
 
 
+  function beginNewPlaylist() {
+    if (!project?.id) {
+      return;
+    }
+
+    setCreatingPlaylist(
+      true
+    );
+
+    setWorkingPlaylistId(
+      null
+    );
+
+    setActiveSection(
+      "playlist"
+    );
+  }
+
+
+  async function handleNewPlaylistSaved(
+    playlistId
+  ) {
+    const id =
+      Number(
+        playlistId ||
+        0
+      );
+
+    if (
+      !project?.id
+      ||
+      id <= 0
+    ) {
+      return;
+    }
+
+    setWorkingPlaylistId(
+      id
+    );
+
+    setProject(
+      (current) =>
+        current
+          ? {
+              ...current,
+              playlist_id:
+                id,
+            }
+          : current
+    );
+
+    setCreatingPlaylist(
+      false
+    );
+
+    try {
+      const res =
+        await fetch(
+          SAVE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                project_id:
+                  Number(
+                    project.id
+                  ),
+
+                project_name:
+                  project.project_name
+                  ??
+                  null,
+
+                client_id:
+                  project.client_id
+                  ??
+                  null,
+
+                property_id:
+                  project.property_id
+                  ??
+                  null,
+
+                playlist_id:
+                  id,
+              }),
+          }
+        );
+
+      const text =
+        await res.text();
+
+      let data =
+        null;
+
+      try {
+        data =
+          JSON.parse(
+            text
+          );
+      } catch {
+        throw new Error(
+          `HTTP ${res.status}: ${text.slice(0, 250)}`
+        );
+      }
+
+      if (
+        !res.ok
+        ||
+        !data?.ok
+      ) {
+        throw new Error(
+          data?.error ||
+          "Playlist was created, but the Project could not be updated."
+        );
+      }
+
+      if (
+        data?.project
+      ) {
+        setProject(
+          data.project
+        );
+      }
+
+    } catch (err) {
+      setError(
+        err?.message ||
+        "Playlist was created, but the Project could not be updated."
+      );
+    }
+  }
+
+
   const list =
     (
       <AdminListPane
         title={
-          <select
-            className="admin-field__control"
+          <ProjectSelect
             value={
               project?.id
                 ? String(project.id)
                 : ""
             }
+            includeNone={false}
             onChange={
-              (event) => {
+              (value) => {
                 const nextId =
                   Number(
-                    event.target.value || 0
+                    value || 0
                   );
 
                 if (
@@ -309,36 +431,22 @@ export default function AdminProjectPage() {
                     nextId
                   );
 
+                  setWorkingPlaylistId(
+                    null
+                  );
+
+                  setCreatingPlaylist(
+                    false
+                  );
+
                   setActiveSection(
                     "setup"
                   );
                 }
               }
             }
-          >
-            {
-              projects.map(
-                (row) => {
-                  const label =
-                    String(
-                      row?.project_name ||
-                      ""
-                    ).trim()
-                    ||
-                    `Project #${row.id}`;
-
-                  return (
-                    <option
-                      key={row.id}
-                      value={row.id}
-                    >
-                      {label}
-                    </option>
-                  );
-                }
-              )
-            }
-          </select>
+            maxWidth="100%"
+          />
         }
       >
         <AdminObjectList ariaLabel="Project">
@@ -360,12 +468,14 @@ export default function AdminProjectPage() {
             id="playlist"
             title="Playlist"
             meta={[
-              project?.playlist_id
-                ? (
-                    project.playlist_title
-                    || `Playlist #${project.playlist_id}`
-                  )
-                : "Not assigned",
+              creatingPlaylist
+                ? "New playlist"
+                : project?.playlist_id
+                  ? (
+                      project.playlist_title
+                      || `Playlist #${project.playlist_id}`
+                    )
+                  : "Not assigned",
             ]}
             selected={
               activeSection ===
@@ -416,30 +526,64 @@ export default function AdminProjectPage() {
   ) {
     detail =
       (
-        <ProjectSetup
-          project={project}
-          onSaved={
-            (savedProject) => {
-              setProject(
-                savedProject
-              );
-
-              setProjects(
-                (current) =>
-                  current.map(
-                    (row) =>
-                      Number(row.id) ===
-                      Number(savedProject.id)
-                        ? {
-                            ...row,
-                            ...savedProject,
-                          }
-                        : row
-                  )
-              );
-            }
+        <AdminDetailPane
+          title={`Project #${project.id} Setup`}
+          actions={
+            <AdminButton
+              type="submit"
+              form="admin-project-setup-form"
+            >
+              Save
+            </AdminButton>
           }
-        />
+        >
+          <ProjectSetup
+            project={project}
+            onNewPlaylist={
+              beginNewPlaylist
+            }
+            onSaved={
+              (savedProject) => {
+                setProject(
+                  savedProject
+                );
+
+                setWorkingPlaylistId(
+                  Number(
+                    savedProject?.playlist_id ||
+                    0
+                  ) > 0
+                    ? Number(
+                        savedProject.playlist_id
+                      )
+                    : null
+                );
+              }
+            }
+          />
+        </AdminDetailPane>
+      );
+
+  } else if (
+    creatingPlaylist
+  ) {
+    detail =
+      (
+        <DumbContainer ariaLabel="Playlist">
+          <PlaylistEditor
+            playlistId={
+              null
+            }
+            initialProjectId={
+              Number(
+                project.id
+              )
+            }
+            onSaved={
+              handleNewPlaylistSaved
+            }
+          />
+        </DumbContainer>
       );
 
   } else if (
@@ -447,13 +591,23 @@ export default function AdminProjectPage() {
   ) {
     detail =
       (
-        <PlaylistEditor
-          playlistId={
-            Number(
-              project.playlist_id
-            )
-          }
-        />
+        <DumbContainer ariaLabel="Playlist">
+          <PlaylistEditor
+            playlistId={
+              Number(
+                project.playlist_id
+              )
+            }
+            onSaved={
+              (playlistId) =>
+                setWorkingPlaylistId(
+                  Number(
+                    playlistId
+                  )
+                )
+            }
+          />
+        </DumbContainer>
       );
 
   } else {

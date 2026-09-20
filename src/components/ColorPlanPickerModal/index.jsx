@@ -655,7 +655,7 @@ export default function ColorPlanPickerModal({
                               }
                             >
                               {
-                                project.name
+                                project.project_name
                                 ||
                                 `Project #${project.id}`
                               }

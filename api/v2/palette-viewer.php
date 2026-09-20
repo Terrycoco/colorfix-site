@@ -13,7 +13,7 @@ use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
-use App\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Resolvers\PlaylistExperienceResolver;
 use App\REX\Resolvers\RexResolverRegistry;

@@ -14,7 +14,6 @@ require_once __DIR__ . '/../../../db.php';
 require_once __DIR__ . '/../project-workflow/_helpers.php';
 
 use App\Repos\PdoUrlReservationRepository;
-use App\Repos\PdoUrlReservationResourceRepository;
 use App\Services\UrlReservationService;
 use App\Services\UrlReservations\UrlReservationRegistryFactory;
 
@@ -32,7 +31,7 @@ function url_reservation_service(PDO $pdo): UrlReservationService
 
     return new UrlReservationService(
         new PdoUrlReservationRepository($pdo),
-        UrlReservationRegistryFactory::create(new PdoUrlReservationResourceRepository($pdo)),
+        UrlReservationRegistryFactory::create($pdo),
         $baseUrl
     );
 }

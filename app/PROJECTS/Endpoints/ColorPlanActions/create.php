@@ -1,0 +1,31 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/helpers.php';
+
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
+
+try {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        workflow_respond(['ok' => false, 'error' => 'POST only'], 405);
+    }
+    $data = json_decode(file_get_contents('php://input') ?: '', true);
+    if (!is_array($data)) {
+        workflow_respond(['ok' => false, 'error' => 'Invalid JSON'], 400);
+    }
+    $projectId = isset($data['project_id']) ? (int)$data['project_id'] : 0;
+    $repo = new PdoProjectColorPlanRepository($pdo);
+    color_plan_assert_project_exists($repo, $projectId);
+
+    $nickname = color_plan_optional_string($data['nickname'] ?? null) ?? 'New Color Plan';
+    workflow_respond(['ok' => true, 'id' => $repo->createPlan([
+        'project_id' => $projectId,
+        'palette_type' => color_plan_optional_string($data['palette_type'] ?? null) ?? 'exterior',
+        'nickname' => $nickname,
+        'area_name' => color_plan_optional_string($data['area_name'] ?? null),
+        'scheme_title' => color_plan_optional_string($data['scheme_title'] ?? null),
+        'revision_number' => max(1, (int)($data['revision_number'] ?? 1)),
+    ])]);
+} catch (Throwable $e) {
+    workflow_respond(['ok' => false, 'error' => $e->getMessage()], 500);
+}

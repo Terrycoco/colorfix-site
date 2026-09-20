@@ -9,6 +9,7 @@ import {
   AdminObjectListItem,
 } from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
+import { useAppState } from "@context/AppStateContext";
 import "./admin-properties.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/properties/list.php`;
@@ -48,11 +49,22 @@ function formatDate(value) {
   });
 }
 
-function projectTypeLabel(project) {
-  return project.project_type_name || project.project_type_key || "";
-}
-
 export default function AdminPropertiesPage() {
+  const {
+    adminExitPath,
+    clearAdminExitPath,
+  } = useAppState();
+
+  const initialRouteRef = useRef(
+    typeof window === "undefined"
+      ? { propertyId: "", action: "" }
+      : {
+          propertyId: new URLSearchParams(window.location.search).get("property_id") || "",
+          action: new URLSearchParams(window.location.search).get("action") || "",
+        }
+  );
+  const routeConsumedRef = useRef(false);
+
   const [properties, setProperties] = useState([]);
   const [projects, setProjects] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -68,6 +80,22 @@ export default function AdminPropertiesPage() {
 
   const selectedIdRef = useRef(null);
   const modeRef = useRef("detail");
+
+  function handleBack() {
+    const target =
+      String(
+        adminExitPath ||
+        ""
+      ).trim();
+
+    if (target) {
+      clearAdminExitPath();
+      window.location.assign(target);
+      return;
+    }
+
+    window.history.back();
+  }
 
   const selectedProperty = useMemo(
     () => properties.find((item) => Number(item.id) === Number(selectedId)) || null,
@@ -131,6 +159,34 @@ export default function AdminPropertiesPage() {
 
         const items = Array.isArray(data.items) ? data.items : [];
         setProperties(items);
+
+        if (!routeConsumedRef.current) {
+          routeConsumedRef.current = true;
+
+          const requestedAction =
+            String(
+              initialRouteRef.current.action ||
+              ""
+            ).trim().toLowerCase();
+
+          const requestedPropertyId =
+            Number(
+              initialRouteRef.current.propertyId ||
+              0
+            );
+
+          if (requestedAction === "new") {
+            startNewProperty();
+            return;
+          }
+
+          if (requestedPropertyId > 0) {
+            await loadProperty(
+              requestedPropertyId
+            );
+            return;
+          }
+        }
 
         if (modeRef.current === "new" && !preferredId) return;
 
@@ -311,13 +367,30 @@ export default function AdminPropertiesPage() {
     <AdminListPane
       title="Properties"
       actions={
-        <button
-          type="button"
-          className="admin-properties__button admin-properties__button--primary admin-properties__button--compact"
-          onClick={startNewProperty}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
         >
-          New
-        </button>
+          <button
+            type="button"
+            className="admin-properties__button admin-properties__button--compact"
+            onClick={handleBack}
+            title="Back"
+          >
+            ← Back
+          </button>
+
+          <button
+            type="button"
+            className="admin-properties__button admin-properties__button--primary admin-properties__button--compact"
+            onClick={startNewProperty}
+          >
+            New
+          </button>
+        </div>
       }
       toolbar={
         <input
@@ -457,9 +530,9 @@ export default function AdminPropertiesPage() {
                     href={`/admin/projects?project_id=${encodeURIComponent(project.id)}`}
                     className="admin-properties__project-row"
                   >
-                    <span className="admin-properties__project-name">{project.name || `Project #${project.id}`}</span>
-                    <span>{projectTypeLabel(project)}</span>
-                    <span>{project.status || project.experience_key || ""}</span>
+                    <span className="admin-properties__project-name">{project.project_name || `Project #${project.id}`}</span>
+                    <span>{project.client_name || ""}</span>
+                    <span>{project.playlist_title || ""}</span>
                   </a>
                 ))}
               </div>

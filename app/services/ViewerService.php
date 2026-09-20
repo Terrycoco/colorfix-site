@@ -9,8 +9,8 @@ use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
-use App\Repos\PdoProjectColorPlanRepository;
-use App\Repos\PdoProjectRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use DomainException;
 use InvalidArgumentException;
@@ -23,14 +23,12 @@ final class ViewerService
     private const RESOURCE_PALETTE_VIEWER = 'palette_viewer';
     private const RESOURCE_COLOR_PLAN = 'color_plan';
     private const FORMATS = ['public', 'concept', 'client', 'painter'];
-    private const PAINTER_NOT_FINAL_WARNING = 'NOT FINAL: DO NOT SEND TO PAINTER';
 
     private PaletteViewerService $paletteViewer;
     private PdoSavedPaletteRepository $savedPalettes;
     private PdoPaletteViewerRepository $paletteViewers;
     private PdoProjectColorPlanRepository $colorPlans;
     private PdoProjectRepository $projects;
-    private ProjectReleaseSelectionService $releaseSelection;
 
     public function __construct(private PDO $pdo)
     {
@@ -40,7 +38,6 @@ final class ViewerService
         $paletteViewerPhotos = new PdoPaletteViewerPhotoRepository($pdo);
         $this->colorPlans = new PdoProjectColorPlanRepository($pdo);
         $this->projects = new PdoProjectRepository($pdo);
-        $this->releaseSelection = new ProjectReleaseSelectionService($this->projects);
         $this->paletteViewer = new PaletteViewerService(
             $this->savedPalettes,
             new PhotoRenderingService($photoRepo, $pdo),
@@ -76,7 +73,6 @@ final class ViewerService
                 $resourceType,
                 $resourceId,
                 $format,
-                null,
                 $makeoverUrl,
                 $viewerCtaLabel,
                 $viewerCtaUrl
@@ -92,7 +88,6 @@ final class ViewerService
                 $resourceType,
                 $resourceId,
                 $viewerFormat,
-                null,
                 $makeoverUrl,
                 $viewerCtaLabel,
                 $viewerCtaUrl
@@ -107,9 +102,6 @@ final class ViewerService
             );
         }
 
-        $currentRelease = $this->releaseSelection->currentReleaseForProject($projectId);
-        $this->releaseSelection->assertExperienceAllowed($format, $currentRelease);
-
         $payload = $this->paletteViewer->getProjectColorPlan(
             $resourceId,
             $viewerKey
@@ -120,7 +112,6 @@ final class ViewerService
             $resourceType,
             $resourceId,
             $format,
-            $currentRelease,
             $makeoverUrl,
             $viewerCtaLabel,
             $viewerCtaUrl
@@ -228,9 +219,6 @@ final class ViewerService
                 "Project for Color Plan {$resourceId} was not found."
             );
         }
-        $currentRelease = $this->releaseSelection->currentReleaseForProject($projectId);
-        $this->releaseSelection->assertExperienceAllowed($format, $currentRelease);
-
         $planTitle = $this->firstNonEmpty([
             $plan['area_name'] ?? null,
             $plan['nickname'] ?? null,
@@ -238,7 +226,7 @@ final class ViewerService
             "Color Plan #{$resourceId}",
         ]);
         $projectTitle = $this->firstNonEmpty([
-            $project['name'] ?? null,
+            $project['project_name'] ?? null,
             "Project #{$projectId}",
         ]);
 
@@ -260,10 +248,6 @@ final class ViewerService
                 [
                     'label' => 'Color Plan ID',
                     'value' => (string)$resourceId,
-                ],
-                [
-                    'label' => 'Current Release',
-                    'value' => $currentRelease,
                 ],
             ],
         );
@@ -346,16 +330,6 @@ final class ViewerService
         return $this->viewerFormat($context);
     }
 
-    public function notFinalWarningFor(string $format, ?string $currentRelease): ?string
-    {
-        $format = strtolower(trim($format));
-        $release = strtoupper(trim((string)($currentRelease ?? '')));
-
-        return $format === 'painter' && $release !== 'FINAL'
-            ? self::PAINTER_NOT_FINAL_WARNING
-            : null;
-    }
-
     private function normalizeResourceType(string $resourceType): string
     {
         $resourceType = strtolower(trim($resourceType));
@@ -412,7 +386,6 @@ final class ViewerService
         string $resourceType,
         int $resourceId,
         string $format,
-        ?string $currentRelease,
         ?string $makeoverUrl,
         ?string $viewerCtaLabel = null,
         ?string $viewerCtaUrl = null
@@ -424,12 +397,6 @@ final class ViewerService
         $payload['meta']['rex_resource_type'] = $resourceType;
         $payload['meta']['rex_resource_id'] = $resourceId;
         $payload['meta']['viewer_format'] = $format;
-        if ($currentRelease !== null) {
-            $payload['meta']['current_release'] = $currentRelease;
-        }
-        $notFinalWarning = $this->notFinalWarningFor($format, $currentRelease);
-        $payload['meta']['not_final_warning'] = $notFinalWarning;
-        $payload['meta']['show_not_final_warning'] = $notFinalWarning !== null;
         if ($makeoverUrl !== null && $makeoverUrl !== '') {
             $payload['meta']['makeover_url'] = $makeoverUrl;
             $payload['meta']['watch_complete_makeover_url'] = $makeoverUrl;

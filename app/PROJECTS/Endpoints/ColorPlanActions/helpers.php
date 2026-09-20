@@ -1,13 +1,23 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../project-workflow/_helpers.php';
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 
-use App\Repos\PdoProjectColorPlanRepository;
+function workflow_respond(array $payload, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 function color_plan_optional_string(mixed $value): ?string
 {
-    return workflow_optional_string($value);
+    if ($value === null) {
+        return null;
+    }
+    $normalized = trim((string)$value);
+    return $normalized !== '' ? $normalized : null;
 }
 
 function color_plan_optional_datetime(mixed $value): ?string

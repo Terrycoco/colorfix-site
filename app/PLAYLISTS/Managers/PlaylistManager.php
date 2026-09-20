@@ -42,6 +42,24 @@ final class PlaylistManager
     }
 
     /**
+     * Return the playlists tagged to one Project.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listAdminPlaylistsByProjectId(
+        int $projectId
+    ): array {
+        if ($projectId <= 0) {
+            return [];
+        }
+
+        return $this->playlists
+            ->listAdminRowsByProjectId(
+                $projectId
+            );
+    }
+
+    /**
      * @return array{
      *   playlist: array<string, mixed>,
      *   items: array<int, array<string, mixed>>
@@ -78,7 +96,7 @@ final class PlaylistManager
 
     /**
      * @param array<string, mixed> $payload
-     * @return array{playlist_id:int,slug:string}
+     * @return array{playlist_id:int,project_id:?int,slug:string}
      */
     public function saveAdminPlaylist(
         array $payload
@@ -117,6 +135,36 @@ final class PlaylistManager
                         $playlistId
                     )
                 : null;
+
+        /*
+         * project_id is optional.
+         *
+         * - New playlist + project_id => attach it to that Project.
+         * - New playlist without project_id => standalone playlist.
+         * - Existing playlist without project_id in the payload => preserve
+         *   its current Project relationship instead of accidentally clearing it.
+         * - Existing playlist with project_id = null/0/blank => detach it.
+         */
+        if (array_key_exists('project_id', $payload)) {
+            $rawProjectId = $payload['project_id'];
+
+            $projectId =
+                is_numeric($rawProjectId)
+                && (int)$rawProjectId > 0
+                    ? (int)$rawProjectId
+                    : null;
+
+        } elseif (
+            $existing !== null
+            && array_key_exists('project_id', $existing)
+            && $existing['project_id'] !== null
+        ) {
+            $projectId =
+                (int)$existing['project_id'];
+
+        } else {
+            $projectId = null;
+        }
 
         $headline =
             trim(
@@ -164,6 +212,9 @@ final class PlaylistManager
             );
 
         $row = [
+            'project_id' =>
+                $projectId,
+
             'title' =>
                 $title,
 
@@ -251,6 +302,9 @@ final class PlaylistManager
         return [
             'playlist_id' =>
                 $savedId,
+
+            'project_id' =>
+                $projectId,
 
             'slug' =>
                 $slug,

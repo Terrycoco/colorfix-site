@@ -104,12 +104,7 @@ final class PdoPropertyRepository
                     c.name AS client_name,
                     c.first_name AS client_first_name,
                     c.last_name AS client_last_name,
-                    c.email AS client_email,
-                    (
-                        SELECT COUNT(*)
-                        FROM projects prj
-                        WHERE prj.property_id = p.id
-                    ) AS project_count
+                    c.email AS client_email
                 FROM properties p
                 LEFT JOIN addresses a ON a.id = p.address_id
                 LEFT JOIN clients c ON c.id = p.client_id";

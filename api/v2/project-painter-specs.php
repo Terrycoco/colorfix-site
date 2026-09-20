@@ -14,13 +14,11 @@ require_once __DIR__ . '/../autoload.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/admin/project-color-plans/_helpers.php';
 
-use App\Repos\PdoProjectColorPlanRepository;
-use App\Repos\PdoProjectRepository;
+use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use App\Repos\PdoUrlReservationRepository;
-use App\Repos\PdoUrlReservationResourceRepository;
 use App\Services\UrlReservationService;
 use App\Services\UrlReservations\UrlReservationRegistryFactory;
-use App\Services\ViewerService;
 
 function painter_specs_respond(array $payload, int $status = 200): void
 {
@@ -62,7 +60,7 @@ try {
 
     $reservationService = new UrlReservationService(
         new PdoUrlReservationRepository($pdo),
-        UrlReservationRegistryFactory::create(new PdoUrlReservationResourceRepository($pdo))
+        UrlReservationRegistryFactory::create($pdo)
     );
     $reserved = $reservationService->resolveReservation($token);
     $reservation = is_array($reserved['reservation'] ?? null) ? $reserved['reservation'] : [];
@@ -85,9 +83,6 @@ try {
     if (!$project) {
         painter_specs_respond(['ok' => false, 'error' => 'Project not found'], 404);
     }
-    $currentRelease = strtoupper(trim((string)($project['current_release'] ?? '1'))) ?: '1';
-    $viewerService = new ViewerService($pdo);
-    $notFinalWarning = $viewerService->notFinalWarningFor('painter', $currentRelease);
 
     $planRepo = new PdoProjectColorPlanRepository($pdo);
     $plans = array_map(static function (array $row): array {
@@ -110,11 +105,7 @@ try {
             ],
             'project' => [
                 'id' => (int)$project['id'],
-                'name' => (string)($project['name'] ?? ''),
-                'current_release' => $currentRelease,
-                'not_final_warning' => $notFinalWarning,
-                'show_not_final_warning' => $notFinalWarning !== null,
-                'project_painter_note' => (string)($project['project_painter_note'] ?? ''),
+                'name' => (string)($project['project_name'] ?? ''),
                 'property_name' => (string)($project['property_name'] ?? ''),
                 'client_name' => (string)($project['client_name'] ?? ''),
                 'street_1' => (string)($project['street_1'] ?? ''),

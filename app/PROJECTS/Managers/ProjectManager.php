@@ -29,6 +29,17 @@ final class ProjectManager
             ->listAdminRows();
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function listProjectsByPropertyId(int $propertyId): array
+    {
+        return $this->projects->listByPropertyId($propertyId);
+    }
+
+    public function countProjectsByPropertyId(int $propertyId): int
+    {
+        return $this->projects->countByPropertyId($propertyId);
+    }
+
     /**
      * @return array<string, mixed>|null
      */

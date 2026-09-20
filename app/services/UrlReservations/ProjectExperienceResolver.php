@@ -3,18 +3,18 @@ declare(strict_types=1);
 
 namespace App\Services\UrlReservations;
 
-use App\Repos\PdoUrlReservationResourceRepository;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use InvalidArgumentException;
 
 final class ProjectExperienceResolver implements UrlReservationResolver
 {
-    public function __construct(private PdoUrlReservationResourceRepository $resources) {}
+    public function __construct(private PdoProjectRepository $projects) {}
 
     public function resolve(array $reservation, array $params): array
     {
         $experienceKey = $this->validateExperience($reservation['experience_key'] ?? null);
         $projectId = (int)($reservation['resource_id'] ?? 0);
-        $project = $this->resources->findProject($projectId);
+        $project = $this->projects->findById($projectId);
         if (!$project) {
             throw new InvalidArgumentException('Reserved project not found');
         }
@@ -35,7 +35,7 @@ final class ProjectExperienceResolver implements UrlReservationResolver
                 'experience_key' => $experienceKey,
             ],
             'og_defaults' => [
-                'title' => trim((string)($project['name'] ?? '')) ?: 'ColorFix Project',
+                'title' => trim((string)($project['project_name'] ?? '')) ?: 'ColorFix Project',
                 'description' => 'A private ColorFix project experience by Terry Marr.',
                 'image_url' => '/apple-touch-icon-teal-20260712.png',
             ],

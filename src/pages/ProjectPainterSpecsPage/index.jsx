@@ -73,9 +73,6 @@ export default function ProjectPainterSpecsPage() {
         source: "project_painter_specs",
         title: projectTitle,
         display_title: projectTitle,
-        notes: project.project_painter_note || "",
-        current_release: project.current_release || "",
-        not_final_warning: project.not_final_warning || "",
       }}
       painterView={{
         projectName: projectTitle,

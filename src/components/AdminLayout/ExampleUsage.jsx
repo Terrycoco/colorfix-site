@@ -26,11 +26,8 @@ export default function ExampleUsage({
                 title={project.project_name}
                 meta={[
                   project.property_name,
-                  [project.palette_type, project.current_release ? `Version ${project.current_release}` : null]
-                    .filter(Boolean)
-                    .join(" · "),
-                  project.current_playlist_title
-                    ? `Current playlist: ${project.current_playlist_title}`
+                  project.playlist_title
+                    ? `Working playlist: ${project.playlist_title}`
                     : null,
                 ]}
                 selected={selectedProject?.id === project.id}

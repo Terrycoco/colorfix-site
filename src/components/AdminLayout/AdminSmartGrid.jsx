@@ -61,6 +61,8 @@ function SelectAllCheckbox({
 }
 
 export default function AdminSmartGrid({
+  toolbar = null,
+
   editable = false,
   canEdit = () => true,
   editor = null,
@@ -498,6 +500,8 @@ export default function AdminSmartGrid({
 
   return (
     <>
+      {toolbar}
+
       <AdminDataGrid
         {...dataGridProps}
         items={items}

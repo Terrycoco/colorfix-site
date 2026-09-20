@@ -1,3 +1,5 @@
+import ProjectSelect from "@components/Project/ProjectSelect";
+
 import {
   AdminButton,
   AdminCheckboxRow,
@@ -42,6 +44,14 @@ export default function PlaylistRecordEditor({
                 <input
                   className="admin-field__control"
                   type="text"
+                  autoFocus={
+                    !playlist.playlist_id
+                  }
+                  placeholder={
+                    playlist.playlist_id
+                      ? ""
+                      : "[New]"
+                  }
                   value={playlist.title || ""}
                   onChange={(event) =>
                     onChange("title", event.target.value)
@@ -65,6 +75,28 @@ export default function PlaylistRecordEditor({
                     <option key={type} value={type} />
                   ))}
                 </datalist>
+              </AdminField>
+
+              <AdminField label="Project" compact>
+                <ProjectSelect
+                  value={
+                    playlist.project_id
+                    ??
+                    ""
+                  }
+                  disabled={
+                    busy
+                  }
+                  includeNone
+                  noneLabel="None"
+                  onChange={
+                    (value) =>
+                      onChange(
+                        "project_id",
+                        value
+                      )
+                  }
+                />
               </AdminField>
 
               <AdminToolbar compact>

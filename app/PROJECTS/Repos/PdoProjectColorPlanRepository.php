@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Repos;
+namespace App\PROJECTS\Repos;
 
 use PDO;
 

@@ -5,7 +5,7 @@ namespace App\PUB\Analyze\Sources;
 
 use App\PALETTES\PV\PVService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\PUB\Entities\PhotoEntity;
+use App\PHOTOS\Entities\PhotoEntity;
 use App\REX\DTO\RexReservationRelationship;
 use App\REX\Services\RexReservationRelationships;
 use RuntimeException;

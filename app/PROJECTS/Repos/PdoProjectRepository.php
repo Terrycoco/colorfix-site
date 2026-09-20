@@ -40,6 +40,84 @@ final class PdoProjectRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /** @return array<int, array<string, mixed>> */
+    public function listByPropertyId(int $propertyId): array
+    {
+        if ($propertyId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                p.id,
+                p.project_name,
+                p.client_id,
+                p.property_id,
+                p.playlist_id,
+                c.name AS client_name,
+                pr.name AS property_name,
+                pl.title AS playlist_title
+             FROM projects p
+             LEFT JOIN clients c ON c.id = p.client_id
+             LEFT JOIN properties pr ON pr.id = p.property_id
+             LEFT JOIN playlists pl ON pl.playlist_id = p.playlist_id
+             WHERE p.property_id = :property_id
+             ORDER BY p.project_name ASC, p.id ASC'
+        );
+        $stmt->execute([':property_id' => $propertyId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPlaylists(int $projectId): array
+    {
+        if ($projectId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT playlist_id, project_id, title, slug, updated_at
+             FROM playlists
+             WHERE project_id = :project_id
+             ORDER BY updated_at DESC, playlist_id DESC'
+        );
+        $stmt->execute([':project_id' => $projectId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function findProjectIdByPlaylistId(int $playlistId): ?int
+    {
+        if ($playlistId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT project_id
+             FROM playlists
+             WHERE playlist_id = :playlist_id
+             LIMIT 1'
+        );
+        $stmt->execute([':playlist_id' => $playlistId]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false || $value === null ? null : (int)$value;
+    }
+
+    public function countByPropertyId(int $propertyId): int
+    {
+        if ($propertyId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM projects WHERE property_id = :property_id'
+        );
+        $stmt->execute([':property_id' => $propertyId]);
+        return (int)$stmt->fetchColumn();
+    }
+
     /**
      * @return array<string, mixed>|null
      */

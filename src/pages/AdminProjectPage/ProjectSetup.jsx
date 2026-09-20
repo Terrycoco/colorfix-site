@@ -5,16 +5,18 @@ import {
 } from "react";
 
 import {
-  AdminButton,
   AdminField,
   AdminNotice,
-  AdminPanel,
   AdminStack,
 } from "@components/AdminLayout";
 
 import {
   API_FOLDER,
 } from "@helpers/config";
+
+import {
+  useAppState,
+} from "@context/AppStateContext";
 
 
 const SAVE_URL =
@@ -174,7 +176,14 @@ async function fetchJson(url) {
 export default function ProjectSetup({
   project,
   onSaved,
+  onNewPlaylist,
 }) {
+  const {
+    workingPlaylistId,
+    setWorkingPlaylistId,
+    setAdminExitPath,
+  } = useAppState();
+
   const [
     form,
     setForm,
@@ -395,22 +404,192 @@ export default function ProjectSetup({
   const sortedPlaylists =
     useMemo(
       () =>
-        [...playlists].sort(
-          (a, b) =>
-            playlistLabel(a)
-              .localeCompare(
-                playlistLabel(b),
-                undefined,
-                {
-                  sensitivity:
-                    "base",
-                }
+        playlists
+          .filter(
+            (playlist) =>
+              Number(
+                playlist?.project_id ||
+                0
+              ) ===
+              Number(
+                project?.id ||
+                0
               )
-        ),
+          )
+          .sort(
+            (a, b) =>
+              playlistLabel(a)
+                .localeCompare(
+                  playlistLabel(b),
+                  undefined,
+                  {
+                    sensitivity:
+                      "base",
+                  }
+                )
+          ),
       [
         playlists,
+        project?.id,
       ]
     );
+
+
+  useEffect(() => {
+    const workingId =
+      Number(
+        workingPlaylistId ||
+        0
+      );
+
+    const workingBelongsToProject =
+      workingId > 0
+      &&
+      sortedPlaylists.some(
+        (playlist) =>
+          Number(
+            playlist?.playlist_id ||
+            0
+          ) === workingId
+      );
+
+    if (workingBelongsToProject) {
+      return;
+    }
+
+    const savedProjectPlaylistId =
+      Number(
+        project?.playlist_id ||
+        0
+      );
+
+    const savedPlaylistBelongsToProject =
+      savedProjectPlaylistId > 0
+      &&
+      sortedPlaylists.some(
+        (playlist) =>
+          Number(
+            playlist?.playlist_id ||
+            0
+          ) === savedProjectPlaylistId
+      );
+
+    setWorkingPlaylistId(
+      savedPlaylistBelongsToProject
+        ? savedProjectPlaylistId
+        : null
+    );
+  }, [
+    project?.id,
+    project?.playlist_id,
+    sortedPlaylists,
+    workingPlaylistId,
+    setWorkingPlaylistId,
+  ]);
+
+
+  function selectWorkingPlaylist(
+    playlistId
+  ) {
+    const id =
+      nullableId(
+        playlistId
+      );
+
+    setWorkingPlaylistId(
+      id
+    );
+
+    setField(
+      "playlist_id",
+      id
+        ? String(id)
+        : ""
+    );
+  }
+
+
+  function projectReturnPath() {
+    if (typeof window === "undefined") {
+      return "/admin/project#setup";
+    }
+
+    return `${window.location.pathname}${window.location.search || ""}#setup`;
+  }
+
+
+  function openClientAdmin() {
+    const clientId =
+      nullableId(
+        form.client_id
+      );
+
+    setAdminExitPath(
+      projectReturnPath()
+    );
+
+    const params =
+      new URLSearchParams();
+
+    if (clientId) {
+      params.set(
+        "client_id",
+        String(clientId)
+      );
+    } else {
+      params.set(
+        "action",
+        "new"
+      );
+    }
+
+    window.location.assign(
+      `/admin/clients?${params.toString()}`
+    );
+  }
+
+
+  function openPropertyAdmin() {
+    const propertyId =
+      nullableId(
+        form.property_id
+      );
+
+    setAdminExitPath(
+      projectReturnPath()
+    );
+
+    const params =
+      new URLSearchParams();
+
+    if (propertyId) {
+      params.set(
+        "property_id",
+        String(propertyId)
+      );
+    } else {
+      params.set(
+        "action",
+        "new"
+      );
+
+      const clientId =
+        nullableId(
+          form.client_id
+        );
+
+      if (clientId) {
+        params.set(
+          "client_id",
+          String(clientId)
+        );
+      }
+    }
+
+    window.location.assign(
+      `/admin/properties?${params.toString()}`
+    );
+  }
 
 
   function setField(
@@ -540,6 +719,12 @@ export default function ProjectSetup({
             ),
         };
 
+      setWorkingPlaylistId(
+        nullableId(
+          savedProject?.playlist_id
+        )
+      );
+
       onSaved?.(
         savedProject
       );
@@ -562,29 +747,11 @@ export default function ProjectSetup({
 
   return (
     <form
+      id="admin-project-setup-form"
       className="admin-project-setup"
       onSubmit={saveSetup}
     >
-      <AdminPanel
-        title={`Project #${project.id} Setup`}
-        actions={
-          <AdminButton
-            type="submit"
-            disabled={
-              saving
-              ||
-              optionsLoading
-            }
-          >
-            {
-              saving
-                ? "Saving..."
-                : "Save"
-            }
-          </AdminButton>
-        }
-      >
-        <AdminStack>
+      <AdminStack>
           {
             error
               ? (
@@ -610,6 +777,10 @@ export default function ProjectSetup({
           >
             <input
               className="admin-field__control"
+              style={{
+                maxWidth:
+                  "620px",
+              }}
               type="text"
               value={
                 form.project_name
@@ -627,142 +798,390 @@ export default function ProjectSetup({
           <AdminField
             label="Client"
           >
-            <select
-              className="admin-field__control"
-              value={
-                form.client_id
-              }
-              disabled={
-                optionsLoading
-              }
-              onChange={
-                (event) =>
-                  setField(
-                    "client_id",
-                    event.target.value
-                  )
-              }
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap:
+                  "8px",
+                maxWidth:
+                  "620px",
+              }}
             >
-              <option value="">
-                No client assigned
-              </option>
+              <select
+                className="admin-field__control"
+                style={{
+                  flex:
+                    "1 1 auto",
+                  minWidth:
+                    0,
+                }}
+                value={
+                  form.client_id
+                }
+                disabled={
+                  optionsLoading
+                }
+                onChange={
+                  (event) =>
+                    setField(
+                      "client_id",
+                      event.target.value
+                    )
+                }
+              >
+                <option value="">
+                  No client assigned
+                </option>
 
-              {
-                sortedClients.map(
-                  (client) => (
-                    <option
-                      key={
-                        client.id
-                      }
-                      value={
-                        client.id
-                      }
-                    >
-                      {
-                        clientLabel(
-                          client
-                        )
-                      }
-                    </option>
+                {
+                  sortedClients.map(
+                    (client) => (
+                      <option
+                        key={
+                          client.id
+                        }
+                        value={
+                          client.id
+                        }
+                      >
+                        {
+                          clientLabel(
+                            client
+                          )
+                        }
+                      </option>
+                    )
                   )
-                )
-              }
-            </select>
+                }
+              </select>
+
+              <button
+                type="button"
+                title={
+                  form.client_id
+                    ? "Edit client"
+                    : "New client"
+                }
+                aria-label={
+                  form.client_id
+                    ? "Edit client"
+                    : "New client"
+                }
+                onClick={
+                  openClientAdmin
+                }
+                style={{
+                  flex:
+                    "0 0 36px",
+                  width:
+                    "36px",
+                  height:
+                    "36px",
+                  border:
+                    "1px solid #bbb",
+                  borderRadius:
+                    "4px",
+                  background:
+                    form.client_id
+                      ? "#fff"
+                      : "#e8f5e9",
+                  color:
+                    form.client_id
+                      ? "inherit"
+                      : "#1b7f32",
+                  cursor:
+                    "pointer",
+                  fontSize:
+                    "18px",
+                  lineHeight:
+                    1,
+                }}
+              >
+                {
+                  form.client_id
+                    ? "✎"
+                    : "+"
+                }
+              </button>
+            </div>
           </AdminField>
 
           <AdminField
             label="Property"
           >
-            <select
-              className="admin-field__control"
-              value={
-                form.property_id
-              }
-              disabled={
-                optionsLoading
-              }
-              onChange={
-                (event) =>
-                  setField(
-                    "property_id",
-                    event.target.value
-                  )
-              }
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                gap:
+                  "8px",
+                maxWidth:
+                  "620px",
+              }}
             >
-              <option value="">
-                No property assigned
-              </option>
+              <select
+                className="admin-field__control"
+                style={{
+                  flex:
+                    "1 1 auto",
+                  minWidth:
+                    0,
+                }}
+                value={
+                  form.property_id
+                }
+                disabled={
+                  optionsLoading
+                }
+                onChange={
+                  (event) =>
+                    setField(
+                      "property_id",
+                      event.target.value
+                    )
+                }
+              >
+                <option value="">
+                  No property assigned
+                </option>
 
-              {
-                sortedProperties.map(
-                  (property) => (
-                    <option
-                      key={
-                        property.id
-                      }
-                      value={
-                        property.id
-                      }
-                    >
-                      {
-                        propertyLabel(
-                          property
-                        )
-                      }
-                    </option>
+                {
+                  sortedProperties.map(
+                    (property) => (
+                      <option
+                        key={
+                          property.id
+                        }
+                        value={
+                          property.id
+                        }
+                      >
+                        {
+                          propertyLabel(
+                            property
+                          )
+                        }
+                      </option>
+                    )
                   )
-                )
-              }
-            </select>
+                }
+              </select>
+
+              <button
+                type="button"
+                title={
+                  form.property_id
+                    ? "Edit property"
+                    : "New property"
+                }
+                aria-label={
+                  form.property_id
+                    ? "Edit property"
+                    : "New property"
+                }
+                onClick={
+                  openPropertyAdmin
+                }
+                style={{
+                  flex:
+                    "0 0 36px",
+                  width:
+                    "36px",
+                  height:
+                    "36px",
+                  border:
+                    "1px solid #bbb",
+                  borderRadius:
+                    "4px",
+                  background:
+                    form.property_id
+                      ? "#fff"
+                      : "#e8f5e9",
+                  color:
+                    form.property_id
+                      ? "inherit"
+                      : "#1b7f32",
+                  cursor:
+                    "pointer",
+                  fontSize:
+                    "18px",
+                  lineHeight:
+                    1,
+                }}
+              >
+                {
+                  form.property_id
+                    ? "✎"
+                    : "+"
+                }
+              </button>
+            </div>
           </AdminField>
 
           <AdminField
-            label="Playlist"
+            label="Working Playlist"
           >
-            <select
-              className="admin-field__control"
-              value={
-                form.playlist_id
-              }
-              disabled={
-                optionsLoading
-              }
-              onChange={
-                (event) =>
-                  setField(
-                    "playlist_id",
-                    event.target.value
-                  )
-              }
+            <div
+              style={{
+                display:
+                  "flex",
+                alignItems:
+                  "flex-start",
+                gap:
+                  "8px",
+                maxWidth:
+                  "620px",
+              }}
             >
-              <option value="">
-                No playlist assigned
-              </option>
+              <div
+                role="listbox"
+                aria-label="Working Playlist"
+                style={{
+                  flex:
+                    "1 1 auto",
+                  minWidth:
+                    0,
+                  border:
+                    "1px solid #c8c8c8",
+                  borderRadius:
+                    "4px",
+                  overflow:
+                    "hidden",
+                  background:
+                    "#fff",
+                }}
+              >
+                {
+                  sortedPlaylists.length === 0
+                    ? (
+                        <div
+                          style={{
+                            padding:
+                              "9px 8px",
+                            color:
+                              "#777",
+                            fontStyle:
+                              "italic",
+                          }}
+                        >
+                          No playlists tagged to this project
+                        </div>
+                      )
+                    : sortedPlaylists.map(
+                        (playlist) => {
+                          const playlistId =
+                            Number(
+                              playlist.playlist_id ||
+                              0
+                            );
 
-              {
-                sortedPlaylists.map(
-                  (playlist) => (
-                    <option
-                      key={
-                        playlist.playlist_id
-                      }
-                      value={
-                        playlist.playlist_id
-                      }
-                    >
-                      {
-                        playlistLabel(
-                          playlist
-                        )
-                      }
-                    </option>
-                  )
-                )
-              }
-            </select>
+                          const selected =
+                            playlistId > 0
+                            &&
+                            playlistId ===
+                              Number(
+                                workingPlaylistId
+                                ||
+                                form.playlist_id
+                                ||
+                                0
+                              );
+
+                          return (
+                            <button
+                              key={
+                                playlist.playlist_id
+                              }
+                              type="button"
+                              role="option"
+                              aria-selected={
+                                selected
+                              }
+                              onClick={
+                                () =>
+                                  selectWorkingPlaylist(
+                                    playlist.playlist_id
+                                  )
+                              }
+                              style={{
+                                display:
+                                  "block",
+                                width:
+                                  "100%",
+                                padding:
+                                  "5px 8px",
+                                border:
+                                  0,
+                                borderBottom:
+                                  "1px solid #eee",
+                                background:
+                                  selected
+                                    ? "var(--admin-selected)"
+                                    : "transparent",
+                                color:
+                                  "inherit",
+                                textAlign:
+                                  "left",
+                                cursor:
+                                  "pointer",
+                                font:
+                                  "inherit",
+                              }}
+                            >
+                              {
+                                playlistLabel(
+                                  playlist
+                                )
+                              }
+                            </button>
+                          );
+                        }
+                      )
+                }
+              </div>
+
+              <button
+                type="button"
+                title="New playlist"
+                aria-label="New playlist"
+                onClick={
+                  onNewPlaylist
+                }
+                style={{
+                  flex:
+                    "0 0 36px",
+                  width:
+                    "36px",
+                  height:
+                    "36px",
+                  border:
+                    "1px solid #9bbf9f",
+                  borderRadius:
+                    "4px",
+                  background:
+                    "#e8f5e9",
+                  color:
+                    "#1b7f32",
+                  cursor:
+                    "pointer",
+                  fontSize:
+                    "22px",
+                  lineHeight:
+                    1,
+                  fontWeight:
+                    600,
+                }}
+              >
+                +
+              </button>
+            </div>
           </AdminField>
-        </AdminStack>
-      </AdminPanel>
+      </AdminStack>
     </form>
   );
 }

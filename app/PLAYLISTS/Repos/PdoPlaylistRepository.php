@@ -39,6 +39,7 @@ class PdoPlaylistRepository
                 new PlaylistStep('all', false, $items),
             ],
             [
+                'project_id' => $meta['project_id'] ?? null,
                 'slug' => $meta['slug'] ?? null,
                 'headline' => $meta['headline'] ?? null,
                 'meta_description' => $meta['meta_description'] ?? null,
@@ -52,6 +53,7 @@ class PdoPlaylistRepository
         $sql = <<<SQL
             SELECT
                 p.playlist_id,
+                p.project_id,
                 p.title,
                 p.type,
                 p.is_active,
@@ -97,6 +99,7 @@ public function listAdminRows(): array
     $sql = <<<SQL
         SELECT
             p.playlist_id,
+            p.project_id,
             p.title,
             p.type,
             p.is_active,
@@ -119,6 +122,75 @@ public function listAdminRows(): array
     return $stmt->fetchAll(
         PDO::FETCH_ASSOC
     ) ?: [];
+}
+
+
+/**
+ * Return the active playlists tagged to one Project.
+ *
+ * This is intentionally a compact project-scoped list for PROJECTS.
+ * The Project workspace can use it to populate its playlist list box.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+public function listAdminRowsByProjectId(
+    int $projectId
+): array {
+    if ($projectId <= 0) {
+        return [];
+    }
+
+    $sql = <<<SQL
+        SELECT
+            p.playlist_id,
+            p.project_id,
+            p.title,
+            p.type,
+            p.is_active,
+            p.is_public,
+            p.updated_at
+        FROM playlists p
+        WHERE p.project_id = :project_id
+          AND COALESCE(p.is_retired, 0) = 0
+        ORDER BY p.playlist_id ASC
+        SQL;
+
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([
+        'project_id' => $projectId,
+    ]);
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+}
+
+
+/**
+ * Attach or detach a Playlist from a Project.
+ *
+ * Passing NULL leaves the Playlist standalone.
+ */
+public function setProjectId(
+    int $playlistId,
+    ?int $projectId
+): void {
+    if ($playlistId <= 0) {
+        return;
+    }
+
+    $stmt = $this->pdo->prepare(
+        'UPDATE playlists
+            SET project_id = :project_id,
+                updated_at = NOW()
+          WHERE playlist_id = :playlist_id'
+    );
+
+    $stmt->bindValue(
+        ':project_id',
+        $projectId !== null && $projectId > 0 ? $projectId : null,
+        $projectId !== null && $projectId > 0 ? PDO::PARAM_INT : PDO::PARAM_NULL
+    );
+    $stmt->bindValue(':playlist_id', $playlistId, PDO::PARAM_INT);
+    $stmt->execute();
 }
 
 
@@ -163,9 +235,13 @@ public function saveAdminRow(
     array $row
 ): int {
     if ($playlistId > 0) {
+        $projectSet = array_key_exists('project_id', $row)
+            ? "project_id = :project_id,\n                "
+            : '';
+
         $sql = <<<SQL
             UPDATE playlists
-            SET title = :title,
+            SET {$projectSet}title = :title,
                 type = :type,
                 is_active = :is_active,
                 is_public = :is_public,
@@ -199,8 +275,13 @@ public function saveAdminRow(
         return $playlistId;
     }
 
+    if (!array_key_exists('project_id', $row)) {
+        $row['project_id'] = null;
+    }
+
     $sql = <<<SQL
         INSERT INTO playlists (
+            project_id,
             title,
             type,
             is_active,
@@ -220,6 +301,7 @@ public function saveAdminRow(
             updated_at
         )
         VALUES (
+            :project_id,
             :title,
             :type,
             :is_active,
@@ -1670,7 +1752,7 @@ public function getPublicActiveSlides(
     private function getPlaylistMeta(string $playlistId): ?array
     {
         $sql = <<<SQL
-            SELECT playlist_id, title, type, slug, headline, meta_description, dek
+            SELECT playlist_id, project_id, title, type, slug, headline, meta_description, dek
             FROM playlists
             WHERE playlist_id = :playlist_id
             LIMIT 1
@@ -1686,6 +1768,9 @@ public function getPublicActiveSlides(
 
         return [
             'playlist_id' => (string)$row['playlist_id'],
+            'project_id' => isset($row['project_id']) && $row['project_id'] !== null
+                ? (int)$row['project_id']
+                : null,
             'title' => (string)$row['title'],
             'type' => (string)$row['type'],
             'slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
@@ -1713,6 +1798,9 @@ public function getPublicActiveSlides(
 
         return [
             'playlist_id' => (int)($row['playlist_id'] ?? 0),
+            'project_id' => isset($row['project_id']) && $row['project_id'] !== null
+                ? (int)$row['project_id']
+                : null,
             'title' => (string)($row['title'] ?? ''),
             'type' => (string)($row['type'] ?? ''),
             'is_active' => (int)($row['is_active'] ?? 0),
