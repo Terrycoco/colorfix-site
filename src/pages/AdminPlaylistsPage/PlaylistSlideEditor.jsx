@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   AdminButton,
@@ -16,6 +16,10 @@ import PermissionStatus from "@components/PermissionStatus";
 import UploadPhotoDialog from "@components/Dialogs/UploadPhotoDialog";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import fetchColorDetail from "@data/fetchColorDetail";
+import { API_FOLDER } from "@helpers/config";
+
+const PROJECT_SLIDE_PALETTE_URL =
+  `${API_FOLDER}/v2/admin/playlist-items/project-palette.php`;
 
 const DEFAULT_HUE_WHEEL_CONFIG = {
   items: [
@@ -63,14 +67,12 @@ export default function PlaylistSlideEditor({
   slideNumber,
   photoThumb = "",
   photoInfo = null,
-  attachedPalette = null,
   saving = false,
   saveError = "",
   onUpdate,
   onPickPhoto,
   onUploadPhoto,
   onClearPhoto,
-  onPickPalette,
   onRemove,
   onSave,
 }) {
@@ -78,6 +80,238 @@ export default function PlaylistSlideEditor({
     uploadOpen,
     setUploadOpen,
   ] = useState(false);
+
+  const [
+    projectPalettes,
+    setProjectPalettes,
+  ] = useState([]);
+
+  const [
+    slidePaletteId,
+    setSlidePaletteId,
+  ] = useState("");
+
+  const [
+    paletteLoading,
+    setPaletteLoading,
+  ] = useState(false);
+
+  const [
+    paletteSaving,
+    setPaletteSaving,
+  ] = useState(false);
+
+  const [
+    paletteError,
+    setPaletteError,
+  ] = useState("");
+
+  const playlistItemId =
+    Number(
+      item?.playlist_item_id ||
+      0
+    );
+
+  const selectedProjectPalette =
+    useMemo(
+      () =>
+        projectPalettes.find(
+          (palette) =>
+            Number(
+              palette?.saved_palette_id ||
+              0
+            ) ===
+            Number(
+              slidePaletteId ||
+              0
+            )
+        )
+        ||
+        null,
+      [
+        projectPalettes,
+        slidePaletteId,
+      ]
+    );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (playlistItemId <= 0) {
+      setProjectPalettes([]);
+      setSlidePaletteId("");
+      setPaletteError("");
+      setPaletteLoading(false);
+      return undefined;
+    }
+
+    setPaletteLoading(true);
+    setPaletteError("");
+
+    (
+      async () => {
+        try {
+          const params =
+            new URLSearchParams({
+              playlist_item_id:
+                String(
+                  playlistItemId
+                ),
+              _:
+                String(
+                  Date.now()
+                ),
+            });
+
+          const response =
+            await fetch(
+              `${PROJECT_SLIDE_PALETTE_URL}?${params.toString()}`,
+              {
+                credentials:
+                  "include",
+                cache:
+                  "no-store",
+              }
+            );
+
+          const data =
+            await readJsonResponse(
+              response,
+              "Failed to load project palettes"
+            );
+
+          if (cancelled) {
+            return;
+          }
+
+          setProjectPalettes(
+            Array.isArray(
+              data?.palettes
+            )
+              ? data.palettes
+              : []
+          );
+
+          setSlidePaletteId(
+            Number(
+              data?.saved_palette_id ||
+              0
+            ) > 0
+              ? String(
+                  data.saved_palette_id
+                )
+              : ""
+          );
+
+        } catch (error) {
+          if (!cancelled) {
+            setProjectPalettes([]);
+            setSlidePaletteId("");
+            setPaletteError(
+              error?.message ||
+              "Failed to load project palettes."
+            );
+          }
+
+        } finally {
+          if (!cancelled) {
+            setPaletteLoading(false);
+          }
+        }
+      }
+    )();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    playlistItemId,
+  ]);
+
+  async function setProjectPalette(
+    value
+  ) {
+    if (
+      playlistItemId <= 0
+      ||
+      paletteSaving
+    ) {
+      return;
+    }
+
+    const previousValue =
+      slidePaletteId;
+
+    const nextValue =
+      String(
+        value ||
+        ""
+      );
+
+    setSlidePaletteId(
+      nextValue
+    );
+
+    setPaletteSaving(
+      true
+    );
+
+    setPaletteError(
+      ""
+    );
+
+    try {
+      const response =
+        await fetch(
+          PROJECT_SLIDE_PALETTE_URL,
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify({
+                playlist_item_id:
+                  playlistItemId,
+
+                saved_palette_id:
+                  nextValue
+                    ? Number(
+                        nextValue
+                      )
+                    : null,
+              }),
+          }
+        );
+
+      await readJsonResponse(
+        response,
+        "Failed to attach project palette"
+      );
+
+    } catch (error) {
+      setSlidePaletteId(
+        previousValue
+      );
+
+      setPaletteError(
+        error?.message ||
+        "Failed to attach project palette."
+      );
+
+    } finally {
+      setPaletteSaving(
+        false
+      );
+    }
+  }
 
   const photoId = item?.photo_library_id || "";
   const hueConfig =
@@ -262,28 +496,135 @@ export default function PlaylistSlideEditor({
             </AdminStack>
           </div>
 
-          <AdminToolbar compact>
-            <AdminField label="Palette" compact>
-              <input
-                className="admin-field__control"
-                type="text"
-                readOnly
-                value={attachedPalette?.attachedSavedPaletteLabel || ""}
-                placeholder="No palette attached"
-              />
-            </AdminField>
-
-            <AdminButton
-              type="button"
-              variant="secondary"
-              disabled={typeof onPickPalette !== "function"}
-              onClick={onPickPalette}
+          <AdminField label="Palette" compact>
+            <select
+              className="admin-field__control"
+              value={slidePaletteId}
+              disabled={
+                playlistItemId <= 0
+                ||
+                paletteLoading
+                ||
+                paletteSaving
+              }
+              onChange={(event) =>
+                setProjectPalette(
+                  event.target.value
+                )
+              }
             >
-              {attachedPalette?.attachedSavedPaletteLabel
-                ? "Change Palette"
-                : "Attach Palette"}
-            </AdminButton>
-          </AdminToolbar>
+              <option value="">
+                {
+                  playlistItemId <= 0
+                    ? "Save playlist before attaching a palette"
+                    : paletteLoading
+                      ? "Loading project palettes..."
+                      : projectPalettes.length
+                        ? "No palette attached"
+                        : "No project palettes"
+                }
+              </option>
+
+              {
+                projectPalettes.map(
+                  (palette) => {
+                    const paletteId =
+                      Number(
+                        palette?.saved_palette_id ||
+                        0
+                      );
+
+                    const label =
+                      String(
+                        palette?.display_title
+                        ||
+                        palette?.nickname
+                        ||
+                        `Palette #${paletteId}`
+                      ).trim();
+
+                    return (
+                      <option
+                        key={paletteId}
+                        value={String(paletteId)}
+                      >
+                        {label}
+                      </option>
+                    );
+                  }
+                )
+              }
+            </select>
+          </AdminField>
+
+          {
+            selectedProjectPalette
+              ?.colors
+              ?.length
+              ? (
+                  <div
+                    aria-label="Selected palette colors"
+                    style={{
+                      display: "flex",
+                      gap: "2px",
+                      alignItems: "stretch",
+                    }}
+                  >
+                    {
+                      selectedProjectPalette.colors.map(
+                        (
+                          color,
+                          index
+                        ) => (
+                          <span
+                            key={
+                              color?.member_id
+                              ||
+                              `${color?.color_id || "color"}-${index}`
+                            }
+                            title={
+                              [
+                                color?.color_name,
+                                color?.role
+                                  ? `Used for: ${color.role}`
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")
+                            }
+                            style={{
+                              display: "block",
+                              width: "46px",
+                              height: "30px",
+                              border:
+                                "1px solid var(--admin-border)",
+                              borderRadius:
+                                "3px",
+                              boxSizing:
+                                "border-box",
+                              backgroundColor:
+                                normalizeProjectPaletteHex(
+                                  color?.color_hex6
+                                ),
+                            }}
+                          />
+                        )
+                      )
+                    }
+                  </div>
+                )
+              : null
+          }
+
+          {
+            paletteError
+              ? (
+                  <AdminNotice variant="danger">
+                    {paletteError}
+                  </AdminNotice>
+                )
+              : null
+          }
         </AdminStack>
       </AdminPanel>
 
@@ -782,6 +1123,66 @@ function HueWheelFields({ config, onChange }) {
       </AdminStack>
     </AdminPanel>
   );
+}
+
+
+async function readJsonResponse(
+  response,
+  fallbackMessage
+) {
+  const text =
+    await response.text();
+
+  let data = {};
+
+  try {
+    data =
+      text.trim()
+        ? JSON.parse(
+            text
+          )
+        : {};
+  } catch {
+    throw new Error(
+      `${fallbackMessage}: invalid JSON response`
+    );
+  }
+
+  if (
+    !response.ok
+    ||
+    data?.ok === false
+  ) {
+    throw new Error(
+      data?.error
+      ||
+      `HTTP ${response.status}`
+    );
+  }
+
+  return data;
+}
+
+
+function normalizeProjectPaletteHex(
+  value
+) {
+  const raw =
+    String(
+      value ||
+      ""
+    )
+      .trim()
+      .replace(
+        /^#/,
+        ""
+      );
+
+  return /^[0-9a-f]{6}$/i.test(
+    raw
+  )
+    ? `#${raw.toUpperCase()}`
+    : "#E5E5E5";
 }
 
 function parseHueWheelBody(rawBody) {

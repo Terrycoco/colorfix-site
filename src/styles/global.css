@@ -27,7 +27,14 @@
   --navbar-zindex: 4000;
   --dashboard-zindex: 2000;
   --palette-zindex: 4001;
-  --board-scroller-height: 40px;
+ --bar-h: 40px;
+
+  --board-scroller-height:
+    calc(
+      var(--bar-h)
+      + max(env(safe-area-inset-top, 0px), 10px)
+      + 1px
+    );
   --search-item-background: #DDE2E2; /* etched glass */
   --search-item-background-hover: #BEDCDD; /* birds egg */
   --highlight-cyan: #BEDCDD; /* birds egg */

@@ -44,6 +44,35 @@ const SAVE_URL =
 const LIST_URL =
   `${API_FOLDER}/v2/admin/projects/list.php`;
 
+const PROJECT_SECTION_STORAGE_KEY =
+  "admin-project-active-section";
+
+const PROJECT_SECTIONS =
+  new Set([
+    "setup",
+    "palettes",
+    "playlist",
+  ]);
+
+function readLastProjectSection() {
+  if (typeof window === "undefined") {
+    return "playlist";
+  }
+
+  try {
+    const saved =
+      window.localStorage.getItem(
+        PROJECT_SECTION_STORAGE_KEY
+      );
+
+    return PROJECT_SECTIONS.has(saved)
+      ? saved
+      : "playlist";
+  } catch {
+    return "playlist";
+  }
+}
+
 
 export default function AdminProjectPage() {
   const {
@@ -90,12 +119,39 @@ export default function AdminProjectPage() {
   const [
     activeSection,
     setActiveSection,
-  ] = useState("setup");
+  ] = useState(
+    readLastProjectSection
+  );
 
   const [
     creatingPlaylist,
     setCreatingPlaylist,
   ] = useState(false);
+
+
+  useEffect(
+    () => {
+      if (
+        !PROJECT_SECTIONS.has(
+          activeSection
+        )
+      ) {
+        return;
+      }
+
+      try {
+        window.localStorage.setItem(
+          PROJECT_SECTION_STORAGE_KEY,
+          activeSection
+        );
+      } catch {
+        // Storage can be unavailable in private/restricted browser modes.
+      }
+    },
+    [
+      activeSection,
+    ]
+  );
 
 
   useEffect(() => {
@@ -402,19 +458,6 @@ export default function AdminProjectPage() {
   }
 
 
-  function beginNewPalette() {
-    /*
-     * Next step: open Project Palette drawer in create mode.
-     */
-  }
-
-
-  function openPalette() {
-    /*
-     * Next step: open Project Palette drawer for the double-clicked row.
-     */
-  }
-
 
   const list =
     (
@@ -450,10 +493,6 @@ export default function AdminProjectPage() {
 
                   setCreatingPlaylist(
                     false
-                  );
-
-                  setActiveSection(
-                    "setup"
                   );
                 }
               }
@@ -608,12 +647,6 @@ export default function AdminProjectPage() {
             Number(
               project.id
             )
-          }
-          onNewPalette={
-            beginNewPalette
-          }
-          onOpenPalette={
-            openPalette
           }
         />
       );
