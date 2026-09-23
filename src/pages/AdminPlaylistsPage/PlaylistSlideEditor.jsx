@@ -9,7 +9,6 @@ import {
   AdminPanel,
   AdminStack,
   AdminToolbar,
-  AdminToolbarSpacer,
 } from "@components/AdminLayout";
 
 import PermissionStatus from "@components/PermissionStatus";
@@ -68,13 +67,14 @@ export default function PlaylistSlideEditor({
   photoThumb = "",
   photoInfo = null,
   saving = false,
+  saveMessage = "",
   saveError = "",
   onUpdate,
   onPickPhoto,
   onUploadPhoto,
   onClearPhoto,
   onRemove,
-  onSave,
+  onCommit,
 }) {
   const [
     uploadOpen,
@@ -320,23 +320,17 @@ export default function PlaylistSlideEditor({
       : null;
 
   return (
-    <AdminStack gap="md">
+    <div onBlurCapture={() => onCommit?.()}>
+      <AdminStack gap="md">
       {saveError ? (
         <AdminNotice variant="danger">
           {saveError}
         </AdminNotice>
       ) : null}
 
-      <AdminToolbar compact>
-        <AdminToolbarSpacer />
-        <AdminButton
-          type="button"
-          disabled={saving}
-          onClick={onSave}
-        >
-          {saving ? "Saving..." : "Save"}
-        </AdminButton>
-      </AdminToolbar>
+      <div className="admin-workbench-drawer__autosave-indicator">
+        {saving ? "Saving..." : saveMessage || "Autosave"}
+      </div>
 
       <AdminPanel title={`Slide ${slideNumber}`} compact>
         <AdminStack gap="sm">
@@ -820,16 +814,6 @@ export default function PlaylistSlideEditor({
         <AdminButton type="button" variant="danger" onClick={onRemove}>
           Remove Slide
         </AdminButton>
-
-        <AdminToolbarSpacer />
-
-        <AdminButton
-          type="button"
-          disabled={saving}
-          onClick={onSave}
-        >
-          {saving ? "Saving..." : "Save"}
-        </AdminButton>
       </AdminToolbar>
 
       <UploadPhotoDialog
@@ -842,7 +826,8 @@ export default function PlaylistSlideEditor({
           setUploadOpen(false);
         }}
       />
-    </AdminStack>
+      </AdminStack>
+    </div>
   );
 }
 

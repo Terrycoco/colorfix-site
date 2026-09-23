@@ -1,0 +1,37 @@
+.playlist-rex-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+
+  padding: 0;
+
+  border: 1px solid var(--admin-accent, #c62a78);
+  border-radius: 5px;
+
+  background: transparent;
+  color: var(--admin-accent, #c62a78);
+
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.playlist-rex-button:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--admin-accent, #c62a78) 10%,
+    transparent
+  );
+}
+
+.playlist-rex-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

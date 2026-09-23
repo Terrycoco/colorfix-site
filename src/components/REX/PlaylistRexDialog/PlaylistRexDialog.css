@@ -1,0 +1,99 @@
+.playlist-rex-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.playlist-rex-dialog__heading {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--admin-border, #dfe5ee);
+}
+
+.playlist-rex-dialog__rows {
+  display: grid;
+  gap: 4px;
+}
+
+.playlist-rex-dialog__row {
+  display: grid;
+  grid-template-columns:
+    72px
+    minmax(0, 1fr)
+    auto;
+
+  align-items: center;
+  gap: 8px;
+
+  min-height: 36px;
+}
+
+.playlist-rex-dialog__label {
+  font-weight: 700;
+}
+
+.playlist-rex-dialog__value {
+  min-width: 0;
+}
+
+.playlist-rex-dialog__missing {
+  color: var(--admin-muted, #687386);
+}
+
+.playlist-rex-dialog__url {
+  display: block;
+  width: 100%;
+
+  padding: 0;
+
+  overflow: hidden;
+
+  border: 0;
+  background: transparent;
+
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  cursor: pointer;
+}
+
+.playlist-rex-dialog__url:hover {
+  text-decoration-thickness: 2px;
+}
+
+.playlist-rex-dialog__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.playlist-rex-dialog__health {
+  min-width: 34px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.playlist-rex-dialog__health.is-good {
+  color: #287347;
+}
+
+.playlist-rex-dialog__health.is-bad {
+  color: #a76b00;
+}
+
+@media (max-width: 680px) {
+  .playlist-rex-dialog__row {
+    grid-template-columns:
+      64px
+      minmax(0, 1fr);
+  }
+
+  .playlist-rex-dialog__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

@@ -30,6 +30,7 @@ import {
 
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
 import ProjectPalettes from "./ProjectPalettes";
+import ProjectPVPage from "./ProjectPVPage";
 import ProjectSetup from "./ProjectSetup";
 
 import "./admin-project.css";
@@ -50,8 +51,9 @@ const PROJECT_SECTION_STORAGE_KEY =
 const PROJECT_SECTIONS =
   new Set([
     "setup",
-    "palettes",
     "playlist",
+    "palettes",
+    "pvs",
   ]);
 
 function readLastProjectSection() {
@@ -517,22 +519,8 @@ export default function AdminProjectPage() {
           />
 
           <AdminObjectListItem
-            id="palettes"
-            title="Palettes"
-            selected={
-              activeSection ===
-              "palettes"
-            }
-            onSelect={() =>
-              setActiveSection(
-                "palettes"
-              )
-            }
-          />
-
-          <AdminObjectListItem
             id="playlist"
-            title="Playlist"
+            title="Playlists"
             meta={[
               creatingPlaylist
                 ? "New playlist"
@@ -550,6 +538,34 @@ export default function AdminProjectPage() {
             onSelect={() =>
               setActiveSection(
                 "playlist"
+              )
+            }
+          />
+
+          <AdminObjectListItem
+            id="palettes"
+            title="Palettes"
+            selected={
+              activeSection ===
+              "palettes"
+            }
+            onSelect={() =>
+              setActiveSection(
+                "palettes"
+              )
+            }
+          />
+
+          <AdminObjectListItem
+            id="pvs"
+            title="PVs"
+            selected={
+              activeSection ===
+              "pvs"
+            }
+            onSelect={() =>
+              setActiveSection(
+                "pvs"
               )
             }
           />
@@ -643,6 +659,24 @@ export default function AdminProjectPage() {
     detail =
       (
         <ProjectPalettes
+          projectId={
+            Number(
+              project.id
+            )
+          }
+        />
+      );
+
+  } else if (
+    activeSection ===
+    "pvs"
+  ) {
+    detailTitle =
+      "PVs";
+
+    detail =
+      (
+        <ProjectPVPage
           projectId={
             Number(
               project.id

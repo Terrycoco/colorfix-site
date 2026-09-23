@@ -502,6 +502,185 @@ final class PdoPVRepository
         return array_values($resultByPv);
     }
 
+
+    /**
+     * Create one first-class PV.
+     */
+    public function create(
+        int $savedPaletteId,
+        string $format,
+        string $title,
+        ?string $kickerText = null,
+        ?string $intro = null
+    ): int {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO palette_viewers
+                (
+                    saved_palette_id,
+                    format,
+                    template_key,
+                    kicker_text,
+                    title,
+                    intro,
+                    notes,
+                    cta_label,
+                    is_active,
+                    created_at,
+                    updated_at
+                )
+             VALUES
+                (
+                    :saved_palette_id,
+                    :format,
+                    NULL,
+                    :kicker_text,
+                    :title,
+                    :intro,
+                    NULL,
+                    NULL,
+                    1,
+                    NOW(),
+                    NOW()
+                )"
+        );
+
+        $stmt->execute([
+            ':saved_palette_id' => $savedPaletteId,
+            ':format' => strtolower(trim($format)),
+            ':kicker_text' => $this->nullableText($kickerText),
+            ':title' => $this->nullableText($title),
+            ':intro' => $this->nullableText($intro),
+        ]);
+
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    /**
+     * Grid/list rows for one or more Saved Palettes.
+     *
+     * @param int[] $savedPaletteIds
+     * @return array<int,array<string,mixed>>
+     */
+    public function listGridRowsBySavedPaletteIds(
+        array $savedPaletteIds
+    ): array {
+        $ids = array_values(array_unique(array_filter(
+            array_map(
+                static fn(mixed $value): int => (int)$value,
+                $savedPaletteIds
+            ),
+            static fn(int $value): bool => $value > 0
+        )));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+
+        foreach ($ids as $index => $id) {
+            $key = ':palette_' . $index;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+
+        $sql =
+            "SELECT
+                pv.palette_viewer_id,
+                pv.saved_palette_id,
+                pv.format,
+                pv.kicker_text,
+                pv.title,
+                pv.intro,
+                pv.is_active,
+
+                COALESCE(
+                    NULLIF(TRIM(sp.nickname), ''),
+                    CONCAT('Palette #', sp.id)
+                ) AS palette_name,
+
+                (
+                    SELECT COUNT(*)
+                      FROM palette_viewer_photos pvp
+                     WHERE pvp.palette_viewer_id =
+                           pv.palette_viewer_id
+                ) AS photo_count
+
+             FROM palette_viewers pv
+
+             INNER JOIN saved_palettes sp
+               ON sp.id = pv.saved_palette_id
+
+             WHERE pv.is_active = 1
+               AND pv.saved_palette_id IN (" .
+                    implode(', ', $placeholders) .
+               ")
+
+             ORDER BY
+                COALESCE(NULLIF(TRIM(pv.title), ''), '') ASC,
+                pv.format ASC,
+                pv.palette_viewer_id ASC";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * One grid/list row by PV id.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function findGridRowById(
+        int $pvId
+    ): ?array {
+        if ($pvId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                pv.palette_viewer_id,
+                pv.saved_palette_id,
+                pv.format,
+                pv.kicker_text,
+                pv.title,
+                pv.intro,
+                pv.is_active,
+
+                COALESCE(
+                    NULLIF(TRIM(sp.nickname), ''),
+                    CONCAT('Palette #', sp.id)
+                ) AS palette_name,
+
+                (
+                    SELECT COUNT(*)
+                      FROM palette_viewer_photos pvp
+                     WHERE pvp.palette_viewer_id =
+                           pv.palette_viewer_id
+                ) AS photo_count
+
+             FROM palette_viewers pv
+
+             INNER JOIN saved_palettes sp
+               ON sp.id = pv.saved_palette_id
+
+             WHERE pv.palette_viewer_id = :pv_id
+
+             LIMIT 1"
+        );
+
+        $stmt->execute([
+            ':pv_id' => $pvId,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
+
     public function deletePhotosByPVId(int $pvId): int
     {
         if ($pvId <= 0) {

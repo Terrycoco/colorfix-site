@@ -31,6 +31,7 @@
 }
 
 .admin-workbench-drawer {
+  position: relative;
   width: var(--admin-workbench-drawer-width, 380px);
   min-width: var(--admin-workbench-drawer-width, 380px);
   max-width: var(--admin-workbench-drawer-width, 380px);
@@ -47,15 +48,14 @@
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 0 10px;
   border-bottom: 1px solid var(--admin-border);
   background: var(--admin-selected);
-
 }
 
 .admin-workbench-drawer__title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--admin-text);
@@ -66,9 +66,53 @@
   white-space: nowrap;
 }
 
-.admin-workbench-drawer__close {
+.admin-workbench-drawer__close-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-bg);
+}
+
+.admin-workbench-drawer__close-button {
   flex: 0 0 auto;
-  padding: 2px 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+  background: var(--admin-accent, #f57c00);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-workbench-drawer__close-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/*
+ * Playlist autosave status is rendered by PlaylistSlideEditor,
+ * but positioned into the drawer's Close row.
+ */
+.admin-workbench-drawer__autosave-indicator {
+  position: absolute;
+  top: 40px;
+  right: 12px;
+  z-index: 2;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  color: var(--admin-text);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  opacity: 0.65;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .admin-workbench-drawer__body {

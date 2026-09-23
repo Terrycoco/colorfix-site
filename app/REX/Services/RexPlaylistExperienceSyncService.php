@@ -48,7 +48,7 @@ final class RexPlaylistExperienceSyncService
         ],
         'client' => [
             'slide_flag' => 'client',
-            'viewer_formats' => ['client', 'painter'],
+            'viewer_formats' => ['client'],
             'thumbs_format' => 'client',
         ],
     ];
@@ -996,9 +996,7 @@ final class RexPlaylistExperienceSyncService
                 continue;
             }
 
-            $child = $relationship->reservation;
-
-            if (!($child instanceof RexReservation)) {
+            $child = $relationship->reservation;if (!($child instanceof RexReservation)) {
                 continue;
             }
 

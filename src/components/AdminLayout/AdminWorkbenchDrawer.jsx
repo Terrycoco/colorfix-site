@@ -43,21 +43,10 @@ export default function AdminWorkbenchDrawer({
         }
       }
 
-      onClose();
+      await onClose();
     } finally {
       setClosing(false);
     }
-  }
-
-  function handleDrawerDoubleClick(event) {
-    if (!onClose || closing) return;
-
-    /*
-     * Use capture so the drawer always receives the double-click,
-     * even if something inside the drawer stops propagation.
-     */
-    event.preventDefault();
-    requestClose();
   }
 
   const drawer = (
@@ -70,26 +59,25 @@ export default function AdminWorkbenchDrawer({
       style={{
         "--admin-workbench-drawer-width": cssWidth,
       }}
-      onDoubleClickCapture={handleDrawerDoubleClick}
     >
       <div className="admin-workbench-drawer__header">
         <strong className="admin-workbench-drawer__title">
           {title}
         </strong>
+      </div>
 
-        {onClose ? (
+      {onClose ? (
+        <div className="admin-workbench-drawer__close-row">
           <button
             type="button"
-            className="admin-workbench-drawer__close"
+            className="admin-workbench-drawer__close-button"
             disabled={closing}
             onClick={requestClose}
-            aria-label="Close drawer"
-            title="Close"
           >
-            ×
+            ← CLOSE
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       <div
         className={[

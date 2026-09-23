@@ -40,6 +40,7 @@ import {
 
 import PlaylistRecordEditor from "./PlaylistRecordEditor";
 import SlideDefaultsDialog from "./SlideDefaultsDialog";
+import PlaylistRexButton from "@components/REX/PlaylistRexButton";
 import PlaylistSlideEditor, {
   BRAND_BUMPER_BODY_TEMPLATE,
   HUE_WHEEL_BODY_TEMPLATE,
@@ -997,8 +998,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             .toLowerCase();
 
         const rows =
-          needle
-            ? playlists.filter(
+          needle? playlists.filter(
                 (row) => {
                   const title =
                     String(
@@ -1997,8 +1997,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                         )
                       : "",
                 }
-              : item
-        )
+              : item)
     );
 
     markDirty();
@@ -2997,8 +2996,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
           value:
             (item) =>
-              itemIndex(
-                items,
+              itemIndex(items,
                 item
               ) + 1,
         },
@@ -3211,6 +3209,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         <AdminBadge variant="warning">
           Unsaved
         </AdminBadge>
+      ) : null}
+
+      {playlist?.playlist_id ? (
+        <PlaylistRexButton
+          playlistId={playlist.playlist_id}
+          title={playlist.title}
+          disabled={dirty || saving}
+        />
       ) : null}
 
       <AdminButton
@@ -3996,9 +4002,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               ||
               playlistDraft.title
             );
-          }
-
-          setHeroPickerOpen(
+          }setHeroPickerOpen(
             false
           );
         }}
@@ -4997,8 +5001,7 @@ function photoInfoFromRow(
   return {
     attachedSavedPaletteId:
       row
-        ?.attached_saved_palette_id
-      ??
+        ?.attached_saved_palette_id??
       null,
 
     attachedSavedPaletteLabel:

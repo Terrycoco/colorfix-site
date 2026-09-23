@@ -31,6 +31,11 @@ final class RexResolverRegistryFactory
             new RouteResolver()
         );
 
+$registry->register(
+    'document',
+    new DocumentResolver($pdo)
+);
+
         return $registry;
     }
 }
