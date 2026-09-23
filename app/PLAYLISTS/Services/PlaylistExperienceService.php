@@ -132,7 +132,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     $ctaStartedAt = microtime(true);
     $ctaRepo = new PdoCtaRepository($this->pdo);
     $ctaPageId = $this->resolvePublicRexCtaPageId($ctaRepo, $experience->ctaPageId);
-    $ctas = $this->selectPublicRexCtas(
+    $ctas = $this->selectRexCtas(
         $ctaRepo->getByGroupId($ctaPageId),
         $colorsUsedDestination
     );
@@ -218,14 +218,14 @@ private function resolvePublicRexCtaPageId(PdoCtaRepository $ctaRepo, int $fallb
 /**
  * REX playlists send the exact end-screen CTA set the player should render.
  *
- * The public/default CTA page may contain both one-viewer and many-viewer
+ * A configured CTA page may contain both one-viewer and many-viewer
  * "colors used" actions. PES owns the reservation context, so it chooses the
  * single correct action before the payload reaches the player.
  *
  * @param array<int, array<string, mixed>> $ctas
  * @return array<int, array<string, mixed>>
  */
-private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination): array
+private function selectRexCtas(array $ctas, string $colorsUsedDestination): array
 {
     $destination = strtolower(trim($colorsUsedDestination));
     $colorActions = ['see_colors_used', 'to_palette', 'to_thumbs'];
@@ -251,7 +251,9 @@ private function selectPublicRexCtas(array $ctas, string $colorsUsedDestination)
         }
     }
 
-    $keepColorIndex = $preferredColorIndex ?? $fallbackColorIndex;
+    $keepColorIndex = $preferredColorAction !== ''
+        ? ($preferredColorIndex ?? $fallbackColorIndex)
+        : null;
 
     $filtered = [];
     foreach ($ctas as $index => $cta) {
@@ -580,18 +582,49 @@ public function buildPlaybackPlanFromProjectExperience(
         $paletteViewerKey = $experience->paletteViewerKey;
         $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
         $this->hydrateProjectColorPlanViewerUrls($items, $paletteViewerKey, $reservationToken);
+
+        /*
+         * Modern REX/PV navigation is relationship-driven.
+         * The current experience decides which linked PVs count.
+         */
+        $viewerRex = $this->buildLinkedPVData(
+            $playlistId,
+            $experienceKey
+        );
+        $viewerRexCount = $viewerRex['count'];
+
+        $thumbsEnabled =
+            $experienceKey !== 'painter'
+            && $viewerRexCount > 1;
+
+        $colorsUsedDestination =
+            $viewerRexCount === 1
+                ? 'viewer'
+                : ($thumbsEnabled ? 'thumbs' : 'none');
+
+        $colorsUsedUrl =
+            $viewerRexCount === 1
+                ? (string)($viewerRex['urls'][0] ?? '')
+                : (
+                    $thumbsEnabled
+                        ? '/playlist-thumbs/' . rawurlencode((string)$playlist->playlist_id)
+                        : ''
+                );
+
         $this->markTiming('hydrate_items', $itemsStartedAt);
         $startIndex = $this->resolveStartIndex($items, $start, $startTarget);
 
         $ctaStartedAt = microtime(true);
         $ctaRepo = new PdoCtaRepository($this->pdo);
-        $ctas = $ctaRepo->getByGroupId($experience->ctaPageId);
+        $ctas = $this->selectRexCtas(
+            $ctaRepo->getByGroupId($experience->ctaPageId),
+            $colorsUsedDestination
+        );
         if (!empty($ctas)) {
             $ctas = $this->hydrateArticleCtas($ctas);
         }
         $this->markTiming('load_ctas', $ctaStartedAt);
 
-        $thumbsEnabled = $experienceKey !== 'painter' && count($colorPlanIds) > 1;
         $this->lastTiming['total'] = round((microtime(true) - $startedAt) * 1000, 1);
 
         $displayTitle = trim((string)($project['project_name'] ?? '')) ?: $playlist->title;
@@ -647,6 +680,12 @@ public function buildPlaybackPlanFromProjectExperience(
             'cta_page_id' => $experience->ctaPageId,
             'experience_source' => 'project_reservation',
             'src' => $sourceAttribution,
+            'reservation_token' => $reservationToken,
+            'viewer_rex_count' => $viewerRexCount,
+            'viewer_rex_urls' => $viewerRex['urls'],
+            'viewer_rex_targets' => $viewerRex['targets'],
+            'colors_used_destination' => $colorsUsedDestination,
+            'colors_used_url' => $colorsUsedUrl,
         ];
     }
 

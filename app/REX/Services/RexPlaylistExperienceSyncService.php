@@ -3,9 +3,10 @@ declare(strict_types=1);
 
 namespace App\REX\Services;
 
-use App\PALETTES\Repos\PdoPVRepository;
+use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlaylistItemPaletteRepository;
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
 use App\REX\Repos\PdoRexReservationRepository;
@@ -48,14 +49,15 @@ final class RexPlaylistExperienceSyncService
         ],
         'client' => [
             'slide_flag' => 'client',
-            'viewer_formats' => ['client'],
+            'viewer_formats' => ['client', 'painter'],
             'thumbs_format' => 'client',
         ],
     ];
 
     private PdoPlaylistRepository $playlists;
+    private PdoPlaylistItemPaletteRepository $playlistItemPalettes;
     private PdoPaletteViewerRepository $paletteViewers;
-    private PdoPVRepository $pvs;
+    private PdoSavedPaletteRepository $savedPalettes;
     private PdoRexReservationRepository $reservations;
     private RexReservationRelationships $relationships;
     private RexReserver $reserver;
@@ -64,8 +66,9 @@ final class RexPlaylistExperienceSyncService
         private PDO $pdo
     ) {
         $this->playlists = new PdoPlaylistRepository($pdo);
+        $this->playlistItemPalettes = new PdoPlaylistItemPaletteRepository($pdo);
         $this->paletteViewers = new PdoPaletteViewerRepository($pdo);
-        $this->pvs = new PdoPVRepository($pdo);
+        $this->savedPalettes = new PdoSavedPaletteRepository($pdo);
         $this->reservations = new PdoRexReservationRepository($pdo);
         $this->relationships = new RexReservationRelationships(
             $this->reservations
@@ -109,8 +112,9 @@ final class RexPlaylistExperienceSyncService
 
         $items = $this->playlists->getAdminItemRows($playlistId);
         $referencesByItemId = $this->referencesByItemId(
-            $this->playlists->listSavedPaletteReferencesByPlaylist(
-                $playlistId
+            $this->savedPaletteReferencesForPlaylist(
+                $playlistId,
+                $items
             )
         );
 
@@ -184,8 +188,9 @@ final class RexPlaylistExperienceSyncService
         $items = $this->playlists->getAdminItemRows($playlistId);
 
         $referencesByItemId = $this->referencesByItemId(
-            $this->playlists->listSavedPaletteReferencesByPlaylist(
-                $playlistId
+            $this->savedPaletteReferencesForPlaylist(
+                $playlistId,
+                $items
             )
         );
 
@@ -411,32 +416,22 @@ final class RexPlaylistExperienceSyncService
                     continue;
                 }
 
-                try {
-                    $pv = $this->pvs->findById($pvId);
-                } catch (Throwable $e) {
-                    $issues[] = [
-                        'code' => 'invalid_pv',
-                        'saved_palette_id' => (int)$savedPaletteId,
-                        'viewer_format' => $format,
-                        'pv_id' => $pvId,
-                        'message' => $e->getMessage(),
-                    ];
-                    continue;
-                }
+                /*
+                 * PaletteViewerRepository is the authority for the PV row
+                 * and already confirmed that this Viewer is active and uses
+                 * the requested format.
+                 *
+                 * The PALETTES PdoPVRepository now returns arrays and no
+                 * longer owns swatches. Validate color presence against the
+                 * Saved Palette members instead.
+                 */
+                $members =
+                    $this->savedPalettes
+                        ->getMembersForPalette(
+                            (int)$savedPaletteId
+                        );
 
-                if ($pv === null || !$pv->isActive) {
-                    $issues[] = [
-                        'code' => 'inactive_pv',
-                        'saved_palette_id' => (int)$savedPaletteId,
-                        'viewer_format' => $format,
-                        'pv_id' => $pvId,
-                        'message' =>
-                            "PV #{$pvId} is missing or inactive.",
-                    ];
-                    continue;
-                }
-
-                if (count($pv->swatches) < 1) {
+                if (count($members) < 1) {
                     $issues[] = [
                         'code' => 'empty_pv',
                         'saved_palette_id' => (int)$savedPaletteId,
@@ -449,14 +444,8 @@ final class RexPlaylistExperienceSyncService
                 }
 
                 $title = trim(
-                    (string)($pv->meta['title'] ?? '')
+                    (string)($viewer->title ?? '')
                 );
-
-                if ($title === '') {
-                    $title = trim(
-                        (string)($viewer->title ?? '')
-                    );
-                }
 
                 if ($title === '') {
                     $title =
@@ -497,8 +486,7 @@ final class RexPlaylistExperienceSyncService
                     'playlist_item_ids' =>
                         $source['playlist_item_ids'],
                     'sort_order' =>
-                        (int)$source['sort_order'],
-                    'viewer_format' => $format,
+                        (int)$source['sort_order'],'viewer_format' => $format,
                     'pv_id' => $pvId,
                     'title' => $title,
                     'is_primary' =>
@@ -1379,6 +1367,74 @@ final class RexPlaylistExperienceSyncService
                 . 'as canonical.',
         ]];
     }
+
+    /**
+     * Resolve Saved Palette references for the Playlist.
+     *
+     * Current Project workflow stores the slide -> Saved Palette relationship
+     * through PdoPlaylistItemPaletteRepository. Legacy public playlists may
+     * still use saved_palette_set_id / palette_hash on playlist_items.
+     *
+     * The current Project relationship wins when both exist.
+     *
+     * @param array<int,array<string,mixed>> $items
+     * @return array<int,array<string,mixed>>
+     */
+    private function savedPaletteReferencesForPlaylist(
+        int $playlistId,
+        array $items
+    ): array {
+        $byItemId = $this->referencesByItemId(
+            $this->playlists->listSavedPaletteReferencesByPlaylist(
+                $playlistId
+            )
+        );
+
+        foreach ($items as $item) {
+            $playlistItemId = (int)(
+                $item['playlist_item_id']
+                ?? 0
+            );
+
+            if ($playlistItemId <= 0) {
+                continue;
+            }
+
+            $context =
+                $this->playlistItemPalettes
+                    ->getContext($playlistItemId);
+
+            if (!is_array($context)) {
+                continue;
+            }
+
+            $savedPaletteId = (int)(
+                $context['saved_palette_id']
+                ?? 0
+            );
+
+            if ($savedPaletteId <= 0) {
+                continue;
+            }
+
+            $byItemId[$playlistItemId] = [
+                'playlist_item_id' => $playlistItemId,
+                'playlist_id' => (int)(
+                    $context['playlist_id']
+                    ?? $playlistId
+                ),
+                'order_index' => (int)(
+                    $item['order_index']
+                    ?? 0
+                ),
+                'saved_palette_set_id' => null,
+                'saved_palette_id' => $savedPaletteId,
+            ];
+        }
+
+        return array_values($byItemId);
+    }
+
 
     /**
      * @param array<int,array<string,mixed>> $references

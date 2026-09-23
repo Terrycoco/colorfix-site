@@ -20,16 +20,43 @@ use App\REX\DTO\RexReservationSearchCriteria;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
 
-function rex_playlist_url_is_public_playlist_rex(RexReservation $reservation): bool
+
+/**
+ * Normalize the requested Playlist experience.
+ *
+ * Public remains the compatibility default for callers that do not yet send
+ * an experience_key.
+ */
+function rex_playlist_url_experience_key(mixed $value): string
 {
+    $experienceKey = strtolower(trim((string)($value ?? 'public')));
+
+    if ($experienceKey === '') {
+        $experienceKey = 'public';
+    }
+
+    if (!preg_match('/^[a-z0-9_-]+$/', $experienceKey)) {
+        throw new InvalidArgumentException('Invalid experience key.');
+    }
+
+    return $experienceKey;
+}
+
+
+function rex_playlist_url_matches_experience(
+    RexReservation $reservation,
+    string $experienceKey
+): bool {
     return strtolower(trim($reservation->resolverKey)) === 'playlist_experience'
         && strtolower(trim($reservation->resourceType)) === 'playlist'
-        && strtolower(trim((string)($reservation->experienceKey ?? ''))) === 'public'
+        && strtolower(trim((string)($reservation->experienceKey ?? '')))
+            === $experienceKey
         && strtolower(trim($reservation->status)) === 'active';
 }
 
+
 /**
- * Pick the canonical public Playlist REX without using legacy Playlist Instance clues.
+ * Pick the canonical Playlist REX for the requested experience.
  *
  * Prefer a reservation that already has viewer children, then the oldest
  * reservation for stable URLs.
@@ -38,11 +65,16 @@ function rex_playlist_url_is_public_playlist_rex(RexReservation $reservation): b
  */
 function rex_playlist_url_select_canonical(
     array $matches,
-    RexReservationRelationships $relationships
+    RexReservationRelationships $relationships,
+    string $experienceKey
 ): ?RexReservation {
     $eligible = array_values(array_filter(
         $matches,
-        'rex_playlist_url_is_public_playlist_rex'
+        static fn (RexReservation $reservation): bool =>
+            rex_playlist_url_matches_experience(
+                $reservation,
+                $experienceKey
+            )
     ));
 
     if (!$eligible) {
@@ -74,6 +106,7 @@ function rex_playlist_url_select_canonical(
     return $eligible[0] ?? null;
 }
 
+
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
         workflow_respond([
@@ -87,6 +120,10 @@ try {
         'Playlist ID'
     );
 
+    $experienceKey = rex_playlist_url_experience_key(
+        $_GET['experience_key'] ?? 'public'
+    );
+
     $repo = new PdoRexReservationRepository($pdo);
     $relationships = new RexReservationRelationships($repo);
 
@@ -97,30 +134,40 @@ try {
             resourceId: $playlistId,
             status: 'active',
             limit: 500,
-            experienceKey: 'public',
+            experienceKey: $experienceKey,
         )
     );
 
     $matches = array_values(array_filter(
         $reservations,
-        'rex_playlist_url_is_public_playlist_rex'
+        static fn (RexReservation $reservation): bool =>
+            rex_playlist_url_matches_experience(
+                $reservation,
+                $experienceKey
+            )
     ));
 
     $selected = rex_playlist_url_select_canonical(
         $matches,
-        $relationships
+        $relationships,
+        $experienceKey
     );
 
     if (!$selected) {
         workflow_respond([
             'ok' => true,
             'item' => null,
-            'reason' => 'No active Public Playlist REX reservation found.',
+            'experience_key' => $experienceKey,
+            'reason' =>
+                'No active '
+                . ucfirst($experienceKey)
+                . ' Playlist REX reservation found.',
         ]);
     }
 
     workflow_respond([
         'ok' => true,
+        'experience_key' => $experienceKey,
         'item' => rex_admin_reservation_payload($selected),
     ]);
 

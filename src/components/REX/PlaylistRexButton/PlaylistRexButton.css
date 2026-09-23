@@ -9,11 +9,11 @@
 
   padding: 0;
 
-  border: 1px solid var(--admin-accent, #c62a78);
+  border: 1px solid #ffffff;
   border-radius: 5px;
-
-  background: transparent;
-  color: var(--admin-accent, #c62a78);
+  background: var(--admin-accent, #c62a78);
+ 
+  color: #ffffff;
 
   font: inherit;
   font-size: 12px;

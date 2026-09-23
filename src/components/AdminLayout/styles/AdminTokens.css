@@ -15,6 +15,7 @@
   --admin-warning: #c2410c;
   --admin-info: #4b6b8a;
   --admin-accent: #e4658e;
+  --admin-toolbar-bg: var(--brand-muted);
 
   /* Shared admin overlay stack. */
   --admin-z-fullscreen: 1000000;

@@ -61,7 +61,7 @@ const AdminPlaylistSetsPage = lazy(() => import('@pages/AdminPlaylistSetsPage'))
 const AdminPlayerExperiencesPage = lazy(() => import('@pages/AdminPlayerExperiencesPage'));
 const AdminCtasPage = lazy(() => import('@pages/AdminCtasPage'));
 const AdminCtaPagesPage = lazy(() => import('@pages/AdminCtaPagesPage'));
-const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage'));
+const AdminPlaylistsPage = lazy(() => import('@pages/AdminPlaylistsPage/AdminPlaylistsPage'));
 const PlayerPage = lazy(() => import('@pages/PlayerPage'));
 const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
  const AdminAnalyticsPage = lazy(() => import('@pages/AdminAnalyticsPage'));

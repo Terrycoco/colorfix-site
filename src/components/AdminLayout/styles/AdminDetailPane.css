@@ -34,7 +34,7 @@
   min-height: 44px;
   padding: 0.45rem 18px;
   border-bottom: 1px solid var(--admin-border-soft);
-  background: var(--admin-surface);
+  background: var(--admin-toolbar-bg);
 }
 
 .admin-detail-pane__titlebar {

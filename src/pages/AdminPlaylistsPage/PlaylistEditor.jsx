@@ -12,6 +12,10 @@ import {
 } from "react-router-dom";
 
 import {
+  useAppState,
+} from "@context/AppStateContext.jsx";
+
+import {
   AdminBadge,
   AdminButton,
   AdminDetailPane,
@@ -28,6 +32,7 @@ import {
 
 import PhotoPickerDialog from "@components/Dialogs/PhotoPickerDialog";
 import ColorPlanPickerModal from "@components/ColorPlanPickerModal";
+import PlaylistRexButton from "@components/REX/PlaylistRexButton";
 
 import {
   API_FOLDER,
@@ -40,7 +45,6 @@ import {
 
 import PlaylistRecordEditor from "./PlaylistRecordEditor";
 import SlideDefaultsDialog from "./SlideDefaultsDialog";
-import PlaylistRexButton from "@components/REX/PlaylistRexButton";
 import PlaylistSlideEditor, {
   BRAND_BUMPER_BODY_TEMPLATE,
   HUE_WHEEL_BODY_TEMPLATE,
@@ -176,6 +180,11 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
   const navigate =
     useNavigate();
+
+  const {
+    playerExperience,
+    setPlayerExperience,
+  } = useAppState();
 
   const routePlaylistId =
     /^\d+$/.test(
@@ -327,7 +336,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     slideDefaultsOpen,
     setSlideDefaultsOpen,
   ] = useState(false);
-
 
   const [
     photoPickerKey,
@@ -2678,6 +2686,22 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
 
   async function saveAndPlay() {
+    const experienceKey =
+      String(
+        playerExperience ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (!experienceKey) {
+      setDetailError(
+        "Choose a Play As experience first."
+      );
+
+      return;
+    }
+
     const id =
       await savePlaylist();
 
@@ -2686,9 +2710,27 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     }
 
     try {
+      const params =
+        new URLSearchParams();
+
+      params.set(
+        "playlist_id",
+        String(id)
+      );
+
+      params.set(
+        "experience_key",
+        experienceKey
+      );
+
+      params.set(
+        "_",
+        String(Date.now())
+      );
+
       const res =
         await fetch(
-          `${REX_PLAYLIST_URL}?playlist_id=${encodeURIComponent(String(id))}&_=${Date.now()}`,
+          `${REX_PLAYLIST_URL}?${params.toString()}`,
           {
             credentials:
               "include",
@@ -2721,7 +2763,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
       if (!publicUrl) {
         throw new Error(
-          "Saved, but this playlist has no Public REX URL."
+          `Saved, but this playlist has no ${experienceKey} REX URL.`
         );
       }
 
@@ -3177,60 +3219,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   );
 
 
-  const detailMeta = (
-    <>
-      {playlist.playlist_id ? (
-        <AdminMetaText as="span">
-          #{playlist.playlist_id}
-        </AdminMetaText>
-      ) : null}
-
-      {playlist.type ? (
-        <AdminBadge variant="neutral">
-          {playlist.type}
-        </AdminBadge>
-      ) : null}
-
-      <AdminBadge
-        variant={
-          playlist.is_active
-            ? "success"
-            : "neutral"
-        }
-      >
-        {
-          playlist.is_active
-            ? "Active"
-            : "Inactive"
-        }
-      </AdminBadge>
-
-      {dirty ? (
-        <AdminBadge variant="warning">
-          Unsaved
-        </AdminBadge>
-      ) : null}
-
-      {playlist?.playlist_id ? (
-        <PlaylistRexButton
-          playlistId={playlist.playlist_id}
-          title={playlist.title}
-          disabled={dirty || saving}
-        />
-      ) : null}
-
-      <AdminButton
-        type="button"
-        variant="secondary"
-        title="Edit playlist"
-        aria-label="Edit playlist"
-        onClick={openPlaylistEditor}
-      >
-        ✎
-      </AdminButton>
-    </>
-  );
-
   const primaryActions = (
     <AdminToolbar>
       <AdminButton
@@ -3244,11 +3232,48 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
       <AdminButton
         type="button"
+        variant="secondary"
+        disabled={saving}
+        onClick={openPlaylistEditor}
+      >
+        Edit
+      </AdminButton>
+
+      <AdminButton
+        type="button"
         disabled={saving}
         onClick={() => savePlaylist()}
       >
         {saving ? "Saving..." : "Save"}
       </AdminButton>
+
+      <AdminField
+        label="Play As"
+        compact
+      >
+        <select
+          className="admin-field__control"
+          value={playerExperience || ""}
+          onChange={(event) =>
+            setPlayerExperience(
+              event.target.value
+            )
+          }
+        >
+          <option value="">
+            Choose…
+          </option>
+          <option value="public">
+            Public
+          </option>
+          <option value="concept">
+            Concept
+          </option>
+          <option value="client">
+            Client
+          </option>
+        </select>
+      </AdminField>
 
       <AdminButton
         type="button"
@@ -3281,6 +3306,21 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       >
         Slide Defaults
       </AdminButton>
+
+      <PlaylistRexButton
+        playlistId={
+          Number(
+            playlist?.playlist_id ||
+            routePlaylistId ||
+            0
+          )
+        }
+        title={
+          playlist?.title ||
+          ""
+        }
+        disabled={saving}
+      />
     </AdminToolbar>
   );
 
@@ -3410,7 +3450,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       <AdminDetailPane
         ariaLabel="Playlist"
         title={currentTitle}
-        meta={detailMeta}
         actions={
           detailLoading && !isNewRoute
             ? null

@@ -13,6 +13,7 @@ const BRAND_FILTERS_STORAGE_KEY = "pals.brand_filters.v1";
 const ADMIN_EXIT_PATH_STORAGE_KEY = "cf.admin_exit_path.v1";
 const ACTIVE_PROJECT_STORAGE_KEY = "cf.active_project_id.v1";
 const WORKING_PLAYLIST_STORAGE_KEY = "cf.working_playlist_id.v1";
+const PLAYER_EXPERIENCE_STORAGE_KEY = "cf.player_experience.v1";
 //import mockBoards from '@test/mockBoards';
 
 
@@ -257,6 +258,20 @@ export function AppStateProvider({ children }) {
   });
 
  
+  const [playerExperience, setPlayerExperienceState] = useState(() => {
+    if (typeof window === 'undefined') return '';
+
+    try {
+      return String(
+        sessionStorage.getItem(PLAYER_EXPERIENCE_STORAGE_KEY) || ''
+      )
+        .trim()
+        .toLowerCase();
+    } catch {
+      return '';
+    }
+  });
+
   const [recentSwatches, setRecentSwatches] = useState([]); //used for detail screen
 const [searchFilters, setSearchFilters] = useState(() => {
   if (typeof window === 'undefined') return { brands: [] };
@@ -731,6 +746,35 @@ function clearWorkingPlaylistId() {
 }
 
 
+function setPlayerExperience(experience = '') {
+  const next =
+    String(experience || '')
+      .trim()
+      .toLowerCase();
+
+  setPlayerExperienceState(next);
+
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (next) {
+      sessionStorage.setItem(
+        PLAYER_EXPERIENCE_STORAGE_KEY,
+        next
+      );
+    } else {
+      sessionStorage.removeItem(
+        PLAYER_EXPERIENCE_STORAGE_KEY
+      );
+    }
+  } catch {}
+}
+
+function clearPlayerExperience() {
+  setPlayerExperience('');
+}
+
+
   //EXPORTS
   const state = {
     loggedIn, setLoggedIn,
@@ -748,6 +792,7 @@ function clearWorkingPlaylistId() {
     adminExitPath, setAdminExitPath, clearAdminExitPath,
     activeProjectId, setActiveProjectId, clearActiveProjectId,
     workingPlaylistId, setWorkingPlaylistId, clearWorkingPlaylistId,
+    playerExperience, setPlayerExperience, clearPlayerExperience,
     recentSwatches, setRecentSwatches,
     searchFilters, setSearchFilters, clearSearchFilters,
        toggleFilter, clearFilter, setFilterValues, isFilterChecked,

@@ -12,6 +12,7 @@ import {
   AdminField,
   AdminMetaText,
   AdminNotice,
+  AdminPanel,
   AdminSmartGrid,
   AdminStack,
   AdminToolbar,
@@ -74,19 +75,12 @@ function colorLabel(color) {
     || color?.color_name
   );
 
-  const brand = cleanText(
-    color?.brand_name
-    || color?.color_brand_name
-    || color?.brand
-    || color?.color_brand
-  );
-
   const code = cleanText(
     color?.code
     || color?.color_code
   );
 
-  return [name, brand, code]
+  return [name, code]
     .filter(Boolean)
     .join(" · ");
 }
@@ -138,6 +132,7 @@ function memberFromProjectColor(member, index) {
       hex6: member?.color_hex6 || "",
     },
     role: cleanText(member?.role),
+    sheen: cleanText(member?.sheen),
   };
 }
 
@@ -219,7 +214,6 @@ export default function ProjectPalettes({
   const [draftName, setDraftName] = useState("");
   const [draftNote, setDraftNote] = useState("");
   const [draftMembers, setDraftMembers] = useState([]);
-  const [colorPickerKey, setColorPickerKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [drawerError, setDrawerError] = useState("");
   const [drawerStatus, setDrawerStatus] = useState("");
@@ -283,7 +277,6 @@ export default function ProjectPalettes({
     setDraftName("");
     setDraftNote("");
     setDraftMembers([]);
-    setColorPickerKey((current) => current + 1);
     setDrawerError("");
     setDrawerStatus("");
   }, [projectId]);
@@ -366,6 +359,26 @@ export default function ProjectPalettes({
       ),
     },
     {
+      key: "sheen",
+      label: "Sheen",
+      sortable: false,
+      render: (row) => (
+        <input
+          className="admin-field__control"
+          type="text"
+          value={row.sheen || ""}
+          placeholder="flat, eggshell, satin…"
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+          onChange={(event) =>
+            updateMember(row.key, {
+              sheen: event.target.value,
+            })
+          }
+        />
+      ),
+    },
+    {
       key: "remove",
       label: "",
       sortable: false,
@@ -408,9 +421,9 @@ export default function ProjectPalettes({
       (Array.isArray(row?.colors) ? row.colors : [])
         .map(memberFromProjectColor)
     );
-    setColorPickerKey((current) => current + 1);
     setDrawerError("");
     setDrawerStatus("");
+    setDrawerOpen(true);
   }
 
   function closeDrawer() {
@@ -444,11 +457,10 @@ export default function ProjectPalettes({
           key: `new-${color.id}-${Date.now()}`,
           color,
           role: "",
+          sheen: "",
         },
       ];
     });
-
-    setColorPickerKey((current) => current + 1);
   }
 
   async function linkPalette(savedPaletteId, note) {
@@ -508,7 +520,7 @@ export default function ProjectPalettes({
         members: draftMembers.map((member, index) => ({
           color_id: Number(member?.color?.id || 0),
           role: cleanText(member?.role) || null,
-          sheen: null,
+          sheen: cleanText(member?.sheen) || null,
           note: null,
           order_index: index,
         })),
@@ -551,6 +563,7 @@ export default function ProjectPalettes({
           member_id: member.key,
           color_id: member.color.id,
           role: member.role,
+          sheen: member.sheen,
           order_index: index,
           color_name: member.color.name,
           color_brand: member.color.brand,
@@ -570,7 +583,7 @@ export default function ProjectPalettes({
     }
   }
 
-  async function removeFromProject(close = null) {
+  async function removeFromProject() {
     const savedPaletteId = Number(
       drawerPalette?.saved_palette_id || 0
     );
@@ -606,13 +619,7 @@ export default function ProjectPalettes({
       );
 
       setSelectedKey(null);
-
-      if (typeof close === "function") {
-        close();
-      } else {
-        setDrawerOpen(false);
-      }
-
+      setDrawerOpen(false);
       await loadPalettes();
     } catch (err) {
       setDrawerError(
@@ -624,111 +631,8 @@ export default function ProjectPalettes({
     }
   }
 
-  function renderPaletteEditor(close) {
-    return (
-      <AdminStack gap="md">
-        {drawerError ? (
-          <AdminNotice variant="danger">
-            {drawerError}
-          </AdminNotice>
-        ) : null}
-
-        {drawerStatus ? (
-          <AdminNotice>
-            {drawerStatus}
-          </AdminNotice>
-        ) : null}
-
-        <AdminField label="Palette Name" compact>
-          <input
-            className="admin-field__control"
-            type="text"
-            value={draftName}
-            placeholder="Wine Room Teal"
-            onChange={(event) => {
-              setDraftName(event.target.value);
-              setDrawerStatus("");
-            }}
-          />
-        </AdminField>
-
-        <AdminField label="Project Note" compact>
-          <textarea
-            className="admin-field__control"
-            rows={3}
-            value={draftNote}
-            placeholder="Other colors to try, ideas, reminders…"
-            onChange={(event) => {
-              setDraftNote(event.target.value);
-              setDrawerStatus("");
-            }}
-          />
-        </AdminField>
-
-        <FuzzySearchColorSelect
-          key={colorPickerKey}
-          className="full-width"
-          autoFocus={false}
-          preventAutoFocus
-          onSelect={addPickedColor}
-        />
-
-        {draftMembers.length ? (
-          <AdminSmartGrid
-            items={draftMembers}
-            columns={colorColumns}
-            getRowKey={(row) => row.key}
-            ariaLabel="Palette colors"
-            verticalAlign="middle"
-          />
-        ) : (
-          <AdminEmptyState
-            title="No colors yet"
-            message="Use Enter A Color to build this palette."
-          />
-        )}
-
-        <AdminToolbar>
-          {drawerMode === "edit" ? (
-            <AdminButton
-              type="button"
-              variant="danger"
-              disabled={saving}
-              onClick={() => removeFromProject(close)}
-            >
-              Remove from Project
-            </AdminButton>
-          ) : null}
-
-          <AdminToolbarSpacer />
-
-          <AdminButton
-            type="button"
-            variant="secondary"
-            disabled={saving}
-            onClick={close}
-          >
-            Cancel
-          </AdminButton>
-
-          <AdminButton
-            type="button"
-            disabled={
-              saving
-              || !cleanText(draftName)
-              || !draftMembers.length
-            }
-            onClick={savePalette}
-          >
-            {saving ? "Saving..." : "Save Palette"}
-          </AdminButton>
-        </AdminToolbar>
-      </AdminStack>
-    );
-  }
-
-  const projectPaletteActions = (
-    <AdminToolbar>
+  const detailActions = (
+    <>
       <AdminButton
         type="button"
         onClick={openNewPalette}
@@ -736,12 +640,10 @@ export default function ProjectPalettes({
         New Palette
       </AdminButton>
 
-      <AdminToolbarSpacer />
-
-      <AdminMetaText as="span">
+      <AdminMetaText as="div">
         {items.length} palette{items.length === 1 ? "" : "s"}
       </AdminMetaText>
-    </AdminToolbar>
+    </>
   );
 
   return (
@@ -749,72 +651,172 @@ export default function ProjectPalettes({
       <AdminDetailPane
         ariaLabel="Project palettes"
         title="Palettes"
-        actions={projectPaletteActions}
+        actions={detailActions}
       >
-        <AdminStack gap="sm">
-          {error ? (
-            <AdminNotice variant="danger">
-              {error}
-            </AdminNotice>
-          ) : null}
+        {error ? (
+          <AdminNotice variant="danger">
+            {error}
+          </AdminNotice>
+        ) : null}
 
-          <AdminSmartGrid
-            items={items}
-            columns={paletteColumns}
-            getRowKey={(row) => Number(row?.saved_palette_id)}
-            selectedKey={selectedKey}
-            onSelectionChange={(row, key) => {
-              setSelectedKey(
-                key
-                ?? row?.saved_palette_id
-                ?? null
-              );
+        <AdminSmartGrid
+          items={items}
+          columns={paletteColumns}
+          getRowKey={(row) => Number(row?.saved_palette_id)}
+          selectedKey={selectedKey}
+          onSelectionChange={(row, key) =>
+            setSelectedKey(
+              key
+              ?? row?.saved_palette_id
+              ?? null
+            )
+          }
+          onRowDoubleClick={openExistingPalette}
+          defaultSortKey="name"
+          defaultSortDirection="asc"
+          ariaLabel="Project palettes"
+          verticalAlign="middle"
+        />
 
-              if (row) {
-                openExistingPalette(row);
-              }
-            }}
-            drawer={{
-              title: (row) => paletteLabel(row),
-              width: 720,
-              padded: true,
-              portal: true,
-              render: ({ item, close }) =>
-                renderPaletteEditor(close),
-            }}
-            defaultSortKey="name"
-            defaultSortDirection="asc"
-            ariaLabel="Project palettes"
-            verticalAlign="middle"
+        {loading && !items.length ? (
+          <AdminEmptyState
+            title="Palettes"
+            message="Loading project palettes..."
           />
+        ) : null}
 
-          {loading && !items.length ? (
-            <AdminEmptyState
-              title="Palettes"
-              message="Loading project palettes..."
-            />
-          ) : null}
-
-          {!loading && !error && !items.length ? (
-            <AdminEmptyState
-              title="No palettes yet"
-              message="Click New Palette to create the first palette for this project."
-            />
-          ) : null}
-        </AdminStack>
+        {!loading && !error && !items.length ? (
+          <AdminEmptyState
+            title="No palettes yet"
+            message="Click New Palette to create the first palette for this project."
+          />
+        ) : null}
       </AdminDetailPane>
 
       <AdminWorkbenchDrawer
         open={drawerOpen}
         width={720}
-        title="New Palette"
+        title={
+          drawerMode === "new"
+            ? "New Palette"
+            : paletteLabel(drawerPalette)
+        }
         onClose={closeDrawer}
         portal
         padded
       >
-        {renderPaletteEditor(closeDrawer)}
+        <AdminStack gap="md">
+          {drawerError ? (
+            <AdminNotice variant="danger">
+              {drawerError}
+            </AdminNotice>
+          ) : null}
+
+          {drawerStatus ? (
+            <AdminNotice>
+              {drawerStatus}
+            </AdminNotice>
+          ) : null}
+
+          <AdminField label="Palette Name" compact>
+            <input
+              className="admin-field__control"
+              type="text"
+              value={draftName}
+              placeholder="Wine Room Teal"
+              onChange={(event) => {
+                setDraftName(event.target.value);
+                setDrawerStatus("");
+              }}
+            />
+          </AdminField>
+
+          <AdminField label="Project Note" compact>
+            <textarea
+              className="admin-field__control"
+              rows={3}
+              value={draftNote}
+              placeholder="Other colors to try, ideas, reminders…"
+              onChange={(event) => {
+                setDraftNote(event.target.value);
+                setDrawerStatus("");
+              }}
+            />
+          </AdminField>
+
+          <FuzzySearchColorSelect
+            className="full-width"
+            autoFocus={false}
+            preventAutoFocus
+            onSelect={addPickedColor}
+          />
+
+          {draftMembers.length ? (
+            <AdminSmartGrid
+              items={draftMembers}
+              columns={colorColumns}
+              getRowKey={(row) => row.key}
+              ariaLabel="Palette colors"
+              verticalAlign="middle"
+            />
+          ) : (
+            <AdminEmptyState
+              title="No colors yet"
+              message="Use Add Color to build this palette."
+            />
+          )}
+
+          <AdminToolbar>
+            <AdminToolbarSpacer />
+
+            <AdminButton
+              type="button"
+              variant="secondary"
+              disabled={saving}
+              onClick={closeDrawer}
+            >
+              Cancel
+            </AdminButton>
+
+            <AdminButton
+              type="button"
+              disabled={
+                saving
+                || !cleanText(draftName)
+                || !draftMembers.length
+              }
+              onClick={savePalette}
+            >
+              {saving ? "Saving..." : "Save Palette"}
+            </AdminButton>
+          </AdminToolbar>
+
+          {drawerMode === "edit" ? (
+            <>
+              <div
+                aria-hidden="true"
+                style={{
+                  minHeight: 260,
+                }}
+              />
+
+              <AdminPanel
+                title="Danger Zone"
+                compact
+              >
+                <AdminButton
+                  type="button"
+                  variant="danger"
+                  disabled={saving}
+                  onClick={removeFromProject}
+                >
+                  Remove from Project
+                </AdminButton>
+              </AdminPanel>
+            </>
+          ) : null}
+        </AdminStack>
       </AdminWorkbenchDrawer>
     </>
   );
-
 }

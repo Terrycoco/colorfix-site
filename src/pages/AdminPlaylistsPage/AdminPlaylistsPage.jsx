@@ -323,6 +323,19 @@ export default function AdminPlaylistsPage() {
   }
 
 
+  async function beginNewPlaylist() {
+    if (
+      !await commitCurrentEditor()
+    ) {
+      return;
+    }
+
+    navigate(
+      "/admin/playlists/new"
+    );
+  }
+
+
   function handleSaved(
     id
   ) {
@@ -417,26 +430,37 @@ export default function AdminPlaylistsPage() {
           ]}
 
           actions={
-            <AdminButton
-              type="button"
-              variant="secondary"
-              disabled={
-                listLoading
-              }
-              title="Refresh playlists"
-              aria-label="Refresh playlists"
-              onClick={() =>
-                fetchPlaylists(
-                  true
-                )
-              }
-            >
-              {
-                listLoading
-                  ? "…"
-                  : "↻"
-              }
-            </AdminButton>
+            <>
+              <AdminButton
+                type="button"
+                onClick={
+                  beginNewPlaylist
+                }
+              >
+                New
+              </AdminButton>
+
+              <AdminButton
+                type="button"
+                variant="secondary"
+                disabled={
+                  listLoading
+                }
+                title="Refresh playlists"
+                aria-label="Refresh playlists"
+                onClick={() =>
+                  fetchPlaylists(
+                    true
+                  )
+                }
+              >
+                {
+                  listLoading
+                    ? "…"
+                    : "↻"
+                }
+              </AdminButton>
+            </>
           }
         >
           {

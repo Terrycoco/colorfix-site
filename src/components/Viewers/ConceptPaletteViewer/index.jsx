@@ -37,7 +37,7 @@ export default function ConceptPaletteViewer({
   });
 
   const kicker = meta?.kicker_text || "";
-  const displayKicker = kicker ? `${kicker} Concept` : "Concept";
+  const displayKicker = kicker;
   const title = formatTitle(meta?.title || "Design Concept");
   const intro = meta?.intro || "";
   const notes = meta?.notes || "";
@@ -368,23 +368,32 @@ export default function ConceptPaletteViewer({
 
         <div className="apv-column apv-column--details">
           <div className="apv-info cpv-summary">
-            <div className="apv-kicker">{displayKicker}</div>
+            {displayKicker && (
+              <div className="apv-kicker">{displayKicker}</div>
+            )}
 
             <h1>{title}</h1>
 
-            {intro && (
+            {(intro || notes) && (
               <section className="apv-concept-section">
-                <div className="apv-kicker">The Challenge</div>
-                <p className="apv-notes">{intro}</p>
+                {intro && <p className="apv-notes">{intro}</p>}
+                {notes && <p className="apv-notes">{notes}</p>}
               </section>
             )}
 
-            {notes && (
-              <section className="apv-concept-section">
-                <div className="apv-kicker">The Design Direction</div>
-                <p className="apv-notes">{notes}</p>
-              </section>
-            )}
+            <p
+              className="apv-concept-scope-note"
+              style={{
+                textAlign: "left",
+                width: "88%",
+                maxWidth: "88%",
+                marginLeft: 0,
+                marginRight: 0,
+              }}
+            >
+              Design direction only. Final paint colors, placements, and sheens
+              will be confirmed after concept approval.
+            </p>
 
 {resolvedPlaylistUrl && (
   <div className="apv-concept-cta">
@@ -406,10 +415,6 @@ export default function ConceptPaletteViewer({
       </a>
     </div>
 
-    <p className="apv-concept-scope-note">
-      Final paint colors, sheens, placement specifications, and contractor
-      support are included in the Implementation Package.
-    </p>
   </div>
 )}
           </div>

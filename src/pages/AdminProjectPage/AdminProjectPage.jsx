@@ -14,6 +14,7 @@ import {
 
 import {
   AdminButton,
+  AdminDetailPane,
   AdminEmptyState,
   AdminListPane,
   AdminMasterDetail,
@@ -575,87 +576,97 @@ export default function AdminProjectPage() {
 
 
   let detail = null;
-  let detailTitle = "";
-  let detailActions = null;
 
   if (loading) {
     detail =
       (
-        <AdminEmptyState
+        <AdminDetailPane
+          ariaLabel="Project"
           title="Project"
-          message="Loading project..."
-        />
+        >
+          <AdminEmptyState
+            title="Project"
+            message="Loading project..."
+          />
+        </AdminDetailPane>
       );
 
   } else if (error) {
     detail =
       (
-        <AdminNotice variant="danger">
-          {error}
-        </AdminNotice>
+        <AdminDetailPane
+          ariaLabel="Project"
+          title="Project"
+        >
+          <AdminNotice variant="danger">
+            {error}
+          </AdminNotice>
+        </AdminDetailPane>
       );
 
   } else if (!project) {
     detail =
       (
-        <AdminEmptyState
+        <AdminDetailPane
+          ariaLabel="Project"
           title="Project"
-          message="Project not found."
-        />
+        >
+          <AdminEmptyState
+            title="Project"
+            message="Project not found."
+          />
+        </AdminDetailPane>
       );
 
   } else if (
     activeSection ===
     "setup"
   ) {
-    detailTitle =
-      `Project #${project.id} Setup`;
-
-    detailActions =
-      (
-        <AdminButton
-          type="submit"
-          form="admin-project-setup-form"
-        >
-          Save
-        </AdminButton>
-      );
-
     detail =
       (
-        <ProjectSetup
-          project={project}
-          onNewPlaylist={
-            beginNewPlaylist
+        <AdminDetailPane
+          ariaLabel="Project setup"
+          title={`Project #${project.id} Setup`}
+          actions={
+            <AdminButton
+              type="submit"
+              form="admin-project-setup-form"
+            >
+              Save
+            </AdminButton>
           }
-          onSaved={
-            (savedProject) => {
-              setProject(
-                savedProject
-              );
-
-              setWorkingPlaylistId(
-                Number(
-                  savedProject?.playlist_id ||
-                  0
-                ) > 0
-                  ? Number(
-                      savedProject.playlist_id
-                    )
-                  : null
-              );
+        >
+          <ProjectSetup
+            project={project}
+            onNewPlaylist={
+              beginNewPlaylist
             }
-          }
-        />
+            onSaved={
+              (savedProject) => {
+                setProject(
+                  savedProject
+                );
+
+                setWorkingPlaylistId(
+                  Number(
+                    savedProject?.playlist_id ||
+                    0
+                  ) > 0
+                    ? Number(
+                        savedProject.playlist_id
+                      )
+                    : null
+                );
+              }
+            }
+          />
+        </AdminDetailPane>
       );
 
   } else if (
     activeSection ===
     "palettes"
   ) {
-    detailTitle =
-      "Palettes";
-
     detail =
       (
         <ProjectPalettes
@@ -671,9 +682,6 @@ export default function AdminProjectPage() {
     activeSection ===
     "pvs"
   ) {
-    detailTitle =
-      "PVs";
-
     detail =
       (
         <ProjectPVPage
@@ -681,6 +689,15 @@ export default function AdminProjectPage() {
             Number(
               project.id
             )
+          }
+          playlistId={
+            Number(
+              project.playlist_id
+              ||
+              0
+            )
+            ||
+            null
           }
         />
       );
@@ -730,10 +747,15 @@ export default function AdminProjectPage() {
   } else {
     detail =
       (
-        <AdminEmptyState
-          title="No playlist assigned"
-          message="Choose a Playlist in Setup first."
-        />
+        <AdminDetailPane
+          ariaLabel="Playlist"
+          title="Playlist"
+        >
+          <AdminEmptyState
+            title="No playlist assigned"
+            message="Choose a Playlist in Setup first."
+          />
+        </AdminDetailPane>
       );
   }
 
@@ -744,8 +766,6 @@ export default function AdminProjectPage() {
       defaultListWidth={240}
       list={list}
       detail={detail}
-      detailTitle={detailTitle}
-      detailActions={detailActions}
     />
   );
 }
