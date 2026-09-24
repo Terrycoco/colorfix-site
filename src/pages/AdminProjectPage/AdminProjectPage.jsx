@@ -32,6 +32,7 @@ import {
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
 import ProjectPalettes from "./ProjectPalettes";
 import ProjectPVPage from "./ProjectPVPage";
+import ProjectScope from "./ProjectScope";
 import ProjectSetup from "./ProjectSetup";
 
 import "./admin-project.css";
@@ -52,6 +53,7 @@ const PROJECT_SECTION_STORAGE_KEY =
 const PROJECT_SECTIONS =
   new Set([
     "setup",
+    "scope",
     "playlist",
     "palettes",
     "pvs",
@@ -520,6 +522,20 @@ export default function AdminProjectPage() {
           />
 
           <AdminObjectListItem
+            id="scope"
+            title="Scope"
+            selected={
+              activeSection ===
+              "scope"
+            }
+            onSelect={() =>
+              setActiveSection(
+                "scope"
+              )
+            }
+          />
+
+          <AdminObjectListItem
             id="playlist"
             title="Playlists"
             meta={[
@@ -658,6 +674,34 @@ export default function AdminProjectPage() {
                     : null
                 );
               }
+            }
+          />
+        </AdminDetailPane>
+      );
+
+  } else if (
+    activeSection ===
+    "scope"
+  ) {
+    detail =
+      (
+        <AdminDetailPane
+          ariaLabel="Project scope"
+          title={`Project #${project.id} Scope`}
+          actions={
+            <AdminButton
+              type="submit"
+              form="admin-project-scope-form"
+            >
+              Save
+            </AdminButton>
+          }
+        >
+          <ProjectScope
+            projectId={
+              Number(
+                project.id
+              )
             }
           />
         </AdminDetailPane>
