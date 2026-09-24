@@ -10,6 +10,8 @@ use App\PUB\Dispatch\Pinterest\PinterestShippingConfig;
 use App\PUB\Dispatch\Pinterest\PinterestVideoShipper;
 use App\PUB\Dispatch\YouTube\YouTubeShippingConfig;
 use App\PUB\Dispatch\YouTube\YouTubeVideoShipper;
+use App\PUB\Errors\CriticalErrorNotifier;
+use App\PUB\Errors\PubErrorCode;
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
@@ -17,6 +19,7 @@ use App\PUB\PubCom\PubComManagerContract;
 use App\PUB\PubCom\PubComSignal;
 use App\PUB\PubCom\PubComWorkerContract;
 use App\PUB\Repos\PdoPubAssetRepository;
+use App\PUB\Repos\PdoPubErrorRepository;
 use App\PUB\Support\ProductionSignature;
 use App\REX\Repos\PdoRexReservationRepository;
 use PDO;
@@ -115,7 +118,13 @@ final class DispatchManager implements PubComManagerContract
         $this->errors =
             new PubErrorReporter(
                 $this->projectRoot
-                . '/app/PUB/Errors/pub_errors.log'
+                . '/app/PUB/Errors/pub_errors.log',
+                new PdoPubErrorRepository(
+                    $this->pdo
+                ),
+                new CriticalErrorNotifier(
+                    $this->projectRoot
+                )
             );
     }
 
@@ -722,13 +731,38 @@ final class DispatchManager implements PubComManagerContract
 
 
         /*
-         * notify_on_publish is a generic Scheduler instruction.
+         * SUCCESS NOTIFICATION
+         *
+         * notify_on_publish remains the generic Scheduler instruction for
+         * channels that want a success email.
+         *
+         * YouTube is special operationally: every successfully shipped
+         * YouTube video must notify Terry regardless of how it got here
+         * (automatic Schedule, Send Now, or Retry Shipping), because the
+         * uploaded video still needs Terry's manual PUBLIC step.
          *
          * The shipment is already durably SHIPPED before notification is
          * attempted. Mail trouble must never turn a successful shipment
          * into a Dispatch failure.
          */
-        if ($notifyOnPublish) {
+        $channel =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'channel'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+        $shouldNotify =
+            $notifyOnPublish
+            || $channel === 'youtube';
+
+
+        if ($shouldNotify) {
             try {
                 $notifier =
                     new PublishNotifier(
@@ -762,6 +796,11 @@ final class DispatchManager implements PubComManagerContract
 
                                 'pub_asset_id' =>
                                     $pubAssetId,
+
+                                'channel' =>
+                                    $channel !== ''
+                                        ? $channel
+                                        : null,
 
                                 'code' =>
                                     'publish_notification_failure',
@@ -909,6 +948,64 @@ final class DispatchManager implements PubComManagerContract
                 'dispatch',
                 $code,
                 $message
+            );
+
+
+        /*
+         * This is a definitive Dispatch failure, including failures reported
+         * back later by an asynchronous driver. Record it in the permanent
+         * PUB error log as well as on the asset row.
+         */
+        $centralCode =
+            $this->centralErrorCodeForDispatchFailure(
+                $asset,
+                $code,
+                $message
+            );
+
+        $this->errors
+            ->report(
+                new RuntimeException(
+                    $message
+                ),
+                [
+                    'stage' =>
+                        'dispatch',
+
+                    'pub_asset_id' =>
+                        $pubAssetId,
+
+                    'asset_type' =>
+                        $asset[
+                            'asset_type'
+                        ]
+                        ?? null,
+
+                    'source_type' =>
+                        $asset[
+                            'source_type'
+                        ]
+                        ?? null,
+
+                    'source_id' =>
+                        $asset[
+                            'source_id'
+                        ]
+                        ?? null,
+
+                    'channel' =>
+                        $this->channelForAsset(
+                            $asset
+                        ),
+
+                    'code' =>
+                        $centralCode,
+
+                    'diagnostics' => [
+                        'reported_dispatch_code' =>
+                            $code,
+                    ],
+                ]
             );
 
 
@@ -1135,13 +1232,76 @@ final class DispatchManager implements PubComManagerContract
                  * A failed readiness/preflight gate must not strand it
                  * at pipeline_stage=shipping.
                  */
+                $signalMessage =
+                    $signal
+                        ->message();
+
+
                 $this->assets
                     ->markError(
                         $pubAssetId,
                         'dispatch',
                         'dispatch_failure',
-                        $signal
-                            ->message()
+                        $signalMessage
+                    );
+
+
+                /*
+                 * PubCom explains the operational condition to the Manager.
+                 * Once that condition actually prevents this Dispatch unit
+                 * from shipping, it also belongs in the permanent error log.
+                 */
+                $this->errors
+                    ->report(
+                        new RuntimeException(
+                            $signalMessage
+                        ),
+                        [
+                            'stage' =>
+                                'dispatch',
+
+                            'pub_asset_id' =>
+                                $pubAssetId,
+
+                            'asset_type' =>
+                                $asset[
+                                    'asset_type'
+                                ]
+                                ?? null,
+
+                            'source_type' =>
+                                $asset[
+                                    'source_type'
+                                ]
+                                ?? null,
+
+                            'source_id' =>
+                                $asset[
+                                    'source_id'
+                                ]
+                                ?? null,
+
+                            'channel' =>
+                                $this->channelForAsset(
+                                    $asset
+                                ),
+
+                            'code' =>
+                                $this->centralErrorCodeForDispatchFailure(
+                                    $asset,
+                                    'dispatch_failure',
+                                    $signalMessage
+                                ),
+
+                            'diagnostics' => [
+                                'line' =>
+                                    $lineKey,
+
+                                'pubcom_type' =>
+                                    $signal
+                                        ->type(),
+                            ],
+                        ]
                     );
 
 
@@ -1368,8 +1528,17 @@ final class DispatchManager implements PubComManagerContract
                                 ]
                                 ?? null,
 
+                            'channel' =>
+                                $this->channelForAsset(
+                                    $asset
+                                ),
+
                             'code' =>
-                                'dispatch_failure',
+                                $this->centralErrorCodeForDispatchFailure(
+                                    $asset,
+                                    'dispatch_failure',
+                                    $e->getMessage()
+                                ),
 
                             'diagnostics' => [
                                 'batch_index' =>
@@ -1794,4 +1963,134 @@ final class DispatchManager implements PubComManagerContract
             'DISPATCH received an asset without a usable sealed package.'
         );
     }
+
+    /**
+     * Permanent PUB error code for a failed Dispatch unit.
+     *
+     * Keep the catalog conservative. Unknown failures retain the code
+     * already supplied by the Dispatch path and therefore fall through
+     * PubErrorPolicy as ordinary non-email errors.
+     *
+     * Auth loss is different: unattended publishing cannot recover without
+     * Terry reconnecting the channel, so that condition is promoted to the
+     * known critical code.
+     */
+    private function centralErrorCodeForDispatchFailure(
+        array $asset,
+        string $reportedCode,
+        string $message
+    ): string {
+        $channel =
+            $this->channelForAsset(
+                $asset
+            );
+
+
+        if (
+            $this->isAuthenticationInterventionRequired(
+                $channel,
+                $message
+            )
+        ) {
+            return
+                PubErrorCode::DISPATCH_AUTH_REVOKED;
+        }
+
+
+        $reportedCode =
+            trim(
+                $reportedCode
+            );
+
+
+        return
+            $reportedCode !== ''
+                ? $reportedCode
+                : PubErrorCode::PUB_FAILURE;
+    }
+
+
+    private function channelForAsset(
+        array $asset
+    ): ?string {
+        $channel =
+            strtolower(
+                trim(
+                    (string)(
+                        $asset[
+                            'channel'
+                        ]
+                        ?? ''
+                    )
+                )
+            );
+
+
+        return
+            $channel !== ''
+                ? $channel
+                : null;
+    }
+
+
+    /**
+     * Current known critical automation failure:
+     * provider authentication is unusable and requires human reconnection.
+     *
+     * YouTube currently surfaces this through a generic Shipper-unavailable
+     * PubCom signal, so the provider message is the only preserved detail
+     * that distinguishes auth loss from other station outages.
+     */
+    private function isAuthenticationInterventionRequired(
+        ?string $channel,
+        string $message
+    ): bool {
+        if (
+            $channel !== 'youtube'
+            && $channel !== 'pinterest'
+        ) {
+            return false;
+        }
+
+
+        $message =
+            strtolower(
+                trim(
+                    $message
+                )
+            );
+
+
+        if ($message === '') {
+            return false;
+        }
+
+
+        foreach (
+            [
+                'invalid_grant',
+                'expired or revoked',
+                'token has been expired or revoked',
+                'no refresh token is available',
+                'reconnect youtube',
+                'reconnect pinterest',
+                'youtube is not connected',
+                'pinterest is not connected',
+            ]
+            as $needle
+        ) {
+            if (
+                str_contains(
+                    $message,
+                    $needle
+                )
+            ) {
+                return true;
+            }
+        }
+
+
+        return false;
+    }
+
 }

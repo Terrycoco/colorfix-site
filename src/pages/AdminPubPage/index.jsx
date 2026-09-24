@@ -36,6 +36,9 @@ import PubScheduleTable
 import PubDispatchTable
   from "./PubDispatchTable";
 
+import PubErrorsTable
+  from "./PubErrorsTable";
+
 import PubAnalyzeStage
   from "./PubAnalyzeStage";
 
@@ -52,6 +55,7 @@ const PUB_STAGE_KEYS =
     "package",
     "schedule",
     "dispatch",
+    "errors",
   ]);
 
 
@@ -489,6 +493,20 @@ export default function AdminPubPage() {
                   )
                 }
               />
+
+              <AdminObjectListItem
+                id="errors"
+                title="Errors"
+                selected={
+                  stage ===
+                  "errors"
+                }
+                onSelect={() =>
+                  setStage(
+                    "errors"
+                  )
+                }
+              />
             </AdminObjectList>
           </AdminListPane>
         }
@@ -549,6 +567,10 @@ export default function AdminPubPage() {
             ) : stage ===
             "dispatch" ? (
               <PubDispatchTable />
+
+            ) : stage ===
+            "errors" ? (
+              <PubErrorsTable />
 
             ) : stage ===
             "analyze" ? (
