@@ -1,0 +1,193 @@
+.document-sheet {
+  width: 8.5in;
+  min-height: 11in;
+  margin: 0 auto;
+  padding: 0.7in 0.75in 0.8in;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #d8dde1;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  color: #20262d;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.5pt;
+  line-height: 1.38;
+}
+
+.document-sheet h1,
+.document-sheet h2,
+.document-sheet h3,
+.document-sheet p,
+.document-sheet ul,
+.document-sheet ol {
+  margin-top: 0;
+}
+
+.document-sheet h1 {
+  margin-bottom: 14px;
+  font-size: 15pt;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+.document-sheet h2 {
+  margin: 24px 0 5px;
+  padding: 0;
+  border: 0;
+  font-size: 9.75pt;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+
+.document-sheet h3 {
+  margin: 18px 0 4px;
+  font-size: 9.5pt;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.document-sheet p {
+  margin-bottom: 7px;
+  font-size: 9.5pt;
+  line-height: 1.38;
+}
+
+/* Keep the client/project/designer block at normal body size. */
+.document-sheet h1 + p {
+  margin-bottom: 18px;
+  font-size: 9.5pt;
+  line-height: 1.38;
+}
+
+.document-sheet ul,
+.document-sheet ol {
+  margin-bottom: 8px;
+  padding-left: 18px;
+}
+
+.document-sheet li + li {
+  margin-top: 1px;
+}
+
+.document-sheet strong {
+  font-weight: 700;
+}
+
+.document-sheet hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid #dfe4e8;
+}
+
+@media (max-width: 900px) {
+  .document-sheet {
+    width: 100%;
+    min-height: 0;
+    padding: 30px 34px 38px;
+  }
+}
+
+@media (max-width: 560px) {
+  .document-sheet {
+    padding: 22px 18px 28px;
+  }
+}
+
+@media print {
+  @page {
+    size: Letter;
+    margin: 0;
+  }
+
+  .document-sheet {
+    width: 8.5in;
+    min-height: 11in;
+    margin: 0;
+    padding: 0.7in 0.75in 0.8in;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Admin preview only. The underlying document remains true US Letter size. */
+.document-preview-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  overflow: auto;
+  padding: 8px 0 18px;
+}
+
+.document-sheet--preview {
+  zoom: 0.74;
+}
+
+@media print {
+  .document-preview-stage {
+    display: block;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .document-sheet--preview {
+    zoom: 1;
+  }
+}
+
+/* Full-screen admin review. The document itself remains the same Letter sheet. */
+.document-preview-stage--clickable {
+  cursor: zoom-in;
+}
+
+.document-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: auto;
+  background: rgba(20, 24, 28, 0.88);
+  cursor: zoom-out;
+}
+
+.document-review-overlay__stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 32px 24px 56px;
+}
+
+.document-sheet--review {
+  flex: 0 0 auto;
+  margin: 0;
+  zoom: 1;
+  cursor: zoom-out;
+}
+
+@media (max-width: 900px) {
+  .document-review-overlay__stage {
+    padding: 18px 12px 32px;
+  }
+
+  .document-review-overlay .document-sheet {
+    width: 8.5in;
+    min-height: 11in;
+    padding: 0.7in 0.75in 0.8in;
+  }
+}
+
+@media print {
+  .document-review-overlay {
+    position: static;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .document-review-overlay__stage {
+    display: block;
+    padding: 0;
+  }
+}

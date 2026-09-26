@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ANAProvider, { resolveSessionId } from "@ANA/ANAProvider";
 import ANATrack from "@ANA/ANATrack";
 import { recordANAEvent } from "@ANA/ANAClient";
@@ -11,7 +11,6 @@ import Player from "@RX/Player";
 import PV from "@RX/PV";
 import Thumbs from "@RX/Thumbs";
 import "../RexPublicPage/rex-public-page.css";
-
 
 const EMPTY_STATE = {
   loading: true,
@@ -26,7 +25,30 @@ const EMPTY_STATE = {
 
 export default function RexPublicPage() {
   const { token = "" } = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState(EMPTY_STATE);
+
+  const returnTo = normalizeInternalReturnPath(
+    searchParams.get("return_to") ?? ""
+  );
+
+  const browserBackRequested =
+    searchParams.get("back") === "1";
+
+  const showViewerBack =
+    Boolean(returnTo) || browserBackRequested;
+
+  const handleViewerBack = showViewerBack
+    ? () => {
+        if (returnTo) {
+          navigate(withSourceParam(returnTo));
+          return;
+        }
+
+        window.history.back();
+      }
+    : undefined;
 
   useEffect(() => {
     if (!token) {
@@ -60,8 +82,6 @@ export default function RexPublicPage() {
         const destination = payload.data.destination || {};
         const rex = payload.data.rex || null;
 
-
-        
         if (resolverKey === "route") {
           const path = String(destination.path || "").trim();
 
@@ -174,9 +194,9 @@ export default function RexPublicPage() {
 
   if (state.kind === "playlist") {
     return (
-          <ANAProvider rex={state.rex}>
-            <ANATrack>
-        <Player playbackPlan={state.playbackPlan} />
+      <ANAProvider rex={state.rex}>
+        <ANATrack>
+          <Player playbackPlan={state.playbackPlan} />
         </ANATrack>
       </ANAProvider>
     );
@@ -184,24 +204,26 @@ export default function RexPublicPage() {
 
   if (state.kind === "viewer") {
     return (
-          <ANAProvider rex={state.rex}>
-            <ANATrack>
-      <PV
-        viewer={state.viewer}
-        experienceKey={state.experienceKey}
-      />
-      </ANATrack>
+      <ANAProvider rex={state.rex}>
+        <ANATrack>
+          <PV
+            viewer={state.viewer}
+            experienceKey={state.experienceKey}
+            showBackButton={showViewerBack}
+            onBack={handleViewerBack}
+          />
+        </ANATrack>
       </ANAProvider>
     );
   }
 
   if (state.kind === "thumbs") {
     return (
-          <ANAProvider rex={state.rex}>
-            <ANATrack>
-    <Thumbs collection={state.collection} />
-    </ANATrack>
-    </ANAProvider>
+      <ANAProvider rex={state.rex}>
+        <ANATrack>
+          <Thumbs collection={state.collection} />
+        </ANATrack>
+      </ANAProvider>
     );
   }
 
@@ -210,4 +232,13 @@ export default function RexPublicPage() {
       {state.error || "Link not found."}
     </div>
   );
+}
+
+function normalizeInternalReturnPath(value) {
+  const trimmed = String(value || "").trim();
+
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "";
+
+  return trimmed;
 }

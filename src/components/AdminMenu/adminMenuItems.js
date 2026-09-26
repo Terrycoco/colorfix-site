@@ -38,7 +38,7 @@ export const adminMenuItems = [
       { label: "Project", href: "/admin/project" },
       { label: "Clients", href: "/admin/clients" },
       { label: "Properties", href: "/admin/properties" },
-      { label: "Email Templates", href: "/admin/email-templates" },
+      { label: "Doc Templates", href: "/admin/templates" },
       { label: "Share", href: "/admin/share" },
     ],
   },

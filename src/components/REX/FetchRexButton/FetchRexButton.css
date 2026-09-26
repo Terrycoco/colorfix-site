@@ -2,23 +2,36 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 7px 13px;
-  border: 1px solid #111827;
-  border-radius: 6px;
-  background: #111827;
-  color: #fff;
+
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+
+  padding: 0;
+
+  border: 1px solid #ffffff;
+  border-radius: 5px;
+  background: var(--admin-accent, #c62a78);
+
+  color: #ffffff;
+
   font: inherit;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
   line-height: 1;
+
   cursor: pointer;
 }
 
 .fetch-rex-button:hover:not(:disabled) {
-  background: #1f2937;
+  background: color-mix(
+    in srgb,
+    var(--admin-accent, #c62a78) 10%,
+    transparent
+  );
 }
 
 .fetch-rex-button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }

@@ -1,7 +1,10 @@
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -21,6 +24,7 @@ import {
 
 import PhotoPickerDialog from "@components/Dialogs/PhotoPickerDialog";
 import KickerDropdown from "@components/KickerDropdown";
+import FetchRexButton from "@components/REX/FetchRexButton";
 
 import {
   API_FOLDER,
@@ -282,6 +286,37 @@ function rexUrlFromDetail(
 }
 
 
+function rexAdminUrl(
+  value
+) {
+  const raw =
+    cleanText(
+      value
+    );
+
+  if (!raw) {
+    return "";
+  }
+
+  try {
+    const url =
+      new URL(
+        raw,
+        window.location.origin
+      );
+
+    url.searchParams.set(
+      "back",
+      "1"
+    );
+
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+
 function normalizePVDetail(
   payload,
   row
@@ -390,12 +425,12 @@ function normalizePVDetail(
 }
 
 
-function PVDrawerEditor({
+const PVDrawerEditor = forwardRef(function PVDrawerEditor({
   item,
   palettes,
   playlistId,
   onSaved,
-}) {
+}, ref) {
   const [
     detail,
     setDetail,
@@ -1259,13 +1294,17 @@ function PVDrawerEditor({
     photo,
     role
   ) {
-    const index =
-      usedPhotoIndex(
-        photo
+    const isUsed =
+      detail?.photos?.some(
+        (row) =>
+          samePhoto(
+            row,
+            photo
+          )
       );
 
     if (
-      index < 0
+      !isUsed
     ) {
       return;
     }
@@ -1276,12 +1315,11 @@ function PVDrawerEditor({
     ) {
       const anotherMain =
         detail.photos.some(
-          (
-            row,
-            rowIndex
-          ) =>
-            rowIndex !==
-              index
+          (row) =>
+            !samePhoto(
+              row,
+              photo
+            )
             &&
             cleanText(
               row?.photo_type
@@ -1314,16 +1352,19 @@ function PVDrawerEditor({
 
           photos:
             current.photos.map(
-              (
-                row,
-                rowIndex
-              ) =>
-                rowIndex ===
-                index
+              (row) =>
+                samePhoto(
+                  row,
+                  photo
+                )
                   ? {
                       ...row,
                       photo_type:
                         role,
+                      trigger_mode:
+                        role === "before"
+                          ? "none"
+                          : "any",
                       caption:
                         role === "before"
                           ? "Before"
@@ -1564,10 +1605,12 @@ function PVDrawerEditor({
               trigger_mode:
                 cleanText(
                   photo
-                    ?.trigger_mode
-                )
-                ||
-                "any",
+                    ?.photo_type
+                ).toLowerCase()
+                ===
+                "before"
+                  ? "none"
+                  : "any",
 
               trigger_color_id:
                 null,
@@ -1659,62 +1702,14 @@ function PVDrawerEditor({
   }
 
 
-  async function viewPV() {
-    if (
-      saving
-    ) {
-      return;
-    }
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: savePV,
+    }),
+    [detail, saving]
+  );
 
-    const previewWindow =
-      window.open(
-        "",
-        "_blank"
-      );
-
-    const saved =
-      await savePV();
-
-    if (
-      !saved
-    ) {
-      previewWindow?.close();
-      return;
-    }
-
-    const rexUrl =
-      rexUrlFromDetail(
-        saved
-      );
-
-    if (
-      !rexUrl
-    ) {
-      previewWindow?.close();
-
-      setError(
-        "This PV does not currently have a REX URL."
-      );
-
-      return;
-    }
-
-    if (
-      previewWindow
-    ) {
-      previewWindow.opener =
-        null;
-
-      previewWindow.location.href =
-        rexUrl;
-
-      return;
-    }
-
-    window.location.assign(
-      rexUrl
-    );
-  }
 
 
   if (
@@ -1765,36 +1760,6 @@ function PVDrawerEditor({
             : null
         }
 
-        <AdminToolbar compact>
-          <AdminButton
-            type="button"
-            disabled={
-              saving
-            }
-            onClick={
-              savePV
-            }
-          >
-            {
-              saving
-                ? "Saving..."
-                : "Save"
-            }
-          </AdminButton>
-
-          <AdminButton
-            type="button"
-            variant="secondary"
-            disabled={
-              saving
-            }
-            onClick={
-              viewPV
-            }
-          >
-            View
-          </AdminButton>
-        </AdminToolbar>
 
         <AdminPanel
           title="PV"
@@ -2341,7 +2306,7 @@ function PVDrawerEditor({
       </AdminDialog>
     </>
   );
-}
+});
 
 
 export default function ProjectPVPage({
@@ -2373,6 +2338,9 @@ export default function ProjectPVPage({
     selectedKey,
     setSelectedKey,
   ] = useState(null);
+
+  const pvEditorRef =
+    useRef(null);
 
 
   const [
@@ -2669,58 +2637,14 @@ export default function ProjectPVPage({
               ),
         },
 
-        {
-          key:
-            "rex",
-
-          label:
-            "REX",
-
-          sortable:
-            false,
-
-          render:
-            (item) => (
-              <button
-                type="button"
-                className="admin-smart-grid__edit-button"
-                title="View PV"
-                aria-label={`View ${derivedHandle(item)}`}
-                onClick={(
-                  event
-                ) => {
-                  event.stopPropagation();
-
-                  void openPVFromGrid(
-                    item
-                  );
-                }}
-              >
-                R↗
-              </button>
-            ),
-        },
       ],
-      [
-        onRex,
-      ]
+      []
     );
 
 
-  async function openPVFromGrid(
+  async function viewPVFromGrid(
     item
   ) {
-    if (
-      typeof onRex ===
-      "function"
-    ) {
-      onRex(
-        item
-      );
-
-      return;
-    }
-
     const pvId =
       Number(
         item?.palette_viewer_id
@@ -2770,15 +2694,14 @@ export default function ProjectPVPage({
         !rexUrl
       ) {
         throw new Error(
-          "This PV does not currently have a REX URL."
+          "This PV does not currently have a viewer URL."
         );
       }
 
-      window.open(
-        rexUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.location.href =
+        rexAdminUrl(
+          rexUrl
+        );
 
     } catch (err) {
       setError(
@@ -3062,6 +2985,24 @@ export default function ProjectPVPage({
   }
 
 
+  const selectedPV =
+    items.find(
+      (item) =>
+        Number(
+          item?.palette_viewer_id
+          ||
+          0
+        ) ===
+        Number(
+          selectedKey
+          ||
+          0
+        )
+    )
+    ||
+    null;
+
+
   const detailActions = (
     <>
       <AdminButton
@@ -3071,6 +3012,101 @@ export default function ProjectPVPage({
       >
         New PV
       </AdminButton>
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={!selectedPV}
+        onClick={() => {
+          if (selectedPV) {
+            void viewPVFromGrid(
+              selectedPV
+            );
+          }
+        }}
+      >
+        View
+      </AdminButton>
+
+      <FetchRexButton
+        buttonLabel="R↗"
+        disabled={!selectedPV}
+        request={
+          selectedPV
+            ? {
+                label:
+                  cleanText(
+                    selectedPV?.title
+                  )
+                  ||
+                  derivedHandle(
+                    selectedPV
+                  ),
+
+                resolverKey:
+                  "viewer",
+
+                resourceType:
+                  "palette_viewer",
+
+                resourceId:
+                  Number(
+                    selectedPV?.palette_viewer_id
+                    ||
+                    0
+                  ),
+
+                context: {
+                  format:
+                    cleanText(
+                      selectedPV?.format
+                      ??
+                      selectedPV?.experience_key
+                    )
+                    ||
+                    "public",
+                },
+              }
+            : null
+        }
+        resolveExistingUrl={async () => {
+          const pvId =
+            Number(
+              selectedPV?.palette_viewer_id
+              ||
+              0
+            );
+
+          if (pvId <= 0) {
+            return "";
+          }
+
+          const data =
+            await readJson(
+              await fetch(
+                `${PV_ADMIN_URL}?id=${encodeURIComponent(
+                  pvId
+                )}&_=${Date.now()}`,
+                {
+                  credentials:
+                    "include",
+
+                  cache:
+                    "no-store",
+                }
+              ),
+
+              "Failed to load PV"
+            );
+
+          return rexUrlFromDetail(
+            data?.item
+          );
+        }}
+        onCreated={() => {
+          void loadPage();
+        }}
+      />
 
       <AdminMetaText as="div">
         {items.length} PV{items.length === 1 ? "" : "s"}
@@ -3193,11 +3229,48 @@ export default function ProjectPVPage({
           padded:
             true,
 
+          closeLabel:
+            "Save & Close",
+
+          beforeClose:
+            async () => {
+              const saved =
+                await pvEditorRef.current?.save?.();
+
+              if (!saved) {
+                return false;
+              }
+
+              // The drawer is the single commit point.
+              // Reload so the PV list and editor both come back from the DB.
+              window.location.reload();
+
+              return false;
+            },
+
+          footer:
+            ({
+              close,
+              closing,
+            }) => (
+              <button
+                type="button"
+                className="admin-button admin-button--primary"
+                disabled={closing}
+                onClick={close}
+              >
+                {closing
+                  ? "Saving..."
+                  : "Save & Close"}
+              </button>
+            ),
+
           render:
             ({
               item,
             }) => (
               <PVDrawerEditor
+                ref={pvEditorRef}
                 item={
                   item
                 }

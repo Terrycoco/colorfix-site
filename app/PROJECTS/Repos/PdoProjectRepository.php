@@ -26,12 +26,32 @@ final class PdoProjectRepository
                 p.playlist_id,
                 c.name AS client_name,
                 pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
                 pl.title AS playlist_title
              FROM projects p
              LEFT JOIN clients c
                ON c.id = p.client_id
              LEFT JOIN properties pr
                ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
              LEFT JOIN playlists pl
                ON pl.playlist_id = p.playlist_id
              ORDER BY p.id DESC'
@@ -56,11 +76,34 @@ final class PdoProjectRepository
                 p.playlist_id,
                 c.name AS client_name,
                 pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
                 pl.title AS playlist_title
              FROM projects p
-             LEFT JOIN clients c ON c.id = p.client_id
-             LEFT JOIN properties pr ON pr.id = p.property_id
-             LEFT JOIN playlists pl ON pl.playlist_id = p.playlist_id
+             LEFT JOIN clients c
+               ON c.id = p.client_id
+             LEFT JOIN properties pr
+               ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
+             LEFT JOIN playlists pl
+               ON pl.playlist_id = p.playlist_id
              WHERE p.property_id = :property_id
              ORDER BY p.project_name ASC, p.id ASC'
         );
@@ -137,12 +180,32 @@ final class PdoProjectRepository
                 p.playlist_id,
                 c.name AS client_name,
                 pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
                 pl.title AS playlist_title
              FROM projects p
              LEFT JOIN clients c
                ON c.id = p.client_id
              LEFT JOIN properties pr
                ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
              LEFT JOIN playlists pl
                ON pl.playlist_id = p.playlist_id
              WHERE p.id = :project_id

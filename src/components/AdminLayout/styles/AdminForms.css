@@ -15,24 +15,57 @@
   text-transform: uppercase;
 }
 
-select.admin-field__control {
-  width: auto;
+/*
+ * Standard vertical form controls stay at a readable working width instead
+ * of stretching across the entire detail pane. Compact/grow fields and
+ * explicit --full controls keep their existing layout behavior.
+ */
+.admin-field:not(.admin-field--compact):not(.admin-field--grow)
+  > input.admin-field__control:not(.admin-field__control--full),
+.admin-field:not(.admin-field--compact):not(.admin-field--grow)
+  > textarea.admin-field__control:not(.admin-field__control--full) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 620px;
+}
+
+/*
+ * Numeric controls should read like numeric controls, not text-entry fields.
+ * Full-width remains available explicitly with --full.
+ */
+.admin-field:not(.admin-field--compact):not(.admin-field--grow)
+  > input.admin-field__control[type="number"]:not(.admin-field__control--full) {
+  width: 10rem;
+  max-width: 100%;
+}
+
+/*
+ * Selects should read like choices, not text-entry fields. By default they
+ * size to their content with enough room to make the native arrow easy to
+ * find. Use --full only when a select deliberately needs to fill its row.
+ */
+select.admin-field__control:not(.admin-field__control--full) {
+  box-sizing: border-box;
+  field-sizing: content;
+  width: fit-content;
+  min-width: 10rem;
   max-width: min(100%, 28rem);
   height: 34px;
   min-height: 34px;
   padding-block: 0;
+  padding-inline: 10px 30px;
   background-color: var(--admin-surface);
   color: var(--admin-text);
-}
-
-select.admin-field__control {
-  width: auto;
-  max-width: min(100%, 28rem);
 }
 
 select.admin-field__control.admin-field__control--full {
   width: 100%;
   max-width: 100%;
+  height: 34px;
+  min-height: 34px;
+  padding-block: 0;
+  background-color: var(--admin-surface);
+  color: var(--admin-text);
 }
 
 .admin-button--secondary {

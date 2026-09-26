@@ -74,7 +74,7 @@ export default function AdminWorkbenchDrawer({
             disabled={closing}
             onClick={requestClose}
           >
-            ← CLOSE
+            {closing ? "Saving..." : "Save & Close"}
           </button>
         </div>
       ) : null}

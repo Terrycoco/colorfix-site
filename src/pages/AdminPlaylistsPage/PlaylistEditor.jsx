@@ -865,14 +865,27 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               }
 
               result.push({
+                ...row,
+
                 id:
                   row.id,
+
+                saved_palette_id:
+                  row.saved_palette_id
+                  ??
+                  row.id,
+
+                project_id:
+                  row.project_id
+                  ??
+                  "",
 
                 palette_hash:
                   hash,
 
                 label:
                   String(
+                    row.display_title ||
                     row.nickname ||
                     ""
                   ).trim()
@@ -1440,23 +1453,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       return;
     }
 
-    /*
-     * Normal playlist navigation commits pending work first.
-     * There is no discard prompt in the ordinary workflow.
-     */
-    if (
-      dirty
-    ) {
-      const savedId =
-        await savePlaylist();
-
-      if (
-        !savedId
-      ) {
-        return;
-      }
-    }
-
     navigate(
       `/admin/playlists/${id}`
     );
@@ -1464,23 +1460,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
 
   async function beginNewPlaylist() {
-    /*
-     * Starting another playlist is also normal navigation:
-     * save the current work first, then continue.
-     */
-    if (
-      dirty
-    ) {
-      const savedId =
-        await savePlaylist();
-
-      if (
-        !savedId
-      ) {
-        return;
-      }
-    }
-
     navigate(
       "/admin/playlists/new"
     );
@@ -2351,20 +2330,13 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       return;
     }
 
-    const savedId =
-      await savePlaylist(
-        null,
-        nextItems
-      );
-
-    if (
-      !savedId
-    ) {
-      return;
-    }
+    setItems(
+      nextItems
+    );
 
     setBatchSelectedKeys([]);
     setSelectedSlideKey(null);
+    markDirty();
   }
 
 
@@ -2394,36 +2366,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       )
         ? itemsOverride
         : items;
-
-    const selectedItemIndex =
-      itemsToSave.findIndex(
-        (item) =>
-          item
-            ._clientKey ===
-          selectedSlideKey
-      );
-
-    const selectedItem =
-      selectedItemIndex >=
-        0
-        ? itemsToSave[
-            selectedItemIndex
-          ]
-        : null;
-
-    const preserveSelection =
-      selectedItem
-        ? {
-            playlist_item_id:
-              selectedItem
-                .playlist_item_id
-              ??
-              null,
-
-            index:
-              selectedItemIndex,
-          }
-        : null;
 
     setSaving(
       true
@@ -2635,11 +2577,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           )
       );
 
-      await fetchPlaylist(
-        id,
-        preserveSelection
-      );
-
       setSaveMessage(
         "Saved"
       );
@@ -2703,9 +2640,17 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     }
 
     const id =
-      await savePlaylist();
+      Number(
+        playlist?.playlist_id ||
+        routePlaylistId ||
+        0
+      );
 
     if (!id) {
+      setDetailError(
+        "Save & Close the playlist before playing it."
+      );
+
       return;
     }
 
@@ -2763,7 +2708,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
       if (!publicUrl) {
         throw new Error(
-          `Saved, but this playlist has no ${experienceKey} REX URL.`
+          `This playlist has no ${experienceKey} REX URL.`
         );
       }
 
@@ -2810,7 +2755,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       setDetailError(
         err?.message
         ||
-        "Saved, but the playlist could not be opened."
+        "The playlist could not be opened."
       );
     }
   }
@@ -3200,15 +3145,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         dirty,
 
       saveIfDirty:
-        async () => {
-          if (!dirty) {
-            return true;
-          }
-
-          return Boolean(
-            await savePlaylist()
-          );
-        },
+        async () =>
+          !dirty,
     }),
     [
       dirty,
@@ -3241,7 +3179,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
       <AdminButton
         type="button"
-        disabled={saving}
+        variant="primary"
+        disabled={saving || !dirty}
         onClick={() => savePlaylist()}
       >
         {saving ? "Saving..." : "Save"}
@@ -3281,7 +3220,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         disabled={saving}
         onClick={saveAndPlay}
       >
-        Save & Play
+        Play
       </AdminButton>
 
       <AdminButton
@@ -3582,6 +3521,49 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                               padded:
                                 true,
 
+                              closeLabel:
+                                "Save & Close",
+
+                              beforeClose:
+                                async () => {
+                                  const savedId =
+                                    await savePlaylist();
+
+                                  if (!savedId) {
+                                    return false;
+                                  }
+
+                                  // The drawer is the single commit point.
+                                  // Reload the current admin page so every
+                                  // playlist row/slide comes back from the DB.
+                                  window.location.reload();
+
+                                  return false;
+                                },
+
+                              footer:
+                                ({
+                                  close,
+                                  closing,
+                                }) => (
+                                  <button
+                                    type="button"
+                                    className="admin-button admin-button--primary"
+                                    disabled={
+                                      saving
+                                      ||
+                                      closing
+                                    }
+                                    onClick={
+                                      close
+                                    }
+                                  >
+                                    {saving || closing
+                                      ? "Saving..."
+                                      : "Save & Close"}
+                                  </button>
+                                ),
+
                               render:
                                 ({
                                   item,
@@ -3644,6 +3626,15 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
                                       photoInfo={
                                         info
+                                      }
+
+                                      savedPalettes={
+                                        savedOptions
+                                      }
+
+                                      projectId={
+                                        playlist
+                                          .project_id
                                       }
 
                                       attachedPalette={
@@ -3718,7 +3709,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                           if (
                                             removed
                                           ) {
-                                            close();
+                                            // Local only. Save & Close commits
+                                            // the complete playlist.
                                           }
                                         }
                                       }
@@ -3731,9 +3723,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                         detailError
                                       }
 
-                                      onSave={() =>
-                                        savePlaylist()
-                                      }
                                     />
                                   );
                                 },

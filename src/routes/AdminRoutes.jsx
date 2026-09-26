@@ -54,6 +54,7 @@ const AdminPhotoLibraryToolsPage = lazy(() => import('@pages/AdminPhotoLibraryTo
 const AdminFileLockerPage = lazy(() => import('@pages/AdminFileLockerPage'));
 const AdminClientsPage = lazy(() => import('@pages/AdminClientsPage'));
 const AdminEmailTemplatesPage = lazy(() => import('@pages/AdminEmailTemplatesPage'));
+const AdminTemplatesPage = lazy(() => import('@pages/AdminTemplatesPage'));
 const AdminPlayerPage = lazy(() => import('@pages/AdminPlayerPage'));
 const AdminPlaylistPresenterPage = lazy(() => import('@pages/AdminPlaylistPresenterPage'));
 const AdminPlaylistSetsPage = lazy(() => import('@pages/AdminPlaylistSetsPage'));
@@ -72,8 +73,6 @@ const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
 
 const AdminPubPage = lazy(() => import("@pages/AdminPubPage"));
 const Marketing = lazy(() => import("@components/Marketing/MarketingWorkspace"));
-
-
 
 function renderWithSuspense(Component, label) {
   return (
@@ -153,7 +152,20 @@ export default function AdminRoutes() {
         <Route path="photo-library-tools" element={renderWithSuspense(AdminPhotoLibraryToolsPage, 'Loading photo library tools...')} />
         <Route path="file-locker" element={renderWithSuspense(AdminFileLockerPage, 'Loading file locker...')} />
         <Route path="clients" element={renderWithSuspense(AdminClientsPage, 'Loading clients...')} />
-        <Route path="email-templates" element={renderWithSuspense(AdminEmailTemplatesPage, 'Loading email templates...')} />
+        <Route
+          path="email-templates"
+          element={renderWithSuspense(
+            AdminEmailTemplatesPage,
+            'Loading email templates...'
+          )}
+        />
+        <Route
+          path="templates"
+          element={renderWithSuspense(
+            AdminTemplatesPage,
+            'Loading templates...'
+          )}
+        />
         <Route path="send-note" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="picker" element={<PublicPathRedirect stripPrefix="/admin" />} />
         <Route path="p/:playlistId" element={<PublicPathRedirect stripPrefix="/admin" />} />
