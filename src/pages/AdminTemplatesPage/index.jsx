@@ -91,6 +91,7 @@ function emptyTemplate() {
     text_template: "",
     html_template: "",
     is_active: true,
+    approval_required: false,
   };
 }
 
@@ -161,6 +162,13 @@ function normalizeTemplate(
       && Number(
         template?.is_active
         ?? 1
+      ) !== 0,
+
+    approval_required:
+      template?.approval_required === true
+      || Number(
+        template?.approval_required
+        ?? 0
       ) !== 0,
   };
 }
@@ -921,6 +929,9 @@ export default function AdminTemplatesPage() {
 
                 is_active:
                   form.is_active,
+
+                approval_required:
+                  form.approval_required,
               }),
           }
         );
@@ -1276,23 +1287,43 @@ export default function AdminTemplatesPage() {
                   />
                 </AdminField>
 
-                <AdminCheckboxRow
-                  checked={
-                    form.is_active
-                  }
-                  onChange={
-                    (event) =>
-                      setForm(
-                        (prev) => ({
-                          ...prev,
-                          is_active:
-                            event.target.checked,
-                        })
-                      )
-                  }
-                >
-                  Active
-                </AdminCheckboxRow>
+                <AdminFieldRow>
+                  <AdminCheckboxRow
+                    checked={
+                      form.is_active
+                    }
+                    onChange={
+                      (event) =>
+                        setForm(
+                          (prev) => ({
+                            ...prev,
+                            is_active:
+                              event.target.checked,
+                          })
+                        )
+                    }
+                  >
+                    Active
+                  </AdminCheckboxRow>
+
+                  <AdminCheckboxRow
+                    checked={
+                      form.approval_required
+                    }
+                    onChange={
+                      (event) =>
+                        setForm(
+                          (prev) => ({
+                            ...prev,
+                            approval_required:
+                              event.target.checked,
+                          })
+                        )
+                    }
+                  >
+                    Approval Required
+                  </AdminCheckboxRow>
+                </AdminFieldRow>
               </AdminStack>
             </AdminPanel>
 

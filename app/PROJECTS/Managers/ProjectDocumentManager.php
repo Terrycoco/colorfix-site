@@ -229,6 +229,12 @@ final class ProjectDocumentManager
         $scopeId =
             (int)$scope['id'];
 
+        $approvalRequired =
+            !empty(
+                $template['approval_required']
+                ?? 0
+            );
+
         $draft =
             $this->documents
                 ->findReusableDraft(
@@ -246,7 +252,8 @@ final class ProjectDocumentManager
                     $documentId,
                     $documentType,
                     $title,
-                    $contentHtml
+                    $contentHtml,
+                    $approvalRequired
                 );
         } else {
             $documentId =
@@ -257,7 +264,8 @@ final class ProjectDocumentManager
                         $documentType,
                         $templateKey,
                         $title,
-                        $contentHtml
+                        $contentHtml,
+                        $approvalRequired
                     );
         }
 
