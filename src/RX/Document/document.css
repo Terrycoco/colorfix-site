@@ -13,9 +13,9 @@
 .rex-document__approval {
   box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 18px 24px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   margin: 18px auto 0;
   padding: 20px 24px;
   border: 1px solid #dce4e5;
@@ -27,7 +27,7 @@
 
 .rex-document__approval-copy,
 .rex-document__accepted {
-  flex: 1 1 440px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -46,7 +46,6 @@
 }
 
 .rex-document__approve-button {
-  flex: 0 0 auto;
   min-width: 176px;
   box-sizing: border-box;
   padding: 11px 18px;
@@ -76,7 +75,7 @@
 }
 
 .rex-document__approval-error {
-  flex: 0 0 100%;
+  width: 100%;
   color: #9f2929;
   font-size: 13px;
   line-height: 1.4;

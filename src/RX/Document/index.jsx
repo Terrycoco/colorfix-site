@@ -113,9 +113,6 @@ export default function Document({ document: documentRecord }) {
                       ? `I, ${clientName}, have reviewed and approve the ${documentTitle} above.`
                       : `I have reviewed and approve the ${documentTitle} above.`}
                   </div>
-                  <div className="rex-document__approval-detail">
-                    By clicking Approve Agreement, you confirm this approval.
-                  </div>
                 </div>
 
                 <button
@@ -126,6 +123,10 @@ export default function Document({ document: documentRecord }) {
                 >
                   {approving ? "Approving…" : "Approve Agreement"}
                 </button>
+
+                <div className="rex-document__approval-detail">
+                  By clicking Approve Agreement, you confirm this approval.
+                </div>
 
                 {approvalError ? (
                   <div
