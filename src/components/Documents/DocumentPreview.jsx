@@ -6,7 +6,7 @@ import {
   createPortal,
 } from "react-dom";
 
-import "./DocumentPreview.css";
+import DocumentBody from "./DocumentBody";
 
 
 export default function DocumentPreview({
@@ -47,12 +47,8 @@ export default function DocumentPreview({
       document.body.style.overflow =
         "hidden";
 
-      function handleKeyDown(
-        event
-      ) {
-        if (
-          event.key === "Escape"
-        ) {
+      function handleKeyDown(event) {
+        if (event.key === "Escape") {
           onClose?.();
         }
       }
@@ -90,41 +86,30 @@ export default function DocumentPreview({
 
   return createPortal(
     <div
-      className="document-preview"
+      className="document-review-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label={
-        previewTitle
-      }
+      aria-label={previewTitle}
       title="Click to close"
-      onClick={
-        onClose
-      }
+      onClick={onClose}
     >
-      <article
-        className="document-preview__sheet"
-        aria-label={
-          previewTitle
-        }
-      >
+      <div className="document-review-overlay__stage">
         {
           previewHtml
             ? (
-                <div
-                  className="document-preview__content"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      previewHtml,
-                  }}
+                <DocumentBody
+                  html={previewHtml}
+                  className="document-sheet--review"
                 />
               )
             : (
-                <div className="document-preview__empty">
-                  Nothing to preview.
-                </div>
+                <DocumentBody
+                  html="<p>Nothing to preview.</p>"
+                  className="document-sheet--review"
+                />
               )
         }
-      </article>
+      </div>
     </div>,
     document.body
   );

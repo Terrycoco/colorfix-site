@@ -10,6 +10,7 @@ use App\REX\DTO\RexResolutionBehavior;
 use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
 use App\REX\DTO\RexShareMetadata;
+use App\PROJECTS\Repos\PdoProjectRepository;
 use PDO;
 use RuntimeException;
 
@@ -44,6 +45,11 @@ final class DocumentResolver implements RexResolverInterface
             );
         }
 
+        $project = (new PdoProjectRepository($this->pdo))
+            ->findById((int)$document['project_id']);
+
+        $clientName = trim((string)($project['client_name'] ?? ''));
+
         return new RexResolutionResult(
             resolverKey: 'document',
             resourceType: 'doc',
@@ -66,9 +72,10 @@ final class DocumentResolver implements RexResolverInterface
                     'title' => (string)$document['title'],
                     'content_html' => (string)$document['content_html'],
                     'status' => (string)$document['status'],
-
+                    'approval_required' => !empty($document['approval_required']),
                     'sent_at' => $document['sent_at'],
                     'accepted_at' => $document['accepted_at'],
+                    'client_name' => $clientName,
                 ],
             ],
             analyticsMetadata: [

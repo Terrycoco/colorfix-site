@@ -17,6 +17,7 @@ final class PdoClientActivityRepository
         $sql = <<<SQL
             INSERT INTO client_activity (
                 client_id,
+                project_id,
                 activity_type,
                 summary,
                 details,
@@ -26,6 +27,7 @@ final class PdoClientActivityRepository
                 admin_read_at
             ) VALUES (
                 :client_id,
+                :project_id,
                 :activity_type,
                 :summary,
                 :details,
@@ -39,6 +41,9 @@ final class PdoClientActivityRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             'client_id' => (int)($payload['client_id'] ?? 0),
+            'project_id' => !empty($payload['project_id'])
+                ? (int)$payload['project_id']
+                : null,
             'activity_type' => (string)($payload['activity_type'] ?? ''),
             'summary' => $payload['summary'] ?? null,
             'details' => $payload['details'] ?? null,
@@ -60,6 +65,7 @@ final class PdoClientActivityRepository
                AND admin_read_at IS NULL"
         );
         $stmt->execute();
+
         return (int)($stmt->fetchColumn() ?: 0);
     }
 
@@ -68,10 +74,12 @@ final class PdoClientActivityRepository
         $sql = "UPDATE client_activity
                 SET admin_read_at = COALESCE(admin_read_at, :admin_read_at)
                 WHERE client_activity_id = :activity_id";
+
         $params = [
             'admin_read_at' => AppTime::now(),
             'activity_id' => $activityId,
         ];
+
         if ($clientId !== null && $clientId > 0) {
             $sql .= ' AND client_id = :client_id';
             $params['client_id'] = $clientId;
@@ -79,12 +87,14 @@ final class PdoClientActivityRepository
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+
         return $stmt->rowCount() > 0;
     }
 
     public function listByClient(int $clientId, int $limit = 200): array
     {
         $limit = max(1, min(500, $limit));
+
         $stmt = $this->pdo->prepare(
             "SELECT
                 ca.*,
@@ -106,14 +116,56 @@ final class PdoClientActivityRepository
              ORDER BY ca.occurred_at DESC, ca.client_activity_id DESC
              LIMIT {$limit}"
         );
-        $stmt->execute(['client_id' => $clientId]);
+
+        $stmt->execute([
+            'client_id' => $clientId,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function listByProject(int $projectId, int $limit = 200): array
+    {
+        $limit = max(1, min(500, $limit));
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                ca.*,
+                ce.direction AS email_direction,
+                ce.status AS email_status,
+                ce.subject AS email_subject,
+                ce.from_email AS email_from_email,
+                ce.to_email AS email_to_email,
+                ce.cc_emails AS email_cc_emails,
+                ce.bcc_emails AS email_bcc_emails,
+                ce.text_body AS email_text_body,
+                ce.html_body AS email_html_body,
+                ce.sent_at AS email_sent_at,
+                ce.received_at AS email_received_at
+             FROM client_activity ca
+             LEFT JOIN client_emails ce
+               ON ce.client_email_id = ca.related_client_email_id
+             WHERE ca.project_id = :project_id
+             ORDER BY ca.occurred_at DESC, ca.client_activity_id DESC
+             LIMIT {$limit}"
+        );
+
+        $stmt->execute([
+            'project_id' => $projectId,
+        ]);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     public function deleteById(int $activityId, ?int $clientId = null): bool
     {
-        $sql = 'DELETE FROM client_activity WHERE client_activity_id = :activity_id';
-        $params = ['activity_id' => $activityId];
+        $sql = 'DELETE FROM client_activity
+                WHERE client_activity_id = :activity_id';
+
+        $params = [
+            'activity_id' => $activityId,
+        ];
+
         if ($clientId !== null && $clientId > 0) {
             $sql .= ' AND client_id = :client_id';
             $params['client_id'] = $clientId;
@@ -121,6 +173,7 @@ final class PdoClientActivityRepository
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+
         return $stmt->rowCount() > 0;
     }
 }

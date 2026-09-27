@@ -16,6 +16,7 @@ final class PdoClientEmailRepository
         $sql = <<<SQL
             INSERT INTO client_emails (
                 client_id,
+                project_id,
                 direction,
                 status,
                 purpose,
@@ -33,6 +34,7 @@ final class PdoClientEmailRepository
                 received_at
             ) VALUES (
                 :client_id,
+                :project_id,
                 :direction,
                 :status,
                 :purpose,
@@ -54,6 +56,9 @@ final class PdoClientEmailRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             'client_id' => (int)($payload['client_id'] ?? 0),
+            'project_id' => !empty($payload['project_id'])
+                ? (int)$payload['project_id']
+                : null,
             'direction' => (string)($payload['direction'] ?? 'outbound'),
             'status' => (string)($payload['status'] ?? 'sent'),
             'purpose' => $payload['purpose'] ?? null,
@@ -76,23 +81,57 @@ final class PdoClientEmailRepository
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM client_emails WHERE client_email_id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare(
+            'SELECT *
+             FROM client_emails
+             WHERE client_email_id = :id
+             LIMIT 1'
+        );
+
         $stmt->execute(['id' => $id]);
+
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
         return $row ?: null;
     }
 
     public function listByClient(int $clientId, int $limit = 100): array
     {
         $limit = max(1, min(500, $limit));
+
         $stmt = $this->pdo->prepare(
             "SELECT *
              FROM client_emails
              WHERE client_id = :client_id
-             ORDER BY COALESCE(received_at, sent_at, created_at) DESC, client_email_id DESC
+             ORDER BY COALESCE(received_at, sent_at, created_at) DESC,
+                      client_email_id DESC
              LIMIT {$limit}"
         );
-        $stmt->execute(['client_id' => $clientId]);
+
+        $stmt->execute([
+            'client_id' => $clientId,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function listByProject(int $projectId, int $limit = 100): array
+    {
+        $limit = max(1, min(500, $limit));
+
+        $stmt = $this->pdo->prepare(
+            "SELECT *
+             FROM client_emails
+             WHERE project_id = :project_id
+             ORDER BY COALESCE(received_at, sent_at, created_at) DESC,
+                      client_email_id DESC
+             LIMIT {$limit}"
+        );
+
+        $stmt->execute([
+            'project_id' => $projectId,
+        ]);
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 }

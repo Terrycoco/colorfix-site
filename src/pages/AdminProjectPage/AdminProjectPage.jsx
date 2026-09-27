@@ -6,8 +6,6 @@ import {
 
 } from "react";
 
-
-
 import {
 
   useLocation,
@@ -16,15 +14,11 @@ import {
 
 } from "react-router-dom";
 
-
-
 import {
 
   useAppState,
 
 } from "@context/AppStateContext.jsx";
-
-
 
 import {
 
@@ -48,23 +42,15 @@ import {
 
 } from "@components/AdminLayout";
 
-
-
 import DocumentPreview from "@components/Documents/DocumentPreview";
 
-
-
 import ProjectSelect from "@components/Project/ProjectSelect";
-
-
 
 import {
 
   API_FOLDER,
 
 } from "@helpers/config";
-
-
 
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
 
@@ -78,37 +64,23 @@ import ProjectScope from "./ProjectScope";
 
 import ProjectSetup from "./ProjectSetup";
 
-
-
 import "./admin-project.css";
-
-
-
-
 
 const GET_URL =
 
   `${API_FOLDER}/v2/admin/projects/get.php`;
 
-
-
 const SAVE_URL =
 
   `${API_FOLDER}/v2/admin/projects/save.php`;
-
-
 
 const LIST_URL =
 
   `${API_FOLDER}/v2/admin/projects/list.php`;
 
-
-
 const PROJECT_SECTION_STORAGE_KEY =
 
   "admin-project-active-section";
-
-
 
 const PROJECT_SECTIONS =
 
@@ -128,8 +100,6 @@ const PROJECT_SECTIONS =
 
   ]);
 
-
-
 function readLastProjectSection() {
 
   if (typeof window === "undefined") {
@@ -137,8 +107,6 @@ function readLastProjectSection() {
     return "playlist";
 
   }
-
-
 
   try {
 
@@ -149,8 +117,6 @@ function readLastProjectSection() {
         PROJECT_SECTION_STORAGE_KEY
 
       );
-
-
 
     return PROJECT_SECTIONS.has(saved)
 
@@ -166,10 +132,6 @@ function readLastProjectSection() {
 
 }
 
-
-
-
-
 export default function AdminProjectPage() {
 
   const {
@@ -178,11 +140,7 @@ export default function AdminProjectPage() {
 
   } = useParams();
 
-
-
   const location = useLocation();
-
-
 
   const {
 
@@ -193,8 +151,6 @@ export default function AdminProjectPage() {
     setWorkingPlaylistId,
 
   } = useAppState();
-
-
 
   const routeProjectId =
 
@@ -208,8 +164,6 @@ export default function AdminProjectPage() {
 
       : 0;
 
-
-
   const numericProjectId =
 
     routeProjectId
@@ -222,8 +176,6 @@ export default function AdminProjectPage() {
 
     Number(activeProjectId || 0);
 
-
-
   const [
 
     project,
@@ -231,8 +183,6 @@ export default function AdminProjectPage() {
     setProject,
 
   ] = useState(null);
-
-
 
   const [
 
@@ -242,8 +192,6 @@ export default function AdminProjectPage() {
 
   ] = useState(true);
 
-
-
   const [
 
     error,
@@ -251,8 +199,6 @@ export default function AdminProjectPage() {
     setError,
 
   ] = useState("");
-
-
 
   const [
 
@@ -266,8 +212,6 @@ export default function AdminProjectPage() {
 
   );
 
-
-
   const [
 
     creatingPlaylist,
@@ -275,8 +219,6 @@ export default function AdminProjectPage() {
     setCreatingPlaylist,
 
   ] = useState(false);
-
-
 
   const [
 
@@ -286,8 +228,6 @@ export default function AdminProjectPage() {
 
   ] = useState(null);
 
-
-
   const [
 
     projectDocumentPreviewOpen,
@@ -295,10 +235,6 @@ export default function AdminProjectPage() {
     setProjectDocumentPreviewOpen,
 
   ] = useState(false);
-
-
-
-
 
   useEffect(
 
@@ -317,8 +253,6 @@ export default function AdminProjectPage() {
         return;
 
       }
-
-
 
       try {
 
@@ -346,15 +280,9 @@ export default function AdminProjectPage() {
 
   );
 
-
-
-
-
   useEffect(() => {
 
     let cancelled = false;
-
-
 
     async function loadProject() {
 
@@ -362,15 +290,11 @@ export default function AdminProjectPage() {
 
       setError("");
 
-
-
       try {
 
         let resolvedProjectId =
 
           numericProjectId;
-
-
 
         if (
 
@@ -392,17 +316,11 @@ export default function AdminProjectPage() {
 
             );
 
-
-
           const listText =
 
             await listRes.text();
 
-
-
           let listData = null;
-
-
 
           try {
 
@@ -424,8 +342,6 @@ export default function AdminProjectPage() {
 
           }
 
-
-
           if (
 
             !listRes.ok
@@ -446,8 +362,6 @@ export default function AdminProjectPage() {
 
           }
 
-
-
           const firstProject =
 
             Array.isArray(
@@ -460,8 +374,6 @@ export default function AdminProjectPage() {
 
               : null;
 
-
-
           resolvedProjectId =
 
             Number(
@@ -471,8 +383,6 @@ export default function AdminProjectPage() {
               0
 
             );
-
-
 
           if (
 
@@ -489,8 +399,6 @@ export default function AdminProjectPage() {
           }
 
         }
-
-
 
         const res =
 
@@ -510,17 +418,11 @@ export default function AdminProjectPage() {
 
           );
 
-
-
         const text =
 
           await res.text();
 
-
-
         let data = null;
-
-
 
         try {
 
@@ -537,8 +439,6 @@ export default function AdminProjectPage() {
           );
 
         }
-
-
 
         if (
 
@@ -564,13 +464,9 @@ export default function AdminProjectPage() {
 
         }
 
-
-
         if (!cancelled) {
 
           setProject(data.project);
-
-
 
           setActiveProjectId(
 
@@ -581,8 +477,6 @@ export default function AdminProjectPage() {
             )
 
           );
-
-
 
           setWorkingPlaylistId(
 
@@ -604,8 +498,6 @@ export default function AdminProjectPage() {
 
           );
 
-
-
           setCreatingPlaylist(
 
             false
@@ -613,8 +505,6 @@ export default function AdminProjectPage() {
           );
 
         }
-
-
 
       } catch (err) {
 
@@ -632,8 +522,6 @@ export default function AdminProjectPage() {
 
         }
 
-
-
       } finally {
 
         if (!cancelled) {
@@ -646,11 +534,7 @@ export default function AdminProjectPage() {
 
     }
 
-
-
     loadProject();
-
-
 
     return () => {
 
@@ -666,10 +550,6 @@ export default function AdminProjectPage() {
 
   ]);
 
-
-
-
-
   function beginNewPlaylist() {
 
     if (!project?.id) {
@@ -678,23 +558,17 @@ export default function AdminProjectPage() {
 
     }
 
-
-
     setCreatingPlaylist(
 
       true
 
     );
 
-
-
     setWorkingPlaylistId(
 
       null
 
     );
-
-
 
     setActiveSection(
 
@@ -703,10 +577,6 @@ export default function AdminProjectPage() {
     );
 
   }
-
-
-
-
 
   async function handleNewPlaylistSaved(
 
@@ -724,8 +594,6 @@ export default function AdminProjectPage() {
 
       );
 
-
-
     if (
 
       !project?.id
@@ -740,15 +608,11 @@ export default function AdminProjectPage() {
 
     }
 
-
-
     setWorkingPlaylistId(
 
       id
 
     );
-
-
 
     setProject(
 
@@ -770,15 +634,11 @@ export default function AdminProjectPage() {
 
     );
 
-
-
     setCreatingPlaylist(
 
       false
 
     );
-
-
 
     try {
 
@@ -794,13 +654,9 @@ export default function AdminProjectPage() {
 
               "POST",
 
-
-
             credentials:
 
               "include",
-
-
 
             headers: {
 
@@ -809,8 +665,6 @@ export default function AdminProjectPage() {
                 "application/json",
 
             },
-
-
 
             body:
 
@@ -824,8 +678,6 @@ export default function AdminProjectPage() {
 
                   ),
 
-
-
                 project_name:
 
                   project.project_name
@@ -833,8 +685,6 @@ export default function AdminProjectPage() {
                   ??
 
                   null,
-
-
 
                 client_id:
 
@@ -844,8 +694,6 @@ export default function AdminProjectPage() {
 
                   null,
 
-
-
                 property_id:
 
                   project.property_id
@@ -853,8 +701,6 @@ export default function AdminProjectPage() {
                   ??
 
                   null,
-
-
 
                 playlist_id:
 
@@ -866,19 +712,13 @@ export default function AdminProjectPage() {
 
         );
 
-
-
       const text =
 
         await res.text();
 
-
-
       let data =
 
         null;
-
-
 
       try {
 
@@ -900,8 +740,6 @@ export default function AdminProjectPage() {
 
       }
 
-
-
       if (
 
         !res.ok
@@ -922,8 +760,6 @@ export default function AdminProjectPage() {
 
       }
 
-
-
       if (
 
         data?.project
@@ -938,8 +774,6 @@ export default function AdminProjectPage() {
 
       }
 
-
-
     } catch (err) {
 
       setError(
@@ -953,12 +787,6 @@ export default function AdminProjectPage() {
     }
 
   }
-
-
-
-
-
-
 
   const list =
 
@@ -994,8 +822,6 @@ export default function AdminProjectPage() {
 
                   );
 
-
-
                 if (
 
                   nextId > 0
@@ -1014,15 +840,11 @@ export default function AdminProjectPage() {
 
                   );
 
-
-
                   setWorkingPlaylistId(
 
                     null
 
                   );
-
-
 
                   setCreatingPlaylist(
 
@@ -1072,8 +894,6 @@ export default function AdminProjectPage() {
 
           />
 
-
-
           <AdminObjectListItem
 
             id="scope"
@@ -1099,8 +919,6 @@ export default function AdminProjectPage() {
             }
 
           />
-
-
 
           <AdminObjectListItem
 
@@ -1128,8 +946,6 @@ export default function AdminProjectPage() {
 
           />
 
-
-
           <AdminObjectListItem
 
             id="pvs"
@@ -1155,8 +971,6 @@ export default function AdminProjectPage() {
             }
 
           />
-
-
 
           <AdminObjectListItem
 
@@ -1204,8 +1018,6 @@ export default function AdminProjectPage() {
 
           />
 
-
-
           <AdminObjectListItem
 
             id="documents"
@@ -1238,13 +1050,7 @@ export default function AdminProjectPage() {
 
     );
 
-
-
-
-
   let detail = null;
-
-
 
   if (loading) {
 
@@ -1272,8 +1078,6 @@ export default function AdminProjectPage() {
 
       );
 
-
-
   } else if (error) {
 
     detail =
@@ -1297,8 +1101,6 @@ export default function AdminProjectPage() {
         </AdminDetailPane>
 
       );
-
-
 
   } else if (!project) {
 
@@ -1325,8 +1127,6 @@ export default function AdminProjectPage() {
         </AdminDetailPane>
 
       );
-
-
 
   } else if (
 
@@ -1384,8 +1184,6 @@ export default function AdminProjectPage() {
 
                 );
 
-
-
                 setWorkingPlaylistId(
 
                   Number(
@@ -1415,8 +1213,6 @@ export default function AdminProjectPage() {
         </AdminDetailPane>
 
       );
-
-
 
   } else if (
 
@@ -1472,8 +1268,6 @@ export default function AdminProjectPage() {
 
       );
 
-
-
   } else if (
 
     activeSection ===
@@ -1501,8 +1295,6 @@ export default function AdminProjectPage() {
         />
 
       );
-
-
 
   } else if (
 
@@ -1550,8 +1342,6 @@ export default function AdminProjectPage() {
 
       );
 
-
-
   } else if (
 
     activeSection ===
@@ -1564,89 +1354,43 @@ export default function AdminProjectPage() {
 
       (
 
-        <AdminDetailPane
+        <ProjectDocuments
 
-          ariaLabel="Project documents"
+          projectId={
 
-          title={`Project #${project.id} Documents`}
+            Number(
 
-          actions={
+              project.id
 
-            <AdminToolbar compact>
-
-              <AdminButton
-
-                type="button"
-
-                variant="secondary"
-
-                disabled={
-
-                  !selectedProjectDocument
-
-                }
-
-                onClick={() =>
-
-                  setProjectDocumentPreviewOpen(
-
-                    true
-
-                  )
-
-                }
-
-              >
-
-                Preview
-
-              </AdminButton>
-
-
-
-              <AdminButton
-
-                type="submit"
-
-                form="admin-project-documents-generate-form"
-
-              >
-
-                Generate Agreement
-
-              </AdminButton>
-
-            </AdminToolbar>
+            )
 
           }
 
-        >
+          onSelectedDocumentChange={
 
-          <ProjectDocuments
+            setSelectedProjectDocument
 
-            projectId={
+          }
 
-              Number(
+          onPreview={(document) => {
 
-                project.id
+            setSelectedProjectDocument(
 
-              )
+              document
 
-            }
+            );
 
-            onSelectedDocumentChange={
+            setProjectDocumentPreviewOpen(
 
-              setSelectedProjectDocument
+              true
 
-            }
+            );
 
-          />
+          }}
 
-        </AdminDetailPane>
+        />
 
       );
-
-
 
   } else if (
 
@@ -1685,8 +1429,6 @@ export default function AdminProjectPage() {
         />
 
       );
-
-
 
   } else if (
 
@@ -1730,8 +1472,6 @@ export default function AdminProjectPage() {
 
       );
 
-
-
   } else {
 
     detail =
@@ -1760,10 +1500,6 @@ export default function AdminProjectPage() {
 
   }
 
-
-
-
-
   return (
 
     <>
@@ -1779,8 +1515,6 @@ export default function AdminProjectPage() {
         detail={detail}
 
       />
-
-
 
       <DocumentPreview
 

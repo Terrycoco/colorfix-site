@@ -15,6 +15,23 @@
   text-transform: uppercase;
 }
 
+
+/* All admin dropdowns must remain readable regardless of surrounding theme. */
+.admin-master-detail select,
+.admin-workbench select,
+.admin-drawer select,
+.admin-toolbar select {
+  background-color: #fff;
+  color: #000;
+}
+
+.admin-master-detail select option,
+.admin-workbench select option,
+.admin-drawer select option,
+.admin-toolbar select option {
+  background-color: #fff;
+  color: #000;
+}
 /*
  * Standard vertical form controls stay at a readable working width instead
  * of stretching across the entire detail pane. Compact/grow fields and

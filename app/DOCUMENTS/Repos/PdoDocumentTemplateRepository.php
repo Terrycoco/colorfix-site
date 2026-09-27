@@ -30,6 +30,7 @@ final class PdoDocumentTemplateRepository
                     text_template,
                     html_template,
                     is_active,
+                    approval_required,
                     created_at,
                     updated_at
                  FROM document_templates
@@ -64,6 +65,7 @@ final class PdoDocumentTemplateRepository
                     text_template,
                     html_template,
                     is_active,
+                    approval_required,
                     created_at,
                     updated_at
                  FROM document_templates
@@ -108,6 +110,7 @@ final class PdoDocumentTemplateRepository
                     text_template,
                     html_template,
                     is_active,
+                    approval_required,
                     created_at,
                     updated_at
                  FROM document_templates
@@ -224,6 +227,13 @@ final class PdoDocumentTemplateRepository
                 )
                     ? 1
                     : 0,
+
+            ':approval_required' =>
+                !empty(
+                    $payload['approval_required']
+                )
+                    ? 1
+                    : 0,
         ];
 
         if ($id > 0) {
@@ -247,7 +257,8 @@ final class PdoDocumentTemplateRepository
                         title_template = :title_template,
                         text_template = :text_template,
                         html_template = :html_template,
-                        is_active = :is_active
+                        is_active = :is_active,
+                        approval_required = :approval_required
                      WHERE id = :id'
                 );
 
@@ -282,7 +293,8 @@ final class PdoDocumentTemplateRepository
                     title_template,
                     text_template,
                     html_template,
-                    is_active
+                    is_active,
+                    approval_required
                  ) VALUES (
                     :template_key,
                     :template_type,
@@ -291,7 +303,8 @@ final class PdoDocumentTemplateRepository
                     :title_template,
                     :text_template,
                     :html_template,
-                    :is_active
+                    :is_active,
+                    :approval_required
                  )'
             );
 

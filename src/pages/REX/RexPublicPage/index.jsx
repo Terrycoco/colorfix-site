@@ -10,6 +10,7 @@ import {
 import Player from "@RX/Player";
 import PV from "@RX/PV";
 import Thumbs from "@RX/Thumbs";
+import Document from "@RX/Document";
 import "../RexPublicPage/rex-public-page.css";
 
 const EMPTY_STATE = {
@@ -21,6 +22,7 @@ const EMPTY_STATE = {
   viewer: null,
   experienceKey: "",
   collection: null,
+  document: null,
 };
 
 export default function RexPublicPage() {
@@ -169,6 +171,25 @@ export default function RexPublicPage() {
           return;
         }
 
+        if (resolverKey === "document") {
+          const document = destination.document || null;
+
+          if (!document) {
+            throw new Error(
+              "REX Document destination is missing its document."
+            );
+          }
+
+          setState({
+            ...EMPTY_STATE,
+            loading: false,
+            kind: "document",
+            document,
+            rex,
+          });
+          return;
+        }
+
         throw new Error(`Unsupported REX destination: ${resolverKey}`);
       })
       .catch((error) => {
@@ -222,6 +243,16 @@ export default function RexPublicPage() {
       <ANAProvider rex={state.rex}>
         <ANATrack>
           <Thumbs collection={state.collection} />
+        </ANATrack>
+      </ANAProvider>
+    );
+  }
+
+  if (state.kind === "document") {
+    return (
+      <ANAProvider rex={state.rex}>
+        <ANATrack>
+          <Document document={state.document} />
         </ANATrack>
       </ANAProvider>
     );
