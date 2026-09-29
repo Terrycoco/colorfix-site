@@ -47,6 +47,19 @@ final class RexPublicEntryEndpoint
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('X-Robots-Tag: noindex, noarchive');
 
+        /*
+         * Route REXes must enter through the public React REX shell.
+         * RexPublicPage records the REX analytics event (including src)
+         * before navigating to the resolved route. Redirecting here would
+         * bypass that tracking entirely.
+         */
+        if (
+            $result->behavior === RexResolutionBehavior::REDIRECT
+            && $result->resolverKey === 'route'
+        ) {
+            self::renderReactShell($indexPath);
+        }
+
         if ($result->behavior === RexResolutionBehavior::REDIRECT) {
             $target = trim((string)(
                 $result->destination['url']
@@ -68,20 +81,25 @@ final class RexPublicEntryEndpoint
          * resolver-key allowlist.
          */
         if ($result->behavior === RexResolutionBehavior::RENDER) {
-            $html = is_file($indexPath)
-                ? (string)file_get_contents($indexPath)
-                : '';
-
-            if ($html === '') {
-                self::notFound();
-            }
-
-            header('Content-Type: text/html; charset=utf-8');
-            echo $html;
-            exit;
+            self::renderReactShell($indexPath);
         }
 
         self::notFound();
+    }
+
+    private static function renderReactShell(string $indexPath): never
+    {
+        $html = is_file($indexPath)
+            ? (string)file_get_contents($indexPath)
+            : '';
+
+        if ($html === '') {
+            self::notFound();
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        echo $html;
+        exit;
     }
 
     private static function notFound(): never
