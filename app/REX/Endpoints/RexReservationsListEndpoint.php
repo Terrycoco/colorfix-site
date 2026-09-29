@@ -43,10 +43,21 @@ final class RexReservationsListEndpoint
                     }
                 }
             } else {
-                $requestedType = self::requiredString(
-                    $_GET['resource_type'] ?? null,
-                    'Resource type'
-                );
+                $qrOnly = isset($_GET['qr_only'])
+                    && in_array(strtolower(trim((string)$_GET['qr_only'])), ['1', 'true', 'yes'], true);
+
+                if ($qrOnly) {
+                    $items = $repo->search(
+                        new RexReservationSearchCriteria(
+                            limit: 500,
+                            qrOnly: true,
+                        )
+                    );
+                } else {
+                    $requestedType = self::requiredString(
+                        $_GET['resource_type'] ?? null,
+                        'Resource type'
+                    );
 
                 /*
                  * The Reservations admin groups public REX experiences by the
@@ -93,6 +104,7 @@ final class RexReservationsListEndpoint
                             strtolower(trim($reservation->resolverKey))
                                 === 'playlist_experience'
                     ));
+                }
                 }
             }
 
@@ -171,6 +183,7 @@ final class RexReservationsListEndpoint
             'token' => $reservation->token,
             'label' => $reservation->label,
             'admin_note' => $reservation->adminNote,
+            'qr_key' => $reservation->qrKey,
             'resolver_key' => $reservation->resolverKey,
             'experience_key' => $reservation->experienceKey,
             'resource_type' => $reservation->resourceType,

@@ -2311,6 +2311,7 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
 
 export default function ProjectPVPage({
   projectId,
+  projectName = "",
   playlistId = null,
   onRex = null,
 }) {
@@ -3158,7 +3159,7 @@ export default function ProjectPVPage({
     <>
       <AdminDetailPane
         ariaLabel="Project PVs"
-        title="PVs"
+        title={`${cleanText(projectName) || `Project #${projectId}`} PVs`}
         actions={detailActions}
       >
         {

@@ -10,6 +10,7 @@ final readonly class RexReservation
         public string $token,
         public string $label,
         public ?string $adminNote,
+        public ?string $qrKey,
         public string $resolverKey,
         public string $resourceType,
         public int $resourceId,

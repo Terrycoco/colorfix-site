@@ -73,6 +73,7 @@ final class RexCreateEndpoint
                 ),
                 context: $context,
                 experienceKey: $experienceKey,
+                qrKey: self::optionalString($data['qr_key'] ?? null),
             );
 
             if (!empty($data['reuse_existing'])) {
@@ -290,6 +291,7 @@ final class RexCreateEndpoint
             'token' => $reservation->token,
             'label' => $reservation->label,
             'admin_note' => $reservation->adminNote,
+            'qr_key' => $reservation->qrKey,
             'resolver_key' => $reservation->resolverKey,
             'resource_type' => $reservation->resourceType,
             'resource_id' => $reservation->resourceId,

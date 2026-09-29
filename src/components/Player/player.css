@@ -650,3 +650,54 @@
     font-size: 13px;
   }
 }
+
+
+/* ===============================
+   FULLSCREEN CONTROL
+   =============================== */
+
+.player-fullscreen {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  right: calc(58px + env(safe-area-inset-right));
+  z-index: 60;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.player-root:not(.player-embedded) .player-fullscreen {
+  position: fixed;
+}
+
+.player-root:fullscreen,
+.player-root:-webkit-full-screen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.player-root:fullscreen .player-fullscreen,
+.player-root:-webkit-full-screen .player-fullscreen {
+  position: fixed;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .player-fullscreen {
+    top: calc(16px + env(safe-area-inset-top));
+    right: calc(58px + env(safe-area-inset-right));
+  }
+}

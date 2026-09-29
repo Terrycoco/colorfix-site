@@ -31,6 +31,7 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
                 token,
                 label,
                 admin_note,
+                qr_key,
                 resolver_key,
                 experience_key,
                 resource_type,
@@ -44,6 +45,7 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
                 :token,
                 :label,
                 :admin_note,
+                :qr_key,
                 :resolver_key,
                 :experience_key,
                 :resource_type,
@@ -60,6 +62,7 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
             ':token' => $token,
             ':label' => trim($request->label),
             ':admin_note' => $this->nullableTrim($request->adminNote),
+            ':qr_key' => $this->nullableTrim($request->qrKey),
             ':resolver_key' => trim($request->resolverKey),
             ':experience_key' => $experienceKey,
             ':resource_type' => trim($request->resourceType),
@@ -266,6 +269,13 @@ public function deleteByResource(
         if ($criteria->status !== null && trim($criteria->status) !== '') {
             $where[] = 'r.status = :status';
             $params[':status'] = trim($criteria->status);
+        }
+
+        if ($criteria->qrKey !== null && trim($criteria->qrKey) !== '') {
+            $where[] = 'r.qr_key = :qr_key';
+            $params[':qr_key'] = trim($criteria->qrKey);
+        } elseif ($criteria->qrOnly) {
+            $where[] = 'r.qr_key IS NOT NULL';
         }
 
         $limit = max(1, min(500, $criteria->limit));
@@ -992,6 +1002,25 @@ public function deleteByResource(
         return $this->requireReservation($request->reservationId);
     }
 
+    public function setQrKey(
+        int $reservationId,
+        ?string $qrKey,
+    ): RexReservation {
+        $stmt = $this->pdo->prepare(
+            "UPDATE rex_reservations
+                SET qr_key = :qr_key,
+                    updated_at = NOW()
+              WHERE id = :id"
+        );
+
+        $stmt->execute([
+            ':id' => $reservationId,
+            ':qr_key' => $this->nullableTrim($qrKey),
+        ]);
+
+        return $this->requireReservation($reservationId);
+    }
+
     public function setFallbackRexId(
         int $reservationId,
         ?int $fallbackRexId,
@@ -1275,6 +1304,9 @@ public function deleteByResource(
             label: (string)$row['label'],
             adminNote: $row['admin_note'] !== null
                 ? (string)$row['admin_note']
+                : null,
+            qrKey: isset($row['qr_key']) && $row['qr_key'] !== null
+                ? (string)$row['qr_key']
                 : null,
             resolverKey: (string)$row['resolver_key'],
             resourceType: (string)$row['resource_type'],

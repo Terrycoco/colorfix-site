@@ -121,6 +121,7 @@ function templateLabel(template) {
 
 export default function ProjectDocuments({
   projectId,
+  projectName = "",
   onSelectedDocumentChange,
   onPreview,
 }) {
@@ -801,7 +802,7 @@ export default function ProjectDocuments({
   return (
     <AdminDetailPane
       ariaLabel="Project documents"
-      title={`Project #${projectId} Documents`}
+      title={`${String(projectName || "").trim() || `Project #${projectId}`} Documents`}
       actions={
         detailActions
       }

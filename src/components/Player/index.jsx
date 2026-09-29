@@ -59,11 +59,13 @@ const Player = forwardRef(function Player({
   const [showAdvanceHint, setShowAdvanceHint] = useState(true);
   const [palettePromptReady, setPalettePromptReady] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [prevImageUrl, setPrevImageUrl] = useState("");
   const didInitRef = useRef(false);
   const endEmitRef = useRef(null);
   const currentImgRef = useRef(null);
   const stageRef = useRef(null);
+  const playerRootRef = useRef(null);
   const titleRef = useRef(null);
   const didLikeInteractRef = useRef(false);
 
@@ -75,6 +77,40 @@ function queueFadeReady(img, stageEl) {
         updateOverlayPositions(img, stageEl);
       });
     });
+  }
+
+  function getFullscreenElement() {
+    if (typeof document === "undefined") return null;
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  async function handleFullscreen(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const root = playerRootRef.current;
+    if (!root || typeof document === "undefined") return;
+
+    try {
+      if (getFullscreenElement()) {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+        return;
+      }
+
+      if (root.requestFullscreen) {
+        await root.requestFullscreen();
+      } else if (root.webkitRequestFullscreen) {
+        root.webkitRequestFullscreen();
+      }
+    } catch (error) {
+      console.error("Unable to toggle player fullscreen", error);
+    }
   }
 
   function handleExit() {
@@ -90,6 +126,23 @@ function queueFadeReady(img, stageEl) {
       }
     }
   }
+
+  useEffect(() => {
+    if (typeof document === "undefined") return () => {};
+
+    const syncFullscreenState = () => {
+      setIsFullscreen(getFullscreenElement() === playerRootRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+    syncFullscreenState();
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
+    };
+  }, []);
 
   function handleBack(e) {
     if (e) {
@@ -428,11 +481,40 @@ function startPlayback(nextMode, nextIndex = 0) {
   useEffect(() => {
     if (playbackState !== "end") return;
     if (!onPlaybackEnd) return;
+
     const signature = `${playbackMode}:${likedSet.size}`;
     if (endEmitRef.current === signature) return;
     endEmitRef.current = signature;
-    onPlaybackEnd({ likedCount: likedSet.size });
-  }, [playbackState, onPlaybackEnd, likedSet.size]);
+
+    let cancelled = false;
+
+    const finishPlayback = async () => {
+      // The CTA/end screen is rendered outside the Player. If the Player is
+      // the fullscreen element, leaving fullscreen first prevents the CTA
+      // from appearing as a blank black screen.
+      if (getFullscreenElement() === playerRootRef.current) {
+        try {
+          if (document.exitFullscreen) {
+            await document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
+        } catch (error) {
+          console.error("Unable to exit player fullscreen at playback end", error);
+        }
+      }
+
+      if (!cancelled) {
+        onPlaybackEnd({ likedCount: likedSet.size });
+      }
+    };
+
+    finishPlayback();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playbackState, playbackMode, onPlaybackEnd, likedSet.size]);
 
   useEffect(() => {
     if (playbackState === "end") return;
@@ -614,13 +696,23 @@ function startPlayback(nextMode, nextIndex = 0) {
   }, [currentIndex, currentImageUrl, playItems, imageLoaded]);
 
   return (
-    <div className={`player-root${embedded ? " player-embedded" : ""}`}>
+    <div ref={playerRootRef} className={`player-root${embedded ? " player-embedded" : ""}${isFullscreen ? " is-fullscreen" : ""}`}>
       {galleryJsonLd && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: safeJsonForScript(galleryJsonLd) }}
         />
       )}
+      <button
+        className="player-fullscreen"
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={handleFullscreen}
+        aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+        title={isFullscreen ? "Exit full screen" : "Full screen"}
+      >
+        <span aria-hidden="true">{isFullscreen ? "↙" : "⛶"}</span>
+      </button>
       <button
         className="player-exit"
         type="button"

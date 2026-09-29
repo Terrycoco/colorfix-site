@@ -14,5 +14,6 @@ final readonly class RexCreateReservationRequest
         public array $context = [],
         public string $status = 'active',
         public ?string $experienceKey = null,
+        public ?string $qrKey = null,
     ) {}
 }

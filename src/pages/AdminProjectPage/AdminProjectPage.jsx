@@ -54,6 +54,8 @@ import {
 
 import PlaylistEditor from "@pages/AdminPlaylistsPage/PlaylistEditor";
 
+import ProjectActivity from "./ProjectActivity";
+
 import ProjectDocuments from "./ProjectDocuments";
 
 import ProjectPalettes from "./ProjectPalettes";
@@ -97,6 +99,8 @@ const PROJECT_SECTIONS =
     "playlist",
 
     "documents",
+
+    "activity",
 
   ]);
 
@@ -1018,6 +1022,8 @@ export default function AdminProjectPage() {
 
           />
 
+ 
+
           <AdminObjectListItem
 
             id="documents"
@@ -1037,6 +1043,32 @@ export default function AdminProjectPage() {
               setActiveSection(
 
                 "documents"
+
+              )
+
+            }
+
+          />
+
+                   <AdminObjectListItem
+
+            id="activity"
+
+            title="Activity"
+
+            selected={
+
+              activeSection ===
+
+              "activity"
+
+            }
+
+            onSelect={() =>
+
+              setActiveSection(
+
+                "activity"
 
               )
 
@@ -1144,7 +1176,7 @@ export default function AdminProjectPage() {
 
           ariaLabel="Project setup"
 
-          title={`Project #${project.id} Setup`}
+          title={`${project.project_name || `Project #${project.id}`} Setup`}
 
           actions={
 
@@ -1230,7 +1262,7 @@ export default function AdminProjectPage() {
 
           ariaLabel="Project scope"
 
-          title={`Project #${project.id} Scope`}
+          title={`${project.project_name || `Project #${project.id}`} Scope`}
 
           actions={
 
@@ -1292,6 +1324,8 @@ export default function AdminProjectPage() {
 
           }
 
+          projectName={project.project_name || ""}
+
         />
 
       );
@@ -1320,6 +1354,8 @@ export default function AdminProjectPage() {
 
           }
 
+          projectName={project.project_name || ""}
+
           playlistId={
 
             Number(
@@ -1337,6 +1373,36 @@ export default function AdminProjectPage() {
             null
 
           }
+
+        />
+
+      );
+
+  } else if (
+
+    activeSection ===
+
+    "activity"
+
+  ) {
+
+    detail =
+
+      (
+
+        <ProjectActivity
+
+          projectId={
+
+            Number(
+
+              project.id
+
+            )
+
+          }
+
+          projectName={project.project_name || ""}
 
         />
 
@@ -1365,6 +1431,8 @@ export default function AdminProjectPage() {
             )
 
           }
+
+          projectName={project.project_name || ""}
 
           onSelectedDocumentChange={
 

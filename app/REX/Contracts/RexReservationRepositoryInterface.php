@@ -94,6 +94,8 @@ interface RexReservationRepositoryInterface
 
     public function updateMetadata(RexUpdateMetadataRequest $request): RexReservation;
 
+    public function setQrKey(int $reservationId, ?string $qrKey): RexReservation;
+
     public function revoke(int $reservationId): RexReservation;
 
     public function reactivate(int $reservationId): RexReservation;

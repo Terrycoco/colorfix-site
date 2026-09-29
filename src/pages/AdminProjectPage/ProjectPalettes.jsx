@@ -202,6 +202,7 @@ function LargeSwatch({ color }) {
 
 export default function ProjectPalettes({
   projectId,
+  projectName = "",
 }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -650,7 +651,7 @@ export default function ProjectPalettes({
     <>
       <AdminDetailPane
         ariaLabel="Project palettes"
-        title="Palettes"
+        title={`${cleanText(projectName) || `Project #${projectId}`} Palettes`}
         actions={detailActions}
       >
         {error ? (
