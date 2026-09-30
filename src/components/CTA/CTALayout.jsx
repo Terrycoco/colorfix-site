@@ -2,11 +2,13 @@ import CTAButton from "./CTAButton";
 import ArticleLinkCta from "./ArticleLinkCta";
 import WatchNextCta from "./WatchNextCta";
 import "./cta.css";
+import { Fragment } from "react";
 
 export default function CTALayout({
   ctas = [],
   layout = "stacked",
   onCtaClick,
+   notice = "",
 }) {
   if (!ctas.length) return null;
 
@@ -38,13 +40,20 @@ export default function CTALayout({
             />
           );
         }
-        return (
-          <CTAButton
-            key={cta.cta_id}
-            cta={cta}
-            onClick={onCtaClick}
-          />
-        );
+return (
+  <Fragment key={cta.cta_id}>
+    <CTAButton
+      cta={cta}
+      onClick={onCtaClick}
+    />
+
+{notice && key === "share" && (
+  <div className="cta-notice" role="status">
+    {notice}
+  </div>
+)}
+  </Fragment>
+);
       })}
     </div>
   );

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\REX\Endpoints;
 
 use App\REX\DTO\RexResolutionBehavior;
+use App\REX\DTO\RexShareMetadata;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Resolvers\RexResolverRegistryFactory;
 use App\REX\Services\RexResolver;
@@ -57,7 +58,7 @@ final class RexPublicEntryEndpoint
             $result->behavior === RexResolutionBehavior::REDIRECT
             && $result->resolverKey === 'route'
         ) {
-            self::renderReactShell($indexPath);
+            self::renderReactShell($indexPath, $result->shareMetadata);
         }
 
         if ($result->behavior === RexResolutionBehavior::REDIRECT) {
@@ -81,14 +82,16 @@ final class RexPublicEntryEndpoint
          * resolver-key allowlist.
          */
         if ($result->behavior === RexResolutionBehavior::RENDER) {
-            self::renderReactShell($indexPath);
+            self::renderReactShell($indexPath, $result->shareMetadata);
         }
 
         self::notFound();
     }
 
-    private static function renderReactShell(string $indexPath): never
-    {
+    private static function renderReactShell(
+        string $indexPath,
+        RexShareMetadata $shareMetadata
+    ): never {
         $html = is_file($indexPath)
             ? (string)file_get_contents($indexPath)
             : '';
@@ -97,9 +100,121 @@ final class RexPublicEntryEndpoint
             self::notFound();
         }
 
+        $title = trim((string)($shareMetadata->title ?? ''));
+        $description = trim((string)($shareMetadata->description ?? ''));
+        $imageUrl = self::absoluteUrl($shareMetadata->imageUrl);
+        $shareUrl = self::currentAbsoluteUrl();
+
+        /*
+         * The Vite shell contains site-wide social metadata. REX pages need
+         * object-specific metadata, so remove the static OG/Twitter tags
+         * before inserting the resolved REX metadata below.
+         */
+        $html = preg_replace(
+            '/<meta\s+(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*>\s*/i',
+            '',
+            $html
+        ) ?? $html;
+
+        $tags = [];
+
+        if ($title !== '') {
+            $escapedTitle = self::escapeHtml($title);
+
+            $html = preg_replace(
+                '/<title\b[^>]*>.*?<\/title>/is',
+                '<title>' . $escapedTitle . '</title>',
+                $html,
+                1
+            ) ?? $html;
+
+            $tags[] = '<meta property="og:title" content="' . $escapedTitle . '">';
+            $tags[] = '<meta name="twitter:title" content="' . $escapedTitle . '">';
+        }
+
+        if ($description !== '') {
+            $escapedDescription = self::escapeHtml($description);
+            $tags[] = '<meta property="og:description" content="' . $escapedDescription . '">';
+            $tags[] = '<meta name="twitter:description" content="' . $escapedDescription . '">';
+        }
+
+        if ($imageUrl !== '') {
+            $escapedImage = self::escapeHtml($imageUrl);
+            $tags[] = '<meta property="og:image" content="' . $escapedImage . '">';
+            $tags[] = '<meta name="twitter:image" content="' . $escapedImage . '">';
+            $tags[] = '<meta name="twitter:card" content="summary_large_image">';
+        }
+
+        if ($shareUrl !== '') {
+            $tags[] = '<meta property="og:url" content="' . self::escapeHtml($shareUrl) . '">';
+        }
+
+        $tags[] = '<meta property="og:type" content="website">';
+
+        if ($tags !== []) {
+            $metaHtml = implode("\n", $tags) . "\n";
+            $html = preg_replace(
+                '/<\/head>/i',
+                $metaHtml . '</head>',
+                $html,
+                1
+            ) ?? $html;
+        }
+
         header('Content-Type: text/html; charset=utf-8');
         echo $html;
         exit;
+    }
+
+    private static function absoluteUrl(?string $value): string
+    {
+        $value = trim((string)$value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (preg_match('~^https?://~i', $value) === 1) {
+            return $value;
+        }
+
+        if (!str_starts_with($value, '/')) {
+            $value = '/' . $value;
+        }
+
+        return self::requestOrigin() . $value;
+    }
+
+    private static function currentAbsoluteUrl(): string
+    {
+        $requestUri = trim((string)($_SERVER['REQUEST_URI'] ?? ''));
+
+        if ($requestUri === '') {
+            return '';
+        }
+
+        return self::requestOrigin() . $requestUri;
+    }
+
+    private static function requestOrigin(): string
+    {
+        $forwardedProto = trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+        $scheme = $forwardedProto !== ''
+            ? strtolower(explode(',', $forwardedProto)[0])
+            : (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+
+        $host = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+
+        if ($host === '') {
+            return '';
+        }
+
+        return $scheme . '://' . $host;
+    }
+
+    private static function escapeHtml(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     private static function notFound(): never

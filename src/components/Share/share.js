@@ -1,17 +1,19 @@
+
+
 export function canUseNativeShare() {
-  if (typeof window === "undefined" || typeof navigator === "undefined") {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.share !== "function"
+  ) {
     return false;
   }
 
-  if (typeof navigator.share !== "function") {
-    return false;
-  }
-
-  if (window.matchMedia?.("(hover: none) and (pointer: coarse)").matches) {
-    return true;
-  }
-
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  // Native Web Share is useful on mobile.
+  // On desktop macOS/Chrome, Messages does not reliably
+  // preserve the share when choosing an arbitrary recipient.
+  return /Android|iPhone|iPad|iPod/i.test(
+    navigator.userAgent || ""
+  );
 }
 
 export function buildSmsShareUrl(body, phone = "") {
@@ -91,9 +93,23 @@ export async function openTextShare({
 
   await copyShareText(body);
 
-  if (typeof window !== "undefined") {
-    window.location.href = buildSmsShareUrl(body, phone);
+  if (typeof window === "undefined") {
+    return true;
   }
+
+  const userAgent = navigator?.userAgent || "";
+
+  // macOS Messages loses a prefilled sms: body when the user
+  // subsequently selects an existing recipient/thread.
+  //
+  // The complete share message is already on the clipboard,
+  // so open Messages without attempting to prefill the draft.
+  if (/Macintosh/i.test(userAgent)) {
+    window.location.href = "sms:/open";
+    return true;
+  }
+
+  window.location.href = buildSmsShareUrl(body, phone);
 
   return true;
 }
@@ -141,6 +157,21 @@ export async function shareUrl({
     return "native";
   }
 
+  const body = composeShareMessage({
+    text,
+    url: shareableUrl,
+  });
+
+  // Desktop fallback: copy the complete share to the clipboard.
+  // Do not launch Messages; macOS can discard the draft when
+  // the user subsequently chooses a recipient.
+  const copied = await copyShareText(body);
+
+  if (copied) {
+    return "copied";
+  }
+
+  // Last-resort fallback for environments without clipboard access.
   await openTextShare({
     text,
     url: shareableUrl,

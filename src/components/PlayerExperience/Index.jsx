@@ -37,6 +37,7 @@ export default function PlayerExperience({ data }) {
 
   const [likedCount, setLikedCount] = useState(0);
   const [playbackEnded, setPlaybackEnded] = useState(false);
+  const [ctaNotice, setCtaNotice] = useState("");
   const [watchNextCta, setWatchNextCta] = useState(null);
   const playerRef = useRef(null);
   const initializedWatchNextJourneyRef = useRef("");
@@ -218,11 +219,24 @@ export default function PlayerExperience({ data }) {
     }
   }
 
-  function handleCta(cta) {
-    const key = getCtaKey(cta);
-    if (!key) return;
-    ctaHandlers[key]?.(cta);
+async function handleCta(cta) {
+  const key = getCtaKey(cta);
+  if (!key) return;
+
+  setCtaNotice("");
+
+  const result = await ctaHandlers[key]?.(cta);
+
+ 
+
+  if (result === "copied") {
+    setCtaNotice("Link copied to clipboard");
+
+    window.setTimeout(() => {
+      setCtaNotice("");
+    }, 3000);
   }
+}
 
   function handlePalettePromptClick(item) {
     if (!item) return;
@@ -347,6 +361,7 @@ export default function PlayerExperience({ data }) {
                   layout="stacked"
                   ctas={orderedCTAs}
                   onCtaClick={handleCta}
+                    notice={ctaNotice}
                 />
               )}
             </PlayerEndScreen>

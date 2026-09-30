@@ -348,6 +348,13 @@
   transform: scale(0.98);
 }
 
+.cta-notice {
+  margin-top: -6px;
+  font-size: 0.8rem;
+  color: #f3f4f6;
+  text-align: center;
+}
+
 @media (max-width: 640px) {
   .cta-watch-next {
     width: 100%;
@@ -377,6 +384,8 @@
     max-width: 100%;
   }
 }
+
+
 
 @media (max-width: 640px) {
   .cta-article-link {
