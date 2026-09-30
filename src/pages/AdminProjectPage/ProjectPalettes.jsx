@@ -21,6 +21,7 @@ import {
 } from "@components/AdminLayout";
 
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import { useAppState } from "@context/AppStateContext.jsx";
 import { API_FOLDER } from "@helpers/config";
 
 const LIST_URL =
@@ -31,6 +32,8 @@ const UNLINK_URL =
   `${API_FOLDER}/v2/admin/projects/palettes/unlink.php`;
 const SAVE_PALETTE_URL =
   `${API_FOLDER}/v2/admin/palettes/save.php`;
+const SAVED_PALETTES_URL =
+  `${API_FOLDER}/v2/admin/palettes/list.php`;
 
 function cleanText(value) {
   return String(value ?? "").trim();
@@ -204,6 +207,10 @@ export default function ProjectPalettes({
   projectId,
   projectName = "",
 }) {
+  const {
+    palette: myPalette,
+  } = useAppState();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -218,6 +225,12 @@ export default function ProjectPalettes({
   const [saving, setSaving] = useState(false);
   const [drawerError, setDrawerError] = useState("");
   const [drawerStatus, setDrawerStatus] = useState("");
+
+  const [savedPaletteOptions, setSavedPaletteOptions] = useState([]);
+  const [savedPaletteChoice, setSavedPaletteChoice] = useState("");
+  const [savedPalettesLoading, setSavedPalettesLoading] = useState(false);
+  const [savedPalettesError, setSavedPalettesError] = useState("");
+  const [sourceSavedPaletteId, setSourceSavedPaletteId] = useState(null);
 
   const loadPalettes = useCallback(async () => {
     const id = Number(projectId || 0);
@@ -271,6 +284,52 @@ export default function ProjectPalettes({
     void loadPalettes();
   }, [loadPalettes]);
 
+  const loadSavedPaletteOptions = useCallback(async () => {
+    setSavedPalettesLoading(true);
+    setSavedPalettesError("");
+
+    try {
+      const data = await readJson(
+        await fetch(
+          `${SAVED_PALETTES_URL}?limit=500&_=${Date.now()}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+          }
+        ),
+        "Failed to load saved palettes"
+      );
+
+      const nextOptions = Array.isArray(data?.items)
+        ? data.items
+        : [];
+
+      setSavedPaletteOptions(nextOptions);
+      return nextOptions;
+    } catch (err) {
+      setSavedPaletteOptions([]);
+      setSavedPalettesError(
+        err?.message
+        || "Failed to load saved palettes."
+      );
+      return [];
+    } finally {
+      setSavedPalettesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!drawerOpen || drawerMode !== "new") {
+      return;
+    }
+
+    void loadSavedPaletteOptions();
+  }, [
+    drawerOpen,
+    drawerMode,
+    loadSavedPaletteOptions,
+  ]);
+
   useEffect(() => {
     setSelectedKey(null);
     setDrawerOpen(false);
@@ -280,6 +339,9 @@ export default function ProjectPalettes({
     setDraftMembers([]);
     setDrawerError("");
     setDrawerStatus("");
+    setSavedPaletteChoice("");
+    setSavedPalettesError("");
+    setSourceSavedPaletteId(null);
   }, [projectId]);
 
   const paletteColumns = useMemo(
@@ -407,6 +469,9 @@ export default function ProjectPalettes({
     setDraftMembers([]);
     setDrawerError("");
     setDrawerStatus("");
+    setSavedPaletteChoice("");
+    setSavedPalettesError("");
+    setSourceSavedPaletteId(null);
     setDrawerOpen(true);
   }
 
@@ -462,6 +527,112 @@ export default function ProjectPalettes({
         },
       ];
     });
+  }
+
+  function buildImportedMembers(colors, sourceLabel) {
+    const seen = new Set();
+
+    return (Array.isArray(colors) ? colors : [])
+      .map((item, index) => {
+        const sourceColor =
+          item?.color
+          ?? item;
+
+        const color = normalizePickedColor(sourceColor);
+        const colorId = Number(color?.id || 0);
+
+        if (!colorId || seen.has(colorId)) {
+          return null;
+        }
+
+        seen.add(colorId);
+
+        return {
+          key: `import-${sourceLabel}-${colorId}-${index}`,
+          color,
+          role: cleanText(
+            item?.role
+            ?? item?.role_name
+          ),
+          sheen: cleanText(item?.sheen),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function loadCurrentMyPalette() {
+    const imported = buildImportedMembers(
+      myPalette,
+      "mypalette"
+    );
+
+    if (!imported.length) {
+      setDrawerError("MyPalette is empty.");
+      setDrawerStatus("");
+      return;
+    }
+
+    setDraftMembers(imported);
+    setSourceSavedPaletteId(null);
+    setSavedPaletteChoice("");
+    setDrawerError("");
+    setDrawerStatus(
+      `Loaded ${imported.length} color${imported.length === 1 ? "" : "s"} from MyPalette.`
+    );
+  }
+
+  function loadSelectedSavedPalette() {
+    const savedPaletteId = Number(savedPaletteChoice || 0);
+
+    if (!savedPaletteId) {
+      setDrawerError("Choose a saved palette first.");
+      setDrawerStatus("");
+      return;
+    }
+
+    const source = savedPaletteOptions.find(
+      (palette) => Number(palette?.id || 0) === savedPaletteId
+    );
+
+    if (!source) {
+      setDrawerError("That saved palette could not be found.");
+      setDrawerStatus("");
+      return;
+    }
+
+    const imported = buildImportedMembers(
+      source?.members,
+      `saved-${savedPaletteId}`
+    );
+
+    if (!imported.length) {
+      setDrawerError("That saved palette has no colors.");
+      setDrawerStatus("");
+      return;
+    }
+
+    const sourceName =
+      cleanText(
+        source?.nickname
+        || source?.display_title
+      )
+      || `Palette #${savedPaletteId}`;
+
+    const projectSuffix =
+      cleanText(projectName)
+      || `Project ${projectId}`;
+
+    setDraftMembers(imported);
+    setSourceSavedPaletteId(savedPaletteId);
+
+    if (!cleanText(draftName)) {
+      setDraftName(`${sourceName} — ${projectSuffix}`);
+    }
+
+    setDrawerError("");
+    setDrawerStatus(
+      `Loaded ${imported.length} color${imported.length === 1 ? "" : "s"} from ${sourceName}.`
+    );
   }
 
   async function linkPalette(savedPaletteId, note) {
@@ -527,6 +698,14 @@ export default function ProjectPalettes({
         })),
       };
 
+      // New Project palettes are always independent copies.
+      // sourceSavedPaletteId is deliberately NOT sent as `id`,
+      // so importing a Saved Palette can never overwrite the source.
+      if (drawerMode === "new" && sourceSavedPaletteId) {
+        payload.id = null;
+        payload.is_public = false;
+      }
+
       const saveData = await readJson(
         await fetch(SAVE_PALETTE_URL, {
           method: "POST",
@@ -574,6 +753,9 @@ export default function ProjectPalettes({
         })),
       });
       setDrawerStatus("Saved.");
+      setSourceSavedPaletteId(null);
+      setSavedPaletteChoice("");
+      setDrawerOpen(false);
     } catch (err) {
       setDrawerError(
         err?.message
@@ -719,6 +901,75 @@ export default function ProjectPalettes({
             </AdminNotice>
           ) : null}
 
+          {drawerMode === "new" ? (
+            <>
+              <AdminToolbar>
+                <AdminButton
+                  type="button"
+                  variant="secondary"
+                  disabled={
+                    saving
+                    || !(Array.isArray(myPalette) && myPalette.length)
+                  }
+                  onClick={loadCurrentMyPalette}
+                >
+                  Load MyPalette
+                </AdminButton>
+
+                <AdminToolbarSpacer />
+
+                <select
+                  className="admin-field__control"
+                  value={savedPaletteChoice}
+                  disabled={saving || savedPalettesLoading}
+                  aria-label="Saved palette"
+                  onChange={(event) => {
+                    setSavedPaletteChoice(event.target.value);
+                    setDrawerError("");
+                    setDrawerStatus("");
+                  }}
+                >
+                  <option value="">
+                    {savedPalettesLoading
+                      ? "Loading saved palettes..."
+                      : "Choose Saved Palette"}
+                  </option>
+
+                  {savedPaletteOptions.map((palette) => (
+                    <option
+                      key={palette.id}
+                      value={palette.id}
+                    >
+                      {cleanText(
+                        palette?.nickname
+                        || palette?.display_title
+                      ) || `Palette #${palette.id}`}
+                    </option>
+                  ))}
+                </select>
+
+                <AdminButton
+                  type="button"
+                  variant="secondary"
+                  disabled={
+                    saving
+                    || savedPalettesLoading
+                    || !savedPaletteChoice
+                  }
+                  onClick={loadSelectedSavedPalette}
+                >
+                  Load Saved Palette
+                </AdminButton>
+              </AdminToolbar>
+
+              {savedPalettesError ? (
+                <AdminNotice variant="danger">
+                  {savedPalettesError}
+                </AdminNotice>
+              ) : null}
+            </>
+          ) : null}
+
           <AdminField label="Palette Name" compact>
             <input
               className="admin-field__control"
@@ -788,7 +1039,7 @@ export default function ProjectPalettes({
               }
               onClick={savePalette}
             >
-              {saving ? "Saving..." : "Save Palette"}
+              {saving ? "Saving..." : "Save & Close"}
             </AdminButton>
           </AdminToolbar>
 
