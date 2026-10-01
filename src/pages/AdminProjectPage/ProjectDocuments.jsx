@@ -630,7 +630,9 @@ export default function ProjectDocuments({
   }
 
 
-  async function generateDocument() {
+  async function generateDocument(
+    templateKeyOverride = ""
+  ) {
     const id =
       Number(
         projectId || 0
@@ -638,6 +640,8 @@ export default function ProjectDocuments({
 
     const templateKey =
       cleanText(
+        templateKeyOverride
+        ||
         selectedTemplateKey
       );
 
@@ -1198,11 +1202,38 @@ export default function ProjectDocuments({
                       <AdminButton
                         type="button"
                         variant="secondary"
+                        disabled={
+                          generating
+                        }
                         onClick={
                           closeDrawer
                         }
                       >
                         Close
+                      </AdminButton>
+
+                      <AdminButton
+                        type="button"
+                        disabled={
+                          generating
+                          ||
+                          !cleanText(
+                            drawerDocument?.template_key
+                          )
+                        }
+                        onClick={() => {
+                          void generateDocument(
+                            cleanText(
+                              drawerDocument?.template_key
+                            )
+                          );
+                        }}
+                      >
+                        {
+                          generating
+                            ? "Generating…"
+                            : "Generate"
+                        }
                       </AdminButton>
                     </AdminToolbar>
                   </>
