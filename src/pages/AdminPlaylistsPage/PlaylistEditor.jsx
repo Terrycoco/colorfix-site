@@ -91,6 +91,7 @@ const EMPTY_COPIED_SLIDES = [];
 
 
 const DEFAULT_PLAYLIST_TYPES = [
+  "normal",
   "teaching",
 ];
 
@@ -113,7 +114,7 @@ const emptyPlaylist = {
   playlist_id: null,
   project_id: "",
   title: "",
-  type: "",
+  type: "normal",
   is_active: true,
   is_public: false,
   slug: "",
@@ -172,6 +173,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     initialCopiedSlides = EMPTY_COPIED_SLIDES,
     onSaved = null,
     onDeleted = null,
+    onNew = null,
   },
   ref
 ) {
@@ -1460,6 +1462,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
 
   async function beginNewPlaylist() {
+    if (
+      typeof onNew ===
+      "function"
+    ) {
+      await onNew();
+      return;
+    }
+
     navigate(
       "/admin/playlists/new"
     );
@@ -1495,24 +1505,35 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   async function savePlaylistDraftAndClose() {
     const savedId =
       await savePlaylist(
-        playlistDraft
+        playlistDraft,
+        null,
+        false
       );
 
-    if (
-      !savedId
-    ) {
+    if (!savedId) {
       return;
     }
 
-    setPlaylist({
+    const savedPlaylist = {
       ...playlistDraft,
-      playlist_id:
-        savedId,
-    });
+      playlist_id: savedId,
+    };
 
-    setPlaylistEditorOpen(
-      false
-    );
+    setPlaylist(savedPlaylist);
+
+    // Close this editor before notifying a parent that may replace
+    // the PlaylistEditor instance (Project -> newly created playlist).
+    setPlaylistEditorOpen(false);
+
+    if (
+      typeof onSaved ===
+        "function"
+    ) {
+      await onSaved(
+        savedId,
+        savedPlaylist
+      );
+    }
   }
 
 
@@ -2342,7 +2363,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
   async function savePlaylist(
     playlistOverride = null,
-    itemsOverride = null
+    itemsOverride = null,
+    notifySaved = true
   ) {
     const hasPlaylistOverride =
       playlistOverride
@@ -2582,11 +2604,17 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       );
 
       if (
+        notifySaved
+        &&
         typeof onSaved ===
-        "function"
+          "function"
       ) {
-        onSaved(
-          id
+        await onSaved(
+          id,
+          {
+            ...playlistToSave,
+            playlist_id: id,
+          }
         );
       }
 
@@ -3162,7 +3190,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       <AdminButton
         type="button"
         variant="secondary"
-        disabled={saving}
+        disabled={saving || isNewRoute}
         onClick={beginNewPlaylist}
       >
         New

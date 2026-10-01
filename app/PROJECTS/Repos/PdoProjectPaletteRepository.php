@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PROJECTS\Repos;
 
 use PDO;
+use Throwable;
 
 final class PdoProjectPaletteRepository
 {
@@ -26,6 +27,8 @@ final class PdoProjectPaletteRepository
                 pp.project_id,
                 pp.saved_palette_id,
                 pp.note,
+                pp.is_final,
+                pp.order_index,
                 pp.created_at,
 
                 sp.palette_hash,
@@ -42,6 +45,7 @@ final class PdoProjectPaletteRepository
             WHERE pp.project_id = :project_id
 
             ORDER BY
+                pp.order_index ASC,
                 COALESCE(
                     NULLIF(TRIM(sp.display_title), ''),
                     NULLIF(TRIM(sp.nickname), ''),
@@ -55,7 +59,9 @@ final class PdoProjectPaletteRepository
             ':project_id' => $projectId,
         ]);
 
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows =
+            $stmt->fetchAll(PDO::FETCH_ASSOC)
+            ?: [];
 
         if (!$rows) {
             return [];
@@ -71,21 +77,37 @@ final class PdoProjectPaletteRepository
             )
         );
 
-        $colorsByPalette = $this->colorsForPalettes($paletteIds);
+        $colorsByPalette =
+            $this->colorsForPalettes(
+                $paletteIds
+            );
 
         foreach ($rows as &$row) {
-            $savedPaletteId = (int)$row['saved_palette_id'];
+            $savedPaletteId =
+                (int)$row['saved_palette_id'];
 
             $row['project_palette_id'] =
                 (int)$row['project_palette_id'];
+
             $row['project_id'] =
                 (int)$row['project_id'];
+
             $row['saved_palette_id'] =
                 $savedPaletteId;
+
+            $row['is_final'] =
+                (int)($row['is_final'] ?? 0);
+
+            $row['order_index'] =
+                (int)($row['order_index'] ?? 0);
+
             $row['is_public'] =
                 (int)($row['is_public'] ?? 0);
+
             $row['colors'] =
-                $colorsByPalette[$savedPaletteId] ?? [];
+                $colorsByPalette[
+                    $savedPaletteId
+                ] ?? [];
         }
 
         unset($row);
@@ -98,9 +120,32 @@ final class PdoProjectPaletteRepository
         int $savedPaletteId,
         ?string $note = null
     ): int {
-        if ($projectId <= 0 || $savedPaletteId <= 0) {
+        if (
+            $projectId <= 0
+            || $savedPaletteId <= 0
+        ) {
             return 0;
         }
+
+        $orderStmt =
+            $this->pdo->prepare(
+                "
+                SELECT
+                    COALESCE(
+                        MAX(order_index),
+                        -1
+                    ) + 1
+                FROM project_palettes
+                WHERE project_id = :project_id
+                "
+            );
+
+        $orderStmt->execute([
+            ':project_id' => $projectId,
+        ]);
+
+        $nextOrder =
+            (int)$orderStmt->fetchColumn();
 
         $stmt = $this->pdo->prepare(
             "
@@ -109,6 +154,8 @@ final class PdoProjectPaletteRepository
                     project_id,
                     saved_palette_id,
                     note,
+                    is_final,
+                    order_index,
                     created_at
                 )
             VALUES
@@ -116,42 +163,169 @@ final class PdoProjectPaletteRepository
                     :project_id,
                     :saved_palette_id,
                     :note,
+                    0,
+                    :order_index,
                     NOW()
                 )
+
             ON DUPLICATE KEY UPDATE
                 note = VALUES(note),
-                project_palette_id = LAST_INSERT_ID(project_palette_id)
+                project_palette_id =
+                    LAST_INSERT_ID(
+                        project_palette_id
+                    )
             "
         );
 
         $stmt->execute([
-            ':project_id' => $projectId,
-            ':saved_palette_id' => $savedPaletteId,
-            ':note' => $note,
+            ':project_id' =>
+                $projectId,
+
+            ':saved_palette_id' =>
+                $savedPaletteId,
+
+            ':note' =>
+                $note,
+
+            ':order_index' =>
+                $nextOrder,
         ]);
 
-        return (int)$this->pdo->lastInsertId();
+        return
+            (int)$this->pdo
+                ->lastInsertId();
     }
 
-    public function unlink(
+    public function setFinal(
         int $projectId,
-        int $savedPaletteId
+        int $savedPaletteId,
+        bool $isFinal
     ): void {
-        if ($projectId <= 0 || $savedPaletteId <= 0) {
+        if (
+            $projectId <= 0
+            || $savedPaletteId <= 0
+        ) {
             return;
         }
 
         $stmt = $this->pdo->prepare(
             "
-            DELETE FROM project_palettes
+            UPDATE project_palettes
+
+            SET is_final = :is_final
+
             WHERE project_id = :project_id
               AND saved_palette_id = :saved_palette_id
             "
         );
 
         $stmt->execute([
-            ':project_id' => $projectId,
-            ':saved_palette_id' => $savedPaletteId,
+            ':is_final' =>
+                $isFinal ? 1 : 0,
+
+            ':project_id' =>
+                $projectId,
+
+            ':saved_palette_id' =>
+                $savedPaletteId,
+        ]);
+    }
+
+    /**
+     * @param array<int, int> $savedPaletteIds
+     */
+    public function reorder(
+        int $projectId,
+        array $savedPaletteIds
+    ): void {
+        if ($projectId <= 0) {
+            return;
+        }
+
+        $ids = array_values(
+            array_unique(
+                array_filter(
+                    array_map(
+                        'intval',
+                        $savedPaletteIds
+                    ),
+                    static fn(int $id): bool =>
+                        $id > 0
+                )
+            )
+        );
+
+        if (!$ids) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "
+            UPDATE project_palettes
+
+            SET order_index = :order_index
+
+            WHERE project_id = :project_id
+              AND saved_palette_id = :saved_palette_id
+            "
+        );
+
+        $this->pdo->beginTransaction();
+
+        try {
+            foreach (
+                $ids as $orderIndex => $savedPaletteId
+            ) {
+                $stmt->execute([
+                    ':order_index' =>
+                        $orderIndex,
+
+                    ':project_id' =>
+                        $projectId,
+
+                    ':saved_palette_id' =>
+                        $savedPaletteId,
+                ]);
+            }
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if (
+                $this->pdo->inTransaction()
+            ) {
+                $this->pdo->rollBack();
+            }
+
+            throw $e;
+        }
+    }
+
+    public function unlink(
+        int $projectId,
+        int $savedPaletteId
+    ): void {
+        if (
+            $projectId <= 0
+            || $savedPaletteId <= 0
+        ) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "
+            DELETE FROM project_palettes
+
+            WHERE project_id = :project_id
+              AND saved_palette_id = :saved_palette_id
+            "
+        );
+
+        $stmt->execute([
+            ':project_id' =>
+                $projectId,
+
+            ':saved_palette_id' =>
+                $savedPaletteId,
         ]);
     }
 
@@ -160,8 +334,12 @@ final class PdoProjectPaletteRepository
     ): array {
         $paletteIds = array_values(
             array_filter(
-                array_map('intval', $paletteIds),
-                static fn(int $id): bool => $id > 0
+                array_map(
+                    'intval',
+                    $paletteIds
+                ),
+                static fn(int $id): bool =>
+                    $id > 0
             )
         );
 
@@ -171,7 +349,11 @@ final class PdoProjectPaletteRepository
 
         $placeholders = implode(
             ',',
-            array_fill(0, count($paletteIds), '?')
+            array_fill(
+                0,
+                count($paletteIds),
+                '?'
+            )
         );
 
         $stmt = $this->pdo->prepare(
@@ -181,6 +363,7 @@ final class PdoProjectPaletteRepository
                 m.saved_palette_id,
                 m.color_id,
                 m.role_name AS role,
+                m.sheen,
                 m.order_index,
 
                 c.name AS color_name,
@@ -194,7 +377,8 @@ final class PdoProjectPaletteRepository
             LEFT JOIN swatch_view c
                 ON c.id = m.color_id
 
-            WHERE m.saved_palette_id IN ({$placeholders})
+            WHERE m.saved_palette_id
+                IN ({$placeholders})
 
             ORDER BY
                 m.saved_palette_id ASC,
@@ -203,34 +387,53 @@ final class PdoProjectPaletteRepository
             "
         );
 
-        $stmt->execute($paletteIds);
+        $stmt->execute(
+            $paletteIds
+        );
 
         $map = [];
 
         foreach (
-            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
+            $stmt->fetchAll(
+                PDO::FETCH_ASSOC
+            ) ?: []
             as $row
         ) {
             $savedPaletteId =
-                (int)$row['saved_palette_id'];
+                (int)$row[
+                    'saved_palette_id'
+                ];
 
             $map[$savedPaletteId][] = [
                 'member_id' =>
                     (int)$row['member_id'],
+
                 'color_id' =>
                     (int)$row['color_id'],
+
                 'role' =>
                     $row['role'] ?? null,
+
+                'sheen' =>
+                    $row['sheen'] ?? null,
+
                 'order_index' =>
                     (int)$row['order_index'],
+
                 'color_name' =>
                     $row['color_name'] ?? null,
+
                 'color_brand' =>
                     $row['color_brand'] ?? null,
+
                 'color_brand_name' =>
-                    $row['color_brand_name'] ?? null,
+                    $row[
+                        'color_brand_name'
+                    ] ?? null,
+
                 'color_code' =>
                     $row['color_code'] ?? null,
+
                 'color_hex6' =>
                     $row['color_hex6'] ?? null,
             ];

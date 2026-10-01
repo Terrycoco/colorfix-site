@@ -4,241 +4,347 @@ declare(strict_types=1);
 namespace App\PROJECTS\Repos;
 
 use PDO;
+use RuntimeException;
 
-final class PdoProjectPaletteRepository
+final class PdoProjectRepository
 {
     public function __construct(
         private PDO $pdo
-    ) {
+    ) {}
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listAdminRows(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT
+                p.id,
+                p.project_name,
+                p.client_id,
+                p.property_id,
+                p.playlist_id,
+                c.name AS client_name,
+                pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
+                pl.title AS playlist_title
+             FROM projects p
+             LEFT JOIN clients c
+               ON c.id = p.client_id
+             LEFT JOIN properties pr
+               ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
+             LEFT JOIN playlists pl
+               ON pl.playlist_id = p.playlist_id
+             ORDER BY p.id DESC'
+        );
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function listForProject(
-        int $projectId
-    ): array {
+    /** @return array<int, array<string, mixed>> */
+    public function listByPropertyId(int $propertyId): array
+    {
+        if ($propertyId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                p.id,
+                p.project_name,
+                p.client_id,
+                p.property_id,
+                p.playlist_id,
+                c.name AS client_name,
+                pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
+                pl.title AS playlist_title
+             FROM projects p
+             LEFT JOIN clients c
+               ON c.id = p.client_id
+             LEFT JOIN properties pr
+               ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
+             LEFT JOIN playlists pl
+               ON pl.playlist_id = p.playlist_id
+             WHERE p.property_id = :property_id
+             ORDER BY p.project_name ASC, p.id ASC'
+        );
+        $stmt->execute([':property_id' => $propertyId]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPlaylists(int $projectId): array
+    {
         if ($projectId <= 0) {
             return [];
         }
 
         $stmt = $this->pdo->prepare(
-            "
-            SELECT
-                pp.project_palette_id,
-                pp.project_id,
-                pp.saved_palette_id,
-                pp.note,
-                pp.created_at,
+            'SELECT playlist_id, project_id, title, slug, updated_at
+             FROM playlists
+             WHERE project_id = :project_id
+             ORDER BY updated_at DESC, playlist_id DESC'
+        );
+        $stmt->execute([':project_id' => $projectId]);
 
-                sp.palette_hash,
-                sp.nickname,
-                sp.display_title,
-                sp.palette_type,
-                sp.is_public
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
 
-            FROM project_palettes pp
+    public function findProjectIdByPlaylistId(int $playlistId): ?int
+    {
+        if ($playlistId <= 0) {
+            return null;
+        }
 
-            INNER JOIN saved_palettes sp
-                ON sp.id = pp.saved_palette_id
+        $stmt = $this->pdo->prepare(
+            'SELECT project_id
+             FROM playlists
+             WHERE playlist_id = :playlist_id
+             LIMIT 1'
+        );
+        $stmt->execute([':playlist_id' => $playlistId]);
+        $value = $stmt->fetchColumn();
 
-            WHERE pp.project_id = :project_id
+        return $value === false || $value === null ? null : (int)$value;
+    }
 
-            ORDER BY
-                COALESCE(
-                    NULLIF(TRIM(sp.display_title), ''),
-                    NULLIF(TRIM(sp.nickname), ''),
-                    CONCAT('Palette #', sp.id)
-                ) ASC,
-                sp.id ASC
-            "
+    public function countByPropertyId(int $propertyId): int
+    {
+        if ($propertyId <= 0) {
+            return 0;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM projects WHERE property_id = :property_id'
+        );
+        $stmt->execute([':property_id' => $propertyId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findById(
+        int $projectId
+    ): ?array {
+        if ($projectId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT
+                p.id,
+                p.project_name,
+                p.client_id,
+                p.property_id,
+                p.playlist_id,
+                c.name AS client_name,
+                pr.name AS property_name,
+                TRIM(
+                    CONCAT_WS(
+                        \', \',
+                        NULLIF(TRIM(a.street_1), \'\'),
+                        NULLIF(TRIM(a.street_2), \'\'),
+                        NULLIF(TRIM(a.city), \'\'),
+                        NULLIF(
+                            TRIM(
+                                CONCAT_WS(
+                                    \' \',
+                                    NULLIF(TRIM(a.state), \'\'),
+                                    NULLIF(TRIM(a.postal_code), \'\')
+                                )
+                            ),
+                            \'\'
+                        )
+                    )
+                ) AS property_address,
+                pl.title AS playlist_title
+             FROM projects p
+             LEFT JOIN clients c
+               ON c.id = p.client_id
+             LEFT JOIN properties pr
+               ON pr.id = p.property_id
+             LEFT JOIN addresses a
+               ON a.id = pr.address_id
+             LEFT JOIN playlists pl
+               ON pl.playlist_id = p.playlist_id
+             WHERE p.id = :project_id
+             LIMIT 1'
         );
 
         $stmt->execute([
             ':project_id' => $projectId,
         ]);
 
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$rows) {
-            return [];
-        }
-
-        $paletteIds = array_values(
-            array_unique(
-                array_map(
-                    static fn(array $row): int =>
-                        (int)$row['saved_palette_id'],
-                    $rows
-                )
-            )
-        );
-
-        $colorsByPalette = $this->colorsForPalettes($paletteIds);
-
-        foreach ($rows as &$row) {
-            $savedPaletteId = (int)$row['saved_palette_id'];
-
-            $row['project_palette_id'] =
-                (int)$row['project_palette_id'];
-            $row['project_id'] =
-                (int)$row['project_id'];
-            $row['saved_palette_id'] =
-                $savedPaletteId;
-            $row['is_public'] =
-                (int)($row['is_public'] ?? 0);
-            $row['colors'] =
-                $colorsByPalette[$savedPaletteId] ?? [];
-        }
-
-        unset($row);
-
-        return $rows;
+        return $row ?: null;
     }
 
-    public function link(
-        int $projectId,
-        int $savedPaletteId,
-        ?string $note = null
+    public function create(
+        ?string $projectName,
+        ?int $clientId,
+        ?int $propertyId,
+        ?int $playlistId
     ): int {
-        if ($projectId <= 0 || $savedPaletteId <= 0) {
-            return 0;
-        }
-
         $stmt = $this->pdo->prepare(
-            "
-            INSERT INTO project_palettes
-                (
-                    project_id,
-                    saved_palette_id,
-                    note,
-                    created_at
-                )
-            VALUES
-                (
-                    :project_id,
-                    :saved_palette_id,
-                    :note,
-                    NOW()
-                )
-            ON DUPLICATE KEY UPDATE
-                note = VALUES(note),
-                project_palette_id = LAST_INSERT_ID(project_palette_id)
-            "
+            'INSERT INTO projects (
+                project_name,
+                client_id,
+                property_id,
+                playlist_id
+             ) VALUES (
+                :project_name,
+                :client_id,
+                :property_id,
+                :playlist_id
+             )'
         );
 
         $stmt->execute([
-            ':project_id' => $projectId,
-            ':saved_palette_id' => $savedPaletteId,
-            ':note' => $note,
+            ':project_name' => $projectName,
+            ':client_id' => $clientId,
+            ':property_id' => $propertyId,
+            ':playlist_id' => $playlistId,
         ]);
 
         return (int)$this->pdo->lastInsertId();
     }
 
-    public function unlink(
+    public function update(
         int $projectId,
-        int $savedPaletteId
-    ): void {
-        if ($projectId <= 0 || $savedPaletteId <= 0) {
-            return;
+        ?string $projectName,
+        ?int $clientId,
+        ?int $propertyId,
+        ?int $playlistId
+    ): bool {
+        if ($projectId <= 0) {
+            throw new RuntimeException(
+                'Valid project ID required.'
+            );
         }
 
         $stmt = $this->pdo->prepare(
-            "
-            DELETE FROM project_palettes
-            WHERE project_id = :project_id
-              AND saved_palette_id = :saved_palette_id
-            "
+            'UPDATE projects
+                SET project_name = :project_name,
+                    client_id = :client_id,
+                    property_id = :property_id,
+                    playlist_id = :playlist_id
+              WHERE id = :project_id'
         );
 
         $stmt->execute([
             ':project_id' => $projectId,
-            ':saved_palette_id' => $savedPaletteId,
+            ':project_name' => $projectName,
+            ':client_id' => $clientId,
+            ':property_id' => $propertyId,
+            ':playlist_id' => $playlistId,
         ]);
+
+        return true;
     }
 
-    private function colorsForPalettes(
-        array $paletteIds
-    ): array {
-        $paletteIds = array_values(
-            array_filter(
-                array_map('intval', $paletteIds),
-                static fn(int $id): bool => $id > 0
-            )
-        );
-
-        if (!$paletteIds) {
-            return [];
+    public function deleteById(
+        int $projectId
+    ): int {
+        if ($projectId <= 0) {
+            return 0;
         }
-
-        $placeholders = implode(
-            ',',
-            array_fill(0, count($paletteIds), '?')
-        );
 
         $stmt = $this->pdo->prepare(
-            "
-            SELECT
-                m.id AS member_id,
-                m.saved_palette_id,
-                m.color_id,
-                m.role_name AS role,
-                m.sheen,
-                m.order_index,
-
-                c.name AS color_name,
-                c.brand AS color_brand,
-                c.brand_name AS color_brand_name,
-                c.code AS color_code,
-                c.hex6 AS color_hex6
-
-            FROM saved_palette_members m
-
-            LEFT JOIN swatch_view c
-                ON c.id = m.color_id
-
-            WHERE m.saved_palette_id IN ({$placeholders})
-
-            ORDER BY
-                m.saved_palette_id ASC,
-                m.order_index ASC,
-                m.id ASC
-            "
+            'DELETE FROM projects
+              WHERE id = :project_id'
         );
 
-        $stmt->execute($paletteIds);
+        $stmt->execute([
+            ':project_id' => $projectId,
+        ]);
 
-        $map = [];
+        return $stmt->rowCount();
+    }
 
-        foreach (
-            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []
-            as $row
-        ) {
-            $savedPaletteId =
-                (int)$row['saved_palette_id'];
-
-            $map[$savedPaletteId][] = [
-                'member_id' =>
-                    (int)$row['member_id'],
-                'color_id' =>
-                    (int)$row['color_id'],
-                'role' =>
-                    $row['role'] ?? null,
-                'sheen' =>
-                    $row['sheen'] ?? null,
-                'order_index' =>
-                    (int)$row['order_index'],
-                'color_name' =>
-                    $row['color_name'] ?? null,
-                'color_brand' =>
-                    $row['color_brand'] ?? null,
-                'color_brand_name' =>
-                    $row['color_brand_name'] ?? null,
-                'color_code' =>
-                    $row['color_code'] ?? null,
-                'color_hex6' =>
-                    $row['color_hex6'] ?? null,
-            ];
+    public function playlistInUseByAnotherProject(
+        int $playlistId,
+        ?int $excludeProjectId = null
+    ): bool {
+        if ($playlistId <= 0) {
+            return false;
         }
 
-        return $map;
+        $sql =
+            'SELECT 1
+               FROM projects
+              WHERE playlist_id = :playlist_id';
+
+        $params = [
+            ':playlist_id' => $playlistId,
+        ];
+
+        if (
+            $excludeProjectId !== null
+            &&
+            $excludeProjectId > 0
+        ) {
+            $sql .=
+                ' AND id <> :exclude_project_id';
+
+            $params[
+                ':exclude_project_id'
+            ] = $excludeProjectId;
+        }
+
+        $sql .= ' LIMIT 1';
+
+        $stmt =
+            $this->pdo
+                ->prepare(
+                    $sql
+                );
+
+        $stmt->execute(
+            $params
+        );
+
+        return (bool)$stmt->fetchColumn();
     }
 }
