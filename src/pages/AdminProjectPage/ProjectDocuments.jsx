@@ -8,9 +8,14 @@ import {
   AdminButton,
   AdminDetailPane,
   AdminEmptyState,
+  AdminField,
+  AdminMetaText,
   AdminNotice,
   AdminSmartGrid,
+  AdminStack,
   AdminToolbar,
+  AdminToolbarSpacer,
+  AdminWorkbenchDrawer,
 } from "@components/AdminLayout";
 
 import FetchRexButton from "@components/REX/FetchRexButton";
@@ -35,7 +40,10 @@ function cleanText(value) {
 }
 
 
-async function readJson(response, fallbackMessage) {
+async function readJson(
+  response,
+  fallbackMessage
+) {
   const text =
     await response.text();
 
@@ -119,6 +127,15 @@ function templateLabel(template) {
 }
 
 
+function yesNo(value) {
+  return Number(
+    value ?? 0
+  ) === 1
+    ? "Yes"
+    : "No";
+}
+
+
 export default function ProjectDocuments({
   projectId,
   projectName = "",
@@ -146,6 +163,21 @@ export default function ProjectDocuments({
   ] = useState("");
 
   const [
+    drawerOpen,
+    setDrawerOpen,
+  ] = useState(false);
+
+  const [
+    drawerMode,
+    setDrawerMode,
+  ] = useState("new");
+
+  const [
+    drawerDocument,
+    setDrawerDocument,
+  ] = useState(null);
+
+  const [
     loading,
     setLoading,
   ] = useState(true);
@@ -163,6 +195,16 @@ export default function ProjectDocuments({
   const [
     statusMessage,
     setStatusMessage,
+  ] = useState("");
+
+  const [
+    drawerError,
+    setDrawerError,
+  ] = useState("");
+
+  const [
+    drawerStatus,
+    setDrawerStatus,
   ] = useState("");
 
 
@@ -253,6 +295,8 @@ export default function ProjectDocuments({
         setTemplates([]);
         setSelectedDocumentId(null);
         setSelectedTemplateKey("");
+        setDrawerOpen(false);
+        setDrawerDocument(null);
         setLoading(false);
         setError("");
         return undefined;
@@ -342,27 +386,10 @@ export default function ProjectDocuments({
             );
 
             setSelectedTemplateKey(
-              (current) => {
-                if (
-                  current
-                  &&
-                  activeTemplates.some(
-                    (template) =>
-                      cleanText(
-                        template?.template_key
-                      )
-                      ===
-                      current
-                  )
-                ) {
-                  return current;
-                }
-
-                return cleanText(
-                  activeTemplates[0]
-                    ?.template_key
-                );
-              }
+              cleanText(
+                activeTemplates[0]
+                  ?.template_key
+              )
             );
 
           } catch (err) {
@@ -490,12 +517,9 @@ export default function ProjectDocuments({
             true,
           value:
             (document) =>
-              Number(
+              yesNo(
                 document?.approval_required
-                ?? 0
-              ) === 1
-                ? "Yes"
-                : "No",
+              ),
         },
         {
           key:
@@ -519,6 +543,93 @@ export default function ProjectDocuments({
     );
 
 
+  function openNewDocument() {
+    setDrawerMode(
+      "new"
+    );
+
+    setDrawerDocument(
+      null
+    );
+
+    setSelectedTemplateKey(
+      (current) => {
+        if (
+          current
+          &&
+          templates.some(
+            (template) =>
+              cleanText(
+                template?.template_key
+              )
+              ===
+              current
+          )
+        ) {
+          return current;
+        }
+
+        return cleanText(
+          templates[0]
+            ?.template_key
+        );
+      }
+    );
+
+    setDrawerError("");
+    setDrawerStatus("");
+    setDrawerOpen(true);
+  }
+
+
+  function openExistingDocument(
+    document
+  ) {
+    const id =
+      Number(
+        document?.id || 0
+      );
+
+    if (!id) {
+      return;
+    }
+
+    setSelectedDocumentId(
+      id
+    );
+
+    setDrawerMode(
+      "edit"
+    );
+
+    setDrawerDocument(
+      document
+    );
+
+    setDrawerError("");
+    setDrawerStatus("");
+    setDrawerOpen(true);
+  }
+
+
+  function closeDrawer() {
+    if (generating) {
+      return;
+    }
+
+    setDrawerOpen(
+      false
+    );
+
+    setDrawerDocument(
+      null
+    );
+
+    setDrawerError("");
+    setDrawerStatus("");
+  }
+
+
   async function generateDocument() {
     const id =
       Number(
@@ -540,55 +651,9 @@ export default function ProjectDocuments({
       return;
     }
 
-    const existing =
-      documents.find(
-        (document) =>
-          cleanText(
-            document?.template_key
-          )
-          ===
-          templateKey
-          &&
-          !document?.sent_at
-          &&
-          !document?.accepted_at
-          &&
-          !document?.locked_at
-      )
-      ||
-      null;
-
-    const selectedTemplate =
-      templates.find(
-        (template) =>
-          cleanText(
-            template?.template_key
-          )
-          ===
-          templateKey
-      )
-      ||
-      null;
-
-    const label =
-      templateLabel(
-        selectedTemplate
-      );
-
-    const confirmed =
-      window.confirm(
-        existing
-          ? `Generate ${label}?\n\nThis will overwrite the existing unlocked draft.`
-          : `Generate ${label}?`
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
     setGenerating(true);
-    setError("");
-    setStatusMessage("");
+    setDrawerError("");
+    setDrawerStatus("");
 
     try {
       const data =
@@ -655,12 +720,24 @@ export default function ProjectDocuments({
         )
       );
 
+      setDrawerMode(
+        "edit"
+      );
+
+      setDrawerDocument(
+        generated
+      );
+
+      setDrawerStatus(
+        "Document generated."
+      );
+
       setStatusMessage(
         "Document generated."
       );
 
     } catch (err) {
-      setError(
+      setDrawerError(
         err?.message
         ||
         "Failed to generate document."
@@ -678,6 +755,15 @@ export default function ProjectDocuments({
     <AdminToolbar compact>
       <AdminButton
         type="button"
+        onClick={
+          openNewDocument
+        }
+      >
+        New
+      </AdminButton>
+
+      <AdminButton
+        type="button"
         variant="secondary"
         disabled={
           !selectedDocument
@@ -693,74 +779,6 @@ export default function ProjectDocuments({
         }}
       >
         Preview
-      </AdminButton>
-
-      <select
-        value={
-          selectedTemplateKey
-        }
-        onChange={(event) =>
-          setSelectedTemplateKey(
-            event.target.value
-          )
-        }
-        disabled={
-          loading
-          ||
-          generating
-          ||
-          templates.length === 0
-        }
-        aria-label="Document template"
-      >
-        {
-          templates.length === 0
-            ? (
-                <option value="">
-                  No templates
-                </option>
-              )
-            : templates.map(
-                (template) => (
-                  <option
-                    key={
-                      cleanText(
-                        template?.template_key
-                      )
-                    }
-                    value={
-                      cleanText(
-                        template?.template_key
-                      )
-                    }
-                  >
-                    {
-                      templateLabel(
-                        template
-                      )
-                    }
-                  </option>
-                )
-              )
-        }
-      </select>
-
-      <AdminButton
-        type="button"
-        disabled={
-          generating
-          ||
-          !selectedTemplateKey
-        }
-        onClick={() => {
-          void generateDocument();
-        }}
-      >
-        {
-          generating
-            ? "Generating…"
-            : "Generate"
-        }
       </AdminButton>
 
       <FetchRexButton
@@ -800,98 +818,398 @@ export default function ProjectDocuments({
 
 
   return (
-    <AdminDetailPane
-      ariaLabel="Project documents"
-      title={`${String(projectName || "").trim() || `Project #${projectId}`} Documents`}
-      actions={
-        detailActions
-      }
-    >
-      {
-        error
-          ? (
-              <AdminNotice variant="danger">
-                {error}
-              </AdminNotice>
-            )
-          : null
-      }
+    <>
+      <AdminDetailPane
+        ariaLabel="Project documents"
+        title={`${String(projectName || "").trim() || `Project #${projectId}`} Documents`}
+        actions={
+          detailActions
+        }
+      >
+        {
+          error
+            ? (
+                <AdminNotice variant="danger">
+                  {error}
+                </AdminNotice>
+              )
+            : null
+        }
 
-      {
-        statusMessage
-          ? (
-              <AdminNotice variant="success">
-                {statusMessage}
-              </AdminNotice>
-            )
-          : null
-      }
+        {
+          statusMessage
+            ? (
+                <AdminNotice variant="success">
+                  {statusMessage}
+                </AdminNotice>
+              )
+            : null
+        }
 
-      {
-        loading
-          ? (
-              <AdminNotice>
-                Loading Project Documents...
-              </AdminNotice>
-            )
-          : null
-      }
+        {
+          loading
+            ? (
+                <AdminNotice>
+                  Loading Project Documents...
+                </AdminNotice>
+              )
+            : null
+        }
 
-      {
-        !loading
-        &&
-        documents.length === 0
-          ? (
-              <AdminEmptyState
-                title="No documents"
-                message="Choose a template above and generate the first document."
-              />
-            )
-          : null
-      }
+        {
+          !loading
+          &&
+          documents.length === 0
+            ? (
+                <AdminEmptyState
+                  title="No documents"
+                  message="Click New to generate the first document for this project."
+                />
+              )
+            : null
+        }
 
-      {
-        documents.length > 0
-          ? (
-              <AdminSmartGrid
-                items={
-                  documents
-                }
-                columns={
-                  columns
-                }
-                getRowKey={(document) =>
-                  Number(
-                    document?.id || 0
-                  )
-                }
-                selectedKey={
-                  selectedDocumentId
-                }
-                onSelectionChange={(
-                  document,
-                  key
-                ) =>
-                  setSelectedDocumentId(
+        {
+          documents.length > 0
+            ? (
+                <AdminSmartGrid
+                  items={
+                    documents
+                  }
+                  columns={
+                    columns
+                  }
+                  getRowKey={(document) =>
                     Number(
-                      key
-                      ??
-                      document?.id
-                      ??
-                      0
+                      document?.id || 0
                     )
-                    ||
-                    null
-                  )
-                }
-                defaultSortKey="name"
-                defaultSortDirection="asc"
-                ariaLabel="Project documents"
-                verticalAlign="middle"
-              />
-            )
-          : null
-      }
-    </AdminDetailPane>
+                  }
+                  selectedKey={
+                    selectedDocumentId
+                  }
+                  onSelectionChange={(
+                    document,
+                    key
+                  ) =>
+                    setSelectedDocumentId(
+                      Number(
+                        key
+                        ??
+                        document?.id
+                        ??
+                        0
+                      )
+                      ||
+                      null
+                    )
+                  }
+                  onRowDoubleClick={
+                    openExistingDocument
+                  }
+                  defaultSortKey="name"
+                  defaultSortDirection="asc"
+                  ariaLabel="Project documents"
+                  verticalAlign="middle"
+                />
+              )
+            : null
+        }
+      </AdminDetailPane>
+
+
+      <AdminWorkbenchDrawer
+        open={
+          drawerOpen
+        }
+        width={
+          680
+        }
+        title={
+          drawerMode === "new"
+            ? "New Document"
+            : (
+                cleanText(
+                  drawerDocument?.title
+                )
+                ||
+                "Document"
+              )
+        }
+        onClose={
+          closeDrawer
+        }
+        portal
+        padded
+      >
+        <AdminStack gap="md">
+          {
+            drawerError
+              ? (
+                  <AdminNotice variant="danger">
+                    {drawerError}
+                  </AdminNotice>
+                )
+              : null
+          }
+
+          {
+            drawerStatus
+              ? (
+                  <AdminNotice variant="success">
+                    {drawerStatus}
+                  </AdminNotice>
+                )
+              : null
+          }
+
+          {
+            drawerMode === "new"
+              ? (
+                  <>
+                    <AdminField
+                      label="Template"
+                      compact
+                    >
+                      <select
+                        className="admin-field__control"
+                        value={
+                          selectedTemplateKey
+                        }
+                        onChange={(event) =>
+                          setSelectedTemplateKey(
+                            event.target.value
+                          )
+                        }
+                        disabled={
+                          loading
+                          ||
+                          generating
+                          ||
+                          templates.length === 0
+                        }
+                      >
+                        {
+                          templates.length === 0
+                            ? (
+                                <option value="">
+                                  No templates
+                                </option>
+                              )
+                            : templates.map(
+                                (template) => (
+                                  <option
+                                    key={
+                                      cleanText(
+                                        template?.template_key
+                                      )
+                                    }
+                                    value={
+                                      cleanText(
+                                        template?.template_key
+                                      )
+                                    }
+                                  >
+                                    {
+                                      templateLabel(
+                                        template
+                                      )
+                                    }
+                                  </option>
+                                )
+                              )
+                        }
+                      </select>
+                    </AdminField>
+
+                    {
+                      selectedTemplateKey
+                        ? (
+                            <AdminMetaText as="div">
+                              {
+                                cleanText(
+                                  templates.find(
+                                    (template) =>
+                                      cleanText(
+                                        template?.template_key
+                                      )
+                                      ===
+                                      selectedTemplateKey
+                                  )?.description
+                                )
+                              }
+                            </AdminMetaText>
+                          )
+                        : null
+                    }
+
+                    <AdminToolbar>
+                      <AdminToolbarSpacer />
+
+                      <AdminButton
+                        type="button"
+                        variant="secondary"
+                        disabled={
+                          generating
+                        }
+                        onClick={
+                          closeDrawer
+                        }
+                      >
+                        Close
+                      </AdminButton>
+
+                      <AdminButton
+                        type="button"
+                        disabled={
+                          generating
+                          ||
+                          !selectedTemplateKey
+                        }
+                        onClick={() => {
+                          void generateDocument();
+                        }}
+                      >
+                        {
+                          generating
+                            ? "Generating…"
+                            : "Generate"
+                        }
+                      </AdminButton>
+                    </AdminToolbar>
+                  </>
+                )
+              : (
+                  <>
+                    <AdminField
+                      label="Title"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          cleanText(
+                            drawerDocument?.title
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Template"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          cleanText(
+                            drawerDocument?.template_key
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Type"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          cleanText(
+                            drawerDocument?.document_type
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Status"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          cleanText(
+                            drawerDocument?.status
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Approval Required"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          yesNo(
+                            drawerDocument?.approval_required
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Sent"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          formatDate(
+                            drawerDocument?.sent_at
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminField
+                      label="Accepted"
+                      compact
+                    >
+                      <input
+                        className="admin-field__control"
+                        type="text"
+                        value={
+                          formatDate(
+                            drawerDocument?.accepted_at
+                          )
+                        }
+                        readOnly
+                      />
+                    </AdminField>
+
+                    <AdminToolbar>
+                      <AdminToolbarSpacer />
+
+                      <AdminButton
+                        type="button"
+                        variant="secondary"
+                        onClick={
+                          closeDrawer
+                        }
+                      >
+                        Close
+                      </AdminButton>
+                    </AdminToolbar>
+                  </>
+                )
+          }
+        </AdminStack>
+      </AdminWorkbenchDrawer>
+    </>
   );
 }

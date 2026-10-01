@@ -9,6 +9,16 @@ import {
 import DocumentBody from "./DocumentBody";
 
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+
 export default function DocumentPreview({
   open = false,
   document: documentRecord = null,
@@ -26,6 +36,15 @@ export default function DocumentPreview({
       documentRecord?.content_html
       ||
       ""
+    );
+
+  const renderedHtml =
+    `<h1>${escapeHtml(previewTitle)}</h1>`
+    +
+    (
+      previewHtml
+        ? previewHtml
+        : "<p>Nothing to preview.</p>"
     );
 
 
@@ -94,21 +113,10 @@ export default function DocumentPreview({
       onClick={onClose}
     >
       <div className="document-review-overlay__stage">
-        {
-          previewHtml
-            ? (
-                <DocumentBody
-                  html={previewHtml}
-                  className="document-sheet--review"
-                />
-              )
-            : (
-                <DocumentBody
-                  html="<p>Nothing to preview.</p>"
-                  className="document-sheet--review"
-                />
-              )
-        }
+        <DocumentBody
+          html={renderedHtml}
+          className="document-sheet--review"
+        />
       </div>
     </div>,
     document.body

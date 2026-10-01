@@ -10,8 +10,6 @@ import {
 
 } from "react";
 
-
-
 import {
 
   AdminButton,
@@ -46,11 +44,7 @@ import {
 
 } from "@components/AdminLayout";
 
-
-
 import DocumentPreview from "@components/Documents/DocumentPreview";
-
-
 
 import {
 
@@ -58,29 +52,17 @@ import {
 
 } from "@helpers/config";
 
-
-
-
-
 const DOCUMENT_TEMPLATES_LIST_URL =
 
   `${API_FOLDER}/v2/admin/documents/templates/list.php`;
-
-
 
 const DOCUMENT_TEMPLATES_SAVE_URL =
 
   `${API_FOLDER}/v2/admin/documents/templates/save.php`;
 
-
-
 const FORM_ID =
 
   "admin-document-template-form";
-
-
-
-
 
 const DOCUMENT_FIELDS = [
 
@@ -158,10 +140,6 @@ const DOCUMENT_FIELDS = [
 
 ];
 
-
-
-
-
 function emptyTemplate() {
 
   return {
@@ -190,10 +168,6 @@ function emptyTemplate() {
 
 }
 
-
-
-
-
 function generatedKey(label) {
 
   return String(label || "")
@@ -207,10 +181,6 @@ function generatedKey(label) {
     .replace(/^_+|_+$/g, "");
 
 }
-
-
-
-
 
 function normalizeTemplate(
 
@@ -230,8 +200,6 @@ function normalizeTemplate(
 
       ) || null,
 
-
-
     template_key:
 
       String(
@@ -241,8 +209,6 @@ function normalizeTemplate(
         ?? ""
 
       ),
-
-
 
     template_type:
 
@@ -254,8 +220,6 @@ function normalizeTemplate(
 
       ),
 
-
-
     label:
 
       String(
@@ -265,8 +229,6 @@ function normalizeTemplate(
         ?? ""
 
       ),
-
-
 
     description:
 
@@ -278,8 +240,6 @@ function normalizeTemplate(
 
       ),
 
-
-
     title_template:
 
       String(
@@ -289,8 +249,6 @@ function normalizeTemplate(
         ?? ""
 
       ),
-
-
 
     text_template:
 
@@ -302,8 +260,6 @@ function normalizeTemplate(
 
       ),
 
-
-
     html_template:
 
       String(
@@ -313,8 +269,6 @@ function normalizeTemplate(
         ?? ""
 
       ),
-
-
 
     is_active:
 
@@ -327,8 +281,6 @@ function normalizeTemplate(
         ?? 1
 
       ) !== 0,
-
-
 
     approval_required:
 
@@ -346,10 +298,6 @@ function normalizeTemplate(
 
 }
 
-
-
-
-
 function htmlToPlainText(html) {
 
   const normalized =
@@ -365,8 +313,6 @@ function htmlToPlainText(html) {
       .replace(/<\/li>/gi, "\n")
 
       .replace(/<li\b[^>]*>/gi, "* ");
-
-
 
   if (
 
@@ -384,8 +330,6 @@ function htmlToPlainText(html) {
 
   }
 
-
-
   const container =
 
     window.document.createElement(
@@ -394,13 +338,9 @@ function htmlToPlainText(html) {
 
     );
 
-
-
   container.innerHTML =
 
     normalized;
-
-
 
   return String(
 
@@ -418,10 +358,6 @@ function htmlToPlainText(html) {
 
 }
 
-
-
-
-
 function escapeHtml(value) {
 
   return String(value || "")
@@ -438,10 +374,6 @@ function escapeHtml(value) {
 
 }
 
-
-
-
-
 function plainTextToHtml(text) {
 
   const normalized =
@@ -452,31 +384,21 @@ function plainTextToHtml(text) {
 
       .trim();
 
-
-
   if (!normalized) {
 
     return "";
 
   }
 
-
-
   const lines =
 
     normalized.split("\n");
-
-
 
   const html = [];
 
   let group = [];
 
   let previousWasHeading = false;
-
-  let headingCount = 0;
-
-
 
   const isHeadingLine =
 
@@ -485,8 +407,6 @@ function plainTextToHtml(text) {
       const value =
 
         String(line || "").trim();
-
-
 
       if (
 
@@ -502,8 +422,6 @@ function plainTextToHtml(text) {
 
       }
 
-
-
       return (
 
         value === value.toUpperCase()
@@ -513,8 +431,6 @@ function plainTextToHtml(text) {
       );
 
     };
-
-
 
   const isMetadataLine =
 
@@ -526,8 +442,6 @@ function plainTextToHtml(text) {
 
       );
 
-
-
   const isBulletLine =
 
     (line) =>
@@ -538,8 +452,6 @@ function plainTextToHtml(text) {
 
       );
 
-
-
   const stripBullet =
 
     (line) =>
@@ -549,8 +461,6 @@ function plainTextToHtml(text) {
         .trim()
 
         .replace(/^[-*]\s+/, "");
-
-
 
   const looksLikeShortList =
 
@@ -568,8 +478,6 @@ function plainTextToHtml(text) {
 
             String(line || "").trim();
 
-
-
           return (
 
             value.length > 0
@@ -586,8 +494,6 @@ function plainTextToHtml(text) {
 
       );
 
-
-
   const renderMetadataLine =
 
     (line) => {
@@ -595,8 +501,6 @@ function plainTextToHtml(text) {
       const value =
 
         String(line || "").trim();
-
-
 
       const match =
 
@@ -606,15 +510,11 @@ function plainTextToHtml(text) {
 
         );
 
-
-
       if (!match) {
 
         return escapeHtml(value);
 
       }
-
-
 
       return (
 
@@ -634,8 +534,6 @@ function plainTextToHtml(text) {
 
     };
 
-
-
   const flushGroup =
 
     () => {
@@ -645,8 +543,6 @@ function plainTextToHtml(text) {
         return;
 
       }
-
-
 
       const items =
 
@@ -662,19 +558,13 @@ function plainTextToHtml(text) {
 
           .filter(Boolean);
 
-
-
       group = [];
-
-
 
       if (items.length === 0) {
 
         return;
 
       }
-
-
 
       if (
 
@@ -692,19 +582,13 @@ function plainTextToHtml(text) {
 
         );
 
-
-
         previousWasHeading =
 
           false;
 
-
-
         return;
 
       }
-
-
 
       if (
 
@@ -742,19 +626,13 @@ function plainTextToHtml(text) {
 
         );
 
-
-
         previousWasHeading =
 
           false;
 
-
-
         return;
 
       }
-
-
 
       html.push(
 
@@ -762,23 +640,17 @@ function plainTextToHtml(text) {
 
       );
 
-
-
       previousWasHeading =
 
         false;
 
     };
 
-
-
   for (const rawLine of lines) {
 
     const line =
 
       String(rawLine || "").trim();
-
-
 
     if (!line) {
 
@@ -787,8 +659,6 @@ function plainTextToHtml(text) {
       continue;
 
     }
-
-
 
     if (
 
@@ -801,36 +671,16 @@ function plainTextToHtml(text) {
     ) {
 
       flushGroup();
-
-
-
-      headingCount += 1;
-
-
-
       html.push(
-
-        headingCount === 1
-
-          ? `<h1>${escapeHtml(line)}</h1>`
-
-          : `<h2>${escapeHtml(line)}</h2>`
-
+        `<h2>${escapeHtml(line)}</h2>`
       );
-
-
-
-      previousWasHeading =
+previousWasHeading =
 
         true;
-
-
 
       continue;
 
     }
-
-
 
     group.push(
 
@@ -840,19 +690,11 @@ function plainTextToHtml(text) {
 
   }
 
-
-
   flushGroup();
-
-
 
   return html.join("\n");
 
 }
-
-
-
-
 
 async function readJson(
 
@@ -866,11 +708,7 @@ async function readJson(
 
     await response.text();
 
-
-
   let data = null;
-
-
 
   try {
 
@@ -887,8 +725,6 @@ async function readJson(
     );
 
   }
-
-
 
   if (
 
@@ -908,15 +744,9 @@ async function readJson(
 
   }
 
-
-
   return data;
 
 }
-
-
-
-
 
 export default function AdminTemplatesPage() {
 
@@ -928,8 +758,6 @@ export default function AdminTemplatesPage() {
 
   ] = useState([]);
 
-
-
   const [
 
     selectedId,
@@ -937,8 +765,6 @@ export default function AdminTemplatesPage() {
     setSelectedId,
 
   ] = useState(null);
-
-
 
   const [
 
@@ -951,8 +777,6 @@ export default function AdminTemplatesPage() {
     emptyTemplate
 
   );
-
-
 
   const [
 
@@ -968,8 +792,6 @@ export default function AdminTemplatesPage() {
 
   );
 
-
-
   const [
 
     insertTarget,
@@ -982,8 +804,6 @@ export default function AdminTemplatesPage() {
 
   );
 
-
-
   const [
 
     query,
@@ -991,8 +811,6 @@ export default function AdminTemplatesPage() {
     setQuery,
 
   ] = useState("");
-
-
 
   const [
 
@@ -1006,8 +824,6 @@ export default function AdminTemplatesPage() {
 
   );
 
-
-
   const [
 
     saving,
@@ -1020,8 +836,6 @@ export default function AdminTemplatesPage() {
 
   );
 
-
-
   const [
 
     error,
@@ -1029,8 +843,6 @@ export default function AdminTemplatesPage() {
     setError,
 
   ] = useState("");
-
-
 
   const [
 
@@ -1040,8 +852,6 @@ export default function AdminTemplatesPage() {
 
   ] = useState("");
 
-
-
   const [
 
     previewOpen,
@@ -1050,19 +860,13 @@ export default function AdminTemplatesPage() {
 
   ] = useState(false);
 
-
-
   const titleInputRef =
 
     useRef(null);
 
-
-
   const textTextareaRef =
 
     useRef(null);
-
-
 
   const selectionRef =
 
@@ -1086,10 +890,6 @@ export default function AdminTemplatesPage() {
 
     });
 
-
-
-
-
   function getFieldRef(field) {
 
     if (
@@ -1104,15 +904,9 @@ export default function AdminTemplatesPage() {
 
     }
 
-
-
     return textTextareaRef;
 
   }
-
-
-
-
 
   function syncSelection(field) {
 
@@ -1124,15 +918,11 @@ export default function AdminTemplatesPage() {
 
       ).current;
 
-
-
     if (!element) {
 
       return;
 
     }
-
-
 
     selectionRef.current[field] = {
 
@@ -1141,8 +931,6 @@ export default function AdminTemplatesPage() {
         element.selectionStart
 
         ?? 0,
-
-
 
       end:
 
@@ -1154,8 +942,6 @@ export default function AdminTemplatesPage() {
 
     };
 
-
-
     setInsertTarget(
 
       field
@@ -1163,10 +949,6 @@ export default function AdminTemplatesPage() {
     );
 
   }
-
-
-
-
 
   function selectTemplate(
 
@@ -1182,15 +964,11 @@ export default function AdminTemplatesPage() {
 
       );
 
-
-
     setSelectedId(
 
       next.id
 
     );
-
-
 
     setForm({
 
@@ -1206,8 +984,6 @@ export default function AdminTemplatesPage() {
 
     });
 
-
-
     setInsertToken(
 
       DOCUMENT_FIELDS[0]?.token
@@ -1216,17 +992,11 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
     setError("");
 
     setNotice("");
 
   }
-
-
-
-
 
   function startNew() {
 
@@ -1236,15 +1006,11 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
     setForm(
 
       emptyTemplate()
 
     );
-
-
 
     setInsertToken(
 
@@ -1254,25 +1020,17 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
     setInsertTarget(
 
       "text_template"
 
     );
 
-
-
     setError("");
 
     setNotice("");
 
   }
-
-
-
-
 
   async function loadTemplates(
 
@@ -1286,11 +1044,7 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
     setError("");
-
-
 
     try {
 
@@ -1314,8 +1068,6 @@ export default function AdminTemplatesPage() {
 
         );
 
-
-
       const data =
 
         await readJson(
@@ -1325,8 +1077,6 @@ export default function AdminTemplatesPage() {
           "Failed to load document templates"
 
         );
-
-
 
       const nextItems =
 
@@ -1350,15 +1100,11 @@ export default function AdminTemplatesPage() {
 
           );
 
-
-
       setItems(
 
         nextItems
 
       );
-
-
 
       const targetId =
 
@@ -1372,8 +1118,6 @@ export default function AdminTemplatesPage() {
 
         );
 
-
-
       const target =
 
         nextItems.find(
@@ -1385,8 +1129,6 @@ export default function AdminTemplatesPage() {
             === targetId
 
         );
-
-
 
       if (target) {
 
@@ -1420,8 +1162,6 @@ export default function AdminTemplatesPage() {
 
       }
 
-
-
     } catch (err) {
 
       setError(
@@ -1431,8 +1171,6 @@ export default function AdminTemplatesPage() {
         || "Failed to load document templates"
 
       );
-
-
 
     } finally {
 
@@ -1446,10 +1184,6 @@ export default function AdminTemplatesPage() {
 
   }
 
-
-
-
-
   useEffect(
 
     () => {
@@ -1461,10 +1195,6 @@ export default function AdminTemplatesPage() {
     []
 
   );
-
-
-
-
 
   function handleInsertField() {
 
@@ -1480,13 +1210,9 @@ export default function AdminTemplatesPage() {
 
     }
 
-
-
     const targetField =
 
       insertTarget;
-
-
 
     const targetRef =
 
@@ -1495,8 +1221,6 @@ export default function AdminTemplatesPage() {
         targetField
 
       );
-
-
 
     const {
 
@@ -1520,8 +1244,6 @@ export default function AdminTemplatesPage() {
 
       };
 
-
-
     setForm(
 
       (prev) => {
@@ -1535,8 +1257,6 @@ export default function AdminTemplatesPage() {
             || ""
 
           );
-
-
 
         const safeStart =
 
@@ -1554,8 +1274,6 @@ export default function AdminTemplatesPage() {
 
           );
 
-
-
         const safeEnd =
 
           Math.max(
@@ -1572,8 +1290,6 @@ export default function AdminTemplatesPage() {
 
           );
 
-
-
         const nextValue =
 
           `${currentValue.slice(0, safeStart)}`
@@ -1581,8 +1297,6 @@ export default function AdminTemplatesPage() {
           + `${insertToken}`
 
           + `${currentValue.slice(safeEnd)}`;
-
-
 
         const next = {
 
@@ -1593,8 +1307,6 @@ export default function AdminTemplatesPage() {
             nextValue,
 
         };
-
-
 
         if (
 
@@ -1612,23 +1324,17 @@ export default function AdminTemplatesPage() {
 
         }
 
-
-
         return next;
 
       }
 
     );
 
-
-
     const nextCaret =
 
       start
 
       + insertToken.length;
-
-
 
     selectionRef.current[
 
@@ -1646,8 +1352,6 @@ export default function AdminTemplatesPage() {
 
     };
 
-
-
     window.requestAnimationFrame(
 
       () => {
@@ -1656,19 +1360,13 @@ export default function AdminTemplatesPage() {
 
           targetRef.current;
 
-
-
         if (!element) {
 
           return;
 
         }
 
-
-
         element.focus();
-
-
 
         element.setSelectionRange(
 
@@ -1684,15 +1382,9 @@ export default function AdminTemplatesPage() {
 
   }
 
-
-
-
-
   async function handleSave(event) {
 
     event.preventDefault();
-
-
 
     setSaving(
 
@@ -1700,13 +1392,9 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
     setError("");
 
     setNotice("");
-
-
 
     try {
 
@@ -1726,8 +1414,6 @@ export default function AdminTemplatesPage() {
 
         );
 
-
-
       if (!key) {
 
         throw new Error(
@@ -1737,8 +1423,6 @@ export default function AdminTemplatesPage() {
         );
 
       }
-
-
 
       if (
 
@@ -1760,8 +1444,6 @@ export default function AdminTemplatesPage() {
 
       }
 
-
-
       const htmlToSave =
 
         plainTextToHtml(
@@ -1769,8 +1451,6 @@ export default function AdminTemplatesPage() {
           form.text_template
 
         );
-
-
 
       const response =
 
@@ -1784,13 +1464,9 @@ export default function AdminTemplatesPage() {
 
               "POST",
 
-
-
             credentials:
 
               "include",
-
-
 
             headers: {
 
@@ -1800,8 +1476,6 @@ export default function AdminTemplatesPage() {
 
             },
 
-
-
             body:
 
               JSON.stringify({
@@ -1810,13 +1484,9 @@ export default function AdminTemplatesPage() {
 
                   form.id,
 
-
-
                 template_key:
 
                   key,
-
-
 
                 template_type:
 
@@ -1824,43 +1494,29 @@ export default function AdminTemplatesPage() {
 
                   || "document",
 
-
-
                 label:
 
                   form.label,
-
-
 
                 description:
 
                   form.description,
 
-
-
                 title_template:
 
                   form.title_template,
-
-
 
                 text_template:
 
                   form.text_template,
 
-
-
                 html_template:
 
                   htmlToSave,
 
-
-
                 is_active:
 
                   form.is_active,
-
-
 
                 approval_required:
 
@@ -1872,8 +1528,6 @@ export default function AdminTemplatesPage() {
 
         );
 
-
-
       const data =
 
         await readJson(
@@ -1883,8 +1537,6 @@ export default function AdminTemplatesPage() {
           "Failed to save document template"
 
         );
-
-
 
       const savedId =
 
@@ -1898,8 +1550,6 @@ export default function AdminTemplatesPage() {
 
         );
 
-
-
       setNotice(
 
         selectedId
@@ -1910,15 +1560,11 @@ export default function AdminTemplatesPage() {
 
       );
 
-
-
       await loadTemplates(
 
         savedId
 
       );
-
-
 
     } catch (err) {
 
@@ -1929,8 +1575,6 @@ export default function AdminTemplatesPage() {
         || "Failed to save document template"
 
       );
-
-
 
     } finally {
 
@@ -1943,10 +1587,6 @@ export default function AdminTemplatesPage() {
     }
 
   }
-
-
-
-
 
   const filteredItems =
 
@@ -1962,15 +1602,11 @@ export default function AdminTemplatesPage() {
 
             .toLowerCase();
 
-
-
         if (!needle) {
 
           return items;
 
         }
-
-
 
         return items.filter(
 
@@ -2029,10 +1665,6 @@ export default function AdminTemplatesPage() {
       ]
 
     );
-
-
-
-
 
   const list =
 
@@ -2204,10 +1836,6 @@ export default function AdminTemplatesPage() {
 
     );
 
-
-
-
-
   const detailTitle =
 
     selectedId
@@ -2223,10 +1851,6 @@ export default function AdminTemplatesPage() {
         )
 
       : "New Template";
-
-
-
-
 
   const detail =
 
@@ -2268,8 +1892,6 @@ export default function AdminTemplatesPage() {
 
             </AdminButton>
 
-
-
             <AdminButton
 
               type="submit"
@@ -2291,14 +1913,8 @@ export default function AdminTemplatesPage() {
               {
 
                 saving
-
-                  ? "Saving..."
-
-                  : selectedId
-
-                    ? "Save"
-
-                    : "Create"
+                ? "Saving..."
+                : "Save"
 
               }
 
@@ -2354,8 +1970,6 @@ export default function AdminTemplatesPage() {
 
             }
 
-
-
             {
 
               notice
@@ -2377,8 +1991,6 @@ export default function AdminTemplatesPage() {
                 : null
 
             }
-
-
 
             <AdminPanel
 
@@ -2440,8 +2052,6 @@ export default function AdminTemplatesPage() {
 
                 </AdminFieldRow>
 
-
-
                 <AdminField
 
                   label="Label"
@@ -2483,8 +2093,6 @@ export default function AdminTemplatesPage() {
                   />
 
                 </AdminField>
-
-
 
                 <AdminField
 
@@ -2530,8 +2138,6 @@ export default function AdminTemplatesPage() {
 
                 </AdminField>
 
-
-
                 <AdminField
 
                   label="Description"
@@ -2574,8 +2180,6 @@ export default function AdminTemplatesPage() {
 
                 </AdminField>
 
-
-
                 <AdminFieldRow>
 
                   <AdminCheckboxRow
@@ -2611,8 +2215,6 @@ export default function AdminTemplatesPage() {
                     Active
 
                   </AdminCheckboxRow>
-
-
 
                   <AdminCheckboxRow
 
@@ -2654,8 +2256,6 @@ export default function AdminTemplatesPage() {
 
             </AdminPanel>
 
-
-
             <AdminPanel
 
               title="Insertion Fields"
@@ -2677,8 +2277,6 @@ export default function AdminTemplatesPage() {
                   Document merge fields use double braces.
 
                 </AdminMetaText>
-
-
 
                 <AdminFieldRow>
 
@@ -2754,8 +2352,6 @@ export default function AdminTemplatesPage() {
 
                   </AdminField>
 
-
-
                   <AdminField
 
                     label="Insert into"
@@ -2792,23 +2388,17 @@ export default function AdminTemplatesPage() {
 
                       </option>
 
-
-
                       <option value="text_template">
 
                         Plain Text
 
                       </option>
 
-
-
                     </select>
 
                   </AdminField>
 
                 </AdminFieldRow>
-
-
 
                 <AdminToolbar
 
@@ -2842,11 +2432,7 @@ export default function AdminTemplatesPage() {
 
                   </AdminMetaText>
 
-
-
                   <AdminToolbarSpacer />
-
-
 
                   <AdminButton
 
@@ -2871,8 +2457,6 @@ export default function AdminTemplatesPage() {
               </AdminStack>
 
             </AdminPanel>
-
-
 
             <AdminPanel
 
@@ -2974,8 +2558,6 @@ export default function AdminTemplatesPage() {
 
                 </AdminField>
 
-
-
                 <AdminField
 
                   label="Text template"
@@ -3013,8 +2595,6 @@ export default function AdminTemplatesPage() {
                             text_template:
 
                               event.target.value,
-
-
 
                             html_template:
 
@@ -3074,8 +2654,6 @@ export default function AdminTemplatesPage() {
 
                 </AdminField>
 
-
-
               </AdminStack>
 
             </AdminPanel>
@@ -3087,10 +2665,6 @@ export default function AdminTemplatesPage() {
       </AdminDetailPane>
 
     );
-
-
-
-
 
   return (
 
@@ -3115,8 +2689,6 @@ export default function AdminTemplatesPage() {
         }
 
       />
-
-
 
       <DocumentPreview
 
