@@ -11,6 +11,7 @@
 }
 
 .rex-document__approval {
+  width: calc(100% - 1in);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -102,6 +103,7 @@
   }
 
   .rex-document__approval {
+    width: 100%;
     flex-direction: column;
     align-items: stretch;
     gap: 16px;

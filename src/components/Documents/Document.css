@@ -14,6 +14,13 @@
   line-height: 1.38;
 }
 
+/* Public REX view: let the document end where its content ends.
+ * Preview/review/print remain true Letter size.
+ */
+.document-sheet--public {
+  min-height: 0;
+}
+
 .document-sheet__letterhead {
   display: flex;
   justify-content: center;
@@ -112,12 +119,12 @@
     margin-bottom: 28px;
   }
 
-.document-sheet h1 {
-  margin-bottom: 16px;
-  font-size: 18px;
-  line-height: 1.2;
-  letter-spacing: -0.005em;
-}
+  .document-sheet h1 {
+    margin-bottom: 16px;
+    font-size: 18px;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+  }
 
   .document-sheet h2 {
     margin: 28px 0 7px;
@@ -169,7 +176,8 @@
     margin: 0;
   }
 
-  .document-sheet {
+  .document-sheet,
+  .document-sheet--public {
     width: 8.5in;
     min-height: 11in;
     margin: 0;

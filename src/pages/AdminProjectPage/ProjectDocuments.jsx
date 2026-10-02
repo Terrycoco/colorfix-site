@@ -31,6 +31,15 @@ const LIST_URL =
 const GENERATE_URL =
   `${API_FOLDER}/v2/admin/projects/documents/generate.php`;
 
+const FREEZE_URL =
+  `${API_FOLDER}/v2/admin/projects/documents/freeze.php`;
+
+const SENT_URL =
+  `${API_FOLDER}/v2/admin/projects/documents/sent.php`;
+
+const ACTIVITY_SAVE_URL =
+  `${API_FOLDER}/v2/admin/projects/activity/save.php`;
+
 const TEMPLATE_LIST_URL =
   `${API_FOLDER}/v2/admin/documents/templates/list.php`;
 
@@ -136,6 +145,24 @@ function yesNo(value) {
 }
 
 
+function checkmark(value) {
+  return value
+    ? "✓"
+    : "—";
+}
+
+
+function dateInputValue(value) {
+  const text = cleanText(value);
+
+  if (!text) {
+    return "";
+  }
+
+  return text.slice(0, 10);
+}
+
+
 export default function ProjectDocuments({
   projectId,
   projectName = "",
@@ -186,6 +213,16 @@ export default function ProjectDocuments({
     generating,
     setGenerating,
   ] = useState(false);
+
+  const [
+    updatingState,
+    setUpdatingState,
+  ] = useState(false);
+
+  const [
+    sentDate,
+    setSentDate,
+  ] = useState("");
 
   const [
     error,
@@ -495,24 +532,9 @@ export default function ProjectDocuments({
         },
         {
           key:
-            "type",
-          label:
-            "Type",
-          sortable:
-            true,
-          value:
-            (document) =>
-              cleanText(
-                document?.document_type
-              )
-              ||
-              "Document",
-        },
-        {
-          key:
             "approval_required",
           label:
-            "Approval Reqd",
+            "Appr Req",
           sortable:
             true,
           value:
@@ -534,13 +556,53 @@ export default function ProjectDocuments({
               || "",
           value:
             (document) =>
-              formatDate(
+              checkmark(
                 document?.sent_at
               ),
+        },
+        {
+          key:
+            "frozen",
+          label:
+            "Frozen",
+          sortable:
+            true,
+          sortValue:
+            (document) =>
+              document?.locked_at
+              || "",
+          value:
+            (document) =>
+              checkmark(
+                document?.locked_at
+              ),
+        },
+        {
+          key:
+            "approved",
+          label:
+            "Approved",
+          sortable:
+            true,
+          sortValue:
+            (document) =>
+              document?.accepted_at
+              || "",
+          value:
+            (document) =>
+              Number(
+                document?.approval_required
+                ?? 0
+              ) === 1
+                ? checkmark(
+                    document?.accepted_at
+                  )
+                : "—",
         },
       ],
       []
     );
+
 
 
   function openNewDocument() {
@@ -606,6 +668,12 @@ export default function ProjectDocuments({
       document
     );
 
+    setSentDate(
+      dateInputValue(
+        document?.sent_at
+      )
+    );
+
     setDrawerError("");
     setDrawerStatus("");
     setDrawerOpen(true);
@@ -624,6 +692,8 @@ export default function ProjectDocuments({
     setDrawerDocument(
       null
     );
+
+    setSentDate("");
 
     setDrawerError("");
     setDrawerStatus("");
@@ -751,6 +821,234 @@ export default function ProjectDocuments({
       setGenerating(
         false
       );
+    }
+  }
+
+
+  async function logSend() {
+    const documentId =
+      Number(
+        drawerDocument?.id || 0
+      );
+
+    const activityDate =
+      cleanText(
+        sentDate
+      );
+
+    if (
+      updatingState
+      || documentId <= 0
+      || !activityDate
+    ) {
+      return;
+    }
+
+    setUpdatingState(true);
+    setDrawerError("");
+    setDrawerStatus("");
+
+    try {
+      const data =
+        await readJson(
+          await fetch(
+            SENT_URL,
+            {
+              method:
+                "POST",
+              credentials:
+                "include",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body:
+                JSON.stringify({
+                  document_id:
+                    documentId,
+                  sent_date:
+                    activityDate,
+                }),
+            }
+          ),
+          "Failed to update sent date"
+        );
+
+      const updated =
+        data?.document
+        || null;
+
+      if (!updated) {
+        throw new Error(
+          "Sent date update did not return a document."
+        );
+      }
+
+      await readJson(
+        await fetch(
+          ACTIVITY_SAVE_URL,
+          {
+            method:
+              "POST",
+            credentials:
+              "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body:
+              JSON.stringify({
+                project_id:
+                  Number(
+                    projectId || 0
+                  ),
+                activity_date:
+                  activityDate,
+                description:
+                  `Sent ${cleanText(
+                    updated?.title
+                  ) || `Document #${documentId}`}`,
+                hours:
+                  null,
+                miles:
+                  null,
+                amount:
+                  null,
+              }),
+          }
+        ),
+        "Failed to log document send"
+      );
+
+      setDrawerDocument(
+        updated
+      );
+
+      setSentDate(
+        dateInputValue(
+          updated?.sent_at
+        )
+      );
+
+      setDocuments(
+        (current) =>
+          current.map(
+            (document) =>
+              Number(
+                document?.id || 0
+              ) === documentId
+                ? updated
+                : document
+          )
+      );
+
+      setDrawerStatus(
+        "Logged."
+      );
+
+    } catch (err) {
+      setDrawerError(
+        err?.message
+        ||
+        "Failed to log document send."
+      );
+
+    } finally {
+      setUpdatingState(false);
+    }
+  }
+
+
+  async function freezeDocument() {
+    const documentId =
+      Number(
+        drawerDocument?.id || 0
+      );
+
+    if (
+      updatingState
+      || documentId <= 0
+      || drawerDocument?.locked_at
+    ) {
+      return;
+    }
+
+    const confirmed =
+      window.confirm(
+        "Freeze this document? The frozen version cannot be regenerated or overwritten."
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setUpdatingState(true);
+    setDrawerError("");
+    setDrawerStatus("");
+
+    try {
+      const data =
+        await readJson(
+          await fetch(
+            FREEZE_URL,
+            {
+              method:
+                "POST",
+              credentials:
+                "include",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body:
+                JSON.stringify({
+                  document_id:
+                    documentId,
+                }),
+            }
+          ),
+          "Failed to freeze document"
+        );
+
+      const updated =
+        data?.document
+        || null;
+
+      if (!updated) {
+        throw new Error(
+          "Freeze did not return a document."
+        );
+      }
+
+      setDrawerDocument(
+        updated
+      );
+
+      setDocuments(
+        (current) =>
+          current.map(
+            (document) =>
+              Number(
+                document?.id || 0
+              ) === documentId
+                ? updated
+                : document
+          )
+      );
+
+      setDrawerStatus(
+        "Document frozen."
+      );
+
+    } catch (err) {
+      setDrawerError(
+        err?.message
+        ||
+        "Failed to freeze document."
+      );
+
+    } finally {
+      setUpdatingState(false);
     }
   }
 
@@ -1117,38 +1415,6 @@ export default function ProjectDocuments({
                     </AdminField>
 
                     <AdminField
-                      label="Type"
-                      compact
-                    >
-                      <input
-                        className="admin-field__control"
-                        type="text"
-                        value={
-                          cleanText(
-                            drawerDocument?.document_type
-                          )
-                        }
-                        readOnly
-                      />
-                    </AdminField>
-
-                    <AdminField
-                      label="Status"
-                      compact
-                    >
-                      <input
-                        className="admin-field__control"
-                        type="text"
-                        value={
-                          cleanText(
-                            drawerDocument?.status
-                          )
-                        }
-                        readOnly
-                      />
-                    </AdminField>
-
-                    <AdminField
                       label="Approval Required"
                       compact
                     >
@@ -1168,42 +1434,89 @@ export default function ProjectDocuments({
                       label="Sent"
                       compact
                     >
-                      <input
-                        className="admin-field__control"
-                        type="text"
-                        value={
-                          formatDate(
-                            drawerDocument?.sent_at
-                          )
-                        }
-                        readOnly
-                      />
+                      <AdminToolbar compact>
+                        <input
+                          className="admin-field__control"
+                          type="date"
+                          style={{ width: 150 }}
+                          value={
+                            sentDate
+                          }
+                          onChange={(event) =>
+                            setSentDate(
+                              event.target.value
+                            )
+                          }
+                          disabled={
+                            updatingState
+                          }
+                        />
+
+                        <AdminButton
+                          type="button"
+                          variant="secondary"
+                          disabled={
+                            updatingState
+                            || !sentDate
+                          }
+                          onClick={() => {
+                            void logSend();
+                          }}
+                        >
+                          Log Send
+                        </AdminButton>
+                      </AdminToolbar>
                     </AdminField>
 
-                    <AdminField
-                      label="Accepted"
-                      compact
-                    >
-                      <input
-                        className="admin-field__control"
-                        type="text"
-                        value={
-                          formatDate(
-                            drawerDocument?.accepted_at
-                          )
-                        }
-                        readOnly
-                      />
-                    </AdminField>
+                    <AdminToolbar compact>
+                      <AdminField
+                        label="Frozen"
+                        compact
+                      >
+                        <input
+                          className="admin-field__control"
+                          type="text"
+                          style={{ width: 150 }}
+                          value={
+                            formatDate(
+                              drawerDocument?.locked_at
+                            )
+                          }
+                          readOnly
+                        />
+                      </AdminField>
+
+                      <AdminField
+                        label="Approved"
+                        compact
+                      >
+                        <input
+                          className="admin-field__control"
+                          type="text"
+                          style={{ width: 150 }}
+                          value={
+                            Number(
+                              drawerDocument?.approval_required
+                              ?? 0
+                            ) === 1
+                              ? formatDate(
+                                  drawerDocument?.accepted_at
+                                )
+                              : "—"
+                          }
+                          readOnly
+                        />
+                      </AdminField>
+                    </AdminToolbar>
 
                     <AdminToolbar>
-                      <AdminToolbarSpacer />
-
                       <AdminButton
                         type="button"
                         variant="secondary"
                         disabled={
                           generating
+                          ||
+                          updatingState
                         }
                         onClick={
                           closeDrawer
@@ -1212,10 +1525,43 @@ export default function ProjectDocuments({
                         Close
                       </AdminButton>
 
+                      <AdminToolbarSpacer />
+
+                      <AdminButton
+                        type="button"
+                        variant="secondary"
+                        disabled={
+                          generating
+                          ||
+                          updatingState
+                          ||
+                          Boolean(
+                            drawerDocument?.locked_at
+                          )
+                        }
+                        onClick={() => {
+                          void freezeDocument();
+                        }}
+                      >
+                        {
+                          drawerDocument?.locked_at
+                            ? "Frozen"
+                            : updatingState
+                              ? "Freezing…"
+                              : "Freeze"
+                        }
+                      </AdminButton>
+
                       <AdminButton
                         type="button"
                         disabled={
                           generating
+                          ||
+                          updatingState
+                          ||
+                          Boolean(
+                            drawerDocument?.locked_at
+                          )
                           ||
                           !cleanText(
                             drawerDocument?.template_key

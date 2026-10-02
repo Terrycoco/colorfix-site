@@ -27,6 +27,7 @@ final class PdoProjectPaletteRepository
                 pp.project_id,
                 pp.saved_palette_id,
                 pp.note,
+                pp.area_label,
                 pp.is_final,
                 pp.order_index,
                 pp.created_at,
@@ -118,7 +119,8 @@ final class PdoProjectPaletteRepository
     public function link(
         int $projectId,
         int $savedPaletteId,
-        ?string $note = null
+        ?string $note = null,
+        ?string $areaLabel = null
     ): int {
         if (
             $projectId <= 0
@@ -154,6 +156,7 @@ final class PdoProjectPaletteRepository
                     project_id,
                     saved_palette_id,
                     note,
+                    area_label,
                     is_final,
                     order_index,
                     created_at
@@ -163,6 +166,7 @@ final class PdoProjectPaletteRepository
                     :project_id,
                     :saved_palette_id,
                     :note,
+                    :area_label,
                     0,
                     :order_index,
                     NOW()
@@ -170,6 +174,7 @@ final class PdoProjectPaletteRepository
 
             ON DUPLICATE KEY UPDATE
                 note = VALUES(note),
+                area_label = VALUES(area_label),
                 project_palette_id =
                     LAST_INSERT_ID(
                         project_palette_id
@@ -186,6 +191,9 @@ final class PdoProjectPaletteRepository
 
             ':note' =>
                 $note,
+
+            ':area_label' =>
+                $areaLabel,
 
             ':order_index' =>
                 $nextOrder,

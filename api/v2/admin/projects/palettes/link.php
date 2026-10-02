@@ -39,6 +39,15 @@ try {
         $note = null;
     }
 
+    $areaLabelRaw = $input['area_label'] ?? null;
+    $areaLabel = is_string($areaLabelRaw)
+        ? trim($areaLabelRaw)
+        : null;
+
+    if ($areaLabel === '') {
+        $areaLabel = null;
+    }
+
     if ($projectId <= 0 || $savedPaletteId <= 0) {
         http_response_code(400);
         echo json_encode([
@@ -52,7 +61,8 @@ try {
     $projectPaletteId = $repo->link(
         $projectId,
         $savedPaletteId,
-        $note
+        $note,
+        $areaLabel
     );
 
     echo json_encode([

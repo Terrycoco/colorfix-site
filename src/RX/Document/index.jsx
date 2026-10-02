@@ -89,6 +89,7 @@ export default function Document({ document: documentRecord }) {
       <article className="rex-document__frame">
         <DocumentBody
           html={String(document.content_html || "")}
+          className="document-sheet--public"
           letterhead
         />
 

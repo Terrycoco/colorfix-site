@@ -341,4 +341,121 @@ final class PdoProjectDocumentRepository
 
         return $document;
     }
+
+    /**
+     * Freezes the current document snapshot. Repeated calls are idempotent.
+     *
+     * @return array<string, mixed>
+     */
+    public function freeze(int $documentId): array
+    {
+        if ($documentId <= 0) {
+            throw new RuntimeException(
+                'Valid document ID required.'
+            );
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE project_documents
+                SET locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP)
+              WHERE id = :document_id'
+        );
+
+        $stmt->execute([
+            ':document_id' => $documentId,
+        ]);
+
+        $document = $this->findById($documentId);
+
+        if (!$document) {
+            throw new RuntimeException(
+                'Project document was not found.'
+            );
+        }
+
+        if ($document['locked_at'] === null) {
+            throw new RuntimeException(
+                'Project document could not be frozen.'
+            );
+        }
+
+        return $document;
+    }
+
+    /**
+     * Sets or clears the manually recorded sent date.
+     *
+     * @return array<string, mixed>
+     */
+    public function setSentDate(
+        int $documentId,
+        ?string $sentDate
+    ): array {
+        if ($documentId <= 0) {
+            throw new RuntimeException(
+                'Valid document ID required.'
+            );
+        }
+
+        $sentAt = null;
+
+        if ($sentDate !== null && trim($sentDate) !== '') {
+            $value = trim($sentDate);
+
+            $date = \DateTimeImmutable::createFromFormat(
+                '!Y-m-d',
+                $value
+            );
+
+            if (
+                !$date
+                || $date->format('Y-m-d') !== $value
+            ) {
+                throw new RuntimeException(
+                    'Sent date must be a valid YYYY-MM-DD date.'
+                );
+            }
+
+            $sentAt = $value . ' 00:00:00';
+        }
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE project_documents
+                SET sent_at = :sent_at
+              WHERE id = :document_id'
+        );
+
+        $stmt->bindValue(
+            ':document_id',
+            $documentId,
+            PDO::PARAM_INT
+        );
+
+        if ($sentAt === null) {
+            $stmt->bindValue(
+                ':sent_at',
+                null,
+                PDO::PARAM_NULL
+            );
+        } else {
+            $stmt->bindValue(
+                ':sent_at',
+                $sentAt,
+                PDO::PARAM_STR
+            );
+        }
+
+        $stmt->execute();
+
+        $document = $this->findById($documentId);
+
+        if (!$document) {
+            throw new RuntimeException(
+                'Project document was not found.'
+            );
+        }
+
+        return $document;
+    }
+
 }
