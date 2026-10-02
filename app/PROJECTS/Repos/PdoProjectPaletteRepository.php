@@ -116,6 +116,65 @@ final class PdoProjectPaletteRepository
         return $rows;
     }
 
+
+    public function findBySavedPaletteId(
+        int $savedPaletteId
+    ): ?array {
+        if ($savedPaletteId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "
+            SELECT
+                pp.project_palette_id,
+                pp.project_id,
+                pp.saved_palette_id,
+                pp.note,
+                pp.area_label,
+                pp.is_final,
+                pp.order_index,
+                pp.created_at
+
+            FROM project_palettes pp
+
+            WHERE pp.saved_palette_id = :saved_palette_id
+
+            ORDER BY
+                pp.project_palette_id DESC
+
+            LIMIT 1
+            "
+        );
+
+        $stmt->execute([
+            ':saved_palette_id' => $savedPaletteId,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($row === false) {
+            return null;
+        }
+
+        $row['project_palette_id'] =
+            (int)$row['project_palette_id'];
+
+        $row['project_id'] =
+            (int)$row['project_id'];
+
+        $row['saved_palette_id'] =
+            (int)$row['saved_palette_id'];
+
+        $row['is_final'] =
+            (int)($row['is_final'] ?? 0);
+
+        $row['order_index'] =
+            (int)($row['order_index'] ?? 0);
+
+        return $row;
+    }
+
     public function link(
         int $projectId,
         int $savedPaletteId,

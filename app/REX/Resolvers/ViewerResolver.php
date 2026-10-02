@@ -11,6 +11,7 @@ use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
+use App\PALETTES\PV\PVService;
 use App\Services\ViewerService;
 use PDO;
 use RuntimeException;
@@ -18,11 +19,13 @@ use RuntimeException;
 final class ViewerResolver implements RexResolverInterface
 {
     private ViewerService $viewers;
+    private PVService $pvService;
     private RexReservationRelationships $relationships;
 
     public function __construct(private PDO $pdo)
     {
         $this->viewers = new ViewerService($pdo);
+        $this->pvService = new PVService($pdo);
         $this->relationships = new RexReservationRelationships(
             new PdoRexReservationRepository($pdo)
         );
@@ -48,14 +51,52 @@ final class ViewerResolver implements RexResolverInterface
             ? $viewerCta['url']
             : null;
 
-        $viewer = $this->viewers->resolve(
-            $request->resourceType,
-            $request->resourceId,
-            $request->context,
-            $makeoverUrl,
-            $viewerCta['label'],
-            $viewerCta['url']
-        );
+        if (
+            strtolower(trim($request->resourceType))
+            === 'palette_viewer'
+        ) {
+            $viewer =
+                $this->pvService
+                    ->getPV(
+                        $request->resourceId
+                    );
+
+            if (!is_array($viewer['meta'] ?? null)) {
+                $viewer['meta'] = [];
+            }
+
+            $viewer['meta']['rex_resource_type'] =
+                $request->resourceType;
+
+            $viewer['meta']['rex_resource_id'] =
+                $request->resourceId;
+
+            $viewer['meta']['viewer_format'] =
+                $format;
+
+            if ($makeoverUrl !== null) {
+                $viewer['meta']['makeover_url'] =
+                    $makeoverUrl;
+
+                $viewer['meta']['watch_complete_makeover_url'] =
+                    $makeoverUrl;
+            }
+
+            $viewer['meta']['viewer_cta_label'] =
+                $viewerCta['label'];
+
+            $viewer['meta']['viewer_cta_url'] =
+                $viewerCta['url'];
+        } else {
+            $viewer = $this->viewers->resolve(
+                $request->resourceType,
+                $request->resourceId,
+                $request->context,
+                $makeoverUrl,
+                $viewerCta['label'],
+                $viewerCta['url']
+            );
+        }
 
         return new RexResolutionResult(
             resolverKey: 'viewer',

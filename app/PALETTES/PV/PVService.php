@@ -5,6 +5,7 @@ namespace App\PALETTES\PV;
 
 use App\PALETTES\Repos\PdoPVRepository;
 use App\PALETTES\Repos\PdoSavedPaletteRepository;
+use App\PROJECTS\Repos\PdoProjectPaletteRepository;
 use InvalidArgumentException;
 use PDO;
 use RuntimeException;
@@ -13,11 +14,13 @@ final class PVService
 {
     private PdoPVRepository $repo;
     private PdoSavedPaletteRepository $savedPaletteRepo;
+    private PdoProjectPaletteRepository $projectPaletteRepo;
 
     public function __construct(PDO $pdo)
     {
         $this->repo = new PdoPVRepository($pdo);
         $this->savedPaletteRepo = new PdoSavedPaletteRepository($pdo);
+        $this->projectPaletteRepo = new PdoProjectPaletteRepository($pdo);
     }
 
     public function getPV(int $pvId): array
@@ -63,6 +66,19 @@ final class PVService
         $palette = $savedPalette['palette'] ?? [];
         $members = $savedPalette['members'] ?? [];
         $photos = $record['photos'] ?? [];
+
+        $projectPalette =
+            $this->projectPaletteRepo
+                ->findBySavedPaletteId(
+                    $savedPaletteId
+                );
+
+        $areaLabel = trim(
+            (string)(
+                $projectPalette['area_label']
+                ?? ''
+            )
+        );
 
         $fullPhoto = null;
         $insets = [];
@@ -129,9 +145,24 @@ final class PVService
             }
         }
 
-        $title = trim(
-            (string)($record['viewer_title'] ?? '')
+        $format = strtolower(
+            trim((string)($record['format'] ?? 'public'))
         );
+
+        $title = '';
+
+        if (
+            $format === 'painter'
+            && $areaLabel !== ''
+        ) {
+            $title = $areaLabel;
+        }
+
+        if ($title === '') {
+            $title = trim(
+                (string)($record['viewer_title'] ?? '')
+            );
+        }
 
         if ($title === '') {
             $title = trim(
@@ -156,10 +187,6 @@ final class PVService
          * Experience ownership will be cleaned up separately;
          * REX is authoritative for experience.
          */
-        $format = strtolower(
-            trim((string)($record['format'] ?? 'public'))
-        );
-
         $paletteViewerKey = $format === 'public'
             ? 'full_palette'
             : $format;
@@ -215,9 +242,23 @@ final class PVService
             'intro' => $record['intro'] ?? '',
 
             'notes' =>
-                $record['viewer_notes']
-                ?? $palette['notes']
-                ?? '',
+                $format === 'painter'
+                    ? ''
+                    : (
+                        $record['viewer_notes']
+                        ?? $palette['notes']
+                        ?? ''
+                    ),
+
+            'area_label' =>
+                $areaLabel !== ''
+                    ? $areaLabel
+                    : null,
+
+            'project_id' =>
+                isset($projectPalette['project_id'])
+                    ? (int)$projectPalette['project_id']
+                    : null,
 
             'cta_label' => $record['cta_label'] ?? '',
             'playlist_url' => '',
