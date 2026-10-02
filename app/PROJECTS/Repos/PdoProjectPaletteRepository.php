@@ -372,6 +372,7 @@ final class PdoProjectPaletteRepository
                 m.color_id,
                 m.role_name AS role,
                 m.sheen,
+                m.note,
                 m.order_index,
 
                 c.name AS color_name,
@@ -424,6 +425,9 @@ final class PdoProjectPaletteRepository
 
                 'sheen' =>
                     $row['sheen'] ?? null,
+
+                'note' =>
+                    $row['note'] ?? null,
 
                 'order_index' =>
                     (int)$row['order_index'],

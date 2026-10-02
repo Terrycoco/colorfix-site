@@ -248,6 +248,8 @@ function memberFromProjectColor(member, index) {
 
     sheen: cleanText(member?.sheen),
 
+    note: cleanText(member?.note),
+
   };
 
 }
@@ -1154,7 +1156,45 @@ export default function ProjectPalettes({
 
         <div>
 
-          {colorLabel(row.color) || "Unnamed color"}
+          <div>
+
+            {colorLabel(row.color) || "Unnamed color"}
+
+          </div>
+
+          <label
+            style={{
+              display: "block",
+              marginTop: 8,
+            }}
+          >
+
+            <span
+              style={{
+                display: "block",
+                marginBottom: 4,
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              Painter's Note
+            </span>
+
+            <input
+              className="admin-field__control"
+              type="text"
+              value={row.note || ""}
+              placeholder="Special instruction for this color…"
+              onClick={(event) => event.stopPropagation()}
+              onDoubleClick={(event) => event.stopPropagation()}
+              onChange={(event) =>
+                updateMember(row.key, {
+                  note: event.target.value,
+                })
+              }
+            />
+
+          </label>
 
         </div>
 
@@ -1394,6 +1434,8 @@ export default function ProjectPalettes({
 
           sheen: "",
 
+          note: "",
+
         },
 
       ];
@@ -1443,6 +1485,8 @@ export default function ProjectPalettes({
           ),
 
           sheen: cleanText(item?.sheen),
+
+          note: cleanText(item?.note),
 
         };
 
@@ -1678,7 +1722,7 @@ export default function ProjectPalettes({
 
           sheen: cleanText(member?.sheen) || null,
 
-          note: null,
+          note: cleanText(member?.note) || null,
 
           order_index: index,
 
@@ -1767,6 +1811,8 @@ export default function ProjectPalettes({
           role: member.role,
 
           sheen: member.sheen,
+
+          note: member.note,
 
           order_index: index,
 
