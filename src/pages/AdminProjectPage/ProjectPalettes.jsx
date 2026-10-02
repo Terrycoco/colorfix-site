@@ -1,5 +1,7 @@
 import {
 
+  Fragment,
+
   useCallback,
 
   useEffect,
@@ -2308,19 +2310,142 @@ export default function ProjectPalettes({
 
           {draftMembers.length ? (
 
-            <AdminSmartGrid
+            <div style={{ width: "100%", overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  tableLayout: "fixed",
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th style={{ width: 68 }} />
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px",
+                        fontSize: 12,
+                      }}
+                    >
+                      COLOR
+                    </th>
+                    <th
+                      style={{
+                        width: 190,
+                        textAlign: "left",
+                        padding: "8px",
+                        fontSize: 12,
+                      }}
+                    >
+                      PLACEMENT
+                    </th>
+                    <th
+                      style={{
+                        width: 180,
+                        textAlign: "left",
+                        padding: "8px",
+                        fontSize: 12,
+                      }}
+                    >
+                      SHEEN
+                    </th>
+                    <th style={{ width: 52 }} />
+                  </tr>
+                </thead>
 
-              items={draftMembers}
+                <tbody>
+                  {draftMembers.map((member) => (
+                    <Fragment key={member.key}>
+                      <tr>
+                        <td style={{ padding: "10px 8px", verticalAlign: "middle" }}>
+                          <LargeSwatch color={member.color} />
+                        </td>
 
-              columns={colorColumns}
+                        <td style={{ padding: "10px 8px", verticalAlign: "middle" }}>
+                          {colorLabel(member.color) || "Unnamed color"}
+                        </td>
 
-              getRowKey={(row) => row.key}
+                        <td style={{ padding: "10px 8px", verticalAlign: "middle" }}>
+                          <input
+                            className="admin-field__control"
+                            type="text"
+                            value={member.role || ""}
+                            placeholder="walls, fireplace, trim…"
+                            onChange={(event) =>
+                              updateMember(member.key, {
+                                role: event.target.value,
+                              })
+                            }
+                          />
+                        </td>
 
-              ariaLabel="Palette colors"
+                        <td style={{ padding: "10px 8px", verticalAlign: "middle" }}>
+                          <input
+                            className="admin-field__control"
+                            type="text"
+                            value={member.sheen || ""}
+                            placeholder="flat, eggshell, satin…"
+                            onChange={(event) =>
+                              updateMember(member.key, {
+                                sheen: event.target.value,
+                              })
+                            }
+                          />
+                        </td>
 
-              verticalAlign="middle"
+                        <td style={{ padding: "10px 8px", verticalAlign: "middle" }}>
+                          <AdminButton
+                            type="button"
+                            variant="danger"
+                            onClick={() => removeMember(member.key)}
+                          >
+                            ×
+                          </AdminButton>
+                        </td>
+                      </tr>
 
-            />
+                      <tr>
+                        <td colSpan={5} style={{ padding: "0 8px 12px 8px" }}>
+                          <label
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "auto minmax(0, 1fr)",
+                              alignItems: "center",
+                              gap: 8,
+                              width: "100%",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Painter's Note:
+                            </span>
+
+                            <input
+                              className="admin-field__control"
+                              type="text"
+                              value={member.note || ""}
+                              placeholder="Special instruction for this color…"
+                              style={{ width: "100%" }}
+                              onChange={(event) =>
+                                updateMember(member.key, {
+                                  note: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
           ) : (
 

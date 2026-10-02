@@ -221,6 +221,30 @@
   align-items: start;
 }
 
+
+/* Painter spec rows should use the full width of the left specification column. */
+.ppv-plan-specs .apv-entries {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ppv-plan-specs .apv-entry,
+.ppv-plan-specs .cpv-entry {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.ppv-plan-specs .apv-color,
+.ppv-plan-specs .apv-color-meta,
+.ppv-plan-specs .cpv-assignment,
+.ppv-plan-specs .cpv-spec-line,
+.ppv-plan-specs .ppv-note {
+  min-width: 0;
+  max-width: none;
+}
+
 .ppv-plan-specs {
   position: relative;
   min-width: 0;

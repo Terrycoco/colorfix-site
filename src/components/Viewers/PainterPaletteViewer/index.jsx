@@ -54,14 +54,23 @@ export default function PainterPaletteViewer({
   const address = painterView.address || "";
   const projectTitle = formatTitle(painterView.projectName || meta?.display_title || fallbackTitle);
   const issuedLabel = painterView.issuedLabel || "";
-  const overallNote = meta?.notes || painterView.overallPainterNote || "";
+  const overallNote = meta?.intro || painterView.overallPainterNote || "";
   const hasPlanPayload = Array.isArray(plans) && plans.length > 0;
   const notFinalWarning = String(meta?.not_final_warning || painterView.notFinalWarning || "").trim();
+
+  const areaTitle = formatTitle(
+    painterView.areaLabel
+      || painterView.area_label
+      || meta?.area_label
+      || meta?.areaLabel
+      || painterPlans[0]?.title
+      || projectTitle
+  );
 
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
-  const photoAlt = meta?.photo_alt || projectTitle || "Final palette rendering";
+  const photoAlt = meta?.photo_alt || areaTitle || "Final palette rendering";
   const ogImageUrl = meta?.og_image_url || photoUrl;
   const viewerCtaLabel = meta?.viewer_cta_label || "";
   const viewerCtaUrl = meta?.viewer_cta_url || "";
@@ -69,7 +78,7 @@ export default function PainterPaletteViewer({
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
 
-  const seoTitle = `${projectTitle} Painter Specification Sheet | ColorFix`;
+  const seoTitle = `${areaTitle} Painter Specification Sheet | ColorFix`;
   const seoDescription = address || shareText;
 
   const showExteriorNote =
@@ -309,7 +318,7 @@ export default function PainterPaletteViewer({
 
             <div className="apv-kicker">Painter Specification Sheet</div>
 
-            <h1>{projectTitle}</h1>
+            <h1>{areaTitle}</h1>
 
             {overallNote && (
               <div className="ppv-note ppv-overall-note">
@@ -323,9 +332,11 @@ export default function PainterPaletteViewer({
             <div className="ppv-plan-list">
               {painterPlans.map((plan, planIndex) => (
                 <section className="ppv-plan-section" key={plan.key || plan.id || planIndex}>
-                  <div className="ppv-plan-header">
-                    <h2>{plan.title || `Area ${planIndex + 1}`}</h2>
-                  </div>
+                  {painterPlans.length > 1 && (
+                    <div className="ppv-plan-header">
+                      <h2>{plan.title || `Area ${planIndex + 1}`}</h2>
+                    </div>
+                  )}
 
                   <div className="ppv-plan-body">
                     <div className="ppv-plan-specs">
