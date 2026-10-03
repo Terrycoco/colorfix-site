@@ -78,6 +78,12 @@ const EXPERIENCE_OPTIONS = [
   },
   {
     value:
+      "showcase",
+    label:
+      "Showcase",
+  },
+  {
+    value:
       "painter",
     label:
       "Painter",
@@ -109,6 +115,42 @@ function paletteLabel(
         ? `Palette #${row.saved_palette_id}`
         : ""
     )
+  );
+}
+
+
+function painterPaletteLabel(
+  row
+) {
+  const area =
+    cleanText(
+      row?.area_label
+      ||
+      row?.area_name
+      ||
+      row?.room_name
+    );
+
+  const palette =
+    paletteLabel(
+      row
+    );
+
+  if (
+    area
+    &&
+    palette
+    &&
+    area.toLowerCase() !==
+      palette.toLowerCase()
+  ) {
+    return `${area} — ${palette}`;
+  }
+
+  return (
+    area
+    ||
+    palette
   );
 }
 
@@ -2355,6 +2397,11 @@ export default function ProjectPVPage({
   ] = useState("");
 
   const [
+    newPaletteIds,
+    setNewPaletteIds,
+  ] = useState([]);
+
+  const [
     newExperience,
     setNewExperience,
   ] = useState("");
@@ -2458,6 +2505,11 @@ export default function ProjectPVPage({
 
           const pvParams =
             new URLSearchParams({
+              project_id:
+                String(
+                  id
+                ),
+
               saved_palette_ids:
                 paletteIds.join(
                   ","
@@ -2537,6 +2589,10 @@ export default function ProjectPVPage({
 
       setNewPaletteId(
         ""
+      );
+
+      setNewPaletteIds(
+        []
       );
 
       setNewExperience(
@@ -2729,6 +2785,10 @@ export default function ProjectPVPage({
         : ""
     );
 
+    setNewPaletteIds(
+      []
+    );
+
     setNewExperience(
       ""
     );
@@ -2839,11 +2899,73 @@ export default function ProjectPVPage({
   }
 
 
+  function togglePainterPalette(
+    paletteId,
+    checked
+  ) {
+    const id =
+      Number(
+        paletteId
+        ||
+        0
+      );
+
+    if (
+      id <= 0
+    ) {
+      return;
+    }
+
+    setNewPaletteIds(
+      (current) => {
+        const next =
+          new Set(
+            current.map(
+              Number
+            )
+          );
+
+        if (
+          checked
+        ) {
+          next.add(
+            id
+          );
+        } else {
+          next.delete(
+            id
+          );
+        }
+
+        return Array.from(
+          next
+        );
+      }
+    );
+
+    setCreateError(
+      ""
+    );
+  }
+
+
+  const isPainterCreate =
+    cleanText(
+      newExperience
+    ).toLowerCase()
+    ===
+    "painter";
+
+
   const canCreate =
-    Number(
-      newPaletteId ||
-      0
-    ) > 0
+    (
+      isPainterCreate
+        ? newPaletteIds.length > 0
+        : Number(
+            newPaletteId ||
+            0
+          ) > 0
+    )
     &&
     cleanText(
       newExperience
@@ -2887,22 +3009,46 @@ export default function ProjectPVPage({
               },
 
               body:
-                JSON.stringify({
-                  saved_palette_id:
-                    Number(
-                      newPaletteId
-                    ),
+                JSON.stringify(
+                  isPainterCreate
+                    ? {
+                        project_id:
+                          Number(
+                            projectId
+                            ||
+                            0
+                          ),
 
-                  experience:
-                    cleanText(
-                      newExperience
-                    ),
+                        project_palette_ids:
+                          newPaletteIds.map(
+                            Number
+                          ),
 
-                  title:
-                    cleanText(
-                      newTitle
-                    ),
-                }),
+                        experience:
+                          "painter",
+
+                        title:
+                          cleanText(
+                            newTitle
+                          ),
+                      }
+                    : {
+                        saved_palette_id:
+                          Number(
+                            newPaletteId
+                          ),
+
+                        experience:
+                          cleanText(
+                            newExperience
+                          ),
+
+                        title:
+                          cleanText(
+                            newTitle
+                          ),
+                      }
+                ),
             }
           ),
 
@@ -2961,6 +3107,10 @@ export default function ProjectPVPage({
 
       setNewPaletteId(
         ""
+      );
+
+      setNewPaletteIds(
+        []
       );
 
       setNewExperience(
@@ -3367,54 +3517,6 @@ export default function ProjectPVPage({
               : null
           }
 
-          <AdminField label="Palette">
-            <select
-              className="admin-field__control"
-              value={
-                newPaletteId
-              }
-              disabled={
-                creating
-                ||
-                !palettes.length
-              }
-              onChange={(
-                event
-              ) =>
-                handlePaletteChange(
-                  event.target.value
-                )
-              }
-            >
-              <option value="">
-                Choose a palette...
-              </option>
-
-              {
-                palettes.map(
-                  (palette) => (
-                    <option
-                      key={
-                        palette
-                          .saved_palette_id
-                      }
-                      value={
-                        palette
-                          .saved_palette_id
-                      }
-                    >
-                      {
-                        paletteLabel(
-                          palette
-                        )
-                      }
-                    </option>
-                  )
-                )
-              }
-            </select>
-          </AdminField>
-
           <AdminField label="Experience">
             <select
               className="admin-field__control"
@@ -3427,9 +3529,49 @@ export default function ProjectPVPage({
               onChange={(
                 event
               ) => {
+                const value =
+                  event.target.value;
+
                 setNewExperience(
-                  event.target.value
+                  value
                 );
+
+                if (
+                  value ===
+                  "painter"
+                ) {
+                  setNewPaletteId(
+                    ""
+                  );
+
+                  setNewPaletteIds(
+                    []
+                  );
+
+                  if (
+                    !cleanText(
+                      newTitle
+                    )
+                    ||
+                    palettes.some(
+                      (palette) =>
+                        cleanText(
+                          newTitle
+                        ) ===
+                        paletteLabel(
+                          palette
+                        )
+                    )
+                  ) {
+                    setNewTitle(
+                      "Painter Specifications"
+                    );
+                  }
+                } else {
+                  setNewPaletteIds(
+                    []
+                  );
+                }
 
                 setCreateError(
                   ""
@@ -3460,6 +3602,133 @@ export default function ProjectPVPage({
               }
             </select>
           </AdminField>
+
+          {
+            isPainterCreate
+              ? (
+                  <AdminField label="Include palettes / rooms">
+                    <AdminStack gap="sm">
+                      {
+                        palettes.map(
+                          (palette) => {
+                            const paletteId =
+                              Number(
+                                palette
+                                  ?.project_palette_id
+                                ||
+                                0
+                              );
+
+                            const checked =
+                              newPaletteIds
+                                .map(
+                                  Number
+                                )
+                                .includes(
+                                  paletteId
+                                );
+
+                            return (
+                              <label
+                                key={
+                                  paletteId
+                                }
+                                style={{
+                                  display:
+                                    "flex",
+                                  alignItems:
+                                    "center",
+                                  gap:
+                                    8,
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    checked
+                                  }
+                                  disabled={
+                                    creating
+                                    ||
+                                    paletteId <= 0
+                                  }
+                                  onChange={(
+                                    event
+                                  ) =>
+                                    togglePainterPalette(
+                                      paletteId,
+                                      event
+                                        .target
+                                        .checked
+                                    )
+                                  }
+                                />
+
+                                <span>
+                                  {
+                                    painterPaletteLabel(
+                                      palette
+                                    )
+                                  }
+                                </span>
+                              </label>
+                            );
+                          }
+                        )
+                      }
+                    </AdminStack>
+                  </AdminField>
+                )
+              : (
+                  <AdminField label="Palette">
+                    <select
+                      className="admin-field__control"
+                      value={
+                        newPaletteId
+                      }
+                      disabled={
+                        creating
+                        ||
+                        !palettes.length
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        handlePaletteChange(
+                          event.target.value
+                        )
+                      }
+                    >
+                      <option value="">
+                        Choose a palette...
+                      </option>
+
+                      {
+                        palettes.map(
+                          (palette) => (
+                            <option
+                              key={
+                                palette
+                                  .saved_palette_id
+                              }
+                              value={
+                                palette
+                                  .saved_palette_id
+                              }
+                            >
+                              {
+                                paletteLabel(
+                                  palette
+                                )
+                              }
+                            </option>
+                          )
+                        )
+                      }
+                    </select>
+                  </AdminField>
+                )
+          }
 
           <AdminField label="Title">
             <input

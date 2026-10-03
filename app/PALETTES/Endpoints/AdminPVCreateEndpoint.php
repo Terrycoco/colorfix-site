@@ -12,137 +12,56 @@ use Throwable;
 
 final class AdminPVCreateEndpoint
 {
-    public static function handle(
-        PDO $pdo
-    ): void {
-        header(
-            'Content-Type: application/json; charset=utf-8'
-        );
-        header(
-            'Cache-Control: no-store'
-        );
+    public static function handle(PDO $pdo): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
 
         try {
-            if (
-                ($_SERVER['REQUEST_METHOD'] ?? 'GET')
-                !== 'POST'
-            ) {
-                http_response_code(
-                    405
-                );
-
-                echo json_encode([
-                    'ok' => false,
-                    'error' => 'POST required.',
-                ]);
-
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+                http_response_code(405);
+                echo json_encode(['ok' => false, 'error' => 'POST required.']);
                 return;
             }
 
-            $raw =
-                file_get_contents(
-                    'php://input'
-                );
-
-            $input =
-                json_decode(
-                    $raw !== false
-                        ? $raw
-                        : '',
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR
-                );
+            $raw = file_get_contents('php://input');
+            $input = json_decode(
+                $raw !== false ? $raw : '',
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
 
             if (!is_array($input)) {
-                throw new InvalidArgumentException(
-                    'JSON object required.'
-                );
+                throw new InvalidArgumentException('JSON object required.');
             }
 
-            $item =
-                (
-                    new PVManager(
-                        $pdo
-                    )
-                )
-                ->createPV(
-                    savedPaletteId:
-                        (int)(
-                            $input[
-                                'saved_palette_id'
-                            ]
-                            ?? 0
-                        ),
+            $projectPaletteIds = [];
+            foreach (($input['project_palette_ids'] ?? []) as $value) {
+                $id = (int)$value;
+                if ($id > 0) {
+                    $projectPaletteIds[] = $id;
+                }
+            }
 
-                    experience:
-                        (string)(
-                            $input[
-                                'experience'
-                            ]
-                            ??
-                            $input[
-                                'format'
-                            ]
-                            ??
-                            ''
-                        ),
-
-                    title:
-                        (string)(
-                            $input[
-                                'title'
-                            ]
-                            ?? ''
-                        ),
-                );
-
-            echo json_encode([
-                'ok' => true,
-                'item' => $item,
-            ]);
-
-        } catch (
-            InvalidArgumentException
-            |
-            JsonException
-            $e
-        ) {
-            http_response_code(
-                422
+            $item = (new PVManager($pdo))->createPV(
+                savedPaletteId: (int)($input['saved_palette_id'] ?? 0),
+                experience: (string)($input['experience'] ?? $input['format'] ?? ''),
+                title: (string)($input['title'] ?? ''),
+                projectId: (int)($input['project_id'] ?? 0),
+                projectPaletteIds: $projectPaletteIds,
             );
 
-            echo json_encode([
-                'ok' => false,
-                'error' =>
-                    $e->getMessage(),
-            ]);
-
-        } catch (
-            RuntimeException $e
-        ) {
-            http_response_code(
-                409
-            );
-
-            echo json_encode([
-                'ok' => false,
-                'error' =>
-                    $e->getMessage(),
-            ]);
-
-        } catch (
-            Throwable $e
-        ) {
-            http_response_code(
-                500
-            );
-
-            echo json_encode([
-                'ok' => false,
-                'error' =>
-                    $e->getMessage(),
-            ]);
+            echo json_encode(['ok' => true, 'item' => $item]);
+        } catch (InvalidArgumentException|JsonException $e) {
+            http_response_code(422);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        } catch (RuntimeException $e) {
+            http_response_code(409);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
     }
 }

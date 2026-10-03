@@ -5,6 +5,7 @@ namespace App\PALETTES\Managers;
 
 use App\PALETTES\Repos\PdoPVRepository;
 use App\PALETTES\Repos\PdoSavedPaletteRepository;
+use App\PROJECTS\Repos\PdoProjectPaletteRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use InvalidArgumentException;
 use PDO;
@@ -15,239 +16,135 @@ final class PVManager
 {
     private PdoPVRepository $pvs;
     private PdoSavedPaletteRepository $savedPalettes;
+    private PdoProjectPaletteRepository $projectPalettes;
 
     public function __construct(
         private PDO $pdo
     ) {
-        $this->pvs =
-            new PdoPVRepository(
-                $this->pdo
-            );
-
-        $this->savedPalettes =
-            new PdoSavedPaletteRepository(
-                $this->pdo
-            );
+        $this->pvs = new PdoPVRepository($this->pdo);
+        $this->savedPalettes = new PdoSavedPaletteRepository($this->pdo);
+        $this->projectPalettes = new PdoProjectPaletteRepository($this->pdo);
     }
 
-    /**
-     * Create one first-class PV.
-     *
-     * The database id is the real identity. The human-readable handle
-     * is derived for presentation from Title + Experience.
-     *
-     * @return array<string,mixed>
-     */
+    /** @param int[] $projectPaletteIds */
     public function createPV(
         int $savedPaletteId,
         string $experience,
-        string $title
+        string $title,
+        int $projectId = 0,
+        array $projectPaletteIds = []
     ): array {
-        if ($savedPaletteId <= 0) {
+        $experience = strtolower(trim($experience));
+        $allowed = ['public', 'concept', 'client', 'showcase', 'painter'];
+
+        if (!in_array($experience, $allowed, true)) {
             throw new InvalidArgumentException(
-                'saved_palette_id required'
+                'experience must be Public, Concept, Client, Showcase, or Painter'
             );
         }
 
-        if (
-            !$this->savedPalettes
-                ->paletteExists(
-                    $savedPaletteId
-                )
-        ) {
-            throw new RuntimeException(
-                "Saved Palette {$savedPaletteId} not found"
-            );
-        }
-
-        $experience =
-            strtolower(
-                trim(
-                    $experience
-                )
-            );
-
-        $allowed = [
-            'public',
-            'concept',
-            'client',
-            'painter',
-        ];
-
-        if (
-            !in_array(
-                $experience,
-                $allowed,
-                true
-            )
-        ) {
-            throw new InvalidArgumentException(
-                'experience must be Public, Concept, Client, or Painter'
-            );
-        }
-
-        $title =
-            trim(
-                $title
-            );
-
+        $title = trim($title);
         if ($title === '') {
-            throw new InvalidArgumentException(
-                'title required'
+            throw new InvalidArgumentException('title required');
+        }
+
+        if ($experience === 'painter') {
+            if ($projectId <= 0) {
+                throw new InvalidArgumentException('project_id required for Painter');
+            }
+
+            $requestedIds = array_values(array_unique(array_filter(
+                array_map('intval', $projectPaletteIds),
+                static fn(int $id): bool => $id > 0
+            )));
+
+            if ($requestedIds === []) {
+                throw new InvalidArgumentException(
+                    'Select at least one project palette for Painter'
+                );
+            }
+
+            $allowedRows = $this->projectPalettes->listForProject($projectId);
+            $allowedIds = array_map(
+                static fn(array $row): int => (int)($row['project_palette_id'] ?? 0),
+                $allowedRows
+            );
+
+            foreach ($requestedIds as $id) {
+                if (!in_array($id, $allowedIds, true)) {
+                    throw new InvalidArgumentException(
+                        "Project Palette {$id} does not belong to Project {$projectId}"
+                    );
+                }
+            }
+
+            $pvId = $this->pvs->createPainter(
+                projectId: $projectId,
+                projectPaletteIds: $requestedIds,
+                title: $title,
+            );
+        } else {
+            if ($savedPaletteId <= 0) {
+                throw new InvalidArgumentException('saved_palette_id required');
+            }
+
+            if (!$this->savedPalettes->paletteExists($savedPaletteId)) {
+                throw new RuntimeException(
+                    "Saved Palette {$savedPaletteId} not found"
+                );
+            }
+
+            $pvId = $this->pvs->create(
+                savedPaletteId: $savedPaletteId,
+                format: $experience,
+                title: $title,
             );
         }
 
-        $pvId =
-            $this->pvs
-                ->create(
-                    savedPaletteId:
-                        $savedPaletteId,
-                    format:
-                        $experience,
-                    title:
-                        $title,
-                );
-
-        $row =
-            $this->pvs
-                ->findGridRowById(
-                    $pvId
-                );
-
+        $row = $this->pvs->findGridRowById($pvId);
         if ($row === null) {
             throw new RuntimeException(
                 "Palette Viewer {$pvId} was created but could not be reloaded."
             );
         }
 
-        return $this->gridPayload(
-            $row
-        );
+        return $this->gridPayload($row);
     }
 
-    /**
-     * @param int[] $savedPaletteIds
-     * @return array<int,array<string,mixed>>
-     */
-    public function listPVsForSavedPalettes(
+    /** @param int[] $savedPaletteIds */
+    public function listPVsForProject(
+        int $projectId,
         array $savedPaletteIds
     ): array {
         return array_map(
-            fn(array $row): array =>
-                $this->gridPayload(
-                    $row
-                ),
-            $this->pvs
-                ->listGridRowsBySavedPaletteIds(
-                    $savedPaletteIds
-                )
+            fn(array $row): array => $this->gridPayload($row),
+            $this->pvs->listGridRowsForProject($projectId, $savedPaletteIds)
         );
     }
 
-    /**
-     * @param array<string,mixed> $row
-     * @return array<string,mixed>
-     */
-    private function gridPayload(
-        array $row
-    ): array {
-        $title =
-            trim(
-                (string)(
-                    $row['title']
-                    ?? ''
-                )
-            );
-
-        if ($title === '') {
-            $title = 'Untitled';
-        }
-
-        $experience =
-            strtolower(
-                trim(
-                    (string)(
-                        $row['format']
-                        ?? ''
-                    )
-                )
-            );
-
-        $experienceLabel =
-            $experience !== ''
-                ? ucfirst(
-                    $experience
-                )
-                : 'Unknown';
+    private function gridPayload(array $row): array
+    {
+        $title = trim((string)($row['title'] ?? '')) ?: 'Untitled';
+        $experience = strtolower(trim((string)($row['format'] ?? '')));
+        $savedPaletteId = isset($row['saved_palette_id']) && $row['saved_palette_id'] !== null
+            ? (int)$row['saved_palette_id']
+            : null;
 
         return [
-            'palette_viewer_id' =>
-                (int)(
-                    $row[
-                        'palette_viewer_id'
-                    ]
-                    ?? 0
-                ),
-
-            'saved_palette_id' =>
-                (int)(
-                    $row[
-                        'saved_palette_id'
-                    ]
-                    ?? 0
-                ),
-
-            'format' =>
-                $experience,
-
-            'experience_key' =>
-                $experience,
-
-            'title' =>
-                $title,
-
-            'handle' =>
-                $title
-                . ' - '
-                . $experienceLabel,
-
-            'palette_name' =>
-                trim(
-                    (string)(
-                        $row[
-                            'palette_name'
-                        ]
-                        ?? ''
-                    )
-                ),
-
-            'kicker_text' =>
-                $row[
-                    'kicker_text'
-                ]
-                ?? null,
-
-            'intro' =>
-                $row[
-                    'intro'
-                ]
-                ?? null,
-
-            'photo_count' =>
-                (int)(
-                    $row[
-                        'photo_count'
-                    ]
-                    ?? 0
-                ),
-
-            'is_active' =>
-                (int)(
-                    $row[
-                        'is_active'
-                    ]
-                    ?? 0
-                ),
+            'palette_viewer_id' => (int)($row['palette_viewer_id'] ?? 0),
+            'saved_palette_id' => $savedPaletteId,
+            'project_id' => isset($row['project_id']) && $row['project_id'] !== null
+                ? (int)$row['project_id']
+                : null,
+            'format' => $experience,
+            'experience_key' => $experience,
+            'title' => $title,
+            'handle' => $title . ' - ' . ($experience !== '' ? ucfirst($experience) : 'Unknown'),
+            'palette_name' => trim((string)($row['palette_name'] ?? '')),
+            'kicker_text' => $row['kicker_text'] ?? null,
+            'intro' => $row['intro'] ?? null,
+            'photo_count' => (int)($row['photo_count'] ?? 0),
+            'is_active' => (int)($row['is_active'] ?? 0),
         ];
     }
 

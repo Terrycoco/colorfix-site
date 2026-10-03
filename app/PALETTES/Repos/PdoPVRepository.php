@@ -67,6 +67,7 @@ final class PdoPVRepository
             "SELECT
                 pv.palette_viewer_id,
                 pv.saved_palette_id,
+                pv.project_id,
                 pv.format,
                 NULLIF(TRIM(pv.template_key), '') AS template_key,
                 NULLIF(TRIM(pv.kicker_text), '') AS kicker_text,
@@ -556,66 +557,82 @@ final class PdoPVRepository
     }
 
     /**
-     * Grid/list rows for one or more Saved Palettes.
+     * Grid/list rows for one Project. Normal PVs are found through the
+     * Project's saved palettes; Painter PVs are found directly by project_id.
      *
      * @param int[] $savedPaletteIds
      * @return array<int,array<string,mixed>>
      */
-    public function listGridRowsBySavedPaletteIds(
+    public function listGridRowsForProject(
+        int $projectId,
         array $savedPaletteIds
     ): array {
-        $ids = array_values(array_unique(array_filter(
-            array_map(
-                static fn(mixed $value): int => (int)$value,
-                $savedPaletteIds
-            ),
-            static fn(int $value): bool => $value > 0
-        )));
-
-        if ($ids === []) {
+        if ($projectId <= 0) {
             return [];
         }
 
-        $placeholders = [];
-        $params = [];
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn(mixed $value): int => (int)$value, $savedPaletteIds),
+            static fn(int $value): bool => $value > 0
+        )));
 
-        foreach ($ids as $index => $id) {
-            $key = ':palette_' . $index;
-            $placeholders[] = $key;
-            $params[$key] = $id;
+        $params = [':project_id' => $projectId];
+        $normalClause = '0 = 1';
+
+        if ($ids !== []) {
+            $placeholders = [];
+            foreach ($ids as $index => $id) {
+                $key = ':palette_' . $index;
+                $placeholders[] = $key;
+                $params[$key] = $id;
+            }
+            $normalClause = 'pv.saved_palette_id IN (' . implode(', ', $placeholders) . ')';
         }
 
         $sql =
             "SELECT
                 pv.palette_viewer_id,
                 pv.saved_palette_id,
+                pv.project_id,
                 pv.format,
                 pv.kicker_text,
                 pv.title,
                 pv.intro,
                 pv.is_active,
 
-                COALESCE(
-                    NULLIF(TRIM(sp.nickname), ''),
-                    CONCAT('Palette #', sp.id)
-                ) AS palette_name,
+                CASE
+                    WHEN LOWER(TRIM(COALESCE(pv.format, ''))) = 'painter'
+                    THEN CONCAT(
+                        (SELECT COUNT(*)
+                           FROM palette_viewer_project_palettes pvpp
+                          WHERE pvpp.palette_viewer_id = pv.palette_viewer_id),
+                        ' areas'
+                    )
+                    ELSE COALESCE(
+                        NULLIF(TRIM(sp.nickname), ''),
+                        CONCAT('Palette #', sp.id)
+                    )
+                END AS palette_name,
 
                 (
                     SELECT COUNT(*)
                       FROM palette_viewer_photos pvp
-                     WHERE pvp.palette_viewer_id =
-                           pv.palette_viewer_id
+                     WHERE pvp.palette_viewer_id = pv.palette_viewer_id
                 ) AS photo_count
 
              FROM palette_viewers pv
 
-             INNER JOIN saved_palettes sp
+             LEFT JOIN saved_palettes sp
                ON sp.id = pv.saved_palette_id
 
              WHERE pv.is_active = 1
-               AND pv.saved_palette_id IN (" .
-                    implode(', ', $placeholders) .
-               ")
+               AND (
+                    (LOWER(TRIM(COALESCE(pv.format, ''))) = 'painter'
+                     AND pv.project_id = :project_id)
+                    OR
+                    (LOWER(TRIM(COALESCE(pv.format, ''))) <> 'painter'
+                     AND {$normalClause})
+               )
 
              ORDER BY
                 COALESCE(NULLIF(TRIM(pv.title), ''), '') ASC,
@@ -644,16 +661,26 @@ final class PdoPVRepository
             "SELECT
                 pv.palette_viewer_id,
                 pv.saved_palette_id,
+                pv.project_id,
                 pv.format,
                 pv.kicker_text,
                 pv.title,
                 pv.intro,
                 pv.is_active,
 
-                COALESCE(
-                    NULLIF(TRIM(sp.nickname), ''),
-                    CONCAT('Palette #', sp.id)
-                ) AS palette_name,
+                CASE
+                    WHEN LOWER(TRIM(COALESCE(pv.format, ''))) = 'painter'
+                    THEN CONCAT(
+                        (SELECT COUNT(*)
+                           FROM palette_viewer_project_palettes pvpp
+                          WHERE pvpp.palette_viewer_id = pv.palette_viewer_id),
+                        ' areas'
+                    )
+                    ELSE COALESCE(
+                        NULLIF(TRIM(sp.nickname), ''),
+                        CONCAT('Palette #', sp.id)
+                    )
+                END AS palette_name,
 
                 (
                     SELECT COUNT(*)
@@ -664,7 +691,7 @@ final class PdoPVRepository
 
              FROM palette_viewers pv
 
-             INNER JOIN saved_palettes sp
+             LEFT JOIN saved_palettes sp
                ON sp.id = pv.saved_palette_id
 
              WHERE pv.palette_viewer_id = :pv_id
@@ -679,6 +706,156 @@ final class PdoPVRepository
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return $row !== false ? $row : null;
+    }
+
+    /** @param int[] $projectPaletteIds */
+    public function createPainter(
+        int $projectId,
+        array $projectPaletteIds,
+        string $title
+    ): int {
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO palette_viewers
+                    (saved_palette_id, project_id, format, template_key, title, is_active, created_at, updated_at)
+                 VALUES
+                    (NULL, :project_id, 'painter', 'painter', :title, 1, NOW(), NOW())"
+            );
+            $stmt->execute([
+                ':project_id' => $projectId,
+                ':title' => $this->nullableText($title),
+            ]);
+
+            $pvId = (int)$this->pdo->lastInsertId();
+
+            $linkStmt = $this->pdo->prepare(
+                "INSERT INTO palette_viewer_project_palettes
+                    (palette_viewer_id, project_palette_id, order_index, created_at)
+                 VALUES
+                    (:pv_id, :project_palette_id, :order_index, NOW())"
+            );
+
+            foreach (array_values($projectPaletteIds) as $orderIndex => $projectPaletteId) {
+                $linkStmt->execute([
+                    ':pv_id' => $pvId,
+                    ':project_palette_id' => (int)$projectPaletteId,
+                    ':order_index' => $orderIndex,
+                ]);
+            }
+
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
+
+            return $pvId;
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    public function listPainterProjectPalettes(int $pvId): array
+    {
+        if ($pvId <= 0) {
+            return [];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                pvpp.project_palette_id,
+                pvpp.order_index AS viewer_order_index,
+                pp.project_id,
+                pp.saved_palette_id,
+                pp.area_label,
+                pp.note,
+                pp.is_final,
+                pp.order_index AS project_order_index
+             FROM palette_viewer_project_palettes pvpp
+             INNER JOIN project_palettes pp
+               ON pp.project_palette_id = pvpp.project_palette_id
+             WHERE pvpp.palette_viewer_id = :pv_id
+             ORDER BY pvpp.order_index ASC, pvpp.palette_viewer_project_palette_id ASC"
+        );
+        $stmt->execute([':pv_id' => $pvId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function findProjectSummary(int $projectId): ?array
+    {
+        if ($projectId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT id, project_name, playlist_id
+               FROM projects
+              WHERE id = :project_id
+              LIMIT 1"
+        );
+        $stmt->execute([':project_id' => $projectId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    /** @param int[] $savedPaletteIds */
+    public function loadProjectPlaylistPhotos(
+        int $projectId,
+        array $savedPaletteIds
+    ): array {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $savedPaletteIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if ($projectId <= 0 || $ids === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [':project_id' => $projectId];
+        foreach ($ids as $index => $id) {
+            $key = ':palette_' . $index;
+            $placeholders[] = $key;
+            $params[$key] = $id;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                pi.saved_palette_id,
+                pi.photo_library_id,
+                pi.order_index,
+                COALESCE(NULLIF(pl.rel_path, ''), NULLIF(pi.image_url, '')) AS rel_path,
+                COALESCE(NULLIF(pl.ai_alt_text, ''), NULLIF(pl.alt_text, ''), NULLIF(pi.title, '')) AS alt_text,
+                pl.updated_at AS resolved_updated_at
+             FROM playlist_items pi
+             INNER JOIN playlists p
+               ON p.playlist_id = pi.playlist_id
+             LEFT JOIN photo_library pl
+               ON pl.photo_library_id = pi.photo_library_id
+             WHERE p.project_id = :project_id
+               AND pi.saved_palette_id IN (" . implode(', ', $placeholders) . ")
+               AND (pi.photo_library_id IS NOT NULL OR NULLIF(TRIM(pi.image_url), '') IS NOT NULL)
+             ORDER BY pi.saved_palette_id ASC, pi.order_index ASC, pi.playlist_item_id ASC"
+        );
+        $stmt->execute($params);
+
+        $rows = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $row['url'] = $this->appendCacheBuster(
+                trim((string)($row['rel_path'] ?? '')),
+                $row['resolved_updated_at'] ?? null
+            );
+            $rows[] = $row;
+        }
+        return $rows;
     }
 
     public function deletePhotosByPVId(int $pvId): int
