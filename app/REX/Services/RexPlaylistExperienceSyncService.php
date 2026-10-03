@@ -47,6 +47,11 @@ final class RexPlaylistExperienceSyncService
             'viewer_formats' => ['concept'],
             'thumbs_format' => 'concept',
         ],
+        'showcase' => [
+            'slide_flag' => 'showcase',
+            'viewer_formats' => ['showcase'],
+            'thumbs_format' => 'showcase',
+        ],
         'client' => [
             'slide_flag' => 'client',
             'viewer_formats' => ['client', 'painter'],
@@ -371,7 +376,7 @@ final class RexPlaylistExperienceSyncService
                 ));
 
                 if ($matching === []) {
-                    $issues[] = [
+                    $missingPv = [
                         'code' => 'missing_pv',
                         'saved_palette_id' => (int)$savedPaletteId,
                         'viewer_format' => $format,
@@ -380,6 +385,14 @@ final class RexPlaylistExperienceSyncService
                             . " PV is missing for Saved Palette "
                             . "#{$savedPaletteId}.",
                     ];
+
+                    /*
+                     * A Playlist never requires a PV in order to exist or play.
+                     * PVs are optional child experiences. If one is missing,
+                     * keep the Playlist REX valid and simply omit that child.
+                     */
+                    $warnings[] = $missingPv;
+
                     continue;
                 }
 

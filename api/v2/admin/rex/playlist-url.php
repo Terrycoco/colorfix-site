@@ -18,6 +18,7 @@ require_once __DIR__ . '/_helpers.php';
 use App\REX\DTO\RexReservation;
 use App\REX\DTO\RexReservationSearchCriteria;
 use App\REX\Repos\PdoRexReservationRepository;
+use App\REX\Services\RexPlaylistExperienceSyncService;
 use App\REX\Services\RexReservationRelationships;
 
 
@@ -107,26 +108,15 @@ function rex_playlist_url_select_canonical(
 }
 
 
-try {
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
-        workflow_respond([
-            'ok' => false,
-            'error' => 'GET only',
-        ], 405);
-    }
-
-    $playlistId = rex_admin_positive_int(
-        $_GET['playlist_id'] ?? null,
-        'Playlist ID'
-    );
-
-    $experienceKey = rex_playlist_url_experience_key(
-        $_GET['experience_key'] ?? 'public'
-    );
-
-    $repo = new PdoRexReservationRepository($pdo);
-    $relationships = new RexReservationRelationships($repo);
-
+/**
+ * Find the canonical active Playlist REX for one experience.
+ */
+function rex_playlist_url_find(
+    PdoRexReservationRepository $repo,
+    RexReservationRelationships $relationships,
+    int $playlistId,
+    string $experienceKey
+): ?RexReservation {
     $reservations = $repo->search(
         new RexReservationSearchCriteria(
             resolverKey: 'playlist_experience',
@@ -147,11 +137,57 @@ try {
             )
     ));
 
-    $selected = rex_playlist_url_select_canonical(
+    return rex_playlist_url_select_canonical(
         $matches,
         $relationships,
         $experienceKey
     );
+}
+
+
+try {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
+        workflow_respond([
+            'ok' => false,
+            'error' => 'GET only',
+        ], 405);
+    }
+
+    $playlistId = rex_admin_positive_int(
+        $_GET['playlist_id'] ?? null,
+        'Playlist ID'
+    );
+
+    $experienceKey = rex_playlist_url_experience_key(
+        $_GET['experience_key'] ?? 'public'
+    );
+
+    $repo = new PdoRexReservationRepository($pdo);
+    $relationships = new RexReservationRelationships($repo);
+
+    $selected = rex_playlist_url_find(
+        $repo,
+        $relationships,
+        $playlistId,
+        $experienceKey
+    );
+
+    /*
+     * Admin Play / Fetch REX should be self-healing:
+     * if this Playlist experience has never had a REX, run the normal
+     * Playlist REX sync once, then look it up again.
+     */
+    if (!$selected) {
+        $sync = new RexPlaylistExperienceSyncService($pdo);
+        $sync->syncPlaylist($playlistId);
+
+        $selected = rex_playlist_url_find(
+            $repo,
+            $relationships,
+            $playlistId,
+            $experienceKey
+        );
+    }
 
     if (!$selected) {
         workflow_respond([
@@ -161,7 +197,7 @@ try {
             'reason' =>
                 'No active '
                 . ucfirst($experienceKey)
-                . ' Playlist REX reservation found.',
+                . ' Playlist REX reservation found after sync.',
         ]);
     }
 

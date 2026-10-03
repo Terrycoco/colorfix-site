@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace App\PLAYLISTS\Services;
 
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\Repos\PdoPlayerExperienceRepository;
+use App\PLAYLISTS\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
 use App\Repos\PdoArticleRepository;
 use App\PROJECTS\Repos\PdoProjectRepository;
@@ -16,7 +16,7 @@ use App\REX\Services\RexReservationRelationships;
 use App\PLAYLISTS\Entities\Playlist;
 use App\PLAYLISTS\Entities\PlaylistItem;
 use App\Services\PaletteViewerTokenService;
-use App\Entities\PlayerExperience;
+use App\PLAYLISTS\Entities\PlayerExperience;
 use DomainException;
 use PDO;
 use RuntimeException;
@@ -527,7 +527,7 @@ public function buildPlaybackPlanFromProjectExperience(
 ): array {
         $startedAt = microtime(true);
         $experienceKey = strtolower(trim($experienceKey));
-        if (!in_array($experienceKey, ['public', 'concept', 'client', 'painter'], true)) {
+        if (!in_array($experienceKey, ['public', 'concept', 'showcase', 'client', 'painter'], true)) {
             throw new DomainException("Player experience configuration error: unsupported experience_key '{$experienceKey}'.");
         }
 
@@ -806,7 +806,7 @@ public function buildPlaybackPlanFromProjectExperience(
         if (in_array($value, ['public', 'full_palette'], true)) {
             return 'site';
         }
-        $allowed = ['site', 'yt', 'pin',  'concept', 'client'];
+        $allowed = ['site', 'yt', 'pin', 'concept', 'showcase', 'client'];
         if (!in_array($value, $allowed, true)) {
             throw new DomainException("Player experience configuration error: unsupported slide_flag '{$slideFlag}'.");
         }
@@ -818,8 +818,11 @@ public function buildPlaybackPlanFromProjectExperience(
         if (strtolower(trim($experience->paletteViewerKey)) === 'none') {
             return false;
         }
-        return strtolower(trim($experience->experienceKey)) !== 'concept'
-            && strtolower(trim($experience->slideFlag)) !== 'concept';
+        $experienceKey = strtolower(trim($experience->experienceKey));
+        $slideFlag = strtolower(trim($experience->slideFlag));
+
+        return !in_array($experienceKey, ['concept', 'showcase'], true)
+            && !in_array($slideFlag, ['concept', 'showcase'], true);
     }
 
     private function normalizeStartIndex(?int $start, int $count): int

@@ -348,7 +348,7 @@ export default function PainterPaletteViewer({
                       )}
 
                       {plan.groups.length > 0 ? (
-                        <div className="apv-entries">
+                        <div className="ppv-spec-list">
                           {plan.groups.map((group) => (
                             <PainterColorEntry
                               key={group.key}
@@ -567,7 +567,7 @@ export default function PainterPaletteViewer({
 
 function PainterColorEntry({ group, showExteriorNote }) {
   return (
-    <article className="apv-entry cpv-entry">
+    <article className="ppv-spec-entry">
       <div className="apv-color">
         <span
           className="apv-swatch"

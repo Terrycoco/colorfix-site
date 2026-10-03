@@ -155,6 +155,7 @@ const emptyItem = {
   site: true,
   yt: true,
   concept: true,
+  showcase: true,
   client: true,
   pin: true,
   color_plan_id: "",
@@ -1646,6 +1647,9 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                 nextItem.concept =
                   true;
 
+                nextItem.showcase =
+                  true;
+
                 nextItem.client =
                   true;
 
@@ -2682,7 +2686,9 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       return;
     }
 
-    try {
+    setDetailError("");
+
+    async function getRexUrl() {
       const params =
         new URLSearchParams();
 
@@ -2725,18 +2731,75 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         );
       }
 
-      const publicUrl =
-        String(
-          data
-            ?.item
-            ?.public_url
+      return String(
+        data
+          ?.item
+          ?.public_url
+        ||
+        ""
+      ).trim();
+    }
+
+    try {
+      let publicUrl =
+        await getRexUrl();
+
+      /*
+       * Play always uses the real REX-backed experience.
+       * If this experience has never had a REX, re-save the
+       * current slide set to trigger the normal REX sync once.
+       */
+      if (!publicUrl) {
+        const syncRes =
+          await fetch(
+            SAVE_ITEMS_URL,
+            {
+              method:
+                "POST",
+
+              credentials:
+                "include",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  playlist_id:
+                    id,
+
+                  items:
+                    items.map(
+                      serializePlaylistItem
+                    ),
+                }),
+            }
+          );
+
+        const syncData =
+          await syncRes.json();
+
+        if (
+          !syncRes.ok
           ||
-          ""
-        ).trim();
+          !syncData?.ok
+        ) {
+          throw new Error(
+            syncData?.error
+            ||
+            `Could not create the ${experienceKey} REX.`
+          );
+        }
+
+        publicUrl =
+          await getRexUrl();
+      }
 
       if (!publicUrl) {
         throw new Error(
-          `This playlist has no ${experienceKey} REX URL.`
+          `Could not create the ${experienceKey} REX URL.`
         );
       }
 
@@ -3230,14 +3293,17 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           <option value="">
             Choose…
           </option>
-          <option value="public">
-            Public
-          </option>
           <option value="concept">
             Concept
           </option>
           <option value="client">
             Client
+          </option>
+          <option value="showcase">
+            Showcase
+          </option>
+          <option value="public">
+            Public Full
           </option>
         </select>
       </AdminField>
@@ -4408,6 +4474,16 @@ function normalizePlaylistItem(
             )
           ),
 
+    showcase:
+      raw.showcase ==
+        null
+        ? true
+        : Boolean(
+            Number(
+              raw.showcase
+            )
+          ),
+
     client:
       raw.client ==
         null
@@ -4598,6 +4674,12 @@ function buildPresetItem(
     concept:
       preset
         ?.default_concept
+      ??
+      true,
+
+    showcase:
+      preset
+        ?.default_showcase
       ??
       true,
 
@@ -4837,6 +4919,10 @@ function serializePlaylistItem(
 
     concept:
       item.concept !==
+      false,
+
+    showcase:
+      item.showcase !==
       false,
 
     client:
@@ -5145,6 +5231,15 @@ function slideUsageLabel(
   ) {
     values.push(
       "Concept"
+    );
+  }
+
+  if (
+    item.showcase !==
+    false
+  ) {
+    values.push(
+      "Showcase"
     );
   }
 

@@ -356,3 +356,42 @@
     height: 62px;
   }
 }
+
+/* Painter specification list owns its layout.
+   Do not inherit compact APV entry sizing here. */
+.apv-shell--painter .ppv-spec-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  gap: 12px;
+}
+
+.apv-shell--painter .ppv-spec-entry {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.apv-shell--painter .ppv-spec-entry + .ppv-spec-entry {
+  border-top: 1px solid #b8c0cc;
+}
+
+.apv-shell--painter .ppv-spec-entry .apv-color,
+.apv-shell--painter .ppv-spec-entry .apv-color-meta,
+.apv-shell--painter .ppv-spec-entry .cpv-assignment,
+.apv-shell--painter .ppv-spec-entry .cpv-spec-line,
+.apv-shell--painter .ppv-spec-entry .ppv-note {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
+}
+
