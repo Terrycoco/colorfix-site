@@ -55,14 +55,31 @@ final class ProjectActivitySaveEndpoint
 
             $repository = new PdoProjectActivityRepository($pdo);
 
-            $activity = $repository->createManual(
-                projectId: $projectId,
-                activityDate: $activityDate,
-                description: $description,
-                hours: $hours,
-                miles: $miles,
-                amount: $amount
-            );
+            $activityId = $payload['activity_id'] ?? null;
+            if ($activityId !== null) {
+                $activityId = filter_var($activityId, FILTER_VALIDATE_INT);
+                if ($activityId === false || $activityId <= 0) {
+                    throw new \InvalidArgumentException('Valid activity ID required.');
+                }
+                $activity = $repository->updateEntry(
+                    activityId: $activityId,
+                    projectId: $projectId,
+                    activityDate: $activityDate,
+                    description: $description,
+                    hours: $hours,
+                    miles: $miles,
+                    amount: $amount
+                );
+            } else {
+                $activity = $repository->createManual(
+                    projectId: $projectId,
+                    activityDate: $activityDate,
+                    description: $description,
+                    hours: $hours,
+                    miles: $miles,
+                    amount: $amount
+                );
+            }
 
             echo json_encode([
                 'ok' => true,

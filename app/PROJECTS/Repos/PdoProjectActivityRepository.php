@@ -273,6 +273,48 @@ final class PdoProjectActivityRepository
         return $activity;
     }
 
+    /** Updates editable fields while preserving system event identity. */
+    public function updateEntry(
+        int $activityId,
+        int $projectId,
+        string $activityDate,
+        string $description,
+        ?float $hours = null,
+        ?float $miles = null,
+        ?float $amount = null
+    ): array {
+        if ($activityId <= 0 || $projectId <= 0) {
+            throw new RuntimeException('Valid project and activity IDs required.');
+        }
+        $description = trim($description);
+        if ($description === '' || trim($activityDate) === '') {
+            throw new RuntimeException('Activity date and description required.');
+        }
+        $activity = $this->findById($activityId);
+        if (!$activity || (int)$activity['project_id'] !== $projectId) {
+            throw new RuntimeException('Project activity was not found in this project.');
+        }
+        $stmt = $this->pdo->prepare(
+            'UPDATE project_activity
+                SET activity_date = :activity_date,
+                    description = :description,
+                    hours = :hours,
+                    miles = :miles,
+                    amount = :amount
+              WHERE id = :activity_id AND project_id = :project_id'
+        );
+        $stmt->execute([
+            ':activity_id' => $activityId,
+            ':project_id' => $projectId,
+            ':activity_date' => $activityDate,
+            ':description' => $description,
+            ':hours' => $hours,
+            ':miles' => $miles,
+            ':amount' => $amount,
+        ]);
+        return $this->requireById($activityId);
+    }
+
     /**
      * @return array<string, mixed>
      */

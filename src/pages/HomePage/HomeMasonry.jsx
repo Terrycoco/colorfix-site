@@ -161,6 +161,8 @@ export default function HomeMasonry({
           columnGutter={gutter}
           rowGutter={gutter}
           maxColumnCount={columnCount}
+          // This finite homepage must not depend on window scroll virtualization.
+          overscanBy={Infinity}
         />
       </div>
     </div>
