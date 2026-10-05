@@ -188,6 +188,37 @@ final class PdoProjectPaletteRepository
             return 0;
         }
 
+        $existingStmt = $this->pdo->prepare(
+            'SELECT project_palette_id
+               FROM project_palettes
+              WHERE project_id = :project_id
+                AND saved_palette_id = :saved_palette_id
+              ORDER BY project_palette_id ASC
+              LIMIT 1'
+        );
+        $linkParams = [
+            ':project_id' => $projectId,
+            ':saved_palette_id' => $savedPaletteId,
+        ];
+        $existingStmt->execute($linkParams);
+        $existingId = (int)$existingStmt->fetchColumn();
+
+        if ($existingId > 0) {
+            $updateStmt = $this->pdo->prepare(
+                'UPDATE project_palettes
+                    SET note = :note,
+                        area_label = :area_label
+                  WHERE project_id = :project_id
+                    AND saved_palette_id = :saved_palette_id'
+            );
+            $updateStmt->execute($linkParams + [
+                ':note' => $note,
+                ':area_label' => $areaLabel,
+            ]);
+
+            return $existingId;
+        }
+
         $orderStmt =
             $this->pdo->prepare(
                 "

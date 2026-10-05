@@ -272,10 +272,23 @@ try {
       ";
 
       $stmtSaved = $pdo->prepare($sqlSaved);
-      $stmtSaved->execute([
+      $photoParams = [
         ...array_keys($colorIds),
         ...array_keys($colorIds),
-      ]);
+      ];
+      if ((new \App\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable()) {
+        $stmtSaved = $pdo->prepare("SELECT m.color_id, pl.photo_library_id, pl.rel_path,
+            'zoom' AS photo_type, NULL AS trigger_color_id, pl.photo_library_id AS order_index,
+            sp.id AS saved_palette_id, NULL AS saved_palette_set_id, sp.palette_hash, sp.nickname, sp.brand
+            FROM photo_library pl JOIN saved_palettes sp ON sp.id = pl.palette_id
+            JOIN saved_palette_members m ON m.saved_palette_id = pl.palette_id
+            WHERE m.color_id IN ($placeholders) AND pl.show_in_gallery = 1
+              AND COALESCE(pl.is_inactive, 0) = 0 AND COALESCE(pl.is_retired, 0) = 0
+              AND pl.rel_path IS NOT NULL AND pl.rel_path <> ''
+            ORDER BY m.color_id, pl.photo_library_id");
+        $photoParams = array_keys($colorIds);
+      }
+      $stmtSaved->execute($photoParams);
       $savedRows = $stmtSaved->fetchAll(PDO::FETCH_ASSOC);
 
       $photoRows = $savedRows;

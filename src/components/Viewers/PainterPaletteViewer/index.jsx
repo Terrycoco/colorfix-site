@@ -58,19 +58,12 @@ export default function PainterPaletteViewer({
   const hasPlanPayload = Array.isArray(plans) && plans.length > 0;
   const notFinalWarning = String(meta?.not_final_warning || painterView.notFinalWarning || "").trim();
 
-  const areaTitle = formatTitle(
-    painterView.areaLabel
-      || painterView.area_label
-      || meta?.area_label
-      || meta?.areaLabel
-      || painterPlans[0]?.title
-      || projectTitle
-  );
+  const documentTitle = projectTitle || formatTitle(painterPlans[0]?.title || "Painter Specifications");
 
   const paletteType = String(meta?.palette_type || "").toLowerCase();
   const photoUrl = meta?.photo_url || "";
   const insetPhotos = Array.isArray(meta?.inset_photos) ? meta.inset_photos : [];
-  const photoAlt = meta?.photo_alt || areaTitle || "Final palette rendering";
+  const photoAlt = meta?.photo_alt || documentTitle || "Final palette rendering";
   const ogImageUrl = meta?.og_image_url || photoUrl;
   const viewerCtaLabel = meta?.viewer_cta_label || "";
   const viewerCtaUrl = meta?.viewer_cta_url || "";
@@ -78,7 +71,7 @@ export default function PainterPaletteViewer({
   const resolvedShareUrl =
     shareUrl || (typeof window !== "undefined" ? window.location.href : "");
 
-  const seoTitle = `${areaTitle} Painter Specification Sheet | ColorFix`;
+  const seoTitle = `${documentTitle} Painter Specification Sheet | ColorFix`;
   const seoDescription = address || shareText;
 
   const showExteriorNote =
@@ -318,7 +311,7 @@ export default function PainterPaletteViewer({
 
             <div className="apv-kicker">Painter Specification Sheet</div>
 
-            <h1>{areaTitle}</h1>
+            <h1>{documentTitle}</h1>
 
             {overallNote && (
               <div className="ppv-note ppv-overall-note">

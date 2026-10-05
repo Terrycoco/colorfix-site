@@ -93,6 +93,25 @@ final class RexPlaylistExperienceSyncService
      *
      * @return array<string,mixed>
      */
+    public function syncProjectPlaylistsForSavedPalette(int $savedPaletteId): void
+    {
+        if ($savedPaletteId <= 0) {
+            return;
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT pl.playlist_id
+             FROM playlists pl
+             INNER JOIN project_palettes pp ON pp.project_id = pl.project_id
+             WHERE pp.saved_palette_id = :saved_palette_id AND pl.is_active = 1
+             ORDER BY pl.playlist_id ASC'
+        );
+        $stmt->execute([':saved_palette_id' => $savedPaletteId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $playlistId) {
+            $this->syncPlaylist((int)$playlistId);
+        }
+    }
+
     public function inspectPlaylist(int $playlistId): array
     {
         if ($playlistId <= 0) {
@@ -138,6 +157,7 @@ final class RexPlaylistExperienceSyncService
                 $profile,
                 $items,
                 $referencesByItemId,
+                (int)($playlist['project_id'] ?? 0),
             );
 
             $inspection = $this->inspectionExperience($plan);
@@ -212,6 +232,7 @@ final class RexPlaylistExperienceSyncService
                 $profile,
                 $items,
                 $referencesByItemId,
+                (int)($playlist['project_id'] ?? 0),
             );
         }
 
@@ -282,6 +303,7 @@ final class RexPlaylistExperienceSyncService
         array $profile,
         array $items,
         array $referencesByItemId,
+        int $projectId = 0,
     ): array {
         $slideFlag = (string)$profile['slide_flag'];
 
@@ -342,6 +364,29 @@ final class RexPlaylistExperienceSyncService
 
             $paletteSources[$savedPaletteId]['playlist_item_ids'][] =
                 $playlistItemId;
+        }
+
+        if ($experienceKey === 'client' && $projectId > 0) {
+            // Final project palettes replace historical concept slide references.
+            $stmt = $this->pdo->prepare(
+                'SELECT saved_palette_id, order_index FROM project_palettes
+                 WHERE project_id = :project_id AND is_final = 1
+                 ORDER BY order_index ASC, project_palette_id ASC'
+            );
+            $stmt->execute([':project_id' => $projectId]);
+            $paletteSources = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $paletteId = (int)$row['saved_palette_id'];
+                if ($paletteId > 0 && !isset($paletteSources[$paletteId])) {
+                    $paletteSources[$paletteId] = [
+                        'saved_palette_id' => $paletteId,
+                        'sort_order' => max(0, (int)$row['order_index']),
+                        'playlist_item_ids' => [],
+                    ];
+                }
+            }
+            // The project-wide Painter REX is shared separately.
+            $profile['viewer_formats'] = ['client'];
         }
 
         uasort(

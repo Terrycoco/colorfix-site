@@ -266,8 +266,24 @@ try {
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $libraryOwnsPalette = (new \App\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable();
+    if ($libraryOwnsPalette) {
+        $direct = $pdo->prepare("SELECT pl.palette_id, COALESCE(NULLIF(p.display_title, ''), NULLIF(p.nickname, ''), p.palette_hash) AS label
+            FROM photo_library pl LEFT JOIN saved_palettes p ON p.id = pl.palette_id WHERE pl.photo_library_id = ?");
+        foreach ($rows as &$row) {
+            $direct->execute([$row['photo_library_id']]);
+            $link = $direct->fetch(PDO::FETCH_ASSOC);
+            $row['attached_saved_palette_id'] = $link['palette_id'];
+            $row['attached_saved_palette_label'] = $link['label'];
+            $row['attached_saved_palette_link_count'] = $link['palette_id'] ? 1 : 0;
+            foreach (['set_id', 'set_label', 'photo_type', 'trigger_mode', 'trigger_color_id'] as $field) {
+                $row['attached_saved_palette_' . $field] = null;
+            }
+        }
+        unset($row);
+    }
 
-    $items = array_map(static function(array $row): array {
+    $items = array_map(static function(array $row) use ($libraryOwnsPalette): array {
         $rawRelPath = (string)$row['rel_path'];
         $updatedAt = $row['updated_at'] ?? null;
         $filename = basename(parse_url($rawRelPath, PHP_URL_PATH) ?: $rawRelPath);
@@ -299,6 +315,8 @@ try {
             'note' => $row['note'] ?? '',
             'show_in_gallery' => (int)$row['show_in_gallery'] === 1,
             'has_palette' => (int)$row['has_palette'] === 1,
+            'palette_owned_by_library' => $libraryOwnsPalette,
+            'palette_id' => $row['attached_saved_palette_id'] !== null ? (int)$row['attached_saved_palette_id'] : null,
             'is_inactive' => (int)($row['is_inactive'] ?? 0) === 1,
             'is_retired' => (int)($row['is_retired'] ?? 0) === 1,
             'created_at' => $row['created_at'],

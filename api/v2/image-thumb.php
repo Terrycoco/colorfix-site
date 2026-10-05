@@ -53,7 +53,7 @@ try {
         exit;
     }
 
-    $mtime = (string)(filemtime($sourcePath) ?: strtotime((string)($photo['updated_at'] ?? '')) ?: time());
+    $mtime = substr(hash('sha256', $sourcePath), 0, 12) . '-' . (string)(filemtime($sourcePath) ?: strtotime((string)($photo['updated_at'] ?? '')) ?: time());
     $cacheDir = $root . '/photos/cache/thumbs';
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0755, true);
@@ -66,8 +66,7 @@ try {
         create_thumbnail($sourcePath, $cachePath, $width, $quality, $format);
     }
 
-    $maxAge = 31536000;
-    header('Cache-Control: public, max-age=' . $maxAge . ', immutable');
+    header('Cache-Control: no-cache');
     header('Content-Type: ' . ($format === 'webp' ? 'image/webp' : 'image/jpeg'));
     header('Content-Length: ' . filesize($cachePath));
     readfile($cachePath);

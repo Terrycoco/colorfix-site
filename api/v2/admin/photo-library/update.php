@@ -33,6 +33,8 @@ try {
     }
 
     $fields = [];
+    if (array_key_exists('palette_id', $payload)) $fields['palette_id'] = $payload['palette_id'];
+    if (array_key_exists('expected_palette_id', $payload)) $fields['expected_palette_id'] = $payload['expected_palette_id'];
     if (array_key_exists('source_type', $payload)) $fields['source_type'] = trim((string)$payload['source_type']);
     if (array_key_exists('title', $payload)) $fields['title'] = trim((string)$payload['title']);
     if (array_key_exists('tags', $payload)) $fields['tags'] = trim((string)$payload['tags']);

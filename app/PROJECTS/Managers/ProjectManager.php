@@ -84,6 +84,10 @@ final class ProjectManager
                 ?? null
             );
 
+        $rooms = array_key_exists('rooms', $payload)
+            ? self::validateRooms($payload['rooms'])
+            : null;
+
         if (
             $playlistId !== null
             &&
@@ -119,7 +123,8 @@ final class ProjectManager
                     $projectName,
                     $clientId,
                     $propertyId,
-                    $playlistId
+                    $playlistId,
+                    $rooms
                 );
 
             return $projectId;
@@ -130,7 +135,8 @@ final class ProjectManager
                 $projectName,
                 $clientId,
                 $propertyId,
-                $playlistId
+                $playlistId,
+                $rooms
             );
     }
 
@@ -145,6 +151,35 @@ final class ProjectManager
             ->deleteById(
                 $projectId
             ) === 1;
+    }
+
+    private static function validateRooms(mixed $value): array
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw new RuntimeException('Rooms must be an array.');
+        }
+
+        $rooms = [];
+        $ids = [];
+        $names = [];
+        foreach ($value as $room) {
+            if (!is_array($room) || !is_string($room['id'] ?? null) || !is_string($room['name'] ?? null)) {
+                throw new RuntimeException('Each area requires an ID and name.');
+            }
+            $id = trim($room['id']);
+            $name = trim($room['name']);
+            if ($id === '' || $id === '__all__' || $name === '') {
+                throw new RuntimeException('Each area requires a valid ID and name.');
+            }
+            $nameKey = function_exists('mb_strtolower') ? mb_strtolower($name, 'UTF-8') : strtolower($name);
+            if (isset($ids[$id]) || isset($names[$nameKey])) {
+                throw new RuntimeException('Each area must have a unique ID and name.');
+            }
+            $ids[$id] = true;
+            $names[$nameKey] = true;
+            $rooms[] = ['id' => $id, 'name' => $name];
+        }
+        return $rooms;
     }
 
     private static function nullableId(

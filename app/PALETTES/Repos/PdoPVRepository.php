@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PALETTES\Repos;
 
 use PDO;
+use App\PROJECTS\Repos\PdoProjectPhotoRepository;
 
 final class PdoPVRepository
 {
@@ -23,7 +24,8 @@ final class PdoPVRepository
             return null;
         }
 
-        $base['photos'] = $this->loadPhotos($pvId);
+        $base['photos'] = (new PdoProjectPhotoRepository($this->pdo))->forViewer($pvId)
+            ?? $this->loadPhotos($pvId);
 
         return $base;
     }
@@ -514,6 +516,7 @@ final class PdoPVRepository
         ?string $kickerText = null,
         ?string $intro = null
     ): int {
+        $this->assertUniqueTitleExperience(0, $savedPaletteId, $format, $title);
         $stmt = $this->pdo->prepare(
             "INSERT INTO palette_viewers
                 (
@@ -714,6 +717,7 @@ final class PdoPVRepository
         array $projectPaletteIds,
         string $title
     ): int {
+        $this->assertUniqueTitleExperience($projectId, 0, 'painter', $title);
         $ownsTransaction = !$this->pdo->inTransaction();
         if ($ownsTransaction) {
             $this->pdo->beginTransaction();
@@ -762,6 +766,210 @@ final class PdoPVRepository
     }
 
     /** @return array<int,array<string,mixed>> */
+    /**
+     * Dedicated admin document query for a project-scoped Painter PV.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function findPainterAdminDocument(int $pvId): ?array
+    {
+        if ($pvId <= 0) {
+            return null;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT
+                pv.palette_viewer_id,
+                pv.project_id,
+                pv.format,
+                pv.template_key,
+                pv.kicker_text,
+                pv.title,
+                pv.intro,
+                pv.notes,
+                pv.cta_label,
+                pv.is_active,
+                p.project_name
+
+             FROM palette_viewers pv
+
+             LEFT JOIN projects p
+               ON p.id = pv.project_id
+
+             WHERE pv.palette_viewer_id = :pv_id
+               AND LOWER(TRIM(COALESCE(pv.format, ''))) = 'painter'
+
+             LIMIT 1"
+        );
+
+        $stmt->execute([
+            ':pv_id' => $pvId,
+        ]);
+
+        $viewer = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($viewer === false) {
+            return null;
+        }
+
+        $viewer['palette_viewer_id'] = (int)$viewer['palette_viewer_id'];
+        $viewer['project_id'] = isset($viewer['project_id'])
+            ? (int)$viewer['project_id']
+            : null;
+        $viewer['saved_palette_id'] = null;
+        $viewer['is_active'] = (int)($viewer['is_active'] ?? 0);
+
+        $rex = null;
+
+        $rexStmt = $this->pdo->prepare(
+            "SELECT id, token
+               FROM rex_reservations
+              WHERE resolver_key = 'viewer'
+                AND resource_type = 'palette_viewer'
+                AND resource_id = :pv_id
+                AND status = 'active'
+                AND revoked_at IS NULL
+              ORDER BY id ASC
+              LIMIT 1"
+        );
+        $rexStmt->execute([':pv_id' => $pvId]);
+        $rexRow = $rexStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (is_array($rexRow)) {
+            $token = trim((string)($rexRow['token'] ?? ''));
+            if ($token !== '') {
+                $rex = [
+                    'reservation_id' => (int)($rexRow['id'] ?? 0),
+                    'id' => (int)($rexRow['id'] ?? 0),
+                    'token' => $token,
+                    'public_url' => '/t/' . $token,
+                ];
+            }
+        }
+
+        $projectPalettes = $this->listPainterProjectPalettes($pvId);
+        foreach ($projectPalettes as &$projectPalette) {
+            $projectPalette['photos'] = (new PdoProjectPhotoRepository($this->pdo))->forPalette(
+                (int)$viewer['project_id'], (int)$projectPalette['saved_palette_id'], true
+            );
+        }
+        unset($projectPalette);
+
+        return [
+            'viewer' => $viewer,
+            'project_palettes' => $projectPalettes,
+            'rex' => $rex,
+        ];
+    }
+
+    /**
+     * Update the Painter document header and selected project palettes.
+     *
+     * @param int[] $projectPaletteIds
+     */
+    public function savePainterAdminDocument(
+        int $pvId,
+        int $projectId,
+        array $projectPaletteIds,
+        ?string $kickerText,
+        string $title,
+        ?string $intro,
+        ?string $notes,
+        bool $isActive,
+        ?string $ctaLabel = null
+    ): void {
+        $this->assertUniqueTitleExperience($projectId, 0, 'painter', $title, $pvId);
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $projectPaletteIds),
+            static fn(int $id): bool => $id > 0
+        )));
+
+        if ($pvId <= 0 || $projectId <= 0 || $ids === []) {
+            throw new \InvalidArgumentException(
+                'Painter viewer, project, and at least one project palette are required.'
+            );
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $check = $this->pdo->prepare(
+            "SELECT project_palette_id
+               FROM project_palettes
+              WHERE project_id = ?
+                AND project_palette_id IN ({$placeholders})"
+        );
+        $check->execute([$projectId, ...$ids]);
+        $allowed = array_map('intval', $check->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        sort($allowed);
+        $expected = $ids;
+        sort($expected);
+
+        if ($allowed !== $expected) {
+            throw new \InvalidArgumentException(
+                'One or more selected palettes do not belong to this project.'
+            );
+        }
+
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            $stmt = $this->pdo->prepare(
+                "UPDATE palette_viewers
+                    SET saved_palette_id = NULL,
+                        project_id = :project_id,
+                        format = 'painter',
+                        kicker_text = :kicker_text,
+                        title = :title,
+                        intro = :intro,
+                        notes = :notes,
+                        cta_label = :cta_label,
+                        is_active = :is_active
+                  WHERE palette_viewer_id = :pv_id"
+            );
+            $stmt->execute([
+                ':project_id' => $projectId,
+                ':kicker_text' => $kickerText,
+                ':title' => $title,
+                ':intro' => $intro,
+                ':notes' => $notes,
+                ':cta_label' => $ctaLabel,
+                ':is_active' => $isActive ? 1 : 0,
+                ':pv_id' => $pvId,
+            ]);
+
+            $delete = $this->pdo->prepare(
+                "DELETE FROM palette_viewer_project_palettes
+                  WHERE palette_viewer_id = :pv_id"
+            );
+            $delete->execute([':pv_id' => $pvId]);
+
+            $insert = $this->pdo->prepare(
+                "INSERT INTO palette_viewer_project_palettes
+                    (palette_viewer_id, project_palette_id, order_index)
+                 VALUES
+                    (:pv_id, :project_palette_id, :order_index)"
+            );
+
+            foreach ($ids as $index => $projectPaletteId) {
+                $insert->execute([
+                    ':pv_id' => $pvId,
+                    ':project_palette_id' => $projectPaletteId,
+                    ':order_index' => $index,
+                ]);
+            }
+
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function listPainterProjectPalettes(int $pvId): array
     {
         if ($pvId <= 0) {
@@ -770,19 +978,18 @@ final class PdoPVRepository
 
         $stmt = $this->pdo->prepare(
             "SELECT
-                pvpp.project_palette_id,
-                pvpp.order_index AS viewer_order_index,
+                pp.project_palette_id,
+                pp.order_index AS viewer_order_index,
                 pp.project_id,
                 pp.saved_palette_id,
                 pp.area_label,
                 pp.note,
                 pp.is_final,
                 pp.order_index AS project_order_index
-             FROM palette_viewer_project_palettes pvpp
-             INNER JOIN project_palettes pp
-               ON pp.project_palette_id = pvpp.project_palette_id
-             WHERE pvpp.palette_viewer_id = :pv_id
-             ORDER BY pvpp.order_index ASC, pvpp.palette_viewer_project_palette_id ASC"
+             FROM palette_viewers pv
+             INNER JOIN project_palettes pp ON pp.project_id = pv.project_id
+             WHERE pv.palette_viewer_id = :pv_id AND pp.is_final = 1
+             ORDER BY pp.order_index ASC, pp.project_palette_id ASC"
         );
         $stmt->execute([':pv_id' => $pvId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -843,6 +1050,7 @@ final class PdoPVRepository
              WHERE p.project_id = :project_id
                AND pi.saved_palette_id IN (" . implode(', ', $placeholders) . ")
                AND (pi.photo_library_id IS NOT NULL OR NULLIF(TRIM(pi.image_url), '') IS NOT NULL)
+               AND LOWER(COALESCE(pi.analyzer_role, 'ignore')) <> 'before'
              ORDER BY pi.saved_palette_id ASC, pi.order_index ASC, pi.playlist_item_id ASC"
         );
         $stmt->execute($params);
@@ -856,6 +1064,41 @@ final class PdoPVRepository
             $rows[] = $row;
         }
         return $rows;
+    }
+
+    public function assertUniqueTitleExperience(int $projectId, int $savedPaletteId, string $format, string $title, int $excludeId = 0): void
+    {
+        $projectIds = $projectId > 0 ? [$projectId] : [];
+        if (!$projectIds && $savedPaletteId > 0) {
+            $stmt = $this->pdo->prepare('SELECT DISTINCT project_id FROM project_palettes WHERE saved_palette_id = ?');
+            $stmt->execute([$savedPaletteId]);
+            $projectIds = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        }
+        $scope = 'pv.saved_palette_id = ?';
+        $scopeParams = [$savedPaletteId];
+        if ($projectIds) {
+            $marks = implode(',', array_fill(0, count($projectIds), '?'));
+            $scope .= " OR pv.project_id IN ({$marks}) OR pv.saved_palette_id IN (SELECT saved_palette_id FROM project_palettes WHERE project_id IN ({$marks}))";
+            $scopeParams = [...$scopeParams, ...$projectIds, ...$projectIds];
+        }
+        $stmt = $this->pdo->prepare("SELECT 1 FROM palette_viewers pv WHERE LOWER(TRIM(pv.title)) = ? AND LOWER(TRIM(pv.format)) = ? AND pv.palette_viewer_id <> ? AND ({$scope}) LIMIT 1");
+        $stmt->execute([strtolower(trim($title)), strtolower(trim($format)), $excludeId, ...$scopeParams]);
+        if ($stmt->fetchColumn()) {
+            throw new \InvalidArgumentException('A PV with this title and experience already exists in this project. Change the title or experience.');
+        }
+    }
+
+    public function updateHeader(int $pvId, array $fields): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE palette_viewers SET template_key = ?, kicker_text = ?, intro = ?, notes = ?, cta_label = ?, is_active = ? WHERE palette_viewer_id = ?');
+        $stmt->execute([
+            $this->nullableText($fields['template_key'] ?? null),
+            $this->nullableText($fields['kicker_text'] ?? null),
+            $this->nullableText($fields['intro'] ?? null),
+            $this->nullableText($fields['notes'] ?? null),
+            $this->nullableText($fields['cta_label'] ?? null),
+            (int)(bool)($fields['is_active'] ?? true), $pvId,
+        ]);
     }
 
     public function deletePhotosByPVId(int $pvId): int

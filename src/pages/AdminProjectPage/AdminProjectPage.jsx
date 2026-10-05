@@ -123,6 +123,7 @@ import ProjectPalettes from "./ProjectPalettes";
 
 
 import ProjectPVPage from "./ProjectPVPage";
+import ProjectPhotos from "./ProjectPhotos";
 
 
 
@@ -189,6 +190,7 @@ const PROJECT_SECTIONS =
     "palettes",
 
      "playlist",
+     "photos",
 
 
 
@@ -1908,6 +1910,12 @@ export default function AdminProjectPage() {
 
 
 
+            id="photos"
+            title="Photos"
+            selected={activeSection === "photos"}
+            onSelect={() => setActiveSection("photos")}
+          />
+          <AdminObjectListItem
             id="playlist"
 
 
@@ -2649,6 +2657,7 @@ export default function AdminProjectPage() {
 
 
           projectName={project.project_name || ""}
+          rooms={project.rooms || []}
 
 
 
@@ -2668,7 +2677,12 @@ export default function AdminProjectPage() {
 
 
 
-    "pvs"
+    "photos"
+
+  ) {
+    detail = <ProjectPhotos key={project.id} projectId={Number(project.id)} projectName={project.project_name || ""} rooms={project.rooms || []} />;
+  } else if (
+    activeSection === "pvs"
 
 
 

@@ -6,6 +6,7 @@ namespace App\PALETTES\PV;
 use App\PALETTES\Repos\PdoPVRepository;
 use App\PALETTES\Repos\PdoSavedPaletteRepository;
 use App\PROJECTS\Repos\PdoProjectPaletteRepository;
+use App\PROJECTS\Repos\PdoProjectPhotoRepository;
 use InvalidArgumentException;
 use PDO;
 use RuntimeException;
@@ -16,7 +17,7 @@ final class PVService
     private PdoSavedPaletteRepository $savedPaletteRepo;
     private PdoProjectPaletteRepository $projectPaletteRepo;
 
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
         $this->repo = new PdoPVRepository($pdo);
         $this->savedPaletteRepo = new PdoSavedPaletteRepository($pdo);
@@ -80,6 +81,11 @@ final class PVService
         $palette = $savedPalette['palette'] ?? [];
         $members = $savedPalette['members'] ?? [];
         $photos = $record['photos'] ?? [];
+        if ($format === 'painter') {
+            $photos = array_values(array_filter($photos,
+                static fn(array $photo): bool => strtolower((string)($photo['photo_type'] ?? '')) !== 'before'
+            ));
+        }
 
         $projectPalette =
             $this->projectPaletteRepo
@@ -319,54 +325,6 @@ final class PVService
         }
 
         $project = $this->repo->findProjectSummary($projectId) ?? [];
-        $savedPaletteIds = array_values(array_unique(array_map(
-            static fn(array $row): int => (int)($row['saved_palette_id'] ?? 0),
-            $selected
-        )));
-
-        $photoRows = $this->repo->loadProjectPlaylistPhotos(
-            $projectId,
-            $savedPaletteIds
-        );
-
-        $photosByPalette = [];
-        foreach ($photoRows as $photo) {
-            $savedPaletteId = (int)($photo['saved_palette_id'] ?? 0);
-            $url = trim((string)($photo['url'] ?? ''));
-            if ($savedPaletteId <= 0 || $url === '') {
-                continue;
-            }
-
-            $photosByPalette[$savedPaletteId] ??= [];
-
-            $photoLibraryId = (int)($photo['photo_library_id'] ?? 0);
-            $key = $photoLibraryId > 0
-                ? 'library:' . $photoLibraryId
-                : 'url:' . $url;
-
-            $seen = false;
-            foreach ($photosByPalette[$savedPaletteId] as $existing) {
-                $existingId = (int)($existing['photo_library_id'] ?? 0);
-                $existingKey = $existingId > 0
-                    ? 'library:' . $existingId
-                    : 'url:' . trim((string)($existing['url'] ?? ''));
-                if ($existingKey === $key) {
-                    $seen = true;
-                    break;
-                }
-            }
-
-            if (!$seen) {
-                $photosByPalette[$savedPaletteId][] = [
-                    'photo_library_id' => $photoLibraryId > 0
-                        ? $photoLibraryId
-                        : null,
-                    'url' => $url,
-                    'alt_text' => $photo['alt_text'] ?? null,
-                    'photo_type' => 'full',
-                ];
-            }
-        }
 
         $plans = [];
         $firstPhoto = null;
@@ -415,7 +373,7 @@ final class PVService
                 ];
             }
 
-            $planPhotos = $photosByPalette[$savedPaletteId] ?? [];
+            $planPhotos = (new PdoProjectPhotoRepository($this->pdo))->forPalette($projectId, $savedPaletteId, true);
             if ($firstPhoto === null && $planPhotos !== []) {
                 $firstPhoto = $planPhotos[0];
             }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PALETTES\Endpoints;
 
 use App\PALETTES\Managers\PVManager;
+use App\REX\Services\RexPlaylistExperienceSyncService;
 use InvalidArgumentException;
 use JsonException;
 use PDO;
@@ -44,6 +45,7 @@ final class AdminPVCreateEndpoint
                 }
             }
 
+            $pdo->beginTransaction();
             $item = (new PVManager($pdo))->createPV(
                 savedPaletteId: (int)($input['saved_palette_id'] ?? 0),
                 experience: (string)($input['experience'] ?? $input['format'] ?? ''),
@@ -52,14 +54,29 @@ final class AdminPVCreateEndpoint
                 projectPaletteIds: $projectPaletteIds,
             );
 
+            if (is_array($input['viewer_fields'] ?? null)) {
+                $repo = new \App\PALETTES\Repos\PdoPVRepository($pdo);
+                $pvId = (int)$item['palette_viewer_id'];
+                $repo->updateHeader($pvId, $input['viewer_fields']);
+                $item = array_replace($item, $repo->findGridRowById($pvId) ?? []);
+            }
+            // A copied project PV must be reachable as soon as its save succeeds.
+            (new RexPlaylistExperienceSyncService($pdo))->syncProjectPlaylistsForSavedPalette(
+                (int)($item['saved_palette_id'] ?? 0)
+            );
+            $pdo->commit();
+
             echo json_encode(['ok' => true, 'item' => $item]);
         } catch (InvalidArgumentException|JsonException $e) {
+            if ($pdo->inTransaction()) { $pdo->rollBack(); }
             http_response_code(422);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         } catch (RuntimeException $e) {
+            if ($pdo->inTransaction()) { $pdo->rollBack(); }
             http_response_code(409);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) { $pdo->rollBack(); }
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }

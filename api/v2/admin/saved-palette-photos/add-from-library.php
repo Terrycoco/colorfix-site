@@ -58,6 +58,16 @@ try {
     $caption = isset($payload['caption']) ? trim((string)$payload['caption']) : null;
     $altText = isset($payload['alt_text']) ? trim((string)$payload['alt_text']) : null;
 
+    $libraryRepo = new PdoPhotoLibraryRepository($pdo);
+    if ($photoLibraryId > 0 && $libraryRepo->paletteColumnAvailable()) {
+        $fields = ['palette_id' => $photoType === 'before' ? null : $paletteId];
+        if (array_key_exists('show_in_gallery', $payload)) {
+            $fields['show_in_gallery'] = !empty($payload['show_in_gallery']);
+        }
+        $libraryRepo->update($photoLibraryId, $fields);
+        respond(['ok' => true, 'photo' => $libraryRepo->findById($photoLibraryId)]);
+    }
+
     $repo = new PdoSavedPaletteRepository($pdo);
     if ($setId <= 0 && $createNewSet) {
         $setId = $repo->createAutoSetForPalette($paletteId);

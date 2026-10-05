@@ -11,6 +11,7 @@ use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\PROJECTS\Repos\PdoProjectRepository;
+use App\PALETTES\Repos\PdoPVRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use DomainException;
 use InvalidArgumentException;
@@ -174,6 +175,55 @@ final class ViewerService
             }
 
             $viewerFormat = $this->normalizeViewerFormatText($viewer->format);
+            if ($viewerFormat === 'painter') {
+                $pvRepo = new PdoPVRepository($this->pdo);
+                $record = $pvRepo->findById($resourceId);
+                $projectId = (int)($record['project_id'] ?? 0);
+
+                if ($projectId > 0) {
+                    $project = $pvRepo->findProjectSummary($projectId);
+                    if (!$project) {
+                        throw new RuntimeException(
+                            "Project {$projectId} for Painter Viewer {$resourceId} was not found."
+                        );
+                    }
+
+                    $palettes = $pvRepo->listPainterProjectPalettes($resourceId);
+                    if ($palettes === []) {
+                        throw new RuntimeException(
+                            "Painter Viewer {$resourceId} has no selected project palettes"
+                        );
+                    }
+
+                    $projectTitle = $this->firstNonEmpty([
+                        $project['project_name'] ?? null,
+                        "Project #{$projectId}",
+                    ]);
+                    $title = $this->firstNonEmpty([$viewer->title, $projectTitle]);
+
+                    return new RexReservationDescriptor(
+                        title: "{$title} — Painter",
+                        fields: [
+                            ['label' => 'Viewer Format', 'value' => 'Painter'],
+                            ['label' => 'Palette Viewer ID', 'value' => (string)$resourceId],
+                            ['label' => 'Project', 'value' => $projectTitle],
+                            ['label' => 'Project ID', 'value' => (string)$projectId],
+                            ['label' => 'Selected Palettes', 'value' => (string)count($palettes)],
+                            [
+                                'label' => 'Areas / Rooms',
+                                'value' => implode(', ', array_map(
+                                    fn(array $palette): string => $this->firstNonEmpty([
+                                        $palette['area_label'] ?? null,
+                                        'Palette #' . (int)$palette['saved_palette_id'],
+                                    ]),
+                                    $palettes
+                                )),
+                            ],
+                        ],
+                    );
+                }
+            }
+
             $palette = $this->savedPalettes->getSavedPaletteById($viewer->savedPaletteId);
             if (!$palette) {
                 throw new RuntimeException(

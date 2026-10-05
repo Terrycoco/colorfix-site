@@ -112,6 +112,10 @@ class PhotoLibraryService
             $this->repo->update($existingId, $data);
             return $existingId;
         }
+        if ($this->repo->paletteColumnAvailable()) {
+            $data['palette_id'] = $photoType === 'before' ? null : ($photo['saved_palette_id'] ?? null);
+            $data['has_palette'] = !empty($data['palette_id']);
+        }
         return $this->repo->insert($data);
     }
 

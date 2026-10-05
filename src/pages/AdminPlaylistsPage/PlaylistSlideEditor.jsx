@@ -62,6 +62,7 @@ export default function PlaylistSlideEditor({
   onUpdate,
   onPickPhoto,
   onUploadPhoto,
+  onConfirmReplacePhoto,
   onClearPhoto,
   onRemove,
   onCommit,
@@ -571,6 +572,8 @@ export default function PlaylistSlideEditor({
     </div>
       <UploadPhotoDialog
         open={uploadOpen}
+        replacePhotoLibraryId={photoId || null}
+        beforeUpload={photoId ? onConfirmReplacePhoto : null}
         onClose={() =>
           setUploadOpen(false)
         }

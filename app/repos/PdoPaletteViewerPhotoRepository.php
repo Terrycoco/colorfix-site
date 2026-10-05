@@ -6,6 +6,7 @@ namespace App\Repos;
 use App\Entities\PaletteViewerPhoto;
 use InvalidArgumentException;
 use PDO;
+use App\PROJECTS\Repos\PdoProjectPhotoRepository;
 
 final class PdoPaletteViewerPhotoRepository
 {
@@ -18,6 +19,24 @@ final class PdoPaletteViewerPhotoRepository
     {
         if ($paletteViewerId <= 0) {
             return [];
+        }
+
+        $shared = (new PdoProjectPhotoRepository($this->pdo))->forViewer($paletteViewerId);
+        if ($shared !== null) {
+            return array_map(fn(array $photo): PaletteViewerPhoto => new PaletteViewerPhoto(
+                paletteViewerPhotoId: (int)($photo['project_photo_id'] ?? 0),
+                paletteViewerId: $paletteViewerId,
+                photoLibraryId: $photo['photo_library_id'],
+                photoType: $photo['photo_type'],
+                triggerMode: $photo['role'] === 'before' ? 'none' : 'any',
+                triggerColorId: null,
+                caption: $photo['caption'],
+                altText: $photo['alt_text'],
+                orderIndex: $photo['order_index'],
+                relPath: $photo['url'],
+                createdAt: '',
+                updatedAt: null,
+            ), $shared);
         }
 
         $stmt = $this->pdo->prepare(
@@ -79,6 +98,14 @@ final class PdoPaletteViewerPhotoRepository
         }
 
         return $counts;
+    }
+
+    public function projectPhotoSource(int $paletteViewerId): ?int
+    {
+        $repo = new PdoProjectPhotoRepository($this->pdo);
+        if (!$repo->schemaAvailable()) { return null; }
+        $projectId = $repo->viewerProjectId($paletteViewerId);
+        return $projectId > 0 ? $projectId : null;
     }
 
     public function findById(int $paletteViewerPhotoId): ?PaletteViewerPhoto

@@ -169,6 +169,10 @@ export default function ProjectActivity({ projectId, projectName = "" }) {
         label: "Date",
         sortable: true,
         value: (item) => formatDate(item?.activity_date),
+        sortValue: (item) => {
+          const date = Date.parse(`${cleanText(item?.activity_date).slice(0, 10)}T12:00:00`);
+          return Number.isFinite(date) ? date : null;
+        },
       },
       {
         key: "description",

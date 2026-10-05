@@ -24,6 +24,7 @@ final class PdoProjectRepository
                 p.client_id,
                 p.property_id,
                 p.playlist_id,
+                p.rooms,
                 c.name AS client_name,
                 pr.name AS property_name,
                 TRIM(
@@ -57,7 +58,7 @@ final class PdoProjectRepository
              ORDER BY p.id DESC'
         );
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(self::decodeRooms(...), $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -74,6 +75,7 @@ final class PdoProjectRepository
                 p.client_id,
                 p.property_id,
                 p.playlist_id,
+                p.rooms,
                 c.name AS client_name,
                 pr.name AS property_name,
                 TRIM(
@@ -109,7 +111,7 @@ final class PdoProjectRepository
         );
         $stmt->execute([':property_id' => $propertyId]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(self::decodeRooms(...), $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
     }
 
     /** @return array<int, array<string, mixed>> */
@@ -178,6 +180,7 @@ final class PdoProjectRepository
                 p.client_id,
                 p.property_id,
                 p.playlist_id,
+                p.rooms,
                 c.name AS client_name,
                 pr.name AS property_name,
                 TRIM(
@@ -218,26 +221,29 @@ final class PdoProjectRepository
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
+        return $row ? self::decodeRooms($row) : null;
     }
 
     public function create(
         ?string $projectName,
         ?int $clientId,
         ?int $propertyId,
-        ?int $playlistId
+        ?int $playlistId,
+        ?array $rooms = null
     ): int {
         $stmt = $this->pdo->prepare(
             'INSERT INTO projects (
                 project_name,
                 client_id,
                 property_id,
-                playlist_id
+                playlist_id,
+                rooms
              ) VALUES (
                 :project_name,
                 :client_id,
                 :property_id,
-                :playlist_id
+                :playlist_id,
+                :rooms
              )'
         );
 
@@ -246,6 +252,7 @@ final class PdoProjectRepository
             ':client_id' => $clientId,
             ':property_id' => $propertyId,
             ':playlist_id' => $playlistId,
+            ':rooms' => json_encode($rooms ?? [], JSON_THROW_ON_ERROR),
         ]);
 
         return (int)$this->pdo->lastInsertId();
@@ -256,7 +263,8 @@ final class PdoProjectRepository
         ?string $projectName,
         ?int $clientId,
         ?int $propertyId,
-        ?int $playlistId
+        ?int $playlistId,
+        ?array $rooms = null
     ): bool {
         if ($projectId <= 0) {
             throw new RuntimeException(
@@ -269,7 +277,8 @@ final class PdoProjectRepository
                 SET project_name = :project_name,
                     client_id = :client_id,
                     property_id = :property_id,
-                    playlist_id = :playlist_id
+                    playlist_id = :playlist_id,
+                    rooms = COALESCE(:rooms, rooms)
               WHERE id = :project_id'
         );
 
@@ -279,9 +288,19 @@ final class PdoProjectRepository
             ':client_id' => $clientId,
             ':property_id' => $propertyId,
             ':playlist_id' => $playlistId,
+            ':rooms' => $rooms === null ? null : json_encode($rooms, JSON_THROW_ON_ERROR),
         ]);
 
         return true;
+    }
+
+    private static function decodeRooms(array $row): array
+    {
+        $row['rooms'] = $row['rooms'] === null
+            ? []
+            : json_decode($row['rooms'], true, 512, JSON_THROW_ON_ERROR);
+
+        return $row;
     }
 
     public function deleteById(

@@ -164,6 +164,7 @@ export default function FetchRexButton({
   existingUrl = "",
   resolveExistingUrl = null,
   autoCreate = false,
+  navigateOnFetch = true,
 }) {
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -181,7 +182,12 @@ export default function FetchRexButton({
       }
 
       if (url) {
-        window.location.href = adminRexUrl(url);
+        if (request?.resolverKey === "viewer" && request?.resourceType === "palette_viewer") {
+          const result = await createReservation({ ...request, reuseExisting: true });
+          onCreated?.(result);
+          url = createdPublicUrl(result);
+        }
+        if (navigateOnFetch) window.location.href = adminRexUrl(url);
         return;
       }
 
@@ -198,7 +204,7 @@ export default function FetchRexButton({
           );
         }
 
-        window.location.href = adminRexUrl(createdUrl);
+        if (navigateOnFetch) window.location.href = adminRexUrl(createdUrl);
         return;
       }
 

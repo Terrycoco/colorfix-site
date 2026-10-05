@@ -4,7 +4,7 @@ import "./document.css";
 
 const API_FOLDER = import.meta.env.VITE_API_FOLDER || "/api";
 
-export default function Document({ document: documentRecord }) {
+export default function Document({ document: documentRecord, rexToken }) {
   const [document, setDocument] = useState(documentRecord);
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState("");
@@ -44,6 +44,7 @@ export default function Document({ document: documentRecord }) {
           },
           body: JSON.stringify({
             document_id: documentId,
+            rex_token: rexToken,
           }),
         }
       );
@@ -111,8 +112,8 @@ export default function Document({ document: documentRecord }) {
                 <div className="rex-document__approval-copy">
                   <div className="rex-document__approval-label">
                     {clientName
-                      ? `I, ${clientName}, have reviewed and approve the ${documentTitle} above.`
-                      : `I have reviewed and approve the ${documentTitle} above.`}
+                      ? `I, ${clientName}, have reviewed the document above.`
+                      : "I have reviewed the document above."}
                   </div>
                 </div>
 
@@ -122,12 +123,8 @@ export default function Document({ document: documentRecord }) {
                   onClick={handleApprove}
                   disabled={approving}
                 >
-                  {approving ? "Approving…" : "Approve Agreement"}
+                  {approving ? "Approving…" : "I Approve"}
                 </button>
-
-                <div className="rex-document__approval-detail">
-                  By clicking Approve Agreement, you confirm this approval.
-                </div>
 
                 {approvalError ? (
                   <div

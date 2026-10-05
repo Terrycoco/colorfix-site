@@ -41,6 +41,7 @@ import {
 } from "@components/AdminLayout";
 
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
+import ProjectAreaDropdown from "@components/Project/ProjectAreaDropdown";
 
 import { useAppState } from "@context/AppStateContext.jsx";
 
@@ -377,6 +378,7 @@ export default function ProjectPalettes({
   projectId,
 
   projectName = "",
+  rooms = [],
 
 }) {
 
@@ -2068,7 +2070,7 @@ export default function ProjectPalettes({
 
         }
 
-        onClose={closeDrawer}
+        onClose={savePalette}
 
         portal
 
@@ -2250,29 +2252,20 @@ export default function ProjectPalettes({
 
           <AdminField label="Area / Room" compact>
 
-          <input
-
-            className="admin-field__control"
-
-            type="text"
-
+          <ProjectAreaDropdown
+            rooms={rooms}
+            valueKey="name"
             value={draftAreaLabel}
-
-            placeholder="Living / Dining Room"
-
-            onChange={(event) => {
-
-              setDraftAreaLabel(event.target.value);
-
+            disabled={saving}
+            onChange={(area) => {
+              setDraftAreaLabel(area);
               setDrawerStatus("");
-
             }}
-
           />
 
         </AdminField>
 
-        <AdminField label="Project Note" compact>
+        <AdminField label="PAINTER'S AREA NOTE" compact>
 
             <textarea
 

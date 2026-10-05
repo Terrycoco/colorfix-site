@@ -514,7 +514,12 @@ export default function AdminPhotoLibraryPage() {
 
   const handleLibraryField = (id, key, value) => {
     setItems((prev) =>
-      prev.map((item) => (item.photo_library_id === id ? { ...item, [key]: value } : item))
+      prev.map((item) => (item.photo_library_id === id ? {
+        ...item,
+        ...(key === "palette_id" ? { palette_changed: true,
+          expected_palette_id: item.palette_changed ? item.expected_palette_id : item.palette_id } : {}),
+        [key]: value,
+      } : item))
     );
     setDirtyIds((prev) => {
       const next = new Set(prev);
@@ -738,6 +743,8 @@ export default function AdminPhotoLibraryPage() {
         photo_permission_status: item.photo_permission_override_status || "",
         show_in_gallery: !!item.show_in_gallery,
         has_palette: !!item.has_palette,
+        ...(item.palette_owned_by_library && item.palette_changed
+          ? { palette_id: item.palette_id, expected_palette_id: item.expected_palette_id } : {}),
         is_inactive: !!item.is_inactive,
       };
       if (item.source_type === "client" || item.client_id) {
@@ -781,6 +788,8 @@ export default function AdminPhotoLibraryPage() {
           photo_permission_status: item.photo_permission_override_status || "",
           show_in_gallery: !!item.show_in_gallery,
           has_palette: !!item.has_palette,
+          ...(item.palette_owned_by_library && item.palette_changed
+            ? { palette_id: item.palette_id, expected_palette_id: item.expected_palette_id } : {}),
           is_inactive: !!item.is_inactive,
         };
         if (item.source_type === "client" || item.client_id) {
@@ -1615,7 +1624,19 @@ export default function AdminPhotoLibraryPage() {
                     </td>
                     <td>
                       <div className="admin-photo-library__meta">
-                        {item.attached_saved_palette_id ? (
+                        {item.palette_owned_by_library ? (
+                          <select
+                            aria-label={`Palette for photo ${item.photo_library_id}`}
+                            value={item.palette_id || ""}
+                            onChange={(event) => handleLibraryField(item.photo_library_id, "palette_id", Number(event.target.value) || null)}
+                          >
+                            <option value="">No palette</option>
+                            {item.palette_id && !paletteOptions.some((palette) => Number(palette.id) === Number(item.palette_id)) && (
+                              <option value={item.palette_id}>{item.attached_saved_palette_label || `Palette #${item.palette_id}`}</option>
+                            )}
+                            {paletteOptions.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}
+                          </select>
+                        ) : item.attached_saved_palette_id ? (
                           <>
                             {(() => {
                               const type = String(item.attached_saved_palette_photo_type || "full").toLowerCase();
@@ -1693,14 +1714,14 @@ export default function AdminPhotoLibraryPage() {
                           />
                           Gallery
                         </label>
-                        <label className="admin-photo-library__check">
+                        {!item.palette_owned_by_library && <label className="admin-photo-library__check">
                           <input
                             type="checkbox"
                             checked={!!item.has_palette}
                             onChange={(e) => handleLibraryField(item.photo_library_id, "has_palette", e.target.checked)}
                           />
                           Palette
-                        </label>
+                        </label>}
                         <label className="admin-photo-library__check">
                           <input
                             type="checkbox"

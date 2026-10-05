@@ -3,6 +3,8 @@ import {
   useMemo,
   useState,
 } from "react";
+import { Plus } from "lucide-react";
+import { v4 as uuid } from "uuid";
 
 import {
   AdminField,
@@ -188,6 +190,7 @@ export default function ProjectSetup({
     form,
     setForm,
   ] = useState({
+    rooms: Array.isArray(project?.rooms) ? project.rooms : [],
     project_name:
       String(
         project?.project_name ||
@@ -248,6 +251,7 @@ export default function ProjectSetup({
 
   useEffect(() => {
     setForm({
+      rooms: Array.isArray(project?.rooms) ? project.rooms : [],
       project_name:
         String(
           project?.project_name ||
@@ -275,6 +279,7 @@ export default function ProjectSetup({
     project?.client_id,
     project?.property_id,
     project?.playlist_id,
+    project?.rooms,
   ]);
 
 
@@ -619,6 +624,16 @@ export default function ProjectSetup({
     setStatus("");
 
     try {
+      const rooms = form.rooms.map((room) => ({
+        id: room.id,
+        name: room.name.trim(),
+      }));
+      if (rooms.some((room) => !room.name)) {
+        throw new Error("Enter a name for each area.");
+      }
+      if (new Set(rooms.map((room) => room.name.toLowerCase())).size !== rooms.length) {
+        throw new Error("Each area must have a different name.");
+      }
       const res =
         await fetch(
           SAVE_URL,
@@ -636,6 +651,7 @@ export default function ProjectSetup({
 
             body:
               JSON.stringify({
+                rooms,
                 project_id:
                   Number(
                     project.id
@@ -695,6 +711,7 @@ export default function ProjectSetup({
         data?.project
         || {
           ...project,
+          rooms,
 
           project_name:
             String(
@@ -794,6 +811,8 @@ export default function ProjectSetup({
               }
             />
           </AdminField>
+
+
 
           <AdminField
             label="Client"
@@ -1181,6 +1200,41 @@ export default function ProjectSetup({
               </button>
             </div>
           </AdminField>
+
+          <section className="admin-project-areas" aria-labelledby="project-areas-heading">
+            <div className="admin-project-areas__heading">
+              <h3 id="project-areas-heading">Areas / Rooms</h3>
+              <button
+                type="button"
+                className="admin-project-areas__add"
+                aria-label="Add area"
+                title="Add area"
+                disabled={saving}
+                onClick={() => setField("rooms", [...form.rooms, { id: uuid(), name: "" }])}
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+            {form.rooms.length === 0 && <div className="admin-project-areas__empty">No areas added</div>}
+            <div className="admin-project-areas__list">
+              {form.rooms.map((room, index) => (
+                <input
+                  key={room.id}
+                  className="admin-field__control"
+                  aria-label={`Area ${index + 1}`}
+                  placeholder="Area / room name"
+                  value={room.name}
+                  disabled={saving}
+                  autoFocus={room.name === ""}
+                  required
+                  onChange={(event) => setField("rooms", form.rooms.map((current) => (
+                    current.id === room.id ? { ...current, name: event.target.value } : current
+                  )))}
+                />
+              ))}
+            </div>
+          </section>
+
       </AdminStack>
     </form>
   );

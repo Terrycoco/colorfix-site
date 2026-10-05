@@ -18,7 +18,7 @@ function extractThumbVersion(value) {
   if (!raw) return "";
   try {
     const parsed = new URL(raw, window.location.origin);
-    return parsed.searchParams.get("v") || "";
+    return parsed.searchParams.get("v") || parsed.pathname;
   } catch {
     const match = raw.match(/[?&]v=([^&]+)/);
     return match ? decodeURIComponent(match[1]) : "";

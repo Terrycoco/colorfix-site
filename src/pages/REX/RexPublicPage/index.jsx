@@ -252,7 +252,7 @@ export default function RexPublicPage() {
     return (
       <ANAProvider rex={state.rex}>
         <ANATrack>
-          <Document document={state.document} />
+          <Document document={state.document} rexToken={token} />
         </ANATrack>
       </ANAProvider>
     );

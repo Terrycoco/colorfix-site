@@ -19,6 +19,8 @@ import {
 } from "@components/AdminLayout";
 
 import FetchRexButton from "@components/REX/FetchRexButton";
+import { Check, Copy } from "lucide-react";
+import { copyShareText } from "@helpers/shareUrls";
 
 import {
   API_FOLDER,
@@ -42,6 +44,8 @@ const ACTIVITY_SAVE_URL =
 
 const TEMPLATE_LIST_URL =
   `${API_FOLDER}/v2/admin/documents/templates/list.php`;
+
+const REX_LIST_URL = `${API_FOLDER}/v2/admin/rex/list.php`;
 
 
 function cleanText(value) {
@@ -189,6 +193,7 @@ export default function ProjectDocuments({
     setSelectedTemplateKey,
   ] = useState("");
 
+
   const [
     drawerOpen,
     setDrawerOpen,
@@ -203,6 +208,64 @@ export default function ProjectDocuments({
     drawerDocument,
     setDrawerDocument,
   ] = useState(null);
+
+  const [rexUrl, setRexUrl] = useState("");
+  const [rexLoading, setRexLoading] = useState(false);
+  const [rexError, setRexError] = useState("");
+  const [rexCopied, setRexCopied] = useState(false);
+  const drawerDocumentId = Number(drawerDocument?.id || 0);
+
+  useEffect(() => {
+    setRexUrl("");
+    setRexError("");
+    setRexCopied(false);
+    setRexLoading(false);
+    if (!drawerOpen || drawerMode !== "edit" || !drawerDocumentId) return undefined;
+
+    const controller = new AbortController();
+    setRexLoading(true);
+    const params = new URLSearchParams({
+      resource_type: "doc",
+      resource_id: String(drawerDocumentId),
+    });
+    fetch(`${REX_LIST_URL}?${params}`, {
+      credentials: "include",
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then((response) => readJson(response, "Could not load document REX"))
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        const reservation = (data.items || []).find((item) =>
+          item.status === "active" && !item.revoked_at &&
+          item.resolver_key === "document" && item.resource_type === "doc" &&
+          Number(item.resource_id) === drawerDocumentId
+        );
+        if (reservation?.token) {
+          setRexUrl(new URL(
+            `/t/${encodeURIComponent(reservation.token)}`,
+            window.location.origin
+          ).toString());
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setRexError(error.message || "Could not load document REX.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRexLoading(false);
+      });
+    return () => controller.abort();
+  }, [drawerOpen, drawerMode, drawerDocumentId]);
+
+  async function copyDocumentRex() {
+    setRexCopied(false);
+    setRexError("");
+    if (await copyShareText(rexUrl.trim())) {
+      setRexCopied(true);
+    } else {
+      setRexError("Could not copy the link. Select the URL and copy it manually.");
+    }
+  }
 
   const [
     loading,
@@ -1224,7 +1287,7 @@ export default function ProjectDocuments({
           drawerOpen
         }
         width={
-          680
+          "min(680px, 100%)"
         }
         title={
           drawerMode === "new"
@@ -1268,6 +1331,7 @@ export default function ProjectDocuments({
             drawerMode === "new"
               ? (
                   <>
+
                     <AdminField
                       label="Template"
                       compact
@@ -1396,6 +1460,58 @@ export default function ProjectDocuments({
                         }
                         readOnly
                       />
+                    </AdminField>
+
+                    <AdminField label="REX URL" compact>
+                      <div style={{ display: "flex", gap: 8, minWidth: 0 }}>
+                        <input
+                          className="admin-field__control"
+                          type="text"
+                          aria-label="Document REX URL"
+                          value={rexUrl}
+                          disabled={rexLoading}
+                          style={{ flex: "1 1 0", minWidth: 0 }}
+                          onChange={(event) => {
+                            setRexUrl(event.target.value);
+                            setRexCopied(false);
+                            setRexError("");
+                          }}
+                        />
+                        <AdminButton
+                          type="button"
+                          variant="secondary"
+                          aria-label={rexCopied ? "Link copied" : "Copy REX URL"}
+                          title={rexCopied ? "Link copied" : "Copy REX URL"}
+                          disabled={rexLoading || !rexUrl.trim()}
+                          onClick={copyDocumentRex}
+                          style={{ flexShrink: 0, width: 42, padding: 0 }}
+                        >
+                          {rexCopied ? <Check size={18} /> : <Copy size={18} />}
+                        </AdminButton>
+                      </div>
+                      {!rexLoading && !rexUrl ? (
+                        <FetchRexButton
+                          buttonLabel="Get REX"
+                          request={{
+                            label: cleanText(drawerDocument?.title) || `Document #${drawerDocumentId}`,
+                            resolverKey: "document",
+                            resourceType: "doc",
+                            resourceId: drawerDocumentId,
+                            reuseExisting: true,
+                          }}
+                          autoCreate
+                          navigateOnFetch={false}
+                          onCreated={(result) => {
+                            setRexUrl(new URL(
+                              `/t/${encodeURIComponent(result.token)}`,
+                              window.location.origin
+                            ).toString());
+                            setRexCopied(false);
+                            setRexError("");
+                          }}
+                        />
+                      ) : null}
+                      {rexError ? <AdminNotice variant="error">{rexError}</AdminNotice> : null}
                     </AdminField>
 
                     <AdminField

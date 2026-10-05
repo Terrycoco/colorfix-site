@@ -1,4 +1,9 @@
 import {
+  CopyPlus,
+  Trash2,
+} from "lucide-react";
+
+import {
   forwardRef,
   useCallback,
   useEffect,
@@ -20,9 +25,9 @@ import {
   AdminSmartGrid,
   AdminStack,
   AdminToolbar,
+  AdminWorkbenchDrawer,
 } from "@components/AdminLayout";
 
-import PhotoPickerDialog from "@components/Dialogs/PhotoPickerDialog";
 import KickerDropdown from "@components/KickerDropdown";
 import FetchRexButton from "@components/REX/FetchRexButton";
 
@@ -30,9 +35,6 @@ import {
   API_FOLDER,
 } from "@helpers/config";
 
-import {
-  buildImageUrl,
-} from "@helpers/assetImage";
 
 
 const PROJECT_PALETTES_URL =
@@ -44,17 +46,14 @@ const PV_LIST_URL =
 const PV_CREATE_URL =
   `${API_FOLDER}/v2/admin/palettes/pvs/create.php`;
 
+const PV_DELETE_URL = `${API_FOLDER}/v2/admin/palettes/pvs/delete.php`;
+
 const PV_ADMIN_URL =
   `${API_FOLDER}/v2/admin/palette-viewers.php`;
 
-const PLAYLIST_GET_URL =
-  `${API_FOLDER}/v2/admin/playlists/get.php`;
+const PAINTER_PV_ADMIN_URL =
+  `${API_FOLDER}/v2/admin/palettes/pvs/painter.php`;
 
-const PROJECT_SLIDE_PALETTE_URL =
-  `${API_FOLDER}/v2/admin/playlist-items/project-palette.php`;
-
-const PHOTO_LIBRARY_LIST_URL =
-  `${API_FOLDER}/v2/admin/photo-library/list.php`;
 
 
 const EXPERIENCE_OPTIONS = [
@@ -75,12 +74,6 @@ const EXPERIENCE_OPTIONS = [
       "client",
     label:
       "Client",
-  },
-  {
-    value:
-      "showcase",
-    label:
-      "Showcase",
   },
   {
     value:
@@ -119,42 +112,6 @@ function paletteLabel(
 }
 
 
-function painterPaletteLabel(
-  row
-) {
-  const area =
-    cleanText(
-      row?.area_label
-      ||
-      row?.area_name
-      ||
-      row?.room_name
-    );
-
-  const palette =
-    paletteLabel(
-      row
-    );
-
-  if (
-    area
-    &&
-    palette
-    &&
-    area.toLowerCase() !==
-      palette.toLowerCase()
-  ) {
-    return `${area} — ${palette}`;
-  }
-
-  return (
-    area
-    ||
-    palette
-  );
-}
-
-
 function experienceLabel(
   value
 ) {
@@ -172,6 +129,19 @@ function experienceLabel(
     +
     text.slice(1)
   );
+}
+
+
+function isPainterPV(
+  value
+) {
+  return cleanText(
+    value?.format
+    ??
+    value?.experience_key
+    ??
+    value?.viewer?.format
+  ).toLowerCase() === "painter";
 }
 
 
@@ -234,85 +204,8 @@ async function readJson(
 }
 
 
-function normalizePVPhoto(
-  photo,
-  index
-) {
-  return {
-    ...photo,
-    photo_type:
-      cleanText(
-        photo?.photo_type
-      ).toLowerCase()
-      ||
-      (
-        index === 0
-          ? "full"
-          : "zoom"
-      ),
-    order_index:
-      Number(
-        photo?.order_index
-        ??
-        index
-      ),
-  };
-}
 
 
-function photoImageUrl(
-  photo
-) {
-  const raw =
-    cleanText(
-      photo?.rel_path
-      ||
-      photo?.raw_rel_path
-      ||
-      photo?.image_url
-    );
-
-  if (!raw) {
-    return "";
-  }
-
-  if (
-    /^https?:\/\//i.test(
-      raw
-    )
-    ||
-    raw.startsWith(
-      "/"
-    )
-  ) {
-    return raw;
-  }
-
-  return buildImageUrl(
-    raw
-  );
-}
-
-
-function photoLabel(
-  photo
-) {
-  return (
-    cleanText(
-      photo?.caption
-    )
-    ||
-    cleanText(
-      photo?.alt_text
-    )
-    ||
-    (
-      photo?.photo_library_id
-        ? `Photo #${photo.photo_library_id}`
-        : "Photo"
-    )
-  );
-}
 
 
 function rexUrlFromDetail(
@@ -390,6 +283,17 @@ function normalizePVDetail(
           ""
         ),
 
+      project_id:
+        Number(
+          viewer?.project_id
+          ??
+          row?.project_id
+          ??
+          0
+        )
+        ||
+        null,
+
       format:
         cleanText(
           viewer?.format
@@ -448,16 +352,34 @@ function normalizePVDetail(
           : 0,
     },
 
-    photos:
+    project_palette_ids:
       (
         Array.isArray(
-          payload?.photos
+          payload?.project_palettes
         )
-          ? payload.photos
+          ? payload.project_palettes
           : []
-      ).map(
-        normalizePVPhoto
-      ),
+      )
+        .map(
+          (palette) =>
+            Number(
+              palette?.project_palette_id
+              ||
+              0
+            )
+        )
+        .filter(
+          (id) =>
+            id > 0
+        ),
+
+    project_palettes:
+      Array.isArray(
+        payload?.project_palettes
+      )
+        ? payload.project_palettes
+        : [],
+
 
     rex:
       payload?.rex
@@ -470,8 +392,10 @@ function normalizePVDetail(
 const PVDrawerEditor = forwardRef(function PVDrawerEditor({
   item,
   palettes,
-  playlistId,
   onSaved,
+  initialDetail = null,
+  existingItems = [],
+  onSavingChange,
 }, ref) {
   const [
     detail,
@@ -498,30 +422,6 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
     setStatus,
   ] = useState("");
 
-  const [
-    pickerOpen,
-    setPickerOpen,
-  ] = useState(false);
-
-  const [
-    mainConflictOpen,
-    setMainConflictOpen,
-  ] = useState(false);
-
-  const [
-    suggestedPhotos,
-    setSuggestedPhotos,
-  ] = useState([]);
-
-  const [
-    suggestedPhotosLoading,
-    setSuggestedPhotosLoading,
-  ] = useState(false);
-
-  const [
-    suggestedPhotosError,
-    setSuggestedPhotosError,
-  ] = useState("");
 
   const pvId =
     Number(
@@ -530,11 +430,21 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
       0
     );
 
+  const draftMode = Boolean(initialDetail);
+  useEffect(() => { onSavingChange?.(saving); }, [saving, onSavingChange]);
+
 
   useEffect(
     () => {
       let cancelled =
         false;
+
+      if (initialDetail) {
+        setDetail(initialDetail);
+        setLoading(false);
+        setError("");
+        return undefined;
+      }
 
       if (pvId <= 0) {
         setDetail(null);
@@ -555,7 +465,11 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
             const data =
               await readJson(
                 await fetch(
-                  `${PV_ADMIN_URL}?id=${encodeURIComponent(
+                  `${
+                    isPainterPV(item)
+                      ? PAINTER_PV_ADMIN_URL
+                      : PV_ADMIN_URL
+                  }?id=${encodeURIComponent(
                     pvId
                   )}&_=${Date.now()}`,
                   {
@@ -616,405 +530,11 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
     [
       pvId,
       item,
+      initialDetail,
     ]
   );
 
 
-  useEffect(
-    () => {
-      let cancelled =
-        false;
-
-      const savedPaletteId =
-        Number(
-          detail
-            ?.viewer
-            ?.saved_palette_id
-          ||
-          0
-        );
-
-      const resolvedPlaylistId =
-        Number(
-          playlistId
-          ||
-          0
-        );
-
-      if (
-        savedPaletteId <= 0
-        ||
-        resolvedPlaylistId <= 0
-      ) {
-        setSuggestedPhotos([]);
-        setSuggestedPhotosLoading(false);
-        setSuggestedPhotosError("");
-        return undefined;
-      }
-
-      setSuggestedPhotosLoading(true);
-      setSuggestedPhotosError("");
-
-      (
-        async () => {
-          try {
-            const playlistParams =
-              new URLSearchParams({
-                playlist_id:
-                  String(
-                    resolvedPlaylistId
-                  ),
-
-                _:
-                  String(
-                    Date.now()
-                  ),
-              });
-
-            const playlistData =
-              await readJson(
-                await fetch(
-                  `${PLAYLIST_GET_URL}?${playlistParams.toString()}`,
-                  {
-                    credentials:
-                      "include",
-
-                    cache:
-                      "no-store",
-                  }
-                ),
-
-                "Failed to load playlist photos"
-              );
-
-            const slides =
-              (
-                Array.isArray(
-                  playlistData?.items
-                )
-                  ? playlistData.items
-                  : []
-              ).filter(
-                (slide) =>
-                  Number(
-                    slide?.playlist_item_id
-                    ||
-                    0
-                  ) > 0
-                  &&
-                  (
-                    Number(
-                      slide?.photo_library_id
-                      ||
-                      0
-                    ) > 0
-                    ||
-                    cleanText(
-                      slide?.image_url
-                    )
-                  )
-              );
-
-            const photoLibraryIds =
-              Array.from(
-                new Set(
-                  slides
-                    .map(
-                      (slide) =>
-                        Number(
-                          slide?.photo_library_id
-                          ||
-                          0
-                        )
-                    )
-                    .filter(
-                      (id) =>
-                        id > 0
-                    )
-                )
-              );
-
-            const resolvedThumbs =
-              {};
-
-            if (
-              photoLibraryIds.length
-            ) {
-              const photoParams =
-                new URLSearchParams({
-                  photo_library_ids:
-                    photoLibraryIds.join(
-                      ","
-                    ),
-
-                  limit:
-                    String(
-                      photoLibraryIds.length
-                    ),
-
-                  _:
-                    String(
-                      Date.now()
-                    ),
-                });
-
-              const photoData =
-                await readJson(
-                  await fetch(
-                    `${PHOTO_LIBRARY_LIST_URL}?${photoParams.toString()}`,
-                    {
-                      credentials:
-                        "include",
-
-                      cache:
-                        "no-store",
-                    }
-                  ),
-
-                  "Failed to resolve playlist photos"
-                );
-
-              for (
-                const photo
-                of (
-                  Array.isArray(
-                    photoData?.items
-                  )
-                    ? photoData.items
-                    : []
-                )
-              ) {
-                const id =
-                  Number(
-                    photo?.photo_library_id
-                    ||
-                    0
-                  );
-
-                if (
-                  id <= 0
-                ) {
-                  continue;
-                }
-
-                resolvedThumbs[
-                  id
-                ] =
-                  cleanText(
-                    photo?.image_url
-                    ||
-                    photo?.rel_path
-                  );
-              }
-            }
-
-            const resolved =
-              await Promise.all(
-                slides.map(
-                  async (
-                    slide
-                  ) => {
-                    let linkedPaletteId =
-                      Number(
-                        slide?.saved_palette_id
-                        ||
-                        0
-                      );
-
-                    if (
-                      linkedPaletteId <= 0
-                    ) {
-                      const linkParams =
-                        new URLSearchParams({
-                          playlist_item_id:
-                            String(
-                              slide.playlist_item_id
-                            ),
-
-                          _:
-                            String(
-                              Date.now()
-                            ),
-                        });
-
-                      const linkData =
-                        await readJson(
-                          await fetch(
-                            `${PROJECT_SLIDE_PALETTE_URL}?${linkParams.toString()}`,
-                            {
-                              credentials:
-                                "include",
-
-                              cache:
-                                "no-store",
-                            }
-                          ),
-
-                          "Failed to load slide palette"
-                        );
-
-                      linkedPaletteId =
-                        Number(
-                          linkData
-                            ?.saved_palette_id
-                          ||
-                          0
-                        );
-                    }
-
-                    if (
-                      linkedPaletteId !==
-                      savedPaletteId
-                    ) {
-                      return null;
-                    }
-
-                    return {
-                      photo_library_id:
-                        Number(
-                          slide?.photo_library_id
-                          ||
-                          0
-                        )
-                        ||
-                        null,
-
-                      image_url:
-                        cleanText(
-                          resolvedThumbs[
-                            Number(
-                              slide?.photo_library_id
-                              ||
-                              0
-                            )
-                          ]
-                          ||
-                          slide?.image_url
-                        ),
-
-                      rel_path:
-                        "",
-
-                      caption:
-                        "",
-
-                      alt_text:
-                        cleanText(
-                          slide?.title
-                        ),
-
-                      playlist_item_id:
-                        Number(
-                          slide?.playlist_item_id
-                          ||
-                          0
-                        ),
-
-                      order_index:
-                        Number(
-                          slide?.order_index
-                          ||
-                          0
-                        ),
-                    };
-                  }
-                )
-              );
-
-            if (
-              cancelled
-            ) {
-              return;
-            }
-
-            const seen =
-              new Set();
-
-            const unique =
-              resolved
-                .filter(Boolean)
-                .filter(
-                  (photo) => {
-                    const key =
-                      photo
-                        ?.photo_library_id
-                        ? `library:${photo.photo_library_id}`
-                        : `url:${cleanText(photo?.image_url)}`;
-
-                    if (
-                      seen.has(
-                        key
-                      )
-                    ) {
-                      return false;
-                    }
-
-                    seen.add(
-                      key
-                    );
-
-                    return true;
-                  }
-                )
-                .sort(
-                  (
-                    a,
-                    b
-                  ) =>
-                    Number(
-                      a?.order_index
-                      ||
-                      0
-                    )
-                    -
-                    Number(
-                      b?.order_index
-                      ||
-                      0
-                    )
-                );
-
-            setSuggestedPhotos(
-              unique
-            );
-
-          } catch (err) {
-            if (
-              !cancelled
-            ) {
-              setSuggestedPhotos([]);
-
-              setSuggestedPhotosError(
-                err?.message
-                ||
-                "Failed to load photos used with this palette."
-              );
-            }
-
-          } finally {
-            if (
-              !cancelled
-            ) {
-              setSuggestedPhotosLoading(
-                false
-              );
-            }
-          }
-        }
-      )();
-
-      return () => {
-        cancelled =
-          true;
-      };
-    },
-    [
-      detail
-        ?.viewer
-        ?.saved_palette_id,
-      playlistId,
-    ]
-  );
 
 
   function updateViewer(
@@ -1041,440 +561,6 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
   }
 
 
-  function photoIdentity(
-    photo
-  ) {
-    const libraryId =
-      Number(
-        photo?.photo_library_id
-        ||
-        0
-      );
-
-    if (
-      libraryId > 0
-    ) {
-      return `library:${libraryId}`;
-    }
-
-    const path =
-      cleanText(
-        photo?.rel_path
-        ||
-        photo?.raw_rel_path
-        ||
-        photo?.image_url
-        ||
-        photo?.file_path
-      );
-
-    return path
-      ? `path:${path}`
-      : "";
-  }
-
-
-  function samePhoto(
-    a,
-    b
-  ) {
-    const aId =
-      Number(
-        a?.photo_library_id
-        ||
-        0
-      );
-
-    const bId =
-      Number(
-        b?.photo_library_id
-        ||
-        0
-      );
-
-    if (
-      aId > 0
-      &&
-      bId > 0
-    ) {
-      return aId === bId;
-    }
-
-    const aPath =
-      cleanText(
-        a?.rel_path
-        ||
-        a?.raw_rel_path
-        ||
-        a?.image_url
-        ||
-        a?.file_path
-      );
-
-    const bPath =
-      cleanText(
-        b?.rel_path
-        ||
-        b?.raw_rel_path
-        ||
-        b?.image_url
-        ||
-        b?.file_path
-      );
-
-    return Boolean(
-      aPath
-      &&
-      bPath
-      &&
-      aPath === bPath
-    );
-  }
-
-
-  function usedPhotoIndex(
-    photo
-  ) {
-    return (
-      detail?.photos?.findIndex(
-        (row) =>
-          samePhoto(
-            row,
-            photo
-          )
-      )
-      ??
-      -1
-    );
-  }
-
-
-  function addPhoto(
-    photo
-  ) {
-    setPickerOpen(
-      false
-    );
-
-    const photoLibraryId =
-      Number(
-        photo?.photo_library_id
-        ||
-        0
-      );
-
-    const relPath =
-      cleanText(
-        photo?.rel_path
-        ||
-        photo?.raw_rel_path
-        ||
-        photo?.image_url
-        ||
-        photo?.file_path
-      );
-
-    if (
-      photoLibraryId <= 0
-      &&
-      !relPath
-    ) {
-      setError(
-        "That photo does not have a usable Photo Library ID or image path."
-      );
-      return;
-    }
-
-    setError(
-      ""
-    );
-
-    setDetail(
-      (current) => {
-        if (
-          !current
-        ) {
-          return current;
-        }
-
-        if (
-          current.photos.some(
-            (row) =>
-              samePhoto(
-                row,
-                photo
-              )
-          )
-        ) {
-          return current;
-        }
-
-        const alreadyHasMain =
-          current.photos.some(
-            (row) =>
-              cleanText(
-                row?.photo_type
-              ).toLowerCase()
-              ===
-              "full"
-          );
-
-        return {
-          ...current,
-
-          photos: [
-            ...current.photos,
-
-            {
-              palette_viewer_photo_id:
-                null,
-
-              palette_viewer_id:
-                current.viewer
-                  .palette_viewer_id,
-
-              photo_library_id:
-                photoLibraryId > 0
-                  ? photoLibraryId
-                  : null,
-
-              rel_path:
-                relPath,
-
-              photo_type:
-                alreadyHasMain
-                  ? "zoom"
-                  : "full",
-
-              trigger_mode:
-                "any",
-
-              trigger_color_id:
-                null,
-
-              caption:
-                cleanText(
-                  photo?.caption
-                ),
-
-              alt_text:
-                cleanText(
-                  photo?.alt_text
-                  ||
-                  photo?.title
-                ),
-
-              order_index:
-                current.photos.length,
-            },
-          ],
-        };
-      }
-    );
-
-    setStatus(
-      ""
-    );
-  }
-
-
-  function setPhotoUse(
-    photo,
-    checked
-  ) {
-    if (
-      checked
-    ) {
-      addPhoto(
-        photo
-      );
-
-      return;
-    }
-
-    setDetail(
-      (current) => {
-        if (
-          !current
-        ) {
-          return current;
-        }
-
-        return {
-          ...current,
-
-          photos:
-            current.photos
-              .filter(
-                (row) =>
-                  !samePhoto(
-                    row,
-                    photo
-                  )
-              )
-              .map(
-                (
-                  row,
-                  index
-                ) => ({
-                  ...row,
-                  order_index:
-                    index,
-                })
-              ),
-        };
-      }
-    );
-
-    setStatus(
-      ""
-    );
-  }
-
-
-  function setPhotoRole(
-    photo,
-    role
-  ) {
-    const isUsed =
-      detail?.photos?.some(
-        (row) =>
-          samePhoto(
-            row,
-            photo
-          )
-      );
-
-    if (
-      !isUsed
-    ) {
-      return;
-    }
-
-    if (
-      role ===
-      "full"
-    ) {
-      const anotherMain =
-        detail.photos.some(
-          (row) =>
-            !samePhoto(
-              row,
-              photo
-            )
-            &&
-            cleanText(
-              row?.photo_type
-            ).toLowerCase()
-            ===
-            "full"
-        );
-
-      if (
-        anotherMain
-      ) {
-        setMainConflictOpen(
-          true
-        );
-
-        return;
-      }
-    }
-
-    setDetail(
-      (current) => {
-        if (
-          !current
-        ) {
-          return current;
-        }
-
-        return {
-          ...current,
-
-          photos:
-            current.photos.map(
-              (row) =>
-                samePhoto(
-                  row,
-                  photo
-                )
-                  ? {
-                      ...row,
-                      photo_type:
-                        role,
-                      trigger_mode:
-                        role === "before"
-                          ? "none"
-                          : "any",
-                      caption:
-                        role === "before"
-                          ? "Before"
-                          : "",
-                    }
-                  : row
-            ),
-        };
-      }
-    );
-
-    setStatus(
-      ""
-    );
-  }
-
-
-  const photoChoices =
-    useMemo(
-      () => {
-        const choices =
-          [];
-
-        const seen =
-          new Set();
-
-        for (
-          const photo
-          of [
-            ...suggestedPhotos,
-            ...(
-              detail?.photos
-              ||
-              []
-            ),
-          ]
-        ) {
-          const key =
-            photoIdentity(
-              photo
-            );
-
-          if (
-            !key
-            ||
-            seen.has(
-              key
-            )
-          ) {
-            continue;
-          }
-
-          seen.add(
-            key
-          );
-
-          choices.push(
-            photo
-          );
-        }
-
-        return choices;
-      },
-      [
-        suggestedPhotos,
-        detail?.photos,
-      ]
-    );
 
 
   async function savePV() {
@@ -1489,7 +575,19 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
     const viewer =
       detail.viewer;
 
+    if (existingItems.some((row) => Number(row.palette_viewer_id) !== pvId
+      && cleanText(row.title).toLowerCase() === cleanText(viewer.title).toLowerCase()
+      && cleanText(row.format || row.experience_key).toLowerCase() === cleanText(viewer.format).toLowerCase())) {
+      setError("A PV with this title and experience already exists. Change the title or experience.");
+      return;
+    }
+
+    const painter =
+      isPainterPV(viewer);
+
     if (
+      !painter
+      &&
       Number(
         viewer
           ?.saved_palette_id
@@ -1499,6 +597,23 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
     ) {
       setError(
         "Choose a palette."
+      );
+      return;
+    }
+
+    if (
+      painter
+      &&
+      !(
+        Array.isArray(
+          detail?.project_palette_ids
+        )
+        &&
+        detail.project_palette_ids.length
+      )
+    ) {
+      setError(
+        "Mark at least one project palette FINAL."
       );
       return;
     }
@@ -1525,24 +640,6 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
       return;
     }
 
-    if (
-      detail.photos.length
-      &&
-      detail.photos.filter(
-        (photo) =>
-          cleanText(
-            photo?.photo_type
-          ).toLowerCase()
-          ===
-          "full"
-      ).length !==
-        1
-    ) {
-      setError(
-        "Choose exactly one Main photo."
-      );
-      return;
-    }
 
     setSaving(
       true
@@ -1557,48 +654,58 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
     );
 
     try {
-      const payload = {
+      const painterPayload = {
         viewer: {
-          ...viewer,
-
-          saved_palette_id:
+          palette_viewer_id:
             Number(
-              viewer
-                .saved_palette_id
+              viewer?.palette_viewer_id
+              ||
+              pvId
+            ),
+
+          project_id:
+            Number(
+              viewer?.project_id
+              ||
+              item?.project_id
+              ||
+              0
             ),
 
           format:
-            cleanText(
-              viewer
-                .format
-            ).toLowerCase(),
+            "painter",
 
           kicker_text:
             cleanText(
-              viewer
-                .kicker_text
+              viewer?.kicker_text
             )
             ||
             null,
 
           title:
             cleanText(
-              viewer
-                .title
+              viewer?.title
             ),
 
           intro:
             String(
-              viewer
-                .intro
+              viewer?.intro
               ??
               ""
             ),
 
+          notes:
+            String(
+              viewer?.notes
+              ??
+              ""
+            ),
+
+          cta_label: cleanText(viewer?.cta_label) || null,
+
           is_active:
             Number(
-              viewer
-                .is_active
+              viewer?.is_active
               ??
               1
             )
@@ -1606,85 +713,83 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
               : 0,
         },
 
-        photos:
-          detail.photos.map(
-            (
-              photo,
-              index
-            ) => ({
-              ...photo,
+        project_palette_ids:
+          detail.project_palette_ids,
+      };
 
-              photo_library_id:
-                Number(
-                  photo
-                    ?.photo_library_id
+
+      const normalPayload = {
+              viewer: {
+                ...viewer,
+      
+                saved_palette_id:
+                  Number(
+                    viewer
+                      .saved_palette_id
+                  ),
+      
+                format:
+                  cleanText(
+                    viewer
+                      .format
+                  ).toLowerCase(),
+      
+                kicker_text:
+                  cleanText(
+                    viewer
+                      .kicker_text
+                  )
                   ||
-                  0
-                )
-                ||
-                null,
+                  null,
+      
+                title:
+                  cleanText(
+                    viewer
+                      .title
+                  ),
+      
+                intro:
+                  String(
+                    viewer
+                      .intro
+                    ??
+                    ""
+                  ),
+      
+                is_active:
+                  Number(
+                    viewer
+                      .is_active
+                    ??
+                    1
+                  )
+                    ? 1
+                    : 0,
+              },
+      
+            };
 
-              rel_path:
-                photo
-                  ?.photo_library_id
-                  ? ""
-                  : cleanText(
-                      photo?.rel_path
-                    ),
+      const payload =
+        painter
+          ? painterPayload
+          : normalPayload;
 
-              photo_type:
-                cleanText(
-                  photo
-                    ?.photo_type
-                ).toLowerCase()
-                ||
-                (
-                  index === 0
-                    ? "full"
-                    : "zoom"
-                ),
-
-              trigger_mode:
-                cleanText(
-                  photo
-                    ?.photo_type
-                ).toLowerCase()
-                ===
-                "before"
-                  ? "none"
-                  : "any",
-
-              trigger_color_id:
-                null,
-
-              caption:
-                cleanText(
-                  photo
-                    ?.photo_type
-                ).toLowerCase()
-                ===
-                "before"
-                  ? "Before"
-                  : null,
-
-              alt_text:
-                cleanText(
-                  photo
-                    ?.alt_text
-                )
-                ||
-                null,
-
-              order_index:
-                index,
-            })
-          ),
+      const createPayload = {
+        saved_palette_id: Number(viewer.saved_palette_id || 0),
+        project_id: Number(viewer.project_id || 0),
+        experience: viewer.format,
+        title: cleanText(viewer.title),
+        project_palette_ids: detail.project_palette_ids,
+        viewer_fields: { ...viewer, template_key: viewer.format === initialDetail?.viewer.format
+          ? viewer.template_key : viewer.format === "public" ? "full_palette" : viewer.format },
       };
 
       const data =
         await readJson(
           await fetch(
-            PV_ADMIN_URL,
+            draftMode ? PV_CREATE_URL : painter
+              ? PAINTER_PV_ADMIN_URL
+              : PV_ADMIN_URL,
             {
               method:
                 "POST",
@@ -1699,7 +804,7 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
 
               body:
                 JSON.stringify(
-                  payload
+                  draftMode ? createPayload : payload
                 ),
             }
           ),
@@ -1709,9 +814,10 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
 
       const saved =
         normalizePVDetail(
-          data?.item,
+          draftMode ? { ...detail, viewer: { ...viewer, ...data.item } } : data?.item,
           item
         );
+
 
       setDetail(
         saved
@@ -1809,61 +915,98 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
         >
           <AdminStack gap="sm">
             <AdminToolbar compact>
-              <AdminField
-                label="Palette"
-                compact
-              >
-                <select
-                  className="admin-field__control"
-                  value={
-                    detail
-                      .viewer
-                      .saved_palette_id
-                  }
-                  disabled={
-                    saving
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    updateViewer(
-                      "saved_palette_id",
-                      event
-                        .target
-                        .value
-                    )
-                  }
-                >
-                  <option value="">
-                    Choose a palette...
-                  </option>
-
-                  {
-                    palettes.map(
-                      (
-                        palette
-                      ) => (
-                        <option
-                          key={
-                            palette
-                              .saved_palette_id
-                          }
-                          value={
-                            palette
-                              .saved_palette_id
-                          }
-                        >
+              {
+                isPainterPV(
+                  detail?.viewer
+                )
+                  ? (
+                      <AdminField
+                        label="Areas"
+                        compact
+                      >
+                        <AdminMetaText as="div">
                           {
-                            paletteLabel(
-                              palette
+                            (
+                              detail?.project_palettes
+                              ||
+                              []
+                            )
+                              .map(
+                                (palette) =>
+                                  cleanText(
+                                    palette?.area_label
+                                  )
+                                  ||
+                                  paletteLabel(
+                                    palette
+                                  )
+                              )
+                              .filter(Boolean)
+                              .join(", ")
+                            ||
+                            `${detail?.project_palette_ids?.length || 0} areas`
+                          }
+                        </AdminMetaText>
+                      </AdminField>
+                    )
+                  : (
+                      <AdminField
+                        label="Palette"
+                        compact
+                      >
+                        <select
+                          className="admin-field__control"
+                          value={
+                            detail
+                              .viewer
+                              .saved_palette_id
+                          }
+                          disabled={
+                            saving
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            updateViewer(
+                              "saved_palette_id",
+                              event
+                                .target
+                                .value
                             )
                           }
-                        </option>
-                      )
+                        >
+                          <option value="">
+                            Choose a palette...
+                          </option>
+
+                          {
+                            palettes.map(
+                              (
+                                palette
+                              ) => (
+                                <option
+                                  key={
+                                    palette
+                                      .saved_palette_id
+                                  }
+                                  value={
+                                    palette
+                                      .saved_palette_id
+                                  }
+                                >
+                                  {
+                                    paletteLabel(
+                                      palette
+                                    )
+                                  }
+                                </option>
+                              )
+                            )
+                          }
+                        </select>
+                      </AdminField>
                     )
-                  }
-                </select>
-              </AdminField>
+              }
 
               <AdminField
                 label="Experience"
@@ -2038,314 +1181,21 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
           </AdminStack>
         </AdminPanel>
 
-        <AdminPanel
-          title="Photos"
-          compact
-          actions={
-            <AdminButton
-              type="button"
-              variant="secondary"
-              disabled={
-                saving
-              }
-              onClick={() =>
-                setPickerOpen(
-                  true
-                )
-              }
-            >
-              Add from Library
-            </AdminButton>
-          }
-        >
-          <AdminStack gap="sm">
-            {
-              suggestedPhotosLoading
-                ? (
-                    <AdminMetaText as="div">
-                      Loading related playlist photos...
-                    </AdminMetaText>
-                  )
-                : suggestedPhotosError
-                  ? (
-                      <AdminNotice variant="danger">
-                        {suggestedPhotosError}
-                      </AdminNotice>
-                    )
-                  : null
-            }
+        <AdminField label="Notes" compact>
+          <textarea className="admin-field__control" rows={3} value={detail.viewer.notes || ""}
+            disabled={saving} onChange={(event) => updateViewer("notes", event.target.value)} />
+        </AdminField>
+        <AdminField label="CTA Label" compact>
+          <input className="admin-field__control" value={detail.viewer.cta_label || ""}
+            disabled={saving} onChange={(event) => updateViewer("cta_label", event.target.value)} />
+        </AdminField>
+        <label><input type="checkbox" checked={Boolean(detail.viewer.is_active)} disabled={saving}
+          onChange={(event) => updateViewer("is_active", event.target.checked ? 1 : 0)} /> Active</label>
 
-            {
-              photoChoices.length
-                ? (
-                    <AdminToolbar compact>
-                      {
-                        photoChoices.map(
-                          (
-                            photo,
-                            index
-                          ) => {
-                            const key =
-                              photoIdentity(
-                                photo
-                              )
-                              ||
-                              `photo-${index}`;
-
-                            const usedIndex =
-                              usedPhotoIndex(
-                                photo
-                              );
-
-                            const used =
-                              usedIndex >=
-                              0;
-
-                            const usedPhoto =
-                              used
-                                ? detail
-                                    .photos[
-                                      usedIndex
-                                    ]
-                                : photo;
-
-                            const role =
-                              cleanText(
-                                usedPhoto
-                                  ?.photo_type
-                              ).toLowerCase()
-                              ||
-                              "zoom";
-
-                            const imageUrl =
-                              photoImageUrl(
-                                photo
-                              )
-                              ||
-                              photoImageUrl(
-                                usedPhoto
-                              );
-
-                            return (
-                              <AdminStack
-                                key={
-                                  key
-                                }
-                                gap="xs"
-                              >
-                                {
-                                  imageUrl
-                                    ? (
-                                        <img
-                                          src={
-                                            imageUrl
-                                          }
-                                          alt={
-                                            photoLabel(
-                                              photo
-                                            )
-                                          }
-                                          width="180"
-                                          loading="lazy"
-                                        />
-                                      )
-                                    : (
-                                        <AdminMetaText as="div">
-                                          No preview
-                                        </AdminMetaText>
-                                      )
-                                }
-
-                                <div
-                                  style={{
-                                    display:
-                                      "flex",
-
-                                    alignItems:
-                                      "center",
-
-                                    justifyContent:
-                                      "space-between",
-
-                                    width:
-                                      180,
-
-                                    minHeight:
-                                      24,
-                                  }}
-                                >
-                                  <label
-                                    style={{
-                                      display:
-                                        "flex",
-
-                                      alignItems:
-                                        "center",
-
-                                      gap:
-                                        4,
-
-                                      height:
-                                        24,
-
-                                      lineHeight:
-                                        "24px",
-                                    }}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={
-                                        used
-                                      }
-                                      disabled={
-                                        saving
-                                      }
-                                      style={{
-                                        margin:
-                                          0,
-                                      }}
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setPhotoUse(
-                                          photo,
-                                          event
-                                            .target
-                                            .checked
-                                        )
-                                      }
-                                    />
-
-                                    <span>
-                                      Use
-                                    </span>
-                                  </label>
-
-                                  <select
-                                    aria-label="Photo role"
-                                    value={
-                                      role
-                                    }
-                                    disabled={
-                                      saving
-                                      ||
-                                      !used
-                                    }
-                                    style={{
-                                      width:
-                                        "auto",
-
-                                      minWidth:
-                                        0,
-
-                                      height:
-                                        24,
-
-                                      margin:
-                                        0,
-
-                                      padding:
-                                        "0 22px 0 6px",
-
-                                      fontSize:
-                                        12,
-
-                                      lineHeight:
-                                        "22px",
-                                    }}
-                                    onChange={(
-                                      event
-                                    ) =>
-                                      setPhotoRole(
-                                        photo,
-                                        event
-                                          .target
-                                          .value
-                                      )
-                                    }
-                                  >
-                                    <option value="full">
-                                      Main
-                                    </option>
-
-                                    <option value="zoom">
-                                      Zoom
-                                    </option>
-
-                                    <option value="before">
-                                      Before
-                                    </option>
-                                  </select>
-                                </div>
-                              </AdminStack>
-                            );
-                          }
-                        )
-                      }
-                    </AdminToolbar>
-                  )
-                : (
-                    <AdminEmptyState
-                      title="No photos available"
-                      message="No related playlist photos are available for this palette. Add from Library if needed."
-                    />
-                  )
-            }
-          </AdminStack>
-        </AdminPanel>
 
       </AdminStack>
 
-      <PhotoPickerDialog
-        open={
-          pickerOpen
-        }
-        title="Add PV Photo"
-        onClose={() =>
-          setPickerOpen(
-            false
-          )
-        }
-        onPick={
-          addPhoto
-        }
-      />
 
-      <AdminDialog
-        open={
-          mainConflictOpen
-        }
-        title="Main Photo"
-        width={
-          420
-        }
-        actions={
-          <AdminButton
-            type="button"
-            onClick={() =>
-              setMainConflictOpen(
-                false
-              )
-            }
-          >
-            OK
-          </AdminButton>
-        }
-        onClose={() =>
-          setMainConflictOpen(
-            false
-          )
-        }
-        onCancel={() =>
-          setMainConflictOpen(
-            false
-          )
-        }
-      >
-        <AdminMetaText as="div">
-          Only one used photo can be Main. Change the current Main photo first.
-        </AdminMetaText>
-      </AdminDialog>
     </>
   );
 });
@@ -2354,7 +1204,6 @@ const PVDrawerEditor = forwardRef(function PVDrawerEditor({
 export default function ProjectPVPage({
   projectId,
   projectName = "",
-  playlistId = null,
   onRex = null,
 }) {
   const [
@@ -2385,6 +1234,13 @@ export default function ProjectPVPage({
   const pvEditorRef =
     useRef(null);
 
+  const copyEditorRef = useRef(null);
+  const [copyDraft, setCopyDraft] = useState(null);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [copySaving, setCopySaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
 
   const [
     newOpen,
@@ -2395,11 +1251,6 @@ export default function ProjectPVPage({
     newPaletteId,
     setNewPaletteId,
   ] = useState("");
-
-  const [
-    newPaletteIds,
-    setNewPaletteIds,
-  ] = useState([]);
 
   const [
     newExperience,
@@ -2582,6 +1433,8 @@ export default function ProjectPVPage({
       setSelectedKey(
         null
       );
+      setCopyDraft(null);
+      setDeleteTarget(null);
 
       setNewOpen(
         false
@@ -2589,10 +1442,6 @@ export default function ProjectPVPage({
 
       setNewPaletteId(
         ""
-      );
-
-      setNewPaletteIds(
-        []
       );
 
       setNewExperience(
@@ -2675,24 +1524,6 @@ export default function ProjectPVPage({
               ),
         },
 
-        {
-          key:
-            "photos",
-
-          label:
-            "Photos",
-
-          sortable:
-            true,
-
-          value:
-            (item) =>
-              Number(
-                item?.photo_count
-                ??
-                0
-              ),
-        },
 
       ],
       []
@@ -2727,7 +1558,11 @@ export default function ProjectPVPage({
       const data =
         await readJson(
           await fetch(
-            `${PV_ADMIN_URL}?id=${encodeURIComponent(
+            `${
+              isPainterPV(item)
+                ? PAINTER_PV_ADMIN_URL
+                : PV_ADMIN_URL
+            }?id=${encodeURIComponent(
               pvId
             )}&_=${Date.now()}`,
             {
@@ -2785,10 +1620,6 @@ export default function ProjectPVPage({
         : ""
     );
 
-    setNewPaletteIds(
-      []
-    );
-
     setNewExperience(
       ""
     );
@@ -2808,6 +1639,49 @@ export default function ProjectPVPage({
     setNewOpen(
       true
     );
+  }
+
+  async function copyPV(item) {
+    setCopyBusy(true);
+    setError("");
+    try {
+      const url = isPainterPV(item) ? PAINTER_PV_ADMIN_URL : PV_ADMIN_URL;
+      const data = await readJson(await fetch(`${url}?id=${Number(item.palette_viewer_id)}&_=${Date.now()}`, {
+        credentials: "include", cache: "no-store",
+      }), "Failed to load the PV to copy");
+      const detail = normalizePVDetail(data.item, item);
+      const base = cleanText(detail.viewer.title) || "Untitled";
+      let title = `${base} (copy)`;
+      let count = 2;
+      while (items.some((row) => cleanText(row.title).toLowerCase() === title.toLowerCase()
+        && cleanText(row.format || row.experience_key) === detail.viewer.format)) {
+        title = `${base} (copy ${count++})`;
+      }
+      const finalPalettes = palettes.filter((palette) => Number(palette.is_final));
+      setCopyDraft({
+        ...detail, rex: null,
+        viewer: { ...detail.viewer, palette_viewer_id: 0, title, project_id: Number(projectId) },
+        project_palettes: finalPalettes,
+        project_palette_ids: finalPalettes.map((palette) => Number(palette.project_palette_id)),
+      });
+    } catch (err) { setError(err.message || "Could not copy PV."); }
+    finally { setCopyBusy(false); }
+  }
+
+  async function deletePV() {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await readJson(await fetch(PV_DELETE_URL, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: Number(projectId), palette_viewer_id: Number(deleteTarget.palette_viewer_id) }),
+      }), "Failed to delete PV");
+      setDeleteTarget(null);
+      setSelectedKey(null);
+      await loadPage();
+    } catch (err) { setError(err.message || "Could not delete PV."); }
+    finally { setDeleting(false); }
   }
 
 
@@ -2899,73 +1773,11 @@ export default function ProjectPVPage({
   }
 
 
-  function togglePainterPalette(
-    paletteId,
-    checked
-  ) {
-    const id =
-      Number(
-        paletteId
-        ||
-        0
-      );
-
-    if (
-      id <= 0
-    ) {
-      return;
-    }
-
-    setNewPaletteIds(
-      (current) => {
-        const next =
-          new Set(
-            current.map(
-              Number
-            )
-          );
-
-        if (
-          checked
-        ) {
-          next.add(
-            id
-          );
-        } else {
-          next.delete(
-            id
-          );
-        }
-
-        return Array.from(
-          next
-        );
-      }
-    );
-
-    setCreateError(
-      ""
-    );
-  }
-
-
-  const isPainterCreate =
-    cleanText(
-      newExperience
-    ).toLowerCase()
-    ===
-    "painter";
-
-
   const canCreate =
-    (
-      isPainterCreate
-        ? newPaletteIds.length > 0
-        : Number(
-            newPaletteId ||
-            0
-          ) > 0
-    )
+    Number(
+      newPaletteId ||
+      0
+    ) > 0
     &&
     cleanText(
       newExperience
@@ -3009,46 +1821,22 @@ export default function ProjectPVPage({
               },
 
               body:
-                JSON.stringify(
-                  isPainterCreate
-                    ? {
-                        project_id:
-                          Number(
-                            projectId
-                            ||
-                            0
-                          ),
+                JSON.stringify({
+                  saved_palette_id:
+                    Number(
+                      newPaletteId
+                    ),
 
-                        project_palette_ids:
-                          newPaletteIds.map(
-                            Number
-                          ),
+                  experience:
+                    cleanText(
+                      newExperience
+                    ),
 
-                        experience:
-                          "painter",
-
-                        title:
-                          cleanText(
-                            newTitle
-                          ),
-                      }
-                    : {
-                        saved_palette_id:
-                          Number(
-                            newPaletteId
-                          ),
-
-                        experience:
-                          cleanText(
-                            newExperience
-                          ),
-
-                        title:
-                          cleanText(
-                            newTitle
-                          ),
-                      }
-                ),
+                  title:
+                    cleanText(
+                      newTitle
+                    ),
+                }),
             }
           ),
 
@@ -3107,10 +1895,6 @@ export default function ProjectPVPage({
 
       setNewPaletteId(
         ""
-      );
-
-      setNewPaletteIds(
-        []
       );
 
       setNewExperience(
@@ -3235,7 +2019,11 @@ export default function ProjectPVPage({
           const data =
             await readJson(
               await fetch(
-                `${PV_ADMIN_URL}?id=${encodeURIComponent(
+                `${
+                  isPainterPV(selectedPV)
+                    ? PAINTER_PV_ADMIN_URL
+                    : PV_ADMIN_URL
+                }?id=${encodeURIComponent(
                   pvId
                 )}&_=${Date.now()}`,
                 {
@@ -3258,6 +2046,15 @@ export default function ProjectPVPage({
           void loadPage();
         }}
       />
+
+      <AdminButton type="button" variant="secondary" disabled={!selectedPV || copyBusy || deleting || Boolean(copyDraft)}
+        onClick={() => void copyPV(selectedPV)}>
+        <CopyPlus size={16} /> {copyBusy ? "Copying..." : "Copy Into New"}
+      </AdminButton>
+      <AdminButton type="button" variant="secondary" title="Delete selected PV" aria-label="Delete selected PV"
+        disabled={!selectedPV || deleting || copyBusy || Boolean(copyDraft)} onClick={() => { setError(""); setDeleteTarget(selectedPV); }}>
+        <Trash2 size={16} />
+      </AdminButton>
 
       <AdminMetaText as="div">
         {items.length} PV{items.length === 1 ? "" : "s"}
@@ -3421,15 +2218,13 @@ export default function ProjectPVPage({
               item,
             }) => (
               <PVDrawerEditor
+                existingItems={items}
                 ref={pvEditorRef}
                 item={
                   item
                 }
                 palettes={
                   palettes
-                }
-                playlistId={
-                  playlistId
                 }
                 onSaved={() => {
                   void loadPage();
@@ -3468,6 +2263,31 @@ export default function ProjectPVPage({
         }
       </AdminDetailPane>
 
+
+      <AdminDialog
+        open={Boolean(deleteTarget)}
+        title="Delete PV?"
+        message={`Delete "${deleteTarget?.title || "this PV"}" and its REX links? Shared palettes and project photos will be kept.`}
+        confirmLabel={deleting ? "Deleting..." : "Delete PV"}
+        onConfirm={() => void deletePV()}
+        onCancel={() => { if (!deleting) setDeleteTarget(null); }}
+        dismissOnBackdrop={!deleting}
+      >
+        {error ? <AdminNotice variant="danger">{error}</AdminNotice> : null}
+      </AdminDialog>
+
+      <AdminWorkbenchDrawer open={Boolean(copyDraft)} portal padded width="min(720px, 100vw)" title="Copy Into New PV"
+        onClose={async () => {
+          const saved = await copyEditorRef.current?.save?.();
+          if (!saved) return;
+          setCopyDraft(null);
+          setSelectedKey(Number(saved.viewer.palette_viewer_id));
+          await loadPage();
+        }}
+        footer={<AdminButton type="button" variant="secondary" disabled={copySaving} onClick={() => setCopyDraft(null)}>Cancel</AdminButton>}>
+        {copyDraft ? <PVDrawerEditor ref={copyEditorRef} item={copyDraft.viewer} palettes={palettes}
+          initialDetail={copyDraft} existingItems={items} onSavingChange={setCopySaving} /> : null}
+      </AdminWorkbenchDrawer>
 
       <AdminDialog
         open={
@@ -3517,6 +2337,54 @@ export default function ProjectPVPage({
               : null
           }
 
+          <AdminField label="Palette">
+            <select
+              className="admin-field__control"
+              value={
+                newPaletteId
+              }
+              disabled={
+                creating
+                ||
+                !palettes.length
+              }
+              onChange={(
+                event
+              ) =>
+                handlePaletteChange(
+                  event.target.value
+                )
+              }
+            >
+              <option value="">
+                Choose a palette...
+              </option>
+
+              {
+                palettes.map(
+                  (palette) => (
+                    <option
+                      key={
+                        palette
+                          .saved_palette_id
+                      }
+                      value={
+                        palette
+                          .saved_palette_id
+                      }
+                    >
+                      {
+                        paletteLabel(
+                          palette
+                        )
+                      }
+                    </option>
+                  )
+                )
+              }
+            </select>
+          </AdminField>
+
           <AdminField label="Experience">
             <select
               className="admin-field__control"
@@ -3529,49 +2397,9 @@ export default function ProjectPVPage({
               onChange={(
                 event
               ) => {
-                const value =
-                  event.target.value;
-
                 setNewExperience(
-                  value
+                  event.target.value
                 );
-
-                if (
-                  value ===
-                  "painter"
-                ) {
-                  setNewPaletteId(
-                    ""
-                  );
-
-                  setNewPaletteIds(
-                    []
-                  );
-
-                  if (
-                    !cleanText(
-                      newTitle
-                    )
-                    ||
-                    palettes.some(
-                      (palette) =>
-                        cleanText(
-                          newTitle
-                        ) ===
-                        paletteLabel(
-                          palette
-                        )
-                    )
-                  ) {
-                    setNewTitle(
-                      "Painter Specifications"
-                    );
-                  }
-                } else {
-                  setNewPaletteIds(
-                    []
-                  );
-                }
 
                 setCreateError(
                   ""
@@ -3602,133 +2430,6 @@ export default function ProjectPVPage({
               }
             </select>
           </AdminField>
-
-          {
-            isPainterCreate
-              ? (
-                  <AdminField label="Include palettes / rooms">
-                    <AdminStack gap="sm">
-                      {
-                        palettes.map(
-                          (palette) => {
-                            const paletteId =
-                              Number(
-                                palette
-                                  ?.project_palette_id
-                                ||
-                                0
-                              );
-
-                            const checked =
-                              newPaletteIds
-                                .map(
-                                  Number
-                                )
-                                .includes(
-                                  paletteId
-                                );
-
-                            return (
-                              <label
-                                key={
-                                  paletteId
-                                }
-                                style={{
-                                  display:
-                                    "flex",
-                                  alignItems:
-                                    "center",
-                                  gap:
-                                    8,
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    checked
-                                  }
-                                  disabled={
-                                    creating
-                                    ||
-                                    paletteId <= 0
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    togglePainterPalette(
-                                      paletteId,
-                                      event
-                                        .target
-                                        .checked
-                                    )
-                                  }
-                                />
-
-                                <span>
-                                  {
-                                    painterPaletteLabel(
-                                      palette
-                                    )
-                                  }
-                                </span>
-                              </label>
-                            );
-                          }
-                        )
-                      }
-                    </AdminStack>
-                  </AdminField>
-                )
-              : (
-                  <AdminField label="Palette">
-                    <select
-                      className="admin-field__control"
-                      value={
-                        newPaletteId
-                      }
-                      disabled={
-                        creating
-                        ||
-                        !palettes.length
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        handlePaletteChange(
-                          event.target.value
-                        )
-                      }
-                    >
-                      <option value="">
-                        Choose a palette...
-                      </option>
-
-                      {
-                        palettes.map(
-                          (palette) => (
-                            <option
-                              key={
-                                palette
-                                  .saved_palette_id
-                              }
-                              value={
-                                palette
-                                  .saved_palette_id
-                              }
-                            >
-                              {
-                                paletteLabel(
-                                  palette
-                                )
-                              }
-                            </option>
-                          )
-                        )
-                      }
-                    </select>
-                  </AdminField>
-                )
-          }
 
           <AdminField label="Title">
             <input
@@ -3772,3 +2473,4 @@ export default function ProjectPVPage({
     </>
   );
 }
+ 

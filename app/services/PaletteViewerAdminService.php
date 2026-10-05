@@ -67,8 +67,11 @@ final class PaletteViewerAdminService
             throw new RuntimeException('Saved Palette not found.');
         }
 
+        $projectPhotoId = $this->photos->projectPhotoSource($paletteViewerId);
         return [
             'viewer' => $this->viewerPayload($viewer),
+            'photos_source' => $projectPhotoId !== null ? 'project' : 'viewer',
+            'photo_project_id' => $projectPhotoId,
             'palette' => $this->palettePayload($palette, $viewer->savedPaletteId),
             'members' => array_map([$this, 'memberPayload'], $this->savedPalettes->getMembersForPalette($viewer->savedPaletteId)),
             'photos' => array_map([$this, 'photoPayload'], $this->photos->findByViewerId($paletteViewerId)),
@@ -102,7 +105,7 @@ final class PaletteViewerAdminService
             ? $this->viewers->update($paletteViewerId, $data)
             : $this->viewers->create($data);
 
-        if (array_key_exists('photos', $payload)) {
+        if (array_key_exists('photos', $payload) && $this->photos->projectPhotoSource($viewer->paletteViewerId) === null) {
             if (!is_array($payload['photos'])) {
                 throw new InvalidArgumentException('photos must be an array.');
             }

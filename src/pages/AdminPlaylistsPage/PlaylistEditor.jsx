@@ -2016,6 +2016,42 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   }
 
 
+  async function confirmPhotoReplacement(photoId) {
+    return dialog.confirm({
+      title: `Replace Photo #${photoId}?`,
+      message: "This permanently replaces the image everywhere this photo is used, including PVs. The photo number, palette, Use flag, and role stay the same. The old image will be deleted.",
+      confirmLabel: "Replace Photo",
+      cancelLabel: "Cancel",
+    });
+  }
+
+  function applyReplacedPhoto(photo) {
+    const pid = String(photo.photo_library_id);
+    const imageUrl = photo.image_url || photo.rel_path;
+    setPhotoThumbs((current) => ({ ...current, [pid]: imageUrl }));
+    setPhotoInfo((current) => ({ ...current, [pid]: current[pid] || photoInfoFromRow(photo) }));
+    setItems((current) => current.map((item) => Number(getPhotoLibraryId(item)) === Number(pid)
+      ? { ...item, image_url: makePhotoRef(pid, imageUrl) } : item));
+    markDirty();
+  }
+
+  async function pickSlidePhoto(clientKey, photo) {
+    const item = items.find((row) => row._clientKey === clientKey);
+    const oldId = Number(getPhotoLibraryId(item));
+    const newId = Number(photo?.photo_library_id);
+    if (!oldId) { applyPhotoToItem(clientKey, photo); return; }
+    if (oldId === newId || !await confirmPhotoReplacement(oldId)) return;
+    try {
+      const body = new FormData();
+      body.append("photo_library_id", String(oldId));
+      body.append("source_photo_library_id", String(newId));
+      const response = await fetch(`${API_FOLDER}/v2/admin/photo-library/replace.php`, { method: "POST", credentials: "include", body });
+      const data = await response.json();
+      if (!response.ok || !data.ok || !data.photo) throw new Error(data.error || "Could not replace photo.");
+      applyReplacedPhoto(data.photo);
+    } catch (err) { await dialog.alert({ title: "Photo replacement failed", message: err.message }); }
+  }
+
   function applyPhotoToItem(
     clientKey,
     photo
@@ -3763,8 +3799,9 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                         )
                                       }
 
+                                      onConfirmReplacePhoto={() => confirmPhotoReplacement(getPhotoLibraryId(liveItem))}
                                       onUploadPhoto={(photo) =>
-                                        applyPhotoToItem(
+                                        getPhotoLibraryId(liveItem) ? applyReplacedPhoto(photo) : applyPhotoToItem(
                                           liveItem
                                             ._clientKey,
                                           photo
@@ -4053,14 +4090,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           )
         }
 
-        onPick={(picked) => {
+        onPick={async (picked) => {
           if (
             !photoPickerKey
           ) {
             return;
           }
 
-          applyPhotoToItem(
+          await pickSlidePhoto(
             photoPickerKey,
             picked
           );

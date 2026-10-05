@@ -33,6 +33,8 @@ export default function UploadPhotoDialog({
   onClose,
   onUploaded,
   title = "Upload Photo",
+  replacePhotoLibraryId = null,
+  beforeUpload = null,
 }) {
   const [
     file,
@@ -121,7 +123,7 @@ export default function UploadPhotoDialog({
       return;
     }
 
-    if (!tags.trim()) {
+    if (!replacePhotoLibraryId && !tags.trim()) {
       setError(
         "Add at least one tag."
       );
@@ -132,8 +134,11 @@ export default function UploadPhotoDialog({
     setError("");
 
     try {
+      if (beforeUpload && await beforeUpload() === false) return;
       const formData =
         new FormData();
+
+      if (replacePhotoLibraryId) formData.append("photo_library_id", String(replacePhotoLibraryId));
 
       formData.append(
         "photo",
@@ -165,7 +170,7 @@ export default function UploadPhotoDialog({
 
       const res =
         await fetch(
-          UPLOAD_URL,
+          replacePhotoLibraryId ? `${API_FOLDER}/v2/admin/photo-library/replace.php` : UPLOAD_URL,
           {
             method:
               "POST",
@@ -223,7 +228,7 @@ export default function UploadPhotoDialog({
     Boolean(
       file
       &&
-      tags.trim()
+      (replacePhotoLibraryId || tags.trim())
     )
     &&
     !uploading;
@@ -326,7 +331,7 @@ export default function UploadPhotoDialog({
           </label>
 
           <label>
-            Tags *
+            {replacePhotoLibraryId ? "Tags" : "Tags *"}
             <input
               type="text"
               value={tags}

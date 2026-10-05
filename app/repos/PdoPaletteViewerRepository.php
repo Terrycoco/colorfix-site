@@ -125,6 +125,10 @@ final class PdoPaletteViewerRepository
 
     public function create(array $data): PaletteViewer
     {
+        (new \App\PALETTES\Repos\PdoPVRepository($this->pdo))->assertUniqueTitleExperience(
+            (int)($data['project_id'] ?? 0), (int)($data['saved_palette_id'] ?? 0),
+            (string)($data['format'] ?? 'public'), (string)($data['title'] ?? '')
+        );
         $savedPaletteId = (int)($data['saved_palette_id'] ?? 0);
         $format = $this->normalizeKey((string)($data['format'] ?? 'public'));
 
@@ -179,6 +183,10 @@ final class PdoPaletteViewerRepository
 
     public function update(int $paletteViewerId, array $data): PaletteViewer
     {
+        (new \App\PALETTES\Repos\PdoPVRepository($this->pdo))->assertUniqueTitleExperience(
+            (int)($data['project_id'] ?? 0), (int)($data['saved_palette_id'] ?? 0),
+            (string)($data['format'] ?? ''), (string)($data['title'] ?? ''), $paletteViewerId
+        );
         if ($paletteViewerId <= 0) {
             throw new InvalidArgumentException('palette_viewer_id required');
         }

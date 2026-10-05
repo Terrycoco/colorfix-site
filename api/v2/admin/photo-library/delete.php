@@ -6,6 +6,7 @@ header('Content-Type: application/json; charset=UTF-8');
 
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
+require_once __DIR__ . '/../auth.php';
 
 use App\Repos\PdoPhotoLibraryRepository;
 use App\Services\PhotoLibraryUsageService;
@@ -31,15 +32,20 @@ try {
         respond(['ok' => false, 'error' => 'photo_library_id required'], 400);
     }
 
+    $pdo->beginTransaction();
+    $lock = $pdo->prepare('SELECT photo_library_id FROM photo_library WHERE photo_library_id = ? FOR UPDATE');
+    $lock->execute([$id]);
     $repo = new PdoPhotoLibraryRepository($pdo);
     $row = $repo->findById($id);
     if (!$row) {
+        $pdo->rollBack();
         respond(['ok' => false, 'error' => 'Photo not found'], 404);
     }
 
     $usageService = new PhotoLibraryUsageService($repo);
     $usages = $usageService->getUsageSummary($id);
     if ($usages) {
+        $pdo->rollBack();
         respond([
             'ok' => false,
             'error' => 'Photo is still in use elsewhere',
@@ -47,19 +53,25 @@ try {
         ], 409);
     }
 
+    $pdo->prepare('DELETE FROM photo_library WHERE photo_library_id = :id')->execute([':id' => $id]);
+    $pdo->commit();
+
     $sourceType = (string)$row['source_type'];
     $rel = (string)($row['rel_path'] ?? '');
     if (in_array($sourceType, ['progression', 'article', 'pin', 'client'], true) && $rel !== '' && str_starts_with($rel, '/photos/')) {
         $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../../..'), '/');
         $abs = $docRoot . $rel;
-        if (is_file($abs)) {
+        $shared = $pdo->prepare('SELECT COUNT(*) FROM photo_library WHERE rel_path IN (?, ?)');
+        $shared->execute([$rel, ltrim($rel, '/')]);
+        $assetRefs = $pdo->prepare('SELECT COUNT(*) FROM asset_library WHERE rel_path IN (?, ?)');
+        $assetRefs->execute([$rel, ltrim($rel, '/')]);
+        if (!(int)$shared->fetchColumn() && !(int)$assetRefs->fetchColumn() && is_file($abs)) {
             @unlink($abs);
         }
     }
 
-    $pdo->prepare('DELETE FROM photo_library WHERE photo_library_id = :id')->execute([':id' => $id]);
-
     respond(['ok' => true]);
 } catch (Throwable $e) {
+    if ($pdo->inTransaction()) { $pdo->rollBack(); }
     respond(['ok' => false, 'error' => $e->getMessage()], 500);
 }

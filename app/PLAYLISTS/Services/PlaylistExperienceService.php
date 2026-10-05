@@ -343,8 +343,16 @@ private function buildLinkedPVData(
         $experienceKey
     );
 
+    return $this->buildPVTargets($linkedPVs, $experienceKey);
+}
+
+/** @param array<int,array<string,mixed>> $linkedPVs */
+private function buildPVTargets(array $linkedPVs, string $experienceKey): array
+{
     $urls = [];
     $targets = [];
+    $seen = [];
+    $experienceKey = strtolower(trim($experienceKey));
 
     foreach ($linkedPVs as $pv) {
         $url = trim((string)($pv['rex_url'] ?? ''));
@@ -357,10 +365,28 @@ private function buildLinkedPVData(
             ? $pv['meta']
             : [];
 
+        $format = strtolower(trim((string)($meta['format'] ?? 'public')));
+        if ($format === 'full_palette') {
+            $format = 'public';
+        }
+        if ($format !== $experienceKey) {
+            continue;
+        }
+
+        $paletteId = (int)($meta['saved_palette_id'] ?? 0);
+        $pvId = (int)($meta['palette_viewer_id'] ?? 0);
+        $key = $paletteId > 0 ? 'palette:' . $paletteId : 'viewer:' . $pvId;
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+
         $urls[] = $url;
 
         $targets[] = [
             'palette_viewer_id' => (int)($meta['palette_viewer_id'] ?? 0),
+            'saved_palette_id' => $paletteId > 0 ? $paletteId : null,
+            'format' => $format,
             'palette_viewer_url' => $url,
             'title' => (string)($meta['display_title'] ?? $meta['title'] ?? ''),
             'image_url' => (string)($meta['photo_url'] ?? ''),

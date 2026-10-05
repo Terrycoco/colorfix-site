@@ -9,6 +9,7 @@ use App\REX\DTO\RexReservationSearchCriteria;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReserver;
 use App\REX\Services\RexTokenGenerator;
+use App\REX\Services\RexViewerPlaylistLinker;
 use InvalidArgumentException;
 use PDO;
 use Throwable;
@@ -83,6 +84,7 @@ final class RexCreateEndpoint
                 );
 
                 if ($reservation) {
+                    (new RexViewerPlaylistLinker($pdo))->link($reservation);
                     self::respond([
                         'ok' => true,
                         'item' => self::reservationPayload($reservation),
@@ -96,6 +98,8 @@ final class RexCreateEndpoint
                 $repo,
                 new RexTokenGenerator()
             ))->reserve($request);
+
+            (new RexViewerPlaylistLinker($pdo))->link($reservation);
 
             self::respond([
                 'ok' => true,

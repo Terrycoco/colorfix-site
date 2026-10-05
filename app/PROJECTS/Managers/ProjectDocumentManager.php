@@ -1678,11 +1678,26 @@ $this->templates =
 
             ) {
 
+                $hex = ltrim(trim((string)($color['color_hex6'] ?? '')), '#');
+                $swatch = preg_match('/^[0-9a-fA-F]{6}$/D', $hex) === 1
+                    ? '<span class="document-color-schedule__swatch" aria-hidden="true"'
+                        . ' style="display:inline-block;width:28px;height:28px;box-sizing:border-box;'
+                        . 'vertical-align:middle;margin-right:8px;border:1px solid #999;border-radius:3px;'
+                        . 'background-color:#' . $hex . ';print-color-adjust:exact;-webkit-print-color-adjust:exact;"></span>'
+                    : '';
+                $brand = $this->html(
+                    $color['color_brand_name'] ?? $color['color_brand'] ?? ''
+                );
+
                 $rows[] =
 
                     '<tr>'
 
                     . '<td>'
+
+                    . $swatch
+
+                    . '<span class="document-color-schedule__name">'
 
                     . $this->html(
 
@@ -1691,6 +1706,12 @@ $this->templates =
                         ?? ''
 
                     )
+
+                    . ($brand !== ''
+                        ? '<span class="document-color-schedule__mobile-brand" style="display:none">, ' . $brand . '</span>'
+                        : '')
+
+                    . '</span>'
 
                     . '</td>'
 
@@ -1744,7 +1765,7 @@ $this->templates =
 
                 . '</h3>'
 
-                . '<table class="document-color-schedule__table">'
+                . '<table class="document-color-schedule__table document-color-schedule__table--swatches">'
 
                 . '<thead>'
 
@@ -1780,11 +1801,55 @@ $this->templates =
 
         }
 
+        // Keep responsive layout with the saved document, including shared REX views.
+        $mobileStyles = <<<'HTML'
+<style>
+@media screen and (max-width: 560px) {
+  .document-color-schedule__table--swatches { font-size: 14px; line-height: 1.4; }
+  .document-color-schedule__table--swatches thead { display: none; }
+  .document-color-schedule__table--swatches tbody { display: block; }
+  .document-color-schedule__table--swatches tr {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid #e5e9ec;
+  }
+  .document-color-schedule__table--swatches tr:last-child { border-bottom: 0; }
+  .document-color-schedule__table--swatches td:first-child { display: contents; }
+  .document-color-schedule__table--swatches .document-color-schedule__swatch {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    width: 40px !important;
+    height: 40px !important;
+    margin: 0 !important;
+  }
+  .document-color-schedule__table--swatches .document-color-schedule__name {
+    grid-column: 2;
+    grid-row: 1;
+    overflow-wrap: break-word;
+  }
+  .document-color-schedule__table--swatches .document-color-schedule__mobile-brand { display: inline !important; }
+  .document-color-schedule__table--swatches td:nth-child(2) { display: none; }
+  .document-color-schedule__table--swatches td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 2;
+    width: auto;
+    padding: 0;
+    border: 0;
+    overflow-wrap: break-word;
+  }
+}
+</style>
+HTML;
 
 
         return
 
             '<div class="document-color-schedule">'
+
+            . $mobileStyles
 
             . implode('', $sections)
 

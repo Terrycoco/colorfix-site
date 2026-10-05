@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\REX\Resolvers;
 
 use App\PALETTES\Repos\PdoPVRepository;
+use App\PALETTES\PV\PVService;
 use App\REX\Contracts\RexResolverInterface;
 use App\REX\DTO\RexReservation;
 use App\REX\DTO\RexReservationDescriptor;
@@ -19,6 +20,7 @@ use RuntimeException;
 final class PlaylistThumbsResolver implements RexResolverInterface
 {
     private PdoPVRepository $pvs;
+    private PVService $pvService;
     private PdoPlaylistRepository $playlists;
     private PdoRexReservationRepository $reservations;
 
@@ -26,6 +28,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
         private PDO $pdo
     ) {
         $this->pvs = new PdoPVRepository($pdo);
+        $this->pvService = new PVService($pdo);
         $this->playlists = new PdoPlaylistRepository($pdo);
         $this->reservations = new PdoRexReservationRepository($pdo);
     }
@@ -111,6 +114,14 @@ final class PlaylistThumbsResolver implements RexResolverInterface
 
         $items = [];
         $seenPvIds = [];
+        $experienceKey = strtolower(trim((string)(
+            $parentRex->experienceKey
+            ?? $parentRex->context['experience_key']
+            ?? 'public'
+        )));
+        if (!in_array($experienceKey, ['public', 'concept', 'client', 'showcase'], true)) {
+            throw new RuntimeException('Unsupported Playlist Thumbs experience.');
+        }
 
         foreach ($viewerRelationships as $relationship) {
             $viewerRex = $relationship->reservation;
@@ -129,23 +140,25 @@ final class PlaylistThumbsResolver implements RexResolverInterface
                 continue;
             }
 
-            $pv = $this->pvs->findById($pvId);
+            $record = $this->pvs->findById($pvId);
 
-            if ($pv === null || !$pv->isActive || count($pv->swatches) < 1) {
+            if ($record === null || !(bool)($record['is_active'] ?? false)) {
                 continue;
             }
 
             $format = strtolower(trim(
-                (string)($pv->meta['format'] ?? '')
+                (string)($record['format'] ?? '')
             ));
 
-            if ($format !== 'public') {
+            if ($format !== $experienceKey) {
                 continue;
             }
 
+            // PVService owns the current colors and Use-filtered project photos.
+            $pv = $this->pvService->getPV($pvId);
             $seenPvIds[$pvId] = true;
 
-            $title = trim((string)($pv->meta['title'] ?? ''));
+            $title = trim((string)($pv['meta']['title'] ?? ''));
 
             if ($title === '') {
                 $title = "Palette Viewer #{$pvId}";
@@ -153,7 +166,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
 
             $swatches = [];
 
-            foreach ($pv->swatches as $swatch) {
+            foreach ($pv['swatches'] ?? [] as $swatch) {
                 $hex6 = trim((string)($swatch['hex6'] ?? ''));
 
                 if ($hex6 === '') {
@@ -179,10 +192,10 @@ final class PlaylistThumbsResolver implements RexResolverInterface
                 'pv_id' => $pvId,
                 'title' => $title,
                 'photo_url' => trim(
-                    (string)($pv->meta['photo_url'] ?? '')
+                    (string)($pv['meta']['photo_url'] ?? '')
                 ),
                 'photo_alt' => $this->nullableText(
-                    $pv->meta['photo_alt'] ?? null
+                    $pv['meta']['photo_alt'] ?? null
                 ),
                 'swatches' => $swatches,
                 'viewer_rex_id' => $viewerRex->id,
@@ -227,6 +240,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
                 'collection' => [
                     'playlist_id' => $playlistId,
                     'playlist_title' => $playlistTitle,
+                    'experience_key' => $experienceKey,
                     'title' => 'Colors Used',
                     'parent_rex_id' => $parentRex->id,
                     'parent_url' => '/t/' . $parentRex->token,

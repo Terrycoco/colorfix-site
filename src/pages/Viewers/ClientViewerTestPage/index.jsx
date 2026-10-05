@@ -141,9 +141,6 @@ export default function ClientViewerTestPage() {
       showShare={true}
       playlistUrl={testMeta.playlist_url}
       shareUrl="/test/client-viewer"
-      onSendToPainter={() => {
-        window.alert("Painter handoff action placeholder");
-      }}
     />
   );
 }

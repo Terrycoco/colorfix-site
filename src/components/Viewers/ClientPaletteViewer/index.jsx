@@ -32,8 +32,6 @@ export default function ClientPaletteViewer({
   shareText = "Here is the final ColorFix color plan.",
   shareUrl,
   playlistUrl = "",
-  onSendToPainter,
-  showPainterAction = true,
 }) {
   const [photoExpanded, setPhotoExpanded] = useState(false);
   const [expandedPhoto, setExpandedPhoto] = useState(null);
@@ -445,24 +443,11 @@ export default function ClientPaletteViewer({
             </div>
           )}
 
-          {(playlistUrl || showPainterAction) && (
+          {playlistUrl && (
             <div className="cpv-owner-actions">
-              {playlistUrl && (
-                <a className="cpv-action cpv-action--secondary" href={withSourceParam(playlistUrl)}>
-                  Replay Final Transformation
-                </a>
-              )}
-
-              {showPainterAction && (
-                <button
-                  type="button"
-                  className="cpv-action cpv-action--primary"
-                  onClick={onSendToPainter}
-                  aria-disabled={!onSendToPainter}
-                >
-                  Send to Painter
-                </button>
-              )}
+              <a className="cpv-action cpv-action--secondary" href={withSourceParam(playlistUrl)}>
+                Replay Final Transformation
+              </a>
             </div>
           )}
         </div>
