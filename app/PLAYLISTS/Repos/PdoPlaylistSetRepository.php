@@ -217,6 +217,7 @@ final class PdoPlaylistSetRepository
                     playlist_id,
                     target_set_id,
                     item_type,
+                    experience_key,
                     sort_order,
                     created_at,
                     updated_at
@@ -262,12 +263,14 @@ final class PdoPlaylistSetRepository
                     playlist_id,
                     target_set_id,
                     item_type,
+                    experience_key,
                     sort_order
                  ) VALUES (
                     :playlist_set_id,
                     :playlist_id,
                     :target_set_id,
                     :item_type,
+                    :experience_key,
                     :sort_order
                  )'
             );
@@ -338,6 +341,9 @@ final class PdoPlaylistSetRepository
 
                 ':item_type' =>
                     $itemType,
+
+                ':experience_key' =>
+                    $itemType === 'playlist' ? ($item['experience_key'] ?? 'public') : 'public',
 
                 ':sort_order' =>
                     isset($item['sort_order'])
@@ -508,6 +514,8 @@ final class PdoPlaylistSetRepository
 
             sortOrder:
                 (int)$row['sort_order'],
+
+            experienceKey: (string)($row['experience_key'] ?? 'public'),
 
             createdAt:
                 $row['created_at'] !== null

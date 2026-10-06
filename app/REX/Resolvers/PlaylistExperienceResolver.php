@@ -21,6 +21,7 @@ final class PlaylistExperienceResolver implements RexResolverInterface
     private const SUPPORTED_EXPERIENCES = [
         'public',
         'concept',
+        'showcase',
         'client',
     ];
 

@@ -12,6 +12,7 @@
   flex-direction: column;
   gap: 16px;
   min-height: 0;
+  min-width: 0;
 }
 
 .cta-panel {
@@ -23,6 +24,7 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  flex-shrink: 0;
 }
 
 .cta-column:first-child .cta-panel {
@@ -50,6 +52,17 @@
 .panel-actions {
   display: flex;
   gap: 8px;
+}
+
+.admin-ctas .panel-actions {
+  flex-wrap: wrap;
+}
+
+.admin-ctas .cta-help-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .primary-btn {
@@ -137,6 +150,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .form-grid label {
@@ -165,7 +179,7 @@
   grid-column: 1 / -1;
 }
 
-.checkbox-row {
+.admin-ctas .form-grid .checkbox-row {
   flex-direction: row;
   align-items: center;
   gap: 6px;

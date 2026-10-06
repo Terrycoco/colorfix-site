@@ -58,8 +58,8 @@ final class BeforeAfterVideoRecipe
 
 
     /* COPY */
-    public const BEFORE_LABEL = 'BEFORE';
-    public const AFTER_LABEL = 'AFTER';
+    public const BEFORE_LABEL = 'Before';
+    public const AFTER_LABEL = 'ColorFixed';
 
 
     /* VISUAL CONSTANTS */

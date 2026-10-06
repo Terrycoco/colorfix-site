@@ -40,7 +40,28 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
             ':event_key' => $eventKey,
         ]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        if ($resourceType === 'palette_viewer' && $rows !== []) {
+            $ids = array_values(array_unique(array_column($rows, 'resource_id')));
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $titles = $this->pdo->prepare(
+                "SELECT palette_viewer_id, title
+                   FROM palette_viewers
+                  WHERE palette_viewer_id IN ({$placeholders})"
+            );
+            $titles->execute($ids);
+            $byId = $titles->fetchAll(PDO::FETCH_KEY_PAIR);
+
+            foreach ($rows as &$row) {
+                $id = (int)$row['resource_id'];
+                $title = trim((string)($byId[$id] ?? ''));
+                $row['title'] = $title !== '' ? $title : "Viewer #{$id}";
+            }
+            unset($row);
+        }
+
+        return $rows;
     }
 
     public function listResourceTypes(): array

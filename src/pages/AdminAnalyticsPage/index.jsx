@@ -50,6 +50,7 @@ function resourceLabel(resourceType) {
   if (resourceType === "page") return "Page";
   if (resourceType === "article") return "Article";
   if (resourceType === "playlist") return "Playlist";
+  if (resourceType === "palette_viewer") return "Viewer";
   return "Resource";
 }
 

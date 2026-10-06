@@ -14,5 +14,6 @@ final class PlaylistSetItem
         public int $sortOrder = 0,
         public ?string $createdAt = null,
         public ?string $updatedAt = null,
+        public string $experienceKey = 'public',
     ) {}
 }

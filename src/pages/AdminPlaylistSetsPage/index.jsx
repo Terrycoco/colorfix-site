@@ -112,6 +112,8 @@ function normalizeItems(
       playlist_id:
         item?.playlist_id ?? null,
 
+      experience_key: item?.experience_key || "public",
+
       target_set_id:
         item?.target_set_id ?? null,
 
@@ -1145,6 +1147,8 @@ export default function AdminPlaylistSetsPage() {
                 ? "set"
                 : "playlist",
 
+            experience_key: item.experience_key || "public",
+
             playlist_id:
               item.item_type ===
               "set"
@@ -1529,6 +1533,30 @@ export default function AdminPlaylistSetsPage() {
     {
       key:
         "type",
+      label: "Experience",
+      sortable: false,
+      render: (item) => item.item_type === "set" ? null : (
+        <select
+          aria-label={`Experience for ${item.title || `Playlist #${item.playlist_id}`}`}
+          value={item.experience_key || "public"}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            const experience_key = event.target.value;
+            setSetItems((current) => current.map((row) =>
+              row._key === item._key ? { ...row, experience_key } : row
+            ));
+          }}
+        >
+          <option value="public">Public</option>
+          <option value="concept">Concept</option>
+          <option value="showcase">Showcase</option>
+          <option value="client">Client</option>
+        </select>
+      ),
+    },
+
+    {
+      key: "item_type",
 
       label:
         "Type",
@@ -1944,7 +1972,7 @@ export default function AdminPlaylistSetsPage() {
 
                       <AdminPanel
                         title="Playlists in this Set"
-                        meta="Playlist titles and images are derived from the playlist itself. Membership stores only playlist/set identity and order."
+                        meta="Playlist titles and images are derived from the playlist itself."
                       >
                         <AdminStack
                           gap="md"

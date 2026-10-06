@@ -371,6 +371,20 @@ final class PlaylistSetService
         int $setId,
         array $items
     ): void {
+        $experiences = new \App\PLAYLISTS\Repos\PdoPlayerExperienceRepository($this->pdo);
+        foreach ($items as &$item) {
+            if (($item['item_type'] ?? 'playlist') === 'set') {
+                $item['experience_key'] = 'public';
+                continue;
+            }
+            $key = strtolower(trim((string)($item['experience_key'] ?? 'public')));
+            $experience = $experiences->getByExperienceKey($key);
+            if (!in_array($key, ['public', 'concept', 'showcase', 'client'], true) || !$experience || !$experience->isActive) {
+                throw new InvalidArgumentException("Unknown or inactive playlist experience: {$key}");
+            }
+            $item['experience_key'] = $key;
+        }
+        unset($item);
         if (
             !$this->sets
                 ->getById(
@@ -506,14 +520,14 @@ final class PlaylistSetService
             }
         }
 
-        $publicRexByPlaylistId = [];
+        $rexByExperience = [];
 
         if (
             $publicOnly
             && $playlistIds !== []
         ) {
-            $publicRexByPlaylistId =
-                $this->rex
+            foreach (array_unique(array_map(fn(PlaylistSetItem $item): string => $item->experienceKey, $items)) as $experienceKey) {
+                $rexByExperience[$experienceKey] = $this->rex
                     ->findActiveByResourceIdsAndExperience(
                         'playlist_experience',
                         'playlist',
@@ -522,8 +536,9 @@ final class PlaylistSetService
                                 $playlistIds
                             )
                         ),
-                        'public'
+                        $experienceKey
                     );
+            }
         }
 
         $result = [];
@@ -654,7 +669,7 @@ final class PlaylistSetService
             $publicRex =
                 $publicOnly
                     ? (
-                        $publicRexByPlaylistId[
+                        $rexByExperience[$item->experienceKey][
                             $item->playlistId
                         ] ?? null
                     )
@@ -682,6 +697,8 @@ final class PlaylistSetService
 
                 'item_type' =>
                     'playlist',
+
+                'experience_key' => $item->experienceKey,
 
                 'playlist_id' =>
                     $item->playlistId,

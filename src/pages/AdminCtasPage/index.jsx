@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { CircleHelp } from "lucide-react";
 import { API_FOLDER } from "@helpers/config";
 import ModalDialog from "@components/ModalDialog";
 import "./admin-ctas.css";
@@ -79,6 +80,7 @@ export default function AdminCtasPage() {
   const [eventTypes, setEventTypes] = useState([]);
   const [ctaForm, setCtaForm] = useState(emptyCta);
   const [eventsModalOpen, setEventsModalOpen] = useState(false);
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false);
   const [eventForm, setEventForm] = useState(emptyEventForm);
   const [eventSaving, setEventSaving] = useState(false);
   const [eventError, setEventError] = useState("");
@@ -426,6 +428,15 @@ export default function AdminCtasPage() {
           <div className="panel-header">
             <div className="panel-title">CTAs</div>
             <div className="panel-actions">
+              <button
+                type="button"
+                className="secondary-btn cta-help-button"
+                title="CTA Params Cheat Sheet"
+                aria-label="CTA Params Cheat Sheet"
+                onClick={() => setCheatSheetOpen(true)}
+              >
+                <CircleHelp size={18} aria-hidden="true" />
+              </button>
               <Link className="secondary-btn" to="/admin/cta-pages">
                 CTA Pages
               </Link>
@@ -702,10 +713,12 @@ export default function AdminCtasPage() {
             </div>
           )}
         </div>
-        <div className="cta-panel cta-cheatsheet">
-          <div className="panel-header">
-            <div className="panel-title">CTA Params Cheat Sheet</div>
-          </div>
+        <ModalDialog
+          open={cheatSheetOpen}
+          title="CTA Params Cheat Sheet"
+          onClose={() => setCheatSheetOpen(false)}
+          width="680px"
+        >
           <div className="cta-cheatsheet-body">
             <div className="cta-cheatsheet-row">
               <div className="cta-cheatsheet-key">style</div>
@@ -747,7 +760,7 @@ export default function AdminCtasPage() {
               Add these inside Params (JSON). Example: {"{ \"style\":\"link\", \"align\":\"center\" }"}
             </div>
           </div>
-        </div>
+        </ModalDialog>
       </div>
 
       {(status || error) && (

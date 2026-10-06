@@ -14,6 +14,7 @@ import UploadPhotoDialog from "@components/Dialogs/UploadPhotoDialog";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import fetchColorDetail from "@data/fetchColorDetail";
 import { API_FOLDER } from "@helpers/config";
+import { parsePhotoRef } from "@helpers/assetImage";
 const DEFAULT_HUE_WHEEL_CONFIG = {
   items: [
     { hue: 145, label: "Green", color: "#6F8F72", animate: false },
@@ -119,7 +120,7 @@ export default function PlaylistSlideEditor({
     onUpdate("palette_hash", nextHash);
     onUpdate("saved_palette_set_id", "");
   }
-  const photoId = item?.photo_library_id || "";
+  const photoId = item?.photo_library_id || parsePhotoRef(item?.image_url || "")?.photoId || "";
   const hueConfig =
     item?.item_type === "hue-wheel"
       ? parseHueWheelBody(item.body)
@@ -238,12 +239,14 @@ export default function PlaylistSlideEditor({
                   No photo
                 </AdminMetaText>
               )}
+              {photoId ? (
+                <div style={{ marginTop: "4px" }}>
+                  <AdminMetaText as="span">Photo #{photoId}</AdminMetaText>
+                </div>
+              ) : null}
             </div>
             <AdminStack gap="sm">
               <AdminToolbar compact>
-                <AdminMetaText as="span">
-                  Photo #{photoId || "—"}
-                </AdminMetaText>
                 {photoId ? (
                   <PermissionStatus
                     status={photoInfo?.photoPermissionStatus || "unknown"}

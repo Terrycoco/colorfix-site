@@ -1056,7 +1056,7 @@ export default function AdminPlaylistsPage() {
 
       detail={
 
-        <PlaylistEditor
+        (routePlaylistId || isNewRoute) ? <PlaylistEditor
 
           ref={
 
@@ -1103,7 +1103,7 @@ export default function AdminPlaylistsPage() {
 
           }
 
-        />
+        /> : <AdminEmptyState title="Playlists" message={listLoading ? "Loading playlists..." : "Select a playlist."} />
 
       }
 

@@ -45,13 +45,14 @@ public function buildPlaybackPlanFromPlaylistExperience(
 
     $experienceKey = strtolower(trim($experienceKey));
 
-    if ($experienceKey === 'public') {
+    if (in_array($experienceKey, ['public', 'showcase'], true)) {
         return $this->buildPublicPlaybackPlanFromPlaylistExperience(
             $playlistId,
             $sourceAttribution,
             $start,
             $startTarget,
-            $reservationToken
+            $reservationToken,
+            $experienceKey
         );
     }
 
@@ -59,8 +60,9 @@ public function buildPlaybackPlanFromPlaylistExperience(
     $projectId = (int)($projectRepo->findProjectIdByPlaylistId($playlistId) ?? 0);
 
     if ($projectId <= 0) {
-        throw new RuntimeException(
-            "Playlist {$playlistId} is not attached to a project"
+        return $this->buildPublicPlaybackPlanFromPlaylistExperience(
+            $playlistId, $sourceAttribution, $start, $startTarget,
+            $reservationToken, $experienceKey
         );
     }
 
@@ -80,10 +82,12 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     ?string $sourceAttribution = null,
     ?int $start = null,
     ?array $startTarget = null,
-    ?string $reservationToken = null
+    ?string $reservationToken = null,
+    string $experienceKey = 'public'
 ): array {
     $startedAt = microtime(true);
-    $experience = $this->resolveExperienceByKey('public', "playlist reservation experience 'public'");
+    $experience = $this->resolveExperienceByKey($experienceKey, "playlist reservation experience '{$experienceKey}'");
+    $isShowcase = $experienceKey === 'showcase';
     $slideFlag = $this->normalizeSlideFlag($experience->slideFlag);
 
     $playlistStartedAt = microtime(true);
@@ -104,11 +108,23 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
 
     $items = $this->filterPlayableItems($sourceItems);
 
-    $paletteViewerKey = $experience->paletteViewerKey;
-    $showSlidePalettePrompt = $this->shouldShowSlidePalettePrompt($experience);
+    $paletteViewerKey = $isShowcase ? 'none' : $experience->paletteViewerKey;
+    $showSlidePalettePrompt = !$isShowcase && $this->shouldShowSlidePalettePrompt($experience);
+    if ($isShowcase) {
+        foreach ($items as $item) {
+            $item->palette_hash = null;
+            $item->palette_title = null;
+            $item->saved_palette_set_id = null;
+            $item->color_plan_id = null;
+            $item->palette_viewer_url = null;
+            $item->painter_palette_viewer_url = null;
+        }
+    }
 
     /* $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken); */
-    $viewerRex = $this->buildLinkedPVData(
+    $viewerRex = $isShowcase
+        ? ['count' => 0, 'urls' => [], 'targets' => []]
+        : $this->buildLinkedPVData(
         $playlistId,
         $experience->experienceKey
     );
@@ -131,7 +147,9 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
 
     $ctaStartedAt = microtime(true);
     $ctaRepo = new PdoCtaRepository($this->pdo);
-    $ctaPageId = $this->resolvePublicRexCtaPageId($ctaRepo, $experience->ctaPageId);
+    $ctaPageId = $experienceKey === 'public'
+        ? $this->resolvePublicRexCtaPageId($ctaRepo, $experience->ctaPageId)
+        : $experience->ctaPageId;
     $ctas = $this->selectRexCtas(
         $ctaRepo->getByGroupId($ctaPageId),
         $colorsUsedDestination
@@ -169,7 +187,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'items' => $items,
         'ctas' => $ctas,
         'cta_context_key' => null,
-        'audience' => 'public',
+        'audience' => $experienceKey === 'showcase' ? 'public' : $experienceKey,
         'palette_viewer_cta_group_id' => null,
         'show_slide_palette_prompt' => $showSlidePalettePrompt,
         'thumbs_enabled' => $thumbsEnabled,
@@ -185,13 +203,13 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'hide_stars' => false,
         'playlist_instance_set_ids' => [],
         'player_experience_id' => $experience->playerExperienceId,
-        'experience_key' => 'public',
+        'experience_key' => $experienceKey,
         'player_experience_config_key' => $experience->experienceKey,
         'experience_name' => $experience->name,
         'slide_flag' => $slideFlag,
         'palette_viewer_key' => $paletteViewerKey,
         'cta_page_id' => $ctaPageId,
-        'experience_source' => 'playlist_rex_public',
+        'experience_source' => 'playlist_rex_' . $experienceKey,
         'src' => $sourceAttribution,
         'reservation_token' => $reservationToken,
         'viewer_rex_count' => $viewerRexCount,

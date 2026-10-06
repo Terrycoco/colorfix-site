@@ -33,6 +33,10 @@ const EXPERIENCE_ORDER = [
     label: "Concept",
   },
   {
+    key: "showcase",
+    label: "Showcase",
+  },
+  {
     key: "client",
     label: "Client",
   },
