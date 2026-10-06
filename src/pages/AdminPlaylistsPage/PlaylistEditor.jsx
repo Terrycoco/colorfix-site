@@ -6,6 +6,8 @@ import {
   useMemo,
   useState,
 } from "react";
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import PlaylistSlideDragRow, { PlaylistSlideDragHandle } from "./PlaylistSlideDragRow";
 
 import {
   useNavigate,
@@ -1840,56 +1842,26 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   }
 
 
-  function moveItem(
-    clientKey,
-    direction
-  ) {
-    setItems(
-      (current) => {
-        const index =
-          current.findIndex(
-            (row) =>
-              row
-                ._clientKey ===
-              clientKey
-          );
+  const slideDragSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-        const target =
-          index +
-          direction;
-
-        if (
-          index <
-            0
-          ||
-          target <
-            0
-          ||
-          target >=
-            current.length
-        ) {
-          return current;
-        }
-
-        const next = [
-          ...current,
-        ];
-
-        [
-          next[index],
-          next[target],
-        ] = [
-          next[target],
-          next[index],
-        ];
-
-        return next;
-      }
-    );
-
+  function moveSlide(from, to) {
+    if (saving || from === to || from < 0 || to < 0 || to >= items.length) return;
+    setItems((current) => {
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
     markDirty();
   }
 
+  function handleSlideDragEnd({ active, over }) {
+    if (!over || active.id === over.id) return;
+    moveSlide(
+      items.findIndex((item) => item._clientKey === active.id),
+      items.findIndex((item) => item._clientKey === over.id)
+    );
+  }
 
   function clearItemPhoto(
     clientKey
@@ -3031,71 +3003,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             false,
 
           render:
-            (item) => {
-              const index =
-                itemIndex(
-                  items,
-                  item
-                );
-
-              return (
-                <>
-                  <button
-                    type="button"
-                    className="admin-smart-grid__edit-button"
-                    title="Move up"
-                    aria-label="Move slide up"
-                    disabled={
-                      index <=
-                      0
-                    }
-                    onClick={(
-                      event
-                    ) => {
-                      event
-                        .stopPropagation();
-
-                      moveItem(
-                        item
-                          ._clientKey,
-                        -1
-                      );
-                    }}
-                  >
-                    ↑
-                  </button>
-
-                  <button
-                    type="button"
-                    className="admin-smart-grid__edit-button"
-                    title="Move down"
-                    aria-label="Move slide down"
-                    disabled={
-                      index <
-                        0
-                      ||
-                      index >=
-                        items.length -
-                          1
-                    }
-                    onClick={(
-                      event
-                    ) => {
-                      event
-                        .stopPropagation();
-
-                      moveItem(
-                        item
-                          ._clientKey,
-                        1
-                      );
-                    }}
-                  >
-                    ↓
-                  </button>
-                </>
-              );
-            },
+            () => <PlaylistSlideDragHandle />,
         },
 
         {
@@ -3584,7 +3492,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                   {
                     items.length
                       ? (
+                          <DndContext sensors={slideDragSensors} collisionDetection={closestCenter} onDragEnd={handleSlideDragEnd}>
                           <AdminSmartGrid
+                            renderRow={(row, item) => (
+                              <PlaylistSlideDragRow key={item._clientKey} row={row} item={item}
+                                index={itemIndex(items, item)} disabled={saving || items.length < 2} onMove={moveSlide} />
+                            )}
                             items={
                               items
                             }
@@ -3861,6 +3774,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
                             ariaLabel="Playlist slides"
                           />
+                          </DndContext>
                         )
                       : (
                           <AdminEmptyState

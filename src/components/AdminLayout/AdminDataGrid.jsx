@@ -45,6 +45,7 @@ export default function AdminDataGrid({
   items = null,
   columns = null,
   getRowKey = (item) => item.id,
+  renderRow,
 
   selectedKey: controlledSelectedKey,
   onSelectionChange,
@@ -628,7 +629,7 @@ export default function AdminDataGrid({
                         item
                       );
 
-                    return (
+                    const row = (
                       <tr
                         key={
                           key
@@ -675,6 +676,7 @@ export default function AdminDataGrid({
                         )}
                       </tr>
                     );
+                    return renderRow ? renderRow(row, item) : row;
                   }
                 )}
               </tbody>

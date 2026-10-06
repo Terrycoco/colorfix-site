@@ -1,0 +1,35 @@
+.playlist-slide-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #111;
+  cursor: grab;
+  touch-action: none;
+}
+
+.playlist-slide-drag-handle:active {
+  cursor: grabbing;
+}
+
+.playlist-slide-drag-handle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.playlist-slide-drag-row.is-dragging {
+  opacity: 0.6;
+  background: #eef7f7;
+}
+
+.playlist-slide-drag-row.is-drop-before > td {
+  box-shadow: inset 0 3px #467476;
+}
+
+.playlist-slide-drag-row.is-drop-after > td {
+  box-shadow: inset 0 -3px #467476;
+}
