@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../../db.php';
 require_once __DIR__ . '/../auth.php';
 
 use App\PHOTOS\Services\PhotoReplacementService;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 
 header('Content-Type: application/json; charset=UTF-8');
 try {

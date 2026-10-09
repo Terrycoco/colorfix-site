@@ -7,7 +7,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Services\PhotoLibraryService;
 
 function respond(array $payload, int $status = 200): void

@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 require_once __DIR__ . '/../auth.php';
 
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoAssetLibraryRepository;
 use App\Services\AssetLibraryService;
 use App\Services\PhotoAltTextQueueService;

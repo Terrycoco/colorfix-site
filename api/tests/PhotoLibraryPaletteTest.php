@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/ProjectPhotosTest.php';
 
 use App\PROJECTS\Repos\PdoProjectPhotoRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoColorTriggerPhotoRepository;
 
 function libraryPaletteFixture(): PDO

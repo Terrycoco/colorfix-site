@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/PhotoReplacementTest.php';
 
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 
 function photo_library_usage_fixture(): array
 {

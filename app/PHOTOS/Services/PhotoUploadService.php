@@ -5,7 +5,7 @@ namespace App\PHOTOS\Services;
 
 use App\PHOTOS\Entities\PhotoEntity;
 use App\Repos\PdoAssetLibraryRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Services\AssetLibraryService;
 use App\Services\PhotoAltTextQueueService;
 use App\Services\PhotoLibraryService;

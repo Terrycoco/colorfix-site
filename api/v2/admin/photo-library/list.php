@@ -266,7 +266,7 @@ try {
     $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $libraryOwnsPalette = (new \App\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable();
+    $libraryOwnsPalette = (new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable();
     if ($libraryOwnsPalette) {
         $direct = $pdo->prepare("SELECT pl.palette_id, COALESCE(NULLIF(p.display_title, ''), NULLIF(p.nickname, ''), p.palette_hash) AS label
             FROM photo_library pl LEFT JOIN saved_palettes p ON p.id = pl.palette_id WHERE pl.photo_library_id = ?");

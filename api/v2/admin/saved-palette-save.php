@@ -10,7 +10,7 @@ require_once __DIR__ . '/auth.php';
 
 use App\Controllers\SavedPaletteController;
 use App\Repos\PdoSavedPaletteRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Services\PhotoLibraryService;
 use App\Services\SavedPaletteService;
 

@@ -8,7 +8,7 @@ use App\Services\PhotoRenderingService;
 use App\Services\MaskOverlayService;
 use App\Services\PhotosUploadService;
 use App\Services\PhotoLibraryService;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use PDO;
 use RuntimeException;
 

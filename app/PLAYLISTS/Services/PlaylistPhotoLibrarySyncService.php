@@ -6,7 +6,7 @@ namespace App\PLAYLISTS\Services;
 
 use App\Services\PhotoLibraryService;
 use App\Services\PhotoRenderingService;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoPhotoRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use PDO;

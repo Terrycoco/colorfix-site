@@ -4,15 +4,26 @@ declare(strict_types=1);
 namespace App\ANA\Repos;
 
 use App\ANA\Contracts\ANAEventRepositoryInterface;
+use App\ANA\Contracts\ANASourceRepositoryInterface;
 use App\ANA\DTO\ANAEvent;
 use PDO;
 
 final class PdoANAEventRepository implements ANAEventRepositoryInterface
 {
-    public function __construct(private PDO $pdo) {}
+    private ANASourceRepositoryInterface $sources;
+
+    public function __construct(private PDO $pdo, ?ANASourceRepositoryInterface $sources = null)
+    {
+        $this->sources = $sources ?? new PdoANASourceRepository($pdo);
+    }
 
     public function record(ANAEvent $event): int
     {
+        // Preserve NULL attribution and the existing rejection of unknown keys.
+        if ($event->src !== null && !$this->sources->isValidSource($event->src)) {
+            throw new \RuntimeException('Unrecognized analytics source.');
+        }
+
         $payloadJson = $event->payload !== []
             ? json_encode($event->payload, JSON_UNESCAPED_SLASHES)
             : null;

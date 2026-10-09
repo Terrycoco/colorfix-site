@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../autoload.php';
 
 use App\ANA\DTO\ANAEvent;
+use App\ANA\Contracts\ANASourceRepositoryInterface;
 use App\ANA\Repos\PdoANAEventRepository;
 
 test('client source migration allows tagged playlist visits and is repeatable', function () {
@@ -22,7 +23,10 @@ test('client source migration allows tagged playlist visits and is repeatable', 
         payload_json TEXT, created_at TEXT,
         FOREIGN KEY (source_key) REFERENCES analytics_sources(source_key)
     )');
-    $repo = new PdoANAEventRepository($pdo);
+    // This historical test exercises the old FK migration, not current source lookup.
+    $repo = new PdoANAEventRepository($pdo, new class implements ANASourceRepositoryInterface {
+        public function isValidSource(string $src): bool { return true; }
+    });
     $event = new ANAEvent(
         eventKey: 'visit', reservationId: 162,
         resolverKey: 'playlist_experience', resourceType: 'playlist',

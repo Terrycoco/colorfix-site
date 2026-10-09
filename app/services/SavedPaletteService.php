@@ -8,7 +8,7 @@ use InvalidArgumentException;
 use App\Lib\SmtpMailer;
 use App\Services\EmailTemplateService;
 use App\Services\PhotoLibraryService;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Services\ShareService;
 
 class SavedPaletteService

@@ -276,7 +276,7 @@ try {
         ...array_keys($colorIds),
         ...array_keys($colorIds),
       ];
-      if ((new \App\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable()) {
+      if ((new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($pdo))->paletteColumnAvailable()) {
         $stmtSaved = $pdo->prepare("SELECT m.color_id, pl.photo_library_id, pl.rel_path,
             'zoom' AS photo_type, NULL AS trigger_color_id, pl.photo_library_id AS order_index,
             sp.id AS saved_palette_id, NULL AS saved_palette_set_id, sp.palette_hash, sp.nickname, sp.brand

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
 use App\Repos\PdoClientRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Services\ClientService;
 
 function respond(array $payload, int $status = 200): void {

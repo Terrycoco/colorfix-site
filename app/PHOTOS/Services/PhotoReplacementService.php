@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\PHOTOS\Services;
 
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoAssetLibraryRepository;
 use InvalidArgumentException;

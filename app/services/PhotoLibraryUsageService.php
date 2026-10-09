@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 
 final class PhotoLibraryUsageService
 {

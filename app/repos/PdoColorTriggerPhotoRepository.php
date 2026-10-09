@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace App\Repos;
 
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
+
 use PDO;
 
 final class PdoColorTriggerPhotoRepository

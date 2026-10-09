@@ -10,6 +10,11 @@ export default function PlayerPage() {
   const { playlistId, start, token: routeToken } = useParams();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const isPod = location.pathname.replace(/\/+$/, "") === "/pod";
+  const podPhotos = searchParams.get("photos") ?? "";
+  const podBefore = searchParams.get("before") ?? "1";
+  const podCaptions = searchParams.get("captions") ?? "1";
+  const podRequestKey = JSON.stringify([isPod, podPhotos, podBefore, podCaptions, searchParams.get("src") ?? ""]);
 
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const ctaAudience = searchParams.get("aud") ?? "";
@@ -32,39 +37,49 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
+  const [loadedPodRequestKey, setLoadedPodRequestKey] = useState("");
 
   useEffect(() => {
-    if (!playlistId && !reservationTokenParam) {
+    if ((!isPod && !playlistId && !reservationTokenParam) || (isPod && !podPhotos.trim())) {
       setError("Playlist unavailable");
       setErrorCode("playlist_unavailable");
+      setLoadedPodRequestKey(podRequestKey);
       setLoading(false);
       return;
     }
 
     const params = new URLSearchParams();
 
-    if (reservationTokenParam) {
-      params.set("reservation_token", reservationTokenParam);
-    } else if (isNumericId(playlistId)) {
-      params.set("playlist_instance_id", playlistId);
+    if (isPod) {
+      params.set("photos", podPhotos);
+      params.set("before", podBefore);
+      params.set("captions", podCaptions);
+      // POD source comes from this link, without changing its presentation.
+      if (sourceParam !== "") params.set("src", sourceParam);
     } else {
-      params.set("playlist_slug", playlistId);
+      if (reservationTokenParam) {
+        params.set("reservation_token", reservationTokenParam);
+      } else if (isNumericId(playlistId)) {
+        params.set("playlist_instance_id", playlistId);
+      } else {
+        params.set("playlist_slug", playlistId);
+      }
+
+      if (startParamValue !== "") params.set("start", startParamValue);
+      if (offsetParam !== "") params.set("offset", offsetParam);
+      if (positionParam !== "") params.set("position", positionParam);
+      if (slideIdParam !== "") params.set("slide_id", slideIdParam);
+      if (photoIdParam !== "") params.set("photo_id", photoIdParam);
+      if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
+      if (ctaAudience !== "") params.set("aud", ctaAudience);
+      if (returnTo !== "") params.set("return_to", returnTo);
+
+      applySourceToParams(params, sourceParam);
+
+      if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
+      if (freshParam !== "") params.set("fresh", freshParam);
+      if (reloadParam !== "") params.set("_", reloadParam);
     }
-
-    if (startParamValue !== "") params.set("start", startParamValue);
-    if (offsetParam !== "") params.set("offset", offsetParam);
-    if (positionParam !== "") params.set("position", positionParam);
-    if (slideIdParam !== "") params.set("slide_id", slideIdParam);
-    if (photoIdParam !== "") params.set("photo_id", photoIdParam);
-    if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
-    if (ctaAudience !== "") params.set("aud", ctaAudience);
-    if (returnTo !== "") params.set("return_to", returnTo);
-
-    applySourceToParams(params, sourceParam);
-
-    if (debugTimingParam !== "") params.set("debug_timing", debugTimingParam);
-    if (freshParam !== "") params.set("fresh", freshParam);
-    if (reloadParam !== "") params.set("_", reloadParam);
 
     let cancelled = false;
 
@@ -72,11 +87,13 @@ export default function PlayerPage() {
     setError("");
     setErrorCode("");
 
-    fetchPlayerPlaylist(`/api/v2/player-playlist.php?${params.toString()}`)
+    const endpoint = isPod ? "/api/v2/pod/get.php" : "/api/v2/player-playlist.php";
+    fetchPlayerPlaylist(`${endpoint}?${params.toString()}`)
       .then((payload) => {
         if (cancelled) return;
 
-        if (!payload?.ok || !payload?.data) {
+        const nextData = isPod ? payload?.plan : payload?.data;
+        if (!payload?.ok || !nextData) {
           throw new Error(payload?.error || "Failed to load playlist");
         }
 
@@ -84,7 +101,7 @@ export default function PlayerPage() {
           console.log("player-playlist timing_ms", payload.timing_ms);
         }
 
-        setData(payload.data);
+        setData(nextData);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -93,13 +110,21 @@ export default function PlayerPage() {
         setErrorCode(err?.code || "");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadedPodRequestKey(podRequestKey);
+          setLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
   }, [
+    isPod,
+    podPhotos,
+    podBefore,
+    podCaptions,
+    podRequestKey,
     playlistId,
     reservationTokenParam,
     startParamValue,
@@ -116,7 +141,7 @@ export default function PlayerPage() {
     reloadParam,
   ]);
 
-  if (loading) {
+  if (loading || (isPod && loadedPodRequestKey !== podRequestKey)) {
     return (
       <div className="player-page">
         <PlayerLoadingIndicator label="Loading playlist" />
@@ -142,23 +167,27 @@ export default function PlayerPage() {
     );
   }
 
-      const canonicalPlaylistId = Number(data?.playlist_id);
+  if (isPod) {
+    return <PlayerExperience key={podRequestKey} data={data} />;
+  }
 
-    if (!Number.isInteger(canonicalPlaylistId) || canonicalPlaylistId <= 0) {
-      return <PlayerExperience data={data} />;
-    }
+  const canonicalPlaylistId = Number(data?.playlist_id);
 
-    return (
-      <ANATrack
-        resource={{
-          resource_type: "playlist",
-          resource_id: canonicalPlaylistId,
-          experience_key: data?.experience_key ?? null,
-        }}
-      >
-        <PlayerExperience data={data} />
-      </ANATrack>
-    );
+  if (!Number.isInteger(canonicalPlaylistId) || canonicalPlaylistId <= 0) {
+    return <PlayerExperience data={data} />;
+  }
+
+  return (
+    <ANATrack
+      resource={{
+        resource_type: "playlist",
+        resource_id: canonicalPlaylistId,
+        experience_key: data?.experience_key ?? null,
+      }}
+    >
+      <PlayerExperience data={data} />
+    </ANATrack>
+  );
 }
 
 function PlaylistUnavailable() {

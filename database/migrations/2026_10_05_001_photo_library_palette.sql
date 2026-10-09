@@ -14,6 +14,7 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- A duplicate key stops the migration rather than choosing among conflicting palettes.
+-- Obsolete photo-set membership is not a source of photo palette assignments.
 DROP TEMPORARY TABLE IF EXISTS photo_palette_conflicts_must_be_resolved;
 CREATE TEMPORARY TABLE photo_palette_conflicts_must_be_resolved (
     photo_library_id INT UNSIGNED PRIMARY KEY,
@@ -23,10 +24,6 @@ INSERT INTO photo_palette_conflicts_must_be_resolved
 SELECT DISTINCT photo_library_id, palette_id FROM (
     SELECT pp.photo_library_id, pp.palette_id FROM project_photos pp
         WHERE pp.`before` = 0 AND pp.palette_id IS NOT NULL
-    UNION ALL
-    SELECT sp.photo_library_id, s.saved_palette_id FROM saved_palette_set_photos sp
-        JOIN saved_palette_sets s ON s.id = sp.saved_palette_set_id
-        WHERE sp.photo_library_id IS NOT NULL AND sp.photo_type <> 'before'
     UNION ALL
     SELECT pl.photo_library_id, p.saved_palette_id FROM photo_library pl
         JOIN saved_palette_photos p ON pl.source_type = 'saved_palette_photo' AND pl.source_id = p.id

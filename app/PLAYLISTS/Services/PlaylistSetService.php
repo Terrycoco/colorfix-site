@@ -7,7 +7,7 @@ use App\PLAYLISTS\Entities\PlaylistSet;
 use App\PLAYLISTS\Entities\PlaylistSetItem;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistSetRepository;
-use App\Repos\PdoPhotoLibraryRepository;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use InvalidArgumentException;
 use PDO;
