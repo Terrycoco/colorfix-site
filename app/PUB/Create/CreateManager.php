@@ -13,6 +13,9 @@ use App\PUB\Create\Video\PdoVideoJobRepository;
 use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Create\YouTube\PlaylistVideoCreator;
 use App\PUB\Errors\PubErrorReporter;
+use App\PUB\Errors\PubErrorHandler;
+use App\ERR\Managers\ErrorManager;
+use App\ERR\Repos\PdoErrorRepository;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
@@ -72,6 +75,7 @@ use Throwable;
 final class CreateManager implements PubComManagerContract
 {
     private PubErrorReporter $errors;
+    private ?ErrorManager $sharedErrors = null;
     private PdoPubAssetRepository $assets;
 
     /*
@@ -587,6 +591,13 @@ final class CreateManager implements PubComManagerContract
                             'disposition'
                         ]->shouldContinue()
                     ) {
+                        $this->reportUnavailableVideoWorker(
+                            $creator,
+                            $gate['disposition'],
+                            null,
+                            $assetType
+                        );
+
                         $failed[] = [
                             'index' =>
                                 $index,
@@ -743,6 +754,13 @@ final class CreateManager implements PubComManagerContract
                             'disposition'
                         ]->shouldContinue()
                     ) {
+                        $this->reportUnavailableVideoWorker(
+                            $creator,
+                            $gate['disposition'],
+                            (int)$resolved['pub_asset_id'],
+                            $assetType
+                        );
+
                         $failed[] = [
                             'index' =>
                                 $index,
@@ -2378,6 +2396,13 @@ final class CreateManager implements PubComManagerContract
                 'disposition'
             ]->shouldContinue()
         ) {
+            $this->reportUnavailableVideoWorker(
+                $creator,
+                $gate['disposition'],
+                (int)$resolved['pub_asset_id'],
+                (string)$resolved['asset_type']
+            );
+
             /*
              * Expected PubCom block.
              *
@@ -3491,6 +3516,70 @@ final class CreateManager implements PubComManagerContract
 
 
         return $this->videoWorkerHealth;
+    }
+
+
+    /**
+     * Record only the known stopped-listener readiness condition in ERR.
+     * Other PubCom and legacy exception reporting stays intact.
+     */
+    private function reportUnavailableVideoWorker(
+        PubComWorkerContract $creator,
+        PubComDisposition $disposition,
+        ?int $pubAssetId,
+        string $assetType
+    ): void {
+        if (
+            !$disposition->signal()->isUnavailable()
+            || (
+                !$creator instanceof BeforeAfterVideoCreator
+                && !$creator instanceof PlaylistVideoCreator
+            )
+        ) {
+            return;
+        }
+
+        try {
+            $health = $this->videoWorkerHealth()->status();
+            if (!empty($health['alive'])) {
+                return;
+            }
+
+            $this->sharedErrorManager()->reportAndHandle(
+                errNum: 4001,
+                department: 'PUB',
+                message: 'Video worker listener is unavailable.',
+                component: 'CREATE',
+                operation: 'creator_readiness',
+                resourceType: $pubAssetId !== null ? 'pub_asset' : null,
+                resourceId: $pubAssetId,
+                context: [
+                    'asset_type' => $assetType,
+                    'worker_health' => $health,
+                    'pubcom_message' => $disposition->signal()->message()
+                ]
+            );
+        } catch (Throwable) {
+            // ERR must not turn a normal PubCom block into another failure.
+        }
+    }
+
+    private function sharedErrorManager(): ErrorManager
+    {
+        if ($this->sharedErrors === null) {
+            $this->sharedErrors = new ErrorManager(
+                new PdoErrorRepository($this->pdo),
+                $this->projectRoot . '/app/ERR/err_fallback.log',
+                [
+                    'pub.video_worker_unavailable' =>
+                        fn(): PubErrorHandler => new PubErrorHandler(
+                            $this->videoWorkerHealth()
+                        ),
+                ]
+            );
+        }
+
+        return $this->sharedErrors;
     }
 
 

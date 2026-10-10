@@ -61,12 +61,10 @@ final class PinterestVideoShipper implements
     private ?PubComChannel $pubComChannel = null;
     private ?DispatchDriverLauncher $driverLauncher = null;
 
-
     public function __construct(
         private PinterestShippingConfig $config,
         private PinterestAuthService $auth
     ) {}
-
 
     public static function forDriver(
         PDO $pdo,
@@ -82,14 +80,12 @@ final class PinterestVideoShipper implements
         );
     }
 
-
     public function connectPubCom(
         PubComChannel $channel
     ): void {
         $this->pubComChannel =
             $channel;
     }
-
 
     public function readiness(): PubComSignal
     {
@@ -118,7 +114,6 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         return PubComSignal::ready(
             'Pinterest Video Shipper is ready.',
             [
@@ -127,7 +122,6 @@ final class PinterestVideoShipper implements
             ]
         );
     }
-
 
     public function preflight(
         array $package
@@ -148,7 +142,6 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         return PubComSignal::ready(
             'Pinterest video package is ready to ship.',
             [
@@ -157,7 +150,6 @@ final class PinterestVideoShipper implements
             ]
         );
     }
-
 
     /**
      * DispatchManager hands this specialist one sealed package.
@@ -179,11 +171,9 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         $this->assertPackage(
             $package
         );
-
 
         $job =
             new DispatchDriverJob(
@@ -193,13 +183,11 @@ final class PinterestVideoShipper implements
                 $notifyOnPublish
             );
 
-
         $handle =
             $this->driverLauncher()
                 ->requestDriver(
                     $job
                 );
-
 
         error_log(
             'Pinterest video shipment #'
@@ -209,10 +197,8 @@ final class PinterestVideoShipper implements
             . '.'
         );
 
-
         return DispatchShipmentResult::inProgress();
     }
-
 
     /**
      * Complete route executed inside the temporary server driver process.
@@ -229,11 +215,9 @@ final class PinterestVideoShipper implements
             $package
         );
 
-
         $accessToken =
             $this->auth
                 ->validAccessToken();
-
 
         /*
          * TRIP 1 — register the video shipment.
@@ -247,7 +231,6 @@ final class PinterestVideoShipper implements
                 ],
                 $accessToken
             );
-
 
         $mediaId =
             trim(
@@ -281,13 +264,11 @@ final class PinterestVideoShipper implements
                 ]
                 : [];
 
-
         if ($mediaId === '') {
             throw new RuntimeException(
                 'Pinterest video registration returned no media_id.'
             );
         }
-
 
         if ($uploadUrl === '') {
             throw new RuntimeException(
@@ -295,13 +276,11 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         if ($uploadParameters === []) {
             throw new RuntimeException(
                 'Pinterest video registration returned no upload parameters.'
             );
         }
-
 
         /*
          * TRIP 2 — take the actual MP4 to Pinterest's returned upload dock.
@@ -318,7 +297,6 @@ final class PinterestVideoShipper implements
             ]
         );
 
-
         /*
          * TRIP 3+ — keep checking until Pinterest has processed the media.
          */
@@ -328,10 +306,25 @@ final class PinterestVideoShipper implements
                 $accessToken
             );
 
-
         /*
          * FINAL TRIP — create the actual Pin using the processed media.
          */
+        // A separate cover is optional: Pinterest can use a video frame.
+        $pinMediaSource = [
+            'source_type' => 'video_id',
+            'media_id' => $mediaId,
+        ];
+
+        $coverImageUrl = trim(
+            (string)($package['media_source']['cover_image_url'] ?? '')
+        );
+
+        if ($coverImageUrl !== '') {
+            $pinMediaSource['cover_image_url'] = $coverImageUrl;
+        } else {
+            $pinMediaSource['cover_image_key_frame_time'] = 0;
+        }
+
         $response =
             $this->postJson(
                 PinterestShippingConfig::PINS_PATH,
@@ -361,26 +354,10 @@ final class PinterestVideoShipper implements
                             ]
                         ),
 
-                    'media_source' => [
-                        'source_type' =>
-                            'video_id',
-
-                        'cover_image_url' =>
-                            trim(
-                                (string)$package[
-                                    'media_source'
-                                ][
-                                    'cover_image_url'
-                                ]
-                            ),
-
-                        'media_id' =>
-                            $mediaId,
-                    ],
+                    'media_source' => $pinMediaSource,
                 ],
                 $accessToken
             );
-
 
         $pinId =
             trim(
@@ -392,13 +369,11 @@ final class PinterestVideoShipper implements
                 )
             );
 
-
         if ($pinId === '') {
             throw new RuntimeException(
                 'Pinterest accepted the video Pin request but returned no Pin ID.'
             );
         }
-
 
         return [
             'external_id' =>
@@ -422,7 +397,6 @@ final class PinterestVideoShipper implements
         ];
     }
 
-
     private function driverLauncher(): DispatchDriverLauncher
     {
         if ($this->driverLauncher === null) {
@@ -441,10 +415,8 @@ final class PinterestVideoShipper implements
                 );
         }
 
-
         return $this->driverLauncher;
     }
-
 
     private function assertPackage(
         array $package
@@ -474,14 +446,12 @@ final class PinterestVideoShipper implements
             }
         }
 
-
         $videoFile =
             trim(
                 (string)$package[
                     'video_file_path'
                 ]
             );
-
 
         if (
             !is_file(
@@ -496,7 +466,6 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         $mediaSource =
             is_array(
                 $package[
@@ -508,7 +477,6 @@ final class PinterestVideoShipper implements
                     'media_source'
                 ]
                 : [];
-
 
         if (
             strtolower(
@@ -527,7 +495,6 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         $coverImageUrl =
             trim(
                 (string)(
@@ -538,19 +505,18 @@ final class PinterestVideoShipper implements
                 )
             );
 
-
         if (
-            !preg_match(
+            $coverImageUrl !== ''
+            && !preg_match(
                 '#^https?://#i',
                 $coverImageUrl
             )
         ) {
             throw new RuntimeException(
-                'Pinterest video package requires an absolute cover_image_url.'
+                'Pinterest video package cover_image_url must be absolute when supplied.'
             );
         }
     }
-
 
     private function uploadVideo(
         string $uploadUrl,
@@ -558,7 +524,6 @@ final class PinterestVideoShipper implements
         string $videoFile
     ): void {
         $fields = [];
-
 
         foreach (
             $uploadParameters
@@ -577,7 +542,6 @@ final class PinterestVideoShipper implements
             }
         }
 
-
         $fields[
             'file'
         ] =
@@ -589,19 +553,16 @@ final class PinterestVideoShipper implements
                 )
             );
 
-
         $ch =
             curl_init(
                 $uploadUrl
             );
-
 
         if ($ch === false) {
             throw new RuntimeException(
                 'Could not initialize Pinterest video upload.'
             );
         }
-
 
         curl_setopt_array(
             $ch,
@@ -623,7 +584,6 @@ final class PinterestVideoShipper implements
             ]
         );
 
-
         $raw =
             curl_exec(
                 $ch
@@ -640,11 +600,9 @@ final class PinterestVideoShipper implements
                 $ch
             );
 
-
         curl_close(
             $ch
         );
-
 
         if ($raw === false) {
             throw new RuntimeException(
@@ -652,7 +610,6 @@ final class PinterestVideoShipper implements
                 . $curlError
             );
         }
-
 
         if (
             $status < 200
@@ -669,7 +626,6 @@ final class PinterestVideoShipper implements
         }
     }
 
-
     private function waitForMedia(
         string $mediaId,
         string $accessToken
@@ -678,9 +634,7 @@ final class PinterestVideoShipper implements
             time()
             + self::MEDIA_READY_TIMEOUT_SECONDS;
 
-
         $lastResponse = [];
-
 
         while (
             time() <=
@@ -696,7 +650,6 @@ final class PinterestVideoShipper implements
                     $accessToken
                 );
 
-
             $status =
                 strtolower(
                     trim(
@@ -708,7 +661,6 @@ final class PinterestVideoShipper implements
                         )
                     )
                 );
-
 
             if (
                 in_array(
@@ -722,7 +674,6 @@ final class PinterestVideoShipper implements
             ) {
                 return $lastResponse;
             }
-
 
             if (
                 in_array(
@@ -746,12 +697,10 @@ final class PinterestVideoShipper implements
                 );
             }
 
-
             sleep(
                 self::MEDIA_POLL_INTERVAL_SECONDS
             );
         }
-
 
         throw new RuntimeException(
             'Pinterest video media did not become ready within '
@@ -759,7 +708,6 @@ final class PinterestVideoShipper implements
             . ' seconds.'
         );
     }
-
 
     private function postJson(
         string $path,
@@ -774,7 +722,6 @@ final class PinterestVideoShipper implements
         );
     }
 
-
     private function getJson(
         string $path,
         string $accessToken
@@ -786,7 +733,6 @@ final class PinterestVideoShipper implements
             null
         );
     }
-
 
     private function requestJson(
         string $method,
@@ -802,13 +748,11 @@ final class PinterestVideoShipper implements
                     )
             );
 
-
         if ($ch === false) {
             throw new RuntimeException(
                 'Could not initialize Pinterest shipping request.'
             );
         }
-
 
         $headers = [
             'Authorization: Bearer '
@@ -816,7 +760,6 @@ final class PinterestVideoShipper implements
 
             'Accept: application/json',
         ];
-
 
         $options = [
             CURLOPT_RETURNTRANSFER =>
@@ -836,7 +779,6 @@ final class PinterestVideoShipper implements
             CURLOPT_TIMEOUT =>
                 PinterestShippingConfig::REQUEST_TIMEOUT_SECONDS,
         ];
-
 
         if ($payload !== null) {
             $headers[] =
@@ -858,12 +800,10 @@ final class PinterestVideoShipper implements
                 );
         }
 
-
         curl_setopt_array(
             $ch,
             $options
         );
-
 
         $raw =
             curl_exec(
@@ -881,11 +821,9 @@ final class PinterestVideoShipper implements
                 $ch
             );
 
-
         curl_close(
             $ch
         );
-
 
         if ($raw === false) {
             throw new RuntimeException(
@@ -894,13 +832,11 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         $decoded =
             json_decode(
                 (string)$raw,
                 true
             );
-
 
         if (
             $status < 200
@@ -928,7 +864,6 @@ final class PinterestVideoShipper implements
                         (string)$raw
                     );
 
-
             throw new RuntimeException(
                 'Pinterest shipping request failed (HTTP '
                 . $status
@@ -937,7 +872,6 @@ final class PinterestVideoShipper implements
             );
         }
 
-
         if (!is_array(
             $decoded
         )) {
@@ -945,7 +879,6 @@ final class PinterestVideoShipper implements
                 'Pinterest shipping request returned invalid JSON.'
             );
         }
-
 
         return $decoded;
     }

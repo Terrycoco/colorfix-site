@@ -76,7 +76,7 @@ final class BeforeAfterVideoRecipe
     public const TITLE_FONT_WEIGHT = 700;
     public const TITLE_LINE_HEIGHT = 1.08;
 
-    public const IMAGE_BACKGROUND_COLOR = '#111';
+    public const IMAGE_BACKGROUND_COLOR = '#000000';
     public const IMAGE_OBJECT_FIT = 'contain';
 
     public const PHASE_FONT_SIZE = 40;
@@ -395,6 +395,13 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 animations: [
+                    $tools->opacityAnimation(
+                        1,
+                        0,
+                        $dissolveStart,
+                        $dissolveEnd
+                    ),
+
                     $mainFade,
                 ]
             ),
@@ -475,7 +482,16 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 style:
-                    self::phaseLabelStyle()
+                    self::phaseLabelStyle(),
+
+                animations: [
+                    $tools->opacityAnimation(
+                        1,
+                        0,
+                        $dissolveStart,
+                        $dissolveEnd
+                    ),
+                ]
             ),
 
 
@@ -490,7 +506,7 @@ final class BeforeAfterVideoRecipe
                     self::AFTER_LABEL,
 
                 startFrame:
-                    $dissolveEnd,
+                    $dissolveStart,
 
                 endFrame:
                     $endScreenFadeEnd,
@@ -505,9 +521,19 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 style:
-                    self::phaseLabelStyle(),
+                    array_merge(
+                        self::phaseLabelStyle(),
+                        ['opacity' => 0]
+                    ),
 
                 animations: [
+                    $tools->opacityAnimation(
+                        0,
+                        1,
+                        $dissolveStart,
+                        $dissolveEnd
+                    ),
+
                     $mainFade,
                 ]
             ),
