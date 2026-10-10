@@ -16,6 +16,7 @@ export default function AdminWorkbenchDrawer({
   width = 380,
   title = "",
   onClose,
+  closeLabel = "Save & Close",
   beforeClose = null,
   children,
   footer = null,
@@ -74,7 +75,7 @@ export default function AdminWorkbenchDrawer({
             disabled={closing}
             onClick={requestClose}
           >
-            {closing ? "Saving..." : "Save & Close"}
+            {closing ? "Closing..." : closeLabel}
           </button>
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AdminButton,
+  AdminDialog,
   AdminDetailPane,
   AdminField,
   AdminStack,
@@ -18,6 +19,7 @@ import { API_FOLDER } from "@helpers/config";
 
 const URL = `${API_FOLDER}/v2/admin/errors/report.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/errors/save.php`;
+const RECOVER_URL = `${API_FOLDER}/v2/admin/errors/recover.php`;
 const VIEWS = [
   { id: "working", title: "Working" },
   { id: "history", title: "History" },
@@ -53,6 +55,9 @@ export default function AdminErrorPage() {
   const [draft, setDraft] = useState({});
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [bookmarkExpanded, setBookmarkExpanded] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryAlert, setRecoveryAlert] = useState(null);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -84,12 +89,13 @@ export default function AdminErrorPage() {
     setDrawer({ view, row: item });
     setDraft({ ...item });
     setSaveError("");
+    setBookmarkExpanded(false);
   }, [view]);
 
   const change = (field, value) => setDraft((prev) => ({ ...prev, [field]: value }));
 
   async function closeDrawer() {
-    if (!drawer || saving) return;
+    if (!drawer || saving || recovering) return;
     const allowed = {
       working: ["detail"],
       history: ["handling_result"],
@@ -125,6 +131,33 @@ export default function AdminErrorPage() {
       return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function recoverSelected() {
+    if (!drawer || drawer.view !== "working" || recovering) return;
+    setRecovering(true);
+    try {
+      const data = await readResponse(await fetch(RECOVER_URL, {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ working_id: drawer.row.id }),
+      }));
+      if (data.status === "success") {
+        setDrawer(null);
+      }
+      setRecoveryAlert({
+        title: data.status === "success" ? "Recovery Accepted" : "Recovery Not Complete",
+        message: data.message || "The interrupted work remains in Working.",
+      });
+      await load();
+    } catch (failure) {
+      setRecoveryAlert({ title: "Recovery Not Complete", message: failure?.message || "Please try again." });
+      await load();
+    } finally {
+      setRecovering(false);
     }
   }
 
@@ -235,11 +268,6 @@ export default function AdminErrorPage() {
               <AdminButton type="button" variant="secondary" disabled={busy} onClick={() => void load()}>
                 Refresh
               </AdminButton>
-              {view === "working" ? (
-                <AdminButton type="button" disabled title="Recover will be connected after the secured recovery endpoint is built">
-                  Recover
-                </AdminButton>
-              ) : null}
             </AdminToolbar>
           }
         >
@@ -280,6 +308,7 @@ export default function AdminErrorPage() {
       title={drawer ? `${VIEWS.find((v) => v.id === drawer.view)?.title} — ${draft.err_num ?? draft.id ?? ""}` : ""}
       width="min(680px, 100vw)"
       onClose={closeDrawer}
+      closeLabel={drawer?.view === "working" ? "Close" : "Save & Close"}
       portal
       padded
     >
@@ -291,7 +320,20 @@ export default function AdminErrorPage() {
             {readonly("department", "Department")}
             {readonly("occurred_at", "Error occurred")}
             {readonly("description", "Problem")}
-            <AdminField label="You Were Here">
+            <AdminField label={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                You Were Here
+                <button
+                  type="button"
+                  aria-label={bookmarkExpanded ? "Hide rerun parameters" : "Show rerun parameters"}
+                  aria-expanded={bookmarkExpanded}
+                  onClick={() => setBookmarkExpanded((value) => !value)}
+                  style={{ border: 0, background: "transparent", padding: "0 3px", cursor: "pointer", fontSize: 12, color: "inherit" }}
+                >
+                  {bookmarkExpanded ? "▴" : "▾"}
+                </button>
+              </span>
+            }>
               <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                 {workTitle(draft)}
               </div>
@@ -300,6 +342,19 @@ export default function AdminErrorPage() {
                   Asset #{parseBookmark(draft.bookmark_json).summary.asset_id}
                 </div>
               ) : null}
+              {bookmarkExpanded ? (
+                <textarea
+                  className="admin-field__control"
+                  aria-label="Rerun parameters JSON"
+                  readOnly
+                  rows={12}
+                  spellCheck={false}
+                  style={{ width: "100%", marginTop: 8, fontFamily: "monospace", fontSize: 12, resize: "vertical" }}
+                  value={typeof draft.bookmark_json === "string"
+                    ? (() => { try { return JSON.stringify(JSON.parse(draft.bookmark_json), null, 2); } catch { return draft.bookmark_json; } })()
+                    : draft.bookmark_json ? JSON.stringify(draft.bookmark_json, null, 2) : "No bookmark recorded."}
+                />
+              ) : null}
             </AdminField>
             {readonly("message", "Original error")}
             {readonly("step_key", "Recovery step")}
@@ -307,7 +362,10 @@ export default function AdminErrorPage() {
             {readonly("resource_type", "Resource type")}
             {readonly("resource_id", "Resource ID")}
             {readonly("explanation", "Recovery instructions")}
-            {field("detail", "Working notes", true)}
+            <AdminButton type="button" disabled={recovering} onClick={() => void recoverSelected()}>
+              {recovering ? "Recovering..." : "Recover"}
+            </AdminButton>
+            {readonly("detail", "Working notes")}
           </>
         ) : null}
         {drawer?.view === "history" ? (
@@ -355,6 +413,13 @@ export default function AdminErrorPage() {
         ) : null}
       </AdminStack>
     </AdminWorkbenchDrawer>
+    <AdminDialog
+      open={Boolean(recoveryAlert)}
+      mode="alert"
+      title={recoveryAlert?.title || ""}
+      message={recoveryAlert?.message || ""}
+      onConfirm={() => setRecoveryAlert(null)}
+    />
     </>
   );
 }

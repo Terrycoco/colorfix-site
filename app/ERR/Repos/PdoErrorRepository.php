@@ -143,8 +143,8 @@ final class PdoErrorRepository
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO err_working
-                (err_log_id, step_key, status, attempt_count, detail)
-             VALUES (:log_id, :step_key, \'running\', 1, :detail)
+                (err_log_id, step_key, status, attempt_count, detail, bookmark_json)
+             VALUES (:log_id, :step_key, \'running\', 1, :detail, :bookmark_json)
              ON DUPLICATE KEY UPDATE
                 status = \'running\',
                 attempt_count = attempt_count + 1,
@@ -214,6 +214,29 @@ final class PdoErrorRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($logId === null ? [] : ['log_id' => $logId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Retrieve exactly one selected Working row. */
+    public function findWorking(int $workingId): ?array
+    {
+        $this->requirePositive($workingId, 'Working ID');
+        $stmt = $this->pdo->prepare('SELECT * FROM err_working WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $workingId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : $row;
+    }
+
+    /** Claim a waiting/failed manual recovery once; never retry a running row. */
+    public function claimWorking(int $workingId): bool
+    {
+        $this->requirePositive($workingId, 'Working ID');
+        $stmt = $this->pdo->prepare(
+            "UPDATE err_working SET status = 'running',
+                 attempt_count = attempt_count + 1
+             WHERE id = :id AND status IN ('waiting', 'failed', 'unknown')"
+        );
+        $stmt->execute(['id' => $workingId]);
+        return $stmt->rowCount() === 1;
     }
 
     /** Explicit admin action only; never called automatically by recovery. */
