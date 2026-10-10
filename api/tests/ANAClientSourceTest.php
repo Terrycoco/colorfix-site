@@ -40,7 +40,7 @@ test('client source migration allows tagged playlist visits and is repeatable', 
     }
     assert_true($rejected);
 
-    $sql = file_get_contents(__DIR__ . '/../../database/migrations/2026_10_05_002_analytics_client_source.sql');
+    $sql = file_get_contents(__DIR__ . '/../../database/archive/2026_10_10_baseline/2026_10_05_002_analytics_client_source.sql');
     $pdo->exec($sql);
     $pdo->exec($sql);
     assert_equals(1, (int)$pdo->query('SELECT COUNT(*) FROM analytics_sources')->fetchColumn());

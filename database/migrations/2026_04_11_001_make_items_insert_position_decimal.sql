@@ -1,2 +1,0 @@
-ALTER TABLE items
-  MODIFY COLUMN insert_position DECIMAL(10,2) NULL;

@@ -31,7 +31,7 @@ test('ANA src_params preserves sources and reports, with immediate database upda
     }
     $insert->execute(['inactive_fixture', 'Inactive fixture', 0, '2026-10-05 10:00:00']);
 
-    $migration = file_get_contents(__DIR__ . '/../../database/migrations/2026_10_08_001_src_params.sql');
+    $migration = file_get_contents(__DIR__ . '/../../database/archive/2026_10_10_baseline/2026_10_08_001_src_params.sql');
     $seedStart = strpos($migration, 'INSERT INTO src_params');
     $seedEnd = strpos($migration, ';', $seedStart);
     $seed = substr($migration, $seedStart, $seedEnd - $seedStart + 1);

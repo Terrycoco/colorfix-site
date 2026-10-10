@@ -14,7 +14,7 @@ test('photo palette backfill ignores obsolete sets but retains real conflict gua
     $pdo->exec('INSERT INTO saved_palette_sets VALUES (1, 144)');
     $pdo->exec("INSERT INTO saved_palette_set_photos VALUES (72, 1, 'full')");
 
-    $migration = file_get_contents(__DIR__ . '/../../database/migrations/2026_10_05_001_photo_library_palette.sql');
+    $migration = file_get_contents(__DIR__ . '/../../database/archive/2026_10_10_baseline/2026_10_05_001_photo_library_palette.sql');
     assert_true(!str_contains($migration, 'saved_palette_set_photos'));
     $start = strpos($migration, 'INSERT INTO photo_palette_conflicts_must_be_resolved');
     $end = strpos($migration, 'START TRANSACTION;', $start);
