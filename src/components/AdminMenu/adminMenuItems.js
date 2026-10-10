@@ -77,7 +77,8 @@ export const adminMenuItems = [
   {
     label: "Tools",
     items: [
-        { label: "Article Editor", href: "/admin/articles" },
+      { label: "Errors", href: "/admin/err"},
+      { label: "Article Editor", href: "/admin/articles" },
       { label: "Gallery Builder", href: "/admin/sql" },
       { label: "Gallery Items", href: "/admin/items" },
       { label: "Ideas / To-Dos", href: "/admin/ideas" },

@@ -18,7 +18,8 @@ final class ErrorContext
         public readonly ?string $operation = null,
         public readonly ?string $resourceType = null,
         public readonly ?int $resourceId = null,
-        public readonly array $details = []
+        public readonly array $details = [],
+        public readonly ?array $bookmark = null
     ) {
         if ($logId <= 0 || $errNum <= 0) {
             throw new \InvalidArgumentException('Error log ID and error number must be positive.');

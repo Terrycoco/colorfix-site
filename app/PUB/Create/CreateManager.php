@@ -455,6 +455,7 @@ final class CreateManager implements PubComManagerContract
          * production line. Other Creator lines may continue.
          */
         $stoppedLines = [];
+        $stoppedVideoDispositions = [];
 
 
         foreach (
@@ -538,6 +539,16 @@ final class CreateManager implements PubComManagerContract
                             ]
                         )
                     ) {
+                        if (isset($stoppedVideoDispositions[$assetType])) {
+                            $this->reportUnavailableVideoWorker(
+                                $this->creatorForAssetType($assetType),
+                                $stoppedVideoDispositions[$assetType],
+                                null,
+                                $assetType,
+                                $this->videoWorkBookmark($order, $assetType, $existingPolicy)
+                            );
+                        }
+
                         $failed[] = [
                             'index' =>
                                 $index,
@@ -595,7 +606,8 @@ final class CreateManager implements PubComManagerContract
                             $creator,
                             $gate['disposition'],
                             null,
-                            $assetType
+                            $assetType,
+                            $this->videoWorkBookmark($order, $assetType, $existingPolicy)
                         );
 
                         $failed[] = [
@@ -629,6 +641,7 @@ final class CreateManager implements PubComManagerContract
                                 'disposition'
                             ]->shouldStopLine()
                         ) {
+                            $stoppedVideoDispositions[$assetType] = $gate['disposition'];
                             $stoppedLines[
                                 $assetType
                             ] = [
@@ -706,6 +719,16 @@ final class CreateManager implements PubComManagerContract
                             ]
                         )
                     ) {
+                        if (isset($stoppedVideoDispositions[$assetType])) {
+                            $this->reportUnavailableVideoWorker(
+                                $this->creatorForAssetType($assetType),
+                                $stoppedVideoDispositions[$assetType],
+                                (int)$resolved['pub_asset_id'],
+                                $assetType,
+                                $this->videoWorkBookmark($order, $assetType, $existingPolicy, $resolved)
+                            );
+                        }
+
                         $failed[] = [
                             'index' =>
                                 $index,
@@ -758,7 +781,8 @@ final class CreateManager implements PubComManagerContract
                             $creator,
                             $gate['disposition'],
                             (int)$resolved['pub_asset_id'],
-                            $assetType
+                            $assetType,
+                            $this->videoWorkBookmark($order, $assetType, $existingPolicy, $resolved)
                         );
 
                         $failed[] = [
@@ -791,6 +815,7 @@ final class CreateManager implements PubComManagerContract
                                 'disposition'
                             ]->shouldStopLine()
                         ) {
+                            $stoppedVideoDispositions[$assetType] = $gate['disposition'];
                             $stoppedLines[
                                 $assetType
                             ] = [
@@ -2400,7 +2425,18 @@ final class CreateManager implements PubComManagerContract
                 $creator,
                 $gate['disposition'],
                 (int)$resolved['pub_asset_id'],
-                (string)$resolved['asset_type']
+                (string)$resolved['asset_type'],
+                [
+                    'operation' => 'PUB.CREATE.recreate',
+                    'description' => 'Recreating ' . (string)$resolved['asset_type'] . ' asset #' . (int)$resolved['pub_asset_id'],
+                    'params' => [
+                        'pub_asset_id' => (int)$resolved['pub_asset_id'],
+                    ],
+                    'summary' => [
+                        'asset_type' => (string)$resolved['asset_type'],
+                        'asset_id' => (int)$resolved['pub_asset_id'],
+                    ],
+                ]
             );
 
             /*
@@ -3062,6 +3098,9 @@ final class CreateManager implements PubComManagerContract
             'asset_type' =>
                 $assetType,
 
+            'search_title' =>
+                (string)($asset['search_title'] ?? ''),
+
             'creator_key' =>
                 $creatorKey,
 
@@ -3520,6 +3559,46 @@ final class CreateManager implements PubComManagerContract
 
 
     /**
+     * This is PUB's own rerun bookmark. ERR treats the params as opaque.
+     * A NEW order has no asset row yet, so retain its exact sealed Box.
+     * A REDO order uses the existing durable pub_asset_id.
+     */
+    private function videoWorkBookmark(
+        array $order,
+        string $assetType,
+        array $existingPolicy,
+        ?array $resolved = null
+    ): array {
+        $box = is_array($order['box'] ?? null) ? $order['box'] : null;
+        $assetId = (int)($resolved['pub_asset_id'] ?? $order['pub_asset_id'] ?? 0);
+        $title = trim((string)(
+            $box['search_title']
+            ?? $resolved['search_title']
+            ?? ''
+        ));
+        $summary = [
+            'title' => $title,
+            'asset_type' => $assetType,
+            'asset_id' => $assetId > 0 ? $assetId : null,
+            'source_type' => $box['source_type'] ?? null,
+            'source_id' => $box['source_id'] ?? null,
+        ];
+
+        return [
+            'operation' => 'PUB.CREATE.processBatch',
+            'description' => $title !== ''
+                ? 'Creating video: ' . $title
+                : 'Creating ' . $assetType . ($assetId > 0 ? ' #' . $assetId : ''),
+            'summary' => $summary,
+            'params' => [
+                'orders' => [$order],
+                'existing_policy' => $existingPolicy,
+            ],
+        ];
+    }
+
+
+    /**
      * Record only the known stopped-listener readiness condition in ERR.
      * Other PubCom and legacy exception reporting stays intact.
      */
@@ -3527,7 +3606,8 @@ final class CreateManager implements PubComManagerContract
         PubComWorkerContract $creator,
         PubComDisposition $disposition,
         ?int $pubAssetId,
-        string $assetType
+        string $assetType,
+        array $bookmark
     ): void {
         if (
             !$disposition->signal()->isUnavailable()
@@ -3557,7 +3637,8 @@ final class CreateManager implements PubComManagerContract
                     'asset_type' => $assetType,
                     'worker_health' => $health,
                     'pubcom_message' => $disposition->signal()->message()
-                ]
+                ],
+                bookmark: $bookmark
             );
         } catch (Throwable) {
             // ERR must not turn a normal PubCom block into another failure.

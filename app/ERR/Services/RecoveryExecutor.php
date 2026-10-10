@@ -60,7 +60,8 @@ final class RecoveryExecutor
                 $this->repository->startStep(
                     $context->logId,
                     $key,
-                    $step->description()
+                    $step->description(),
+                    $context->bookmark
                 );
 
                 try {

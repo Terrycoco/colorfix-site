@@ -107,7 +107,8 @@ final class ErrorManager
         ?string $resourceType = null,
         ?int $resourceId = null,
         ?string $technicalDetail = null,
-        array $context = []
+        array $context = [],
+        ?array $bookmark = null
     ): ?int {
         $logId = $this->report(
             $errNum, $department, $message, $component, $operation,
@@ -158,7 +159,8 @@ final class ErrorManager
                 operation: $operation,
                 resourceType: $resourceType,
                 resourceId: $resourceId,
-                details: $context
+                details: $context,
+                bookmark: $bookmark
             );
 
             (new RecoveryExecutor($this->repository))

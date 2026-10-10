@@ -74,6 +74,8 @@ const YoutubePlayerPage = lazy(() => import('@pages/YoutubePlayerPage'));
 const AdminPubPage = lazy(() => import("@pages/AdminPubPage"));
 const Marketing = lazy(() => import("@components/Marketing/MarketingWorkspace"));
 
+const AdminErrorPage = lazy(() => import('@pages/AdminErrorPage'));
+
 function renderWithSuspense(Component, label) {
   return (
     <Suspense fallback={<RouteFallback label={label} />}>
@@ -193,16 +195,17 @@ export default function AdminRoutes() {
         <Route path="cta-pages" element={renderWithSuspense(AdminCtaPagesPage, 'Loading CTA pages...')} />
 
 
-<Route path="playlists/:playlistId" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
+        <Route path="playlists/:playlistId" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
 
-<Route path="playlists/new" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
-<Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
+        <Route path="playlists/new" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
+        <Route path="playlists" element={renderWithSuspense(AdminPlaylistsPage, 'Loading playlists...')} />
        <Route path="analytics" element={renderWithSuspense(AdminAnalyticsPage, 'Loading analytics...')}/>
   
         <Route path="pub" element={renderWithSuspense(AdminPubPage, "Loading PUB...")}/>
           <Route path="marketing" element={renderWithSuspense(Marketing, "Loading Mark...")}/>
         <Route path="rex" element={renderWithSuspense(RexReservations, 'Loading REX...')}/>
           <Route path="rexrelationships" element={renderWithSuspense(RexRelationships, "Loading REX...")}/>  
+          <Route path="err" element={renderWithSuspense(AdminErrorPage, "Loading ERR...")}/>  
       </Route>
     </Routes>
     </AdminDialogProvider>
