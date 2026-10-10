@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS app_configs (
+  app_config_id INT NOT NULL AUTO_INCREMENT,
+  config_key VARCHAR(100) NOT NULL,
+  config_json JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (app_config_id),
+  UNIQUE KEY uniq_app_configs_key (config_key)
+);

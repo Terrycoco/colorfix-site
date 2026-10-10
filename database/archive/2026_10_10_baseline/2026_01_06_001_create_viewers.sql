@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS viewers (
+  viewer_id CHAR(36) NOT NULL PRIMARY KEY,
+  created_at DATETIME NOT NULL,
+  last_seen_at DATETIME NOT NULL,
+  visit_count INT NOT NULL DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

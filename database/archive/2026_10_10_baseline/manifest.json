@@ -1,0 +1,710 @@
+{
+  "baseline_date": "2026-10-10",
+  "source_commit": "e7a5e75cbfa8f41e10a0389a5b6d91f2cabdc64d",
+  "files": [
+    {
+      "filename": "2024_11_13_001_create_master_roles.sql",
+      "sha256": "1b5a6578122e158462c7b1b13979b73ccf96e6b1592b3f981414eca1664757d0"
+    },
+    {
+      "filename": "2024_11_13_002_create_palette_role_members.sql",
+      "sha256": "8d453433b4632e7e912c1d7ddb22511374942771eecc26d2f1230365e24ac702"
+    },
+    {
+      "filename": "2024_11_13_003_create_render_projects.sql",
+      "sha256": "bbf3c9fe4ad8bce7fb0ff9b0cfbb7f62c11b25bd1539175fbe8ec6095cc8a602"
+    },
+    {
+      "filename": "2024_11_15_004_create_supercats.sql",
+      "sha256": "3eaf47bf4e2108d1290afa5f49c0a56ee79c1ff13770b219503b07d5ddc0982d"
+    },
+    {
+      "filename": "2024_11_15_006_alter_supercats_store_names.sql",
+      "sha256": "c82e4c1e2608ffa08755e4479074bd9d3835c2d99a44c7416f1490a9141ebc11"
+    },
+    {
+      "filename": "2024_11_16_007_alter_supercat_clause_ranges.sql",
+      "sha256": "24ce907a9caa6a0bf82afa517e27a65afc18e736588e53ded746a31655df4a63"
+    },
+    {
+      "filename": "2024_11_16_008_add_mask_blend_columns.sql",
+      "sha256": "2d1c8e9024164baaa5ad14365c536225d05b37b653458b7b4fd3118fd9672c40"
+    },
+    {
+      "filename": "2025_11_23_001_add_photo_category_path.sql",
+      "sha256": "41e8413d72b216781fb058f067a1a615321d4f2644f56de471be17a1c4c43590"
+    },
+    {
+      "filename": "2025_11_23_002_add_mask_original_texture.sql",
+      "sha256": "b7eb29f8b5c350876450baffb6acf970addb80fd156f2723944ea386074837b6"
+    },
+    {
+      "filename": "2025_11_23_003_create_saved_palettes.sql",
+      "sha256": "f14ffcc2d33cbaa07ca2c9e00ddc583647a900d540357b6623581e8c26619082"
+    },
+    {
+      "filename": "2025_11_23_004_create_clients.sql",
+      "sha256": "6215495e5512b4ab4dce54a74e66709f3f7139aa1f9c12eaaef2348f08b1661d"
+    },
+    {
+      "filename": "2025_11_27_005_create_mask_blend_settings.sql",
+      "sha256": "2747ac7c2bebb4e8ed315e667c088fb853835df64c2b2ee6a09f9a21ce0e8195"
+    },
+    {
+      "filename": "2025_12_02_001_add_overlay_shadow_columns.sql",
+      "sha256": "12dd0ec05d16ff0cf5a4050d6c0fff3239476505c07d8113898cdc5901df8042"
+    },
+    {
+      "filename": "2025_12_03_001_add_mask_blend_shadow_columns.sql",
+      "sha256": "9452ef3fada7ba543b7e1c9d8adbe0aa77c02ab8a9cf874eb84f64ee8e088bba"
+    },
+    {
+      "filename": "2025_12_10_001_create_clients.sql",
+      "sha256": "f83dbd28803659c609dc0f30628c082f5a44f82e68dda31c768d63d3859aaaca"
+    },
+    {
+      "filename": "2025_12_10_002_create_applied_palettes.sql",
+      "sha256": "a21427b8ff1e1252d946758e8d97b64534ead42aa116b803daea39fe759666ed"
+    },
+    {
+      "filename": "2025_12_10_003_create_client_palette_links.sql",
+      "sha256": "74ffa3e870cb1ae8bf433caa24f99f53d4651e11b0964c5c2808a4362c8b4397"
+    },
+    {
+      "filename": "2025_12_24_001_create_applied_palette_shares.sql",
+      "sha256": "13fa29257e6913da282d5f52fd2d172882f0c607366712c9a1b2a0a8b481a5d2"
+    },
+    {
+      "filename": "2026_01_05_001_drop_applied_palette_tokens.sql",
+      "sha256": "bba2cdadb542a0009b71313188d45ae8fba833f8afa5d2659db8a10b18a66b83"
+    },
+    {
+      "filename": "2026_01_05_002_add_tags_to_applied_palettes.sql",
+      "sha256": "f182b5e083b2751b80dd263206ffccc7e2fb5803f4a2fd1c739177a6dc456b28"
+    },
+    {
+      "filename": "2026_01_05_003_add_mask_setting_id.sql",
+      "sha256": "f27d8975a2071066743b468c5e9a511306285b740a39b669a26702fe2145beb3"
+    },
+    {
+      "filename": "2026_01_05_004_add_stale_flag.sql",
+      "sha256": "ae72479a4f7f4b02dfb82cf33ff2f9af5156eeda67b69ae407acc96ef872581a"
+    },
+    {
+      "filename": "2026_01_06_001_create_viewers.sql",
+      "sha256": "1598abca08222ddb256556af9663785860a91f33baae0f2f19b051ace1fbedc8"
+    },
+    {
+      "filename": "2026_01_06_003_add_cta_overrides_to_playlist_instances.sql",
+      "sha256": "4eff162022a9f1662429923c8a3ae4f63611741d00fac8018e8c41e2c0681514"
+    },
+    {
+      "filename": "2026_01_08_001_create_hoa_scheme_mask_maps.sql",
+      "sha256": "a27f47afe5e6b8da58a904171465c8e36f3b84750ea87d4d75f2d9234052ffa3"
+    },
+    {
+      "filename": "2026_01_10_001_add_playlist_item_thumb_exclude.sql",
+      "sha256": "54278289c66862135c49f984f769b9e77b024fdce2019f0fa9a8b5025dc5898a"
+    },
+    {
+      "filename": "2026_01_11_001_add_display_title_to_applied_palettes.sql",
+      "sha256": "8d7942a55c6b544ef53d5881069fbebc5573e1d5a3e8c28dc69d57b32d999cb8"
+    },
+    {
+      "filename": "2026_01_11_002_create_view_hoa_scheme_mask_blend_settings.sql",
+      "sha256": "b267092a9c9efa8d1e4a71055ef2138b52e76c290157843066b72d2a563f2ee4"
+    },
+    {
+      "filename": "2026_01_11_003_create_view_mask_blend_enriched.sql",
+      "sha256": "36a223239388609f0e45c4e9313be80194756bc1545f84aca26bc43612bdcb42"
+    },
+    {
+      "filename": "2026_01_11_004_refresh_view_master_mask_blend.sql",
+      "sha256": "0bb45876eaab8ad92521b9d9e81b5b2aea0219dddaade71e917b27fdb8b64c23"
+    },
+    {
+      "filename": "2026_01_11_005_recreate_vw_master_mask_blend.sql",
+      "sha256": "36a223239388609f0e45c4e9313be80194756bc1545f84aca26bc43612bdcb42"
+    },
+    {
+      "filename": "2026_01_12_001_add_cta_group_audience.sql",
+      "sha256": "f27fcb941b1d87c7004afc8bcadf83f2b2a657c19139936ee73f67c4370c7495"
+    },
+    {
+      "filename": "2026_01_18_001_add_playlist_instance_display_title.sql",
+      "sha256": "e9b71ded74ae093dd3ba93330f1f265a41d70d3c854856e555a9c2fdf7fa3859"
+    },
+    {
+      "filename": "2026_01_18_002_create_playlist_instance_sets.sql",
+      "sha256": "4a8950897c578a910e7aa3201de5b8d817a6859dc8f81c0284b3dd84d03dbd1d"
+    },
+    {
+      "filename": "2026_01_20_001_add_playlist_instance_set_subtitle.sql",
+      "sha256": "8db8f3e8c4cddc1499d1b0c8a0f58294ac5ca454e4ae0b8fbf00bd0f88b73e32"
+    },
+    {
+      "filename": "2026_01_20_002_add_palette_viewer_cta_group_to_playlist_instances.sql",
+      "sha256": "026d6fa9bc9f26c6c727a11067549a05150e6a273ffff7fdbe829e2d72734763"
+    },
+    {
+      "filename": "2026_01_20_004_add_demo_enabled_to_playlist_instances.sql",
+      "sha256": "3cf849ef82c2d845665772dcf6698cacb99304971cee65875d420ceda3266a1a"
+    },
+    {
+      "filename": "2026_01_22_001_add_playlist_instance_audience.sql",
+      "sha256": "cc4404cd329b54f1e94fa39b7b620a6b28831cbb3d15f51d5f0ee45c036cceac"
+    },
+    {
+      "filename": "2026_01_22_002_add_playlist_instance_set_item_type.sql",
+      "sha256": "9a141f90ae230a4d710923c5374d1e1e9d42d6bc6920510592460d1a8c64e62d"
+    },
+    {
+      "filename": "2026_01_23_001_fix_playlist_instance_set_items_nullable.sql",
+      "sha256": "88c9c0d398dd3a1852f08c2bcf66435d6e507efcc374814bc89a15eebc804aa8"
+    },
+    {
+      "filename": "2026_01_29_001_drop_saved_palette_client_fields.sql",
+      "sha256": "be8f6e4793b401a51788adf370dc74356cc2049a10990430cc2079112486acd8"
+    },
+    {
+      "filename": "2026_01_29_002_add_saved_palette_member_role.sql",
+      "sha256": "5af46996055fb880aaae54ff89ccf6fc54534ecfefd13866add837257348641c"
+    },
+    {
+      "filename": "2026_01_29_003_create_saved_palette_photos.sql",
+      "sha256": "8e430abb133a8dde9cd147663beafaf772debf8ddde6842aace69ea109c61890"
+    },
+    {
+      "filename": "2026_01_29_004_add_saved_palette_photo_meta.sql",
+      "sha256": "faf4ca05dbe7fa0d44cc64dc58e08141df12a23b366bdec09e1a428de8b151d2"
+    },
+    {
+      "filename": "2026_01_30_001_add_kickers_and_alt_text.sql",
+      "sha256": "12f65eb8185d58b299c2aa827c917c6977b4854e9e48ba04b836feac1691e011"
+    },
+    {
+      "filename": "2026_01_30_002_add_kicker_to_playlist_instances.sql",
+      "sha256": "d5cc00291eeb77041a93b489152979accb139c686e81bdbf001fe50cc93d8c3b"
+    },
+    {
+      "filename": "2026_02_05_001_create_ideas.sql",
+      "sha256": "12d6dc656e8a5a88999a4ea172daec3710760007f2b9b722143178470ff2da5d"
+    },
+    {
+      "filename": "2026_02_05_002_add_alt_text_to_saved_palette_photos.sql",
+      "sha256": "60dfed264c84f1822d8e38d4a150527d7aa47d9354e8d05c8ff36244c4d26a5d"
+    },
+    {
+      "filename": "2026_02_05_003_create_photo_library.sql",
+      "sha256": "939000268b28e9854ea9d5fa03026afcb3a27373fef48641b151b1d9296f700c"
+    },
+    {
+      "filename": "2026_02_05_004_add_palette_type_to_saved_palettes.sql",
+      "sha256": "cfa12ce435284cbc5f1dea280dd1209f25ffeb94bc82fa04e9b6fae76e35a00b"
+    },
+    {
+      "filename": "2026_02_05_005_add_int_only_to_swatch_view.sql",
+      "sha256": "f57853d3586539e796abbed752df8758b72b26955602953aae24308456a4dc6c"
+    },
+    {
+      "filename": "2026_02_05_006_add_public_notes_to_saved_palettes.sql",
+      "sha256": "6fa81b7a580393f937b4a61d110fa9ac51c6e4bcce34c31c40717c4cdf925cc7"
+    },
+    {
+      "filename": "2026_02_05_007_add_palette_hash_to_playlist_items.sql",
+      "sha256": "ce5a563b914c00c4cf1119cd1b4cfafbf0d39fe340b062bd8809cd9be43494fd"
+    },
+    {
+      "filename": "2026_02_15_001_create_articles.sql",
+      "sha256": "03fc7ebc2f01deac1c88289380c032e03691aedea6f562180c893d9e089eb3dd"
+    },
+    {
+      "filename": "2026_02_20_001_add_dek_to_articles.sql",
+      "sha256": "e45ed67deaef3a791a8f2486cf62379bf48863611d6bb675d229dd231f06771f"
+    },
+    {
+      "filename": "2026_02_20_002_article_sections_sort_order_decimal.sql",
+      "sha256": "4d16e618f13bb2fa3185e80b25a1b88468604e4a874c5228cc3309994e71e4b1"
+    },
+    {
+      "filename": "2026_03_01_001_add_photo_library_id_to_playlist_items.sql",
+      "sha256": "11ea39bfba59e026fded7b8750e7e5e1b5538f6c0fb06541facf14f81470f9a0"
+    },
+    {
+      "filename": "2026_03_01_002_add_article_link_cta_type.sql",
+      "sha256": "92117c54ec255ae4ae1ea1f573842d3966c3a1c18c36d76bae0bd085f9269de9"
+    },
+    {
+      "filename": "2026_03_02_001_add_playlist_link_cta_type.sql",
+      "sha256": "5caaaba55caef7616941f190d9f016bec6c211745e09f9d85968322c6a67bb52"
+    },
+    {
+      "filename": "2026_03_02_002_add_photo_library_id_to_playlist_instance_set_items.sql",
+      "sha256": "113d614c92a35e485c16b85b0d58c161c9122a5065605e3fe776a07eb8006821"
+    },
+    {
+      "filename": "2026_03_02_003_add_cta_overrides_to_articles.sql",
+      "sha256": "caaec1de8cb122f36b413a6eeaa61b5ef48f6d99f8d990675ad6fcbb4d943523"
+    },
+    {
+      "filename": "2026_03_03_001_add_note_to_photo_library.sql",
+      "sha256": "ec123abe7f8977923d13b59d4498204ece426a10a92bd9463ef1b37af78836b6"
+    },
+    {
+      "filename": "2026_03_03_002_create_photo_groups.sql",
+      "sha256": "3e25c7e574d5002bb4a9d79e8e0f094cfc049aaba466d8947f5c4880c207e254"
+    },
+    {
+      "filename": "2026_03_07_001_add_trigger_mode_to_saved_palette_photos.sql",
+      "sha256": "b7c9cc90a43232af265d70a0ca65d93fa6c230d9834babdaede9edd3edc51121"
+    },
+    {
+      "filename": "2026_03_10_001_create_applied_palette_photos.sql",
+      "sha256": "7f59ec3ee64443867ff4f9d5d6330c5096fc5bc3158400da245de74987a869fb"
+    },
+    {
+      "filename": "2026_03_11_001_create_projects.sql",
+      "sha256": "e949a53bd0daf7f7da0644158bdf6bf6cb140b1605038e619ce7c8431d01f990"
+    },
+    {
+      "filename": "2026_03_11_002_create_project_links.sql",
+      "sha256": "a9f902e5f8f949900a0c51aa21581535ae5cefdb3efb98ab5feadc1dc0b1fb2a"
+    },
+    {
+      "filename": "2026_03_17_001_create_user_events.sql",
+      "sha256": "41daa736adc6d19f1053b558847cc32efb528254a08a187cd02a04ad38534362"
+    },
+    {
+      "filename": "2026_03_19_001_add_client_id_to_photo_library.sql",
+      "sha256": "e4ac6cbaa8501276394e73dbc0aa7acb1b10edbb3ea855e7542a4879398a41ba"
+    },
+    {
+      "filename": "2026_03_21_001_add_is_internal_to_user_events.sql",
+      "sha256": "c650ec599b7bcb29450b83405c9c2583c7aec3b7b37792f14b56bfc5d1cea7f3"
+    },
+    {
+      "filename": "2026_03_23_001_add_display_subtitle_to_playlist_instances.sql",
+      "sha256": "de8f1008e84fde06df37766b0032f13008d244e930aaf11b9ea1a9bd36f791c1"
+    },
+    {
+      "filename": "2026_03_23_002_add_subtitle_to_playlist_instance_set_items.sql",
+      "sha256": "c53992b0bbb22b5cad7dd625015f5016997cc453606e68ef080561074e71c8d5"
+    },
+    {
+      "filename": "2026_03_23_003_delete_converted_applied_saved_palettes.sql",
+      "sha256": "2bc7f0bc515dbc83b166e919163a585aee5f4093c50d04d916687f48f44658f1"
+    },
+    {
+      "filename": "2026_03_30_001_expand_article_section_kinds.sql",
+      "sha256": "d4cfa1c39ca048533129e5d6a54dc0844a9747b1cca4919ecd273b7274d14079"
+    },
+    {
+      "filename": "2026_03_30_002_add_mobile_hero_to_articles.sql",
+      "sha256": "0770924b963490ac2381d53948efeed2436841d8e7775615d203a5aea0389e02"
+    },
+    {
+      "filename": "2026_04_01_001_create_saved_palette_sets.sql",
+      "sha256": "c0f5d0577ec29c083f7e603e24e9b36917f8d35f0eea0f71b613b54090569bc0"
+    },
+    {
+      "filename": "2026_04_01_002_create_saved_palette_set_photos.sql",
+      "sha256": "3ebd897e246c265aee4bf0b7d60e01820ac8755a8569ad48d9a96aac2398958b"
+    },
+    {
+      "filename": "2026_04_01_003_backfill_saved_palette_sets.sql",
+      "sha256": "01dc857e40f2edf220228714b198969560abecc996973d2e04700c55ad24935d"
+    },
+    {
+      "filename": "2026_04_04_001_add_is_inactive_to_photo_library.sql",
+      "sha256": "3cb91e07e430c84e5cb78e8ce40c88760926d3b67afc0e50619c56ffd4b07169"
+    },
+    {
+      "filename": "2026_04_04_002_add_saved_palette_set_id_to_playlist_items.sql",
+      "sha256": "9d66aa3c065bafbb9d1440eeb5b927095365dbd660f510a6b6a85190ac410a87"
+    },
+    {
+      "filename": "2026_04_08_001_add_is_retired_flags.sql",
+      "sha256": "57c162c6b2e9e7ef041704151ef4ea7b3894a91e06c80d89b8a8b292fe8d48ea"
+    },
+    {
+      "filename": "2026_04_11_001_make_items_insert_position_decimal.sql",
+      "sha256": "6d309b66846ca1a19c47adde813e68a02baf4d0b74cfce8bbeca04324993a83e"
+    },
+    {
+      "filename": "2026_04_15_001_create_audience_types.sql",
+      "sha256": "8f1614bbef9f4c3fa8b823a1b4474fd4194bd649aed0984f790162c444468f33"
+    },
+    {
+      "filename": "2026_04_15_002_create_app_configs.sql",
+      "sha256": "f6a4998c5995d4a8233dd6de1e56769d98968d6d25ff6fa90d46019764a315f4"
+    },
+    {
+      "filename": "2026_04_18_001_add_playlist_seo_fields.sql",
+      "sha256": "ebb89330067bf10ed5224f918e39c5eadfd4e733015705c08eef9dc24a9a190f"
+    },
+    {
+      "filename": "2026_04_20_001_create_photo_alt_text_jobs.sql",
+      "sha256": "f09325f9b86a0a3632747dea65f1af5a227db82913f890a6f1dd1228aa1cebd4"
+    },
+    {
+      "filename": "2026_04_20_002_add_ai_filename_slug_to_photo_library.sql",
+      "sha256": "af567eb5258b27d0528a5edab1e2e3e9c9382dfa5e396ef87ec2ef2b3a6d26db"
+    },
+    {
+      "filename": "2026_04_20_003_add_provider_to_photo_alt_text_jobs.sql",
+      "sha256": "c187f6f3f9ed9b1abe4fafa85c2d1267f9c90a487c451446490f70b63d96989a"
+    },
+    {
+      "filename": "2026_04_20_004_add_slug_to_playlist_instances.sql",
+      "sha256": "be6d7a5cbfc4ae444df2cab2899a8131c0a0ef6fd055b41d56de3e775204f14b"
+    },
+    {
+      "filename": "2026_04_21_001_add_display_title_to_saved_palettes.sql",
+      "sha256": "b3845278021367064ceb7066a2314a288682e43035377fcd36fcae148d5ac5fe"
+    },
+    {
+      "filename": "2026_04_26_001_add_photo_permission_fields_to_clients.sql",
+      "sha256": "3898e46531c022261428b45bbacfc4c315b74ffe4d67aa703e9070eccf7e6663"
+    },
+    {
+      "filename": "2026_04_26_002_create_email_templates.sql",
+      "sha256": "83c2713879140c80a61bdacea0492c1197b3c492d52f8b705f9a66955a7fe919"
+    },
+    {
+      "filename": "2026_04_26_003_add_first_name_to_clients.sql",
+      "sha256": "7fff7ab342e3d899e6e568b440b53720d643193c4fad84e0285fd72adf920e61"
+    },
+    {
+      "filename": "2026_04_26_004_create_client_emails.sql",
+      "sha256": "2d53bd41faeed154d6f9f86bb10bcb86177fda91ddbd63c9d54f53682718bac8"
+    },
+    {
+      "filename": "2026_04_26_005_create_client_activity.sql",
+      "sha256": "90f1e75aa3674811f34e4329b9a8ea8c0a50ed323f990362c4867218f58eb1a0"
+    },
+    {
+      "filename": "2026_04_26_006_add_fields_to_email_templates.sql",
+      "sha256": "c54f8d326ef51210376bac0680d0c9f26eefb09004b6d22a683b72f4c94787a0"
+    },
+    {
+      "filename": "2026_05_01_001_add_source_to_user_events.sql",
+      "sha256": "19d8e656531b0180d1a4d2d1c074e00636defb7d070c47befa28ad3d10713354"
+    },
+    {
+      "filename": "2026_05_03_001_add_client_types.sql",
+      "sha256": "4a5ec96ba77bfa91f7002886afb3562c8f252f6fa06dd35edc2a77004a260443"
+    },
+    {
+      "filename": "2026_05_03_002_migrate_saved_palette_gallery_flags_to_library.sql",
+      "sha256": "0190be566c6dc6559ce2d1e07637870dbc71d3d27da3c920e03c1db3de5ed513"
+    },
+    {
+      "filename": "2026_05_09_001_restore_last_name_on_clients.sql",
+      "sha256": "dd47a386c6e34180cd5b6cb537bc5971768698dd1349120c7bae40d0a1e934d4"
+    },
+    {
+      "filename": "2026_05_09_002_create_file_locker_entries.sql",
+      "sha256": "13ecd83e2c18b5c719dd4a7c05b866b08461d0ef5e0cbce14e6730edfcc27812"
+    },
+    {
+      "filename": "2026_05_10_001_backfill_unknown_client_names.sql",
+      "sha256": "ef4e2c4894cb77823f726f66a688d07883afcd917924131e6fa147318009966d"
+    },
+    {
+      "filename": "2026_05_10_002_add_clients_last_first_id_index.sql",
+      "sha256": "77937c2071c2b84989107174b5825123e508fa0217fda3f67472b8184ba155fb"
+    },
+    {
+      "filename": "2026_05_10_003_add_playlist_item_share_image_flag.sql",
+      "sha256": "0ed5f9fe59ab2ed9e8b985798e9c95b3110b278f4481cfc3f3e06bedd968f6db"
+    },
+    {
+      "filename": "2026_05_18_001_add_end_cta_to_playlist_instance_sets.sql",
+      "sha256": "723139c35d1b823cdd36ba0f94745f414b1ddc51844d0414412d25f82e7b8eac"
+    },
+    {
+      "filename": "2026_05_18_002_add_playlist_id_to_playlist_instance_set_items.sql",
+      "sha256": "5bee0803730f458098caeed8cbca765ef41e21474e8c2477a32fe36853ffb2f4"
+    },
+    {
+      "filename": "2026_05_19_001_add_is_public_to_playlists.sql",
+      "sha256": "b5e57713a380767d486d66245077071569aa8f7c03c1643b5f7ef6a976c4bb45"
+    },
+    {
+      "filename": "2026_06_01_001_add_priority_to_ideas.sql",
+      "sha256": "d34bf93e79802d6d411ea7609a94c45965c4a2af711131883e2c540a87e21d98"
+    },
+    {
+      "filename": "2026_06_01_002_add_site_yt_to_playlist_items.sql",
+      "sha256": "fc6f6aada8aa45ebe35a8e3b6ccc8ad55f7cf032ae0441a80cc8596a641e9c97"
+    },
+    {
+      "filename": "2026_06_07_001_create_publishing_tables.sql",
+      "sha256": "f76f86ebe5781fee7782df2ad7cf5e12dbc3fadf2aa34b74e1816909303679c7"
+    },
+    {
+      "filename": "2026_06_08_001_create_asset_library.sql",
+      "sha256": "d09d145cc738ec1f50d7435b7c282183971e028da43d33a0b1ec1c5b972826b4"
+    },
+    {
+      "filename": "2026_06_08_002_create_asset_creator_tables.sql",
+      "sha256": "631b359528ceaea41ec58ffbcdfab127e1cd1ed2de2967e25063db02e037b3f5"
+    },
+    {
+      "filename": "2026_06_13_001_create_tracking_lookup_tables.sql",
+      "sha256": "acb980ff4dde475512bb913678d1870c18bd9c938feb344128ec63f1d4579b8f"
+    },
+    {
+      "filename": "2026_06_15_001_add_onclick_to_ctas.sql",
+      "sha256": "4ffe17351b506fc06bbf8b087e1b3637b397ad004b1dee8a9c5ce930520965ad"
+    },
+    {
+      "filename": "2026_06_15_002_add_admin_read_at_to_client_activity.sql",
+      "sha256": "9c3a30bbe0baaa1dbde7fad7fef44b194d2b7c548c588c98a3281b54b6b8f704"
+    },
+    {
+      "filename": "2026_06_16_001_add_photo_permission_status_to_photo_library.sql",
+      "sha256": "34acb6928ad9d1be9d2bc4b0e6fe7b556bacc2bc428f829a81cfbd0b93710d19"
+    },
+    {
+      "filename": "2026_06_19_001_add_analyzer_role_to_playlist_items.sql",
+      "sha256": "59c6c8894eabe9fe7fb14da77aeec1ca8bcee105e8d78e635b8a52fb95a956f5"
+    },
+    {
+      "filename": "2026_06_20_001_create_landing_pages.sql",
+      "sha256": "739c4d15f818bf90ddea71a0714d97ece89ca16bcbdba33f8da65692bc479fdc"
+    },
+    {
+      "filename": "2026_06_20_002_create_publisher_tables.sql",
+      "sha256": "23ca1f08f9a0866f8390312a3fbc21178f15e98e65b7243ea743c3bb5879a910"
+    },
+    {
+      "filename": "2026_06_21_001_add_pinterest_destinations.sql",
+      "sha256": "1ad4ce55dbf8aad964a7d9489a83bfdaede6dc351bd2041413cf54386e3f8eb1"
+    },
+    {
+      "filename": "2026_06_22_001_create_publication_scheduler.sql",
+      "sha256": "73d599aba31cd9b5b23bb79d30bf45349ff3461cdf1d0cdbaa8c684e559404b3"
+    },
+    {
+      "filename": "2026_06_23_001_rename_publisher_assets_to_publishing_jobs.sql",
+      "sha256": "2579727990e5b1e4fd21ac2f6f4a728e599b5d16a54a4fb2d88b96f5f40025a5"
+    },
+    {
+      "filename": "2026_06_25_001_rebuild_publishing_arm_schema.sql",
+      "sha256": "40cf988a6cd6ac78e215b6f735f31b93bcfd19ffa56721d42500893bbfa11288"
+    },
+    {
+      "filename": "2026_06_28_001_add_pin_to_playlist_items.sql",
+      "sha256": "760a66cce96d06e35340a7d1931d70826929383005a564f3565dbbab66b42a5f"
+    },
+    {
+      "filename": "2026_06_28_002_queue_based_publication_scheduler.sql",
+      "sha256": "17afd3913a11e3cb47d8d2bc85cee77258e70d22cb82f96bb1bfb50860b91040"
+    },
+    {
+      "filename": "2026_06_28_003_rebuild_packager_scheduler_publisher_schema.sql",
+      "sha256": "d0d712c7aa2ed6a31349a6f1e072cd465f573e5e6e61c7c4cd222d62159aa6d2"
+    },
+    {
+      "filename": "2026_06_29_001_create_front_page_build_content.sql",
+      "sha256": "f0e821d61bad917310f6253638408d0898873d4b88a824d9708033cc1733ff43"
+    },
+    {
+      "filename": "2026_06_29_002_normalize_package_scheduler_statuses.sql",
+      "sha256": "2df37a440e248b267ece30dd0b649640ab4d3bf81f6ac5dc448992d3e19f3015"
+    },
+    {
+      "filename": "2026_07_05_001_create_playlist_instance_url_reservations.sql",
+      "sha256": "97a81cc3d2fbc06e6802ef3feeba6e863be3fb77052e5af7781f68bde627dc3e"
+    },
+    {
+      "filename": "2026_07_08_001_create_publishing_default_templates.sql",
+      "sha256": "77a1b2cbaa0ea4dfbbe7c8dfdf18cbcf2a90c1e754ae5bd068292919805e9995"
+    },
+    {
+      "filename": "2026_07_12_001_add_started_at_to_clients.sql",
+      "sha256": "0c1f9e027a19655c13df828052802d365282b49b5291f809be7f9fdf9bdbd4c3"
+    },
+    {
+      "filename": "2026_07_13_001_add_finder_start_to_playlist_items.sql",
+      "sha256": "fc2daa437f825bc59341fcd22d13b13754527c484b78699293a4fa1d4e93302b"
+    },
+    {
+      "filename": "2026_07_22_001_create_milestones.sql",
+      "sha256": "e2d340b69a1475e56d2a58047b36950ab365ab23e12c02035064ecfd535e555d"
+    },
+    {
+      "filename": "2026_08_01_001_create_addresses.sql",
+      "sha256": "dce93ae0de36de124f8dc42c5afba0fdb15c68e76aca72fb63264a8931b95d3d"
+    },
+    {
+      "filename": "2026_08_01_002_create_properties.sql",
+      "sha256": "00262996831a08ac22c4020215930007b45b81fd9bdce655f2ce9f7099ac7eb8"
+    },
+    {
+      "filename": "2026_08_01_003_create_project_types.sql",
+      "sha256": "8278ba5d429d136039a4da899101b161425c3466065b0ddf48f1ae94596eea8d"
+    },
+    {
+      "filename": "2026_08_01_004_rename_legacy_projects_create_projects.sql",
+      "sha256": "9d976b448c5eb7d6d815ed6b4e613d2a5b5200b14ccad23639e83b837f236b65"
+    },
+    {
+      "filename": "2026_08_01_005_create_project_photos.sql",
+      "sha256": "38701ac5b0f5be1393fcde4bb982abce8e2bda5990c89a2cc8d070abfc813ce3"
+    },
+    {
+      "filename": "2026_08_01_006_create_project_playlists.sql",
+      "sha256": "75c91d50bd27874cc8aba61ffaa5203b50f2a7e20d0ad092a63306e6a9b0d548"
+    },
+    {
+      "filename": "2026_08_01_007_add_prospect_to_playlist_items.sql",
+      "sha256": "43dff041c217e32650f75dd0303305e3c4095ee369611eabb1dad19985738c58"
+    },
+    {
+      "filename": "2026_08_01_008_create_player_experiences.sql",
+      "sha256": "938710bcbb83049604857b1f0b3c9ef7a06d23db0f199edf5e0b43144907be89"
+    },
+    {
+      "filename": "2026_08_01_009_add_client_to_playlist_items.sql",
+      "sha256": "1de75c549cf4d1d58f312e79f1e5be54046f30c916604834c43e1370c9112521"
+    },
+    {
+      "filename": "2026_08_01_010_add_player_experience_to_playlist_instances.sql",
+      "sha256": "4f6300dee82456c9d8f1ab5c4a773942ccace6a1a1d8bbf2e7d96f1cc5e87fce"
+    },
+    {
+      "filename": "2026_08_01_011_create_saved_palette_viewer_content.sql",
+      "sha256": "7cd9788341267338094cdf612f3d087eed13ba623ef04a398f7ced899a68feae"
+    },
+    {
+      "filename": "2026_08_01_012_add_kicker_text_to_saved_palette_viewer_content.sql",
+      "sha256": "08b73fd1dc929dad082384ee08dd68e342818e6eb7147393853b641a4483cc0d"
+    },
+    {
+      "filename": "2026_08_01_013_drop_kicker_id_from_saved_palette_viewer_content.sql",
+      "sha256": "032ca6e001532cb1381552fcf3f157591777fd207c24ce2c8651a441271a7788"
+    },
+    {
+      "filename": "2026_08_01_014_add_playlist_url_to_saved_palette_viewer_content.sql",
+      "sha256": "68f2a86faa50a655aca357b7b3f316aee6dbee9bde75a46ff1684d874bc3a178"
+    },
+    {
+      "filename": "2026_08_02_001_create_palette_viewer_links.sql",
+      "sha256": "f43c96e864d0378344c045808cc7e25d2cf8eee3c729f4e9936506e676d001c8"
+    },
+    {
+      "filename": "2026_08_02_002_create_share_card_templates.sql",
+      "sha256": "f7c2de975bddcd410cce10632f5e5fdf375601de692f8bbc39404ce2fd1499a1"
+    },
+    {
+      "filename": "2026_08_02_003_add_share_card_fields_to_saved_palette_viewer_content.sql",
+      "sha256": "d16ba238205d5e019d0c65459ee6a68261536ce872fb06848794e50e43f8c50a"
+    },
+    {
+      "filename": "2026_08_05_001_project_property_workflow.sql",
+      "sha256": "077c201a2102016c788176dde2da514fb0083e90766d7407e15896b0daa62280"
+    },
+    {
+      "filename": "2026_08_06_001_create_project_color_plans.sql",
+      "sha256": "b45dd7450f26453163853bfc6b08d5907d242c5eda55c65d50a280946f39cb5f"
+    },
+    {
+      "filename": "2026_08_07_001_drop_project_color_plan_playlist_id.sql",
+      "sha256": "a0a4880ec6e849065494de7a311710fcff96f1fe2d1fffa6fa4374ca7bb478f9"
+    },
+    {
+      "filename": "2026_08_07_002_create_project_color_plan_viewers.sql",
+      "sha256": "a864ae85a57883696ff13ff755c2ecc7870e23a3863b5ec9603bd41b5daf0d41"
+    },
+    {
+      "filename": "2026_08_07_003_cleanup_obsolete_project_color_plan_presentation_fields.sql",
+      "sha256": "c2a7ec528c9bedc81508229574dc6f0f692dc277b0e13fccbd4b1808b70cb965"
+    },
+    {
+      "filename": "2026_08_07_004_drop_project_color_plan_viewer_photo_caption.sql",
+      "sha256": "60c841a18887243c0341a45d187dab6f1dbfb6d6c371515c89016b89d4a4b370"
+    },
+    {
+      "filename": "2026_08_07_005_create_url_reservations.sql",
+      "sha256": "9de4b717d19aba78d3feb1e8c829711a92782f40588ab5de574411a52c33762b"
+    },
+    {
+      "filename": "2026_08_07_006_add_reserved_viewer_cta_type.sql",
+      "sha256": "232590bf9afd31315b4e7a7554db140cf2e71aa80ec9132980cd37a5eee61208"
+    },
+    {
+      "filename": "2026_08_07_007_add_project_painter_note.sql",
+      "sha256": "07e2381fe1620d8b5f14ec35203f45d06a28e9a46db41b1613863984db73a7a9"
+    },
+    {
+      "filename": "2026_08_10_001_create_rex_reservations.sql",
+      "sha256": "ec581a6d9f7e52d518a7eb3205648076d6ddf83495b8edc254edd82b7af403b2"
+    },
+    {
+      "filename": "2026_08_12_000_palette_viewers_saved_palette_id.sql",
+      "sha256": "3d9de1e8ae1cb7ba43b016a73ff956b69edfc849e9686ea4499901398f641179"
+    },
+    {
+      "filename": "2026_08_12_001_migrate_saved_palette_viewers_to_palette_viewers.sql",
+      "sha256": "e624a28a123e2562d5e5c053c2d5cc52b5a82915e1b7c7793429bde39e24507b"
+    },
+    {
+      "filename": "2026_08_13_001_backfill_palette_viewer_photos_from_sets.sql",
+      "sha256": "37a8edd1e15a7d2bd474aafaf7f07b856071dcb03fc19aec79244fbfda9a0978"
+    },
+    {
+      "filename": "2026_08_13_002_backfill_palette_viewer_photo_library_ids.sql",
+      "sha256": "94f9f6eee850e61e490203230ee2f6b7efd53726e8f4c41ecebeb8595e5ef4f2"
+    },
+    {
+      "filename": "2026_08_13_003_backfill_hashed_rendered_palette_viewer_photo_ids.sql",
+      "sha256": "9fd9f346a95ed91d133ff691426b43e25897b03c1cf0c0d690a6b832d7c49ae9"
+    },
+    {
+      "filename": "2026_08_13_004_backfill_palette_viewer_photo_ids_from_canonical_paths.sql",
+      "sha256": "3e1bda80868e97c285c2b0c99a53d8642028eb664eb39d284f426c3c7c706127"
+    },
+    {
+      "filename": "2026_08_13_005_backfill_palette_viewer_saved_palette_rendered_photo_ids.sql",
+      "sha256": "1051d1b2be7e8fe7f6465216ba9d6e42179b289cc38ca46f8e401486f7cad327"
+    },
+    {
+      "filename": "2026_08_13_006_repair_cottage_before_photo_library_path.sql",
+      "sha256": "d4518ceab7abb51531b400ce2682d77061a50f6858268818d692be11fac30b84"
+    },
+    {
+      "filename": "2026_08_13_007_clear_palette_viewer_photo_paths_with_library_id.sql",
+      "sha256": "f30bc41b30a29a9909c8ab1de0caa52bbd499f85198c43d02323074404d99fc0"
+    },
+    {
+      "filename": "2026_09_14_001_remove_legacy_publishing_tables.sql",
+      "sha256": "5ca02e15bcaf62be3d42d5a29b1d4e9421360e4488199c70f02046aa01d94263"
+    },
+    {
+      "filename": "2026_10_04_002_project_photo_order.sql",
+      "sha256": "0659244b80484418d4180123992141a61422d74b0211914a1e59761f91fca888"
+    },
+    {
+      "filename": "2026_10_05_000_project_photo_rooms.sql",
+      "sha256": "c734c03b7a209b21dc78c299abe600d632223e06de00d120f68708eb0a958c65"
+    },
+    {
+      "filename": "2026_10_05_001_photo_library_palette.sql",
+      "sha256": "c5beb1b6fbd274ecf765efc1f86feff97b82b5c363dec459691a20daf634b8f2"
+    },
+    {
+      "filename": "2026_10_05_002_analytics_client_source.sql",
+      "sha256": "3b8fe1820b8a4f8f83503674da3ced22057cad04f6d39bac9d5285029cf5c189"
+    },
+    {
+      "filename": "2026_10_06_001_playlist_set_item_experience.sql",
+      "sha256": "e7bc75d24716a75e775cdcb78db0f622245eb71b9720a662922e4adf6d388a21"
+    },
+    {
+      "filename": "2026_10_08_001_src_params.sql",
+      "sha256": "4bad8180a688d66ac4533b89269491669d7acb54280a5e2cbcf916dc0765cd89"
+    }
+  ]
+}

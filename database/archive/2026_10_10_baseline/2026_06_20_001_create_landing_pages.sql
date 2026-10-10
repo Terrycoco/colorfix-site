@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS landing_pages (
+  id INT NOT NULL AUTO_INCREMENT,
+  slug VARCHAR(160) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  search_title VARCHAR(255) NULL,
+  description TEXT NULL,
+  status ENUM('draft','public','archived') NOT NULL DEFAULT 'draft',
+  page_type ENUM('playlist','collection','article','redirect') NOT NULL DEFAULT 'playlist',
+  primary_playlist_instance_id INT NULL,
+  featured_pin_asset_id INT NULL,
+  redirect_url TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_landing_pages_slug (slug),
+  KEY idx_landing_pages_status (status),
+  KEY idx_landing_pages_page_type (page_type),
+  KEY idx_landing_pages_playlist_instance (primary_playlist_instance_id),
+  KEY idx_landing_pages_featured_pin_asset (featured_pin_asset_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS palette_role_members (
+  palette_id BIGINT UNSIGNED NOT NULL,
+  role_id    INT UNSIGNED NOT NULL,
+  color_id   INT UNSIGNED NOT NULL,
+  priority   SMALLINT UNSIGNED DEFAULT 0,
+  PRIMARY KEY (palette_id, role_id),
+  FOREIGN KEY (palette_id) REFERENCES palettes(id)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (role_id) REFERENCES master_roles(id)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
