@@ -7,13 +7,14 @@ use App\ERR\Repos\PdoErrorRepository;
 use App\ERR\Contracts\ErrorContext;
 use App\ERR\Contracts\ErrorHandlerInterface;
 use App\ERR\Services\RecoveryExecutor;
+use App\ERR\Services\ErrorEmailNotifier;
 use Throwable;
 
 /**
  * Shared error reporting entrypoint.
  *
- * Phase 1: classify and persist occurrences. Recovery dispatch is deliberately
- * not enabled until the handler/executor contracts are installed.
+ * Classifies, persists, dispatches installed handlers, and notifies for
+ * unresolved background incidents according to their registered policy.
  *
  * Never throws for a reporting failure: errors in ERR must not mask the
  * underlying departmental failure.
@@ -132,6 +133,7 @@ final class ErrorManager
                 $this->repository->updateHandling(
                     $logId, 'waiting', 'No automatic handler registered.'
                 );
+                $this->notifyIfAttentionNeeded($logId, $errNum, $department, $context);
                 return $logId;
             }
 
@@ -140,6 +142,7 @@ final class ErrorManager
                 $this->repository->updateHandling(
                     $logId, 'failed', "No installed handler for key: {$handlerKey}"
                 );
+                $this->notifyIfAttentionNeeded($logId, $errNum, $department, $context);
                 return $logId;
             }
 
@@ -180,7 +183,55 @@ final class ErrorManager
             }
         }
 
+        // Email is advisory: failure must never break the logged incident or recovery.
+        $this->notifyIfAttentionNeeded($logId, $errNum, $department, $context);
         return $logId;
+    }
+
+    /** @param array<string, mixed> $context */
+    private function notifyIfAttentionNeeded(
+        int $logId,
+        int $errNum,
+        string $department,
+        array $context
+    ): void {
+        try {
+            $registration = $this->repository->findCode($errNum);
+            if ($registration === null
+                || (int)($registration['is_active'] ?? 0) !== 1
+                || strcasecmp((string)($registration['department'] ?? ''), $department) !== 0) {
+                return;
+            }
+
+            // A registration marked "both" must specify the actual execution context.
+            $kind = strtolower(trim((string)($registration['context_type'] ?? '')));
+            $actual = strtolower(trim((string)($context['execution_context'] ?? '')));
+            if ($kind !== 'background' && !($kind === 'both' && $actual === 'background')) {
+                return;
+            }
+
+            $policy = strtolower(trim((string)($registration['notify_policy'] ?? 'none')));
+            if (!in_array($policy, ['once_per_incident', 'on_failure', 'always'], true)) {
+                return;
+            }
+            $incident = $this->repository->findLog($logId);
+            if ($incident === null) return;
+            $status = strtolower((string)($incident['handling_status'] ?? ''));
+            if (!in_array($status, ['waiting', 'failed'], true)) return;
+            if ($policy === 'on_failure' && $status !== 'failed') return;
+
+            // This is called once on initial report, never for manual Recover attempts.
+            // The project root is three levels above app/ERR/err_fallback.log.
+            $root = dirname($this->fallbackLogPath, 3);
+            (new ErrorEmailNotifier($root))->send($registration, $incident);
+        } catch (Throwable $failure) {
+            $this->writeFallback([
+                'timestamp' => gmdate('c'),
+                'event' => 'err_notification_failed',
+                'err_log_id' => $logId,
+                'message' => $failure->getMessage(),
+            ]);
+        }
     }
 
     /**

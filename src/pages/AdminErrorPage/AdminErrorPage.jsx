@@ -20,6 +20,7 @@ import { API_FOLDER } from "@helpers/config";
 const URL = `${API_FOLDER}/v2/admin/errors/report.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/errors/save.php`;
 const RECOVER_URL = `${API_FOLDER}/v2/admin/errors/recover.php`;
+const DELETE_URL = `${API_FOLDER}/v2/admin/errors/delete-working.php`;
 const VIEWS = [
   { id: "working", title: "Working" },
   { id: "history", title: "History" },
@@ -58,6 +59,8 @@ export default function AdminErrorPage() {
   const [bookmarkExpanded, setBookmarkExpanded] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [recoveryAlert, setRecoveryAlert] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -95,7 +98,7 @@ export default function AdminErrorPage() {
   const change = (field, value) => setDraft((prev) => ({ ...prev, [field]: value }));
 
   async function closeDrawer() {
-    if (!drawer || saving || recovering) return;
+    if (!drawer || saving || recovering || deleting) return;
     const allowed = {
       working: ["detail"],
       history: ["handling_result"],
@@ -158,6 +161,30 @@ export default function AdminErrorPage() {
       await load();
     } finally {
       setRecovering(false);
+    }
+  }
+
+  async function deleteSelected() {
+    if (!drawer || drawer.view !== "working" || deleting || recovering) return;
+    const id = drawer.row.id;
+    setDeleting(true);
+    try {
+      await readResponse(await fetch(DELETE_URL, {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ working_id: id }),
+      }));
+      setDeleteConfirm(false);
+      setDrawer(null);
+      setSelectedKey(null);
+      await load();
+    } catch (failure) {
+      setDeleteConfirm(false);
+      setRecoveryAlert({ title: "Could Not Delete", message: failure?.message || "Please try again." });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -365,6 +392,10 @@ export default function AdminErrorPage() {
             <AdminButton type="button" disabled={recovering} onClick={() => void recoverSelected()}>
               {recovering ? "Recovering..." : "Recover"}
             </AdminButton>
+            <AdminButton type="button" variant="secondary" disabled={deleting || recovering}
+              onClick={() => setDeleteConfirm(true)}>
+              {deleting ? "Deleting..." : "Delete Working Record"}
+            </AdminButton>
             {readonly("detail", "Working notes")}
           </>
         ) : null}
@@ -413,6 +444,17 @@ export default function AdminErrorPage() {
         ) : null}
       </AdminStack>
     </AdminWorkbenchDrawer>
+    <AdminDialog
+      open={deleteConfirm}
+      mode="danger"
+      title="Delete Working Record?"
+      message="Remove this unfinished recovery from Working? This does not rerun the asset. The incident remains in History as manually cleared."
+      confirmLabel="Delete"
+      cancelLabel="Cancel"
+      onConfirm={() => void deleteSelected()}
+      onCancel={() => { if (!deleting) setDeleteConfirm(false); }}
+      dismissOnBackdrop={!deleting}
+    />
     <AdminDialog
       open={Boolean(recoveryAlert)}
       mode="alert"

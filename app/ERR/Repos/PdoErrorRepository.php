@@ -247,6 +247,45 @@ final class PdoErrorRepository
         $stmt->execute(['id' => $workingId]);
     }
 
+    /** Manually clear one unfinished record without executing its bookmark. */
+    public function manuallyClearWorking(int $workingId): bool
+    {
+        $this->requirePositive($workingId, 'Working ID');
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT id, err_log_id, status FROM err_working WHERE id = :id FOR UPDATE'
+            );
+            $stmt->execute(['id' => $workingId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row === false) {
+                $this->pdo->rollBack();
+                return false;
+            }
+            if ($row['status'] === 'running') {
+                throw new \RuntimeException('Cannot delete a recovery while it is running.');
+            }
+            $this->clearWorkingStep($workingId);
+            $remaining = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM err_working WHERE err_log_id = :id'
+            );
+            $remaining->execute(['id' => (int)$row['err_log_id']]);
+            if ((int)$remaining->fetchColumn() === 0) {
+                $this->updateHandling(
+                    (int)$row['err_log_id'],
+                    'manually_cleared',
+                    'Working record manually deleted by admin; interrupted work was not rerun.',
+                    true
+                );
+            }
+            $this->pdo->commit();
+            return true;
+        } catch (\Throwable $failure) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $failure;
+        }
+    }
+
     /** Return all three ERR admin grids from the shared repository. */
     public function report(): array
     {

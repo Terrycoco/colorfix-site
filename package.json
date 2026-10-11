@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:sas": "vite build --config vite.sas.config.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "prebuild-front-page": "php api/tools/prebuild-front-page.php",

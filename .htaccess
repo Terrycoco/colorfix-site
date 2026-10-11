@@ -30,6 +30,11 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^admin/.*$ /admin/index.html [L]
 
+  RewriteRule ^sas/?$ /sas/index.html [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^sas/.*$ /sas/index.html [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . /index.html [L]

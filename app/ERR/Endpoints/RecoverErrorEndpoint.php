@@ -7,6 +7,7 @@ use App\ERR\Contracts\ErrorContext;
 use App\ERR\Contracts\RecoveryStepResult;
 use App\ERR\Repos\PdoErrorRepository;
 use App\PUB\Create\CreateManager;
+use App\PUB\Dispatch\DispatchManager;
 use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Errors\PubErrorHandler;
 use PDO;
@@ -37,8 +38,10 @@ final class RecoverErrorEndpoint
                 return;
             }
             $log = $repo->findLog((int)$row['err_log_id']);
-            if (!$log || (int)$log['err_num'] !== 4001 || $log['department'] !== 'PUB'
-                || (string)$row['step_key'] !== 'check_video_worker') {
+            $errNum = (int)($log['err_num'] ?? 0);
+            $expectedStep = $errNum === 4001 ? 'check_video_worker' : 'retry_dispatch';
+            if (!$log || !in_array($errNum, [4001, 4002, 4003], true) || $log['department'] !== 'PUB'
+                || (string)$row['step_key'] !== $expectedStep) {
                 http_response_code(422);
                 echo json_encode(['ok' => false, 'error' => 'This error does not support Recover yet.']);
                 return;
@@ -58,7 +61,7 @@ final class RecoverErrorEndpoint
             $claimed = true;
             $details = json_decode((string)($log['context_json'] ?? 'null'), true);
             $context = new ErrorContext(
-                logId: (int)$log['id'], errNum: 4001, department: 'PUB',
+                logId: (int)$log['id'], errNum: $errNum, department: 'PUB',
                 message: (string)$log['message'],
                 component: $log['component'], operation: $log['operation'],
                 resourceType: $log['resource_type'],
@@ -66,7 +69,9 @@ final class RecoverErrorEndpoint
                 details: is_array($details) ? $details : [], bookmark: $bookmark
             );
             $handler = new PubErrorHandler(new VideoWorkerHealthService($projectRoot));
-            $result = $handler->recover($context, new CreateManager($pdo, $projectRoot));
+            $result = $errNum === 4001
+                ? $handler->recover($context, new CreateManager($pdo, $projectRoot))
+                : $handler->recoverDispatch($context, new DispatchManager($pdo, $projectRoot));
             if ($result->status === RecoveryStepResult::SUCCESS) {
                 $repo->completeStep((int)$log['id'], (string)$row['step_key']);
                 $repo->updateHandling((int)$log['id'], 'resolved', $result->detail, true);

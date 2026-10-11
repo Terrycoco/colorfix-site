@@ -10,6 +10,10 @@ use App\PUB\Dispatch\Pinterest\PinterestShippingConfig;
 use App\PUB\Dispatch\Pinterest\PinterestVideoShipper;
 use App\PUB\Dispatch\YouTube\YouTubeShippingConfig;
 use App\PUB\Dispatch\YouTube\YouTubeVideoShipper;
+use App\ERR\Managers\ErrorManager;
+use App\ERR\Repos\PdoErrorRepository;
+use App\PUB\Errors\PubErrorHandler;
+use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Errors\CriticalErrorNotifier;
 use App\PUB\Errors\PubErrorCode;
 use App\PUB\Errors\PubErrorReporter;
@@ -67,6 +71,8 @@ final class DispatchManager implements PubComManagerContract
     private const STALE_SHIPPING_SECONDS = 1800;
 
     private PubErrorReporter $errors;
+    private ?ErrorManager $sharedErrors = null;
+    private bool $recoveringThroughErr = false;
     private PdoPubAssetRepository $assets;
     private PdoRexReservationRepository $rex;
 
@@ -447,6 +453,17 @@ final class DispatchManager implements PubComManagerContract
      *   markShipping(pub_asset_id)
      *   getShippingById(pub_asset_id)
      */
+    /** Explicit ERR retry: preserve the existing single-asset shipping route. */
+    public function shipOneForErrRecovery(int $pubAssetId): array
+    {
+        $this->recoveringThroughErr = true;
+        try {
+            return $this->shipOne($pubAssetId);
+        } finally {
+            $this->recoveringThroughErr = false;
+        }
+    }
+
     public function shipOne(
         int $pubAssetId,
         bool $notifyOnPublish = false
@@ -963,50 +980,7 @@ final class DispatchManager implements PubComManagerContract
                 $message
             );
 
-        $this->errors
-            ->report(
-                new RuntimeException(
-                    $message
-                ),
-                [
-                    'stage' =>
-                        'dispatch',
-
-                    'pub_asset_id' =>
-                        $pubAssetId,
-
-                    'asset_type' =>
-                        $asset[
-                            'asset_type'
-                        ]
-                        ?? null,
-
-                    'source_type' =>
-                        $asset[
-                            'source_type'
-                        ]
-                        ?? null,
-
-                    'source_id' =>
-                        $asset[
-                            'source_id'
-                        ]
-                        ?? null,
-
-                    'channel' =>
-                        $this->channelForAsset(
-                            $asset
-                        ),
-
-                    'code' =>
-                        $centralCode,
-
-                    'diagnostics' => [
-                        'reported_dispatch_code' =>
-                            $code,
-                    ],
-                ]
-            );
+        $this->reportPublishingFailure($asset, $pubAssetId, $code, $message);
 
 
         /*
@@ -1251,58 +1225,7 @@ final class DispatchManager implements PubComManagerContract
                  * Once that condition actually prevents this Dispatch unit
                  * from shipping, it also belongs in the permanent error log.
                  */
-                $this->errors
-                    ->report(
-                        new RuntimeException(
-                            $signalMessage
-                        ),
-                        [
-                            'stage' =>
-                                'dispatch',
-
-                            'pub_asset_id' =>
-                                $pubAssetId,
-
-                            'asset_type' =>
-                                $asset[
-                                    'asset_type'
-                                ]
-                                ?? null,
-
-                            'source_type' =>
-                                $asset[
-                                    'source_type'
-                                ]
-                                ?? null,
-
-                            'source_id' =>
-                                $asset[
-                                    'source_id'
-                                ]
-                                ?? null,
-
-                            'channel' =>
-                                $this->channelForAsset(
-                                    $asset
-                                ),
-
-                            'code' =>
-                                $this->centralErrorCodeForDispatchFailure(
-                                    $asset,
-                                    'dispatch_failure',
-                                    $signalMessage
-                                ),
-
-                            'diagnostics' => [
-                                'line' =>
-                                    $lineKey,
-
-                                'pubcom_type' =>
-                                    $signal
-                                        ->type(),
-                            ],
-                        ]
-                    );
+                $this->reportPublishingFailure($asset, $pubAssetId, 'dispatch_failure', $signalMessage);
 
 
                 return [
@@ -1491,64 +1414,11 @@ final class DispatchManager implements PubComManagerContract
             }
 
 
-            $failure =
-                $this->errors
-                    ->report(
-                        $e,
-                        [
-                            'stage' =>
-                                'dispatch',
-
-                            'pub_run_id' =>
-                                $asset[
-                                    'pub_run_id'
-                                ]
-                                ?? null,
-
-                            'pub_asset_id' =>
-                                $pubAssetId > 0
-                                    ? $pubAssetId
-                                    : null,
-
-                            'asset_type' =>
-                                $asset[
-                                    'asset_type'
-                                ]
-                                ?? null,
-
-                            'source_type' =>
-                                $asset[
-                                    'source_type'
-                                ]
-                                ?? null,
-
-                            'source_id' =>
-                                $asset[
-                                    'source_id'
-                                ]
-                                ?? null,
-
-                            'channel' =>
-                                $this->channelForAsset(
-                                    $asset
-                                ),
-
-                            'code' =>
-                                $this->centralErrorCodeForDispatchFailure(
-                                    $asset,
-                                    'dispatch_failure',
-                                    $e->getMessage()
-                                ),
-
-                            'diagnostics' => [
-                                'batch_index' =>
-                                    $index,
-
-                                'line' =>
-                                    $lineKey,
-                            ],
-                        ]
-                    );
+            $failure = [
+                'pub_asset_id' => $pubAssetId,
+                'error' => $e->getMessage(),
+            ];
+            $this->reportPublishingFailure($asset, $pubAssetId, 'dispatch_failure', $e->getMessage());
 
 
             return [
@@ -1962,6 +1832,65 @@ final class DispatchManager implements PubComManagerContract
         throw new RuntimeException(
             'DISPATCH received an asset without a usable sealed package.'
         );
+    }
+
+    /** One ERR incident per failed shipping asset; the exact provider response is retained. */
+    private function reportPublishingFailure(array $asset, int $assetId, string $providerCode, string $message): void
+    {
+        if ($this->recoveringThroughErr || $assetId <= 0) return;
+        $channel = $this->channelForAsset($asset);
+        if (!in_array($channel, ['pinterest', 'youtube'], true)) return;
+
+        $auth = $this->isAuthenticationInterventionRequired($channel, $message)
+            || $this->isAuthenticationInterventionRequired($channel, $providerCode);
+        $number = $auth ? 4002 : 4003;
+        $title = trim((string)($asset['search_title'] ?? $asset['title'] ?? ''));
+        $description = ($channel === 'youtube' ? 'YouTube' : 'Pinterest')
+            . ' publishing: ' . ($title !== '' ? $title : 'asset #' . $assetId);
+        try {
+            $loggedId = $this->errManager()->reportAndHandle(
+                errNum: $number,
+                department: 'PUB',
+                message: $auth ? 'Publishing account needs reconnection.' : 'Publishing failed unexpectedly.',
+                component: 'DISPATCH',
+                operation: 'shipOne',
+                resourceType: 'pub_asset',
+                resourceId: $assetId,
+                technicalDetail: $message,
+                context: [
+                    'execution_context' => 'background',
+                    'channel' => $channel,
+                    'provider_code' => $providerCode,
+                    'provider_message' => $message,
+                    'asset_title' => $title,
+                ],
+                bookmark: [
+                    'operation' => 'PUB.DISPATCH.shipOne',
+                    'description' => $description,
+                    'params' => ['pub_asset_id' => $assetId],
+                ]
+            );
+            if ($loggedId === null) {
+                error_log('[PUB Dispatch] ERR could not record publishing failure for asset #' . $assetId);
+            }
+        } catch (Throwable $failure) {
+            error_log('[PUB Dispatch] ERR reporting failure: ' . $failure->getMessage());
+        }
+    }
+
+    private function errManager(): ErrorManager
+    {
+        if ($this->sharedErrors === null) {
+            $this->sharedErrors = new ErrorManager(
+                new PdoErrorRepository($this->pdo),
+                $this->projectRoot . '/app/ERR/err_fallback.log',
+                [
+                    'pub.publish_auth_required' => fn() => new PubErrorHandler(new VideoWorkerHealthService($this->projectRoot)),
+                    'pub.unexpected_publish_failure' => fn() => new PubErrorHandler(new VideoWorkerHealthService($this->projectRoot)),
+                ]
+            );
+        }
+        return $this->sharedErrors;
     }
 
     /**

@@ -6,9 +6,11 @@ import fs from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import svgr from 'vite-plugin-svgr'
 import { YOUTUBE_VIDEO_TIMING } from './src/remotion/youtubeVideoTiming.js'
+import { sasSpaFallback } from './sas/vite-fallback.js'
 
 export default defineConfig({
   plugins: [
+    sasSpaFallback(),
     adminDevSpaFallback(),
     localPubVideoRenderApi(),
     nonBlockingPlayerCss(),
@@ -59,6 +61,7 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         admin: path.resolve(__dirname, 'admin/index.html'),
         player: path.resolve(__dirname, 'player/index.html'),
+        sas: path.resolve(__dirname, 'sas/index.html'),
       },
     },
   },
