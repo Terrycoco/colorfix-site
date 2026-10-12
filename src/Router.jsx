@@ -4,7 +4,9 @@ import { Suspense, lazy } from 'react';
 
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useANA } from '@ANA/useANA';
+import { resolveSessionId } from '@ANA/ANAProvider';
 
 import App from './App.jsx';
 
@@ -112,6 +114,7 @@ function AppRouter() {
 
       <ANAProvider>
 
+        <ANAPageTracker />
         <ScrollToTop smooth={true} ignoreWhenHash={true} />
 
 
@@ -163,33 +166,7 @@ function AppRouter() {
 
             <Route element={<MainLayout />}>
 
-              <Route
-
-                index
-
-                element={
-
-                  <ANATrack
-
-                    oncePerSession
-
-                    resource={{
-
-                      resource_type: "page",
-
-                      resource_id: 1,
-
-                    }}
-
-                  >
-
-                    {renderWithSuspense(HomePage, 'Loading home…')}
-
-                  </ANATrack>
-
-                }
-
-              />
+              <Route index element={renderWithSuspense(HomePage, 'Loading home…')} />
 
               <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
 
@@ -251,6 +228,36 @@ function AppRouter() {
 
 }
 
+
+
+// Centralized direct-page visit tracking. The server resolves the resource ID
+// from ana_pages by pathname and ignores unregistered/disabled paths.
+function ANAPageTracker() {
+  const { pathname } = useLocation();
+  const { track } = useANA();
+  const lastNavigation = useRef(null);
+
+  useEffect(() => {
+    // StrictMode effect replay must not create a second visit.
+    if (lastNavigation.current === pathname) return;
+    lastNavigation.current = pathname;
+
+    // Preserve the homepage's existing once-per-session behavior.
+    if (pathname === '/') {
+      const key = ['ana_once', resolveSessionId(), 'visit', 'page', 1].join(':');
+      try {
+        if (sessionStorage.getItem(key) === '1') return;
+        sessionStorage.setItem(key, '1');
+      } catch { /* Tracking should work without session storage. */ }
+    }
+
+    // /results/4 retains its existing legacy homepage ANATrack mapping.
+    if (pathname === '/results/4') return;
+    track('visit', {}, { resource_type: 'page' });
+  }, [pathname, track]);
+
+  return null;
+}
 
 
 function GalleryRoute() {

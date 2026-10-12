@@ -21,19 +21,26 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
             return [];
         }
 
-        $stmt = $this->pdo->prepare(
-            "SELECT
-                resource_id,
-                source_key,
-                COUNT(*) AS event_count,
-                MAX(created_at) AS last_visit
-            FROM analytics_events
-            WHERE resource_type = :resource_type
-            AND event_key = :event_key
-            AND resource_id IS NOT NULL
-            GROUP BY resource_id, source_key
-            ORDER BY last_visit DESC, resource_id ASC"
-        );
+        // Page names live in ana_pages; other ANA resource types are unchanged.
+        $sql = $resourceType === 'page'
+            ? "SELECT e.resource_id, e.source_key, COUNT(*) AS event_count,
+                      MAX(e.created_at) AS last_visit, p.title AS title
+                 FROM analytics_events e
+                 LEFT JOIN ana_pages p ON p.id = e.resource_id
+                WHERE e.resource_type = :resource_type
+                  AND e.event_key = :event_key
+                  AND e.resource_id IS NOT NULL
+                GROUP BY e.resource_id, e.source_key, p.title
+                ORDER BY last_visit DESC, e.resource_id ASC"
+            : "SELECT resource_id, source_key, COUNT(*) AS event_count,
+                      MAX(created_at) AS last_visit
+                 FROM analytics_events
+                WHERE resource_type = :resource_type
+                  AND event_key = :event_key
+                  AND resource_id IS NOT NULL
+                GROUP BY resource_id, source_key
+                ORDER BY last_visit DESC, resource_id ASC";
+        $stmt = $this->pdo->prepare($sql);
 
         $stmt->execute([
             ':resource_type' => $resourceType,

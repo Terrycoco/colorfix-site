@@ -17,12 +17,77 @@ if (!fs.existsSync(payloadPath)) {
 
 const payload = JSON.parse(fs.readFileSync(payloadPath, "utf8"));
 const html = fs.readFileSync(distIndex, "utf8");
+// Resolve public page metadata from the ANA page registry. The endpoint is read-only.
+// A failed lookup stops deployment instead of silently overwriting custom previews.
+const registryUrl = `${(process.env.COLORFIX_BASE_URL || "https://colorfix.terrymarr.com").replace(/\/$/, "")}/api/v2/ana/pages-public.php`;
+const response = await fetch(registryUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+if (!response.ok) fail(`ANA page registry HTTP ${response.status}: ${registryUrl}`);
+const registryData = await response.json();
+if (!registryData.ok || !Array.isArray(registryData.pages)) fail(`Invalid ANA page registry response: ${registryUrl}`);
+const pages = registryData.pages;
+const homePage = pages.find(page => page.path === "/");
+if (!homePage) fail("ANA page registry must contain an enabled / homepage.");
+
+// Keep an empty React root on registered subpages; never flash static homepage content.
+for (const page of pages) {
+  if (page.path === "/") continue;
+  const relativePath = String(page.path || "").replace(/^\/+|\/+$/g, "");
+  if (!relativePath || relativePath.split("/").some(part => part === "." || part === "..")) {
+    fail(`Unsafe ANA page path: ${page.path}`);
+  }
+  const outputPath = path.join(root, "dist", relativePath, "index.html");
+  let routeHtml = replaceRoot(stripExistingStaticHome(html), "");
+  if (!routeHtml.includes('<div id="root"></div>') || routeHtml.includes("cf-static-home:start")) {
+    fail(`Cannot prepare ${page.path}: expected a clean #root in Vite output.`);
+  }
+  const publicBase = "https://colorfix.terrymarr.com";
+  const description = String(page.og_description || "").trim();
+  routeHtml = applyBuildContentToHead(routeHtml, {
+    title: page.og_title || page.title,
+    meta_description: description,
+    robots: "index,follow",
+    canonical_url: `${publicBase}${page.path}`,
+    og_title: page.og_title || page.title,
+    og_description: description,
+    og_image: page.og_image || "",
+  });
+  if (page.path === "/card") {
+    // Preserve the card's existing font-loading fix, scoped only to this route.
+    const cardFontBootstrap = `
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&display=swap">
+      <style>html.cf-card-font-pending .digital-card-person h1 { visibility: hidden; }</style>
+      <script>
+        document.documentElement.classList.add('cf-card-font-pending');
+        Promise.race([
+          document.fonts.load('500 67px "Cormorant Garamond"'),
+          new Promise(resolve => setTimeout(resolve, 4000))
+        ]).catch(() => {}).then(() => {
+          document.documentElement.classList.remove('cf-card-font-pending');
+        });
+      </script>`;
+    routeHtml = routeHtml.replace("</head>", `${cardFontBootstrap}\n  </head>`);
+  }
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, routeHtml);
+  console.log(`Built ANA page ${page.path} into ${outputPath}`);
+}
+
 const staticHtml = `<!-- cf-static-home:start -->${renderStaticHome(payload)}<!-- cf-static-home:end -->`;
 const preloadLinks = renderPreloadLinks(payload);
 const styleBlock = `<style id="cf-static-home-style">${getStaticCss()}</style>`;
 
 let next = stripExistingStaticHome(html);
-next = applyBuildContentToHead(next, normalizeBuildContent(payload, "public_home"));
+const homepageContent = normalizeBuildContent(payload, "public_home");
+// Registry is authoritative for the public homepage OG preview; preserve the
+// independently managed homepage title, footer and other build-content fields.
+next = applyBuildContentToHead(next, {
+  ...homepageContent,
+  og_title: homePage.og_title || homePage.title,
+  og_description: homePage.og_description || homepageContent.og_description || homepageContent.meta_description,
+  og_image: homePage.og_image || homepageContent.og_image || "",
+});
 next = replaceRoot(next, staticHtml);
 next = next.replace("</head>", `${preloadLinks}${styleBlock}\n  </head>`);
 

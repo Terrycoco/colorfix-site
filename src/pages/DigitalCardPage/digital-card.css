@@ -1,25 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=League+Spartan:wght@600&family=Montserrat:wght@400;500&family=Poppins:wght@900&display=swap');
 
-.digital-card-page { min-height: 100svh; display: grid; place-items: center; padding: 32px 16px; background: #f4f5f4; color: #171a19; }
-.digital-card { box-sizing: border-box; width: min(100%, 490px); padding: clamp(24px, 5vw, 42px); background: #fff; border: 1px solid #e3e9e7; box-shadow: 0 14px 55px rgba(0,0,0,.085); text-align: center; }
-.digital-card-person { animation: digital-card-enter 650ms ease-out both; }
-.digital-card-brush { display: block; width: 94px; height: 94px; object-fit: contain; margin: 0 auto 9px; }
-.digital-card-person h1 { margin: 0; font: 500 clamp(42px, 9vw, 57px)/1.05 'Cormorant Garamond', Georgia, serif; }
-.digital-card-role { margin: 10px 0 0; color: #008f9b; font: 600 13px/1.5 'League Spartan', sans-serif; letter-spacing: .23em; }
-.digital-card-rule { height: 1px; max-width: 240px; margin: 29px auto; background: #dae5e3; }
-.digital-card-brand { animation: digital-card-enter 650ms ease-out 220ms both; }
-.digital-card-logo-wrap { display: flex; justify-content: center; padding: 9px 0 18px; }
-/* Use the existing shared animated logo; only adjust its scale for this card. */
-.digital-card-logo-wrap .brand-bumper-logo { --brand-bumper-logo-size: clamp(40px, 9vw, 66px); max-width: none; }
-.digital-card-description { margin: 12px 0 5px; font: 500 13px/1.6 Montserrat, sans-serif; }
-.digital-card-domain { color: #008f9b; font: 400 13px/1.5 Montserrat, sans-serif; text-decoration: none; }
-.digital-card-domain:hover { text-decoration: underline; }
-.digital-card-actions { display: grid; gap: 9px; margin-top: 32px; animation: digital-card-enter 650ms ease-out 420ms both; }
-.digital-card-actions a, .digital-card-actions button { box-sizing: border-box; display: block; width: 100%; min-height: 44px; border: 1px solid #b8d3d0; background: #fff; color: #174c4c; border-radius: 7px; padding: 11px 12px; font: 500 14px/1.35 Montserrat, sans-serif; text-decoration: none; cursor: pointer; }
-.digital-card-actions a:hover, .digital-card-actions button:hover { background: #edf7f6; }
-.digital-card-actions .digital-card-primary { background: #008f9b; border-color: #008f9b; color: white; }
-.digital-card-actions .digital-card-primary:hover { background: #007783; }
-.digital-card-email { font: 400 12px/1.6 Montserrat, sans-serif; color: #566864; margin: 18px 0 0; }
+/* Only DigitalCardPage styles. The shared bumper component is unchanged. */
+.digital-card-page { min-height: 100svh; display: grid; place-items: center; padding: 22px 14px; background: #f4f5f4; color: #171a19; }
+.digital-card { box-sizing: border-box; width: min(100%, 440px); padding: 25px clamp(23px, 5vw, 38px) 27px; background: #fff; border: 1px solid #e3e9e7; box-shadow: 0 12px 45px rgba(0,0,0,.07); text-align: center; }
+.digital-card-brand { display: flex; justify-content: center; align-items: center; margin: 26px auto 0; padding-top: 54px; border-top: 1px solid #e3e9e7; }
+/* Force compact logo size even on phones. Use real shared logo animation. */
+.digital-card-brand .brand-bumper-logo { --brand-bumper-logo-size: 23px; max-width: none; }
+.digital-card-person { /* Identity renders immediately; the logo is the only animated element. */ }
+.digital-card-brush { display: block; width: 93px; height: 93px; object-fit: contain; margin: 0 auto 3px; }
+.digital-card-person h1 { margin: 0; font: 500 clamp(51px, 13vw, 67px)/1.02 'Cormorant Garamond', Georgia, serif; }
+.digital-card-role { margin: 10px 0 0; color: #008f9b; font: 600 13px/1.5 'League Spartan', sans-serif; letter-spacing: .25em; }
+.digital-card-description { margin: 10px 0 0; color: #444; font: 500 12px/1.6 Montserrat, sans-serif; }
+.digital-card-actions { display: grid; gap: 11px; margin-top: 96px; }
+.digital-card-actions button, .digital-card-actions a { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-height: 32px; border-radius: 5px; font: 500 12px/1.4 Montserrat, sans-serif; text-decoration: none; cursor: pointer; }
+.digital-card-actions .digital-card-primary { width: 100%; padding: 8px 16px; background: #008f9b; color: #fff; border: 1px solid #008f9b; font-size: 13px; min-height: 40px; }
+.digital-card-actions .digital-card-primary:hover { background: #007984; }
+.digital-card-link-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.digital-card-link-grid a { background: #fff; color: #174c4c; border: 1px solid #c6d9d7; padding: 5px 7px; }
+.digital-card-link-grid a:hover { background: #edf7f6; }
+.digital-card-actions .digital-card-share { border: none; background: none; color: #007f88; padding: 7px 10px; min-height: 30px; text-decoration: underline; text-underline-offset: 3px; }
 .digital-card-feedback { color: #276f70; font: 500 12px Montserrat, sans-serif; overflow-wrap: anywhere; }
-@keyframes digital-card-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .digital-card-person, .digital-card-brand, .digital-card-actions { animation: none; } }
+@media (max-width: 370px) { .digital-card { padding-inline: 19px; } .digital-card-brand .brand-bumper-logo { --brand-bumper-logo-size: 22px; } }
+
+@media (max-height: 690px) { .digital-card-actions { margin-top: 60px; } }

@@ -6,7 +6,7 @@
   RewriteRule ^index\.html$ - [L]
   RewriteRule ^colorfix/index\.html$ - [L]
   RewriteRule ^qr/?$ /qr.php [L,QSA]
-  RewriteRule ^card/?$ /card.php [L,QSA]
+
   RewriteRule ^pv/([^/]+)/?$ /pv.php?code=$1 [L,QSA]
   RewriteRule ^t/([^/]+)/?$ /t.php?token=$1 [L,QSA]
   RewriteRule ^playlist/share/id=([0-9]+)/?$ /playlist-share.php?playlist_id=$1 [L,QSA]

@@ -3,7 +3,7 @@
     "success": true,
     "variant": "public",
     "build_key": "public_home",
-    "generated_at": "2026-10-05T21:29:32+00:00",
+    "generated_at": "2026-10-12T21:41:00+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -11,10 +11,10 @@
     },
     "build_content": {
         "canonical_url": "https://colorfix.terrymarr.com/",
-        "footer_brand_text": "\u00a9 2026 ColorFix by Terry \u2014 home color transformations and paint palettes by Terry Marr.",
+        "footer_brand_text": "\u00a9 2026 ColorFix by Terry \u2014 Home color transformations and designer-curated paint palettes.",
         "footer_url": "https://colorfix.terrymarr.com/",
         "footer_url_text": "colorfix.terrymarr.com",
-        "meta_description": "ColorFix by Terry is Terry Marr\u2019s home color transformation site, featuring before-and-ColorFixed makeovers, exterior paint palettes, and practical color ideas for homeowners.",
+        "meta_description": "ColorFix by Terry features before-and-ColorFixed makeovers, exterior paint palettes, and practical color ideas for homeowners.",
         "robots": "index,follow",
         "title": "ColorFix by Terry | Home Color Transformations & Paint Palettes"
     },
@@ -69,7 +69,7 @@
             "display": "",
             "description": "",
             "image_url": "",
-            "body": "Home color transformations, before-and-ColorFixed makeovers, real examples, and paint palettes by Terry Marr",
+            "body": "Home color transformations, before-and-ColorFixed makeovers, real examples, and curated paint palettes",
             "target_url": "",
             "is_clickable": 0,
             "is_pinnable": 0,

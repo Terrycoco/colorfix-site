@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import BrandBumperLogo from '@components/BrandBumperLogo';
+import paintbrush from './paintbrush.png';
 import './digital-card.css';
 
 const HOME = 'https://colorfix.terrymarr.com/';
@@ -56,31 +57,26 @@ export default function DigitalCardPage() {
     <main className="digital-card-page">
       <article className="digital-card" aria-label="Terry Marr digital business card">
         <section className="digital-card-person">
-          <img className="digital-card-brush" src="/images/colorfix-paintbrush.png" alt="ColorFix paintbrush mark" />
+          <img className="digital-card-brush" src={paintbrush} alt="" aria-hidden="true" />
           <h1>Terry Marr</h1>
           <p className="digital-card-role">COLOR DESIGNER</p>
-        </section>
-
-        <div className="digital-card-rule" aria-hidden="true" />
-
-        <section className="digital-card-brand" aria-label="ColorFix by Terry">
-          <div className="digital-card-logo-wrap">
-            <BrandBumperLogo background="white" />
-          </div>
           <p className="digital-card-description">Interior and exterior color design</p>
-          <a className="digital-card-domain" href={HOME}>colorfix.terrymarr.com</a>
         </section>
 
         <nav className="digital-card-actions" aria-label="Contact and explore ColorFix">
           <button className="digital-card-primary" type="button" onClick={createContactFile}>Save Contact</button>
-          <a href={`mailto:${EMAIL}`}>Email Terry</a>
-          <a href={CONTACT}>Contact Terry</a>
-          <a href={HOME}>Visit ColorFix</a>
-          <a href={YOUTUBE} target="_blank" rel="noopener noreferrer">YouTube Channel</a>
-          <button type="button" onClick={shareCard}>Share This Card</button>
+          <div className="digital-card-link-grid">
+            <a href={`mailto:${EMAIL}`}>Email Terry</a>
+            <a href={CONTACT}>Contact Terry</a>
+            <a href={HOME}>Website</a>
+            <a href={YOUTUBE} target="_blank" rel="noopener noreferrer">YouTube</a>
+          </div>
+          <button className="digital-card-share" type="button" onClick={shareCard}>Share This Card</button>
         </nav>
-        <p className="digital-card-email">{EMAIL}</p>
         {copyStatus && <p className="digital-card-feedback" role="status">{copyStatus}</p>}
+        <footer className="digital-card-brand" aria-label="ColorFix by Terry">
+          <BrandBumperLogo background="white" />
+        </footer>
       </article>
     </main>
   );

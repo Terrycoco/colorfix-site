@@ -19,6 +19,26 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
 
     public function record(ANAEvent $event): int
     {
+        // Registered page visits derive their resource identity from the URL,
+        // never from a numeric ID supplied by the browser.
+        $resolvedPageId = null;
+        $isDirectPageVisit = $event->resourceType === 'page'
+            && $event->eventKey === 'visit';
+        if ($isDirectPageVisit) {
+            $pathname = parse_url((string)($event->path ?? ''), PHP_URL_PATH);
+            $pathname = is_string($pathname) ? $pathname : '';
+            $pathname = $pathname !== '/' ? rtrim($pathname, '/') : '/';
+            // Legacy alternate homepage URL continues to count as ColorFix Home.
+            if ($pathname === '/results/4') $pathname = '/';
+            $pageStmt = $this->pdo->prepare(
+                'SELECT id FROM ana_pages WHERE path = :path AND track_enabled = 1 LIMIT 1'
+            );
+            $pageStmt->execute([':path' => $pathname]);
+            $found = $pageStmt->fetchColumn();
+            if ($found === false) return 0; // Not a registered, enabled page.
+            $resolvedPageId = (int)$found;
+        }
+
         // Preserve NULL attribution and the existing rejection of unknown keys.
         if ($event->src !== null && !$this->sources->isValidSource($event->src)) {
             throw new \RuntimeException('Unrecognized analytics source.');
@@ -74,7 +94,7 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
             ':reservation_id' => $event->reservationId,
             ':resolver_key' => $event->resolverKey,
             ':resource_type' => $event->resourceType,
-            ':resource_id' => $event->resourceId,
+            ':resource_id' => $resolvedPageId ?? $event->resourceId,
             ':experience_key' => $event->experienceKey,
             ':source_key' => $event->src,
             ':session_id' => $event->sessionId,

@@ -1,9 +1,24 @@
 // Add the verified PUBLIC destinations here. Never insert an admin-only URL.
 // A blank URL keeps the item visible but not shareable until configured.
 export const QUICK_SEND_LINKS = [
-  { id: 'contact', title: 'Contact Terry', description: 'Start a design inquiry', url: '' },
-  { id: 'business-card', title: 'Digital Business Card', description: 'Share ColorFix contact details', url: '' },
-  { id: 'youtube', title: 'YouTube Channel', description: 'Explore ColorFix videos', url: '' },
+  {
+    id: 'contact',
+    title: 'Contact Terry',
+    description: 'Start a design inquiry',
+    url: 'https://colorfix.terrymarr.com/send-note?src=sas',
+  },
+  {
+    id: 'business-card',
+    title: 'Digital Business Card',
+    description: 'Share ColorFix contact details',
+    url: 'https://colorfix.terrymarr.com/card?src=sas',
+  },
+  {
+    id: 'youtube',
+    title: 'YouTube Channel',
+    description: 'Explore ColorFix videos',
+    url: 'https://www.youtube.com/@colorfixbyterry',
+  },
 ];
 
 export function verifiedPublicUrl(value) {

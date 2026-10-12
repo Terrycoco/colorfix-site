@@ -3,7 +3,7 @@
     "success": true,
     "variant": "admin",
     "build_key": "admin_home",
-    "generated_at": "2026-10-05T21:29:32+00:00",
+    "generated_at": "2026-10-12T21:41:00+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -64,7 +64,7 @@
             "display": "",
             "description": "",
             "image_url": "",
-            "body": "Home color transformations, before-and-ColorFixed makeovers, real examples, and paint palettes by Terry Marr",
+            "body": "Home color transformations, before-and-ColorFixed makeovers, real examples, and curated paint palettes",
             "target_url": "",
             "is_clickable": 0,
             "is_pinnable": 0,
