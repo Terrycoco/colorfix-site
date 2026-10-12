@@ -3,9 +3,11 @@ import "./brand-bumper-logo.css";
 export default function BrandBumperLogo({
   className = "",
   signatureProgress = null,
+  background = "black",
+  animated = true,
   style = {},
 }) {
-  const controlled = signatureProgress !== null
+  const controlled = animated && signatureProgress !== null
     && signatureProgress !== undefined
     && Number.isFinite(Number(signatureProgress));
   const progress = controlled ? clamp01(Number(signatureProgress)) : null;
@@ -17,7 +19,8 @@ export default function BrandBumperLogo({
     : undefined;
   const rootClass = [
     "brand-bumper-logo",
-    controlled ? "is-controlled" : "is-css-animated",
+    !animated ? "is-static" : (controlled ? "is-controlled" : "is-css-animated"),
+    background === "white" ? "background-white" : "background-black",
     className,
   ].filter(Boolean).join(" ");
 

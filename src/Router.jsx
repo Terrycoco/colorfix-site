@@ -32,6 +32,8 @@ const RequestPlaylistPage = lazy(() => import('@pages/HireTerryPage/RequestPlayl
 
 const SendNotePage = lazy(() => import('@pages/SendNotePage'));
 
+const DigitalCardPage = lazy(() => import('@pages/DigitalCardPage'));
+
 const PrivacyPage = lazy(() => import('@pages/PrivacyPage'));
 
 const TermsPage = lazy(() => import('@pages/PrivacyPage/terms.jsx'));
@@ -131,6 +133,8 @@ function AppRouter() {
           <Route path="test/rex-management" element={renderWithSuspense(RexManagementDialogTestPage, 'Loading REX dialog test…')} />
 
           <Route path="watch" element={renderWithSuspense(WatchRedirectPage, 'Loading watch link…')} />
+
+          <Route path="card" element={renderWithSuspense(DigitalCardPage, 'Loading contact card…')} />
 
 
 

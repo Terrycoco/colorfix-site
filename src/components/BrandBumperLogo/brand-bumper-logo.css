@@ -2,6 +2,10 @@
 
 .brand-bumper-logo {
   --brand-bumper-logo-size: clamp(42px, 4.9vw, 88px);
+  --brand-bumper-color: #fff;
+  --brand-bumper-fix: #009ca6;
+  --brand-bumper-signature: rgba(170, 205, 202, 1);
+  --brand-bumper-reveal-bg: #000;
   position: relative;
   display: inline-flex;
   flex-direction: column;
@@ -11,6 +15,12 @@
   padding: 0;
   line-height: 1;
   overflow: visible;
+}
+
+.brand-bumper-logo.background-white {
+  --brand-bumper-color: #000;
+  --brand-bumper-signature: #547f7c;
+  --brand-bumper-reveal-bg: #fff;
 }
 
 .brand-bumper-logo__main {
@@ -24,11 +34,11 @@
 }
 
 .brand-bumper-logo__color {
-  color: #fff;
+  color: var(--brand-bumper-color);
 }
 
 .brand-bumper-logo__fix {
-  color: #009ca6;
+  color: var(--brand-bumper-fix);
 }
 
 .brand-bumper-logo__by {
@@ -42,7 +52,7 @@
   margin-top: calc(var(--brand-bumper-logo-size) * -.03);
   margin-left: calc(var(--brand-bumper-logo-size) * 3.08);
   gap: .16em;
-  color: rgba(170, 205, 202, 1);
+  color: var(--brand-bumper-signature);
   font-family: "Nothing You Could Do", cursive;
   font-size: calc(var(--brand-bumper-logo-size) * .48);
   font-weight: 400;
@@ -63,10 +73,18 @@
   position: absolute;
   inset: 0 -.3em 0 0;
   z-index: 2;
-  background: #000;
+  background: var(--brand-bumper-reveal-bg);
   transform: translateX(var(--brand-bumper-signature-cover-x));
   transform-origin: right center;
   pointer-events: none;
+}
+
+.brand-bumper-logo.is-static .brand-bumper-logo__by {
+  opacity: 1;
+}
+
+.brand-bumper-logo.is-static .brand-bumper-logo__by::after {
+  transform: translateX(105%);
 }
 
 .brand-bumper-logo.is-css-animated .brand-bumper-logo__by {
