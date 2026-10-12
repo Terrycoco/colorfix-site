@@ -88,6 +88,7 @@ export default function Photos() {
           return <label className={`sas-photo-row${checked ? ' is-selected' : ''}`} key={id}>
             <span className="sas-photo-image">
               {url ? <img loading="lazy" src={url} alt={`Photo ${id}`} /> : <span className="sas-photo-missing"><Images size={24}/>Image unavailable</span>}
+              <span className="sas-photo-id">#{id}</span>
             </span>
             <span className="sas-photo-check">
               <input type="checkbox" aria-label={`Select photo ${id}`} checked={checked} onChange={() => toggle(photo)} />

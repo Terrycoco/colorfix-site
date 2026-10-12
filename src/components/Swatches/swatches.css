@@ -293,3 +293,11 @@
 
 
 }
+
+/* Compact cards show the short brand code; larger cards retain the full brand.
+   The container is .pals-swatch, so this follows card width, not screen width. */
+.pals-brand-short { display: none; }
+@container (max-width: 340px) {
+  .pals-brand-full { display: none; }
+  .pals-brand-short { display: inline; }
+}

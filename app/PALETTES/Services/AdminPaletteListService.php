@@ -3,19 +3,19 @@ declare(strict_types=1);
 
 namespace App\PALETTES\Services;
 
-use App\PALETTES\Repos\PdoPVRepository;
+use App\PALETTES\Repos\PdoAdminPaletteInventoryRepository;
 use App\PALETTES\Repos\PdoSavedPaletteRepository;
 use PDO;
 
 final class AdminPaletteListService
 {
     private PdoSavedPaletteRepository $palettes;
-    private PdoPVRepository $pvs;
+    private PdoAdminPaletteInventoryRepository $inventory;
 
     public function __construct(PDO $pdo)
     {
         $this->palettes = new PdoSavedPaletteRepository($pdo);
-        $this->pvs = new PdoPVRepository($pdo);
+        $this->inventory = new PdoAdminPaletteInventoryRepository($pdo);
     }
 
     /**
@@ -31,6 +31,13 @@ final class AdminPaletteListService
             0
         );
 
+        $ids = array_values(array_filter(array_map(
+            static fn(array $row): int => (int)($row['id'] ?? 0),
+            $rows
+        ), static fn(int $id): bool => $id > 0));
+        $membersByPalette = $this->inventory->membersByPalette($ids);
+        $publicPvIds = $this->inventory->publicPvIdsByPalette($ids);
+        $thumbnails = $this->inventory->thumbnailsByPalette($ids);
         $items = [];
 
         foreach ($rows as $palette) {
@@ -40,19 +47,9 @@ final class AdminPaletteListService
                 continue;
             }
 
-            $members = $this->palettes->getMembersForPalette(
-                $savedPaletteId
-            );
-
-            $pv = $this->pvs->findActivePublicBySavedPaletteId(
-                $savedPaletteId
-            );
-
-            $thumbnail = '';
-
-            if ($pv && is_array($pv['photos'] ?? null)) {
-                $thumbnail = $this->pickThumbnailUrl($pv['photos']);
-            }
+            $members = $membersByPalette[$savedPaletteId] ?? [];
+            $pvId = $publicPvIds[$savedPaletteId] ?? null;
+            $thumbnail = $thumbnails[$savedPaletteId] ?? '';
 
             $items[] = [
                 'id' => $savedPaletteId,
@@ -64,9 +61,7 @@ final class AdminPaletteListService
                 'created_at' => $palette['created_at'] ?? null,
                 'members' => $members,
                 'thumbnail_url' => $thumbnail,
-                'palette_viewer_id' => $pv
-                    ? (int)($pv['palette_viewer_id'] ?? 0)
-                    : null,
+                'palette_viewer_id' => $pvId,
             ];
         }
 
@@ -92,32 +87,4 @@ final class AdminPaletteListService
         return $items;
     }
 
-    /**
-     * @param array<int,array<string,mixed>> $photos
-     */
-    private function pickThumbnailUrl(array $photos): string
-    {
-        $fallback = '';
-
-        foreach ($photos as $photo) {
-            $url = trim((string)($photo['url'] ?? ''));
-
-            if ($url === '') {
-                continue;
-            }
-
-            if ($fallback === '') {
-                $fallback = $url;
-            }
-
-            if (
-                strtolower(trim((string)($photo['photo_type'] ?? '')))
-                === 'full'
-            ) {
-                return $url;
-            }
-        }
-
-        return $fallback;
-    }
 }

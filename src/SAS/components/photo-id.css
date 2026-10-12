@@ -1,0 +1,19 @@
+/* Append to the existing SAS stylesheet; do not replace existing CSS. */
+.sas-photo-image {
+  position: relative;
+}
+
+.sas-photo-id {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  z-index: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  pointer-events: none;
+}

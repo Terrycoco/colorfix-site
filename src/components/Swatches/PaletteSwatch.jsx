@@ -114,7 +114,7 @@ export default function PaletteSwatch({ color, widthPercent = 20, onSelectColor 
         <div className="pals-label" title={color.hue_cats}>
           <div className="pals-name">{displayName}</div>
           <div className="pals-meta">
-            {color.brand_name || color.brand} • H:{typeof color.hcl_h === 'number' ? Math.round(color.hcl_h) : '–'} • C:
+            <span className="pals-brand-full">{color.brand_name || color.brand}</span><span className="pals-brand-short">{String(color.brand || color.brand_name || '').toUpperCase()}</span> • H:{typeof color.hcl_h === 'number' ? Math.round(color.hcl_h) : '–'} • C:
             {typeof color.hcl_c === 'number' ? Math.round(color.hcl_c) : '–'} • L:
             {typeof color.hcl_l === 'number' ? Math.round(color.hcl_l) : '–'}
           </div>
