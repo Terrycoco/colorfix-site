@@ -1,7 +1,8 @@
 # Serve SPA entry point for all routes
 <IfModule mod_rewrite.c>
   RewriteEngine On
-
+  
+  RewriteRule ^pod/?$ /pod.php [L,QSA]
   RewriteRule ^index\.html$ - [L]
   RewriteRule ^colorfix/index\.html$ - [L]
   RewriteRule ^qr/?$ /qr.php [L,QSA]

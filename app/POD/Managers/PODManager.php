@@ -214,7 +214,7 @@ final class PodManager
                 <=> [(int)$b['order_index'], (int)$b['playlist_item_id']]);
             foreach ($rows as $index => $row) {
                 if (!in_array(strtolower((string)($row['item_type'] ?? 'normal')),
-                    ['normal', 'before', 'non-palette', ''], true)) {
+                    ['normal', 'before', 'non-palette', 'palette', ''], true)) {
                     continue;
                 }
                 foreach ($selected as $id => $photo) {

@@ -6,7 +6,14 @@ export default function SharePhotos({ photoIds, onBack }) {
   const [showQr, setShowQr] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const url = buildPodShareUrl(photoIds);
+  const [includeCaptions, setIncludeCaptions] = useState(true);
+  const [includeBefore, setIncludeBefore] = useState(true);
+
+  const podUrl = new URL(buildPodShareUrl(photoIds), window.location.origin);
+  podUrl.searchParams.set('captions', includeCaptions ? '1' : '0');
+  podUrl.searchParams.set('before', includeBefore ? '1' : '0');
+  podUrl.searchParams.delete('befores'); // POD expects the singular `before` parameter.
+  const url = podUrl.toString();
 
   // Reuse the QR image service already used by ColorFix QR reservations.
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(url)}`;
@@ -40,6 +47,16 @@ export default function SharePhotos({ photoIds, onBack }) {
     </button>
     <h1>Share photos</h1>
     <p className="sas-share-summary">{photoIds.length} {photoIds.length === 1 ? 'photo' : 'photos'} · POD presentation</p>
+    <div className="sas-share-preferences" aria-label="POD presentation options">
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+        <input type="checkbox" checked={includeCaptions} onChange={event => { setIncludeCaptions(event.target.checked); setCopied(false); }} />
+        Include Captions
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+        <input type="checkbox" checked={includeBefore} onChange={event => { setIncludeBefore(event.target.checked); setCopied(false); }} />
+        Include Before Photos
+      </label>
+    </div>
     <div className="sas-share-options">
       <button type="button" onClick={() => { setError(''); openSmsComposer(url); }}><MessageSquare/><strong>Text</strong><small>Open SMS</small></button>
       <button type="button" onClick={() => { setError(''); setShowQr(v => !v); }} aria-pressed={showQr}><QrCode/><strong>QR Code</strong><small>Show to scan</small></button>
