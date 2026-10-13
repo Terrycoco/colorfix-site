@@ -148,7 +148,8 @@ final class DispatchDriverRunner
                         ->reportFailure(
                             $job,
                             'dispatch_driver_failure',
-                            $e->getMessage()
+                            $e->getMessage(),
+                            $e instanceof DispatchFailureDetailProvider ? $e->dispatchFailureDetails() : null
                         );
 
             } catch (Throwable $settleError) {

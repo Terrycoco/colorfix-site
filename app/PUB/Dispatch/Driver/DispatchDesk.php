@@ -38,13 +38,15 @@ final class DispatchDesk
     public function reportFailure(
         DispatchDriverJob $job,
         string $code,
-        string $message
+        string $message,
+        ?array $diagnostics = null
     ): array {
         return $this->manager()
             ->failShipment(
                 $job->pubAssetId(),
                 $code,
-                $message
+                $message,
+                $diagnostics
             );
     }
 

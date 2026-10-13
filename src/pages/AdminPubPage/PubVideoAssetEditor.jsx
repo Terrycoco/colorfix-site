@@ -113,6 +113,8 @@ export default function PubVideoAssetEditor({
     setRedoWarningOpen,
   ] = useState(false);
 
+  const [redoError, setRedoError] = useState("");
+
   const [
     rexLinks,
     setRexLinks,
@@ -775,6 +777,8 @@ function appendDescriptionLink(
       false
     );
 
+    setRedoError("");
+
     setSuccessMessage(
       ""
     );
@@ -818,11 +822,11 @@ function appendDescriptionLink(
 
 
     if (
-      recreated === false
+      recreated === false || recreated?.ok === false
     ) {
-      setSuccessMessage(
-        "Changes were saved, but the redo could not be queued."
-      );
+      const message = recreated?.error || "The video could not be recreated.";
+      setActionError(`Changes saved. Video re-creation was not queued. ${message}`);
+      setRedoError(message);
 
       return;
     }
@@ -1371,6 +1375,23 @@ function appendDescriptionLink(
           onClose={() => setMusicOpen(false)}
         />
       ) : null}
+
+      <AdminDialog
+        open={Boolean(redoError)}
+        mode="danger"
+        title="Video re-creation failed"
+        message={`Your metadata and any ingredient changes were saved, but video re-creation was not queued.\n\n${redoError}`}
+        dismissOnBackdrop={false}
+        onClose={() => setRedoError("")}
+        actions={[
+          {
+            key: "dismiss-redo-error",
+            label: "OK",
+            autoFocus: true,
+            onClick: () => setRedoError(""),
+          },
+        ]}
+      />
 
       <AdminDialog
         open={redoWarningOpen}
@@ -2747,4 +2768,3 @@ function humanize(
           .toUpperCase()
     );
 }
-

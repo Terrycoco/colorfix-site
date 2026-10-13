@@ -62,7 +62,10 @@ final class PdoErrorRepository
         ?int $resourceId = null,
         ?string $technicalDetail = null,
         ?array $context = null,
-        string $handlingStatus = 'pending'
+        string $handlingStatus = 'pending',
+        ?int $httpStatus = null,
+        ?string $nativeCode = null,
+        ?string $nativeMessage = null
     ): int {
         if ($errNum !== null) {
             $this->requirePositive($errNum, 'Error number');
@@ -73,16 +76,19 @@ final class PdoErrorRepository
         $this->requireText($department, 'Department');
         $this->requireText($message, 'Error message');
         $this->requireText($handlingStatus, 'Handling status');
+        if ($httpStatus !== null && ($httpStatus < 100 || $httpStatus > 599)) {
+            throw new InvalidArgumentException('HTTP status must be between 100 and 599.');
+        }
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO err_log
                 (err_num, department, component, operation, resource_type,
-                 resource_id, message, technical_detail, context_json,
-                 handling_status)
+                 resource_id, message, technical_detail, http_status,
+                 native_code, native_message, context_json, handling_status)
              VALUES
                 (:err_num, :department, :component, :operation, :resource_type,
-                 :resource_id, :message, :technical_detail, :context_json,
-                 :handling_status)'
+                 :resource_id, :message, :technical_detail, :http_status,
+                 :native_code, :native_message, :context_json, :handling_status)'
         );
         $stmt->execute([
             'err_num' => $errNum,
@@ -93,6 +99,9 @@ final class PdoErrorRepository
             'resource_id' => $resourceId,
             'message' => $message,
             'technical_detail' => $technicalDetail,
+            'http_status' => $httpStatus,
+            'native_code' => $nativeCode,
+            'native_message' => $nativeMessage,
             'context_json' => $context === null ? null : json_encode(
                 $context,
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES

@@ -70,8 +70,11 @@ final class PubErrorHandler implements ErrorHandlerInterface
         }
         try {
             $result = $dispatch->shipOneForErrRecovery($assetId);
-            if (!empty($result['ok'])) {
-                return RecoveryStepResult::success('PUB accepted the recovered publishing order.');
+            if (isset($result['shipped'])) {
+                return RecoveryStepResult::success('Pinterest publication completed; DISPATCH recorded a shipping receipt.');
+            }
+            if (isset($result['in_progress'])) {
+                return RecoveryStepResult::waiting('DISPATCH started publishing; awaiting the final shipping result.');
             }
             $failure = $result['failed'] ?? [];
             $detail = is_array($failure) ? ($failure['error'] ?? null) : null;
@@ -109,9 +112,13 @@ final class PubErrorHandler implements ErrorHandlerInterface
             }
 
             $result = $create->processBatch($orders, $policy);
-            $accepted = count($result['created'] ?? []) + count($result['queued'] ?? []);
-            if ($accepted === 1 && empty($result['failed']) && empty($result['existing_asset_warning'])) {
-                return RecoveryStepResult::success('PUB accepted the recovered CREATE order.');
+            $created = count($result['created'] ?? []);
+            $pending = count($result['queued'] ?? []);
+            if ($created === 1 && empty($result['failed']) && empty($result['existing_asset_warning'])) {
+                return RecoveryStepResult::success('CREATE completed the recovered asset.');
+            }
+            if ($pending === 1 && empty($result['failed']) && empty($result['existing_asset_warning'])) {
+                return RecoveryStepResult::waiting('CREATE accepted the rendering request; waiting for the video worker to finish.');
             }
             if (!empty($result['existing_asset_warning'])) {
                 return RecoveryStepResult::failed(

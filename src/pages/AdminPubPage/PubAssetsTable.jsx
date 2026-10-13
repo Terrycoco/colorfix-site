@@ -975,12 +975,10 @@ async function recreateAsset(
     return true;
 
   } catch (err) {
-    setError(
-      err?.message ||
-      "Could not recreate PUB asset."
-    );
+    const message = err?.message || "Could not recreate PUB asset.";
+    setError(message);
 
-    return false;
+    return { ok: false, error: message };
 
   } finally {
     setRecreating(
@@ -1900,10 +1898,12 @@ async function recreateAsset(
                 recreating={recreating}
                 onEdit={() => openEditor?.(item)}
                 onRedo={async (asset) => {
-                  const ok =
+                  const result =
                     await recreateAsset(
                       asset?.pub_asset_id
                     );
+
+                  const ok = result !== false && result?.ok !== false;
 
                   if (ok) {
                     await loadAssets();
@@ -1985,7 +1985,13 @@ async function recreateAsset(
                 onSetApproval: setAssetApproval,
                 onSave: (changes) =>
                   saveAssetCopy(editorAsset, changes),
-                onRecreate: recreateAsset,
+                onRecreate: async (id) => {
+                  const result = await recreateAsset(id);
+                  // Keep the copy editor's existing boolean failure contract.
+                  return !isVideoAsset(editorAsset) && result?.ok === false
+                    ? false
+                    : result;
+                },
                 onSendToPackaging: sendAssetToPackaging,
                 onPackagingComplete: onOpenPackage,
                 onClose: close,
@@ -2493,4 +2499,3 @@ function humanize(
         character.toUpperCase()
     );
 }
-

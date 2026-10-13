@@ -3656,7 +3656,8 @@ final class CreateManager implements PubComManagerContract
                         fn(): PubErrorHandler => new PubErrorHandler(
                             $this->videoWorkerHealth()
                         ),
-                ]
+                ],
+                new \App\ERR\Repos\PdoExternalErrorCodeRepository($this->pdo)
             );
         }
 

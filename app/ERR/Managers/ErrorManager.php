@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\ERR\Managers;
 
 use App\ERR\Repos\PdoErrorRepository;
+use App\ERR\Repos\PdoExternalErrorCodeRepository;
 use App\ERR\Contracts\ErrorContext;
 use App\ERR\Contracts\ErrorHandlerInterface;
 use App\ERR\Services\RecoveryExecutor;
@@ -24,7 +25,8 @@ final class ErrorManager
     public function __construct(
         private PdoErrorRepository $repository,
         private string $fallbackLogPath,
-        private array $handlerFactories = []
+        private array $handlerFactories = [],
+        private ?PdoExternalErrorCodeRepository $externalCodes = null
     ) {}
 
     /**
@@ -42,7 +44,10 @@ final class ErrorManager
         ?string $resourceType = null,
         ?int $resourceId = null,
         ?string $technicalDetail = null,
-        array $context = []
+        array $context = [],
+        ?int $httpStatus = null,
+        ?string $extErrNum = null,
+        ?string $nativeMessage = null
     ): ?int {
         try {
             $registration = $this->repository->findCode($errNum);
@@ -69,7 +74,10 @@ final class ErrorManager
                 resourceId: $resourceId,
                 technicalDetail: $technicalDetail,
                 context: $context,
-                handlingStatus: $status
+                handlingStatus: $status,
+                httpStatus: $httpStatus,
+                nativeCode: $extErrNum,
+                nativeMessage: $nativeMessage
             );
         } catch (Throwable $failure) {
             $this->writeFallback([
@@ -84,6 +92,9 @@ final class ErrorManager
                 'message' => $message,
                 'technical_detail' => $technicalDetail,
                 'context' => $context,
+                'http_status' => $httpStatus,
+                'ext_err_num' => $extErrNum,
+                'native_message' => $nativeMessage,
                 'reporting_failure' => $failure->getMessage(),
             ]);
             return null;
@@ -109,11 +120,15 @@ final class ErrorManager
         ?int $resourceId = null,
         ?string $technicalDetail = null,
         array $context = [],
-        ?array $bookmark = null
+        ?array $bookmark = null,
+        ?int $httpStatus = null,
+        ?string $extErrNum = null,
+        ?string $nativeMessage = null
     ): ?int {
         $logId = $this->report(
             $errNum, $department, $message, $component, $operation,
-            $resourceType, $resourceId, $technicalDetail, $context
+            $resourceType, $resourceId, $technicalDetail, $context,
+            $httpStatus, $extErrNum, $nativeMessage
         );
 
         if ($logId === null) {
@@ -186,6 +201,85 @@ final class ErrorManager
         // Email is advisory: failure must never break the logged incident or recovery.
         $this->notifyIfAttentionNeeded($logId, $errNum, $department, $context);
         return $logId;
+    }
+
+    /**
+     * Standard entry point for a structured department failure.
+     *
+     * Required: department, message, fallback_cf_err_num. The fallback must
+     * be a registered ColorFix code for that department. External errors are
+     * translated when the optional external repository is installed; unknown
+     * external errors retain the fallback classification and all diagnostics.
+     *
+     * Optional: provider, http_status, ext_err_num, native_message,
+     * component, operation, resource_type, resource_id, technical_detail,
+     * context, bookmark. Keep raw provider response (sanitized) in context.
+     *
+     * @param array<string, mixed> $package
+     */
+    public function reportPackageAndHandle(array $package): ?int
+    {
+        try {
+            $department = trim((string)($package['department'] ?? ''));
+            $message = trim((string)($package['message'] ?? ''));
+            $fallback = (int)($package['fallback_cf_err_num'] ?? 0);
+            if ($department === '' || $message === '' || $fallback <= 0) {
+                throw new \InvalidArgumentException('ERR package requires department, message, and fallback_cf_err_num.');
+            }
+            $context = $package['context'] ?? [];
+            if (!is_array($context)) {
+                throw new \InvalidArgumentException('ERR package context must be an array.');
+            }
+            $provider = strtolower(trim((string)($package['provider'] ?? '')));
+            $status = isset($package['http_status']) ? (int)$package['http_status'] : null;
+            $native = isset($package['ext_err_num']) ? (string)$package['ext_err_num'] : null;
+            $nativeMessage = isset($package['native_message']) ? (string)$package['native_message'] : null;
+            if ($provider !== '') $context['provider'] = $provider;
+            // Lookup is advisory. A broken/missing dictionary must never lose an incident.
+            $errNum = $fallback;
+            if ($provider !== '' && $this->externalCodes !== null) {
+                try {
+                    $mapped = $this->externalCodes->resolve($provider, $status, $native, $nativeMessage ?? $message);
+                    if ($mapped !== null) {
+                        $registration = $this->repository->findCode($mapped);
+                        if ($registration !== null
+                            && (int)($registration['is_active'] ?? 0) === 1
+                            && strcasecmp((string)$registration['department'], $department) === 0) {
+                            $errNum = $mapped;
+                        } else {
+                            $context['external_mapping_invalid'] = $mapped;
+                        }
+                    }
+                } catch (Throwable $failure) {
+                    $context['external_mapping_failure'] = get_class($failure) . ': ' . $failure->getMessage();
+                }
+            }
+            return $this->reportAndHandle(
+                errNum: $errNum,
+                department: $department,
+                message: $message,
+                component: isset($package['component']) ? (string)$package['component'] : null,
+                operation: isset($package['operation']) ? (string)$package['operation'] : null,
+                resourceType: isset($package['resource_type']) ? (string)$package['resource_type'] : null,
+                resourceId: isset($package['resource_id']) ? (int)$package['resource_id'] : null,
+                technicalDetail: isset($package['technical_detail']) ? (string)$package['technical_detail'] : null,
+                context: $context,
+                bookmark: isset($package['bookmark']) && is_array($package['bookmark']) ? $package['bookmark'] : null,
+                httpStatus: $status,
+                extErrNum: $native,
+                nativeMessage: $nativeMessage
+            );
+        } catch (Throwable $failure) {
+            // Never lose the underlying department failure if packaging fails.
+            $this->writeFallback([
+                'timestamp' => gmdate('c'),
+                'event' => 'err_package_failed',
+                'department' => $package['department'] ?? null,
+                'message' => $package['message'] ?? null,
+                'reporting_failure' => $failure->getMessage(),
+            ]);
+            return null;
+        }
     }
 
     /** @param array<string, mixed> $context */

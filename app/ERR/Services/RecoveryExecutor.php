@@ -23,7 +23,8 @@ use Throwable;
 final class RecoveryExecutor
 {
     public function __construct(
-        private PdoErrorRepository $repository
+        private PdoErrorRepository $repository,
+        private ?RecoveryStatusReporter $statusReporter = null
     ) {}
 
     public function run(
@@ -64,6 +65,8 @@ final class RecoveryExecutor
                     $context->bookmark
                 );
 
+                $this->statusReporter?->attempting($step->description());
+
                 try {
                     $result = $step->execute($context);
                 } catch (Throwable $failure) {
@@ -73,6 +76,7 @@ final class RecoveryExecutor
                 }
 
                 $results[$key] = $result;
+                $this->statusReporter?->stepResult($step->description(), $result);
 
                 if ($result->isFinished()) {
                     // If deletion fails, leave the row for reconciliation.
@@ -111,6 +115,7 @@ final class RecoveryExecutor
                 $outcome->status === ErrorHandlingResult::RESOLVED
             );
 
+            $this->statusReporter?->outcome($outcome->status, $outcome->detail);
             return $outcome;
         } catch (Throwable $failure) {
             $detail = 'Recovery execution failed'
@@ -130,6 +135,7 @@ final class RecoveryExecutor
                 error_log($detail);
             }
 
+            $this->statusReporter?->outcome('failed', $detail);
             return ErrorHandlingResult::failed($detail);
         }
     }

@@ -11,6 +11,7 @@ use App\PUB\Dispatch\Pinterest\PinterestVideoShipper;
 use App\PUB\Dispatch\YouTube\YouTubeShippingConfig;
 use App\PUB\Dispatch\YouTube\YouTubeVideoShipper;
 use App\ERR\Managers\ErrorManager;
+use App\ERR\DTOs\ErrorReport;
 use App\ERR\Repos\PdoErrorRepository;
 use App\PUB\Errors\PubErrorHandler;
 use App\PUB\Create\Video\VideoWorkerHealthService;
@@ -849,7 +850,8 @@ final class DispatchManager implements PubComManagerContract
     public function failShipment(
         int $pubAssetId,
         string $code,
-        string $message
+        string $message,
+        ?array $diagnostics = null
     ): array {
         if ($pubAssetId <= 0) {
             throw new RuntimeException(
@@ -980,7 +982,7 @@ final class DispatchManager implements PubComManagerContract
                 $message
             );
 
-        $this->reportPublishingFailure($asset, $pubAssetId, $code, $message);
+        $this->reportPublishingFailure($asset, $pubAssetId, $code, $message, $diagnostics);
 
 
         /*
@@ -1835,7 +1837,7 @@ final class DispatchManager implements PubComManagerContract
     }
 
     /** One ERR incident per failed shipping asset; the exact provider response is retained. */
-    private function reportPublishingFailure(array $asset, int $assetId, string $providerCode, string $message): void
+    private function reportPublishingFailure(array $asset, int $assetId, string $providerCode, string $message, ?array $diagnostics = null): void
     {
         if ($this->recoveringThroughErr || $assetId <= 0) return;
         $channel = $this->channelForAsset($asset);
@@ -1848,14 +1850,18 @@ final class DispatchManager implements PubComManagerContract
         $description = ($channel === 'youtube' ? 'YouTube' : 'Pinterest')
             . ' publishing: ' . ($title !== '' ? $title : 'asset #' . $assetId);
         try {
-            $loggedId = $this->errManager()->reportAndHandle(
-                errNum: $number,
+            $report = new ErrorReport(
                 department: 'PUB',
                 message: $auth ? 'Publishing account needs reconnection.' : 'Publishing failed unexpectedly.',
+                fallbackCfErrNum: $number,
                 component: 'DISPATCH',
                 operation: 'shipOne',
                 resourceType: 'pub_asset',
                 resourceId: $assetId,
+                provider: $channel,
+                httpStatus: isset($diagnostics['http_status']) ? (int)$diagnostics['http_status'] : null,
+                extErrNum: isset($diagnostics['ext_err_num']) ? (string)$diagnostics['ext_err_num'] : null,
+                nativeMessage: isset($diagnostics['native_message']) ? (string)$diagnostics['native_message'] : $message,
                 technicalDetail: $message,
                 context: [
                     'execution_context' => 'background',
@@ -1863,13 +1869,16 @@ final class DispatchManager implements PubComManagerContract
                     'provider_code' => $providerCode,
                     'provider_message' => $message,
                     'asset_title' => $title,
+                    'provider_diagnostics' => $diagnostics['context'] ?? null,
                 ],
                 bookmark: [
                     'operation' => 'PUB.DISPATCH.shipOne',
                     'description' => $description,
                     'params' => ['pub_asset_id' => $assetId],
-                ]
+                ],
+                executionContext: 'background'
             );
+            $loggedId = $this->errManager()->reportPackageAndHandle($report->toArray());
             if ($loggedId === null) {
                 error_log('[PUB Dispatch] ERR could not record publishing failure for asset #' . $assetId);
             }
@@ -1887,7 +1896,8 @@ final class DispatchManager implements PubComManagerContract
                 [
                     'pub.publish_auth_required' => fn() => new PubErrorHandler(new VideoWorkerHealthService($this->projectRoot)),
                     'pub.unexpected_publish_failure' => fn() => new PubErrorHandler(new VideoWorkerHealthService($this->projectRoot)),
-                ]
+                ],
+                new \App\ERR\Repos\PdoExternalErrorCodeRepository($this->pdo)
             );
         }
         return $this->sharedErrors;

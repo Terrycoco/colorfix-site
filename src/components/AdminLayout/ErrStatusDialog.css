@@ -1,0 +1,53 @@
+/* Use AdminDialog's existing typography and pink-border treatment without
+   its modal backdrop/focus trap. Only this component's positioning differs. */
+.err-status {
+  position: fixed;
+  z-index: 12000;
+  box-sizing: border-box;
+  background: var(--admin-surface, #fff);
+  color: var(--admin-text, #222);
+  border: 2px solid var(--admin-accent, #d35b92);
+  border-radius: 10px;
+  box-shadow: 0 9px 35px rgba(0,0,0,.22);
+  font: inherit;
+  max-width: calc(100vw - 24px);
+}
+.err-status--expanded {
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 24px));
+}
+.err-status--minimized {
+  top: 14px; right: 14px;
+  width: min(280px, calc(100vw - 28px));
+}
+.err-status__heading {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; padding: 12px 14px 8px;
+}
+.err-status__title { font-size: 1.05rem; font-weight: 650; }
+.err-status__controls { display: flex; gap: 4px; flex-shrink: 0; }
+.err-status__control {
+  border: 0; background: transparent; color: inherit;
+  cursor: pointer; font: inherit; font-size: 1.25rem;
+  min-width: 30px; min-height: 30px; border-radius: 5px;
+}
+.err-status__control:hover, .err-status__control:focus-visible {
+  background: rgba(127,127,127,.13);
+}
+.err-status__body { padding: 4px 14px 16px; overflow-wrap: anywhere; }
+.err-status__label { display: inline-block; font-weight: 700; margin-right: 7px; }
+.err-status__label--failed { color: #ac2933; }
+.err-status__label--success { color: #28794e; }
+.err-status__label--waiting { color: #926100; }
+.err-status__detail { margin-top: 10px; opacity: .82; }
+.err-status--minimized .err-status__heading { padding: 6px 10px 2px; }
+.err-status--minimized .err-status__title { font-size: .9rem; }
+.err-status--minimized .err-status__body { padding: 0 10px 9px; font-size: .85rem; }
+.err-status--minimized .err-status__message {
+  display: inline; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+@media (max-width: 540px) {
+  .err-status--expanded { top: 45%; }
+  .err-status--minimized { top: 8px; right: 8px; }
+}

@@ -6,6 +6,8 @@ namespace App\ERR\Endpoints;
 use App\ERR\Contracts\ErrorContext;
 use App\ERR\Contracts\RecoveryStepResult;
 use App\ERR\Repos\PdoErrorRepository;
+use App\ERR\Services\ErrorStatusBroadcaster;
+use App\ERR\Services\RecoveryStatusReporter;
 use App\PUB\Create\CreateManager;
 use App\PUB\Dispatch\DispatchManager;
 use App\PUB\Create\Video\VideoWorkerHealthService;
@@ -29,6 +31,10 @@ final class RecoverErrorEndpoint
         $repo = new PdoErrorRepository($pdo);
         $row = null;
         $claimed = false;
+        $status = new ErrorStatusBroadcaster($pdo, ErrorStatusBroadcaster::tokenFromRequest());
+        $operationId = '';
+        $title = 'ERR Recovery';
+        $reporter = null;
         try {
             $input = json_decode(file_get_contents('php://input') ?: '', true, 512, JSON_THROW_ON_ERROR);
             $id = is_array($input) ? (int)($input['working_id'] ?? 0) : 0;
@@ -59,6 +65,14 @@ final class RecoverErrorEndpoint
                 return;
             }
             $claimed = true;
+            $operationId = 'recover-' . (int)$log['id'] . '-' . $id . '-' . bin2hex(random_bytes(4));
+            $resourceId = (int)($log['resource_id'] ?? 0);
+            $title = ($errNum === 4001 ? 'CREATE' : 'DISPATCH') . ' — Asset ' . $resourceId;
+            $reporter = new RecoveryStatusReporter($status, $operationId, $title);
+            $stepDescription = $errNum === 4001
+                ? 'Checking worker and restarting asset creation…'
+                : 'Retrying publication of the existing asset…';
+            $reporter->attempting($stepDescription);
             $details = json_decode((string)($log['context_json'] ?? 'null'), true);
             $context = new ErrorContext(
                 logId: (int)$log['id'], errNum: $errNum, department: 'PUB',
@@ -72,6 +86,7 @@ final class RecoverErrorEndpoint
             $result = $errNum === 4001
                 ? $handler->recover($context, new CreateManager($pdo, $projectRoot))
                 : $handler->recoverDispatch($context, new DispatchManager($pdo, $projectRoot));
+            $reporter->stepResult($stepDescription, $result);
             if ($result->status === RecoveryStepResult::SUCCESS) {
                 $repo->completeStep((int)$log['id'], (string)$row['step_key']);
                 $repo->updateHandling((int)$log['id'], 'resolved', $result->detail, true);
@@ -82,6 +97,7 @@ final class RecoverErrorEndpoint
             echo json_encode(['ok' => true, 'status' => $result->status, 'message' => $result->detail]);
         } catch (Throwable $failure) {
             error_log('ERR manual recover failed: ' . $failure->getMessage());
+            $reporter?->outcome('failed', 'Recovery encountered an internal error.');
             if ($claimed && is_array($row)) {
                 try {
                     $repo->markStep((int)$row['err_log_id'], (string)$row['step_key'], 'failed', 'Recovery encountered an internal error.');

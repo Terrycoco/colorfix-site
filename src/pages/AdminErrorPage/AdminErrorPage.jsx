@@ -16,7 +16,6 @@ import {
   AdminToolbar,
 } from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
-
 const URL = `${API_FOLDER}/v2/admin/errors/report.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/errors/save.php`;
 const RECOVER_URL = `${API_FOLDER}/v2/admin/errors/recover.php`;
@@ -26,11 +25,9 @@ const VIEWS = [
   { id: "history", title: "History" },
   { id: "codes", title: "Error Codes" },
 ];
-
 const text = (value) => String(value ?? "").trim();
 const label = (value) => text(value) || "—";
 const shortDate = (value) => text(value) || "—";
-
 async function readResponse(response) {
   const body = await response.text();
   let data;
@@ -44,7 +41,6 @@ async function readResponse(response) {
   }
   return data;
 }
-
 export default function AdminErrorPage() {
   const [view, setView] = useState("working");
   const [report, setReport] = useState({ working: [], history: [], codes: [] });
@@ -61,7 +57,6 @@ export default function AdminErrorPage() {
   const [recoveryAlert, setRecoveryAlert] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
   const load = useCallback(async () => {
     setBusy(true);
     setError("");
@@ -82,10 +77,8 @@ export default function AdminErrorPage() {
       setBusy(false);
     }
   }, []);
-
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setSelectedKey(null); setSearch(""); }, [view]);
-
   const openRow = useCallback((item) => {
     if (!item) return;
     setSelectedKey(item.id ?? item.err_num);
@@ -94,9 +87,7 @@ export default function AdminErrorPage() {
     setSaveError("");
     setBookmarkExpanded(false);
   }, [view]);
-
   const change = (field, value) => setDraft((prev) => ({ ...prev, [field]: value }));
-
   async function closeDrawer() {
     if (!drawer || saving || recovering || deleting) return;
     const allowed = {
@@ -136,7 +127,6 @@ export default function AdminErrorPage() {
       setSaving(false);
     }
   }
-
   async function recoverSelected() {
     if (!drawer || drawer.view !== "working" || recovering) return;
     setRecovering(true);
@@ -145,16 +135,16 @@ export default function AdminErrorPage() {
         method: "POST",
         credentials: "include",
         cache: "no-store",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-ERR-Status-Session": window.sessionStorage.getItem('err-status-session') || '',
+        },
         body: JSON.stringify({ working_id: drawer.row.id }),
       }));
       if (data.status === "success") {
         setDrawer(null);
       }
-      setRecoveryAlert({
-        title: data.status === "success" ? "Recovery Accepted" : "Recovery Not Complete",
-        message: data.message || "The interrupted work remains in Working.",
-      });
+      // ERR's shell-level status dialog shows the result; no second alert.
       await load();
     } catch (failure) {
       setRecoveryAlert({ title: "Recovery Not Complete", message: failure?.message || "Please try again." });
@@ -163,7 +153,6 @@ export default function AdminErrorPage() {
       setRecovering(false);
     }
   }
-
   async function deleteSelected() {
     if (!drawer || drawer.view !== "working" || deleting || recovering) return;
     const id = drawer.row.id;
@@ -187,7 +176,6 @@ export default function AdminErrorPage() {
       setDeleting(false);
     }
   }
-
   const field = (name, title, multiline = false) => (
     <AdminField label={title} key={name}>
       {multiline ? (
@@ -199,7 +187,6 @@ export default function AdminErrorPage() {
       )}
     </AdminField>
   );
-
   const readonly = (name, title = name.replaceAll("_", " ")) => (
     <AdminField label={title} key={name}>
       <div style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
@@ -207,7 +194,6 @@ export default function AdminErrorPage() {
       </div>
     </AdminField>
   );
-
   // The department owns the bookmark. ERR only shows its human summary.
   const parseBookmark = (value) => {
     if (!value) return null;
@@ -224,7 +210,6 @@ export default function AdminErrorPage() {
     return b?.description || b?.summary?.title || (r.resource_type && r.resource_id
       ? `${r.resource_type} #${r.resource_id}` : "—");
   };
-
   const columns = useMemo(() => ({
     working: [
       { key: "err_num", label: "Code", sortable: true, value: (r) => label(r.err_num) },
@@ -255,7 +240,6 @@ export default function AdminErrorPage() {
       { key: "handler_key", label: "Handler", sortable: true },
     ],
   }), []);
-
   const rawRows = report[view] || [];
   const rows = useMemo(() => rawRows.filter((r) =>
     !search || Object.values(r).some((v) =>
@@ -263,7 +247,6 @@ export default function AdminErrorPage() {
     )
   ), [rawRows, search]);
   const title = VIEWS.find((v) => v.id === view)?.title || "Errors";
-
   return (
     <>
     <AdminMasterDetail
@@ -326,7 +309,6 @@ export default function AdminErrorPage() {
               verticalAlign="middle"
             />
           ) : null}
-
         </AdminDetailPane>
       }
     />

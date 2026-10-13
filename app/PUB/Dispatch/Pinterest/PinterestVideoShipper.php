@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\PUB\Dispatch\Pinterest;
 
 use App\PUB\Dispatch\Auth\PinterestAuthService;
+use App\PUB\Errors\PinterestApiException;
 use App\PUB\Dispatch\DispatchShipmentResult;
 use App\PUB\Dispatch\Driver\DispatchDriverJob;
 use App\PUB\Dispatch\Driver\DispatchDriverLauncher;
@@ -754,6 +755,7 @@ final class PinterestVideoShipper implements
             );
         }
 
+        $responseRequestId = null;
         $headers = [
             'Authorization: Bearer '
             . $accessToken,
@@ -764,6 +766,13 @@ final class PinterestVideoShipper implements
         $options = [
             CURLOPT_RETURNTRANSFER =>
                 true,
+
+            CURLOPT_HEADERFUNCTION => static function ($ch, string $line) use (&$responseRequestId): int {
+                if (preg_match('/^\s*(?:x-request-id|x-pinterest-request-id|request-id)\s*:\s*(.+)\s*$/i', $line, $matches)) {
+                    $responseRequestId = trim($matches[1]);
+                }
+                return strlen($line);
+            },
 
             CURLOPT_CUSTOMREQUEST =>
                 strtoupper(
@@ -864,11 +873,35 @@ final class PinterestVideoShipper implements
                         (string)$raw
                     );
 
-            throw new RuntimeException(
-                'Pinterest shipping request failed (HTTP '
-                . $status
-                . '): '
-                . $message
+            // Preserve complete provider diagnostics without exposing credentials.
+            // This exception crosses a detached driver boundary via a JSON-safe array.
+            $nativeCode = null;
+            if (is_array($decoded)) {
+                foreach (['code', 'error_code', 'errorCode'] as $key) {
+                    if (isset($decoded[$key]) && is_scalar($decoded[$key])) {
+                        $nativeCode = (string)$decoded[$key];
+                        break;
+                    }
+                }
+            }
+            $message = (string)self::redactDiagnostics($message);
+            $safeResponse = self::redactDiagnostics(is_array($decoded) ? $decoded : ['raw_body' => (string)$raw]);
+            $safePayload = $payload === null ? null : self::redactDiagnostics($payload);
+            throw new PinterestApiException(
+                'Pinterest shipping request failed (HTTP ' . $status . '): ' . $message,
+                [
+                    'provider' => 'pinterest',
+                    'http_status' => $status,
+                    'ext_err_num' => $nativeCode,
+                    'native_message' => $message,
+                    'context' => [
+                        'method' => strtoupper($method),
+                        'endpoint_path' => $path,
+                        'request_id' => $responseRequestId,
+                        'response' => $safeResponse,
+                        'request_payload' => $safePayload,
+                    ],
+                ]
             );
         }
 
@@ -882,4 +915,28 @@ final class PinterestVideoShipper implements
 
         return $decoded;
     }
+    /** Sanitize provider diagnostics before they cross any process boundary. */
+    private static function redactDiagnostics(mixed $value, int $depth = 0): mixed
+    {
+        if ($depth > 16) return '[depth limit]';
+        if (is_array($value)) {
+            $safe = [];
+            foreach ($value as $key => $item) {
+                $field = strtolower((string)$key);
+                if (preg_match('/(?:token|secret|password|credential|authorization|upload_url|signature|signed_url|api_key|cookie|upload_parameters)/i', $field)) {
+                    $safe[$key] = '[REDACTED]';
+                } else {
+                    $safe[$key] = self::redactDiagnostics($item, $depth + 1);
+                }
+            }
+            return $safe;
+        }
+        if (is_string($value)) {
+            $value = preg_replace('/Bearer\s+[^\s"\x27]+/i', 'Bearer [REDACTED]', $value);
+            $value = preg_replace('/([?&](?:token|key|signature|X-Amz-[^=&]+|X-Goog-[^=&]+)=)[^&\s]+/i', '$1[REDACTED]', $value);
+            return substr($value, 0, 12000);
+        }
+        return $value;
+    }
+
 }
