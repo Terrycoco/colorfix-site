@@ -17,7 +17,22 @@ use RuntimeException;
 
 final class PdoRexReservationRepository implements RexReservationRepositoryInterface
 {
+    private const RESOURCE_MAP = [
+        'playlist' => ['playlists', ['title', 'name', 'playlist_title', 'label']],
+        'playlists' => ['playlists', ['title', 'name', 'playlist_title', 'label']],
+        'palette' => ['project_palettes', ['title', 'name', 'palette_name', 'area_label', 'label']],
+        'project_palette' => ['project_palettes', ['title', 'name', 'palette_name', 'area_label', 'label']],
+        'document' => ['project_documents', ['title', 'name', 'subject', 'label']],
+        'project_document' => ['project_documents', ['title', 'name', 'subject', 'label']],
+        'project' => ['projects', ['title', 'name', 'project_name', 'label']],
+    ];
+
     public function __construct(private PDO $pdo) {}
+
+    public static function supports(string $resourceType): bool
+    {
+        return isset(self::RESOURCE_MAP[strtolower(trim($resourceType))]);
+    }
 
     public function create(RexCreateReservationRequest $request, string $token): RexReservation
     {
@@ -1118,6 +1133,42 @@ public function deleteByResource(
         }
 
         return $counts;
+    }
+
+    /** @return list<array{id:int,title:string}> */
+    public function listOptions(string $resourceType): array
+    {
+        $type = strtolower(trim($resourceType));
+        if (!self::supports($type)) {
+            throw new \InvalidArgumentException('Unsupported resource type: ' . $type);
+        }
+        [$table, $candidates] = self::RESOURCE_MAP[$type];
+        // All SQL identifiers originate from the hardcoded whitelist above or
+        // from column metadata for a whitelisted table; never from user input.
+        $columns = $this->pdo->query('SHOW COLUMNS FROM `' . $table . '`')->fetchAll(PDO::FETCH_ASSOC);
+        $available = array_column($columns, 'Field');
+        $primary = array_values(array_filter($columns, static fn(array $c): bool => ($c['Key'] ?? '') === 'PRI'));
+        if (count($primary) !== 1) {
+            throw new RuntimeException('Expected exactly one primary key in ' . $table);
+        }
+        $idColumn = (string)$primary[0]['Field'];
+        $idSql = '`' . str_replace('`', '``', $idColumn) . '`';
+        $titleColumn = null;
+        foreach ($candidates as $candidate) {
+            if (in_array($candidate, $available, true)) {
+                $titleColumn = $candidate;
+                break;
+            }
+        }
+        $titleSql = $titleColumn === null
+            ? "CONCAT('Resource ', {$idSql})"
+            : "COALESCE(NULLIF(TRIM(CAST(`{$titleColumn}` AS CHAR)), ''), CONCAT('Resource ', {$idSql}))";
+        $sql = "SELECT {$idSql} AS id, {$titleSql} AS title FROM `{$table}` ORDER BY title ASC, id ASC";
+        $rows = $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(static fn(array $row): array => [
+            'id' => (int)$row['id'],
+            'title' => (string)$row['title'],
+        ], $rows);
     }
 
     public function listResourceTypes(): array

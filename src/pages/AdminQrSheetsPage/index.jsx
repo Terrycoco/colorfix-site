@@ -117,7 +117,7 @@ function formFromReservation(item) {
 
     context_text: JSON.stringify(
 
-      item.context && typeof item.context === "object"
+      item.context && typeof item.context === "object" && !Array.isArray(item.context)
 
         ? item.context
 
@@ -151,7 +151,7 @@ function absolutePublicUrl(value) {
 
   }
 
-  if (/^https?:\\/\\//i.test(raw)) {
+  if (/^https?:\/\//i.test(raw)) {
 
     return raw;
 
@@ -1725,47 +1725,7 @@ export default function AdminQrSheetsPage() {
 
               </AdminField>
 
-              <AdminField
 
-                label="Context"
-
-              >
-
-                <textarea
-
-                  className="admin-field__control"
-
-                  rows={6}
-
-                  value={
-
-                    form.context_text
-
-                  }
-
-                  disabled={
-
-                    saving
-
-                  }
-
-                  onChange={
-
-                    (event) =>
-
-                      setField(
-
-                        "context_text",
-
-                        event.target.value
-
-                      )
-
-                  }
-
-                />
-
-              </AdminField>
 
             </AdminStack>
 

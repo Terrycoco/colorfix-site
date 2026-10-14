@@ -29,15 +29,28 @@ export default function ResourceDropdown({
     }
     setLoading(true);
     const params = new URLSearchParams({ resource_type: resourceType });
-    fetch(`${endpoint}?${params}`, {
+    const url = `${endpoint}?${params}`;
+    fetch(url, {
       credentials: "include",
       signal: controller.signal,
       headers: { Accept: "application/json" },
     })
       .then(async (response) => {
-        const data = await response.json();
+        const body = await response.text();
+        let data;
+        try {
+          data = JSON.parse(body);
+        } catch {
+          console.error("[ResourceDropdown] Invalid JSON response", {
+            url, status: response.status, body,
+          });
+          throw new Error(`Lookup returned non-JSON (HTTP ${response.status}); see console.`);
+        }
         if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
-          throw new Error(data?.error || `Lookup failed (${response.status}).`);
+          console.error("[ResourceDropdown] Resource lookup API failure", {
+            url, status: response.status, response: data,
+          });
+          throw new Error(data?.error || `Lookup failed (HTTP ${response.status}).`);
         }
         return data.items;
       })
@@ -49,7 +62,10 @@ export default function ResourceDropdown({
           .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }) || Number(a.id) - Number(b.id)));
       })
       .catch((err) => {
-        if (!controller.signal.aborted) setError(err.message || "Could not load resources.");
+        if (!controller.signal.aborted) {
+          console.error("[ResourceDropdown] Request failed", { url, resourceType, error: err });
+          setError(err.message || "Could not load resources.");
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
