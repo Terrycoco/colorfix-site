@@ -122,12 +122,15 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     }
 
     /* $viewerRex = $this->hydratePublicRexViewerUrls($items, $reservationToken); */
+    $childrenStartedAt = microtime(true);
     $viewerRex = $isShowcase
         ? ['count' => 0, 'urls' => [], 'targets' => []]
-        : $this->buildLinkedPVData(
-        $playlistId,
-        $experience->experienceKey
-    );
+        : $this->lookupLinkedPVNavigation(
+            $playlistId,
+            $experience->experienceKey,
+            $reservationToken
+        );
+    $this->markTiming('child_rex_lookup', $childrenStartedAt);
     $viewerRexCount = $viewerRex['count'];
     if ($viewerRexCount === 0) {
         $showSlidePalettePrompt = false;
@@ -287,6 +290,82 @@ private function selectRexCtas(array $ctas, string $colorsUsedDestination): arra
     return $filtered;
 }
 
+
+ /**
+  * Lightweight REX child navigation for Playlist Experience startup.
+  * Full PV titles/photos are retrieved by PALETTES/PVThumbs on demand.
+  *
+  * @return array{count:int,urls:array<int,string>,targets:array<int,mixed>}
+  */
+ private function lookupLinkedPVNavigation(
+     int $playlistId,
+     string $experienceKey,
+     ?string $reservationToken
+ ): array {
+     $empty = ['count' => 0, 'urls' => [], 'targets' => []];
+     if ($playlistId <= 0 || trim($experienceKey) === '') {
+         return $empty;
+     }
+
+     $repo = new PdoRexReservationRepository($this->pdo);
+     $relationships = new RexReservationRelationships($repo);
+     $experienceKey = strtolower(trim($experienceKey));
+     $token = trim((string)$reservationToken);
+
+     // Use the exact parent REX whenever available; a playlist may have
+     // separate Public, Concept, Client and Showcase reservations.
+     if ($token !== '') {
+         $parent = $repo->findByToken($token);
+         if (!$parent
+             || strtolower(trim($parent->status)) !== 'active'
+             || $parent->revokedAt !== null
+             || $parent->resolverKey !== 'playlist_experience'
+             || $parent->resourceType !== 'playlist'
+             || (int)$parent->resourceId !== $playlistId
+             || strtolower(trim((string)$parent->experienceKey)) !== $experienceKey
+         ) {
+             return $empty;
+         }
+         $links = $relationships->childRelationships($parent->id, 'viewer');
+     } else {
+         $links = $relationships->childrenForResourceExperience(
+             'playlist_experience',
+             'playlist',
+             $playlistId,
+             $experienceKey,
+             'viewer'
+         );
+     }
+
+     $seen = [];
+     $urls = [];
+     foreach ($links as $link) {
+         $child = $link->reservation;
+         if (strtolower(trim($child->status)) !== 'active'
+             || $child->revokedAt !== null
+             || $child->resolverKey !== 'viewer'
+             || $child->resourceType !== 'palette_viewer'
+             || (int)$child->resourceId <= 0
+         ) {
+             continue;
+         }
+         // A single PV may be linked more than once. Do not count it twice.
+         $id = (int)$child->resourceId;
+         if (isset($seen[$id])) {
+             continue;
+         }
+         $seen[$id] = true;
+         $urls[] = $relationships->publicUrl($child);
+     }
+
+     $count = count($urls);
+     return [
+         'count' => $count,
+         // The Player only needs a URL immediately when there is one child.
+         'urls' => $count === 1 ? $urls : [],
+         'targets' => [],
+     ];
+ }
 
 /** new modern PV call */
 private function getLinkedPVs(
@@ -631,10 +710,13 @@ public function buildPlaybackPlanFromProjectExperience(
          * Modern REX/PV navigation is relationship-driven.
          * The current experience decides which linked PVs count.
          */
-        $viewerRex = $this->buildLinkedPVData(
+        $childrenStartedAt = microtime(true);
+        $viewerRex = $this->lookupLinkedPVNavigation(
             $playlistId,
-            $experienceKey
+            $experienceKey,
+            $reservationToken
         );
+        $this->markTiming('child_rex_lookup', $childrenStartedAt);
         $viewerRexCount = $viewerRex['count'];
 
         $thumbsEnabled =
