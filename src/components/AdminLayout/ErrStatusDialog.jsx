@@ -5,7 +5,9 @@ import './ErrStatusDialog.css';
 
 const STATUS_URL = `${API_FOLDER}/v2/admin/errors/status.php`;
 const SESSION_KEY = 'err-status-session';
+const DISMISSED_EVENT_KEY = 'err-status-dismissed-event';
 const VALID_STATUSES = new Set(['attempting', 'accepted', 'waiting', 'success', 'failed']);
+const WORKER_START_COMMAND = './scripts/start-pub-video-worker.sh';
 
 /**
  * One shell-mounted viewer for ERR's server-side status feed.
@@ -17,7 +19,7 @@ export default function ErrStatusDialog() {
   const [current, setCurrent] = useState(null);
   const [minimized, setMinimized] = useState(false);
   const lastSeenId = useRef(null);
-  const dismissedOperation = useRef(null);
+  const dismissedEventId = useRef(window.sessionStorage.getItem(DISMISSED_EVENT_KEY));
 
   useEffect(() => {
     if (!window.sessionStorage.getItem(SESSION_KEY)) {
@@ -43,9 +45,11 @@ export default function ErrStatusDialog() {
         if (!id || id === lastSeenId.current) return;
         lastSeenId.current = id;
         const operationId = String(event.operationId ?? '');
-        if (dismissedOperation.current === operationId) return;
-        dismissedOperation.current = null;
+        // Dismiss suppresses only this specific event, including after a refresh.
+        // Any new event (even for the same operation) may open the dialog.
+        if (dismissedEventId.current === id) return;
         setCurrent({
+          id,
           operationId,
           title: String(event.title || 'ERR Status'),
           status: event.status,
@@ -70,6 +74,7 @@ export default function ErrStatusDialog() {
 
   if (!current) return null;
   const label = current.status[0].toUpperCase() + current.status.slice(1);
+  const hasWorkerCommand = current.detail.trim() === WORKER_START_COMMAND;
 
   return createPortal(
     <section
@@ -88,16 +93,34 @@ export default function ErrStatusDialog() {
             onClick={() => setMinimized((value) => !value)}>
             {minimized ? '□' : '−'}
           </button>
-          <button type="button" className="err-status__control"
-            aria-label="Dismiss status" title="Dismiss"
-            onClick={() => { dismissedOperation.current = current.operationId; setCurrent(null); }}>×</button>
         </div>
       </div>
       <div className="err-status__body">
         <span className={`err-status__label err-status__label--${current.status}`}>{label}</span>
         <span className="err-status__message">{current.message}</span>
-        {!minimized && current.detail && <div className="err-status__detail">{current.detail}</div>}
+        {!minimized && hasWorkerCommand && (
+          <div className="err-status__command-group">
+            <div>On your Mac, from the ColorFix project root, run:</div>
+            <div className="err-status__command-row">
+              <code className="err-status__command">{current.detail}</code>
+              <button type="button" className="admin-dialog__button admin-dialog__button--confirm"
+                onClick={() => { void navigator.clipboard.writeText(current.detail); }}>
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+        {!minimized && current.detail && !hasWorkerCommand && <div className="err-status__detail">{current.detail}</div>}
       </div>
+      {!minimized && <div className="err-status__actions">
+        <button type="button" className="admin-dialog__button admin-dialog__button--confirm"
+          aria-label="Dismiss status"
+          onClick={() => {
+            dismissedEventId.current = current.id;
+            window.sessionStorage.setItem(DISMISSED_EVENT_KEY, current.id);
+            setCurrent(null);
+          }}>Dismiss</button>
+      </div>}
     </section>,
     document.body
   );

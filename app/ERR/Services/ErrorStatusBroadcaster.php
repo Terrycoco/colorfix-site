@@ -22,21 +22,62 @@ final class ErrorStatusBroadcaster
         if (!in_array($status, ['attempting', 'accepted', 'waiting', 'success', 'failed'], true)) {
             throw new \InvalidArgumentException('Invalid ERR broadcast status.');
         }
+        $this->insertEvent(hash('sha256', $this->sessionToken), $operationId, $title, $status, $message, $detail);
+    }
+
+    private function insertEvent(
+        string $sessionHash, string $operationId, string $title,
+        string $status, string $message, string $detail
+    ): void {
+        if (!in_array($status, ['attempting', 'accepted', 'waiting', 'success', 'failed'], true)) {
+            throw new \InvalidArgumentException('Invalid ERR broadcast status.');
+        }
         try {
             $stmt = $this->pdo->prepare('INSERT INTO err_status_events
                 (session_token, operation_id, title, status, message, detail)
                 VALUES (:session_token, :operation_id, :title, :status, :message, :detail)');
             $stmt->execute([
-                'session_token' => hash('sha256', $this->sessionToken),
+                'session_token' => $sessionHash,
                 'operation_id' => substr($operationId, 0, 100),
                 'title' => substr($title, 0, 180),
                 'status' => $status,
                 'message' => substr($message, 0, 1000),
                 'detail' => substr($detail, 0, 2000),
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('ERR status broadcast unavailable: ' . $e->getMessage());
         }
+    }
+
+    /** Find the original interactive session(s) for a recovery log.
+     * The operation ID is minted by RecoverErrorEndpoint as recover-{logId}-...
+     */
+    public function recoveryTargetsForLog(int $logId): array
+    {
+        if ($logId <= 0) return [];
+        $stmt = $this->pdo->prepare(
+            'SELECT session_token, operation_id FROM err_status_events
+             WHERE operation_id LIKE :prefix AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)
+             ORDER BY id DESC LIMIT 100'
+        );
+        $stmt->execute(['prefix' => 'recover-' . $logId . '-%']);
+        $targets = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            // Only the most recent attempt per browser session may be updated.
+            $targets[$row['session_token']] ??= $row;
+        }
+        return array_values($targets);
+    }
+
+    /** A server-side worker callback has no browser token. Use the stored hash only. */
+    public function broadcastToSessionHash(
+        string $sessionHash, string $operationId, string $title,
+        string $status, string $message, string $detail = ''
+    ): void {
+        if (!preg_match('/\A[a-f0-9]{64}\z/D', $sessionHash)) {
+            throw new \InvalidArgumentException('Invalid ERR session hash.');
+        }
+        $this->insertEvent($sessionHash, $operationId, $title, $status, $message, $detail);
     }
 
     public function latest(): ?array

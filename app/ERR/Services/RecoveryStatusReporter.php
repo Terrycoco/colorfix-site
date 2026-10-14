@@ -19,7 +19,7 @@ final class RecoveryStatusReporter
         $this->broadcaster->broadcast($this->operationId, $this->title, 'attempting', $description);
     }
 
-    public function stepResult(string $description, RecoveryStepResult $result): void
+    public function stepResult(string $description, RecoveryStepResult $result, string $displayDetail = ''): void
     {
         $status = match ($result->status) {
             RecoveryStepResult::SUCCESS => 'success',
@@ -29,7 +29,8 @@ final class RecoveryStatusReporter
         // The next step, if any, replaces this message in the same window.
         $this->broadcaster->broadcast(
             $this->operationId, $this->title, $status,
-            $result->detail !== '' ? $result->detail : $description
+            $result->detail !== '' ? $result->detail : $description,
+            $displayDetail
         );
     }
 

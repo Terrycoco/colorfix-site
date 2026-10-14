@@ -16,6 +16,7 @@ use App\PUB\Errors\PubErrorReporter;
 use App\PUB\Errors\PubErrorHandler;
 use App\ERR\Managers\ErrorManager;
 use App\ERR\Repos\PdoErrorRepository;
+use App\ERR\Services\AssetOutcomeReconciler;
 use App\PUB\PubCom\PubComChannel;
 use App\PUB\PubCom\PubComDisposition;
 use App\PUB\PubCom\PubComManagerContract;
@@ -2324,6 +2325,17 @@ final class CreateManager implements PubComManagerContract
                     $jobId,
                     $message
                 );
+        }
+
+        // Report the durable worker result for ordinary CREATE, REDO, and Recover.
+        // An ERR outage cannot change the settled outcome of the video job.
+        try {
+            (new AssetOutcomeReconciler($this->pdo))->videoJobSettled(
+                $pubAssetId, $jobId, $status,
+                $status === 'failed' ? ($message ?? 'Video rendering failed.') : ''
+            );
+        } catch (Throwable $errFailure) {
+            error_log('ERR video outcome reconciliation failed: ' . $errFailure->getMessage());
         }
 
         $asset =

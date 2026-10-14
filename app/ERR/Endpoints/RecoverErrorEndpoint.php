@@ -86,7 +86,12 @@ final class RecoverErrorEndpoint
             $result = $errNum === 4001
                 ? $handler->recover($context, new CreateManager($pdo, $projectRoot))
                 : $handler->recoverDispatch($context, new DispatchManager($pdo, $projectRoot));
-            $reporter->stepResult($stepDescription, $result);
+            $workerStartCommand = ($errNum === 4001
+                && $result->status === RecoveryStepResult::WAITING
+                && str_contains(strtolower($result->detail), 'offline'))
+                ? './scripts/start-pub-video-worker.sh'
+                : '';
+            $reporter->stepResult($stepDescription, $result, $workerStartCommand);
             if ($result->status === RecoveryStepResult::SUCCESS) {
                 $repo->completeStep((int)$log['id'], (string)$row['step_key']);
                 $repo->updateHandling((int)$log['id'], 'resolved', $result->detail, true);

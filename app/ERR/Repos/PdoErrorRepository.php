@@ -295,6 +295,51 @@ final class PdoErrorRepository
         }
     }
 
+    /** Unresolved history for one durable resource, including incidents without Working rows. */
+    public function unresolvedForResource(string $resourceType, int $resourceId): array
+    {
+        $this->requireText($resourceType, 'Resource type');
+        $this->requirePositive($resourceId, 'Resource ID');
+        $stmt = $this->pdo->prepare(
+            'SELECT id, component, department, handling_status FROM err_log
+             WHERE resource_type = :resource_type AND resource_id = :resource_id
+               AND resolved_at IS NULL ORDER BY id ASC'
+        );
+        $stmt->execute(['resource_type' => $resourceType, 'resource_id' => $resourceId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Reconcile every unresolved incident for the asset, atomically with Working cleanup. */
+    public function resolveUnresolvedForResource(string $resourceType, int $resourceId, string $reason): void
+    {
+        $this->requireText($resourceType, 'Resource type');
+        $this->requirePositive($resourceId, 'Resource ID');
+        $this->requireText($reason, 'Resolution reason');
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->prepare(
+                'SELECT id FROM err_log WHERE resource_type = :resource_type
+                 AND resource_id = :resource_id AND resolved_at IS NULL FOR UPDATE'
+            );
+            $stmt->execute(['resource_type' => $resourceType, 'resource_id' => $resourceId]);
+            $ids = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+            if ($ids !== []) {
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $delete = $this->pdo->prepare("DELETE FROM err_working WHERE err_log_id IN ($in)");
+                $delete->execute($ids);
+                $update = $this->pdo->prepare(
+                    "UPDATE err_log SET handling_status = 'resolved', handling_result = ?,
+                     resolved_at = CURRENT_TIMESTAMP WHERE id IN ($in)"
+                );
+                $update->execute([$reason, ...$ids]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
     /** Return all three ERR admin grids from the shared repository. */
     public function report(): array
     {
