@@ -19,5 +19,6 @@ export const REX_OPTIONS = {
     { value: "client", label: "Client" },
     { value: "concept", label: "Concept" },
     { value: "public", label: "Public" },
+    {value: "showcase", label: "Showcase"},
   ],
 };
