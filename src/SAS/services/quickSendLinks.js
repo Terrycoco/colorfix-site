@@ -2,6 +2,18 @@
 // A blank URL keeps the item visible but not shareable until configured.
 export const QUICK_SEND_LINKS = [
   {
+    id: 'home',
+    title: 'Home Page',
+    description: 'ColorFix by Terry',
+    url: 'https://colorfix.terrymarr.com/?src=sas',
+  },
+    {
+  id: 'browse-playlists',
+  title: 'Browse Playlists',
+  description: 'Explore ColorFix makeovers and color lessons',
+  url: 'https://colorfix.terrymarr.com/picker?set=11&src=sas',
+},
+  {
     id: 'contact',
     title: 'Contact Terry',
     description: 'Start a design inquiry',
@@ -19,12 +31,7 @@ export const QUICK_SEND_LINKS = [
     description: 'Explore ColorFix videos',
     url: 'https://www.youtube.com/@colorfixbyterry',
   },
-  {
-  id: 'browse-playlists',
-  title: 'Browse Playlists',
-  description: 'Explore ColorFix makeovers and color lessons',
-  url: 'https://colorfix.terrymarr.com/picker?set=11&src=sas',
-},
+
 ];
 
 export function verifiedPublicUrl(value) {
