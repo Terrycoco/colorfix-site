@@ -483,13 +483,13 @@ final class RexPlaylistExperienceSyncService
                  * longer owns swatches. Validate color presence against the
                  * Saved Palette members instead.
                  */
-                $members =
+                $hasMembers =
                     $this->savedPalettes
-                        ->getMembersForPalette(
+                        ->hasMembersForPalette(
                             (int)$savedPaletteId
                         );
 
-                if (count($members) < 1) {
+                if (!$hasMembers) {
                     $issues[] = [
                         'code' => 'empty_pv',
                         'saved_palette_id' => (int)$savedPaletteId,

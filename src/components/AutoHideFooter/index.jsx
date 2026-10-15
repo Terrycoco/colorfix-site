@@ -3,23 +3,22 @@ import { createPortal } from "react-dom";
 import "./autohidefooter.css";
 
 /**
- * AutoHideFooter — reveal on:
- *  - wheel down (deltaY > 0) anywhere (works for container scrolls)
- *  - keydown for ArrowDown / PageDown / Space / End
- *  - window near-bottom check (for window-scrolling pages)
- * Then auto-hide after idleTimeout unless hovered/focused.
+ * AutoHideFooter — reveal on downward scrolling, wheel, or keyboard navigation.
+ * Never read full document dimensions: doing so after a large Gallery render
+ * can force an expensive synchronous layout.
  */
 export default function AutoHideFooter({
   children,
   className = "",
   zIndex = 10000,
-  bottomScrollThreshold = 160,
+  bottomScrollThreshold = 160, // retained for backwards compatibility
   idleTimeout = 2400,
   showOnInitial = false,
 }) {
   const [visible, setVisible] = useState(false);
   const hideTimerRef = useRef(null);
   const footerRef = useRef(null);
+  const lastScrollYRef = useRef(null);
 
   const clearHideTimer = () => {
     if (hideTimerRef.current) {
@@ -38,74 +37,43 @@ export default function AutoHideFooter({
     }, idleTimeout);
   };
 
-  // Window near-bottom (works for window-scrolling pages)
+  // Respond to downward page scroll without querying document dimensions.
+  // Covers touch scrolling on phones as well as conventional scroll input.
   useEffect(() => {
-    const isNearBottom = () => {
-      const doc = document.documentElement;
-      const viewport = window.innerHeight || doc.clientHeight || 0;
-      const full = Math.max(
-        doc.scrollHeight,
-        doc.offsetHeight,
-        doc.clientHeight,
-        document.body?.scrollHeight || 0,
-        document.body?.offsetHeight || 0
-      );
-      const y =
-        window.pageYOffset ||
-        document.documentElement.scrollTop ||
-        document.body.scrollTop ||
-        0;
-      return y + viewport >= full - bottomScrollThreshold;
+    lastScrollYRef.current = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      const previousY = lastScrollYRef.current;
+      lastScrollYRef.current = y;
+      if (previousY !== null && y > previousY + 1) show();
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [idleTimeout]);
 
-    const onScrollOrResize = () => {
-      if (isNearBottom()) show();
-    };
-
-    // If we start near bottom, reveal
-    if (isNearBottom()) setVisible(true);
-
-    window.addEventListener("scroll", onScrollOrResize, { passive: true });
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      window.removeEventListener("scroll", onScrollOrResize);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [bottomScrollThreshold, idleTimeout]);
-
-  // Reveal on any downward WHEEL scroll (works even when a child container scrolls)
+  // Reveal on downward wheel gestures, including independently scrolling containers.
   useEffect(() => {
-    const onWheel = (e) => {
-      if (e && typeof e.deltaY === "number" && e.deltaY > 0) {
-        show();
-      }
+    const onWheel = (event) => {
+      if (typeof event?.deltaY === "number" && event.deltaY > 0) show();
     };
     window.addEventListener("wheel", onWheel, { passive: true });
     return () => window.removeEventListener("wheel", onWheel);
   }, [idleTimeout]);
 
-  // Reveal on common "scroll down" keys
   useEffect(() => {
-    const onKeyDown = (e) => {
-      const target = e?.target;
+    const onKeyDown = (event) => {
+      const target = event?.target;
       const tag = target?.tagName?.toLowerCase?.() || "";
-      if (tag === "input" || tag === "textarea" || target?.isContentEditable) {
-        return;
-      }
-      const k = e.key;
-      if (k === "ArrowDown" || k === "PageDown" || k === " " || k === "End") {
-        show();
-      }
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+      if (["ArrowDown", "PageDown", " ", "End"].includes(event.key)) show();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [idleTimeout]);
 
-  // Keep visible while hovered/focused; re-arm timer on leave
   useEffect(() => {
     const node = footerRef.current;
     if (!node) return;
-
     const onEnter = () => {
       clearHideTimer();
       setVisible(true);
@@ -114,12 +82,10 @@ export default function AutoHideFooter({
       clearHideTimer();
       hideTimerRef.current = setTimeout(() => setVisible(false), idleTimeout);
     };
-
     node.addEventListener("mouseenter", onEnter);
     node.addEventListener("mouseleave", onLeave);
     node.addEventListener("focusin", onEnter);
     node.addEventListener("focusout", onLeave);
-
     return () => {
       node.removeEventListener("mouseenter", onEnter);
       node.removeEventListener("mouseleave", onLeave);
@@ -128,7 +94,6 @@ export default function AutoHideFooter({
     };
   }, [idleTimeout]);
 
-  // Optional brief reveal on mount
   useEffect(() => {
     if (showOnInitial) {
       setVisible(true);

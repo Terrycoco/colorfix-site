@@ -1,13 +1,12 @@
-
 cat-text {
     font-size: 8px;
 }
 
 .wheel300-stack {
   position: relative;
-  width: min(100%, var(--wheel-size, 300px));
-  aspect-ratio: 1 / 1;
+  width: var(--wheel-size, 300px);
   max-width: 100%;
+  aspect-ratio: 1 / 1;
   overflow: visible;
 }
 

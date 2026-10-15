@@ -19,10 +19,11 @@ export default function BrandFilterModal({ open, onClose }) {
   // Always return before hooks when closed (prevents hooks-order errors)
   if (!open) return null;
 
-  const { searchFilters, toggleFilter } = useAppState();
+  const { searchFilters, toggleFilter, applyBrandFilters } = useAppState();
 
   const backdropRef = useRef(null);
   const armRef = useRef(false); // prevent instant close from opener tap
+  const appliedBrandsRef = useRef(null);
 
   // Normalize active selections from AppState to a Set of codes
   const activeSet =
@@ -31,6 +32,12 @@ export default function BrandFilterModal({ open, onClose }) {
       : Array.isArray(searchFilters?.brands)
       ? new Set(searchFilters.brands.filter(Boolean))
       : new Set();
+
+  const selectedBrands = [...activeSet].map(String).sort();
+  const selectionKey = selectedBrands.join('|');
+  if (appliedBrandsRef.current === null) {
+    appliedBrandsRef.current = selectionKey;
+  }
 
   // Sort our hardcoded brands alphabetically by LABEL for display
   const list = [...BRANDS].sort((a, b) =>
@@ -43,10 +50,19 @@ export default function BrandFilterModal({ open, onClose }) {
   }
 
   function handleClear() {
-    const visibleCodes = new Set(list.map(b => b.code));
-    for (const code of activeSet) {
-      if (visibleCodes.has(code)) toggleFilter?.('brands', code); // turn off
+    // Clear all brands and issue one unfiltered Gallery request.
+    if (appliedBrandsRef.current !== '') {
+      applyBrandFilters?.([]);
+      appliedBrandsRef.current = '';
     }
+  }
+
+  function handleDone() {
+    if (selectionKey !== appliedBrandsRef.current) {
+      applyBrandFilters?.(selectedBrands);
+      appliedBrandsRef.current = selectionKey;
+    }
+    onClose?.();
   }
 
   // Arm backdrop close slightly after mount to avoid "open→close" on mobile
@@ -98,7 +114,7 @@ export default function BrandFilterModal({ open, onClose }) {
 
         <footer className="bf-footer">
           <button className="bf-btn ghost" type="button" onClick={handleClear}>Clear</button>
-          <button className="bf-btn" type="button" onClick={onClose}>Done</button>
+          <button className="bf-btn" type="button" onClick={handleDone}>Done</button>
         </footer>
       </div>
     </div>,

@@ -517,15 +517,16 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     useCallback(
       async (
         id,
-        preserveSelection = null
+        preserveSelection = null,
+        showLoading = true
       ) => {
         if (!id) {
           return;
         }
 
-        setDetailLoading(
-          true
-        );
+        if (showLoading) {
+          setDetailLoading(true);
+        }
 
         setDetailError(
           ""
@@ -647,16 +648,20 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             false
           );
 
+          return true;
+
         } catch (err) {
           setDetailError(
             err?.message ||
             "Failed to load playlist."
           );
 
+          return false;
+
         } finally {
-          setDetailLoading(
-            false
-          );
+          if (showLoading) {
+            setDetailLoading(false);
+          }
         }
       },
       [
@@ -3576,12 +3581,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                     return false;
                                   }
 
-                                  // The drawer is the single commit point.
-                                  // Reload the current admin page so every
-                                  // playlist row/slide comes back from the DB.
-                                  window.location.reload();
-
-                                  return false;
+                                  return await fetchPlaylist(savedId, null, false);
                                 },
 
                               footer:

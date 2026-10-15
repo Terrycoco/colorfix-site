@@ -1216,6 +1216,16 @@ class PdoSavedPaletteRepository
      *
      * Returns an array ordered by order_index ascending.
      */
+    public function hasMembersForPalette(int $savedPaletteId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM saved_palette_members WHERE saved_palette_id = :id LIMIT 1'
+        );
+        $stmt->execute([':id' => $savedPaletteId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function getMembersForPalette(int $savedPaletteId): array
     {
         $sql = "

@@ -29,7 +29,7 @@ function pickHue(...candidates) {
   return null;
 }
 
-function labelPos(hue, radius = 176, center = 150) {
+function labelPos(hue, radius = 140, center = 150) {
   const angle = ((hue - 90) * Math.PI) / 180;
   return {
     x: center + radius * Math.cos(angle),
@@ -99,7 +99,7 @@ const ColorWheelItem = ({ item = {} }) => {
               hue={startHue}
               center={150}
               radius={150}
-              endRadius={170}
+              endRadius={126}
               strokeColor="#111"
               dashed
             />
@@ -109,7 +109,7 @@ const ColorWheelItem = ({ item = {} }) => {
               hue={endHue}
               center={150}
               radius={150}
-              endRadius={170}
+              endRadius={126}
               strokeColor="#111"
               dashed
             />

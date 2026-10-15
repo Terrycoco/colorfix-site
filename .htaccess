@@ -1,7 +1,10 @@
 # Serve SPA entry point for all routes
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  
+
+  # Only the site root uses the prebuilt homepage.
+  RewriteRule ^$ /index.html [L]
+
   RewriteRule ^pod/?$ /pod.php [L,QSA]
   RewriteRule ^index\.html$ - [L]
   RewriteRule ^colorfix/index\.html$ - [L]
@@ -36,9 +39,15 @@
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^sas/.*$ /sas/index.html [L]
 
+  # Keep the already tested Gallery shell path.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  RewriteRule ^results/[0-9]+/?$ /gallery-shell.html [L,QSA]
+
+  # All other React routes start from the clean shared app shell.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /app-shell.html [L]
 </IfModule>
 
 # Caching rules
@@ -55,7 +64,7 @@
   ExpiresByType image/jpeg "access plus 1 year"
   ExpiresByType image/webp "access plus 1 year"
 
-  # HTML should NOT be cached (forces index.html to reload on revisit)
+  # HTML should NOT be cached (forces shells to reload on revisit)
   ExpiresByType text/html "access plus 0 seconds"
 </IfModule>
 

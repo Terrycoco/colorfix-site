@@ -376,3 +376,32 @@
 @media (max-width: 700px) {
   .btn-add { width: 20px; height: 20px; top: 8px; right: 8px; }
 }
+
+/* Quote tiles occupy the same 5:4 footprint as Gallery swatches.
+   Keep quote layout entirely inside the grid cell; no outer margins. */
+.quote-item {
+  aspect-ratio: 5 / 4;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: clamp(0.5rem, 3%, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(0.3rem, 1.5vw, 1rem);
+  overflow: auto;
+  color: #222;
+  text-align: center;
+  font-style: italic;
+}
+
+.quote-item .quote-text {
+  font-size: clamp(0.7rem, 1.3vw, 1.1rem);
+  line-height: 1.4;
+}
+
+.quote-item .quote-author {
+  font-size: clamp(0.65rem, 0.9vw, 0.75rem);
+  font-weight: 300;
+}

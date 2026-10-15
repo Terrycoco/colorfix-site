@@ -8,5 +8,5 @@ use App\REX\Endpoints\RexPublicEntryEndpoint;
 
 RexPublicEntryEndpoint::handle(
     $pdo,
-    __DIR__ . '/index.html'
+    __DIR__ . '/rex-shell.html'
 );

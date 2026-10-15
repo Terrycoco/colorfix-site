@@ -22,7 +22,6 @@ export default function ColorWheelIndicator({
   return (
     <g id="indicator" transform={`translate(${center}, ${center})`}>
       <path
-        id="current"
         d={`M${x1.toFixed(3)},${y1.toFixed(3)}L${x2.toFixed(3)},${y2.toFixed(3)}`}
         stroke={strokeColor}
         strokeWidth={2}
