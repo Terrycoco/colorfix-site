@@ -2,11 +2,9 @@ import {
   useEffect,
   useState,
 } from "react";
-
 import {
   API_FOLDER,
 } from "@helpers/config";
-
 import {
   AdminDetailPane,
   AdminDialog,
@@ -20,33 +18,22 @@ import {
   AdminStack,
   AdminToast,
 } from "@components/AdminLayout";
-
 import PubPipelineReference
   from "./PubPipelineReference";
-
 import PubAssetsTable
   from "./PubAssetsTable";
-
 import PubPackageTable
   from "./PubPackageTable";
-
 import PubScheduleTable
   from "./PubScheduleTable";
-
 import PubDispatchTable
   from "./PubDispatchTable";
-
 import PubErrorsTable
   from "./PubErrorsTable";
-
 import PubAnalyzeStage
   from "./PubAnalyzeStage";
-
-
 const PUB_CONTRACTS_URL =
   `${API_FOLDER}/v2/admin/pub/contracts.php`;
-
-
 const PUB_STAGE_KEYS =
   new Set([
     "reference",
@@ -57,8 +44,6 @@ const PUB_STAGE_KEYS =
     "dispatch",
     "errors",
   ]);
-
-
 function pubStageFromLocation() {
   if (
     typeof window ===
@@ -66,13 +51,10 @@ function pubStageFromLocation() {
   ) {
     return "analyze";
   }
-
-
   const params =
     new URLSearchParams(
       window.location.search
     );
-
   const queryStage =
     String(
       params.get(
@@ -82,8 +64,6 @@ function pubStageFromLocation() {
     )
       .trim()
       .toLowerCase();
-
-
   if (
     PUB_STAGE_KEYS.has(
       queryStage
@@ -91,8 +71,6 @@ function pubStageFromLocation() {
   ) {
     return queryStage;
   }
-
-
   const hashStage =
     String(
       window.location.hash ||
@@ -104,59 +82,86 @@ function pubStageFromLocation() {
       )
       .trim()
       .toLowerCase();
-
-
   return PUB_STAGE_KEYS.has(
     hashStage
   )
     ? hashStage
     : "analyze";
 }
-
-
 export default function AdminPubPage() {
+  const initialAssetId = (() => {
+    if (typeof window === "undefined") return 0;
+    const raw = new URLSearchParams(window.location.search).get("asset_id") || "";
+    return /^[1-9]\d*$/.test(raw) && Number.isSafeInteger(Number(raw))
+      ? Number(raw) : 0;
+  })();
+  const [assetLookupRequest, setAssetLookupRequest] = useState(() =>
+    initialAssetId ? { id: initialAssetId, nonce: 0 } : null
+  );
+
+  function jumpToAsset(rawId) {
+    const id = Number(rawId);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error("Enter a valid asset number.");
+    }
+    setAssetLookupRequest({ id, nonce: Date.now() });
+    const params = new URLSearchParams(window.location.search);
+    params.set("stage", "assets");
+    params.set("asset_id", String(id));
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}?${params.toString()}`
+    );
+  }
+
+  function clearAssetLookup() {
+    setAssetLookupRequest(null);
+    const params = new URLSearchParams(window.location.search);
+    params.delete("asset_id");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}?${params.toString()}`
+    );
+  }
+
   const [
     pubContracts,
     setPubContracts,
   ] = useState(
     null
   );
-
   const [
     contractError,
     setContractError,
   ] = useState(
     ""
   );
-
   const [
     createMessage,
     setCreateMessage,
   ] = useState(
     ""
   );
-
   const [
     pubComToasts,
     setPubComToasts,
   ] = useState(
     []
   );
-
   const [
     pubComPopups,
     setPubComPopups,
   ] = useState(
     []
   );
-
   const [
     cancelAnalysisToken,
     setCancelAnalysisToken,
   ] = useState(
     0
   );
-
   const [
     stage,
     setStageState,
@@ -164,8 +169,6 @@ export default function AdminPubPage() {
     () =>
       pubStageFromLocation()
   );
-
-
   function receivePubCom(
     payload
   ) {
@@ -173,16 +176,12 @@ export default function AdminPubPage() {
       collectPubComDispositions(
         payload
       );
-
-
     if (
       dispositions.length ===
       0
     ) {
       return dispositions;
     }
-
-
     const toasts =
       dispositions.filter(
         (disposition) =>
@@ -193,7 +192,6 @@ export default function AdminPubPage() {
           ).toLowerCase() ===
           "toast"
       );
-
     const popups =
       dispositions.filter(
         (disposition) =>
@@ -204,8 +202,6 @@ export default function AdminPubPage() {
           ).toLowerCase() ===
           "popup"
       );
-
-
     if (toasts.length) {
       setPubComToasts(
         (current) => [
@@ -214,8 +210,6 @@ export default function AdminPubPage() {
         ]
       );
     }
-
-
     if (popups.length) {
       setPubComPopups(
         (current) => [
@@ -224,37 +218,29 @@ export default function AdminPubPage() {
         ]
       );
     }
-
-
     return dispositions;
   }
-
-
   function cancelAnalysis() {
     /*
-     * The backend ANALYZE request has already completed by the time
-     * PubCom warnings are displayed. Cancel here means:
-     *
-     *   - stop presenting the remaining warning queue
-     *   - clear Analyze-owned notices
-     *   - tell PubAnalyzeStage to discard this Analyze result/workbench
-     *   - remain on ANALYZE with the selected playlist intact
+      * The backend ANALYZE request has already completed by the time
+      * PubCom warnings are displayed. Cancel here means:
+      *
+      *   - stop presenting the remaining warning queue
+      *   - clear Analyze-owned notices
+      *   - tell PubAnalyzeStage to discard this Analyze result/workbench
+      *   - remain on ANALYZE with the selected playlist intact
      */
     setPubComPopups(
       []
     );
-
     setPubComToasts(
       []
     );
-
     setCancelAnalysisToken(
       (current) =>
         current + 1
     );
   }
-
-
   function setStage(
     nextStage
   ) {
@@ -265,20 +251,15 @@ export default function AdminPubPage() {
       )
         .trim()
         .toLowerCase();
-
     const resolved =
       PUB_STAGE_KEYS.has(
         value
       )
         ? value
         : "analyze";
-
-
     setStageState(
       resolved
     );
-
-
     if (
       typeof window !==
       "undefined"
@@ -287,14 +268,10 @@ export default function AdminPubPage() {
         new URLSearchParams(
           window.location.search
         );
-
-
       params.set(
         "stage",
         resolved
       );
-
-
       window.history.replaceState(
         window.history.state,
         "",
@@ -302,26 +279,18 @@ export default function AdminPubPage() {
       );
     }
   }
-
-
   useEffect(() => {
     setStageState(
       pubStageFromLocation()
     );
   }, []);
-
-
   useEffect(() => {
     let active =
       true;
-
-
     async function loadPubContracts() {
       setContractError(
         ""
       );
-
-
       try {
         const res =
           await fetch(
@@ -331,11 +300,8 @@ export default function AdminPubPage() {
                 "include",
             }
           );
-
         const data =
           await res.json();
-
-
         if (
           !res.ok ||
           !data?.ok
@@ -345,42 +311,29 @@ export default function AdminPubPage() {
             "Failed to load PUB contracts"
           );
         }
-
-
         if (!active) {
           return;
         }
-
-
         setPubContracts(
           data.contracts ||
           null
         );
-
       } catch (err) {
         if (!active) {
           return;
         }
-
-
         setContractError(
           err?.message ||
           "Failed to load PUB contracts"
         );
       }
     }
-
-
     loadPubContracts();
-
-
     return () => {
       active =
         false;
     };
   }, []);
-
-
   function handleCreateComplete(
     message
   ) {
@@ -388,13 +341,10 @@ export default function AdminPubPage() {
       message ||
       ""
     );
-
     setStage(
       "assets"
     );
   }
-
-
   return (
     <>
       <AdminMasterDetail
@@ -402,7 +352,6 @@ export default function AdminPubPage() {
         defaultListWidth={280}
         minListWidth={0}
         maxListWidth={420}
-
         list={
           <AdminListPane
             title="PUB"
@@ -423,7 +372,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="analyze"
                 title="Analyze"
@@ -437,7 +385,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="assets"
                 title="Assets"
@@ -451,7 +398,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="package"
                 title="Package"
@@ -465,7 +411,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="schedule"
                 title="Schedule"
@@ -479,7 +424,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="dispatch"
                 title="Dispatch"
@@ -493,7 +437,6 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
               <AdminObjectListItem
                 id="errors"
                 title="Errors"
@@ -510,20 +453,20 @@ export default function AdminPubPage() {
             </AdminObjectList>
           </AdminListPane>
         }
-
         detail={
           <AdminDetailPane
             ariaLabel="PUB"
+            jumpToId={stage === "assets" ? {
+              label: "Asset #",
+              placeholder: "#",
+              initialId: initialAssetId ? String(initialAssetId) : "",
+              onJump: jumpToAsset,
+              onClear: clearAssetLookup,
+            } : null}
           >
-            <div
-              className="admin-detail-header"
-            >
-              <strong>
-                {stage.toUpperCase()}
-              </strong>
+            <div className="admin-detail-header">
+              <strong>{stage.toUpperCase()}</strong>
             </div>
-
-
             {stage ===
             "reference" ? (
               <PubPipelineReference
@@ -531,7 +474,6 @@ export default function AdminPubPage() {
                   pubContracts
                 }
               />
-
             ) : stage ===
             "assets" ? (
               <AdminStack gap="md">
@@ -540,8 +482,8 @@ export default function AdminPubPage() {
                     {createMessage}
                   </AdminNotice>
                 ) : null}
-
                 <PubAssetsTable
+                lookupRequest={assetLookupRequest}
                   onOpenPackage={() =>
                     setStage(
                       "package"
@@ -549,7 +491,6 @@ export default function AdminPubPage() {
                   }
                 />
               </AdminStack>
-
             ) : stage ===
             "package" ? (
               <PubPackageTable
@@ -559,19 +500,15 @@ export default function AdminPubPage() {
                   )
                 }
               />
-
             ) : stage ===
             "schedule" ? (
               <PubScheduleTable />
-
             ) : stage ===
             "dispatch" ? (
               <PubDispatchTable />
-
             ) : stage ===
             "errors" ? (
               <PubErrorsTable />
-
             ) : stage ===
             "analyze" ? (
               <PubAnalyzeStage
@@ -597,7 +534,6 @@ export default function AdminPubPage() {
                   cancelAnalysisToken
                 }
               />
-
             ) : (
               <AdminEmptyState
                 title={
@@ -616,8 +552,6 @@ export default function AdminPubPage() {
           </AdminDetailPane>
         }
       />
-
-
       {pubComToasts.length ? (
         <PubComToast
           disposition={pubComToasts[0]}
@@ -626,8 +560,6 @@ export default function AdminPubPage() {
           }
         />
       ) : null}
-
-
       {pubComPopups.length ? (
         <PubComPopup
           disposition={pubComPopups[0]}
@@ -644,8 +576,6 @@ export default function AdminPubPage() {
     </>
   );
 }
-
-
 function collectPubComDispositions(
   payload
 ) {
@@ -656,11 +586,8 @@ function collectPubComDispositions(
   ) {
     return [];
   }
-
-
   const collected =
     [];
-
   const append = (
     value
   ) => {
@@ -671,8 +598,6 @@ function collectPubComDispositions(
     ) {
       return;
     }
-
-
     for (
       const disposition
       of value
@@ -688,13 +613,9 @@ function collectPubComDispositions(
       }
     }
   };
-
-
   append(
     payload.pubcom
   );
-
-
   for (
     const key
     of [
@@ -709,8 +630,6 @@ function collectPubComDispositions(
       )
         ? payload[key]
         : [];
-
-
     for (
       const entry
       of entries
@@ -721,22 +640,15 @@ function collectPubComDispositions(
       );
     }
   }
-
-
   append(
     payload
       ?.result
       ?.pubcom
   );
-
-
   const seen =
     new Set();
-
   const unique =
     [];
-
-
   for (
     const disposition
     of collected
@@ -745,7 +657,6 @@ function collectPubComDispositions(
       disposition
         ?.signal ||
       {};
-
     const key =
       JSON.stringify([
         disposition
@@ -767,8 +678,6 @@ function collectPubComDispositions(
           ?.context ||
         null,
       ]);
-
-
     if (
       seen.has(
         key
@@ -776,22 +685,15 @@ function collectPubComDispositions(
     ) {
       continue;
     }
-
-
     seen.add(
       key
     );
-
     unique.push(
       disposition
     );
   }
-
-
   return unique;
 }
-
-
 function PubComToast({
   disposition,
   onClose,
@@ -801,8 +703,6 @@ function PubComToast({
       ?.signal
       ?.message ||
     "PUB notice.";
-
-
   return (
     <AdminToast
       label="PUB"
@@ -812,8 +712,6 @@ function PubComToast({
     />
   );
 }
-
-
 function PubComPopup({
   disposition,
   onClose,
@@ -826,13 +724,11 @@ function PubComPopup({
         ?.type ||
       ""
     ).toLowerCase();
-
   const message =
     disposition
       ?.signal
       ?.message ||
     "PUB needs your attention.";
-
   const reason =
     String(
       disposition
@@ -841,7 +737,6 @@ function PubComPopup({
         ?.reason ||
       ""
     ).trim();
-
   const title =
     signalType ===
       "ineligible"
@@ -850,8 +745,6 @@ function PubComPopup({
         "unavailable"
         ? "Worker unavailable"
         : "PUB notice";
-
-
   return (
     <AdminDialog
       open

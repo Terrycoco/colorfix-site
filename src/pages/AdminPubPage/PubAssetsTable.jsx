@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-
 import {
   AdminBadge,
   AdminButton,
@@ -15,90 +14,71 @@ import {
   AdminToolbarSpacer,
   useAdminDialog,
 } from "@components/AdminLayout";
-
 import PubAssetCopyEditor from "./PubAssetCopyEditor";
 import PubVideoAssetEditor from "./PubVideoAssetEditor";
 import { API_FOLDER } from "@helpers/config";
-
-
 const ASSETS_URL =
   `${API_FOLDER}/v2/admin/pub/assets.php`;
-
 const CREATE_URL =
   `${API_FOLDER}/v2/admin/pub/create.php`;
-
 const PACKAGE_URL =
   `${API_FOLDER}/v2/admin/pub/package.php`;
-
-
 export default function PubAssetsTable({
   onOpenPackage,
+  lookupRequest = null,
 }) {
   const dialog = useAdminDialog();
+  const [assetLookup, setAssetLookup] = useState("");
+  const [locatedAsset, setLocatedAsset] = useState(null);
+  const [locatingAsset, setLocatingAsset] = useState(false);
+  const [lookupError, setLookupError] = useState("");
 
   const [assets, setAssets] =
     useState([]);
-
+  const visibleAssets = locatedAsset ? [locatedAsset] : assets;
   const [channels, setChannels] =
     useState([]);
-
   const [assetTypes, setAssetTypes] =
     useState([]);
-
   const [stages, setStages] =
     useState([]);
-
   const [
     sourcePlaylists,
     setSourcePlaylists,
   ] = useState([]);
-
   const [
     sourcePlaylistFilter,
     setSourcePlaylistFilter,
   ] = useState("");
-
   const [channelFilter, setChannelFilter] =
     useState("");
-
   const [typeFilter, setTypeFilter] =
     useState("");
-
   const [stageFilter, setStageFilter] =
     useState("");
-
   const [loading, setLoading] =
     useState(true);
-
   const [error, setError] =
     useState("");
-
   const [
     errorPopupAssetId,
     setErrorPopupAssetId,
   ] = useState(0);
-
   const errorPopupRef =
     useRef(null);
-
   const [editorOpen, setEditorOpen] = useState(false);
-
   const [savingCopy, setSavingCopy] =
     useState(false);
-
   const [recreating, setRecreating] =
     useState(false);
-
   const [
     sendingToPackaging,
     setSendingToPackaging,
   ] = useState(false);
-
   const [
     approvingAssetId,
     setApprovingAssetId,
   ] = useState(0);
-
   /*
    * Historical-delete confirmation.
    *
@@ -110,25 +90,20 @@ export default function PubAssetsTable({
     deleteForeverAsset,
     setDeleteForeverAsset,
   ] = useState(null);
-
   const [
     deleteForeverAuthorized,
     setDeleteForeverAuthorized,
   ] = useState(false);
-
   const [
     deletingAssetId,
     setDeletingAssetId,
   ] = useState(0);
-
-
   /*
    * LOAD ASSETS
    */
   async function loadAssets() {
     setLoading(true);
     setError("");
-
     try {
       const params =
         new URLSearchParams({
@@ -137,40 +112,34 @@ export default function PubAssetsTable({
               Date.now()
             ),
         });
-
       if (sourcePlaylistFilter) {
         params.set(
           "source_type",
           "playlist"
         );
-
         params.set(
           "source_id",
           sourcePlaylistFilter
         );
       }
-
       if (channelFilter) {
         params.set(
           "channel",
           channelFilter
         );
       }
-
       if (typeFilter) {
         params.set(
           "asset_type",
           typeFilter
         );
       }
-
       if (stageFilter) {
         params.set(
           "stage",
           stageFilter
         );
       }
-
       const res =
         await fetch(
           `${ASSETS_URL}?${params.toString()}`,
@@ -179,10 +148,8 @@ export default function PubAssetsTable({
               "include",
           }
         );
-
       const data =
         await res.json();
-
       if (
         !res.ok ||
         !data?.ok
@@ -192,7 +159,6 @@ export default function PubAssetsTable({
           "Failed to load PUB assets."
         );
       }
-
       setAssets(
         Array.isArray(
           data.assets
@@ -200,7 +166,6 @@ export default function PubAssetsTable({
           ? data.assets
           : []
       );
-
       setChannels(
         Array.isArray(
           data?.filters?.channels
@@ -208,7 +173,6 @@ export default function PubAssetsTable({
           ? data.filters.channels
           : []
       );
-
       setAssetTypes(
         Array.isArray(
           data?.filters?.asset_types
@@ -216,7 +180,6 @@ export default function PubAssetsTable({
           ? data.filters.asset_types
           : []
       );
-
       setStages(
         Array.isArray(
           data?.filters?.stages
@@ -224,7 +187,6 @@ export default function PubAssetsTable({
           ? data.filters.stages
           : []
       );
-
       setSourcePlaylists(
         Array.isArray(
           data?.filters?.source_playlists
@@ -232,19 +194,15 @@ export default function PubAssetsTable({
           ? data.filters.source_playlists
           : []
       );
-
     } catch (err) {
       setError(
         err?.message ||
         "Failed to load PUB assets."
       );
-
     } finally {
       setLoading(false);
     }
   }
-
-
   useEffect(() => {
     loadAssets();
   }, [
@@ -253,13 +211,10 @@ export default function PubAssetsTable({
     typeFilter,
     stageFilter,
   ]);
-
-
   useEffect(() => {
     if (!errorPopupAssetId) {
       return;
     }
-
     const closeOnOutsidePointer = (event) => {
       if (
         errorPopupRef.current &&
@@ -270,12 +225,10 @@ export default function PubAssetsTable({
         setErrorPopupAssetId(0);
       }
     };
-
     document.addEventListener(
       "pointerdown",
       closeOnOutsidePointer
     );
-
     return () => {
       document.removeEventListener(
         "pointerdown",
@@ -285,8 +238,6 @@ export default function PubAssetsTable({
   }, [
     errorPopupAssetId,
   ]);
-
-
   useEffect(() => {
     const hasCreating =
       assets.some(
@@ -294,7 +245,6 @@ export default function PubAssetsTable({
           asset.pipeline_stage ===
           "creating"
       );
-
     /*
      * Never let background polling disturb an active asset editor.
      *
@@ -307,7 +257,6 @@ export default function PubAssetsTable({
     ) {
       return;
     }
-
     const timer =
       setInterval(
         () => {
@@ -315,7 +264,6 @@ export default function PubAssetsTable({
         },
         12000
       );
-
     return () => {
       clearInterval(timer);
     };
@@ -323,8 +271,6 @@ export default function PubAssetsTable({
     assets,
     editorOpen,
   ]);
-
-
   async function fetchAssetEditorDetail(
     pubAssetId
   ) {
@@ -333,29 +279,22 @@ export default function PubAssetsTable({
         pubAssetId ||
         0
       );
-
-
     if (!id) {
       throw new Error(
         "Valid PUB asset ID required."
       );
     }
-
-
     const params =
       new URLSearchParams({
         pub_asset_id:
           String(
             id
           ),
-
         _:
           String(
             Date.now()
           ),
       });
-
-
     const res =
       await fetch(
         `${ASSETS_URL}?${params.toString()}`,
@@ -364,12 +303,8 @@ export default function PubAssetsTable({
             "include",
         }
       );
-
-
     const data =
       await res.json();
-
-
     if (
       !res.ok ||
       !data?.ok
@@ -379,11 +314,64 @@ export default function PubAssetsTable({
         "Could not load asset editor."
       );
     }
-
-
     return data;
   }
+  async function findAssetById(event) {
+    event?.preventDefault();
+    const raw = assetLookup.trim().replace(/^#/, "");
+    if (!/^[1-9]\d*$/.test(raw)) {
+      setLookupError("Enter a valid Asset ID.");
+      return;
+    }
 
+    setLocatingAsset(true);
+    setLookupError("");
+    try {
+      // Detail lookup is independent of the list's stage/channel filters.
+      const data = await fetchAssetEditorDetail(Number(raw));
+      if (!data?.asset || Number(data.asset.pub_asset_id) !== Number(raw)) {
+        throw new Error(`Asset #${raw} not found.`);
+      }
+      setLocatedAsset(data.asset);
+    } catch (err) {
+      setLocatedAsset(null);
+      setLookupError(err?.message || `Asset #${raw} not found.`);
+    } finally {
+      setLocatingAsset(false);
+    }
+  }
+
+  function clearAssetLookup() {
+    setAssetLookup("");
+    setLocatedAsset(null);
+    setLookupError("");
+  }
+
+  useEffect(() => {
+    if (!lookupRequest?.id) {
+      setLocatedAsset(null);
+      setLookupError("");
+      return;
+    }
+    let active = true;
+    setLocatingAsset(true);
+    setLookupError("");
+    fetchAssetEditorDetail(lookupRequest.id)
+      .then((data) => {
+        if (!active) return;
+        if (!data?.asset || Number(data.asset.pub_asset_id) !== Number(lookupRequest.id)) {
+          throw new Error(`Asset #${lookupRequest.id} not found.`);
+        }
+        setLocatedAsset(data.asset);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setLocatedAsset(null);
+        setLookupError(err?.message || `Asset #${lookupRequest.id} not found.`);
+      })
+      .finally(() => { if (active) setLocatingAsset(false); });
+    return () => { active = false; };
+  }, [lookupRequest]);
 
   /*
    * APPROVE / UNAPPROVE.
@@ -399,28 +387,20 @@ export default function PubAssetsTable({
         asset?.pub_asset_id ||
         0
       );
-
-
     if (!id) {
       return {
         ok:
           false,
-
         error:
           "Valid PUB asset ID required.",
       };
     }
-
-
     setApprovingAssetId(
       id
     );
-
     setError(
       ""
     );
-
-
     try {
       const res =
         await fetch(
@@ -428,20 +408,16 @@ export default function PubAssetsTable({
           {
             method:
               "PATCH",
-
             credentials:
               "include",
-
             headers: {
               "Content-Type":
                 "application/json",
             },
-
             body:
               JSON.stringify({
                 pub_asset_id:
                   id,
-
                 approved:
                   Boolean(
                     approved
@@ -449,12 +425,8 @@ export default function PubAssetsTable({
               }),
           }
         );
-
-
       const data =
         await res.json();
-
-
       if (
         !res.ok ||
         !data?.ok
@@ -464,8 +436,6 @@ export default function PubAssetsTable({
           "Could not change asset approval."
         );
       }
-
-
       const updatedAsset =
         data.asset || {
           ...asset,
@@ -478,8 +448,6 @@ export default function PubAssetsTable({
               ? "approved"
               : "created",
         };
-
-
       setAssets(
         (current) =>
           current.map(
@@ -494,8 +462,6 @@ export default function PubAssetsTable({
                 : item
           )
       );
-
-
       /*
        * If CREATED or APPROVED itself is the active filter, the row may
        * have just moved out of that result set. Reload immediately so the
@@ -507,43 +473,31 @@ export default function PubAssetsTable({
       ) {
         await loadAssets();
       }
-
-
       return {
         ok:
           true,
-
         asset:
           updatedAsset,
       };
-
     } catch (err) {
       const message =
         err?.message ||
         "Could not change asset approval.";
-
-
       setError(
         message
       );
-
-
       return {
         ok:
           false,
-
         error:
           message,
       };
-
     } finally {
       setApprovingAssetId(
         0
       );
     }
   }
-
-
   /*
    * DELETE
    */
@@ -555,18 +509,13 @@ export default function PubAssetsTable({
         asset?.pub_asset_id ||
         0
       );
-
     if (!id) {
       return;
     }
-
-
     const stage =
       normalizedStage(
         asset
       );
-
-
     /*
      * Dispatch currently owns this asset. Do not provide an override
      * until the shipping operation has actually finished.
@@ -577,11 +526,8 @@ export default function PubAssetsTable({
       setError(
         "This asset is currently shipping and cannot be deleted."
       );
-
       return;
     }
-
-
     if (
       isHistoricalStage(
         stage
@@ -590,15 +536,11 @@ export default function PubAssetsTable({
       setDeleteForeverAuthorized(
         false
       );
-
       setDeleteForeverAsset(
         asset
       );
-
       return;
     }
-
-
     const confirmed =
       await dialog.confirm({
         title: "Delete PUB asset?",
@@ -606,20 +548,14 @@ export default function PubAssetsTable({
         confirmLabel: "Delete",
         cancelLabel: "Cancel",
       });
-
-
     if (!confirmed) {
       return;
     }
-
-
     await performDeleteAsset(
       asset,
       false
     );
   }
-
-
   async function performDeleteAsset(
     asset,
     forceDeleteShipped
@@ -629,22 +565,15 @@ export default function PubAssetsTable({
         asset?.pub_asset_id ||
         0
       );
-
-
     if (!id) {
       return false;
     }
-
-
     setDeletingAssetId(
       id
     );
-
     setError(
       ""
     );
-
-
     try {
       const res =
         await fetch(
@@ -652,20 +581,16 @@ export default function PubAssetsTable({
           {
             method:
               "DELETE",
-
             credentials:
               "include",
-
             headers: {
               "Content-Type":
                 "application/json",
             },
-
             body:
               JSON.stringify({
                 pub_asset_id:
                   id,
-
                 ...(
                   forceDeleteShipped
                     ? {
@@ -677,12 +602,8 @@ export default function PubAssetsTable({
               }),
           }
         );
-
-
       const data =
         await res.json();
-
-
       if (
         !res.ok ||
         !data?.ok
@@ -692,8 +613,6 @@ export default function PubAssetsTable({
           "Could not delete PUB asset."
         );
       }
-
-
       setAssets(
         (current) =>
           current.filter(
@@ -703,8 +622,6 @@ export default function PubAssetsTable({
               ) !== id
           )
       );
-
-
       if (
         Number(
           deleteForeverAsset
@@ -715,31 +632,23 @@ export default function PubAssetsTable({
         setDeleteForeverAsset(
           null
         );
-
         setDeleteForeverAuthorized(
           false
         );
       }
-
-
       return true;
-
     } catch (err) {
       setError(
         err?.message ||
         "Could not delete PUB asset."
       );
-
       return false;
-
     } finally {
       setDeletingAssetId(
         0
       );
     }
   }
-
-
   /*
    * SAVE COPY.
    */
@@ -753,14 +662,11 @@ export default function PubAssetsTable({
           ?.pub_asset_id ||
         0
       );
-
     if (!id) {
       return false;
     }
-
     setSavingCopy(true);
     setError("");
-
     try {
       const res =
         await fetch(
@@ -768,28 +674,22 @@ export default function PubAssetsTable({
           {
             method:
               "PATCH",
-
             credentials:
               "include",
-
             headers: {
               "Content-Type":
                 "application/json",
             },
-
             body:
               JSON.stringify({
                 pub_asset_id:
                   id,
-
                 search_title:
                   changes
                     .search_title,
-
                 description:
                   changes
                     .description,
-
                 ...(
                   changes
                     .ingredient_changes &&
@@ -806,10 +706,8 @@ export default function PubAssetsTable({
               }),
           }
         );
-
       const data =
         await res.json();
-
       if (
         !res.ok ||
         !data?.ok
@@ -819,21 +717,16 @@ export default function PubAssetsTable({
           "Could not save asset copy."
         );
       }
-
       const updatedAsset =
         data.asset || {
           ...asset,
-
           search_title:
             changes
               .search_title,
-
           description:
             changes
               .description,
         };
-
-
       setAssets(
         (current) =>
           current.map(
@@ -849,26 +742,19 @@ export default function PubAssetsTable({
                 : asset
           )
       );
-
-
       return true;
-
     } catch (err) {
       setError(
         err?.message ||
         "Could not save asset copy."
       );
-
       return false;
-
     } finally {
       setSavingCopy(
         false
       );
     }
   }
-
-
   /*
    * REDO ASSET.
    */
@@ -880,14 +766,11 @@ async function recreateAsset(
       pubAssetId ||
       0
     );
-
   if (!id) {
     return false;
   }
-
   setRecreating(true);
   setError("");
-
   try {
     const res =
       await fetch(
@@ -895,15 +778,12 @@ async function recreateAsset(
         {
           method:
             "POST",
-
           credentials:
             "include",
-
           headers: {
             "Content-Type":
               "application/json",
           },
-
           body:
             JSON.stringify({
               orders: [
@@ -915,10 +795,8 @@ async function recreateAsset(
             }),
         }
       );
-
     const data =
       await res.json();
-
     if (
       !res.ok ||
       !data?.ok
@@ -928,15 +806,12 @@ async function recreateAsset(
         "Could not recreate PUB asset."
       );
     }
-
-
     const failed =
       Array.isArray(
         data.failed
       )
         ? data.failed
         : [];
-
     if (failed.length) {
       throw new Error(
         failed[0]
@@ -946,23 +821,18 @@ async function recreateAsset(
         "CREATE rejected the REDO."
       );
     }
-
-
     const queued =
       Array.isArray(
         data.queued
       )
         ? data.queued
         : [];
-
     const created =
       Array.isArray(
         data.created
       )
         ? data.created
         : [];
-
-
     if (
       queued.length === 0 &&
       created.length === 0
@@ -971,23 +841,17 @@ async function recreateAsset(
         "CREATE did not queue the REDO."
       );
     }
-
     return true;
-
   } catch (err) {
     const message = err?.message || "Could not recreate PUB asset.";
     setError(message);
-
     return { ok: false, error: message };
-
   } finally {
     setRecreating(
       false
     );
   }
 }
-
-
   /*
    * SEND ONE REVIEWED ASSET TO PACKAGE.
    */
@@ -999,28 +863,20 @@ async function recreateAsset(
         pubAssetId ||
         0
       );
-
-
     if (!id) {
       return {
         ok:
           false,
-
         error:
           "Valid PUB asset ID required.",
       };
     }
-
-
     setSendingToPackaging(
       true
     );
-
     setError(
       ""
     );
-
-
     try {
       const res =
         await fetch(
@@ -1028,15 +884,12 @@ async function recreateAsset(
           {
             method:
               "POST",
-
             credentials:
               "include",
-
             headers: {
               "Content-Type":
                 "application/json",
             },
-
             body:
               JSON.stringify({
                 pub_asset_id:
@@ -1044,12 +897,8 @@ async function recreateAsset(
               }),
           }
         );
-
-
       const data =
         await res.json();
-
-
       if (
         !res.ok
         ||
@@ -1060,30 +909,24 @@ async function recreateAsset(
           "Could not send asset to Packaging."
         );
       }
-
-
       const packed =
         Array.isArray(
           data.packed
         )
           ? data.packed
           : [];
-
       const pending =
         Array.isArray(
           data.pending
         )
           ? data.pending
           : [];
-
       const failed =
         Array.isArray(
           data.failed
         )
           ? data.failed
           : [];
-
-
       if (failed.length) {
         throw new Error(
           failed[0]
@@ -1091,8 +934,6 @@ async function recreateAsset(
           "Packaging failed."
         );
       }
-
-
       if (
         packed.length === 0
         &&
@@ -1102,51 +943,36 @@ async function recreateAsset(
           "Packaging did not accept this asset."
         );
       }
-
-
       await loadAssets();
-
-
       return {
         ok:
           true,
-
         status:
           packed.length
             ? "packed"
             : "pending",
-
         data:
           data,
       };
-
     } catch (err) {
       const message =
         err?.message ||
         "Could not send asset to Packaging.";
-
-
       setError(
         message
       );
-
-
       return {
         ok:
           false,
-
         error:
           message,
       };
-
     } finally {
       setSendingToPackaging(
         false
       );
     }
   }
-
-
   /*
    * SEND ALL CURRENTLY VISIBLE APPROVED ASSETS TO PACKAGE.
    *
@@ -1167,25 +993,16 @@ async function recreateAsset(
             asset
           ) === "created"
       );
-
-
     if (!approvedAssets.length) {
       return;
     }
-
-
     setSendingToPackaging(
       true
     );
-
     setError(
       ""
     );
-
-
     const failures = [];
-
-
     try {
       for (const asset of approvedAssets) {
         const id =
@@ -1193,13 +1010,9 @@ async function recreateAsset(
             asset?.pub_asset_id ||
             0
           );
-
-
         if (!id) {
           continue;
         }
-
-
         try {
           const res =
             await fetch(
@@ -1207,15 +1020,12 @@ async function recreateAsset(
               {
                 method:
                   "POST",
-
                 credentials:
                   "include",
-
                 headers: {
                   "Content-Type":
                     "application/json",
                 },
-
                 body:
                   JSON.stringify({
                     pub_asset_id:
@@ -1223,12 +1033,8 @@ async function recreateAsset(
                   }),
               }
             );
-
-
           const data =
             await res.json();
-
-
           if (
             !res.ok
             ||
@@ -1239,16 +1045,12 @@ async function recreateAsset(
               "Could not send asset to Packaging."
             );
           }
-
-
           const failed =
             Array.isArray(
               data.failed
             )
               ? data.failed
               : [];
-
-
           if (failed.length) {
             throw new Error(
               failed[0]
@@ -1258,23 +1060,18 @@ async function recreateAsset(
               "Packaging failed."
             );
           }
-
-
           const packed =
             Array.isArray(
               data.packed
             )
               ? data.packed
               : [];
-
           const pending =
             Array.isArray(
               data.pending
             )
               ? data.pending
               : [];
-
-
           if (
             packed.length === 0
             &&
@@ -1284,7 +1081,6 @@ async function recreateAsset(
               "Packaging did not accept this asset."
             );
           }
-
         } catch (err) {
           failures.push(
             `#${id}: ${
@@ -1294,30 +1090,20 @@ async function recreateAsset(
           );
         }
       }
-
-
       await loadAssets();
-
-
       if (failures.length) {
         setError(
           `Some approved assets could not be sent to Packaging:\n${failures.join("\n")}`
         );
-
         return;
       }
-
-
       onOpenPackage?.();
-
     } finally {
       setSendingToPackaging(
         false
       );
     }
   }
-
-
   /*
    * GRID COLUMNS
    */
@@ -1327,10 +1113,8 @@ async function recreateAsset(
         {
           key:
             "pub_asset_id",
-
           label:
             "ID",
-
           sortValue:
             (asset) =>
               Number(
@@ -1339,15 +1123,11 @@ async function recreateAsset(
                 0
               ),
         },
-
-
         {
           key:
             "pub_run_id",
-
           label:
             "Job ID",
-
           value:
             (asset) =>
               Number(
@@ -1355,7 +1135,6 @@ async function recreateAsset(
                   .pub_run_id ||
                 0
               ) || "—",
-
           sortValue:
             (asset) =>
               Number(
@@ -1364,57 +1143,43 @@ async function recreateAsset(
                 0
               ),
         },
-
-
         {
           key:
             "channel",
-
           label:
             "Channel",
         },
-
-
         {
           key:
             "asset_type",
-
           label:
             "Type",
         },
-
-
         {
           key:
             "source",
-
           label:
             "Source",
-
           value:
             (asset) => {
               const type =
                 asset
                   .source_type ||
                 "";
-
               const id =
                 asset
                   .source_id ||
                 "";
-
               const title =
                 asset
                   .source_title ||
                 "";
-
               if (
                 !type &&
                 !id
               ) {
                 return "—";
               }
-
               if (
                 type ===
                   "playlist" &&
@@ -1422,36 +1187,28 @@ async function recreateAsset(
               ) {
                 return title;
               }
-
               return `${type} #${id}`;
             },
-
           sortValue:
             (asset) =>
               asset
                 .source_title ||
               `${asset.source_type || ""} ${asset.source_id || ""}`,
         },
-
-
         {
           key:
             "pipeline_stage",
-
           label:
             "Stage",
-
           render:
             (asset) => {
               const stage =
                 displayStage(
                   asset
                 );
-
               if (!stage) {
                 return "—";
               }
-
               if (stage === "error") {
                 const id =
                   Number(
@@ -1459,15 +1216,12 @@ async function recreateAsset(
                       ?.pub_asset_id ||
                     0
                   );
-
                 const popupOpen =
                   errorPopupAssetId === id;
-
                 const message =
                   assetErrorMessage(
                     asset
                   );
-
                 return (
                   <span
                     ref={
@@ -1494,7 +1248,6 @@ async function recreateAsset(
                       }}
                       onClick={(event) => {
                         event.stopPropagation();
-
                         setErrorPopupAssetId(
                           popupOpen
                             ? 0
@@ -1506,7 +1259,6 @@ async function recreateAsset(
                         Error
                       </AdminBadge>
                     </button>
-
                     {popupOpen ? (
                       <div
                         role="status"
@@ -1536,7 +1288,6 @@ async function recreateAsset(
                   </span>
                 );
               }
-
               return (
                 <AdminBadge
                   variant={
@@ -1551,74 +1302,58 @@ async function recreateAsset(
                 </AdminBadge>
               );
             },
-
           sortValue:
             (asset) =>
               displayStage(
                 asset
               ),
         },
-
-
         {
           key:
             "approved",
-
           label:
             "Approved",
-
           sortable:
             false,
-
           render:
             (asset) => {
               const stage =
                 normalizedStage(
                   asset
                 );
-
               const id =
                 Number(
                   asset
                     .pub_asset_id ||
                   0
                 );
-
               const checked =
                 Number(
                   asset.approved ||
                   0
                 ) === 1;
-
               const editable =
                 stage ===
                   "created";
-
               const saving =
                 Number(
                   approvingAssetId
                 ) === id;
-
-
               return (
                 <input
                   type="checkbox"
-
                   checked={
                     checked
                   }
-
                   disabled={
                     !editable ||
                     saving
                   }
-
                   aria-label={
                     checked
                       ? `Unapprove asset #${id}`
                       : `Approve asset #${id}`
                   }
-
                   title={
                     editable
                       ? checked
@@ -1626,15 +1361,12 @@ async function recreateAsset(
                         : "Approve this asset"
                       : "Approval is locked after the asset leaves CREATED."
                   }
-
-
                   onClick={(
                     event
                   ) => {
                     event
                       .stopPropagation();
                   }}
-
                   onChange={(
                     event
                   ) => {
@@ -1649,59 +1381,44 @@ async function recreateAsset(
               );
             },
         },
-
-
         {
           key:
             "search_title",
-
           label:
             "Title",
-
           value:
             (asset) =>
               asset
                 .search_title ||
               "—",
         },
-
-
         {
           key:
             "updated_at",
-
           label:
             "Last Updated",
-
           value:
             (asset) =>
               asset
                 .updated_at ||
               "—",
         },
-
-
         {
           key:
             "delete",
-
           label:
             "",
-
           sortable:
             false,
-
           render:
             (asset) => {
               const stage =
                 normalizedStage(
                   asset
                 );
-
               const shipping =
                 stage ===
                   "shipping";
-
               const deleting =
                 Number(
                   deletingAssetId
@@ -1711,7 +1428,6 @@ async function recreateAsset(
                     .pub_asset_id ||
                   0
                 );
-
               return (
                 <AdminButton
                   type="button"
@@ -1747,8 +1463,6 @@ async function recreateAsset(
         errorPopupAssetId,
       ]
     );
-
-
   const approvedReadyAssets =
     assets.filter(
       (asset) =>
@@ -1761,8 +1475,6 @@ async function recreateAsset(
           asset
         ) === "created"
     );
-
-
   if (
     loading &&
     !assets.length
@@ -1770,13 +1482,10 @@ async function recreateAsset(
     return (
       <AdminEmptyState
         title="Assets"
-
         message="Loading PUB assets..."
       />
     );
   }
-
-
   return (
     <>
       <div className="admin-detail-workarea">
@@ -1788,7 +1497,6 @@ async function recreateAsset(
               onChange={(event) => setSourcePlaylistFilter(event.target.value)}
             >
               <option value="">All</option>
-
               {sourcePlaylists.map((playlist) => (
                 <option
                   key={playlist.playlist_id}
@@ -1799,7 +1507,6 @@ async function recreateAsset(
               ))}
             </select>
           </AdminField>
-
           <AdminField label="Channel" compact>
             <select
               className="admin-field__control"
@@ -1814,7 +1521,6 @@ async function recreateAsset(
               ))}
             </select>
           </AdminField>
-
           <AdminField label="Type" compact>
             <select
               className="admin-field__control"
@@ -1829,7 +1535,6 @@ async function recreateAsset(
               ))}
             </select>
           </AdminField>
-
           <AdminField label="Stage" compact>
             <select
               className="admin-field__control"
@@ -1844,7 +1549,6 @@ async function recreateAsset(
               ))}
             </select>
           </AdminField>
-
           <AdminButton
             type="button"
             onClick={sendApprovedAssetsToPackaging}
@@ -1859,9 +1563,7 @@ async function recreateAsset(
                 : `Send To Packaging (${approvedReadyAssets.length})`
             }
           </AdminButton>
-
           <AdminToolbarSpacer />
-
           <AdminButton
             type="button"
             variant="secondary"
@@ -1870,20 +1572,27 @@ async function recreateAsset(
           >
             {loading ? "Refreshing..." : "Refresh"}
           </AdminButton>
-
           <AdminMetaText as="div">
-            {assets.length} asset{assets.length === 1 ? "" : "s"}
+            {visibleAssets.length} asset{visibleAssets.length === 1 ? "" : "s"}
           </AdminMetaText>
         </AdminToolbar>
+        {lookupError ? (
+        <AdminNotice variant="danger">{lookupError}</AdminNotice>
+      ) : null}
 
-        {error ? (
+      {locatedAsset ? (
+        <AdminNotice variant="info">
+          Showing asset #{locatedAsset.pub_asset_id}. Select its row to view details; Clear returns to the full list.
+        </AdminNotice>
+      ) : null}
+
+      {error ? (
           <AdminNotice variant="danger">
             {error}
           </AdminNotice>
         ) : null}
-
         <AdminSmartGrid
-          items={assets}
+          items={visibleAssets}
           columns={columns}
           getRowKey={(asset) => asset.pub_asset_id}
           defaultSortKey="pub_asset_id"
@@ -1902,13 +1611,10 @@ async function recreateAsset(
                     await recreateAsset(
                       asset?.pub_asset_id
                     );
-
                   const ok = result !== false && result?.ok !== false;
-
                   if (ok) {
                     await loadAssets();
                   }
-
                   return ok;
                 }}
               />
@@ -1929,52 +1635,41 @@ async function recreateAsset(
               isVideoAsset(asset)
                 ? "Edit Video Asset"
                 : "Edit Asset Copy",
-
             size: (asset) =>
               isVideoAsset(asset)
                 ? "xl"
                 : "md",
-
             meta: (asset) => {
               const values = [];
-
               if (
                 isVideoAsset(asset) &&
                 Number(asset?.duration_ms || 0) > 0
               ) {
                 values.push(`Runtime ${formatDurationMs(asset.duration_ms)}`);
               }
-
               values.push(`Asset #${asset.pub_asset_id}`);
               return values;
             },
-
             busy: () =>
               savingCopy ||
               recreating ||
               sendingToPackaging,
-
             load: (asset) =>
               fetchAssetEditorDetail(asset.pub_asset_id),
-
             render: ({ item, data, close, reload }) => {
               const editorAsset = data?.asset || item;
-
               const ingredientValues =
                 data?.ingredient_values &&
                 typeof data.ingredient_values === "object"
                   ? data.ingredient_values
                   : {};
-
               const ingredientBindings =
                 Array.isArray(data?.ingredient_bindings)
                   ? data.ingredient_bindings
                   : [];
-
               const approvalSaving =
                 Number(approvingAssetId) ===
                 Number(editorAsset?.pub_asset_id || 0);
-
               const sharedProps = {
                 asset: editorAsset,
                 ingredientBindings,
@@ -1996,7 +1691,6 @@ async function recreateAsset(
                 onPackagingComplete: onOpenPackage,
                 onClose: close,
               };
-
               if (isVideoAsset(editorAsset)) {
                 return (
                   <PubVideoAssetEditor
@@ -2006,7 +1700,6 @@ async function recreateAsset(
                   />
                 );
               }
-
               return (
                 <PubAssetCopyEditor
                   {...sharedProps}
@@ -2021,7 +1714,6 @@ async function recreateAsset(
           }}
         />
       </div>
-
       <AdminDialog
         open={Boolean(deleteForeverAsset)}
         mode="danger"
@@ -2066,13 +1758,11 @@ async function recreateAsset(
                 {humanize(normalizedStage(deleteForeverAsset))}
               </strong>.
             </AdminNotice>
-
             <div>
               Asset #{deleteForeverAsset.pub_asset_id}
               {" · "}
               {deleteForeverAsset.search_title || "Untitled"}
             </div>
-
             <div>
               This deletes the permanent PUB record and its local creative
               files. It does <strong>not</strong> delete anything from YouTube,
@@ -2080,7 +1770,6 @@ async function recreateAsset(
               item has already been removed, or when you deliberately want PUB
               to forget this historical shipment.
             </div>
-
             <AdminCheckboxRow
               checked={deleteForeverAuthorized}
               disabled={Boolean(deletingAssetId)}
@@ -2097,8 +1786,6 @@ async function recreateAsset(
     </>
   );
 }
-
-
 function PubAssetDetails({
   asset,
   recreating = false,
@@ -2110,19 +1797,16 @@ function PubAssetDetails({
       asset?.source_type ||
       ""
     ).trim();
-
   const sourceId =
     Number(
       asset?.source_id ||
       0
     );
-
   const sourceTitle =
     String(
       asset?.source_title ||
       ""
     ).trim();
-
   const sourceLabel =
     sourceTitle ||
     (
@@ -2131,29 +1815,24 @@ function PubAssetDetails({
         ? `${humanize(sourceType)} #${sourceId}`
         : "—"
     );
-
   const stage =
     displayStage(
       asset
     );
-
   const approved =
     Number(
       asset?.approved ||
       0
     ) === 1;
-
   const pipelineStage =
     normalizedStage(
       asset
     );
-
   const redoLocked =
     pipelineStage === "shipping" ||
     isHistoricalStage(
       pipelineStage
     );
-
   return (
     <AdminStack gap="md">
       <AdminField label="Asset ID">
@@ -2161,7 +1840,6 @@ function PubAssetDetails({
           #{asset?.pub_asset_id || "—"}
         </div>
       </AdminField>
-
       <AdminField label="Job ID">
         <div>
           {
@@ -2172,13 +1850,11 @@ function PubAssetDetails({
           }
         </div>
       </AdminField>
-
       <AdminField label="Channel">
         <div>
           {asset?.channel || "—"}
         </div>
       </AdminField>
-
       <AdminField label="Type">
         <div>
           {
@@ -2190,13 +1866,21 @@ function PubAssetDetails({
           }
         </div>
       </AdminField>
-
-      <AdminField label="Source">
+      <AdminField label={sourceType === "playlist" ? "Source Playlist" : "Source"}>
         <div>
           {sourceLabel}
+          {sourceType === "playlist" && sourceId > 0 ? (
+            <>
+              {sourceTitle ? ` · #${sourceId}` : null}
+              <div>
+                <a href={`/admin/playlists/${sourceId}`}>
+                  Open Playlist →
+                </a>
+              </div>
+            </>
+          ) : null}
         </div>
       </AdminField>
-
       <AdminField label="Stage">
         <div>
           {stage ? (
@@ -2216,25 +1900,21 @@ function PubAssetDetails({
           )}
         </div>
       </AdminField>
-
       <AdminField label="Approved">
         <div>
           {approved ? "Yes" : "No"}
         </div>
       </AdminField>
-
       <AdminField label="Title">
         <div>
           {asset?.search_title || "—"}
         </div>
       </AdminField>
-
       <AdminField label="Description">
         <div>
           {asset?.description || "—"}
         </div>
       </AdminField>
-
       {asset?.pingback ? (
         <AdminField label="Pingback">
           <AdminToolbar compact>
@@ -2245,7 +1925,6 @@ function PubAssetDetails({
             >
               {asset.pingback}
             </a>
-
             <AdminButton
               type="button"
               size="sm"
@@ -2265,7 +1944,6 @@ function PubAssetDetails({
           </AdminToolbar>
         </AdminField>
       ) : null}
-
       {asset?.url ? (
         <AdminField label="Asset URL">
           <a
@@ -2277,7 +1955,6 @@ function PubAssetDetails({
           </a>
         </AdminField>
       ) : null}
-
       {asset?.thumbnail_url ? (
         <AdminField label="Thumbnail URL">
           <a
@@ -2289,7 +1966,6 @@ function PubAssetDetails({
           </a>
         </AdminField>
       ) : null}
-
       {asset?.created_at ? (
         <AdminField label="Created">
           <AdminMetaText>
@@ -2297,13 +1973,11 @@ function PubAssetDetails({
           </AdminMetaText>
         </AdminField>
       ) : null}
-
       <AdminField label="Last Updated">
         <AdminMetaText>
           {asset?.updated_at || "—"}
         </AdminMetaText>
       </AdminField>
-
       <AdminToolbar compact>
         <AdminButton
           type="button"
@@ -2319,13 +1993,11 @@ function PubAssetDetails({
             ) {
               return;
             }
-
             onEdit?.();
           }}
         >
           Edit
         </AdminButton>
-
         <AdminButton
           type="button"
           disabled={
@@ -2344,7 +2016,6 @@ function PubAssetDetails({
             ) {
               return;
             }
-
             onRedo?.(
               asset
             );
@@ -2360,8 +2031,6 @@ function PubAssetDetails({
     </AdminStack>
   );
 }
-
-
 function assetErrorMessage(
   asset
 ) {
@@ -2373,8 +2042,6 @@ function assetErrorMessage(
     ""
   ).trim();
 }
-
-
 function normalizedStage(
   asset
 ) {
@@ -2385,8 +2052,6 @@ function normalizedStage(
     .trim()
     .toLowerCase();
 }
-
-
 function displayStage(
   asset
 ) {
@@ -2397,19 +2062,13 @@ function displayStage(
     )
       .trim()
       .toLowerCase();
-
-
   if (explicit) {
     return explicit;
   }
-
-
   const stage =
     normalizedStage(
       asset
     );
-
-
   if (
     stage === "created" &&
     Number(
@@ -2419,12 +2078,8 @@ function displayStage(
   ) {
     return "approved";
   }
-
-
   return stage;
 }
-
-
 function isHistoricalStage(
   stage
 ) {
@@ -2441,8 +2096,6 @@ function isHistoricalStage(
       .toLowerCase()
   );
 }
-
-
 function isVideoAsset(
   asset
 ) {
@@ -2453,8 +2106,6 @@ function isVideoAsset(
     )
       .trim()
       .toLowerCase();
-
-
   return (
     assetType ===
       "pin_before_after_video" ||
@@ -2462,23 +2113,16 @@ function isVideoAsset(
       "youtube_video"
   );
 }
-
-
 function formatDurationMs(value) {
   const milliseconds = Number(value || 0);
-
   if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
     return "—";
   }
-
   const totalSeconds = Math.round(milliseconds / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
-
-
 function humanize(
   value
 ) {

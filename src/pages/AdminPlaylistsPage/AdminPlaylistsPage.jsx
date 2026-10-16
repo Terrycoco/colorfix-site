@@ -648,6 +648,28 @@ export default function AdminPlaylistsPage() {
 
 
 
+  async function jumpToPlaylistId(value) {
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id <= 0) return false;
+
+    // The list is the authority for available playlist IDs.
+    if (!playlists.some((row) => Number(row?.playlist_id) === id)) {
+      return false;
+    }
+
+    if (id === routePlaylistId) return true;
+
+    // Preserve the existing navigation guard for unsaved slide changes.
+    if (!await commitCurrentEditor()) {
+      throw new Error("Save your playlist changes before jumping to another playlist.");
+    }
+
+    setQuery("");
+    navigate(`/admin/playlists/${id}`);
+    return true;
+  }
+
+
   async function beginNewPlaylist() {
 
     if (
@@ -1102,6 +1124,7 @@ export default function AdminPlaylistsPage() {
             beginNewPlaylist
 
           }
+          onJumpPlaylistId={jumpToPlaylistId}
 
         /> : <AdminEmptyState title="Playlists" message={listLoading ? "Loading playlists..." : "Select a playlist."} />
 

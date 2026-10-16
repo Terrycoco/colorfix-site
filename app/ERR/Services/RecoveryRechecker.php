@@ -102,7 +102,7 @@ final class RecoveryRechecker
                 bookmark: $bookmark
             );
 
-            $outcome = $this->executor->run($errorContext, $handler);
+            $outcome = $this->executor->resume($errorContext, $handler, (string)$working['step_key']);
             if ($outcome->status === ErrorHandlingResult::RESOLVED) {
                 $tally['resolved']++;
             } elseif ($outcome->status === ErrorHandlingResult::WAITING) {

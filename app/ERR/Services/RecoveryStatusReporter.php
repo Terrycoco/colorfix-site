@@ -14,15 +14,15 @@ final class RecoveryStatusReporter
         private string $title
     ) {}
 
-    public function attempting(string $description): void
+    public function attempting(string $description, string $stepKey = ''): void
     {
-        $this->broadcaster->broadcast($this->operationId, $this->title, 'attempting', $description);
+        $this->broadcaster->broadcast($this->operationId, $this->title, 'attempting', $description, 'step:' . $stepKey);
     }
 
-    public function stepResult(string $description, RecoveryStepResult $result, string $displayDetail = ''): void
+    public function stepResult(string $description, RecoveryStepResult $result, string $stepKey = ''): void
     {
         $status = match ($result->status) {
-            RecoveryStepResult::SUCCESS => 'success',
+            RecoveryStepResult::SUCCESS, RecoveryStepResult::SKIPPED => 'success',
             RecoveryStepResult::WAITING => 'waiting',
             default => 'failed',
         };
@@ -30,7 +30,7 @@ final class RecoveryStatusReporter
         $this->broadcaster->broadcast(
             $this->operationId, $this->title, $status,
             $result->detail !== '' ? $result->detail : $description,
-            $displayDetail
+            'step:' . $stepKey
         );
     }
 

@@ -177,6 +177,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     onSaved = null,
     onDeleted = null,
     onNew = null,
+    onJumpPlaylistId = null,
   },
   ref
 ) {
@@ -3226,12 +3227,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         {saving ? "Saving..." : "Save"}
       </AdminButton>
 
-      <AdminField
-        label="Play As"
-        compact
-      >
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+        Play As
         <select
           className="admin-field__control"
+          aria-label="Play As"
+          style={{ width: 132, minWidth: 0, flex: "none" }}
           value={playerExperience || ""}
           onChange={(event) =>
             setPlayerExperience(
@@ -3255,7 +3256,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             Public Full
           </option>
         </select>
-      </AdminField>
+      </label>
 
       <AdminButton
         type="button"
@@ -3432,6 +3433,10 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
       <AdminDetailPane
         ariaLabel="Playlist"
         title={currentTitle}
+        jumpToId={typeof onJumpPlaylistId === "function" ? {
+          label: "Playlist #",
+          onJump: onJumpPlaylistId,
+        } : null}
         actions={
           detailLoading && !isNewRoute
             ? null

@@ -12,12 +12,18 @@ use App\PUB\Dispatch\DispatchManager;
 use App\PUB\Create\CreateManager;
 use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Errors\Steps\CheckVideoWorker;
+use App\PUB\Errors\Steps\RetryDispatch;
+use App\PUB\Errors\Steps\RetryCreate;
 use Throwable;
 
 /** PUB decides how its interrupted CREATE work is safely re-attempted. */
 final class PubErrorHandler implements ErrorHandlerInterface
 {
-    public function __construct(private VideoWorkerHealthService $workerHealth) {}
+    public function __construct(
+        private VideoWorkerHealthService $workerHealth,
+        private ?CreateManager $create = null,
+        private ?DispatchManager $dispatch = null
+    ) {}
 
     public function steps(ErrorContext $context): array
     {
@@ -25,6 +31,9 @@ final class PubErrorHandler implements ErrorHandlerInterface
             throw new \InvalidArgumentException('Unsupported recovery department.');
         }
         if (in_array($context->errNum, [4002, 4003], true)) {
+            if ($this->dispatch !== null) {
+                return [new RetryDispatch($this, $this->dispatch)];
+            }
             return [new class implements RecoveryStepInterface {
                 public function key(): string { return 'retry_dispatch'; }
                 public function description(): string { return 'Awaiting manual publish retry'; }
@@ -36,22 +45,38 @@ final class PubErrorHandler implements ErrorHandlerInterface
         if ($context->errNum !== 4001) {
             throw new \InvalidArgumentException('Unsupported PUB recovery error.');
         }
-        return [new CheckVideoWorker($this->workerHealth)];
+        return $this->create !== null
+            ? [new CheckVideoWorker($this->workerHealth), new RetryCreate($this, $this->create)]
+            : [new CheckVideoWorker($this->workerHealth)];
     }
 
     public function outcome(ErrorContext $context, array $results): ErrorHandlingResult
     {
         if (in_array($context->errNum, [4002, 4003], true)) {
-            return ErrorHandlingResult::waiting('Correct the publishing failure, then click Recover.');
+            $result = $results['retry_dispatch'] ?? null;
+            if (!$result instanceof RecoveryStepResult) {
+                return ErrorHandlingResult::waiting('Publishing retry has not completed.');
+            }
+            return match ($result->status) {
+                RecoveryStepResult::SUCCESS => ErrorHandlingResult::resolved($result->detail),
+                RecoveryStepResult::FAILED => ErrorHandlingResult::failed($result->detail),
+                default => ErrorHandlingResult::waiting($result->detail ?: 'Publishing retry is pending.'),
+            };
         }
-        $result = $results['check_video_worker'] ?? null;
+        $result = $results['retry_create'] ?? $results['check_video_worker'] ?? null;
         if (!$result instanceof RecoveryStepResult) {
-            return ErrorHandlingResult::failed('Worker health check did not execute.');
+            return ErrorHandlingResult::failed('Worker recovery did not execute.');
+        }
+        // Automatic health checks still use a single step. Manual recovery
+        // also requires RetryCreate before declaring the CREATE work resolved.
+        if ($this->create !== null && !isset($results['retry_create'])
+            && $result->status === RecoveryStepResult::SUCCESS) {
+            return ErrorHandlingResult::waiting('Worker is ready; CREATE has not yet been retried.');
         }
         return match ($result->status) {
             RecoveryStepResult::SUCCESS => ErrorHandlingResult::resolved($result->detail),
             RecoveryStepResult::WAITING => ErrorHandlingResult::waiting($result->detail),
-            default => ErrorHandlingResult::failed($result->detail ?: 'Worker health check failed.'),
+            default => ErrorHandlingResult::failed($result->detail ?: 'Recovery step failed.'),
         };
     }
 

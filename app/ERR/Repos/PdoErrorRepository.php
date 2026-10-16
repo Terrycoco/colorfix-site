@@ -248,6 +248,17 @@ final class PdoErrorRepository
         return $stmt->rowCount() === 1;
     }
 
+    /** Claim exactly one WAITING step while checking the external outcome. */
+    public function claimWaitingForCheck(int $workingId): bool
+    {
+        $this->requirePositive($workingId, 'Working ID');
+        $stmt = $this->pdo->prepare(
+            "UPDATE err_working SET status = 'running' WHERE id = :id AND status = 'waiting'"
+        );
+        $stmt->execute(['id' => $workingId]);
+        return $stmt->rowCount() === 1;
+    }
+
     /** Explicit admin action only; never called automatically by recovery. */
     public function clearWorkingStep(int $workingId): void
     {

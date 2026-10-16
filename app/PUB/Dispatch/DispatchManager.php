@@ -454,6 +454,16 @@ final class DispatchManager implements PubComManagerContract
      *   markShipping(pub_asset_id)
      *   getShippingById(pub_asset_id)
      */
+    /** Read-only status for ERR monitoring. Never claims or resends a shipment. */
+    public function recoveryShipmentState(int $pubAssetId): ?array
+    {
+        if ($pubAssetId <= 0) return null;
+        $stmt = $this->pdo->prepare('SELECT * FROM pub_assets WHERE pub_asset_id = :id LIMIT 1');
+        $stmt->execute(['id' => $pubAssetId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : $row;
+    }
+
     /** Explicit ERR retry: preserve the existing single-asset shipping route. */
     public function shipOneForErrRecovery(int $pubAssetId): array
     {

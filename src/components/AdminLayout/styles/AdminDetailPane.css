@@ -26,6 +26,8 @@
 }
 
 .admin-detail-pane__actions {
+  color: #fff;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -35,6 +37,14 @@
   padding: 0.45rem 18px;
   border-bottom: 1px solid var(--admin-border-soft);
   background: var(--admin-toolbar-bg);
+}
+
+/* All labels and informational text in the green action bar */
+.admin-detail-pane__actions .admin-field__label,
+.admin-detail-pane__actions .admin-meta-text,
+.admin-detail-pane__actions label {
+  color: #fff;
+  font-size: 12px;
 }
 
 .admin-detail-pane__titlebar {
@@ -102,4 +112,37 @@
   .admin-detail-header__actions {
     margin-top: 10px;
   }
+}
+
+/* Shared first-position record lookup in the green action bar. */
+.admin-detail-pane__jump {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.admin-detail-pane__jump label {
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-detail-pane__jump-input {
+  box-sizing: border-box;
+  width: 88px;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-detail-pane__jump-error {
+  color: #fff;
+  font-size: 12px;
 }

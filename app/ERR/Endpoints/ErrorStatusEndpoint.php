@@ -20,7 +20,12 @@ final class ErrorStatusEndpoint
         }
         try {
             $feed = new ErrorStatusBroadcaster($pdo, ErrorStatusBroadcaster::tokenFromRequest());
-            echo json_encode(['ok' => true, 'event' => $feed->latest()], JSON_THROW_ON_ERROR);
+            $operationId = (string)($_GET['operation_id'] ?? '');
+            if ($operationId !== '') {
+                echo json_encode(['ok' => true, 'events' => $feed->recoveryEvents($operationId)], JSON_THROW_ON_ERROR);
+            } else {
+                echo json_encode(['ok' => true, 'event' => $feed->latest()], JSON_THROW_ON_ERROR);
+            }
         } catch (Throwable $e) {
             error_log('ERR status endpoint failed: ' . $e->getMessage());
             http_response_code(500);

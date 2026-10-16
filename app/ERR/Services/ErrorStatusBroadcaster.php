@@ -80,6 +80,24 @@ final class ErrorStatusBroadcaster
         $this->insertEvent($sessionHash, $operationId, $title, $status, $message, $detail);
     }
 
+    /** Return this browser's progress events for one explicitly started recovery. */
+    public function recoveryEvents(string $operationId): array
+    {
+        if ($this->sessionToken === null
+            || !preg_match('/\Aerr-recover-[a-zA-Z0-9-]{8,80}\z/D', $operationId)) {
+            return [];
+        }
+        $stmt = $this->pdo->prepare('SELECT id, operation_id, title, status, message, detail
+            FROM err_status_events WHERE session_token = :session_token
+            AND operation_id = :operation_id
+            ORDER BY id ASC LIMIT 200');
+        $stmt->execute([
+            'session_token' => hash('sha256', $this->sessionToken),
+            'operation_id' => $operationId,
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function latest(): ?array
     {
         if ($this->sessionToken === null) return null;

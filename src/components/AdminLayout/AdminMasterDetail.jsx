@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import useAdminMobile from "./useAdminMobile";
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -31,6 +32,9 @@ export default function AdminMasterDetail({
   className = "",
 }) {
   const shellRef = useRef(null);
+  const isMobile = useAdminMobile();
+
+
 
   const initialWidth = useMemo(() => {
     if (typeof window === "undefined") return defaultListWidth;
