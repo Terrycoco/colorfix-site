@@ -1,3 +1,9 @@
+import { Children, isValidElement } from "react";
+import AdminObjectList from "./AdminObjectList";
+import AdminObjectListItem from "./AdminObjectListItem";
+import useAdminMobile from "./useAdminMobile";
+import MobileListPane from "./mobile/MobileListPane";
+
 
 
 export default function AdminListPane({
@@ -13,11 +19,36 @@ export default function AdminListPane({
   children,
   className = "",
 }) {
+  const isMobile = useAdminMobile();
   const hasSearch = typeof onSearchChange === "function";
   const hasSort =
     typeof onSortChange === "function" &&
     Array.isArray(sortOptions) &&
     sortOptions.length > 0;
+
+  // Present standard selectable object lists with the mobile picker.
+  // Non-standard/custom panes stay on their existing implementation.
+  const nodes = Children.toArray(children);
+  const objectList = nodes.find((node) => isValidElement(node) && node.type === AdminObjectList);
+  const navItems = objectList ? Children.toArray(objectList.props.children) : [];
+  const canUsePicker = !toolbar && (objectList || hasSearch)
+    && navItems.every((item) => isValidElement(item)
+      && item.type === AdminObjectListItem
+      && !item.props.status
+      && !item.props.onStatusClick);
+
+  if (isMobile && canUsePicker) {
+    return (
+      <MobileListPane
+        title={title}
+        actions={actions}
+        searchPlaceholder={searchPlaceholder}
+        className={className}
+      >
+        {children}
+      </MobileListPane>
+    );
+  }
 
   return (
     <section className={`admin-list-pane ${className}`.trim()}>

@@ -1,0 +1,2 @@
+.admin-mobile-list-pane { box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 8px 10px; background: var(--admin-bg); border-bottom: 1px solid var(--admin-border); }
+.admin-mobile-list-pane > .admin-mobile-select { min-width: 0; }
