@@ -6,6 +6,8 @@ import {
 
 import AdminWorkbenchDrawer
   from "./AdminWorkbenchDrawer.jsx";
+import useAdminMobile from "./useAdminMobile.js";
+import MobileDataGrid from "./mobile/MobileDataGrid.jsx";
 
 
 function cssSize(value) {
@@ -36,7 +38,7 @@ function resolveDrawerValue(
 }
 
 
-export default function AdminDataGrid({
+function DesktopAdminDataGrid({
   children,
   className = "",
   tableClassName = "",
@@ -750,4 +752,12 @@ export default function AdminDataGrid({
       ) : null}
     </>
   );
+}
+
+
+export default function AdminDataGrid(props) {
+  const isMobile = useAdminMobile();
+  return isMobile
+    ? <MobileDataGrid {...props} />
+    : <DesktopAdminDataGrid {...props} />;
 }

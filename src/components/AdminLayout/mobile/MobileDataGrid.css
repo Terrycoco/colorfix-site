@@ -1,0 +1,65 @@
+/* Mobile-only horizontal grid scrolling. Desktop AdminDataGrid is unchanged. */
+.mobile-data-grid-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.mobile-data-grid-scroll > .admin-data-grid {
+  width: max-content;
+  min-width: max(100%, var(--admin-data-grid-min-width, 0px));
+}
+
+/* Full-screen mobile details overlay, independent of desktop drawers. */
+.mobile-grid-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  background: var(--admin-surface, #fff);
+}
+
+.mobile-grid-drawer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--admin-surface, #fff);
+  color: inherit;
+}
+
+.mobile-grid-drawer__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: env(safe-area-inset-top, 0px) 12px 0;
+  background: var(--admin-surface, #fff);
+  border-bottom: 1px solid #d9dde3;
+  z-index: 2;
+}
+
+.mobile-grid-drawer__back {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 28px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mobile-grid-drawer__back:disabled { opacity: .45; }
+.mobile-grid-drawer__title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-grid-drawer__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.mobile-grid-drawer__body.is-padded { padding: 12px; }
+.mobile-grid-drawer__footer { flex: 0 0 auto; padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid #d9dde3; background: var(--admin-surface, #fff); }

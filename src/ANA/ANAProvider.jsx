@@ -2,7 +2,6 @@ import { createContext, useMemo } from "react";
 import { getCurrentSourceParam } from "@helpers/sourceParam";
 import { ensureViewerId } from "../lib/viewer";
 
-const ANA_SOURCE_KEY = "ana_src";
 const ANA_SESSION_KEY = "ana_session_id";
 const ANA_REFERRER_KEY = "ana_referrer";
 
@@ -54,25 +53,7 @@ function resolveViewerId(viewerId = null) {
 }
 
 function resolveSource() {
-  if (typeof window === "undefined") return null;
-
-  const currentSource = getCurrentSourceParam();
-
-  if (currentSource) {
-    try {
-      sessionStorage.setItem(ANA_SOURCE_KEY, currentSource);
-    } catch {
-      // Ignore storage failures.
-    }
-
-    return currentSource;
-  }
-
-  try {
-    return sessionStorage.getItem(ANA_SOURCE_KEY) || null;
-  } catch {
-    return null;
-  }
+  return getCurrentSourceParam() || null;
 }
 
 function resolveReferrer() {

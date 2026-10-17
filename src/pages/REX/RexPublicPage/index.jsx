@@ -5,6 +5,7 @@ import ANATrack from "@ANA/ANATrack";
 import { recordANAEvent } from "@ANA/ANAClient";
 import {
   applySourceToParams,
+  getCurrentSourceParam,
   withSourceParam,
 } from "@helpers/sourceParam";
 import Player from "@RX/Player";
@@ -98,7 +99,7 @@ export default function RexPublicPage() {
             resource_type: rex?.resource_type ?? null,
             resource_id: rex?.resource_id ?? null,
             experience_key: rex?.experience_key ?? null,
-            src: new URLSearchParams(window.location.search).get("src") || null,
+            src: getCurrentSourceParam() || null,
             session_id: resolveSessionId(),
             referrer: document.referrer || null,
             path,

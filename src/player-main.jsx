@@ -4,15 +4,20 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AppStateProvider } from '@context/AppStateContext.jsx';
 import StandAloneLayout from '@layout/StandAloneLayout';
 import PlayerPage from '@pages/PlayerPage';
+import { initializeSourcePropagation } from '@helpers/sourceParam';
+import SourceNavigation from '@ANA/SourceNavigation';
 
 import '@styles/reset.css';
 import '@styles/typography.css';
 import '@styles/global.css';
 
+initializeSourcePropagation();
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <AppStateProvider>
       <BrowserRouter basename="/">
+        <SourceNavigation />
         <Routes>
           <Route element={<StandAloneLayout />}>
             <Route path="p/:playlistId" element={<PlayerPage />} />

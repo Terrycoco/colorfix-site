@@ -11,6 +11,7 @@ import { resolveSessionId } from '@ANA/ANAProvider';
 import App from './App.jsx';
 
 import ANAProvider from "@ANA/ANAProvider";
+import SourceNavigation from "@ANA/SourceNavigation";
 
 import ANATrack from "@ANA/ANATrack";
 
@@ -111,6 +112,7 @@ function AppRouter() {
   return (
 
     <BrowserRouter basename="/">
+      <SourceNavigation />
 
       <ANAProvider>
 

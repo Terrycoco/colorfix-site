@@ -1,4 +1,6 @@
 import { useState } from "react";
+import useAdminMobile from "./useAdminMobile";
+import MobileWorkbenchDrawer from "./mobile/MobileWorkbenchDrawer";
 import { createPortal } from "react-dom";
 
 function cssSize(value, fallback) {
@@ -11,7 +13,7 @@ function cssSize(value, fallback) {
     : String(value);
 }
 
-export default function AdminWorkbenchDrawer({
+function DesktopWorkbenchDrawer({
   open,
   width = 380,
   title = "",
@@ -110,4 +112,12 @@ export default function AdminWorkbenchDrawer({
     </div>,
     document.body
   );
+}
+
+// Keep the public interface unchanged; desktop retains the original implementation.
+export default function AdminWorkbenchDrawer(props) {
+  const isMobile = useAdminMobile();
+  return isMobile
+    ? <MobileWorkbenchDrawer {...props} />
+    : <DesktopWorkbenchDrawer {...props} />;
 }

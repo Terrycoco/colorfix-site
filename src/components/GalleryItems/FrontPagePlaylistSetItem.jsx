@@ -1,6 +1,7 @@
 import './front-page-playlist-set-item.css';
 import { photoThumbUrl } from '@helpers/imageThumb';
 import { toFastPlayerPath } from '@helpers/playerUrls';
+import { withSourceParam } from '@helpers/sourceParam';
 
 const FrontPagePlaylistSetItem = ({ item }) => {
   const tiles = Array.isArray(item?.items) ? item.items : [];
@@ -15,7 +16,7 @@ const FrontPagePlaylistSetItem = ({ item }) => {
           <a
             key={tile.id || tile.rex_url || tile.player_url}
             className="front-page-playlist-set-item__tile"
-            href={appendSourceTag(tile.rex_url || toFastPlayerPath(tile.player_url), 'site')}
+            href={withSourceParam(tile.rex_url || toFastPlayerPath(tile.player_url))}
           >
             <div className="front-page-playlist-set-item__image">
               {imageSrc ? (
@@ -40,30 +41,5 @@ const FrontPagePlaylistSetItem = ({ item }) => {
     </section>
   );
 };
-
-function appendSourceTag(url, source) {
-  const rawUrl = String(url || '').trim();
-  const normalizedSource = String(source || '').trim().toLowerCase();
-  if (!rawUrl || !normalizedSource) return rawUrl;
-
-  if (/^https?:\/\//i.test(rawUrl)) {
-    try {
-      const parsed = new URL(rawUrl);
-      parsed.searchParams.set('src', normalizedSource);
-      return parsed.toString();
-    } catch {
-      return rawUrl;
-    }
-  }
-
-  try {
-    const parsed = new URL(rawUrl, window.location.origin);
-    parsed.searchParams.set('src', normalizedSource);
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    const separator = rawUrl.includes('?') ? '&' : '?';
-    return `${rawUrl}${separator}src=${encodeURIComponent(normalizedSource)}`;
-  }
-}
 
 export default FrontPagePlaylistSetItem;

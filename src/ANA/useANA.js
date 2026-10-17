@@ -2,6 +2,7 @@ import { useCallback, useContext } from "react";
 import { recordANAEvent } from "./ANAClient";
 import { ANAContext } from "./ANAProvider";
 import { isAdmin, isAnalyticsTestMode } from "@helpers/authHelper";
+import { getCurrentSourceParam } from "@helpers/sourceParam";
 
 export function useANA() {
   const context = useContext(ANAContext);
@@ -28,7 +29,7 @@ export function useANA() {
           rex?.experience_key ??
           null,
 
-        src: context?.src ?? null,
+        src: getCurrentSourceParam() || null,
         session_id: context?.session_id ?? null,
 
         referrer: context?.referrer ?? null,
