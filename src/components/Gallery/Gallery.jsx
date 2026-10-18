@@ -13,6 +13,7 @@ import SwatchItem from '../GalleryItems/SwatchItem';
 import ImageItem from '../GalleryItems/ImageItem';
 
 import SearchItem from '../GalleryItems/SearchItem';
+import YouTubeItem from '../GalleryItems/YouTubeItem';
 
 import QuoteItem from '../GalleryItems/QuoteItem';
 
@@ -65,6 +66,7 @@ export const renderContent = (item) => {
     case 'image':       return <ImageItem key={key} item={item} />;
 
     case 'search':      return <SearchItem key={key} item={item} />;
+    case 'youtube':     return <YouTubeItem key={key} item={item} />;
 
     case 'quote':       return <QuoteItem key={key} item={item} />;
 

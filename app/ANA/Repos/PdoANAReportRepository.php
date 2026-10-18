@@ -21,6 +21,23 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
             return [];
         }
 
+        // Outbound links have no numeric resource ID: group by destination URL.
+        if ($resourceType === 'outbound_link') {
+            $stmt = $this->pdo->prepare(
+                "SELECT NULL AS resource_id, source_key,
+                        JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.target_url')) AS target_url,
+                        COUNT(*) AS event_count, MAX(created_at) AS last_visit
+                   FROM analytics_events
+                  WHERE resource_type = :resource_type AND event_key = :event_key
+                    AND JSON_VALID(payload_json)
+                    AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.target_url')) IS NOT NULL
+                  GROUP BY source_key, target_url
+                  ORDER BY last_visit DESC"
+            );
+            $stmt->execute([':resource_type' => $resourceType, ':event_key' => $eventKey]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        }
+
         // Page names live in ana_pages; other ANA resource types are unchanged.
         $sql = $resourceType === 'page'
             ? "SELECT e.resource_id, e.source_key, COUNT(*) AS event_count,
@@ -105,17 +122,23 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
 
     public function listEventsForResource(
         string $resourceType,
-        int $resourceId,
+        ?int $resourceId,
         string $eventKey,
-        ?string $sourceKey
+        ?string $sourceKey,
+        ?string $targetUrl = null
     ): array {
         $resourceType = trim($resourceType);
         $eventKey = trim($eventKey);
 
-        if ($resourceType === '' || $resourceId <= 0 || $eventKey === '') {
+        if ($resourceType === '' || $eventKey === '' ||
+            ($resourceType === 'outbound_link' ? !$targetUrl : ($resourceId === null || $resourceId <= 0))) {
             return [];
         }
 
+        $outbound = $resourceType === 'outbound_link';
+        $resourceFilter = $outbound
+            ? "resource_id IS NULL AND JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.target_url')) = :target_url"
+            : "resource_id = :resource_id";
         $stmt = $this->pdo->prepare(
             "SELECT
                 id,
@@ -136,18 +159,23 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
                 created_at
             FROM analytics_events
             WHERE resource_type = :resource_type
-            AND resource_id = :resource_id
+            AND {$resourceFilter}
             AND event_key = :event_key
             AND source_key <=> :source_key
             ORDER BY created_at DESC, id DESC"
         );
 
-        $stmt->execute([
+        $params = [
             ':resource_type' => $resourceType,
-            ':resource_id' => $resourceId,
             ':event_key' => $eventKey,
             ':source_key' => $sourceKey,
-        ]);
+        ];
+        if ($outbound) {
+            $params[':target_url'] = $targetUrl;
+        } else {
+            $params[':resource_id'] = $resourceId;
+        }
+        $stmt->execute($params);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }

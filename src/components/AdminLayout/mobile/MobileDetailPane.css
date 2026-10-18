@@ -1,0 +1,215 @@
+/* Mobile-only action toolbar. Desktop AdminDetailPane styles are untouched. */
+.mobile-detail-pane__toolbar {
+  background: var(--admin-toolbar-bg, #426f70);
+  color: #fff;
+  border-bottom: 1px solid var(--admin-border-soft, #ddd);
+}
+.mobile-detail-pane__bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 48px;
+  width: 48px;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--admin-toolbar-bg, #426f70) !important;
+  color: #fff !important;
+  text-align: left;
+  justify-content: flex-start;
+  appearance: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+/* Keep the hamburger white, left-aligned, and visually unchanged on interaction. */
+.mobile-detail-pane__toolbar .mobile-detail-pane__bar:hover,
+.mobile-detail-pane__toolbar .mobile-detail-pane__bar:active,
+.mobile-detail-pane__toolbar .mobile-detail-pane__bar:focus {
+  background: var(--admin-toolbar-bg, #426f70) !important;
+  color: #fff !important;
+  box-shadow: none;
+}
+.mobile-detail-pane__bar:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+.mobile-detail-pane__hamburger { display: block; margin: 0 auto 0 0; font-size: 25px; line-height: 1; color: #fff; }
+.mobile-detail-pane__dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 12px 12px;
+  background: var(--admin-toolbar-bg, #426f70);
+  color: #fff;
+}
+.mobile-detail-pane__actions,
+.mobile-detail-pane__actions .admin-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  width: 100%;
+  gap: 8px;
+}
+.mobile-detail-pane__actions > *,
+.mobile-detail-pane__actions .admin-toolbar > * { max-width: 100%; }
+.mobile-detail-pane__actions > button,
+.mobile-detail-pane__actions > a[href],
+.mobile-detail-pane__actions .admin-toolbar > button,
+.mobile-detail-pane__actions .admin-toolbar > a[href] {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  white-space: normal;
+}
+.mobile-detail-pane__actions label,
+.mobile-detail-pane__actions .admin-field__label,
+.mobile-detail-pane__actions .admin-meta-text,
+.mobile-detail-pane__jump label { color: #fff; }
+/* Always-visible Jump to ID beside the hamburger. */
+.mobile-detail-pane__top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  min-width: 0;
+}
+.mobile-detail-pane__jump {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.mobile-detail-pane__jump label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #fff;
+}
+.mobile-detail-pane__jump input {
+  flex: 0 0 75px;
+  width: 75px;
+  min-width: 75px;
+  height: 36px;
+  box-sizing: border-box;
+}
+.mobile-detail-pane__jump button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 9px;
+  white-space: nowrap;
+}
+.mobile-detail-pane__jump-error {
+  display: block;
+  padding: 2px 12px 8px;
+  color: #fff;
+  font-size: 12px;
+}
+
+/* Mobile action menu: two consistent columns, as compact as its contents. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions,
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions .admin-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions > *,
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions .admin-toolbar > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions > :is(button, a[href]):not([class*="rex" i]),
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions .admin-toolbar > :is(button, a[href]):not([class*="rex" i]) {
+  min-height: 44px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-inline: 10px;
+}
+
+/* Keep the reusable REX control compact, rather than turning it into a full-width button. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href])[class*="rex" i],
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href]):is([aria-label*="rex" i], [title*="rex" i]),
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href]):is([aria-label*="token" i], [title*="token" i]) {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  justify-content: center;
+  justify-self: start;
+}
+
+/* Layout controls such as Play As retain their original labels and selectors. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(select, input) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* The page commonly passes one AdminToolbar wrapper as `actions`.
+   Let that wrapper span the entire width BEFORE dividing its buttons
+   into two equal columns. Otherwise the toolbar occupies just one cell. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions > .admin-toolbar {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+/* Each ordinary action fills exactly one equal-width grid cell. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions > :not(.admin-toolbar),
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions > .admin-toolbar > * {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  justify-self: stretch;
+}
+
+/* A compact REX button keeps its natural square size INSIDE its grid cell. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href])[class*="rex" i],
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href]):is([aria-label*="rex" i], [title*="rex" i]),
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions :is(button, a[href]):is([aria-label*="token" i], [title*="token" i]) {
+  width: 44px;
+  max-width: 44px;
+  min-width: 44px;
+  height: 44px;
+  justify-self: start;
+}
+
+/* Only the Playlists page mobile selector; desktop remains unchanged. */
+.mobile-playlist-play-as {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: stretch;
+}
+.mobile-playlist-play-as .admin-mobile-select {
+  width: 100%;
+  min-width: 0;
+}
+.mobile-playlist-play-as .admin-mobile-select__trigger {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+}
+/* Ordinary action labels are centered in the two equal columns. */
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions .admin-toolbar > button:not([class*="rex" i]),
+.mobile-detail-pane__dropdown .mobile-detail-pane__actions .admin-toolbar > a[href]:not([class*="rex" i]) {
+  justify-content: center;
+  text-align: center;
+}
+

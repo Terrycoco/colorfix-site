@@ -35,6 +35,8 @@ import {
 import PhotoPickerDialog from "@components/Dialogs/PhotoPickerDialog";
 import ColorPlanPickerModal from "@components/ColorPlanPickerModal";
 import PlaylistRexButton from "@components/REX/PlaylistRexButton";
+import useAdminMobile from "@components/AdminLayout/useAdminMobile";
+import MobileSelect from "@components/AdminLayout/mobile/MobileSelect";
 
 import {
   API_FOLDER,
@@ -181,6 +183,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   },
   ref
 ) {
+  const isMobile = useAdminMobile();
+
   const dialog =
     useAdminDialog();
 
@@ -3227,6 +3231,43 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         {saving ? "Saving..." : "Save"}
       </AdminButton>
 
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={saving || !items.length}
+        onClick={analyzePlaylist}
+      >
+        Analyzer
+      </AdminButton>
+
+      <AdminButton
+        type="button"
+        variant="secondary"
+        disabled={saving}
+        onClick={saveAndPlay}
+      >
+        Play
+      </AdminButton>
+
+      {isMobile ? (
+        <div
+          className="mobile-playlist-play-as"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <MobileSelect
+            title="Play As"
+            placeholder="Play As"
+            value={playerExperience || ""}
+            onChange={setPlayerExperience}
+            options={[
+              { value: "concept", label: "Concept" },
+              { value: "client", label: "Client" },
+              { value: "showcase", label: "Showcase" },
+              { value: "public", label: "Public Full" },
+            ]}
+          />
+        </div>
+      ) : (
       <label style={{ display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
         Play As
         <select
@@ -3257,24 +3298,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           </option>
         </select>
       </label>
-
-      <AdminButton
-        type="button"
-        variant="secondary"
-        disabled={saving}
-        onClick={saveAndPlay}
-      >
-        Play
-      </AdminButton>
-
-      <AdminButton
-        type="button"
-        variant="secondary"
-        disabled={saving || !items.length}
-        onClick={analyzePlaylist}
-      >
-        Analyzer
-      </AdminButton>
+      )}
 
       <AdminButton
         type="button"

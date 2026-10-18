@@ -16,9 +16,10 @@ interface ANAReportRepositoryInterface
 
     public function listEventsForResource(
         string $resourceType,
-        int $resourceId,
+        ?int $resourceId,
         string $eventKey,
-        ?string $sourceKey
+        ?string $sourceKey,
+        ?string $targetUrl = null
     ): array;
 
     public function deleteEventById(int $id): bool;

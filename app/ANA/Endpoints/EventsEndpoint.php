@@ -45,16 +45,18 @@ final class EventsEndpoint
         $resourceType = trim((string)($_GET['resource_type'] ?? ''));
         $resourceId = (int)($_GET['resource_id'] ?? 0);
         $eventKey = trim((string)($_GET['event_key'] ?? ''));
+        $targetUrl = trim((string)($_GET['target_url'] ?? ''));
 
         // Missing source_key means SQL NULL. Present-but-empty remains ''.
         $sourceKey = array_key_exists('source_key', $_GET)
             ? (string)$_GET['source_key']
             : null;
 
-        if ($resourceType === '' || $resourceId <= 0 || $eventKey === '') {
+        if ($resourceType === '' || $eventKey === '' ||
+            ($resourceType === 'outbound_link' ? $targetUrl === '' : $resourceId <= 0)) {
             self::respond([
                 'ok' => false,
-                'error' => 'resource_type, resource_id and event_key required',
+                'error' => 'resource_type, event_key, and resource identifier required',
             ], 400);
         }
 
@@ -64,7 +66,8 @@ final class EventsEndpoint
                 $resourceType,
                 $resourceId,
                 $eventKey,
-                $sourceKey
+                $sourceKey,
+                $resourceType === 'outbound_link' ? $targetUrl : null
             ),
         ]);
     }

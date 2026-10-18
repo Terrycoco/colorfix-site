@@ -19,6 +19,16 @@ final class ANAReportService
     {
         $rows = $this->reports->countEventsByResourceType($resourceType, $eventKey);
 
+        if ($resourceType === 'outbound_link') {
+            foreach ($rows as &$row) {
+                $url = (string)($row['target_url'] ?? '');
+                $host = parse_url($url, PHP_URL_HOST);
+                $row['title'] = $host ? (str_contains(strtolower($host), 'youtube.com') || strtolower($host) === 'youtu.be' ? 'YouTube' : $host) : 'Outbound link';
+            }
+            unset($row);
+            return $rows;
+        }
+
         if ($resourceType === 'page') {
             foreach ($rows as &$row) {
                 $pageId = (int)($row['resource_id'] ?? 0);
@@ -66,9 +76,9 @@ final class ANAReportService
         return $rows;
     }
 
-    public function listEventsForResource(string $resourceType, int $resourceId, string $eventKey, ?string $sourceKey): array
+    public function listEventsForResource(string $resourceType, ?int $resourceId, string $eventKey, ?string $sourceKey, ?string $targetUrl = null): array
     {
-        return $this->reports->listEventsForResource($resourceType, $resourceId, $eventKey, $sourceKey);
+        return $this->reports->listEventsForResource($resourceType, $resourceId, $eventKey, $sourceKey, $targetUrl);
     }
 
     public function deleteEventById(int $id): bool { return $this->reports->deleteEventById($id); }

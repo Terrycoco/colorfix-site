@@ -68,7 +68,7 @@ export default function MobileSelect({
         aria-expanded={open}
         onClick={() => { setSearch(""); setOpen(true); }}
       >
-        <span className="admin-mobile-select__current">{selected?.label ?? placeholder}</span>
+        <span className={`admin-mobile-select__current ${selected ? "" : "is-placeholder"}`.trim()}>{selected?.label ?? placeholder}</span>
         <span aria-hidden="true" className="admin-mobile-select__chevron">⌄</span>
       </button>
       {open && typeof document !== "undefined" ? createPortal(

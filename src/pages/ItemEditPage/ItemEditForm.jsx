@@ -16,6 +16,7 @@ const ITEM_TYPE_OPTIONS = [
   'text',
   'wheel',
   'wheel-ticked',
+  'youtube'
 ];
 
 export default function ItemEditForm ({formData, updateField, handleSubmit, queries, onNew}) {

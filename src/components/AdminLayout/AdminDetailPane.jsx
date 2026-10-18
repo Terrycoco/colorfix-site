@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import "./styles/AdminDetailPane.css";
+import useAdminMobile from "./useAdminMobile";
+import MobileDetailPane from "./mobile/MobileDetailPane";
 
 export default function AdminDetailPane({
   children,
@@ -11,6 +13,8 @@ export default function AdminDetailPane({
   subActions = null,
   jumpToId = null,
 }) {
+  const isMobile = useAdminMobile();
+
   const [jumpValue, setJumpValue] = useState(String(jumpToId?.initialId ?? ""));
   const [jumpBusy, setJumpBusy] = useState(false);
   const [jumpError, setJumpError] = useState("");
@@ -51,6 +55,21 @@ export default function AdminDetailPane({
     setJumpValue("");
     setJumpError("");
     jumpToId?.onClear?.();
+  }
+
+  if (isMobile) {
+    return (
+      <MobileDetailPane
+        children={children}
+        className={className}
+        ariaLabel={ariaLabel}
+        title={title}
+        meta={meta}
+        actions={actions}
+        subActions={subActions}
+        jumpToId={jumpToId}
+      />
+    );
   }
 
   return (

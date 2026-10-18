@@ -22,7 +22,7 @@ import { API_FOLDER } from "@helpers/config";
 const COUNTS_URL = `${API_FOLDER}/v2/admin/analytics/counts.php`;
 const EVENTS_URL = `${API_FOLDER}/v2/admin/analytics/events.php`;
 const DELETE_TESTS_URL = `${API_FOLDER}/v2/admin/analytics/delete-tests.php`;
-const EVENT_KEY = "visit";
+const eventKeyFor = (type) => type === "outbound_link" ? "click" : "visit";
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -51,6 +51,7 @@ function resourceLabel(resourceType) {
   if (resourceType === "article") return "Article";
   if (resourceType === "playlist") return "Playlist";
   if (resourceType === "palette_viewer") return "Viewer";
+  if (resourceType === "outbound_link") return "Destination";
   return "Resource";
 }
 
@@ -64,7 +65,7 @@ function analyticsRowKey(resourceType, item) {
       ? "__NULL__"
       : `source:${item.source_key}`;
 
-  return `${resourceType}:${item?.resource_id}:${sourcePart}`;
+  return `${resourceType}:${item?.target_url || item?.resource_id}:${sourcePart}`;
 }
 
 function AnalyticsVisitsDrawer({
@@ -78,7 +79,7 @@ function AnalyticsVisitsDrawer({
   const [deletingId, setDeletingId] = useState(null);
 
   const loadEvents = useCallback(async () => {
-    if (!item?.resource_id) {
+    if (resourceType !== "outbound_link" && !item?.resource_id) {
       setEvents([]);
       setLoading(false);
       return;
@@ -90,9 +91,14 @@ function AnalyticsVisitsDrawer({
     try {
       const params = new URLSearchParams({
         resource_type: resourceType,
-        resource_id: String(item.resource_id),
-        event_key: EVENT_KEY,
+        event_key: eventKeyFor(resourceType),
       });
+
+      if (resourceType === "outbound_link") {
+        params.set("target_url", item.target_url || "");
+      } else {
+        params.set("resource_id", String(item.resource_id));
+      }
 
       // Omit source_key for SQL NULL; preserve a real empty-string source.
       if (item.source_key !== null && item.source_key !== undefined) {
@@ -117,6 +123,7 @@ function AnalyticsVisitsDrawer({
     }
   }, [
     item?.resource_id,
+    item?.target_url,
     item?.source_key,
     resourceType,
   ]);
@@ -263,7 +270,7 @@ export default function AdminAnalyticsPage() {
       try {
         const params = new URLSearchParams({
           resource_type: resourceType,
-          event_key: EVENT_KEY,
+          event_key: eventKeyFor(resourceType),
         });
 
         const res = await fetch(`${COUNTS_URL}?${params.toString()}`, {
@@ -336,7 +343,7 @@ export default function AdminAnalyticsPage() {
       },
       {
         key: "event_count",
-        label: "Visits",
+        label: resourceType === "outbound_link" ? "Clicks" : "Visits",
         sortValue: (item) => Number(item.event_count || 0),
         render: (item) => item.event_count,
       },
