@@ -4728,6 +4728,7 @@ public function updateOrder(
                 UPDATE pub_assets
                 SET
                     pipeline_stage = 'shipping',
+                    attempt_count = attempt_count + 1,
                     stage_note = NULL,
 
                     error_stage = NULL,
@@ -4825,6 +4826,57 @@ public function updateOrder(
                 'shipping',
         ];
     }
+
+    /**
+     * Return an asset currently in Dispatch custody to the Scheduler's dock.
+     *
+     * DispatchManager authorizes this transition after PUB decides recovery
+     * is appropriate. This repository does not decide which failures qualify.
+     *
+     * The shipment attempt was counted when markShipping() began; returning
+     * to queued must NOT increment or reset attempt_count.
+     *
+     * @return array{pub_asset_id: int, pipeline_stage: string}
+     */
+    public function requeueFromShipping(int $pubAssetId): array
+    {
+        if ($pubAssetId <= 0) {
+            throw new RuntimeException('Valid pub_asset_id required.');
+        }
+
+        $stmt = $this->pdo->prepare(
+            <<<SQL
+            UPDATE pub_assets
+            SET
+                pipeline_stage = 'queued',
+                stage_note = NULL,
+                error_stage = NULL,
+                error_code = NULL,
+                error_message = NULL,
+                errored_at = NULL
+            WHERE pub_asset_id = :pub_asset_id
+              AND pipeline_stage = 'shipping'
+              AND `package` IS NOT NULL
+            SQL
+        );
+
+        $stmt->execute([
+            'pub_asset_id' => $pubAssetId,
+        ]);
+
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException(
+                "PUB asset #{$pubAssetId} cannot return to queued; "
+                . 'expected a shipping asset with a sealed package.'
+            );
+        }
+
+        return [
+            'pub_asset_id' => $pubAssetId,
+            'pipeline_stage' => 'queued',
+        ];
+    }
+
 
     /**
      * DispatchManager's shipping dock.

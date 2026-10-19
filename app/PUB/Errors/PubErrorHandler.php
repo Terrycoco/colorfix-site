@@ -14,6 +14,8 @@ use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Errors\Steps\CheckVideoWorker;
 use App\PUB\Errors\Steps\RetryDispatch;
 use App\PUB\Errors\Steps\RetryCreate;
+use App\PUB\Errors\Steps\LogDispatchAttempt;
+use App\PUB\Errors\Steps\RequeueDispatchAsset;
 use Throwable;
 
 /** PUB decides how its interrupted CREATE work is safely re-attempted. */
@@ -24,6 +26,38 @@ final class PubErrorHandler implements ErrorHandlerInterface
         private ?CreateManager $create = null,
         private ?DispatchManager $dispatch = null
     ) {}
+
+    /**
+     * PUB's automatic recovery procedure, before opening an ERR incident.
+     * An empty list means the failure does not qualify for this procedure.
+     * Three TOTAL attempts (including the original) are permitted.
+     *
+     * @return array<int, object>
+     */
+    public function automaticDispatchSteps(array $asset, ?array $diagnostics): array
+    {
+        $providerCode = trim((string)($diagnostics['ext_err_num'] ?? ''));
+        $nativeMessage = trim((string)($diagnostics['native_message'] ?? ''));
+        $path = parse_url((string)($diagnostics['context']['endpoint_path'] ?? ''), PHP_URL_PATH);
+        $channel = strtolower(trim((string)($asset['channel'] ?? '')));
+        $mime = strtolower(trim((string)($asset['mime_type'] ?? '')));
+
+        if ($channel !== 'pinterest'
+            || !str_starts_with($mime, 'video/')
+            || $providerCode !== '1'
+            || $nativeMessage !== "Sorry! This site doesn't allow you to save Pins."
+            || !is_string($path)
+            || !preg_match('~(?:^|/)pins/?$~', $path)) {
+            return [];
+        }
+
+        // Record EVERY occurrence, including the final failed attempt.
+        $steps = [new LogDispatchAttempt()];
+        if ((int)($asset['attempt_count'] ?? 0) < 3) {
+            $steps[] = new RequeueDispatchAsset();
+        }
+        return $steps;
+    }
 
     public function steps(ErrorContext $context): array
     {

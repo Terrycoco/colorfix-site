@@ -857,6 +857,27 @@ final class DispatchManager implements PubComManagerContract
      * A late failure report must never overwrite an asset that already
      * reached SHIPPED successfully.
      */
+    /** Dispatch owns the queue transition; the repository owns the write. */
+    public function requeueShipment(int $pubAssetId): array
+    {
+        return $this->assets->requeueFromShipping($pubAssetId);
+    }
+
+    /** Preserve each recognized failed attempt in PUB history, not ERR. */
+    public function recordFailedDispatchAttempt(
+        int $pubAssetId,
+        string $code,
+        string $message,
+        ?array $diagnostics = null
+    ): void {
+        $this->errors->report(new RuntimeException($message), [
+            'stage' => 'dispatch',
+            'pub_asset_id' => $pubAssetId,
+            'code' => $code,
+            'diagnostics' => $diagnostics,
+        ]);
+    }
+
     public function failShipment(
         int $pubAssetId,
         string $code,
@@ -970,6 +991,35 @@ final class DispatchManager implements PubComManagerContract
             );
         }
 
+
+        // PUB owns classification and recovery step selection. Dispatch only
+        // executes those reusable PUB steps and owns lifecycle operations.
+        $recoveryHandler = new PubErrorHandler(
+            new VideoWorkerHealthService($this->projectRoot)
+        );
+        $recoverySteps = $recoveryHandler->automaticDispatchSteps($asset, $diagnostics);
+        if ($recoverySteps !== []) {
+            $requeued = null;
+            foreach ($recoverySteps as $step) {
+                $result = $step->execute($this, $asset, $code, $message, $diagnostics);
+                if (is_array($result) && ($result['pipeline_stage'] ?? '') === 'queued') {
+                    $requeued = $result;
+                }
+            }
+            if ($requeued !== null) {
+                try {
+                    $this->setPublicPlaylistRexLockForAsset($asset, false, null);
+                } catch (Throwable $unlockError) {
+                    $this->errors->report($unlockError, [
+                        'stage' => 'dispatch',
+                        'pub_asset_id' => $pubAssetId,
+                        'code' => 'rex_dispatch_unlock_failure',
+                    ]);
+                }
+                return $requeued;
+            }
+            // Attempt limit reached: the existing error/ERR path below applies.
+        }
 
         $this->assets
             ->markError(
