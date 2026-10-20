@@ -17,7 +17,7 @@
 /* --- Floating expanded card --- */
 .name-search-float {
   position: fixed;             /* overlay, not inline */
-  z-index: 3000;
+  z-index: var(--z-drawer);
   top: 50%;                    /* centered on screen */
   left: 50%;
   transform: translate(-50%, -50%);

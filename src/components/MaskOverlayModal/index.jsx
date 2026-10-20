@@ -1,9 +1,13 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import PropTypes from "prop-types";
 import "./maskoverlaymodal.css";
 
 export default function MaskOverlayModal({ title, subtitle, onClose, children }) {
-  return (
-    <div className="mask-overlay-modal" role="dialog" aria-modal="true">
+  const overlayRef = useOverlayLifecycle({ open: true, layer: "dialog", onEscape: onClose });
+
+  return createPortal(
+    <div ref={overlayRef} className="mask-overlay-modal" role="dialog" aria-modal="true">
       <div className="mask-overlay-modal__backdrop" onClick={onClose} />
       <div className="mask-overlay-modal__panel">
         <div className="mask-overlay-modal__header">
@@ -22,7 +26,7 @@ export default function MaskOverlayModal({ title, subtitle, onClose, children })
         </div>
         <div className="mask-overlay-modal__content">{children}</div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 

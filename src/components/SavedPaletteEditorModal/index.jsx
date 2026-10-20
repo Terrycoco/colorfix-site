@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import EditableSwatch from "@components/EditableSwatch";
@@ -890,11 +892,23 @@ export default function SavedPaletteEditorModal({
     }
   }
 
+  const overlayRef = useOverlayLifecycle({
+    open, layer: "dialog", onEscape: () => { if (!editStatus.loading && !photoStatus.loading) onClose?.(); },
+  });
+  const attachChoiceRef = useOverlayLifecycle({
+    open: open && linkOnlyMode && attachChoiceOpen && Boolean(existingPaletteFullPhoto), layer: "critical",
+    onEscape: () => { if (!editStatus.loading) setAttachChoiceOpen(false); },
+  });
+  const noteRef = useOverlayLifecycle({
+    open: open && !linkOnlyMode && noteEditorIndex !== null && Boolean(editMembers[noteEditorIndex]),
+    layer: "dialog", onEscape: () => setNoteEditorIndex(null),
+  });
+
   if (!open) return null;
 
   if (linkOnlyMode) {
-    return (
-      <div className="asp-modal-backdrop" role="dialog" aria-modal="true">
+    return createPortal(
+      <div ref={overlayRef} className="asp-modal-backdrop" role="dialog" aria-modal="true">
         <div className="asp-modal asp-modal-attach-only asp-modal-attach-rebuilt">
           <header className="asp-modal-head">
             <h2>Attach Photo</h2>
@@ -986,8 +1000,8 @@ export default function SavedPaletteEditorModal({
             </div>
           </form>
 
-          {attachChoiceOpen && existingPaletteFullPhoto ? (
-            <div className="asp-confirm-overlay" role="dialog" aria-modal="true">
+          {attachChoiceOpen && existingPaletteFullPhoto ? createPortal(
+            <div ref={attachChoiceRef} className="asp-confirm-overlay" role="dialog" aria-modal="true">
               <div className="asp-confirm-card">
                 <h3>Full Photo Already Exists</h3>
                 <p>
@@ -1103,15 +1117,15 @@ export default function SavedPaletteEditorModal({
                   </button>
                 </div>
               </div>
-            </div>
+            </div>, document.body
           ) : null}
         </div>
-      </div>
+      </div>, document.body
     );
   }
 
-  return (
-    <div className="asp-modal-backdrop" role="dialog" aria-modal="true">
+  return createPortal(
+    <div ref={overlayRef} className="asp-modal-backdrop" role="dialog" aria-modal="true">
       <div className={`asp-modal${linkOnlyMode ? " asp-modal-attach-only" : ""}`}>
         <header className="asp-modal-head">
           <h2>{linkOnlyMode ? "Attach Photo" : (mode === "create" ? "Create Saved Palette" : "Edit Saved Palette")}</h2>
@@ -1590,8 +1604,8 @@ export default function SavedPaletteEditorModal({
             </div>
           </div>
 
-          {noteEditorIndex !== null && editMembers[noteEditorIndex] ? (
-            <div className="asp-note-overlay" role="dialog" aria-modal="true">
+          {noteEditorIndex !== null && editMembers[noteEditorIndex] ? createPortal(
+            <div ref={noteRef} className="asp-note-overlay" role="dialog" aria-modal="true">
               <div className="asp-note-dialog">
                 <h3>Painter Note</h3>
                 <p>{editMembers[noteEditorIndex]?.color?.name || "Palette color"}</p>
@@ -1610,7 +1624,7 @@ export default function SavedPaletteEditorModal({
                   </button>
                 </div>
               </div>
-            </div>
+            </div>, document.body
           ) : null}
 
           <label>
@@ -1674,6 +1688,6 @@ export default function SavedPaletteEditorModal({
           }}
         />
       </div>
-    </div>
+    </div>, document.body
   );
 }

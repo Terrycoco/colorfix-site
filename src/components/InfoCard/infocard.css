@@ -4,12 +4,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-    z-index: 3000;
+    z-index: var(--z-above);
 }
 
 .info-card {
   position: fixed;
-  z-index: 3000;
+  z-index: var(--z-drawer);
   pointer-events: auto;
   background: white;
   border: 1px solid #ccc;
@@ -45,7 +45,7 @@
   line-height: 1;
   color: black;
   cursor: pointer;
-  z-index: 10000;
+  z-index: var(--z-control);
   display: flex;
   align-items: center;
   justify-content: center;

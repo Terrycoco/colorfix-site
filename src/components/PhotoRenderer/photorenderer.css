@@ -83,7 +83,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;                 /* above the app UI */
+  z-index: var(--z-editor);                 /* above the app UI */
 }
 
 .full-img {

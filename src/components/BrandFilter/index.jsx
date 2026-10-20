@@ -1,3 +1,4 @@
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppState } from '@context/AppStateContext';
@@ -16,12 +17,9 @@ const BRANDS = [
 ];
 
 export default function BrandFilterModal({ open, onClose }) {
-  // Always return before hooks when closed (prevents hooks-order errors)
-  if (!open) return null;
 
   const { searchFilters, toggleFilter, applyBrandFilters } = useAppState();
 
-  const backdropRef = useRef(null);
   const armRef = useRef(false); // prevent instant close from opener tap
   const appliedBrandsRef = useRef(null);
 
@@ -77,15 +75,11 @@ export default function BrandFilterModal({ open, onClose }) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
-  // ESC closes
-  useEffect(() => {
-    const onEsc = (e) => { if (e.key === 'Escape') onClose?.(); };
-    window.addEventListener('keydown', onEsc, { passive: true });
-    return () => window.removeEventListener('keydown', onEsc);
-  }, [onClose]);
+  const overlayRef = useOverlayLifecycle({ open, layer: "dialog", onEscape: onClose });
+  if (!open) return null;
 
   return createPortal(
-    <div className="bf-backdrop" ref={backdropRef} onClick={handleBackdropClick}>
+    <div className="bf-backdrop" ref={overlayRef} onClick={handleBackdropClick}>
       <div className="bf-modal" role="dialog" aria-modal="true" aria-label="Filter by brand">
         <header className="bf-header">
           <h3 className="bf-title">Filter by brand</h3>

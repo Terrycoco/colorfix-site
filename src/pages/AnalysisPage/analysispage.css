@@ -169,7 +169,7 @@
 .analysis .grid thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-label);
   background: #f8f8f8;
   border-bottom: 1px solid #ddd;
 }
@@ -247,7 +247,7 @@
   background: #f8f8f8;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-label);
 }
 
 /* 3) Sort button fits within the header cell */
@@ -295,7 +295,7 @@
 .analysis .grid thead th {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-label);
   background: #f8f8f8;
   border-bottom: 1px solid #ddd;
   font-weight: 600;

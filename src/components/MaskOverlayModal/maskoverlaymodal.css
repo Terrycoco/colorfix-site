@@ -1,7 +1,7 @@
 .mask-overlay-modal {
   position: fixed;
   inset: 0;
-  z-index: var(--modals-z-index);
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;

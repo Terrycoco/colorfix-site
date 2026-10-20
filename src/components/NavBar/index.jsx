@@ -90,7 +90,7 @@ function NavBar() {
   ];
 
   return (
-    <nav className="bg-gray-800 text-white sticky top-0 z-[999]">
+    <nav className="bg-gray-800 text-white sticky top-0 z-[var(--z-nav)]">
       <div className="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between">
       
         {showBack ? (
@@ -127,7 +127,7 @@ function NavBar() {
                   {link.label}
                 </span>
                {adminDropdownOpen && (
-                     <div className="absolute mr-0 right-0 top-[3rem] flex flex-col bg-gray-900 text-white rounded shadow-md z-50 min-w-[10rem]">
+                     <div className="absolute mr-0 right-0 top-[3rem] flex flex-col bg-gray-900 text-white rounded shadow-md z-[var(--z-above)] min-w-[10rem]">
 
                     {link.subLinks.map((sublink, subIdx) => (
                       sublink.items ? (
@@ -194,7 +194,7 @@ function NavBar() {
 
           {/* Mobile Dropdown */}
           {hamburgerOpen && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-gray-900 text-white shadow-lg rounded-md z-[9999] flex flex-col gap-y-2 py-3 px-4 text-base">
+            <div className="absolute right-0 top-full mt-2 w-48 bg-gray-900 text-white shadow-lg rounded-md z-[var(--z-dropdown)] flex flex-col gap-y-2 py-3 px-4 text-base">
               <ul className="flex flex-col">
                 {navLinks.map((link, idx) =>
                   link.subLinks ? (

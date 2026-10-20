@@ -12,7 +12,7 @@
   flex-direction: column;
   gap: 16px;
   transition: right 0.3s ease;
-  z-index: 2200;
+  z-index: var(--z-drawer);
 }
 
 .palette-rack.open {
@@ -158,7 +158,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
-  z-index: 2100;
+  z-index: var(--z-fullscreen);
 }
 
 .palette-rack-overlay.open {

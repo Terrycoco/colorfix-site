@@ -1,20 +1,24 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import "./modal-dialog.css";
 
 export default function ModalDialog({ open, title, subtitle = "", onClose, children, width = "560px" }) {
+  const overlayRef = useOverlayLifecycle({ open: open, layer: "dialog", onEscape: onClose });
+
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
+      ref={overlayRef}
       className="modal-dialog__backdrop"
-      role="button"
-      tabIndex={0}
+      role="presentation"
       onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose?.();
-      }}
     >
       <div
         className="modal-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{ width: `min(${width}, 100%)` }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -33,6 +37,6 @@ export default function ModalDialog({ open, title, subtitle = "", onClose, child
         </div>
         <div className="modal-dialog__body">{children}</div>
       </div>
-    </div>
+    </div>, document.body
   );
 }

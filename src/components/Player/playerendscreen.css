@@ -9,7 +9,7 @@
   align-items: center;
 
   background: #000;
-  z-index: 20;
+  z-index: calc(var(--z-drag) + var(--z-label));
   overflow: hidden;
 }
 
@@ -31,7 +31,7 @@
 }
 
 .player-end-screen .player-exit {
-  z-index: 40;
+  z-index: calc(var(--z-drag) + var(--z-control));
 }
 
 .player-end-screen-inner {
@@ -76,7 +76,7 @@
   width: 100%;
   padding-bottom: 120px;
   position: relative;
-  z-index: 10;
+  z-index: calc(var(--z-drag) + var(--z-above));
 }
 
 .player-end-links {
@@ -127,7 +127,7 @@
   align-items: center;
   gap: 6px;
 
-  z-index: 5;
+  z-index: var(--z-drag);
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
   background: rgba(0, 0, 0, 0.88);
   box-shadow: 0 -8px 18px rgba(0, 0, 0, 0.45);

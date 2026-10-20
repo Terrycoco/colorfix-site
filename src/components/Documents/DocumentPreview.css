@@ -1,7 +1,7 @@
 .document-preview {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-editor);
   overflow-y: auto;
   box-sizing: border-box;
   padding: 40px 24px 64px;

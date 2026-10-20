@@ -1,3 +1,4 @@
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import {
   useEffect,
   useMemo,
@@ -48,6 +49,10 @@ export default function PubMusicEditor({
     volume,
     setVolume,
   ] = useState(0.35);
+
+  const overlayRef = useOverlayLifecycle({
+    layer: "editor", onEscape: () => { if (!disabled) onClose?.(); },
+  });
 
   const audioRef =
     useRef(null);
@@ -257,6 +262,7 @@ export default function PubMusicEditor({
 
   return createPortal(
     <div
+      ref={overlayRef}
       style={
         overlayStyle
       }
@@ -658,7 +664,7 @@ const overlayStyle = {
     0,
 
   zIndex:
-    2147483647,
+    "var(--z-editor)",
 
   display:
     "grid",

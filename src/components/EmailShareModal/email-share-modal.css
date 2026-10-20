@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px;
-  z-index: var(--modals-z-index, 5000);
+  z-index: var(--z-dialog);
 }
 
 .admin-email-panel {

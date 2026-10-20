@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect } from "react";
 import "./toast.css";
 
@@ -23,8 +24,8 @@ export default function Toast({
 
   if (!resolvedMessage) return null;
 
-  return (
-    <div className={`app-toast app-toast--${resolvedType}`} role="status" aria-live="polite">
+  return createPortal(
+    <div className={`app-toast app-toast--${resolvedType}`} data-overlay-notification role="status" aria-live="polite">
       <div className="app-toast__title">{resolvedTitle}</div>
       <div className="app-toast__body">{resolvedMessage}</div>
       {onClose ? (
@@ -32,6 +33,6 @@ export default function Toast({
           Close
         </button>
       ) : null}
-    </div>
+    </div>, document.body
   );
 }

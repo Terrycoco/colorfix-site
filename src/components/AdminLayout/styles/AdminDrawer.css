@@ -15,7 +15,7 @@
   top: 12px;
   right: 12px;
   bottom: 12px;
-  z-index: 5;
+  z-index: var(--z-drag);
   display: flex;
   width: var(--admin-workbench-drawer-width, 400px);
 }
@@ -25,7 +25,7 @@
   top: var(--board-scroller-height);
   right: 0;
   bottom: 0;
-  z-index: var(--admin-z-drawer);
+  z-index: var(--z-drawer);
   display: flex;
   width: var(--admin-workbench-drawer-width, 380px);
 }
@@ -102,7 +102,7 @@
   position: absolute;
   top: 40px;
   right: 12px;
-  z-index: 2;
+  z-index: var(--z-label);
   height: 52px;
   display: flex;
   align-items: center;

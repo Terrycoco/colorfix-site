@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import "./photorenderer.css";
@@ -15,6 +17,7 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
   const [isFull, setIsFull] = useState(false);
   const [renderPath, setRenderPath] = useState("");
   const scrollRef = useRef(0);
+  const overlayRef = useOverlayLifecycle({ open: isFull, layer: "editor", onEscape: () => setIsFull(false) });
 
   // Build role -> HEX6
   const hexMap = useMemo(() => {
@@ -102,14 +105,8 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
   useEffect(() => {
     if (isFull) {
       scrollRef.current = window.scrollY || 0;
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
       document.body.classList.add("photo-fullscreen");
-      const onKey = (e) => { if (e.key === "Escape") setIsFull(false); };
-      window.addEventListener("keydown", onKey, { passive: true });
       return () => {
-        window.removeEventListener("keydown", onKey);
-        document.body.style.overflow = prev;
         document.body.classList.remove("photo-fullscreen");
         window.scrollTo({ top: scrollRef.current, behavior: "auto" });
       };
@@ -139,11 +136,11 @@ export default function PhotoRenderer({ asset, assignments, viewMode, onStateCha
       </div>
 
       {/* Fullscreen overlay */}
-      {isFull && (
-        <div className="full-overlay" onClick={toggleFull} role="dialog" aria-label="Fullscreen image">
+      {isFull && createPortal(
+        <div ref={overlayRef} className="full-overlay" onClick={toggleFull} role="dialog" aria-modal="true" aria-label="Fullscreen image">
           <img className="full-img" src={imgSrc} alt="" draggable={false} />
           <div className="full-hint">Tap to close · Esc to exit</div>
-        </div>
+        </div>, document.body
       )}
       {renderPath && (
         <div className="render-meta">

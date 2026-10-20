@@ -48,7 +48,7 @@ export default function PlaylistSlideDragRow({ row, item, index, disabled, onMov
       {cloneElement(row, {
         ref: setNodeRef,
         className: `${row.props.className} playlist-slide-drag-row${isDragging ? " is-dragging" : ""}${dropClass}`,
-        style: transform ? { transform: `translate3d(0, ${transform.y}px, 0)`, position: "relative", zIndex: 1 } : undefined,
+        style: transform ? { transform: `translate3d(0, ${transform.y}px, 0)`, position: "relative", zIndex: "var(--z-drag)" } : undefined,
       })}
     </DragHandleContext.Provider>
   );

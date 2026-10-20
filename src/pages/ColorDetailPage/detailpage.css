@@ -11,7 +11,7 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  z-index: 3;
+  z-index: var(--z-control);
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -56,7 +56,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--z-above);
   pointer-events: none;
   background-repeat: repeat;
   background-size: var(--wood-size, 200px) var(--wood-size, 200px);
@@ -69,7 +69,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: var(--z-label);
   pointer-events: none;
   background-color: rgba(var(--stain-rgb, 120, 80, 40), var(--stain-alpha, .9));
   mix-blend-mode: multiply;
@@ -84,7 +84,7 @@
 .detail-swatch .pals-btn{
   all: unset;
   position: absolute;
-  z-index: 3;
+  z-index: var(--z-control);
   top: 6px; left: 6px;
   display: grid;
   place-items: center;

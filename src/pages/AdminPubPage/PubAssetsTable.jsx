@@ -1266,7 +1266,7 @@ async function recreateAsset(
                           position: "absolute",
                           top: "calc(100% + 6px)",
                           left: 0,
-                          zIndex: 1000,
+                          zIndex: "var(--z-dropdown)",
                           width: "min(320px, 70vw)",
                           padding: "8px 10px",
                           border: "1px solid rgba(0, 0, 0, 0.16)",

@@ -54,7 +54,7 @@
   bottom: calc(var(--bottom-h) + 8px);
   background: #fff;
   padding-top: 6px;
-  z-index: 950; /* above list, below footer */
+  z-index: var(--z-sticky); /* above list, below footer */
 }
 
 /* Fixed compact footer with the action button */
@@ -69,7 +69,7 @@
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
-  z-index: 1000;
+  z-index: var(--z-nav);
 }
 
 /* Submit button — compact */

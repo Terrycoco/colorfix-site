@@ -3,7 +3,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.35);
-  z-index: 999999; /* above sticky bars */
+  z-index: var(--z-dialog); /* above sticky bars */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -76,4 +76,14 @@
   border-top: 1px solid #eee;
   box-shadow: 0 -6px 12px rgba(0,0,0,.06);
   padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+/* The shared anchored-popup hook supplies viewport geometry. */
+.bf-panel {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  background: #fff;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
 }

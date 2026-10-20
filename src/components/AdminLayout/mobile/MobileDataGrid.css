@@ -18,7 +18,7 @@
 .mobile-grid-drawer-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2147483000;
+  z-index: var(--z-drawer);
   background: var(--admin-surface, #fff);
 }
 
@@ -41,7 +41,7 @@
   padding: env(safe-area-inset-top, 0px) 12px 0;
   background: var(--admin-surface, #fff);
   border-bottom: 1px solid #d9dde3;
-  z-index: 2;
+  z-index: var(--z-label);
 }
 
 .mobile-grid-drawer__back {

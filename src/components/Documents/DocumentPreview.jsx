@@ -1,6 +1,4 @@
-import {
-  useEffect,
-} from "react";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 
 import {
   createPortal,
@@ -48,50 +46,7 @@ export default function DocumentPreview({
     );
 
 
-  useEffect(
-    () => {
-      if (
-        !open
-        ||
-        typeof window === "undefined"
-        ||
-        typeof document === "undefined"
-      ) {
-        return undefined;
-      }
-
-      const previousOverflow =
-        document.body.style.overflow;
-
-      document.body.style.overflow =
-        "hidden";
-
-      function handleKeyDown(event) {
-        if (event.key === "Escape") {
-          onClose?.();
-        }
-      }
-
-      window.addEventListener(
-        "keydown",
-        handleKeyDown
-      );
-
-      return () => {
-        window.removeEventListener(
-          "keydown",
-          handleKeyDown
-        );
-
-        document.body.style.overflow =
-          previousOverflow;
-      };
-    },
-    [
-      open,
-      onClose,
-    ]
-  );
+  const overlayRef = useOverlayLifecycle({ open, layer: "editor", onEscape: onClose });
 
 
   if (
@@ -105,6 +60,7 @@ export default function DocumentPreview({
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="document-review-overlay"
       role="dialog"
       aria-modal="true"

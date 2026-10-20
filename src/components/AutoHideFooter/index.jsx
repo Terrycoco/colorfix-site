@@ -10,7 +10,7 @@ import "./autohidefooter.css";
 export default function AutoHideFooter({
   children,
   className = "",
-  zIndex = 10000,
+  zIndex = "var(--z-nav)",
   bottomScrollThreshold = 160, // retained for backwards compatibility
   idleTimeout = 2400,
   showOnInitial = false,

@@ -121,7 +121,7 @@
 }
 
 .admin-project-photos__row.is-dragging {
-  z-index: 2;
+  z-index: var(--z-label);
   box-shadow: 0 4px 14px #0003;
 }
 

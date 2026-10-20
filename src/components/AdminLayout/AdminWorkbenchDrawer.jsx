@@ -1,3 +1,4 @@
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useState } from "react";
 import useAdminMobile from "./useAdminMobile";
 import MobileWorkbenchDrawer from "./mobile/MobileWorkbenchDrawer";
@@ -27,6 +28,11 @@ function DesktopWorkbenchDrawer({
   className = "",
 }) {
   const [closing, setClosing] = useState(false);
+
+  const overlayRef = useOverlayLifecycle({
+    open: open && portal, layer: "drawer", modal: false, autoFocus: false,
+    onEscape: () => void requestClose(),
+  });
 
   if (!open) return null;
 
@@ -103,6 +109,7 @@ function DesktopWorkbenchDrawer({
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="admin-workbench-drawer-host"
       style={{
         "--admin-workbench-drawer-width": cssWidth,

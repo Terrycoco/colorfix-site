@@ -2,7 +2,7 @@
 .mobile-workbench-drawer-overlay {
   position: fixed;
   inset: 0;
-    z-index: 2147483000;
+    z-index: var(--z-drawer);
   width: 100vw;
   height: 100dvh;
   background: var(--admin-surface, #fff);
@@ -25,7 +25,7 @@
   padding: max(8px, env(safe-area-inset-top)) 12px 8px;
   border-bottom: 1px solid var(--admin-border, #ddd);
   background: inherit;
-  z-index: 1;
+  z-index: var(--z-above);
 }
 .mobile-workbench-drawer__back {
   flex: 0 0 44px;

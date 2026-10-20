@@ -89,6 +89,6 @@
   bottom: 12px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.75);
-  z-index: 12;
+  z-index: var(--z-control);
   pointer-events: none;
 }

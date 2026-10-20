@@ -61,7 +61,7 @@
 .primary-btn--play {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-label);
 }
 
 .secondary-btn {
@@ -355,7 +355,7 @@
   .admin-pi-sets > .pi-panel:first-child {
     position: sticky;
     top: 12px;
-    z-index: 4;
+    z-index: var(--z-active);
   }
 
   .pi-mobile-priority {

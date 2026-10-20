@@ -17,7 +17,7 @@ function DraggableInfoCard({ color, onClose, position }) {
     top: `${y}px`,
     left: `${x}px`,
     position: 'fixed',
-    zIndex: 3000,
+    zIndex: "var(--z-drawer)",
   };
 
   const handlePointerDown = (e) => {
@@ -71,7 +71,7 @@ function StaticInfoCard({ color, onClose }) {
         top: '10vh',
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 3000,
+        zIndex: "var(--z-drawer)",
         width: '90vw',
         maxWidth: '400px',
       }}

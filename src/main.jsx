@@ -1,3 +1,4 @@
+import './styles/ZIndex.css';
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AppStateProvider } from '@context/AppStateContext.jsx';

@@ -1,3 +1,4 @@
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_FOLDER } from "@helpers/config";
@@ -28,6 +29,7 @@ export default function MarketingModal({
   onClose,
   title = "Marketing",
 }) {
+  const overlayRef = useOverlayLifecycle({ open, layer: "editor", onEscape: onClose });
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] =
     useState(null);
@@ -396,7 +398,7 @@ export default function MarketingModal({
   }
 
   return createPortal(
-    <div style={overlayStyle}>
+    <div ref={overlayRef} style={overlayStyle}>
       <div style={modalStyle}>
 
         {/* HEADER */}
@@ -632,7 +634,7 @@ export default function MarketingModal({
 const overlayStyle = {
   position: "fixed",
   inset: 0,
-  zIndex: 2147483647,
+  zIndex: "var(--z-editor)",
   background: "rgba(0,0,0,.45)",
   display: "grid",
   placeItems: "center",

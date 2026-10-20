@@ -11,7 +11,7 @@ export function armClickShield(ms = 450) {
       inset: '0',
       background: 'transparent',
       pointerEvents: 'auto',
-      zIndex: '9998',     // below any modal, above content
+      zIndex: "var(--z-shield)",     // below any modal, above content
       display: 'none'
     });
     document.body.appendChild(el);

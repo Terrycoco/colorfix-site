@@ -5,7 +5,7 @@
 .admin-mobile-select__current { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-align: left; }
 .admin-mobile-select__current.is-placeholder { color: #7b8592; font-weight: 400; }
 .admin-mobile-select__chevron { flex: 0 0 auto; margin-left: auto; color: #4b5563; font-size: 0; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); }
-.admin-mobile-select__overlay { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; background: var(--admin-bg, #fff); color: var(--admin-text, #222); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.admin-mobile-select__overlay { position: fixed; inset: 0; z-index: var(--z-picker); display: flex; flex-direction: column; background: var(--admin-bg, #fff); color: var(--admin-text, #222); padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 .admin-mobile-select__header { display: grid; grid-template-columns: 52px minmax(0, 1fr) 75px; align-items: center; min-height: 56px; border-bottom: 1px solid var(--admin-border, #ddd); }
 .admin-mobile-select__header h2 { margin: 0; font-size: 17px; line-height: 1.3; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .admin-mobile-select__back, .admin-mobile-select__cancel { border: 0; background: transparent; color: inherit; font: inherit; min-height: 48px; cursor: pointer; }

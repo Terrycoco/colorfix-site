@@ -24,9 +24,7 @@
   --navbar-height: 4rem;
   --dashboard-height: 4rem;
   --working-height: 5rem;
-  --navbar-zindex: 4000;
-  --dashboard-zindex: 2000;
-  --palette-zindex: 4001;
+
  --bar-h: 40px;
 
   --board-scroller-height:
@@ -39,12 +37,10 @@
   --search-item-background-hover: #BEDCDD; /* birds egg */
   --highlight-cyan: #BEDCDD; /* birds egg */
   --sticky-palette-bar-height: 70px;
-  --board-scroller-z-index: 12000;
-  --modals-z-index: 5000;
-}
-}
 
 
+}
+}
 
 /*smaller screens */
 
@@ -78,7 +74,7 @@ html, body { height: 100%; }
 .fixed-footer {
   position: fixed; left: 0; right: 0; bottom: 0;
   padding-bottom: env(safe-area-inset-bottom);
-  z-index: 1000;
+  z-index: var(--z-nav);
 }
 .scroll-area {
   overflow-y: auto;

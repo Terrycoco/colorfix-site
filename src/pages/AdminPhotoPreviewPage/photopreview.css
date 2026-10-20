@@ -196,7 +196,7 @@
   position: fixed;
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom, 0) + 16px);
-  z-index: 50;
+  z-index: var(--z-nav);
   width: 54px; height: 54px;
   border-radius: 14px;
   border: none;
@@ -228,7 +228,7 @@
     box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
     transform: translateY(100%);
     transition: transform 180ms ease-out;
-    z-index: 60;
+    z-index: var(--z-drawer);
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
   }
   .controls-drawer.open {

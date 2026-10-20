@@ -17,13 +17,6 @@
   --admin-accent: #e4658e;
   --admin-toolbar-bg: var(--brand-muted);
 
-  /* Shared admin overlay stack. */
-  --admin-z-fullscreen: 1000000;
-  --admin-z-drawer: 1000100;
-  --admin-z-editor: 1000200;
-  --admin-z-dialog: 1000300;
-  --admin-z-toast: 1000400;
-
   /* Backward-compatible aliases used by existing admin pages. */
   --admin-layout-bg: var(--admin-bg);
   --admin-layout-text: var(--admin-text);

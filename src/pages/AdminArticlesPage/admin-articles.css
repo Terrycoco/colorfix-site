@@ -70,7 +70,7 @@
 .admin-articles__cta-modal {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +91,7 @@
   border-radius: 14px;
   padding: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  z-index: 1;
+  z-index: var(--z-above);
 }
 
 .admin-articles__cta-panel-header {

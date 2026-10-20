@@ -294,22 +294,7 @@ export default function ProjectPhotos({
     return () => window.removeEventListener("beforeunload", warn);
   }, [busy]);
 
-  useEffect(() => {
-    if (!previewPhoto) return;
-    const previousFocus = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    previewButton.current?.focus();
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setPreviewPhoto(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-      if (previousFocus?.isConnected) previousFocus.focus();
-    };
-  }, [previewPhoto]);
+
 
   function updateItem(index, patch) {
     if (roomsAssignable) {
@@ -666,7 +651,7 @@ export default function ProjectPhotos({
         onClose={() => setPickerOpen(false)}
         onPick={addPhoto}
       />
-      <AdminFullScreenOverlay open={Boolean(previewPhoto)} className="admin-project-photo-preview" ariaLabel="Photo preview">
+      <AdminFullScreenOverlay modal onClose={() => setPreviewPhoto(null)} open={Boolean(previewPhoto)} className="admin-project-photo-preview" ariaLabel="Photo preview">
         {previewPhoto ? (
           <button ref={previewButton} type="button" className="admin-project-photo-preview__close"
             aria-label="Close photo preview" title="Click to close" onClick={() => setPreviewPhoto(null)}>

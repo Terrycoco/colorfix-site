@@ -200,7 +200,7 @@
   background: #dcdcdc;
   color: #111;
   font-weight: 800;
-  z-index: 1;
+  z-index: var(--z-above);
 }
 
 .assetlib-grid tbody tr {
@@ -251,7 +251,7 @@
 .assetlib-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-dialog);
   display: flex;
   align-items: flex-start;
   justify-content: center;

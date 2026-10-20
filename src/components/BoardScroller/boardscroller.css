@@ -11,7 +11,7 @@
   position: sticky; top: 0; width: 100%;
   padding-top: max(env(safe-area-inset-top, 0px), 10px);
   background:#000; color:#fff; border-bottom:1px solid #111;
-  z-index: var(--board-scroller-z-index);
+  z-index: var(--z-nav);
   overflow-x: clip;
 }
 
@@ -29,7 +29,7 @@
 /* ===== CENTER (always dead-center) ===== */
 .scroller-center{
   position: absolute; left: 50%; transform: translateX(-50%);
-  color:#fff; z-index: 20000;
+  color:#fff; z-index: var(--z-above);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -54,7 +54,7 @@
   right: max(var(--edge-pad), env(safe-area-inset-right, 0px));
   display:flex; align-items: center; justify-content:flex-end;
   gap: 10px;
-  z-index:20000;
+  z-index: var(--z-above);
   pointer-events:none;           /* container never blocks the center */
   width: auto;
   max-width: calc(50% - var(--center-gap) - max(var(--edge-pad), env(safe-area-inset-right, 0px)));
@@ -74,7 +74,7 @@
   gap: 12px;
   padding-left: max(var(--edge-pad), env(safe-area-inset-left, 0px));
   pointer-events:auto;
-  z-index:20000;
+  z-index: var(--z-above);
 }
 .scroller-left > *{ pointer-events:auto; }
 
@@ -130,7 +130,7 @@
 
 /* ===== PALETTE STRIP (sticky) ===== */
 .sticky-palette-wrapper {
-  z-index: 10000;
+  z-index: var(--z-sticky);
   position: sticky;
   top: calc(var(--bar-h, 40px) + max(env(safe-area-inset-top, 0px), 10px));
   transform: translateZ(0);

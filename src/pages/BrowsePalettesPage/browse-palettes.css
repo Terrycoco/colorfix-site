@@ -15,12 +15,6 @@
   --bp-swatch-gap: 8px;     /* space between colors */
   --bp-card-gap: 14px;      /* space between rows/cards */
 
-  /* z-index ladder */
-  --z-base: 0;
-  --z-controls: 100;    /* sticky header/controls */
-  --z-dropdown: 200;    /* fuzzy results dropdowns/menus */
-  --z-toast: 400;
-  --z-modal: 5000;      /* PaletteInspector etc. */
 }
 
 @media (max-width: 640px){
@@ -48,7 +42,7 @@
 .bpv1-toolbar {
   position: sticky; /* overridden within controls wrapper */
   top: 0;
-  z-index: 20;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: end;
   justify-content: flex-start;
@@ -262,14 +256,11 @@
   margin-left: 0 !important;
 }
 
-/* ================= Z-INDEX ladder use ================= */
-.results { z-index: var(--z-dropdown) !important; }
-
 /* ================= Collapsible Controls ================= */
 .bpv1-controls {
   position: sticky;
   top: 0;
-  z-index: var(--z-controls);
+  z-index: var(--z-sticky);
   background: #fff;
   border-bottom: 1px solid var(--bp-border);
 }
@@ -323,7 +314,7 @@
   top: calc(env(safe-area-inset-top, 0px) + 8px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: calc(var(--z-controls) + 2); /* ensure visible above content/sticky */
+  z-index: var(--z-sticky); /* ensure visible above content/sticky */
   padding: 6px 12px;
   background: #fff;
   color: var(--bp-text);
@@ -342,7 +333,6 @@
 
 /* ================= Modals above all ================= */
 .PaletteInspector, .palette-inspector-root {
-  z-index: var(--z-modal) !important;
   position: fixed;
 }
 

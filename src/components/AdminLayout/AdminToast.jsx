@@ -26,7 +26,7 @@ export default function AdminToast({
   if (!open) return null;
 
   const toast = (
-    <div className="admin-toast-region" aria-live="polite" aria-atomic="true">
+    <div data-overlay-notification className="admin-toast-region" aria-live="polite" aria-atomic="true">
       <div
         className={[
           "admin-toast",

@@ -187,7 +187,7 @@
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
-  z-index: 1;
+  z-index: var(--z-above);
   padding: 0.24rem 0.48rem;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.45);
@@ -202,7 +202,7 @@
 .playlist-item__play {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--z-above);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -347,7 +347,7 @@
   position: absolute;
   top: 6px;
   right: 6px;
-  z-index: 3;
+  z-index: var(--z-control);
   width: 28px;
   height: 28px;
   border-radius: 50%;

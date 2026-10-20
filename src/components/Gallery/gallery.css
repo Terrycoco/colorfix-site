@@ -226,7 +226,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 12000;
+  z-index: var(--z-sticky);
   background: var(--app-background);
   padding: 8px 12px;
   justify-content: center;
@@ -316,7 +316,7 @@
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 50;
+  z-index: var(--z-nav);
   border: none;
   border-radius: 999px;
   background: #111;

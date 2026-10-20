@@ -2,7 +2,7 @@
   position: fixed;
   top: 88px;
   right: 18px;
-  z-index: 20000;
+  z-index: var(--z-toast);
   width: min(560px, calc(100vw - 36px));
   border: 2px solid #111;
   background: #fff;

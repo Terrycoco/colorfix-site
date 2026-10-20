@@ -1,5 +1,6 @@
+import useAnchoredPopup from "../../hooks/useAnchoredPopup";
 // src/components/BrandFilter/BrandFilterDropdown.jsx
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAppState } from "@context/AppStateContext";
 import './brandfilter.css';
@@ -57,19 +58,7 @@ export default function BrandFilterDropdown({
     onClose?.();
   }
 
-  // position under anchor
-  const panelRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, minWidth: 240 });
-
-  useLayoutEffect(() => {
-    if (!open || !anchorRef?.current) return;
-    const r = anchorRef.current.getBoundingClientRect();
-    setPos({
-      top: r.bottom + window.scrollY + 8,
-      left: Math.min(r.left + window.scrollX, window.scrollX + window.innerWidth - 320),
-      minWidth: Math.max(240, r.width),
-    });
-  }, [open, anchorRef]);
+  const panelRef = useAnchoredPopup({ open, anchorRef, onClose, minWidth: 240 });
 
   // close on outside click / Esc
   useEffect(() => {
@@ -79,14 +68,11 @@ export default function BrandFilterDropdown({
       if (anchorRef.current?.contains(e.target)) return;
       onClose?.();
     };
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("pointerdown", onDown, true);
-      document.removeEventListener("keydown", onKey, true);
     };
-  }, [open, onClose, anchorRef]);
+  }, [open, onClose, anchorRef, panelRef]);
 
   if (!open) return null;
 
@@ -96,7 +82,7 @@ export default function BrandFilterDropdown({
       className="bf-panel"
       role="dialog"
       aria-label="Filter by brand"
-      style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
+      style={{ minWidth: 240 }}
     >
       <div className="bf-header">Select one or more brands</div>
        <div className="bf-note">Click on funnel icon any time to set a Brand filter</div>

@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
+import "./styles/AdminDialog.css";
+import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 function cssSize(value, fallback) {
@@ -26,101 +28,14 @@ export default function AdminDialog({
   const confirmButtonRef = useRef(null);
   const cancel = onCancel || onClose;
 
-  const onConfirmRef = useRef(onConfirm);
-  const cancelRef = useRef(cancel);
-  const modeRef = useRef(mode);
-
-  onConfirmRef.current = onConfirm;
-  cancelRef.current = cancel;
-  modeRef.current = mode;
-
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const previousActiveElement = document.activeElement;
-
-    window.requestAnimationFrame(() => {
-      const dialog = dialogRef.current;
-
-      const firstFormControl = dialog?.querySelector(
-        [
-          "input:not([disabled])",
-          "select:not([disabled])",
-          "textarea:not([disabled])",
-        ].join(",")
-      );
-
-      const target =
-        firstFormControl
-        || confirmButtonRef.current
-        || dialog;
-
-      target?.focus?.();
-
-      if (
-        firstFormControl
-        && firstFormControl instanceof HTMLInputElement
-        && ["text", "search", "email", "url", "tel"].includes(firstFormControl.type)
-      ) {
-        const length = firstFormControl.value.length;
-        firstFormControl.setSelectionRange?.(length, length);
-      }
-    });
-
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-
-        if (modeRef.current === "alert") {
-          onConfirmRef.current?.();
-        } else {
-          cancelRef.current?.();
-        }
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-
-      const focusable = Array.from(
-        dialog.querySelectorAll(
-          [
-            "button:not([disabled])",
-            "[href]",
-            "input:not([disabled])",
-            "select:not([disabled])",
-            "textarea:not([disabled])",
-            '[tabindex]:not([tabindex="-1"])',
-          ].join(",")
-        )
-      );
-
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      previousActiveElement?.focus?.();
-    };
-  }, [open]);
+  const id = useId();
+  const overlayRef = useOverlayLifecycle({
+    open,
+    layer: mode === "alert" || mode === "danger" ? "critical" : "dialog",
+    onEscape: () => mode === "alert" ? onConfirm?.() : cancel?.(),
+    initialFocus: () => dialogRef.current?.querySelector("input:not([disabled]), select:not([disabled]), textarea:not([disabled])")
+      || confirmButtonRef.current || dialogRef.current,
+  });
 
   if (!open) return null;
 
@@ -128,12 +43,14 @@ export default function AdminDialog({
   const actionItems = Array.isArray(actions)
     ? actions.filter(Boolean)
     : null;
-  const titleId = title ? "admin-dialog-title" : undefined;
-  const messageId = message ? "admin-dialog-message" : undefined;
+  const titleId = title ? `${id}-title` : undefined;
+  const messageId = message ? `${id}-message` : undefined;
 
   return createPortal(
     <div
+      ref={overlayRef}
       className="admin-dialog-backdrop"
+      style={{ zIndex: `var(--z-${mode === "alert" || mode === "danger" ? "critical" : "dialog"})` }}
       role="presentation"
       onMouseDown={(event) => {
         if (event.target !== event.currentTarget) return;

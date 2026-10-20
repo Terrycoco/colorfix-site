@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useState } from "react";
 import "./address-modal.css";
 
@@ -30,6 +32,8 @@ export default function AddressModal({
     });
   }, [address, open]);
 
+  const overlayRef = useOverlayLifecycle({ open: open, layer: "dialog", onEscape: () => { if (!saving) onClose?.(); } });
+
   if (!open) return null;
 
   function updateField(field, value) {
@@ -49,8 +53,8 @@ export default function AddressModal({
     });
   }
 
-  return (
-    <div className="address-modal" role="dialog" aria-modal="true" aria-label={title}>
+  return createPortal(
+    <div ref={overlayRef} className="address-modal" role="dialog" aria-modal="true" aria-label={title}>
       <div className="address-modal__backdrop" onClick={onClose} />
       <form className="address-modal__panel" onSubmit={handleSave}>
         <div className="address-modal__header">
@@ -107,6 +111,6 @@ export default function AddressModal({
           </div>
         </div>
       </form>
-    </div>
+    </div>, document.body
   );
 }

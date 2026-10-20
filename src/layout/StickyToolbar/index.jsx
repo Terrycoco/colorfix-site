@@ -34,7 +34,7 @@ export default function StickyToolbar({ children }) {
   }, []);
 
   return (
-    <div className={`sticky top-0 z-[600] w-full bg-gray-100 border-b border-gray-300 transition-transform duration-300 ${
+    <div className={`sticky top-0 z-[var(--z-sticky)] w-full bg-gray-100 border-b border-gray-300 transition-transform duration-300 ${
       hidden ? '-translate-y-full' : 'translate-y-0'
     }`}>
       <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center gap-4">

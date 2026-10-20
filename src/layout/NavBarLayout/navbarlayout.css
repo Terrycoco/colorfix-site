@@ -3,6 +3,6 @@
     top: 0;
     left: 0;
     width: 100%;
-    z-index: var(--navbar-zindex);
+    z-index: var(--z-nav);
     height: var(--navbar-height);
 }

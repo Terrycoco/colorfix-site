@@ -820,7 +820,7 @@ const fullUrlStyle = {
 const drawerStickyActionsStyle = {
   position: "sticky",
   top: 0,
-  zIndex: 2,
+  zIndex: "var(--z-label)",
   display: "flex",
   alignItems: "center",
   flexWrap: "wrap",

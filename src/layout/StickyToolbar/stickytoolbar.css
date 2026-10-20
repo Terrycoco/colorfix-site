@@ -5,7 +5,7 @@
   height: auto; /* allows growth */
   width: 100vw;
   top: 0;
-  z-index: 1000; /* Make sure it's above scrolling content */
+  z-index: var(--z-sticky); /* Make sure it's above scrolling content */
   background: #eee;
   display: flex;
   flex-wrap: wrap;

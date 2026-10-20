@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useAnchoredPopup from "../../hooks/useAnchoredPopup";
 import React, { useEffect, useState, useRef } from "react";
 import { API_FOLDER } from "@helpers/config";
 import './tagmultiselect.css';
@@ -21,6 +23,18 @@ export default function TagMultiSelect({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const timerRef = useRef(null);
+  const anchorRef = useRef(null);
+  const popupRef = useAnchoredPopup({
+    open: !simple && open && suggestions.length > 0,
+    anchorRef, onClose: () => setOpen(false),
+  });
+  useEffect(() => {
+    function outside(event) {
+      if (!anchorRef.current?.contains(event.target) && !popupRef.current?.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [popupRef]);
 
   useEffect(() => {
     if (!simple || focused) return;
@@ -61,7 +75,7 @@ export default function TagMultiSelect({
   }
 
   return (
-    <div className="tag-select">
+    <div ref={anchorRef} className="tag-select">
       <input
         type="text"
         className="bpv1-select"
@@ -87,8 +101,8 @@ export default function TagMultiSelect({
       {!simple && (
         <>
           {loading && <div className="tag-loading">Loading…</div>}
-          {open && suggestions.length > 0 && (
-            <div className="tag-dropdown">
+          {open && suggestions.length > 0 && createPortal(
+            <div ref={popupRef} className="tag-dropdown">
               {suggestions.map((s) => (
                 <div
                   key={s.tag}
@@ -99,7 +113,7 @@ export default function TagMultiSelect({
                   {s.count > 0 && <small>{s.count}</small>}
                 </div>
               ))}
-            </div>
+            </div>, document.body
           )}
           {selected.length > 0 && (
             <div className="tag-chips">

@@ -8,7 +8,7 @@
   color: white;
   padding: 1rem 1.5rem;
   border-radius: 6px;
-  z-index: 1000;
+  z-index: var(--z-toast);
   opacity: 0.95;
   animation: fadeout 0.5s ease-in 2.5s forwards;
   text-align: center;

@@ -5,7 +5,7 @@ export default function PageDashboard({ children, sticky = true }) {
     ? {
         position: 'sticky',
         top: 0, // because MainLayout already accounts for navbar
-        zIndex: 2000,
+        zIndex: "var(--z-nav)",
         background: '#f0f0f0',
         borderBottom: '1px solid #ccc',
       }

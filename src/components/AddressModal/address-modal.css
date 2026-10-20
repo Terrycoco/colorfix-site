@@ -1,7 +1,7 @@
 .address-modal {
   position: fixed;
   inset: 0;
-  z-index: 40000;
+  z-index: var(--z-dialog);
 }
 
 .address-modal__backdrop {

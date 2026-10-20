@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import useOverlayLifecycle from "../../../hooks/useOverlayLifecycle";
 import { createPortal } from "react-dom";
 import "./MobileDataGrid.css";
 
@@ -11,14 +11,12 @@ export default function MobileGridDrawer({
   footer = null,
   children,
 }) {
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, []);
+  const overlayRef = useOverlayLifecycle({
+    layer: "drawer", onEscape: () => { if (!closing) onClose?.(); },
+  });
 
   return createPortal(
-    <div className="mobile-grid-drawer-overlay" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : "Details"}>
+    <div ref={overlayRef} className="mobile-grid-drawer-overlay" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : "Details"}>
       <div className={`mobile-grid-drawer ${className}`}>
         <header className="mobile-grid-drawer__header">
           <button

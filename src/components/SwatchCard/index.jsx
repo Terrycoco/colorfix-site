@@ -44,14 +44,14 @@ function SwatchCard({ color, className, onSelect=null }) {
 
   return (
     <div
-      className={`relative w-[150px] max-h-[200px] border border-gray-300 rounded-md overflow-hidden text-center m-2 font-sans flex flex-col shadow-md z-[300] ${className}`}
+      className={`relative w-[150px] max-h-[200px] border border-gray-300 rounded-md overflow-hidden text-center m-2 font-sans flex flex-col shadow-md z-[var(--z-above)] ${className}`}
       onClick={handleClick}
     >
       <div
         className="relative w-full h-[150px]"
         style={{ backgroundColor: `rgb(${color.r}, ${color.g}, ${color.b})` }}
       >
-        <div className="absolute top-1 left-1 bg-white text-black rounded-sm text-[10px] px-1 py-[2px] opacity-80 z-[400] grid grid-cols-[auto_auto] gap-x-[4px] gap-y-[1px] leading-none">
+        <div className="absolute top-1 left-1 bg-white text-black rounded-sm text-[10px] px-1 py-[2px] opacity-80 z-[var(--z-label)] grid grid-cols-[auto_auto] gap-x-[4px] gap-y-[1px] leading-none">
   <span className="text-left">h:</span> <span>{color.hcl_h?.toFixed(2)}</span>
   <span className="text-left">c:</span> <span>{color.hcl_c?.toFixed(2)}</span>
   <span className="text-left">l:</span> <span>{color.hcl_l?.toFixed(2)}</span>
@@ -65,7 +65,7 @@ function SwatchCard({ color, className, onSelect=null }) {
             e.stopPropagation();
             addToWorking(color);
           }}
-          className="absolute top-[6px] right-[6px] w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center font-bold text-gray-800 cursor-pointer opacity-0 hover:opacity-100 transition-opacity duration-200 ease-in-out z-10"
+          className="absolute top-[6px] right-[6px] w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center font-bold text-gray-800 cursor-pointer opacity-0 hover:opacity-100 transition-opacity duration-200 ease-in-out z-[var(--z-control)]"
         >
           +
         </span>

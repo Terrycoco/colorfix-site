@@ -1,3 +1,6 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
+import useAnchoredPopup from "../../hooks/useAnchoredPopup";
 import { useState, useEffect, useRef } from 'react';
 import { API_FOLDER } from '@helpers/config';
 import './fuzzysearch.css';
@@ -55,6 +58,16 @@ export default function FuzzySearchColorSelect({
   const reqSeq = useRef(0);
   const abortRef = useRef(null);
   const suppressNextSearchRef = useRef(false);
+
+  const popupRef = useAnchoredPopup({
+    open: open && results.length > 0 && !isMobile,
+    anchorRef: rootRef, onClose: () => setOpen(false),
+  });
+  const sheetRef = useOverlayLifecycle({
+    open: sheetOpen && isMobile, layer: "picker",
+    anchorRef: rootRef,
+    onEscape: () => setSheetOpen(false), initialFocus: () => sheetInputRef.current,
+  });
 
   useIOSNoZoomOnFocus(inputRef);
 
@@ -118,13 +131,13 @@ export default function FuzzySearchColorSelect({
   useEffect(() => {
     function onDocPointerDown(e) {
       if (!rootRef.current) return;
-      if (rootRef.current.contains(e.target)) return;
+      if (rootRef.current.contains(e.target) || popupRef.current?.contains(e.target) || sheetRef.current?.contains(e.target)) return;
       if (pickingRef.current) return;
       setOpen(false);
     }
     document.addEventListener('pointerdown', onDocPointerDown, { capture: true });
     return () => document.removeEventListener('pointerdown', onDocPointerDown, { capture: true });
-  }, []);
+  }, [popupRef, sheetRef]);
 
   useEffect(() => {
     return () => abortActiveSearch();
@@ -274,15 +287,6 @@ function pick(color) {
       : "Color name or code";
 
 
-  useEffect(() => {
-    if (sheetOpen && isMobile) {
-      document.body.style.overflow = 'hidden';
-      setTimeout(() => sheetInputRef.current?.focus(), 60);
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [sheetOpen, isMobile]);
 
   const stopCapture = (e) => {
     if (isMobile) return;
@@ -405,8 +409,8 @@ function pick(color) {
         </div>
       )}
 
-      {open && results.length > 0 && !isMobile && (
-        <ul id="fuzzy-results" className="results" role="listbox">
+      {open && results.length > 0 && !isMobile && createPortal(
+        <ul ref={popupRef} id="fuzzy-results" className="results" role="listbox">
           {results.map((c, index) => (
             <li
               key={c.id ?? `${c.name}-${index}`}
@@ -428,11 +432,11 @@ function pick(color) {
               <span className="color-brand">({c.brand_name || c.brand})</span>
             </li>
           ))}
-        </ul>
+        </ul>, document.body
       )}
 
-      {isMobile && sheetOpen && (
-        <>
+      {isMobile && sheetOpen && createPortal(
+        <div ref={sheetRef} className="fuzzy-sheet-host" role="dialog" aria-modal="true" aria-label="Choose a Color">
           <div className="fuzzy-sheet">
             <div className="fuzzy-sheet-header">
               <h3>Choose a Color</h3>
@@ -446,7 +450,6 @@ function pick(color) {
                 type="search"
                 inputMode="search"
                 enterKeyHint="search"
-                autoFocus
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
@@ -479,7 +482,7 @@ function pick(color) {
             </div>
           </div>
           <div className="fuzzy-sheet-backdrop" onClick={() => setSheetOpen(false)} />
-        </>
+        </div>, document.body
       )}
     </div>
   );

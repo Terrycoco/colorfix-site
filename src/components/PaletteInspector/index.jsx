@@ -1,5 +1,7 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 // PaletteInspector.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SwatchGallery from "@components/SwatchGallery";
 import PaletteSwatch from "@components/Swatches/PaletteSwatch";
@@ -11,6 +13,7 @@ import PaletteMetaEditor from "./PaletteMetaEditor";
 const ROLE_OPTIONS = ["body", "trim", "accent"];
 
 export default function PaletteInspector({ palette, onClose, onPatched, topOffset = 56 }) {
+  const overlayRef = useOverlayLifecycle({ layer: "dialog", onEscape: onClose });
   const [colors, setColors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState({});
@@ -138,8 +141,12 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
     });
   }
 
-  return (
+  return createPortal(
     <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Palette inspector"
       className="pi-overlay"
       style={{ "--pi-top-offset": `${topOffset}px` }}
       onClick={onClose}
@@ -206,6 +213,6 @@ export default function PaletteInspector({ palette, onClose, onPatched, topOffse
 {isAdmin() && <PaletteMetaEditor palette={palette} onPatched={onPatched} />}
 
       </div>
-    </div>
+    </div>, document.body
   );
 }

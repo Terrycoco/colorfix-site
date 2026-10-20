@@ -113,7 +113,7 @@ body.photo-fullscreen .results {
   line-height: 1;
   color: #333 !important;
   cursor: pointer;
-  z-index: 2;             /* above input, but only in the padding zone */
+  z-index: var(--z-label);             /* above input, but only in the padding zone */
   touch-action: manipulation;
   -webkit-appearance: none;
   appearance: none;
@@ -159,7 +159,7 @@ body.photo-fullscreen .results {
 
   max-height: 400px;
   overflow-y: auto;
-  z-index: 10;
+  z-index: var(--z-dropdown);
 }
 
 .result-item {
@@ -243,7 +243,7 @@ body.photo-fullscreen .results {
   right:0;
   top:0;
   background:#fff;
-  z-index:30000;
+  z-index: var(--z-picker);
   display:flex;
   flex-direction:column;
 }
@@ -318,5 +318,7 @@ body.photo-fullscreen .results {
   position:fixed;
   inset:0;
   background:rgba(0,0,0,.25);
-  z-index:25000;
+  z-index: var(--z-dialog);
 }
+
+.fuzzy-sheet-host { position: fixed; inset: 0; z-index: var(--z-picker); }

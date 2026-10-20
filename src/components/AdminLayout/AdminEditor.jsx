@@ -1,5 +1,5 @@
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import {
-  useEffect,
   useId,
   useRef,
 } from "react";
@@ -62,113 +62,14 @@ export default function AdminEditor({
   const editorRef =
     useRef(null);
 
-  const onCloseRef =
-    useRef(onClose);
-
-  const titleId =
-    useId();
-
-  const metaItems =
-    normalizeMeta(meta);
-
-  const resolvedWidth =
-    cssSize(width);
-
-
-  /*
-   * Keep the latest close callback without making the editor lifecycle
-   * effect depend on callback identity. Parents commonly pass inline
-   * callbacks; rerunning the lifecycle effect on every render steals
-   * focus from controlled form fields after the first keystroke.
-   */
-  useEffect(() => {
-    onCloseRef.current =
-      onClose;
-  }, [
-    onClose,
-  ]);
-
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-
-    const previousActiveElement =
-      document.activeElement;
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow =
-      "hidden";
-
-
-    window.requestAnimationFrame(
-      () => {
-        editorRef.current
-          ?.focus?.();
-      }
-    );
-
-
-    function handleKeyDown(event) {
-      if (
-        event.key !==
-        "Escape"
-      ) {
-        return;
-      }
-
-      if (
-        !dismissOnEscape
-        ||
-        busy
-      ) {
-        return;
-      }
-
-      /*
-       * A smaller AdminDialog may be open on top of this editor.
-       * Let that top-most dialog own Escape instead of closing both layers.
-       */
-      if (
-        document.querySelector(
-          ".admin-dialog-backdrop"
-        )
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-
-      onCloseRef.current?.();
-    }
-
-
-    document.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
-
-    return () => {
-      document.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
-
-      document.body.style.overflow =
-        previousOverflow;
-
-      previousActiveElement
-        ?.focus?.();
-    };
-  }, [
-    open,
-    busy,
-    dismissOnEscape,
-  ]);
+  const overlayRef = useOverlayLifecycle({
+    open, layer: "editor",
+    onEscape: () => { if (dismissOnEscape && !busy) onClose?.(); },
+    initialFocus: () => editorRef.current,
+  });
+  const titleId = useId();
+  const metaItems = normalizeMeta(meta);
+  const resolvedWidth = cssSize(width);
 
 
   if (!open) {
@@ -178,6 +79,7 @@ export default function AdminEditor({
 
   const editor = (
     <div
+      ref={overlayRef}
       className="admin-editor-backdrop"
       role="presentation"
       onMouseDown={(event) => {
@@ -196,7 +98,7 @@ export default function AdminEditor({
           return;
         }
 
-        onCloseRef.current?.();
+        onClose?.();
       }}
     >
       <section
@@ -307,7 +209,7 @@ export default function AdminEditor({
                         busy
                       }
                       onClick={() =>
-                        onCloseRef.current?.()
+                        onClose?.()
                       }
                       aria-label="Close editor"
                       title="Close"

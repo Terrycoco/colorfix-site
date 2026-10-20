@@ -1,29 +1,23 @@
-import { useEffect, useState } from "react";
+import useOverlayLifecycle from "../../../hooks/useOverlayLifecycle";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import "./MobileWorkbenchDrawer.css";
 
 export default function MobileWorkbenchDrawer({
   open,
-  width = 380,
   title = "",
   onClose,
-  closeLabel = "Save & Close",
   beforeClose = null,
   children,
   footer = null,
-  portal = false,
   padded = false,
   className = "",
 }) {
   const [closing, setClosing] = useState(false);
 
-  // A mobile drawer always overlays the full viewport, regardless of `portal` or `width`.
-  useEffect(() => {
-    if (!open) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
-  }, [open]);
+  const overlayRef = useOverlayLifecycle({
+    open, layer: "drawer", onEscape: () => void requestClose(),
+  });
 
   if (!open) return null;
 
@@ -42,7 +36,7 @@ export default function MobileWorkbenchDrawer({
   }
 
   const drawer = (
-    <div className="mobile-workbench-drawer-overlay" role="dialog" aria-modal="true"
+    <div ref={overlayRef} className="mobile-workbench-drawer-overlay" role="dialog" aria-modal="true"
       aria-label={typeof title === "string" && title ? title : "Details"}>
       <aside className={["mobile-workbench-drawer", className, closing ? "is-closing" : ""].filter(Boolean).join(" ")}>
         <header className="mobile-workbench-drawer__header">

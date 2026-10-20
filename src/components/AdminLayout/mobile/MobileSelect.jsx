@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import useOverlayLifecycle from "../../../hooks/useOverlayLifecycle";
+import { useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./MobileSelect.css";
 
@@ -33,21 +34,10 @@ export default function MobileSelect({
     ) : options;
   }, [options, search]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    if (searchable) searchRef.current?.focus();
-    function onKeyDown(event) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-      triggerRef.current?.focus();
-    };
-  }, [open, searchable]);
+  const overlayRef = useOverlayLifecycle({
+    open, layer: "picker", onEscape: () => { setOpen(false); setSearch(""); },
+    initialFocus: () => searchable ? searchRef.current : null,
+  });
 
   const close = () => { setOpen(false); setSearch(""); };
   const choose = (item) => {
@@ -72,7 +62,7 @@ export default function MobileSelect({
         <span aria-hidden="true" className="admin-mobile-select__chevron">⌄</span>
       </button>
       {open && typeof document !== "undefined" ? createPortal(
-        <div className="admin-mobile-select__overlay" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div ref={overlayRef} className="admin-mobile-select__overlay" role="dialog" aria-modal="true" aria-labelledby={titleId}>
           <header className="admin-mobile-select__header">
             <button type="button" className="admin-mobile-select__back" onClick={close} aria-label="Close selection">←</button>
             <h2 id={titleId}>{title}</h2>

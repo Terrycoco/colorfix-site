@@ -1,0 +1,26 @@
+/* Application layers, shared by public, admin, player and SAS entry points.
+ * Local tokens order children within a component, never whole application overlays.
+ * Portal modal roots use useOverlayLifecycle to coordinate nested focus/dismissal.
+ * A nested overlay may rise one local step above its owner; toast remains highest.
+ * Keep these definitions here; do not redefine them in page stylesheets.
+ */
+:root {
+  --z-back: -1;
+  --z-base: 0;
+  --z-above: 1;
+  --z-label: 2;
+  --z-control: 3;
+  --z-active: 4;
+  --z-drag: 5;
+  --z-sticky: 100;
+  --z-nav: 200;
+  --z-dropdown: 300;
+  --z-shield: 400;
+  --z-fullscreen: 500;
+  --z-drawer: 600;
+  --z-editor: 700;
+  --z-dialog: 800;
+  --z-picker: 900;
+  --z-critical: 1000;
+  --z-toast: 1100;
+}

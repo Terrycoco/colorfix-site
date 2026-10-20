@@ -8,7 +8,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 16px;
-  z-index:  10500;
+  z-index: var(--z-dialog);
 }
 
 /* Modal fills available width so the grid can go across */

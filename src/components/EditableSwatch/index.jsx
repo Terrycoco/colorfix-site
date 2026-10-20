@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import PropTypes from "prop-types";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import "./editableswatch.css";
+import { createPortal } from "react-dom";
+import useAnchoredPopup from "../../hooks/useAnchoredPopup";
+import { containsOverlayTarget } from "../../hooks/useOverlayLifecycle";
 
 function normalizeHex(hex) {
   if (!hex) return "";
@@ -23,7 +26,9 @@ export default function EditableSwatch({
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
-  const popRef = useRef(null);
+  const popRef = useAnchoredPopup({
+    open, anchorRef: btnRef, minWidth: 320, placement, onClose: () => setOpen(false),
+  });
 
   const hex = normalizeHex(value && (value.hex6 || value.hex));
   const chipBg = hex ? `#${hex}` : "transparent";
@@ -54,13 +59,13 @@ export default function EditableSwatch({
     if (!open) return;
     function onDocClick(e) {
       const t = e.target;
-      if (popRef.current && popRef.current.contains(t)) return;
+      if (containsOverlayTarget(popRef.current, t)) return;
       if (btnRef.current && btnRef.current.contains(t)) return;
       setOpen(false);
     }
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
+  }, [open, popRef]);
 
   // keyboard open on button
   function onKeyDownBtn(e) {
@@ -127,7 +132,7 @@ export default function EditableSwatch({
         <span className="ed-swatch__caret" aria-hidden="true">▾</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           id="ed-swatch-popover"
           ref={popRef}
@@ -142,7 +147,7 @@ export default function EditableSwatch({
             onCancel={() => setOpen(false)}
             autoFocus
           />
-        </div>
+        </div>, document.body
       )}
       {showLightness && lightnessVal != null && (
         <div className="ed-swatch__lightness">

@@ -300,7 +300,7 @@ export default function ColorDetailPage() {
 
           {currentColorDetail?.chip_num?.length > 0 && (
             <span
-              className="chip-badge absolute top-2 right-2 z-10 px-2 py-0.5 rounded-md text-xs 
+              className="chip-badge absolute top-2 right-2 z-[var(--z-control)] px-2 py-0.5 rounded-md text-xs
                           pointer-events-none select-none"
               aria-label={`Chip #${currentColorDetail.chip_num}`}
               title="Chip #"

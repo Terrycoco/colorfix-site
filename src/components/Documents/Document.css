@@ -225,7 +225,7 @@
 .document-review-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: var(--z-editor);
   overflow: auto;
   background: rgba(20, 24, 28, 0.88);
   cursor: zoom-out;

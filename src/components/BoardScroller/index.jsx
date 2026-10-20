@@ -247,7 +247,7 @@ const goToHome = (e) => {
   <span
   ref={btnRef}
   className={`mini-brand-wrap ${filterIsActive ? 'has-active' : ''} ${pulse ? 'pulse' : ''}`}
-  style={{ display: 'inline-flex', pointerEvents: 'auto', position: 'relative', zIndex: 3 }}
+  style={{ display: 'inline-flex', pointerEvents: 'auto', position: 'relative', zIndex: "var(--z-control)" }}
   onClick={() => setOpen(true)}
   role="button"
   tabIndex={0}

@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import "./client-picker-modal.css";
@@ -90,10 +92,12 @@ export default function ClientPickerModal({
     }
   }
 
+  const overlayRef = useOverlayLifecycle({ open: open, layer: "dialog", onEscape: () => { if (!saving) onClose?.(); } });
+
   if (!open) return null;
 
-  return (
-    <div className="cpm-overlay" role="dialog" aria-modal="true">
+  return createPortal(
+    <div ref={overlayRef} className="cpm-overlay" role="dialog" aria-modal="true">
       <div className="cpm-backdrop" onClick={onClose} />
       <div className="cpm-panel">
         <div className="cpm-header">
@@ -184,6 +188,6 @@ export default function ClientPickerModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>, document.body
   );
 }

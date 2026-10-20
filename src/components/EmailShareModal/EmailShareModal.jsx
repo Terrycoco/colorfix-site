@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useState } from "react";
 import "./email-share-modal.css";
 
@@ -28,10 +30,12 @@ export default function EmailShareModal({
     if (open) setShowHtmlPreview(false);
   }, [open]);
 
+  const overlayRef = useOverlayLifecycle({ open: open, layer: "dialog", onEscape: () => { if (!status.loading) onClose?.(); } });
+
   if (!open) return null;
 
-  return (
-    <div className="admin-email-modal" role="dialog" aria-modal="true">
+  return createPortal(
+    <div ref={overlayRef} className="admin-email-modal" role="dialog" aria-modal="true">
       <div className="admin-email-panel">
         <div className="admin-email-header">
           <h3>{title}</h3>
@@ -141,6 +145,6 @@ export default function EmailShareModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }

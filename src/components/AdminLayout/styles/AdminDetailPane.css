@@ -20,7 +20,7 @@
 .admin-detail-pane__chrome {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: var(--z-control);
   flex: 0 0 auto;
   background: var(--admin-surface);
 }

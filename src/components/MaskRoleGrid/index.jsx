@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import MaskSettingsTable from "@components/MaskSettingsTable";
 import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import "./mask-role-grid.css";
+import { containsOverlayTarget } from "../../hooks/useOverlayLifecycle";
 
 export default function MaskRoleGrid({
   masks = [],
@@ -54,7 +55,7 @@ export default function MaskRoleGrid({
     if (!activeRole) return;
     const onPointerDown = (e) => {
       if (!editorRef.current) return;
-      if (editorRef.current.contains(e.target)) return;
+      if (containsOverlayTarget(editorRef.current, e.target)) return;
       setActiveRole("");
     };
     document.addEventListener("pointerdown", onPointerDown, { capture: true });

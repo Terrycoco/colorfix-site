@@ -97,7 +97,7 @@ export default function NameSearchItem({ item }) {
         width: '88vw',
         maxWidth: '380px',
         height: 'auto',
-        zIndex: 3000,
+        zIndex: "var(--z-drawer)",
       });
       setOpeningFromRect(null);
     } else {
@@ -110,7 +110,7 @@ export default function NameSearchItem({ item }) {
           left: `${rect.left}px`,
           width: `${rect.width}px`,
           height: 'auto',
-          zIndex: 2000,
+          zIndex: "var(--z-above)",
         });
       } else {
         // Fallback: inline width if rect missing (shouldn't happen)
@@ -121,7 +121,7 @@ export default function NameSearchItem({ item }) {
           width: '600px',
           maxWidth: '90vw',
           height: 'auto',
-          zIndex: 2000,
+          zIndex: "var(--z-above)",
         });
       }
     }

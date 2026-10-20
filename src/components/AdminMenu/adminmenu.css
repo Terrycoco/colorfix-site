@@ -1,7 +1,7 @@
 .admin-menu {
   position: relative;
   display: inline-flex;
-  z-index: 30000;
+  z-index: var(--z-nav);
   overflow: visible;
 }
 
@@ -28,7 +28,7 @@
   padding: 8px 0;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   min-width: 200px;
-  z-index: 30001;
+  z-index: var(--z-dropdown);
   overflow: visible;
 }
 
@@ -76,7 +76,7 @@
   min-width: 220px;
   max-height: min(70vh, 640px);
   overflow-y: auto;
-  z-index: 30002;
+  z-index: var(--z-above);
 }
 
 @media (max-width: 768px) {

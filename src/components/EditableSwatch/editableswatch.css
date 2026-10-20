@@ -73,7 +73,7 @@
 /* Popover */
 .ed-swatch__popover {
   position: absolute;
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   min-width: 320px;
   max-width: 520px;
   border: 1px solid var(--border, #ddd);

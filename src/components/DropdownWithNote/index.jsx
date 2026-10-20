@@ -1,3 +1,6 @@
+import { createPortal } from "react-dom";
+import useAnchoredPopup from "../../hooks/useAnchoredPopup";
+import "./dropdownnote.css";
 import React, { useState, useRef, useEffect} from 'react';
 
 
@@ -11,20 +14,22 @@ function DropdownWithNote({ options, value, onChange, label }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
+  const popupRef = useAnchoredPopup({ open, anchorRef: ref, onClose: () => setOpen(false) });
+
   const selected = options.find(opt => opt.value === value);
 
   
    // ⬇️ Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
+      if (ref.current && !ref.current.contains(event.target) && !popupRef.current?.contains(event.target)) {
         setOpen(false);
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [popupRef]);
 
   return (
     <div className="fancy-dropdown" ref={ref}>
@@ -34,8 +39,8 @@ function DropdownWithNote({ options, value, onChange, label }) {
         <span className="fancy-arrow">{open ? '▲' : '▼'}</span>
       </div>
 
-      {open && (
-        <div className="fancy-options">
+      {open && createPortal(
+        <div ref={popupRef} className="fancy-options">
           {options.map(opt => (
             <div
               key={opt.value}
@@ -49,7 +54,7 @@ function DropdownWithNote({ options, value, onChange, label }) {
               {opt.note && <div className="fancy-option-note">{opt.note}</div>}
             </div>
           ))}
-        </div>
+        </div>, document.body
       )}
     </div>
   );

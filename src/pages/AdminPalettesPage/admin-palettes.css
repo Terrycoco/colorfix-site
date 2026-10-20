@@ -509,7 +509,7 @@
 .palette-photo-preview {
   position: fixed;
   inset: 0;
-  z-index: var(--admin-z-editor);
+  z-index: var(--z-editor);
   display: grid;
   place-items: center;
   padding: 24px;

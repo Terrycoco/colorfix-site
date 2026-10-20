@@ -89,7 +89,7 @@
   width: 150px !important;
 
   position: relative;
-  z-index: 20;
+  z-index: var(--z-above);
 }
 .mbh-add-table td:first-child .fuzzy-input-wrap input[type="search"] {
   font-size: 12px;

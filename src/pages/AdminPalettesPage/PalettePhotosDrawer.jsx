@@ -5,9 +5,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 
-import { AdminWorkbenchDrawer } from "@components/AdminLayout";
+import { AdminWorkbenchDrawer, AdminFullScreenOverlay } from "@components/AdminLayout";
 import PhotoPickerModal from "@components/PhotoPickerModal";
 import { buildImageUrl } from "@helpers/assetImage";
 import { API_FOLDER } from "@helpers/config";
@@ -953,11 +952,8 @@ const PalettePhotosDrawer = forwardRef(
           onPick={handlePhotoPick}
         />
 
-        {previewPhoto
-          && typeof document !== "undefined"
-          ? createPortal(
+        <AdminFullScreenOverlay modal open={Boolean(previewPhoto)} onClose={() => setPreviewPhoto(null)} className="palette-photo-preview" ariaLabel="Photo preview">
               <div
-                className="palette-photo-preview"
                 role="button"
                 tabIndex={0}
                 title="Click to close"
@@ -983,10 +979,8 @@ const PalettePhotosDrawer = forwardRef(
                     previewPhoto
                   )}
                 />
-              </div>,
-              document.body
-            )
-          : null}
+              </div>
+        </AdminFullScreenOverlay>
       </>
     );
   }

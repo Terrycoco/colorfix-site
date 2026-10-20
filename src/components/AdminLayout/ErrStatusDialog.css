@@ -2,7 +2,7 @@
    its modal backdrop/focus trap. Only this component's positioning differs. */
 .err-status {
   position: fixed;
-  z-index: 2147483000; /* Above AdminWorkbenchDrawer and its backdrop */
+  z-index: var(--z-critical); /* Above AdminWorkbenchDrawer and its backdrop */
   box-sizing: border-box;
   background: var(--admin-surface, #fff);
   color: var(--admin-text, #222);

@@ -20,7 +20,7 @@ body { margin: 0; }
 /* TEMP: show page center */
 .app-layout::before{
   content:""; position: fixed; inset:0; left:50%;
-  border-left:1px dashed #ff7a00; pointer-events:none; z-index:9999;
+  border-left:1px dashed #ff7a00; pointer-events:none; z-index: var(--z-above);
 }
 
 

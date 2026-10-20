@@ -110,7 +110,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   font-weight: 600;
   box-shadow: 0 8px 20px rgba(0,0,0,.2);
   cursor: pointer;
-  z-index: 900;
+  z-index: var(--z-nav);
 }
 .myp-save-floating:hover {
   background: #f67c00;
@@ -402,7 +402,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: var(--z-dialog);
 }
 
 .myp-save-modal {
@@ -543,7 +543,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   align-items:center;
   justify-content:center;
   box-shadow:0 8px 20px rgba(0,0,0,.25);
-  z-index:21000;
+  z-index: var(--z-nav);
 }
 .myp-fab-add.is-hidden{ opacity:0; pointer-events:none; }
 
@@ -558,7 +558,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   box-shadow:-3px 0 15px rgba(0,0,0,.2);
   transform:translateX(100%);
   transition:transform .25s ease;
-  z-index:20500;
+  z-index: var(--z-drawer);
   display:flex;
   flex-direction:column;
 }
@@ -666,7 +666,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   position:fixed;
   inset:0;
   background:rgba(0,0,0,.35);
-  z-index:20000;
+  z-index: var(--z-fullscreen);
 }
 
 @media (max-width: 768px){
@@ -734,7 +734,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   left: 12px;
   right: auto;
   max-width: calc(100vw - 24px);
-  z-index: 12000;
+  z-index: var(--z-sticky);
   background: var(--app-background);
   padding: 10px 12px;
   border-radius: 16px;
@@ -799,7 +799,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   position: fixed;
   left: 0;
   top: 0;
-  z-index: -1;
+  z-index: var(--z-back);
   pointer-events: none;
   width: max-content;
   padding: 0;
@@ -882,7 +882,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 50;
+  z-index: var(--z-nav);
   border: none;
   border-radius: 999px;
   background: #111;

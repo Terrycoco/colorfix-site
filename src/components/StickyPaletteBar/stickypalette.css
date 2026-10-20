@@ -7,7 +7,7 @@
   align-items: center;
   background-color: #eee;
   padding: 4px 1.5rem 0 4px;
-  z-index: 100;
+  z-index: var(--z-nav);
   border-bottom: 1px solid #efefef;
   transition: height 200ms ease, padding 200ms ease, background 200ms ease;
 }
@@ -53,7 +53,7 @@
   position: absolute;
   top: -6px;
   right: -6px;
-  z-index: 2;
+  z-index: var(--z-label);
   width: 20px;
   height: 20px;
   border-radius: 50%;

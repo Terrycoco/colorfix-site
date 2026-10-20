@@ -263,7 +263,7 @@
   .playlist-picker {
     position: sticky;
     top: 0;
-    z-index: 5;
+    z-index: var(--z-drag);
     background: #fff;
     border-bottom: 1px solid #bbb;
     padding-bottom: 8px;
@@ -272,7 +272,7 @@
   .playlist-action-strip {
     position: sticky;
     top: 54px;
-    z-index: 5;
+    z-index: var(--z-drag);
   }
 
   .playlist-mobile-card {
