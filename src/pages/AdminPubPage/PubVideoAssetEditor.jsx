@@ -246,6 +246,8 @@ export default function PubVideoAssetEditor({
         ?.text_color
     );
 
+  const [thumbnailColorDraft, setThumbnailColorDraft] = useState("#FFFFFF");
+
   const thumbnailTextColorPickerValue =
     useMemo(
       () =>
@@ -322,6 +324,8 @@ export default function PubVideoAssetEditor({
     setInsideValues(
       editable
     );
+
+    setThumbnailColorDraft(normalizeThumbnailTextColor(editable?.cover?.text_color));
 
     setOriginalInsideValues(
       cloneValue(
@@ -1188,19 +1192,47 @@ function appendDescriptionLink(
                   const nextColor = color
                     ? colorObjectToHex(color)
                     : DEFAULT_YOUTUBE_THUMBNAIL_TEXT_COLOR;
-
+                  const normalized = normalizeThumbnailTextColor(nextColor);
+                  setThumbnailColorDraft(normalized);
                   setInsideValues((current) => ({
                     ...current,
                     cover: {
                       ...(current?.cover || {}),
-                      text_color: normalizeThumbnailTextColor(nextColor),
+                      text_color: normalized,
                     },
                   }));
-
                   setSuccessMessage("");
                   setActionError("");
                 }}
               />
+              <AdminField label="Or enter a hex color">
+                <input
+                  className="admin-field__control"
+                  type="text"
+                  aria-label="Thumbnail text color hex"
+                  value={thumbnailColorDraft}
+                  maxLength={7}
+                  disabled={editorLocked}
+                  onChange={(event) => {
+                    const draft = event.target.value.toUpperCase();
+                    setThumbnailColorDraft(draft);
+                    if (/^#?[0-9A-F]{6}$/.test(draft)) {
+                      setInsideValues((current) => ({
+                        ...current,
+                        cover: {
+                          ...(current?.cover || {}),
+                          text_color: normalizeThumbnailTextColor(draft),
+                        },
+                      }));
+                    }
+                    setSuccessMessage("");
+                    setActionError("");
+                  }}
+                  onBlur={() => {
+                    setThumbnailColorDraft(thumbnailTextColor);
+                  }}
+                />
+              </AdminField>
             </AdminPanel>
           ) : null}
 

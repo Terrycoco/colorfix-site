@@ -61,9 +61,9 @@ function fallbackTitle(resourceType, resourceId) {
 
 function analyticsRowKey(resourceType, item) {
   const sourcePart =
-    item?.source_key === null || item?.source_key === undefined
+    item?.source_label === null || item?.source_label === undefined
       ? "__NULL__"
-      : `source:${item.source_key}`;
+      : `source:${item.source_label}`;
 
   return `${resourceType}:${item?.target_url || item?.resource_id}:${sourcePart}`;
 }
@@ -100,9 +100,9 @@ function AnalyticsVisitsDrawer({
         params.set("resource_id", String(item.resource_id));
       }
 
-      // Omit source_key for SQL NULL; preserve a real empty-string source.
-      if (item.source_key !== null && item.source_key !== undefined) {
-        params.set("source_key", String(item.source_key));
+      // Omit source_label for SQL NULL; preserve a real empty-string label.
+      if (item.source_label !== null && item.source_label !== undefined) {
+        params.set("source_label", String(item.source_label));
       }
 
       const res = await fetch(`${EVENTS_URL}?${params.toString()}`, {
@@ -124,7 +124,7 @@ function AnalyticsVisitsDrawer({
   }, [
     item?.resource_id,
     item?.target_url,
-    item?.source_key,
+    item?.source_label,
     resourceType,
   ]);
 
@@ -179,6 +179,11 @@ function AnalyticsVisitsDrawer({
         key: "session_id",
         label: "Session",
         render: (event) => event.session_id || "—",
+      },
+      {
+        key: "source_key",
+        label: "Actual src",
+        render: (event) => event.source_key ?? "Direct",
       },
       {
         key: "referrer",
@@ -328,6 +333,22 @@ export default function AdminAnalyticsPage() {
     }
   }
 
+  const selectedItem = useMemo(
+    () => items.find((item) => analyticsRowKey(resourceType, item) === selectedKey) || null,
+    [items, resourceType, selectedKey]
+  );
+
+  const selectedVisitUrl = useMemo(() => {
+    const path = String(selectedItem?.visit_path || "").trim();
+    if (!path || !path.startsWith("/") || path.startsWith("//")) return null;
+    try {
+      const url = new URL(path, window.location.origin);
+      return url.origin === window.location.origin ? url.href : null;
+    } catch {
+      return null;
+    }
+  }, [selectedItem]);
+
   const columns = useMemo(
     () => [
       {
@@ -337,9 +358,9 @@ export default function AdminAnalyticsPage() {
           item.title || fallbackTitle(resourceType, item.resource_id),
       },
       {
-        key: "source_key",
+        key: "source_label",
         label: "Source",
-        render: (item) => item.source_key || "Direct",
+        render: (item) => item.source_label || "Direct",
       },
       {
         key: "event_count",
@@ -378,7 +399,23 @@ export default function AdminAnalyticsPage() {
         </AdminListPane>
       }
       detail={
-        <AdminDetailPane ariaLabel="Analytics results">
+        <AdminDetailPane
+          ariaLabel="Analytics results"
+          actions={
+            <AdminButton
+              type="button"
+              variant="secondary"
+              disabled={!selectedVisitUrl}
+              onClick={() => {
+                if (selectedVisitUrl) {
+                  window.location.assign(selectedVisitUrl);
+                }
+              }}
+            >
+              Jump To
+            </AdminButton>
+          }
+        >
           <div className="admin-detail-header">
             <div>
               <h1 className="admin-detail-header__title">Analytics</h1>
@@ -448,7 +485,7 @@ export default function AdminAnalyticsPage() {
                 width: 680,
                 title: (item) =>
                   `${item.title || fallbackTitle(resourceType, item.resource_id)} · ${
-                    item.source_key || "Direct"
+                    item.source_label || "Direct"
                   }`,
                 render: ({ item }) => (
                   <AnalyticsVisitsDrawer

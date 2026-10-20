@@ -795,6 +795,7 @@ final class PubAssetsEndpoint
             $assetType
         ) {
             'pin_before_after_video' => [
+                'search_title',
                 'end_slide_text',
             ],
 

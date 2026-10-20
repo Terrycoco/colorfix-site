@@ -18,7 +18,7 @@ interface ANAReportRepositoryInterface
         string $resourceType,
         ?int $resourceId,
         string $eventKey,
-        ?string $sourceKey,
+        ?string $sourceLabel,
         ?string $targetUrl = null
     ): array;
 

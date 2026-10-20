@@ -76,9 +76,9 @@ final class ANAReportService
         return $rows;
     }
 
-    public function listEventsForResource(string $resourceType, ?int $resourceId, string $eventKey, ?string $sourceKey, ?string $targetUrl = null): array
+    public function listEventsForResource(string $resourceType, ?int $resourceId, string $eventKey, ?string $sourceLabel, ?string $targetUrl = null): array
     {
-        return $this->reports->listEventsForResource($resourceType, $resourceId, $eventKey, $sourceKey, $targetUrl);
+        return $this->reports->listEventsForResource($resourceType, $resourceId, $eventKey, $sourceLabel, $targetUrl);
     }
 
     public function deleteEventById(int $id): bool { return $this->reports->deleteEventById($id); }

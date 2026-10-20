@@ -47,9 +47,9 @@ final class EventsEndpoint
         $eventKey = trim((string)($_GET['event_key'] ?? ''));
         $targetUrl = trim((string)($_GET['target_url'] ?? ''));
 
-        // Missing source_key means SQL NULL. Present-but-empty remains ''.
-        $sourceKey = array_key_exists('source_key', $_GET)
-            ? (string)$_GET['source_key']
+        // Missing source_label means SQL NULL (Direct); a label may aggregate multiple src values.
+        $sourceLabel = array_key_exists('source_label', $_GET)
+            ? (string)$_GET['source_label']
             : null;
 
         if ($resourceType === '' || $eventKey === '' ||
@@ -66,7 +66,7 @@ final class EventsEndpoint
                 $resourceType,
                 $resourceId,
                 $eventKey,
-                $sourceKey,
+                $sourceLabel,
                 $resourceType === 'outbound_link' ? $targetUrl : null
             ),
         ]);
