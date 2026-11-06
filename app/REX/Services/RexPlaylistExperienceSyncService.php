@@ -6,6 +6,7 @@ namespace App\REX\Services;
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlayerExperienceRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistItemPaletteRepository;
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
@@ -188,7 +189,7 @@ final class RexPlaylistExperienceSyncService
      *
      * @return array<string,mixed>
      */
-    public function syncPlaylist(int $playlistId): array
+    public function syncPlaylist(int $playlistId, ?string $selectedExperience = null): array
     {
         if ($playlistId <= 0) {
             throw new InvalidArgumentException(
@@ -196,53 +197,64 @@ final class RexPlaylistExperienceSyncService
             );
         }
 
-        $playlist = $this->playlists->getAdminRowById($playlistId);
-
-        if (!$playlist) {
-            throw new RuntimeException(
-                "Playlist {$playlistId} was not found."
-            );
-        }
-
-        $playlistTitle = trim((string)($playlist['title'] ?? ''));
-
-        if ($playlistTitle === '') {
-            $playlistTitle = "Playlist #{$playlistId}";
-        }
-
-        $items = $this->playlists->getAdminItemRows($playlistId);
-
-        $referencesByItemId = $this->referencesByItemId(
-            $this->savedPaletteReferencesForPlaylist(
-                $playlistId,
-                $items
-            )
-        );
-
-        $plans = [];
-
-        foreach (
-            self::EXPERIENCE_PROFILES
-            as $experienceKey => $profile
-        ) {
-            $plans[$experienceKey] = $this->buildExperiencePlan(
-                $playlistId,
-                $playlistTitle,
-                $experienceKey,
-                $profile,
-                $items,
-                $referencesByItemId,
-                (int)($playlist['project_id'] ?? 0),
-            );
-        }
-
+        // Serialize all canonical sync callers before reading reservations.
+        // The lock lasts until the owning transaction commits (also when a
+        // playlist save started the transaction before calling this service).
+        $profiles = $this->profilesForSelection($selectedExperience);
         $ownsTransaction = !$this->pdo->inTransaction();
-
-        if ($ownsTransaction) {
-            $this->pdo->beginTransaction();
-        }
-
+        if ($ownsTransaction) $this->pdo->beginTransaction();
         try {
+            $lockSql = 'SELECT playlist_id FROM playlists WHERE playlist_id = :id';
+            if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+                $lockSql .= ' FOR UPDATE';
+            }
+            $lock = $this->pdo->prepare($lockSql);
+            $lock->execute([':id' => $playlistId]);
+            if (!$lock->fetchColumn()) {
+                throw new InvalidArgumentException('Playlist not found.');
+            }
+
+            $playlist = $this->playlists->getAdminRowById($playlistId);
+
+            if (!$playlist) {
+                throw new RuntimeException(
+                    "Playlist {$playlistId} was not found."
+                );
+            }
+
+            $playlistTitle = trim((string)($playlist['title'] ?? ''));
+
+            if ($playlistTitle === '') {
+                $playlistTitle = "Playlist #{$playlistId}";
+            }
+
+            $items = $this->playlists->getAdminItemRows($playlistId);
+
+            $referencesByItemId = $this->referencesByItemId(
+                $this->savedPaletteReferencesForPlaylist(
+                    $playlistId,
+                    $items
+                )
+            );
+
+            $plans = [];
+
+            foreach (
+                $profiles
+                as $experienceKey => $profile
+            ) {
+                $plans[$experienceKey] = $this->buildExperiencePlan(
+                    $playlistId,
+                    $playlistTitle,
+                    $experienceKey,
+                    $profile,
+                    $items,
+                    $referencesByItemId,
+                    (int)($playlist['project_id'] ?? 0),
+                );
+                $plans[$experienceKey]['ensure_parent'] = $selectedExperience !== null;
+            }
+
             $results = [];
 
             foreach ($plans as $experienceKey => $plan) {
@@ -286,6 +298,28 @@ final class RexPlaylistExperienceSyncService
 
             throw $e;
         }
+    }
+
+    /** Standard full-sync behavior stays unchanged; selection can also ensure a custom experience. */
+    private function profilesForSelection(?string $experienceKey): array
+    {
+        if ($experienceKey === null) return self::EXPERIENCE_PROFILES;
+        $experienceKey = strtolower(trim($experienceKey));
+        if (isset(self::EXPERIENCE_PROFILES[$experienceKey])) {
+            return [$experienceKey => self::EXPERIENCE_PROFILES[$experienceKey]];
+        }
+        $experience = (new PdoPlayerExperienceRepository($this->pdo))
+            ->getByExperienceKey($experienceKey);
+        if (!$experience || !$experience->isActive) {
+            throw new InvalidArgumentException('Player experience not found or inactive.');
+        }
+        $format = $experience->paletteViewerKey;
+        if ($format === 'full_palette') $format = 'public';
+        return [$experienceKey => [
+            'slide_flag' => $experience->slideFlag,
+            'viewer_formats' => $format === 'none' ? [] : [$format],
+            'thumbs_format' => $format,
+        ]];
     }
 
     /**
@@ -977,6 +1011,7 @@ final class RexPlaylistExperienceSyncService
 
         if (
             $slideCount === 0
+            && empty($plan['ensure_parent'])
             && !($parentRex instanceof RexReservation)
         ) {
             return [
@@ -1302,7 +1337,8 @@ final class RexPlaylistExperienceSyncService
             $this->reservations->findByResource(
                 $resourceType,
                 $resourceId,
-                500
+                500,
+                $resourceType === 'playlist' && $this->pdo->inTransaction(),
             )
             as $reservation
         ) {

@@ -8,6 +8,7 @@ import {
   getCurrentSourceParam,
   withSourceParam,
 } from "@helpers/sourceParam";
+import { readRexBootstrap, readRexResponse, RexNotFoundError, REX_UNAVAILABLE } from "@helpers/rexResolution";
 import Player from "@RX/Player";
 import PV from "@RX/PV";
 import Thumbs from "@RX/Thumbs";
@@ -31,6 +32,7 @@ export default function RexPublicPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [state, setState] = useState(EMPTY_STATE);
+  const [attempt, setAttempt] = useState(0);
 
   const returnTo = normalizeInternalReturnPath(
     searchParams.get("return_to") ?? ""
@@ -69,17 +71,15 @@ export default function RexPublicPage() {
 
     setState(EMPTY_STATE);
 
-    fetch(`/api/v2/rex/resolve.php?${params.toString()}`, {
+    const bootstrap = readRexBootstrap(token, getCurrentSourceParam());
+    const resolution = bootstrap ? Promise.resolve(bootstrap) : fetch(`/api/v2/rex/resolve.php?${params.toString()}`, {
       signal: controller.signal,
       credentials: "include",
       headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        const payload = await response.json().catch(() => null);
+    }).then(readRexResponse);
 
-        if (!response.ok || !payload?.ok || !payload?.data) {
-          throw new Error(payload?.error || "Link not found.");
-        }
+    resolution.then((payload) => {
+        if (controller.signal.aborted) return;
 
         const resolverKey = payload.data.resolver_key || "";
         const destination = payload.data.destination || {};
@@ -199,12 +199,13 @@ export default function RexPublicPage() {
         setState({
           ...EMPTY_STATE,
           loading: false,
-          error: error?.message || "Link not found.",
+          error: error instanceof RexNotFoundError ? "Link not found." : REX_UNAVAILABLE,
+          retryable: !(error instanceof RexNotFoundError),
         });
       });
 
     return () => controller.abort();
-  }, [token]);
+  }, [token, attempt]);
 
   if (state.loading) {
     return (
@@ -261,7 +262,8 @@ export default function RexPublicPage() {
 
   return (
     <div className="rex-public-page rex-public-page--error">
-      {state.error || "Link not found."}
+      <p>{state.error || REX_UNAVAILABLE}</p>
+      {state.retryable && <button type="button" onClick={() => setAttempt(value => value + 1)}>Try again</button>}
     </div>
   );
 }

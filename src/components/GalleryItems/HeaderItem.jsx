@@ -1,6 +1,9 @@
-export default function HeaderItem({meta}) {
+import ReferenceSwatch from '../Swatches/ReferenceSwatch';
 
-  
+export default function HeaderItem({meta}) {
+  const referenceColor = meta?.search_mode === 'hex'
+    ? meta.reference_color
+    : null;
 
 
   function injectColorName(template) {
@@ -12,7 +15,10 @@ export default function HeaderItem({meta}) {
 
     return (
         <div className="header">
-           <h3 className="header-title">{injectColorName(meta.header_title)}</h3> 
+           <div className={referenceColor ? 'header-hex-title' : undefined}>
+             {referenceColor && <ReferenceSwatch color={referenceColor} />}
+             <h3 className="header-title">{injectColorName(meta.header_title)}</h3>
+           </div>
              <h4 className="header-subtitle">{injectColorName(meta.header_subtitle)}</h4> 
            <div className="header-content">{injectColorName(meta.header_content)}</div>
         </div>

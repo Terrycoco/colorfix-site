@@ -93,5 +93,7 @@ run "deploycontent.sh"
 
 run "deploydb.sh"
 
+run "deploy.sh"
+
 
 echo "✅ all deploys finished"

@@ -91,6 +91,18 @@ try {
   await page.waitForFunction(() => document.querySelector('#dynamic').search.includes('src=client'));
   console.log('PASS dynamic internal links receive source in actual href'); passed++;
 
+  await page.evaluate(() => {
+    const canonical = document.createElement('link');
+    canonical.rel = 'canonical';
+    canonical.href = '/t/public-token';
+    document.head.append(canonical);
+    canonical.setAttribute('href', '/t/showcase-token');
+  });
+  // A subsequent task allows the href mutation observer to finish.
+  await page.waitForTimeout(50);
+  assert.equal(await page.getAttribute('link[rel="canonical"]', 'href'), '/t/showcase-token');
+  console.log('PASS canonical href mutations never acquire tracking parameters'); passed++;
+
   await entrance('/', 'https://www.bing.com/search?q=paint'); await check('bing');
   await entrance('/', 'https://www.pinterest.com/pin/123'); await check('pin');
   await entrance('/', 'https://google.com.evil.test/'); await check('');

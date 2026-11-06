@@ -12,6 +12,7 @@ use App\REX\DTO\RexResolutionResult;
 use App\REX\DTO\RexShareMetadata;
 use App\REX\Resources\RexRouteCatalog;
 use RuntimeException;
+use App\REX\Exceptions\RexNotFoundException;
 
 final class RouteResolver implements RexResolverInterface
 {
@@ -21,7 +22,7 @@ final class RouteResolver implements RexResolverInterface
         $route = RexRouteCatalog::get($request->resourceId);
 
         if ($route === null) {
-            throw new RuntimeException('REX route resource was not found.');
+            throw new RexNotFoundException('REX route resource was not found.');
         }
 
         return new RexResolutionResult(
@@ -72,7 +73,7 @@ final class RouteResolver implements RexResolverInterface
         $route = RexRouteCatalog::get($resourceId);
 
         if ($route === null) {
-            throw new RuntimeException('REX route resource was not found.');
+            throw new RexNotFoundException('REX route resource was not found.');
         }
 
         return new RexReservationDescriptor(

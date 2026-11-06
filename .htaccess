@@ -17,6 +17,8 @@
   RewriteRule ^playlist/(.+)$ /p/$1 [R=302,L,NE]
   RewriteRule ^playlists/?$ /playlists/index.php [L,QSA]
   RewriteRule ^sitemap\.xml$ /sitemap.php [L,QSA]
+  # Serve crawler instructions directly, ahead of the SPA fallback.
+  RewriteRule ^robots\.txt$ - [L]
 
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
@@ -51,6 +53,10 @@
 </IfModule>
 
 # Caching rules
+<IfModule mod_mime.c>
+  AddType text/plain .txt
+</IfModule>
+
 <IfModule mod_expires.c>
   ExpiresActive On
 

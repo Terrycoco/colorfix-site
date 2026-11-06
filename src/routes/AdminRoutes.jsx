@@ -85,7 +85,8 @@ function renderWithSuspense(Component, label) {
 }
 
 export default function AdminRoutes() {
-  const { user } = useAppState();
+  const { user, authReady, authError } = useAppState();
+  if (!authReady) return <p role="status">{authError || 'Checking admin session…'}</p>;
   const adminAllowed = Boolean(user?.is_admin) || isAdmin();
 
   if (!adminAllowed) {

@@ -17,6 +17,16 @@ deploy_rsync -avz \
   -e "$RSYNC_SSH" \
   .htaccess sitemap.php playlist-share.php oauth-google.php qr.php card.php pv.php t.php "$REMOTE_TARGET:$REMOTE_PATH/"
 
+# Keep Search Console ownership verification available in root-only deployments.
+# Vite also copies this public asset to dist/ for regular site deployments.
+deploy_rsync -avz \
+  -e "$RSYNC_SSH" \
+  "$SCRIPT_DIR/public/googlef6d155b84b5400fb.html" "$REMOTE_TARGET:$REMOTE_PATH/"
+
+deploy_rsync -avz \
+  -e "$RSYNC_SSH" \
+  "$SCRIPT_DIR/public/robots.txt" "$REMOTE_TARGET:$REMOTE_PATH/"
+
 deploy_rsync -avz --delete \
   -e "$RSYNC_SSH" \
   playlists/ "$REMOTE_TARGET:$REMOTE_PATH/playlists"

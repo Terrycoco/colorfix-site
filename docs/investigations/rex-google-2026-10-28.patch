@@ -1,0 +1,777 @@
+--- a/app/REX/Endpoints/RexResolveEndpoint.php
++++ b/app/REX/Endpoints/RexResolveEndpoint.php
+@@ -8,6 +8,7 @@
+ use App\REX\Services\RexResolver;
+ use PDO;
+ use Throwable;
++use App\REX\Exceptions\RexNotFoundException;
+ 
+ final class RexResolveEndpoint
+ {
+@@ -61,36 +62,57 @@
+                 'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
+             ]);
+ 
+-            self::respond([
+-                'ok' => true,
+-                'data' => [
+-                    'resolver_key' => $result->resolverKey,
+-                    'resource_type' => $result->resourceType,
+-                    'resource_id' => $result->resourceId,
+-                    'behavior' => $result->behavior->value,
+-                    'destination' => $result->destination,
+-                    'share_metadata' => [
+-                        'title' => $result->shareMetadata->title,
+-                        'description' => $result->shareMetadata->description,
+-                        'image_url' => $result->shareMetadata->imageUrl,
+-                    ],
+-                    'analytics_metadata' => $result->analyticsMetadata,
+-                    'rex' => [
+-                        'reservation_id' => $reservation->id,
+-                        'resolver_key' => $reservation->resolverKey,
+-                        'resource_type' => $reservation->resourceType,
+-                        'resource_id' => $reservation->resourceId,
+-                        'experience_key' => $reservation->experienceKey,
+-                    ],
+-                ],
+-            ]);
++            self::respond(self::payload($result, $reservation));
++
++        } catch (RexNotFoundException) {
++            self::respond(['ok' => false, 'error' => 'Link not found.'], 404);
+ 
+         } catch (Throwable $e) {
++            self::logFailure($e);
+             self::respond([
+                 'ok' => false,
+-                'error' => $e->getMessage(),
+-            ], 404);
++                'error' => 'Unable to load this ColorFix link right now. Please try again.',
++            ], 500);
+         }
++    }
++
++    public static function logFailure(Throwable $error): void
++    {
++        // No cookies, request parameters, SQL values or exception messages.
++        error_log('[REX] ' . json_encode([
++            'type' => get_class($error),
++            'file' => $error->getFile(),
++            'line' => $error->getLine(),
++        ], JSON_UNESCAPED_SLASHES));
++    }
++
++    public static function payload(
++        \App\REX\DTO\RexResolutionResult $result,
++        \App\REX\DTO\RexReservation $reservation
++    ): array {
++        return [
++            'ok' => true,
++            'data' => [
++                'resolver_key' => $result->resolverKey,
++                'resource_type' => $result->resourceType,
++                'resource_id' => $result->resourceId,
++                'behavior' => $result->behavior->value,
++                'destination' => $result->destination,
++                'share_metadata' => [
++                    'title' => $result->shareMetadata->title,
++                    'description' => $result->shareMetadata->description,
++                    'image_url' => $result->shareMetadata->imageUrl,
++                ],
++                'analytics_metadata' => $result->analyticsMetadata,
++                'rex' => [
++                    'reservation_id' => $reservation->id,
++                    'resolver_key' => $reservation->resolverKey,
++                    'resource_type' => $reservation->resourceType,
++                    'resource_id' => $reservation->resourceId,
++                    'experience_key' => $reservation->experienceKey,
++                ],
++            ],
++        ];
+     }
+ 
+     private static function respond(array $payload, int $status = 200): void
+@@ -99,7 +121,7 @@
+ 
+         echo json_encode(
+             $payload,
+-            JSON_UNESCAPED_SLASHES
++            JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+         );
+     }
+ }
+--- a/app/REX/Endpoints/RexPublicEntryEndpoint.php
++++ b/app/REX/Endpoints/RexPublicEntryEndpoint.php
+@@ -13,6 +13,7 @@
+ use App\REX\Services\RexIndexingPolicy;
+ use PDO;
+ use Throwable;
++use App\REX\Exceptions\RexNotFoundException;
+ 
+ final class RexPublicEntryEndpoint
+ {
+@@ -44,9 +45,16 @@
+             ]);
+ 
+             $indexable = self::isIndexablePlaylist($pdo, $result);
+-
+-        } catch (Throwable) {
++            $bootstrap = $indexable ? [
++                'token' => $token,
++                'payload' => RexResolveEndpoint::payload($result, $repo->findByToken($token)),
++            ] : null;
++
++        } catch (RexNotFoundException) {
+             self::notFound();
++        } catch (Throwable $error) {
++            RexResolveEndpoint::logFailure($error);
++            self::unavailable();
+         }
+ 
+         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+@@ -86,7 +94,10 @@
+          * resolver-key allowlist.
+          */
+         if ($result->behavior === RexResolutionBehavior::RENDER) {
+-            self::renderReactShell($indexPath, $result->shareMetadata, $indexable);
++            // Reuse the plan already resolved under the normal access rules.
++            // Only eligible marketing playlists embed data; client resources keep
++            // their existing API flow and exclusions.
++            self::renderReactShell($indexPath, $result->shareMetadata, $indexable, $bootstrap);
+         }
+ 
+         self::notFound();
+@@ -114,91 +125,101 @@
+     private static function renderReactShell(
+         string $indexPath,
+         RexShareMetadata $shareMetadata,
+-        bool $indexable = false
++        bool $indexable = false,
++        ?array $bootstrap = null
+     ): never {
+-        $html = is_file($indexPath)
+-            ? (string)file_get_contents($indexPath)
+-            : '';
+-
+-        if ($html === '') {
+-            self::notFound();
+-        }
+-
+-        $html = self::applyRobotsMetadata($html, $indexable);
+-
+-        $title = trim((string)($shareMetadata->title ?? ''));
+-        $description = trim((string)($shareMetadata->description ?? ''));
+-        $imageUrl = self::absoluteUrl($shareMetadata->imageUrl);
+-        $shareUrl = self::publicRexUrl();
+-
+-        // The REX address identifies the experience; query parameters only carry
+-        // tracking/navigation state. Replace any inherited shell canonical.
+-        $html = preg_replace(
+-            '/<link\b(?=[^>]*\brel\s*=\s*["\']canonical["\'])[^>]*>\s*/i',
+-            '',
+-            $html
+-        ) ?? $html;
+-
+-        /*
+-         * The Vite shell contains site-wide social metadata. REX pages need
+-         * object-specific metadata, so remove the static OG/Twitter tags
+-         * before inserting the resolved REX metadata below.
+-         */
+-        $html = preg_replace(
+-            '/<meta\s+(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*>\s*/i',
+-            '',
+-            $html
+-        ) ?? $html;
+-
+-        $tags = [];
+-
+-        if ($title !== '') {
+-            $escapedTitle = self::escapeHtml($title);
+-
++        try {
++            $html = is_file($indexPath)
++                ? (string)file_get_contents($indexPath)
++                : '';
++
++            if ($html === '') {
++                self::unavailable();
++            }
++
++            $html = self::applyRobotsMetadata($html, $indexable);
++
++            $title = trim((string)($shareMetadata->title ?? ''));
++            $description = trim((string)($shareMetadata->description ?? ''));
++            $imageUrl = self::absoluteUrl($shareMetadata->imageUrl);
++            $shareUrl = self::publicRexUrl();
++
++            // The REX address identifies the experience; query parameters only carry
++            // tracking/navigation state. Replace any inherited shell canonical.
+             $html = preg_replace(
+-                '/<title\b[^>]*>.*?<\/title>/is',
+-                '<title>' . $escapedTitle . '</title>',
+-                $html,
+-                1
++                '/<link\b(?=[^>]*\brel\s*=\s*["\']canonical["\'])[^>]*>\s*/i',
++                '',
++                $html
+             ) ?? $html;
+ 
+-            $tags[] = '<meta property="og:title" content="' . $escapedTitle . '">';
+-            $tags[] = '<meta name="twitter:title" content="' . $escapedTitle . '">';
+-        }
+-
+-        if ($description !== '') {
+-            $escapedDescription = self::escapeHtml($description);
+-            $tags[] = '<meta property="og:description" content="' . $escapedDescription . '">';
+-            $tags[] = '<meta name="twitter:description" content="' . $escapedDescription . '">';
+-        }
+-
+-        if ($imageUrl !== '') {
+-            $escapedImage = self::escapeHtml($imageUrl);
+-            $tags[] = '<meta property="og:image" content="' . $escapedImage . '">';
+-            $tags[] = '<meta name="twitter:image" content="' . $escapedImage . '">';
+-            $tags[] = '<meta name="twitter:card" content="summary_large_image">';
+-        }
+-
+-        if ($shareUrl !== '') {
+-            $tags[] = '<link rel="canonical" href="' . self::escapeHtml($shareUrl) . '">';
+-            $tags[] = '<meta property="og:url" content="' . self::escapeHtml($shareUrl) . '">';
+-        }
+-
+-        $tags[] = '<meta property="og:type" content="website">';
+-
+-        if ($tags !== []) {
+-            $metaHtml = implode("\n", $tags) . "\n";
++            /*
++             * The Vite shell contains site-wide social metadata. REX pages need
++             * object-specific metadata, so remove the static OG/Twitter tags
++             * before inserting the resolved REX metadata below.
++             */
+             $html = preg_replace(
+-                '/<\/head>/i',
+-                $metaHtml . '</head>',
+-                $html,
+-                1
++                '/<meta\s+(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*>\s*/i',
++                '',
++                $html
+             ) ?? $html;
+-        }
+-
+-        header('Content-Type: text/html; charset=utf-8');
+-        echo $html;
+-        exit;
++
++            $tags = [];
++
++            if ($title !== '') {
++                $escapedTitle = self::escapeHtml($title);
++
++                $html = preg_replace(
++                    '/<title\b[^>]*>.*?<\/title>/is',
++                    '<title>' . $escapedTitle . '</title>',
++                    $html,
++                    1
++                ) ?? $html;
++
++                $tags[] = '<meta property="og:title" content="' . $escapedTitle . '">';
++                $tags[] = '<meta name="twitter:title" content="' . $escapedTitle . '">';
++            }
++
++            if ($description !== '') {
++                $escapedDescription = self::escapeHtml($description);
++                $tags[] = '<meta property="og:description" content="' . $escapedDescription . '">';
++                $tags[] = '<meta name="twitter:description" content="' . $escapedDescription . '">';
++            }
++
++            if ($imageUrl !== '') {
++                $escapedImage = self::escapeHtml($imageUrl);
++                $tags[] = '<meta property="og:image" content="' . $escapedImage . '">';
++                $tags[] = '<meta name="twitter:image" content="' . $escapedImage . '">';
++                $tags[] = '<meta name="twitter:card" content="summary_large_image">';
++            }
++
++            if ($shareUrl !== '') {
++                $tags[] = '<link rel="canonical" href="' . self::escapeHtml($shareUrl) . '">';
++                $tags[] = '<meta property="og:url" content="' . self::escapeHtml($shareUrl) . '">';
++            }
++
++            $tags[] = '<meta property="og:type" content="website">';
++
++            if ($tags !== []) {
++                $metaHtml = implode("\n", $tags) . "\n";
++                $html = preg_replace(
++                    '/<\/head>/i',
++                    $metaHtml . '</head>',
++                    $html,
++                    1
++                ) ?? $html;
++            }
++
++            if ($bootstrap !== null) {
++                $json = json_encode($bootstrap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
++                $html = str_replace('</head>', '<script type="application/json" id="colorfix-rex-bootstrap">' . $json . '</script></head>', $html);
++            }
++            header('Content-Type: text/html; charset=utf-8');
++            echo $html;
++            exit;
++        } catch (Throwable $error) {
++            RexResolveEndpoint::logFailure($error);
++            self::unavailable();
++        }
+     }
+ 
+     private static function absoluteUrl(?string $value): string
+@@ -252,6 +273,19 @@
+         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+     }
+ 
++    private static function unavailable(): never
++    {
++        http_response_code(503);
++        header('Content-Type: text/html; charset=utf-8');
++        header('Cache-Control: no-store');
++        header('Retry-After: 60');
++        header('X-Robots-Tag: noindex, noarchive');
++        echo '<!doctype html><html><head><meta name="robots" content="noindex, noarchive">'
++            . '<title>ColorFix temporarily unavailable</title></head><body>'
++            . 'Unable to load this ColorFix link right now. Please try again.</body></html>';
++        exit;
++    }
++
+     private static function notFound(): never
+     {
+         http_response_code(404);
+--- a/app/REX/Services/RexResolver.php
++++ b/app/REX/Services/RexResolver.php
+@@ -9,6 +9,7 @@
+ use App\REX\DTO\RexResolutionResult;
+ use App\REX\Resolvers\RexResolverRegistry;
+ use RuntimeException;
++use App\REX\Exceptions\RexNotFoundException;
+ use App\REX\DTO\RexReservationDescriptor;
+ use InvalidArgumentException;
+ 
+@@ -28,7 +29,7 @@
+ 
+         $reservation = $this->reservations->findByToken($token);
+         if (!$reservation) {
+-            throw new RuntimeException('REX reservation token was not found.');
++            throw new RexNotFoundException('REX reservation token was not found.');
+         }
+ 
+         return $this->resolveReservation($reservation, 'token', $token, $requestMetadata);
+@@ -43,7 +44,7 @@
+ 
+         $reservation = $this->reservations->findByAlias($alias);
+         if (!$reservation) {
+-            throw new RuntimeException('REX reservation alias was not found.');
++            throw new RexNotFoundException('REX reservation alias was not found.');
+         }
+ 
+         return $this->resolveReservation($reservation, 'alias', $alias, $requestMetadata);
+@@ -72,7 +73,7 @@
+ 
+     try {
+         if ($reservation->status !== RexReserver::STATUS_ACTIVE || $reservation->revokedAt !== null) {
+-            throw new RuntimeException('REX reservation is not active.');
++            throw new RexNotFoundException('REX reservation is not active.');
+         }
+ 
+         $resolver = $this->registry->get($reservation->resolverKey);
+--- a/app/REX/Resolvers/RouteResolver.php
++++ b/app/REX/Resolvers/RouteResolver.php
+@@ -12,6 +12,7 @@
+ use App\REX\DTO\RexShareMetadata;
+ use App\REX\Resources\RexRouteCatalog;
+ use RuntimeException;
++use App\REX\Exceptions\RexNotFoundException;
+ 
+ final class RouteResolver implements RexResolverInterface
+ {
+@@ -21,7 +22,7 @@
+         $route = RexRouteCatalog::get($request->resourceId);
+ 
+         if ($route === null) {
+-            throw new RuntimeException('REX route resource was not found.');
++            throw new RexNotFoundException('REX route resource was not found.');
+         }
+ 
+         return new RexResolutionResult(
+@@ -72,7 +73,7 @@
+         $route = RexRouteCatalog::get($resourceId);
+ 
+         if ($route === null) {
+-            throw new RuntimeException('REX route resource was not found.');
++            throw new RexNotFoundException('REX route resource was not found.');
+         }
+ 
+         return new RexReservationDescriptor(
+--- a/app/REX/Resolvers/DocumentResolver.php
++++ b/app/REX/Resolvers/DocumentResolver.php
+@@ -13,6 +13,7 @@
+ use App\PROJECTS\Repos\PdoProjectRepository;
+ use PDO;
+ use RuntimeException;
++use App\REX\Exceptions\RexNotFoundException;
+ 
+ final class DocumentResolver implements RexResolverInterface
+ {
+@@ -40,7 +41,7 @@
+         $document = $this->findDocument($documentId);
+ 
+         if (!$document) {
+-            throw new RuntimeException(
++            throw new RexNotFoundException(
+                 "Project document {$documentId} was not found."
+             );
+         }
+@@ -127,7 +128,7 @@
+         $document = $this->findDocument($documentId);
+ 
+         if (!$document) {
+-            throw new RuntimeException(
++            throw new RexNotFoundException(
+                 "Project document {$documentId} was not found."
+             );
+         }
+--- a/app/REX/Resolvers/PlaylistThumbsResolver.php
++++ b/app/REX/Resolvers/PlaylistThumbsResolver.php
+@@ -16,6 +16,7 @@
+ use App\PLAYLISTS\Repos\PdoPlaylistRepository;
+ use PDO;
+ use RuntimeException;
++use App\REX\Exceptions\RexNotFoundException;
+ 
+ final class PlaylistThumbsResolver implements RexResolverInterface
+ {
+@@ -83,7 +84,7 @@
+         $playlist = $this->playlists->getAdminRowById($playlistId);
+ 
+         if (!$playlist) {
+-            throw new RuntimeException(
++            throw new RexNotFoundException(
+                 "Playlist {$playlistId} was not found."
+             );
+         }
+@@ -295,7 +296,7 @@
+         $playlist = $this->playlists->getAdminRowById($playlistId);
+ 
+         if (!$playlist) {
+-            throw new RuntimeException(
++            throw new RexNotFoundException(
+                 "Playlist {$playlistId} was not found."
+             );
+         }
+--- a/app/PLAYLISTS/Services/PlaylistExperienceService.php
++++ b/app/PLAYLISTS/Services/PlaylistExperienceService.php
+@@ -20,6 +20,7 @@
+ use DomainException;
+ use PDO;
+ use RuntimeException;
++use App\REX\Exceptions\RexNotFoundException;
+ use App\PALETTES\PV\PVService;
+ 
+ class PlaylistExperienceService
+@@ -96,7 +97,7 @@
+     $this->markTiming('load_playlist', $playlistStartedAt);
+ 
+     if (!$playlist instanceof Playlist) {
+-        throw new RuntimeException("Playlist {$playlistId} not found for public REX reservation");
++        throw new RexNotFoundException("Playlist {$playlistId} not found for public REX reservation");
+     }
+ 
+     $itemsStartedAt = microtime(true);
+@@ -657,7 +658,7 @@
+         $projectRepo = new PdoProjectRepository($this->pdo);
+         $project = $projectRepo->findById($projectId);
+         if (!$project) {
+-            throw new RuntimeException("Project not found: {$projectId}");
++            throw new RexNotFoundException("Project not found: {$projectId}");
+         }
+         $projectPlaylists = $projectRepo->listPlaylists($projectId);
+ 
+@@ -688,7 +689,7 @@
+         $playlist = $playlistRepo->getById((string)$playlistId, $slideFlag);
+         $this->markTiming('load_playlist', $playlistStartedAt);
+         if (!$playlist instanceof Playlist) {
+-            throw new RuntimeException("Playlist {$playlistId} not found for project {$projectId}");
++            throw new RexNotFoundException("Playlist {$playlistId} not found for project {$projectId}");
+         }
+ 
+         $itemsStartedAt = microtime(true);
+--- a/src/pages/REX/RexPublicPage/index.jsx
++++ b/src/pages/REX/RexPublicPage/index.jsx
+@@ -8,6 +8,7 @@
+   getCurrentSourceParam,
+   withSourceParam,
+ } from "@helpers/sourceParam";
++import { readRexBootstrap, readRexResponse, RexNotFoundError, REX_UNAVAILABLE } from "@helpers/rexResolution";
+ import Player from "@RX/Player";
+ import PV from "@RX/PV";
+ import Thumbs from "@RX/Thumbs";
+@@ -31,6 +32,7 @@
+   const navigate = useNavigate();
+   const [searchParams] = useSearchParams();
+   const [state, setState] = useState(EMPTY_STATE);
++  const [attempt, setAttempt] = useState(0);
+ 
+   const returnTo = normalizeInternalReturnPath(
+     searchParams.get("return_to") ?? ""
+@@ -69,17 +71,15 @@
+ 
+     setState(EMPTY_STATE);
+ 
+-    fetch(`/api/v2/rex/resolve.php?${params.toString()}`, {
++    const bootstrap = readRexBootstrap(token, getCurrentSourceParam());
++    const resolution = bootstrap ? Promise.resolve(bootstrap) : fetch(`/api/v2/rex/resolve.php?${params.toString()}`, {
+       signal: controller.signal,
+       credentials: "include",
+       headers: { Accept: "application/json" },
+-    })
+-      .then(async (response) => {
+-        const payload = await response.json().catch(() => null);
+-
+-        if (!response.ok || !payload?.ok || !payload?.data) {
+-          throw new Error(payload?.error || "Link not found.");
+-        }
++    }).then(readRexResponse);
++
++    resolution.then((payload) => {
++        if (controller.signal.aborted) return;
+ 
+         const resolverKey = payload.data.resolver_key || "";
+         const destination = payload.data.destination || {};
+@@ -199,12 +199,13 @@
+         setState({
+           ...EMPTY_STATE,
+           loading: false,
+-          error: error?.message || "Link not found.",
++          error: error instanceof RexNotFoundError ? "Link not found." : REX_UNAVAILABLE,
++          retryable: !(error instanceof RexNotFoundError),
+         });
+       });
+ 
+     return () => controller.abort();
+-  }, [token]);
++  }, [token, attempt]);
+ 
+   if (state.loading) {
+     return (
+@@ -261,7 +262,8 @@
+ 
+   return (
+     <div className="rex-public-page rex-public-page--error">
+-      {state.error || "Link not found."}
++      <p>{state.error || REX_UNAVAILABLE}</p>
++      {state.retryable && <button type="button" onClick={() => setAttempt(value => value + 1)}>Try again</button>}
+     </div>
+   );
+ }
+--- /dev/null
++++ b/app/REX/Exceptions/RexNotFoundException.php
+@@ -0,0 +1,6 @@
++<?php
++declare(strict_types=1);
++namespace App\REX\Exceptions;
++
++/** A confirmed missing or intentionally unavailable REX resource. */
++final class RexNotFoundException extends \RuntimeException {}
+--- /dev/null
++++ b/src/helpers/rexResolution.js
+@@ -0,0 +1,30 @@
++export const REX_UNAVAILABLE = "Unable to load this ColorFix link right now. Please try again.";
++
++export class RexNotFoundError extends Error {
++  constructor() { super("Link not found."); }
++}
++
++export function readRexBootstrap(token, src) {
++  try {
++    const bootstrap = JSON.parse(document.getElementById("colorfix-rex-bootstrap")?.textContent || "null");
++    if (bootstrap?.token === token && bootstrap.payload?.ok && bootstrap.payload?.data) {
++      // Referrer/session attribution is established in the browser after PHP.
++      const plan = bootstrap.payload.data.destination?.playback_plan;
++      if (plan) plan.src = src || null;
++      return bootstrap.payload;
++    }
++  } catch { /* A missing/invalid bootstrap uses the normal resolver API. */ }
++  return null;
++}
++
++export async function readRexResponse(response) {
++  const payload = await response.json().catch(() => null);
++  // An HTML challenge (even with a 404 status) is not a missing-resource verdict.
++  if (response.status === 404 && payload?.ok === false && payload?.error === "Link not found.") {
++    throw new RexNotFoundError();
++  }
++  if (!response.ok || payload?.ok !== true || !payload?.data) {
++    throw new Error(REX_UNAVAILABLE);
++  }
++  return payload;
++}
+--- /dev/null
++++ b/api/tests/RexFailureHandlingTest.php
+@@ -0,0 +1,34 @@
++<?php
++declare(strict_types=1);
++require_once __DIR__ . '/../autoload.php';
++use App\REX\Endpoints\RexResolveEndpoint;
++
++$pdo = new PDO('sqlite::memory:');
++$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
++$checks = 0;
++function request(PDO $pdo, string $token, int $status, ?string $error): array {
++    global $checks;
++    $_SERVER['REQUEST_METHOD'] = 'GET';
++    $_GET = ['token' => $token];
++    http_response_code(200);
++    ob_start();
++    RexResolveEndpoint::handle($pdo);
++    $body = json_decode(ob_get_clean(), true, 512, JSON_THROW_ON_ERROR);
++    if (http_response_code() !== $status || ($error !== null && $body['error'] !== $error)) {
++        throw new RuntimeException('Unexpected resolver response: ' . json_encode([$status, http_response_code(), $body]));
++    }
++    $checks++;
++    return $body;
++}
++// A database failure is 500 and must not expose SQLite/SQL exception details.
++request($pdo, 'test', 500, 'Unable to load this ColorFix link right now. Please try again.');
++$pdo->exec('CREATE TABLE rex_reservations (id INTEGER, token TEXT, label TEXT, admin_note TEXT, resolver_key TEXT, resource_type TEXT, resource_id INTEGER, context_json TEXT, status TEXT, revoked_at TEXT, created_at TEXT, updated_at TEXT)');
++request($pdo, 'missing', 404, 'Link not found.');
++$pdo->exec("INSERT INTO rex_reservations VALUES (1,'disabled','Fixture',NULL,'route','route',1,'{}','inactive',NULL,NULL,NULL)");
++request($pdo, 'disabled', 404, 'Link not found.');
++$pdo->exec("UPDATE rex_reservations SET status='active', resolver_key='unknown'");
++request($pdo, 'disabled', 500, 'Unable to load this ColorFix link right now. Please try again.');
++$pdo->exec("UPDATE rex_reservations SET resolver_key='route',resource_id=999999");
++request($pdo, 'disabled', 404, 'Link not found.');
++request($pdo, '', 400, 'REX token is required.');
++echo "PASS: $checks resolver error/status checks\n";
+--- /dev/null
++++ b/scripts/test-rex-failures.mjs
+@@ -0,0 +1,19 @@
++import assert from 'node:assert/strict';
++import { readRexResponse, RexNotFoundError, REX_UNAVAILABLE, readRexBootstrap } from '../src/helpers/rexResolution.js';
++
++for (const [status, body, missing] of [
++  [409, '<script>document.cookie="challenge"</script>', false],
++  [200, '<script>document.cookie="challenge"</script>', false],
++  [404, '<html>Proxy error</html>', false],
++  [500, JSON.stringify({ok:false,error:'Private database error'}), false],
++  [404, JSON.stringify({ok:false,error:'Link not found.'}), true],
++]) {
++  await assert.rejects(() => readRexResponse(new Response(body, {status})), error =>
++    missing ? error instanceof RexNotFoundError : error.message === REX_UNAVAILABLE);
++}
++const payload = {ok:true,data:{destination:{playback_plan:{playlist_id:3,src:null}}}};
++assert.deepEqual(await readRexResponse(Response.json(payload)), payload);
++global.document = {getElementById: () => ({textContent:JSON.stringify({token:'target',payload})})};
++assert.equal(readRexBootstrap('different','sas'), null);
++assert.equal(readRexBootstrap('target','google').data.destination.playback_plan.src, 'google');
++console.log('PASS: challenge, network response, missing resource, safe bootstrap and attribution checks');
+--- /dev/null
++++ b/scripts/test-rex-loader.mjs
+@@ -0,0 +1,40 @@
++import assert from 'node:assert/strict';
++import { chromium } from 'playwright';
++import { createServer } from 'vite';
++const server = await createServer({server:{host:'127.0.0.1',port:0,strictPort:false},plugins:[{
++ name:'rex-loader-fixture',
++ resolveId(id) {
++  if(id==='/__rex-loader.js') return '\0rex-loader';
++  if(id==='@RX/Player') return '\0rex-test-player';
++ },
++ load(id) {
++  if(id==='\0rex-test-player') return `import React from 'react';export default ({playbackPlan})=>React.createElement('div',{className:'test-player'},playbackPlan.title);`;
++  if(id==='\0rex-loader') return `import React from 'react';import{createRoot}from'react-dom/client';import{BrowserRouter,Routes,Route}from'react-router-dom';import RexPublicPage from '/src/pages/REX/RexPublicPage/index.jsx';createRoot(document.getElementById('root')).render(React.createElement(BrowserRouter,null,React.createElement(Routes,null,React.createElement(Route,{path:'/t/:token',element:React.createElement(RexPublicPage)}))));`;
++ }
++}]});
++let browser;
++try {
++ await server.listen();
++ const origin=`http://127.0.0.1:${server.httpServer.address().port}`;
++ browser=await chromium.launch();
++ const context=await browser.newContext();
++ let mode='challenge', count=0;
++ await context.route('**/api/**',async route=>{
++  if(!route.request().url().includes('/rex/resolve.php'))return route.fulfill({json:{ok:true}});
++  count++;
++  if(mode==='network')return route.abort('failed');
++  if(mode==='missing')return route.fulfill({status:404,json:{ok:false,error:'Link not found.'}});
++  return route.fulfill({status:mode==='server'?500:409,contentType:'text/html',body:'<script>document.cookie="challenge"</script>'});
++ });
++ await context.route('**/t/**',async route=>route.fulfill({contentType:'text/html',body:await server.transformIndexHtml('/__rex-loader','<!doctype html><div id="root"></div><script type="module" src="/__rex-loader.js"></script>')}));
++ const page=await context.newPage();
++ for(const value of ['challenge','server','network','missing']) {
++  mode=value;
++  await page.goto(origin+'/t/test');
++  await page.getByText(value==='missing'?'Link not found.':'Unable to load this ColorFix link right now. Please try again.',{exact:true}).waitFor();
++  assert.equal(await page.getByRole('button',{name:'Try again'}).count(),value==='missing'?0:1);
++  if(value!=='missing') {const before=count;await page.getByRole('button',{name:'Try again'}).click();await page.getByRole('button',{name:'Try again'}).waitFor();assert(count>before);}
++ }
++ console.log('PASS: actual REX page distinguishes HTML 409, 500, network failure and confirmed 404; Retry makes a new request.');
++ await context.close();
++}finally{await browser?.close();await server.close();}
+--- /dev/null
++++ b/scripts/test-rex-public-render.mjs
+@@ -0,0 +1,42 @@
++import assert from 'node:assert/strict';
++import { chromium } from 'playwright';
++const origin = process.env.COLORFIX_BASE_URL || 'https://colorfix.terrymarr.com';
++const tokens = [
++ ['m70J1Zy-mPOwamhlAMIkAOyXTQ0zy2THjuzWxHCgWZg','public',9],
++ ['f9vnX2UfipaLMqCY_d7ptRLDH-7H3Pi2yS5BUMvcGsE','public'],
++ ['jBEPyoGag6P6hHLAcHhl6yuP6B-yWzw2ML_sV2IZC-o','showcase'],
++];
++const browser=await chromium.launch({headless:true});
++try {
++ for(const blocked of [false,true]) for(const [token,experience,count] of tokens) {
++  const context=await browser.newContext();
++  let resolverRequests=0;
++  const events=[];
++  await context.route('**/api/**',async route=>{
++   if(route.request().url().includes('/rex/resolve.php'))resolverRequests++;
++   if(blocked)return route.fulfill({status:409,contentType:'text/html',body:'<script>document.cookie="challenge"</script>'});
++   if(route.request().url().includes('/ana/record-event.php')){
++    events.push(route.request().postDataJSON());return route.fulfill({json:{ok:true}});
++   }
++   return route.continue();
++  });
++  const page=await context.newPage();
++  const expected=`${origin}/t/${token}`;
++  const response=await page.goto(expected+'?src=sas',{waitUntil:'domcontentloaded'});
++  assert.equal(response.status(),200);
++  assert(!response.headers()['x-robots-tag']?.includes('noindex'));
++  const bootstrap=await page.locator('#colorfix-rex-bootstrap').evaluate(el=>JSON.parse(el.textContent));
++  const plan=bootstrap.payload.data.destination.playback_plan;
++  assert.equal(plan.experience_key,experience);
++  if(count)assert.equal(plan.total_items,count);
++  await page.locator('.player-root').waitFor({state:'visible'});
++  await page.waitForFunction(expected=>document.querySelector('link[rel="canonical"]')?.href===expected,expected);
++  assert.equal(await page.getByText('Link not found.',{exact:true}).count(),0);
++  assert.equal(await page.locator('meta[property="og:url"]').getAttribute('content'),expected);
++  assert(!await page.locator('meta[name="robots"]').getAttribute('content').then(value=>value.includes('noindex')));
++  assert.equal(resolverRequests,0,'Initial rendering must not depend on a second API request');
++  if(!blocked)assert(events.some(event=>event.src==='sas'),'Analytics retains src');
++  console.log(JSON.stringify({token,experience,blockedAPIs:blocked,status:response.status(),title:plan.title,items:plan.total_items,playerVisible:true,resolverRequests,canonical:expected,robots:'index, follow',tracking:blocked?'API deliberately blocked':'PASS'}));
++  await context.close();
++ }
++}finally{await browser.close();}
+--- a/scripts/test-rex-canonical.mjs
++++ b/scripts/test-rex-canonical.mjs
+@@ -18,14 +18,13 @@
+     });
+     const page = await context.newPage();
+     const expected = `${origin}/t/${token}`;
+-    const planResponse = page.waitForResponse(response => response.url().includes('/api/v2/rex/resolve.php?'));
+     const response = await page.goto(expected + tracking, { waitUntil: 'domcontentloaded' });
+     assert.equal(response.status(), 200);
+     assert(!response.headers()['x-robots-tag']?.includes('noindex'));
+     const html = await response.text();
+     assert(html.includes(`<link rel="canonical" href="${expected}">`));
+     assert(html.includes(`<meta property="og:url" content="${expected}">`));
+-    const payload = await (await planResponse).json();
++    const payload = await page.locator('#colorfix-rex-bootstrap').evaluate(el => JSON.parse(el.textContent).payload);
+     const plan = payload.data.destination.playback_plan;
+     assert.equal(plan.experience_key, experience);
+     assert.equal(plan.src, 'sas');

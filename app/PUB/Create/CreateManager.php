@@ -849,6 +849,21 @@ final class CreateManager implements PubComManagerContract
 
 
                 /*
+                 * Associate any pre-reservation ERR 4001 bookmark with this
+                 * exact NEW box after the asset is durably reserved. ERR owns
+                 * the association; failures must never block CREATE.
+                 */
+                if ($hasNewBox && (int)($resolved['pub_asset_id'] ?? 0) > 0) {
+                    try {
+                        (new PdoErrorRepository($this->pdo))->attachPreAssetCreateIncident(
+                            $order['box'], (int)$resolved['pub_asset_id']
+                        );
+                    } catch (Throwable $associationFailure) {
+                        error_log('ERR CREATE correlation failed: ' . $associationFailure->getMessage());
+                    }
+                }
+
+                /*
                  * IDEMPOTENT REPLACEMENT.
                  *
                  * This exact Box has already been prepared or completed
@@ -1086,6 +1101,19 @@ final class CreateManager implements PubComManagerContract
                  * counted as created until the video worker returns
                  * and the Manager promotes the completed file.
                  */
+                // Carry the newly assigned render job ID into any ERR incident
+                // already associated with this exact CREATE asset.
+                $queuedJobId = (int)($asset['video_job']['pub_video_job_id'] ?? 0);
+                if ($queuedJobId > 0) {
+                    try {
+                        (new PdoErrorRepository($this->pdo))->setCreateIncidentVideoJob(
+                            (int)$resolved['pub_asset_id'], $queuedJobId
+                        );
+                    } catch (Throwable $associationFailure) {
+                        error_log('ERR video job annotation failed: ' . $associationFailure->getMessage());
+                    }
+                }
+
                 if (
                     strtolower(
                         trim(

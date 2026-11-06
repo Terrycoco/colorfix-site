@@ -16,6 +16,7 @@ use App\REX\Repos\PdoRexReservationRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use PDO;
 use RuntimeException;
+use App\REX\Exceptions\RexNotFoundException;
 
 final class PlaylistThumbsResolver implements RexResolverInterface
 {
@@ -83,7 +84,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
         $playlist = $this->playlists->getAdminRowById($playlistId);
 
         if (!$playlist) {
-            throw new RuntimeException(
+            throw new RexNotFoundException(
                 "Playlist {$playlistId} was not found."
             );
         }
@@ -295,7 +296,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
         $playlist = $this->playlists->getAdminRowById($playlistId);
 
         if (!$playlist) {
-            throw new RuntimeException(
+            throw new RexNotFoundException(
                 "Playlist {$playlistId} was not found."
             );
         }

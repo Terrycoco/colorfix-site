@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 require_once __DIR__ . '/db.php';
 
 ini_set('display_errors','0');

@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // scripts/update-de-missing.php
 // Fills missing r,g,b,hex6 for Dunn-Edwards colors from /data/de-details.json
 

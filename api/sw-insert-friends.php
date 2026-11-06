@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 /**
  * sw-insert-friends.php
  * Insert Sherwin-Williams friend pairs into EXISTING color_friends(hex1, hex2).

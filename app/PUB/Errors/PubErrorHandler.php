@@ -180,8 +180,8 @@ final class PubErrorHandler implements ErrorHandlerInterface
                 return RecoveryStepResult::waiting('CREATE accepted the rendering request; waiting for the video worker to finish.');
             }
             if (!empty($result['existing_asset_warning'])) {
-                return RecoveryStepResult::failed(
-                    'PUB requires an existing-asset decision. Open CREATE to review it; bookmark retained.'
+                return RecoveryStepResult::waiting(
+                    'An asset already exists for this CREATE order. No duplicate was created. Review it in PUB before retrying.'
                 );
             }
             $firstFailure = $result['failed'][0]['error'] ?? 'PUB did not accept this CREATE order.';

@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // /colorfix/api/import-stage-hexpairs.php
 // Minimal: take hex1..hex4 from stage and insert all 6 unordered pairs into color_friends.
 // Assumes color_friends already exists.

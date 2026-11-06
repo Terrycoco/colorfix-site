@@ -86,12 +86,6 @@ export default function MyPalettePage() {
     showPalette,
   } = useAppState();
 
-  // Compute active brand codes (supports .brands or .brand; array/Set/string)
-  const brandsRaw = (searchFilters && (searchFilters.brands ?? searchFilters.brand)) ?? [];
-  let brandsList = [];
-  if (Array.isArray(brandsRaw)) brandsList = brandsRaw;
-  else if (brandsRaw instanceof Set) brandsList = Array.from(brandsRaw);
-  else if (typeof brandsRaw === "string" && brandsRaw) brandsList = brandsRaw.split(",");
 // Live brand codes (supports .brands/.brand; array/Set/string)
 const activeBrandCodes = useMemo(() => {
   const raw = (searchFilters && (searchFilters.brands ?? searchFilters.brand)) ?? [];
@@ -104,17 +98,8 @@ const activeBrandCodes = useMemo(() => {
   );
 }, [searchFilters]);
 
-  // Live-filter palette on every render (no extra state/effect)
-  const srcPalette = Array.isArray(palette) ? palette : [];
-  const filteredPalette = activeBrandCodes.length
-  ? srcPalette.filter(sw => {
-      const b = (sw?.brand ?? sw?.color?.brand ?? '').toString().trim().toLowerCase();
-      return activeBrandCodes.includes(b);
-    })
-  : srcPalette;
-  const paletteFallback = (filteredPalette.length === 0 && srcPalette.length > 0)
-    ? srcPalette
-    : filteredPalette;
+  // Chosen colors are a personal collection, independent of browsing filters.
+  const paletteColors = useMemo(() => Array.isArray(palette) ? palette : [], [palette]);
 
   const getHex = (sw) => {
     const color = sw?.color ?? sw;
@@ -131,7 +116,7 @@ const activeBrandCodes = useMemo(() => {
       .filter((id) => Number.isFinite(id) && id > 0);
   }, [palette]);
 
-  const isPaletteEmpty = paletteFallback.length === 0;
+  const isPaletteEmpty = paletteColors.length === 0;
   const navigate = useNavigate();
   const adminMode = isAdmin();
 
@@ -160,6 +145,7 @@ const activeBrandCodes = useMemo(() => {
   const heroRef = useRef(null);
   const paletteGridRef = useRef(null);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 768px)").matches;
@@ -212,7 +198,7 @@ const activeBrandCodes = useMemo(() => {
   }, [palette]);
 
   const paletteHueItems = useMemo(() => {
-    const arr = Array.isArray(paletteFallback) ? paletteFallback : [];
+    const arr = Array.isArray(paletteColors) ? paletteColors : [];
     return arr
       .map((swatch) => swatch?.color ?? swatch)
       .filter((color) => color?.hcl_h != null && color.hcl_h !== "")
@@ -227,7 +213,7 @@ const activeBrandCodes = useMemo(() => {
         };
       })
       .filter(Boolean);
-  }, [paletteFallback]);
+  }, [paletteColors]);
 
   async function runQuery(endpoint, tol = null, mode = null) {
     setLoading(true);
@@ -505,19 +491,9 @@ const activeBrandCodes = useMemo(() => {
   }
 
   function handleTranslate() {
-    const ids = [];
-    const seen = new Set();
-    for (const item of (Array.isArray(palette) ? palette : [])) {
-      const sw = item?.color ?? item;
-      const cid = Number(sw?.cluster_id ?? sw?.clusterId ?? 0);
-      if (cid > 0 && !seen.has(cid)) {
-        seen.add(cid);
-        ids.push(cid);
-      }
-    }
-    if (ids.length === 0) return;
+    if (!paletteColorIds.length) return;
     const params = new URLSearchParams();
-    params.set("clusters", ids.join(","));
+    params.set("ids", [...new Set(paletteColorIds)].join(","));
     navigate(`/palette/translate?${params.toString()}`);
   }
 
@@ -529,7 +505,7 @@ const activeBrandCodes = useMemo(() => {
   function onFuzzyPick(item) {
     if (!item?.id) return;
     addToPalette(item);
-    requestAnimationFrame(() => {
+    if (!isMobile) requestAnimationFrame(() => {
       heroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }
@@ -621,27 +597,29 @@ const activeBrandCodes = useMemo(() => {
     setDragOverId(null);
   };
 
-  const ControlsContent = () => (
-    <div className="controls-grid controls-vertical">
-      <div className="cell cell--fuzzy">
+  const ControlsContent = ({ variant = "all" }) => (
+    <div className={`controls-grid controls-vertical ${variant === "main" ? "myp-mobile-primary-tools" : ""}`}>
+      {variant === "all" && <div className="cell cell--fuzzy">
         <FuzzySearchColorSelect
           onSelect={onFuzzyPick}
           className="myp-fuzzy"
           placeholder="Start with a color name or code"
           autoFocus={false}
           mobileBreakpoint={0}
+          autoSearch
+          showNameModeToggle
         />
-      </div>
+      </div>}
 
-      <div className="cell cell--primary-action">
+      {variant !== "secondary" && <div className="cell cell--primary-action">
         <button className="myp-main-action" onClick={handleFriends}>What Colors Go?</button>
-      </div>
+      </div>}
 
-      <div className="cell cell--neutrals">
+      {variant !== "secondary" && <div className="cell cell--neutrals">
         <button className="myp-secondary-action" onClick={handleNeutrals}>What Neutrals Go?</button>
-      </div>
+      </div>}
 
-      <div className="cell cell--similar">
+      {variant !== "secondary" && <div className="cell cell--similar">
         <div className="hue-stack">
           <button className="hue-btn myp-secondary-action" onClick={handleSimilar}>See Similar Colors</button>
           <div className="hue-tolerance-wrap">
@@ -663,9 +641,9 @@ const activeBrandCodes = useMemo(() => {
             <span className="hue-tolerance-suffix">°</span>
           </div>
         </div>
-      </div>
+      </div>}
 
-      <div className="cell cell--opposites">
+      {variant !== "secondary" && <div className="cell cell--opposites">
         <div className="hue-stack">
           <button className="hue-btn myp-secondary-action" onClick={handleOpposites}>See Opposite Colors</button>
           <div className="hue-tolerance-wrap">
@@ -687,21 +665,21 @@ const activeBrandCodes = useMemo(() => {
             <span className="hue-tolerance-suffix">°</span>
           </div>
         </div>
-      </div>
+      </div>}
 
-      <div className="cell cell--browse">
+      {variant !== "main" && <div className="cell cell--browse">
         <button className="myp-secondary-action" type="button" onClick={handleBrowse}>
           See Designer Palettes
         </button>
-      </div>
+      </div>}
 
-      <div className="cell cell--translate">
+      {variant !== "main" && <div className="cell cell--translate">
         <button className="myp-secondary-action" type="button" onClick={handleTranslate}>
           See In All Brands
         </button>
-      </div>
+      </div>}
 
-      <div className="cell cell--include">
+      {variant !== "main" && <div className="cell cell--include">
         <label className="include-close">
           <input
             type="checkbox"
@@ -710,7 +688,7 @@ const activeBrandCodes = useMemo(() => {
           />
           Include close matches
         </label>
-      </div>
+      </div>}
     </div>
   );
 
@@ -950,7 +928,7 @@ const activeBrandCodes = useMemo(() => {
   };
 
   async function handleCopyPalette({ plain = false } = {}) {
-    const colors = (Array.isArray(paletteFallback) ? paletteFallback : [])
+    const colors = (Array.isArray(paletteColors) ? paletteColors : [])
       .map((swatch) => swatch?.color ?? swatch)
       .filter(Boolean);
     if (colors.length === 0) {
@@ -1031,7 +1009,7 @@ const activeBrandCodes = useMemo(() => {
              <h1 className="myp-title">My Palette</h1>
         <div className="myp-header">
           <div className="myp-header-actions">
-            {!isPaletteEmpty && (
+            {!isMobile && !isPaletteEmpty && (
               <button
                 className="myp-clear-btn"
                 onClick={handleClear}
@@ -1042,12 +1020,12 @@ const activeBrandCodes = useMemo(() => {
                 Clear
               </button>
             )}
-            {adminMode && (
+            {!isMobile && adminMode && (
               <button className="myp-clear-btn" type="button" onClick={() => window.location.assign("/saved-palettes")}>
                 Saved Palettes
               </button>
             )}
-            {adminMode && !isPaletteEmpty && (
+            {!isMobile && adminMode && !isPaletteEmpty && (
               <>
                 <button className="myp-clear-btn" type="button" onClick={openSaveModal}>
                   Save
@@ -1073,7 +1051,7 @@ const activeBrandCodes = useMemo(() => {
                 )}
               </>
             )}
-            {adminMode && (
+            {!isMobile && adminMode && (
               <button
                 className={`myp-hue-toggle${showHueWheel ? " is-on" : ""}`}
                 type="button"
@@ -1083,14 +1061,29 @@ const activeBrandCodes = useMemo(() => {
                 Hue Wheel
               </button>
             )}
+            {isMobile && <div className="myp-mobile-menu-wrap">
+              <button type="button" className="myp-mobile-menu-trigger" aria-label="Palette actions"
+                aria-expanded={headerMenuOpen} onClick={() => setHeaderMenuOpen(v => !v)}>⋯</button>
+              {headerMenuOpen && <div className="myp-mobile-menu">
+                {!isPaletteEmpty && <button type="button" onClick={() => { setHeaderMenuOpen(false); handleClear(); }}>Clear Palette</button>}
+                {adminMode && <button type="button" onClick={() => window.location.assign("/saved-palettes")}>Saved Palettes</button>}
+                {adminMode && !isPaletteEmpty && <button type="button" onClick={() => { setHeaderMenuOpen(false); openSaveModal(); }}>Save Palette</button>}
+                {adminMode && <button type="button" onClick={() => { setHeaderMenuOpen(false); setShowHueWheel(v => !v); }}>{showHueWheel ? "Hide Hue Wheel" : "Hue Wheel"}</button>}
+              </div>}
+            </div>}
           </div>
-     
+
           <span className="myp-copy-status" aria-live="polite">
             {copyStatus}
           </span>
           <div className="myp-header-spacer" aria-hidden="true" />
         </div>
 
+        {isMobile && <div className="myp-mobile-picker">
+          <FuzzySearchColorSelect onSelect={onFuzzyPick} className="myp-fuzzy myp-fuzzy-inline"
+            label="Pick a Color" autoFocus={false} mobileBreakpoint={0}
+            autoSearch inlineResults showNameModeToggle clearAfterPick />
+        </div>}
         <section className="myp-top">
           {isPaletteEmpty && !showHueWheel ? (
             <div className="myp-empty">
@@ -1114,14 +1107,14 @@ const activeBrandCodes = useMemo(() => {
                       />
                     </div>
                   )}
-                  {paletteFallback.map((swatch, index) => {
+                  {paletteColors.map((swatch, index) => {
                     const swatchId = getSwatchId(swatch);
                     const key = swatchId ?? swatch?.hex6 ?? swatch?.hex ?? index;
                     return (
                       <div
                         key={key}
                         className={`sg-item${swatchId === draggingId ? " is-dragging" : ""}${swatchId === dragOverId ? " is-over" : ""}`}
-                        draggable={paletteFallback.length > 1}
+                        draggable={paletteColors.length > 1}
                         onDragStart={(event) => handleDragStart(event, swatchId)}
                         onDragOver={(event) => handleDragOver(event, swatchId)}
                         onDrop={(event) => handleDrop(event, swatchId)}
@@ -1141,6 +1134,7 @@ const activeBrandCodes = useMemo(() => {
             </div>
           )}
         </section>
+        {isMobile && <section className="myp-mobile-tools"><ControlsContent variant="main" /></section>}
       </div>
 
       <div id="sticky-sentinel" aria-hidden="true" style={{ height: 1 }} />
@@ -1266,7 +1260,7 @@ const activeBrandCodes = useMemo(() => {
 
             </div>
             <div className="myp-drawer-body">
-              <ControlsContent />
+              <ControlsContent variant="secondary" />
             </div>
           </div>
           {controlsOpen && <div className="myp-drawer-backdrop" onClick={closeControlsPanel} />}

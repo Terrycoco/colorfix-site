@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../auth.php'; // SYSTEM admin validation
+
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'POST') === 'OPTIONS') { http_response_code(200); exit; }
 header('Content-Type: application/json; charset=UTF-8');
 

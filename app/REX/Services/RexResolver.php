@@ -9,6 +9,7 @@ use App\REX\DTO\RexResolutionRequest;
 use App\REX\DTO\RexResolutionResult;
 use App\REX\Resolvers\RexResolverRegistry;
 use RuntimeException;
+use App\REX\Exceptions\RexNotFoundException;
 use App\REX\DTO\RexReservationDescriptor;
 use InvalidArgumentException;
 
@@ -28,7 +29,7 @@ final class RexResolver
 
         $reservation = $this->reservations->findByToken($token);
         if (!$reservation) {
-            throw new RuntimeException('REX reservation token was not found.');
+            throw new RexNotFoundException('REX reservation token was not found.');
         }
 
         return $this->resolveReservation($reservation, 'token', $token, $requestMetadata);
@@ -43,7 +44,7 @@ final class RexResolver
 
         $reservation = $this->reservations->findByAlias($alias);
         if (!$reservation) {
-            throw new RuntimeException('REX reservation alias was not found.');
+            throw new RexNotFoundException('REX reservation alias was not found.');
         }
 
         return $this->resolveReservation($reservation, 'alias', $alias, $requestMetadata);
@@ -72,7 +73,7 @@ private function resolveReservation(
 
     try {
         if ($reservation->status !== RexReserver::STATUS_ACTIVE || $reservation->revokedAt !== null) {
-            throw new RuntimeException('REX reservation is not active.');
+            throw new RexNotFoundException('REX reservation is not active.');
         }
 
         $resolver = $this->registry->get($reservation->resolverKey);

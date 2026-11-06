@@ -88,6 +88,8 @@ class PdoPlaylistRepository
 
                 'headline' => $meta['headline'] ?? null,
 
+                'page_title' => $meta['page_title'] ?? null,
+
                 'meta_description' => $meta['meta_description'] ?? null,
 
                 'dek' => $meta['dek'] ?? null,
@@ -3562,7 +3564,7 @@ public function getPublicActiveSlides(
 
         $sql = <<<SQL
 
-            SELECT playlist_id, project_id, title, type, slug, headline, meta_description, dek
+            SELECT playlist_id, project_id, title, type, slug, headline, page_title, meta_description, dek
 
             FROM playlists
 
@@ -3607,6 +3609,8 @@ public function getPublicActiveSlides(
             'slug' => $row['slug'] !== null ? (string)$row['slug'] : null,
 
             'headline' => $row['headline'] !== null ? (string)$row['headline'] : null,
+
+            'page_title' => $row['page_title'] !== null ? (string)$row['page_title'] : null,
 
             'meta_description' => $row['meta_description'] !== null ? (string)$row['meta_description'] : null,
 

@@ -306,6 +306,104 @@ final class PdoErrorRepository
         }
     }
 
+    /**
+     * Attach a pre-reservation worker incident to the asset that accepted its
+     * EXACT saved CREATE box. Never correlate by title, channel or source alone.
+     * Existing REDO incidents already carry their asset ID.
+     */
+    public function attachPreAssetCreateIncident(array $box, int $assetId): void
+    {
+        $this->requirePositive($assetId, 'Asset ID');
+        $this->pdo->beginTransaction();
+        try {
+            $stmt = $this->pdo->query(
+                "SELECT l.id, w.id AS working_id, w.bookmark_json
+                 FROM err_log l JOIN err_working w ON w.err_log_id = l.id
+                 WHERE l.err_num = 4001 AND l.department = 'PUB'
+                   AND l.component = 'CREATE' AND l.resource_id IS NULL
+                   AND l.resolved_at IS NULL
+                   AND l.created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY)
+                 FOR UPDATE"
+            );
+            $link = $this->pdo->prepare(
+                "UPDATE err_log SET resource_type = 'pub_asset', resource_id = :asset
+                 WHERE id = :id AND resource_id IS NULL AND resolved_at IS NULL"
+            );
+            $updateBookmark = $this->pdo->prepare(
+                'UPDATE err_working SET bookmark_json = :bookmark WHERE id = :id'
+            );
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $bookmark = json_decode((string)($row['bookmark_json'] ?? ''), true);
+                if (!is_array($bookmark) || ($bookmark['operation'] ?? '') !== 'PUB.CREATE.processBatch') {
+                    continue;
+                }
+                $orders = $bookmark['params']['orders'] ?? null;
+                if (!is_array($orders) || count($orders) !== 1 || !is_array($orders[0] ?? null)) {
+                    continue;
+                }
+                $savedBox = $orders[0]['box'] ?? null;
+                // PHP strict array comparison retains the complete sealed order.
+                // Key ordering is irrelevant to CREATE identity, so compare encoded
+                // canonical forms instead of UI labels or partial source metadata.
+                if (!is_array($savedBox) || !$this->sameCreateBox($savedBox, $box)) {
+                    continue;
+                }
+                $link->execute(['asset' => $assetId, 'id' => (int)$row['id']]);
+                if ($link->rowCount() !== 1) {
+                    continue;
+                }
+                $bookmark['summary']['asset_id'] = $assetId;
+                $updateBookmark->execute([
+                    'bookmark' => json_encode($bookmark, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                    'id' => (int)$row['working_id'],
+                ]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    /** Preserve the video job number as soon as the Creator queues it. */
+    public function setCreateIncidentVideoJob(int $assetId, int $jobId): void
+    {
+        $this->requirePositive($assetId, 'Asset ID');
+        $this->requirePositive($jobId, 'Video job ID');
+        $stmt = $this->pdo->prepare(
+            "SELECT w.id, w.bookmark_json FROM err_working w
+             JOIN err_log l ON l.id = w.err_log_id
+             WHERE l.department = 'PUB' AND l.component = 'CREATE'
+               AND l.resource_type = 'pub_asset' AND l.resource_id = :asset
+               AND l.resolved_at IS NULL"
+        );
+        $stmt->execute(['asset' => $assetId]);
+        $update = $this->pdo->prepare(
+            'UPDATE err_working SET bookmark_json = :bookmark WHERE id = :id'
+        );
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $bookmark = json_decode((string)($row['bookmark_json'] ?? ''), true);
+            if (!is_array($bookmark)) continue;
+            $bookmark['summary']['job_id'] = $jobId;
+            $update->execute([
+                'bookmark' => json_encode($bookmark, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => (int)$row['id'],
+            ]);
+        }
+    }
+
+    private function sameCreateBox(array $left, array $right): bool
+    {
+        $normalize = static function (array $value) use (&$normalize): array {
+            foreach ($value as $key => $item) {
+                if (is_array($item)) $value[$key] = $normalize($item);
+            }
+            if (!array_is_list($value)) ksort($value);
+            return $value;
+        };
+        return $normalize($left) === $normalize($right);
+    }
+
     /** Unresolved history for one durable resource, including incidents without Working rows. */
     public function unresolvedForResource(string $resourceType, int $resourceId): array
     {

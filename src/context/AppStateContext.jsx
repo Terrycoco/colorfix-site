@@ -12,6 +12,7 @@ import fetchColorSchemes from '@data/fetchColorSchemes';
 import { normalizeSwatch } from '@helpers/swatchHelper'; 
 
 import { API_FOLDER } from '@helpers/config';
+import { clearLegacyAdminState, setAdmin } from '@helpers/authHelper';
 
 
 
@@ -50,82 +51,6 @@ const savePaletteIds = (arr = []) => {
     );
 
   } catch {}
-
-};
-
-
-
-const readCookie = (name) => {
-
-  if (typeof document === 'undefined') return '';
-
-  const needle = `${name}=`;
-
-  const parts = document.cookie.split(';').map((part) => part.trim());
-
-  const hit = parts.find((part) => part.startsWith(needle));
-
-  return hit ? hit.slice(needle.length) : '';
-
-};
-
-
-
-const persistDeviceToken = (token) => {
-
-  if (typeof window === 'undefined') return;
-
-  try {
-
-    localStorage.setItem('cf_device_token', token);
-
-  } catch {}
-
-  const host = window.location.hostname;
-
-  const isPrimaryDomain = host.endsWith('terrymarr.com');
-
-  const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
-
-  document.cookie = `cf_device_token=${encodeURIComponent(token)}; Max-Age=31536000; path=/; SameSite=Lax${securePart}`;
-
-  if (isPrimaryDomain) {
-
-    document.cookie = `cf_device_token=${encodeURIComponent(token)}; Max-Age=31536000; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-
-  }
-
-};
-
-
-
-const getDeviceToken = () => {
-
-  if (typeof window === 'undefined') return '';
-
-  const params = new URLSearchParams(window.location.search || '');
-
-  const fromUrl = params.get('device_token') || '';
-
-  if (fromUrl) {
-
-    persistDeviceToken(fromUrl);
-
-    return fromUrl;
-
-  }
-
-  try {
-
-    const stored = localStorage.getItem('cf_device_token') || '';
-
-    if (stored) return stored;
-
-  } catch {
-
-  }
-
-  return readCookie('cf_device_token') || '';
 
 };
 
@@ -361,53 +286,11 @@ export function AppStateProvider({ children }) {
 
   //DECLARATIONS
 
-  const [loggedIn, setLoggedIn] = useState(() => {
-
-    if (typeof window === 'undefined') return false;
-
-    try {
-
-      return localStorage.getItem('cf_logged_in') === '1'
-
-        || !!localStorage.getItem('cf_user')
-
-        || readCookie('cf_admin') === '1'
-
-        || readCookie('cf_admin_global') === '1';
-
-    } catch {
-
-      return false;
-
-    }
-
-  });
-
-  const [user, setUser] = useState(() => {
-
-    if (typeof window === 'undefined') return null;
-
-    try {
-
-      const raw = localStorage.getItem('cf_user');
-
-      if (raw) return JSON.parse(raw);
-
-      if (readCookie('cf_admin') === '1' || readCookie('cf_admin_global') === '1') {
-
-        return { is_admin: true };
-
-      }
-
-      return null;
-
-    } catch {
-
-      return null;
-
-    }
-
-  });
+  // Stored browser flags are never proof of authentication.
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const [colors, setColors] = useState([]);
 
@@ -621,137 +504,69 @@ const [hydrated, setHydrated] = useState(false);
 
 
 
-// Persist login state for mobile browsers that reload tabs aggressively.
+// The server validates the HttpOnly session, including account/session revocation.
+useEffect(() => {
+  setAdmin(Boolean(user?.is_admin));
+}, [user]);
 
 useEffect(() => {
-
-  if (typeof window === 'undefined') return;
-
-  try {
-
-    if (loggedIn) {
-
-      localStorage.setItem('cf_logged_in', '1');
-
-    } else {
-
-      localStorage.removeItem('cf_logged_in');
-
-    }
-
-    if (user) {
-
-      localStorage.setItem('cf_user', JSON.stringify(user));
-
-    } else {
-
-      localStorage.removeItem('cf_user');
-
-    }
-
-  } catch {}
-
-}, [loggedIn, user]);
-
-
-
-useEffect(() => {
-
-  if (typeof window === 'undefined') return;
-
-  if (loggedIn && user) return;
-
   let cancelled = false;
-
-  const token = getDeviceToken();
-
-  const authFromToken = token
-
-    ? fetch(`${API_FOLDER}/device-auth.php?token=${encodeURIComponent(token)}`, {
-
-        credentials: 'include',
-
-      })
-
-        .then((res) => res.json())
-
-        .then((payload) => {
-
-          if (cancelled) return false;
-
-          if (payload?.ok && payload?.user) {
-
-            setUser(payload.user);
-
-            setLoggedIn(true);
-
-            if (payload.user.is_admin) {
-
-              localStorage.setItem('isAdmin', 'true');
-
-              localStorage.setItem('isTerry', 'true');
-
-            }
-
-            return true;
-
-          }
-
-          return false;
-
-        })
-
-        .catch(() => false)
-
-    : Promise.resolve(false);
-
-
-
-  authFromToken.then((ok) => {
-
-    if (ok || cancelled) return;
-
-    fetch(`${API_FOLDER}/session.php`, { credentials: 'include' })
-
-      .then((res) => res.json())
-
-      .then((payload) => {
-
-        if (cancelled) return;
-
-        if (payload?.ok && payload?.user) {
-
-          setUser(payload.user);
-
-          setLoggedIn(true);
-
-          if (payload.user.is_admin) {
-
-            localStorage.setItem('isAdmin', 'true');
-
-            localStorage.setItem('isTerry', 'true');
-
-          }
-
-        }
-
-      })
-
-      .catch(() => {});
-
-  });
-
-
-
-  return () => {
-
-    cancelled = true;
-
+  let pending = false;
+  let retryTimer;
+  let requestController;
+  clearLegacyAdminState();
+  const refreshSession = async () => {
+    if (pending) return;
+    pending = true;
+    requestController = new AbortController();
+    const timeout = window.setTimeout(() => requestController.abort(), 15000);
+    try {
+      const response = await fetch(`${API_FOLDER}/session.php`, {
+        credentials: 'include', cache: 'no-store', signal: requestController.signal,
+      });
+      // Only an authoritative rejection ends a verified login. A timeout or
+      // temporary server error must not bounce an already verified device out.
+      if (response.status !== 401 && !response.ok) throw new Error('Session check unavailable');
+      const payload = await response.json();
+      if (cancelled) return;
+      if (response.status !== 401 && !(payload?.ok === false || payload?.ok === true && typeof payload?.user?.is_admin === 'boolean')) {
+        throw new Error('Invalid session response');
+      }
+      const verified = response.ok && payload?.ok && payload?.user?.is_admin;
+      setAdmin(Boolean(verified));
+      setUser(previous => {
+        if (!verified) return null;
+        // Periodic verification must not look like a different user to editors.
+        if (previous?.id === payload.user.id && previous?.email === payload.user.email
+            && previous?.is_admin === payload.user.is_admin) return previous;
+        return payload.user;
+      });
+      setLoggedIn(Boolean(verified));
+      setAuthReady(true);
+      setAuthError('');
+      window.clearTimeout(retryTimer);
+    } catch {
+      if (!cancelled) {
+        setAuthError('Unable to check your saved login. Retrying…');
+        window.clearTimeout(retryTimer);
+        retryTimer = window.setTimeout(refreshSession, 5000);
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      pending = false;
+    }
   };
-
-}, [loggedIn, user]);
-
-
+  refreshSession();
+  const timer = window.setInterval(refreshSession, 60000);
+  window.addEventListener('focus', refreshSession);
+  return () => {
+    cancelled = true;
+    requestController?.abort();
+    window.clearTimeout(retryTimer);
+    window.clearInterval(timer);
+    window.removeEventListener('focus', refreshSession);
+  };
+}, []);
 
 useEffect(() => {
 
@@ -1517,7 +1332,7 @@ function clearPlayerExperience() {
 
   const state = {
 
-    loggedIn, setLoggedIn,
+    loggedIn, setLoggedIn, authReady, authError,
 
     user, setUser,
 

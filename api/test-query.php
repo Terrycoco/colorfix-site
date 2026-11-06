@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/php-error.log');  // puts it in the same folder as your script
 

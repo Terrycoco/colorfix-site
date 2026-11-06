@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\REX\Endpoints;
 
 use App\REX\DTO\RexResolutionBehavior;
+use App\REX\DTO\RexResolutionResult;
 use App\REX\DTO\RexShareMetadata;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Resolvers\RexResolverRegistryFactory;
 use App\REX\Services\RexResolver;
+use App\REX\Services\RexIndexingPolicy;
 use PDO;
 use Throwable;
+use App\REX\Exceptions\RexNotFoundException;
 
 final class RexPublicEntryEndpoint
 {
@@ -41,12 +44,21 @@ final class RexPublicEntryEndpoint
                 'user_agent' => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
             ]);
 
-        } catch (Throwable) {
+            $indexable = self::isIndexablePlaylist($pdo, $result);
+            $bootstrap = $indexable ? [
+                'token' => $token,
+                'payload' => RexResolveEndpoint::payload($result, $repo->findByToken($token)),
+            ] : null;
+
+        } catch (RexNotFoundException) {
             self::notFound();
+        } catch (Throwable $error) {
+            RexResolveEndpoint::logFailure($error);
+            self::unavailable();
         }
 
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('X-Robots-Tag: noindex, noarchive');
+        header('X-Robots-Tag: ' . ($indexable ? 'index, follow' : 'noindex, noarchive'));
 
         /*
          * Route REXes must enter through the public React REX shell.
@@ -82,88 +94,148 @@ final class RexPublicEntryEndpoint
          * resolver-key allowlist.
          */
         if ($result->behavior === RexResolutionBehavior::RENDER) {
-            self::renderReactShell($indexPath, $result->shareMetadata);
+            // Reuse the plan already resolved under the normal access rules.
+            // Only eligible marketing playlists embed data; client resources keep
+            // their existing API flow and exclusions.
+            self::renderReactShell($indexPath, $result->shareMetadata, $indexable, $bootstrap, $result->destination['playback_plan'] ?? []);
         }
 
         self::notFound();
     }
 
-    private static function renderReactShell(
-        string $indexPath,
-        RexShareMetadata $shareMetadata
-    ): never {
-        $html = is_file($indexPath)
-            ? (string)file_get_contents($indexPath)
-            : '';
+    private static function isIndexablePlaylist(PDO $pdo, RexResolutionResult $result): bool
+    {
+        return RexIndexingPolicy::allows($pdo, $result);
+    }
 
-        if ($html === '') {
-            self::notFound();
-        }
-
-        $title = trim((string)($shareMetadata->title ?? ''));
-        $description = trim((string)($shareMetadata->description ?? ''));
-        $imageUrl = self::absoluteUrl($shareMetadata->imageUrl);
-        $shareUrl = self::currentAbsoluteUrl();
-
-        /*
-         * The Vite shell contains site-wide social metadata. REX pages need
-         * object-specific metadata, so remove the static OG/Twitter tags
-         * before inserting the resolved REX metadata below.
-         */
+    private static function applyRobotsMetadata(string $html, bool $indexable): string
+    {
+        // Replace every inherited robots tag, regardless of attribute order, and
+        // explicitly preserve exclusion even if a future shell defaults to indexing.
         $html = preg_replace(
-            '/<meta\s+(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*>\s*/i',
+            '/<meta\b(?=[^>]*\bname\s*=\s*["\']robots["\'])[^>]*>\s*/i',
             '',
             $html
         ) ?? $html;
+        $tag = '<meta name="robots" content="'
+            . ($indexable ? 'index, follow' : 'noindex, noarchive') . '">' . "\n";
+        return preg_replace('/<\/head>/i', $tag . '</head>', $html, 1) ?? $html;
+    }
 
-        $tags = [];
+    private static function renderReactShell(
+        string $indexPath,
+        RexShareMetadata $shareMetadata,
+        bool $indexable = false,
+        ?array $bootstrap = null,
+        array $pageMetadata = []
+    ): never {
+        try {
+            $html = is_file($indexPath)
+                ? (string)file_get_contents($indexPath)
+                : '';
 
-        if ($title !== '') {
-            $escapedTitle = self::escapeHtml($title);
+            if ($html === '') {
+                self::unavailable();
+            }
 
+            $html = self::applyRobotsMetadata($html, $indexable);
+
+            $title = trim((string)($shareMetadata->title ?? ''));
+            $description = trim((string)($shareMetadata->description ?? ''));
+            $imageUrl = self::absoluteUrl($shareMetadata->imageUrl);
+            $shareUrl = self::publicRexUrl();
+
+            // The REX address identifies the experience; query parameters only carry
+            // tracking/navigation state. Replace any inherited shell canonical.
             $html = preg_replace(
-                '/<title\b[^>]*>.*?<\/title>/is',
-                '<title>' . $escapedTitle . '</title>',
-                $html,
-                1
+                '/<link\b(?=[^>]*\brel\s*=\s*["\']canonical["\'])[^>]*>\s*/i',
+                '',
+                $html
             ) ?? $html;
 
-            $tags[] = '<meta property="og:title" content="' . $escapedTitle . '">';
-            $tags[] = '<meta name="twitter:title" content="' . $escapedTitle . '">';
-        }
-
-        if ($description !== '') {
-            $escapedDescription = self::escapeHtml($description);
-            $tags[] = '<meta property="og:description" content="' . $escapedDescription . '">';
-            $tags[] = '<meta name="twitter:description" content="' . $escapedDescription . '">';
-        }
-
-        if ($imageUrl !== '') {
-            $escapedImage = self::escapeHtml($imageUrl);
-            $tags[] = '<meta property="og:image" content="' . $escapedImage . '">';
-            $tags[] = '<meta name="twitter:image" content="' . $escapedImage . '">';
-            $tags[] = '<meta name="twitter:card" content="summary_large_image">';
-        }
-
-        if ($shareUrl !== '') {
-            $tags[] = '<meta property="og:url" content="' . self::escapeHtml($shareUrl) . '">';
-        }
-
-        $tags[] = '<meta property="og:type" content="website">';
-
-        if ($tags !== []) {
-            $metaHtml = implode("\n", $tags) . "\n";
+            /*
+             * The Vite shell contains site-wide social metadata. REX pages need
+             * object-specific metadata, so remove the static OG/Twitter tags
+             * before inserting the resolved REX metadata below.
+             */
             $html = preg_replace(
-                '/<\/head>/i',
-                $metaHtml . '</head>',
-                $html,
-                1
+                '/<meta\s+(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*>\s*/i',
+                '',
+                $html
             ) ?? $html;
-        }
 
-        header('Content-Type: text/html; charset=utf-8');
-        echo $html;
-        exit;
+            $pageTitle = trim((string)($pageMetadata['page_title'] ?? ''));
+            $pageTitle = $pageTitle !== '' ? $pageTitle : $title;
+            $pageDescription = trim((string)($pageMetadata['meta_description'] ?? ''));
+            $pageDescription = $pageDescription !== '' ? $pageDescription : $description;
+            $tags = [];
+
+            if ($pageTitle !== '') {
+                $html = preg_replace_callback(
+                    '/<title\b[^>]*>.*?<\/title>/is',
+                    static fn () => '<title>' . self::escapeHtml($pageTitle) . '</title>',
+                    $html,
+                    1
+                ) ?? $html;
+            }
+
+            if ($pageDescription !== '') {
+                $html = preg_replace(
+                    '/<meta\b(?=[^>]*\bname\s*=\s*["\']description["\'])[^>]*>\s*/i',
+                    '',
+                    $html
+                ) ?? $html;
+                $tags[] = '<meta name="description" content="' . self::escapeHtml($pageDescription) . '">';
+            }
+
+            if ($title !== '') {
+                $escapedTitle = self::escapeHtml($title);
+
+                $tags[] = '<meta property="og:title" content="' . $escapedTitle . '">';
+                $tags[] = '<meta name="twitter:title" content="' . $escapedTitle . '">';
+            }
+
+            if ($description !== '') {
+                $escapedDescription = self::escapeHtml($description);
+                $tags[] = '<meta property="og:description" content="' . $escapedDescription . '">';
+                $tags[] = '<meta name="twitter:description" content="' . $escapedDescription . '">';
+            }
+
+            if ($imageUrl !== '') {
+                $escapedImage = self::escapeHtml($imageUrl);
+                $tags[] = '<meta property="og:image" content="' . $escapedImage . '">';
+                $tags[] = '<meta name="twitter:image" content="' . $escapedImage . '">';
+                $tags[] = '<meta name="twitter:card" content="summary_large_image">';
+            }
+
+            if ($shareUrl !== '') {
+                $tags[] = '<link rel="canonical" href="' . self::escapeHtml($shareUrl) . '">';
+                $tags[] = '<meta property="og:url" content="' . self::escapeHtml($shareUrl) . '">';
+            }
+
+            $tags[] = '<meta property="og:type" content="website">';
+
+            if ($tags !== []) {
+                $metaHtml = implode("\n", $tags) . "\n";
+                $html = preg_replace_callback(
+                    '/<\/head>/i',
+                    static fn () => $metaHtml . '</head>',
+                    $html,
+                    1
+                ) ?? $html;
+            }
+
+            if ($bootstrap !== null) {
+                $json = json_encode($bootstrap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+                $html = str_replace('</head>', '<script type="application/json" id="colorfix-rex-bootstrap">' . $json . '</script></head>', $html);
+            }
+            header('Content-Type: text/html; charset=utf-8');
+            echo $html;
+            exit;
+        } catch (Throwable $error) {
+            RexResolveEndpoint::logFailure($error);
+            self::unavailable();
+        }
     }
 
     private static function absoluteUrl(?string $value): string
@@ -185,15 +257,15 @@ final class RexPublicEntryEndpoint
         return self::requestOrigin() . $value;
     }
 
-    private static function currentAbsoluteUrl(): string
+    private static function publicRexUrl(): string
     {
-        $requestUri = trim((string)($_SERVER['REQUEST_URI'] ?? ''));
+        $token = trim((string)($_GET['token'] ?? ''));
 
-        if ($requestUri === '') {
+        if ($token === '') {
             return '';
         }
 
-        return self::requestOrigin() . $requestUri;
+        return self::requestOrigin() . '/t/' . rawurlencode($token);
     }
 
     private static function requestOrigin(): string
@@ -215,6 +287,19 @@ final class RexPublicEntryEndpoint
     private static function escapeHtml(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    private static function unavailable(): never
+    {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        header('Retry-After: 60');
+        header('X-Robots-Tag: noindex, noarchive');
+        echo '<!doctype html><html><head><meta name="robots" content="noindex, noarchive">'
+            . '<title>ColorFix temporarily unavailable</title></head><body>'
+            . 'Unable to load this ColorFix link right now. Please try again.</body></html>';
+        exit;
     }
 
     private static function notFound(): never

@@ -13,6 +13,7 @@ use App\REX\DTO\RexShareMetadata;
 use App\PROJECTS\Repos\PdoProjectRepository;
 use PDO;
 use RuntimeException;
+use App\REX\Exceptions\RexNotFoundException;
 
 final class DocumentResolver implements RexResolverInterface
 {
@@ -40,7 +41,7 @@ final class DocumentResolver implements RexResolverInterface
         $document = $this->findDocument($documentId);
 
         if (!$document) {
-            throw new RuntimeException(
+            throw new RexNotFoundException(
                 "Project document {$documentId} was not found."
             );
         }
@@ -127,7 +128,7 @@ final class DocumentResolver implements RexResolverInterface
         $document = $this->findDocument($documentId);
 
         if (!$document) {
-            throw new RuntimeException(
+            throw new RexNotFoundException(
                 "Project document {$documentId} was not found."
             );
         }

@@ -80,11 +80,15 @@ export default function PlayerExperience({ data }) {
 
   useEffect(() => {
     if (!data) return;
-    const title = data?.page_h1 || data?.display_title || data?.title || "ColorFix Playlist";
-    const description = data?.project_summary || data?.share_description || "";
+    const title = data?.page_title?.trim() || data?.page_h1 || data?.display_title || data?.title || "ColorFix Playlist";
+    const description = data?.meta_description?.trim() || data?.project_summary || data?.share_description || "";
     const image = String(data?.share_image_url || "").trim();
     const slugOrId = data?.slug || data?.playlist_id || playlistId;
-    const canonicalPath = slugOrId ? `/playlist/${slugOrId}` : location.pathname;
+    // Each REX token identifies its own resolved experience. Keep that address,
+    // without query/hash tracking, instead of collapsing it to a legacy playlist URL.
+    const canonicalPath = location.pathname.startsWith("/t/") && routeToken
+      ? `/t/${encodeURIComponent(routeToken)}`
+      : slugOrId ? `/playlist/${slugOrId}` : location.pathname;
     const canonicalUrl = `${window.location.origin}${canonicalPath}`;
     const absoluteImage = image.startsWith("http://") || image.startsWith("https://")
       ? image
@@ -101,7 +105,7 @@ export default function PlayerExperience({ data }) {
     }
     setMetaProperty("og:image", absoluteImage);
     setCanonicalHref(canonicalUrl);
-  }, [data, location.pathname, playlistId]);
+  }, [data, location.pathname, playlistId, routeToken]);
 
   useEffect(() => {
     setPlaybackEnded(endParam);

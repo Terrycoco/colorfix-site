@@ -20,6 +20,7 @@ use App\PLAYLISTS\Entities\PlayerExperience;
 use DomainException;
 use PDO;
 use RuntimeException;
+use App\REX\Exceptions\RexNotFoundException;
 use App\PALETTES\PV\PVService;
 
 class PlaylistExperienceService
@@ -96,7 +97,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     $this->markTiming('load_playlist', $playlistStartedAt);
 
     if (!$playlist instanceof Playlist) {
-        throw new RuntimeException("Playlist {$playlistId} not found for public REX reservation");
+        throw new RexNotFoundException("Playlist {$playlistId} not found for public REX reservation");
     }
 
     $itemsStartedAt = microtime(true);
@@ -182,6 +183,8 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'display_title' => $displayTitle,
         'slug' => null,
         'page_h1' => $pageH1,
+        'page_title' => trim((string)($playlist->meta['page_title'] ?? '')),
+        'meta_description' => trim((string)($playlist->meta['meta_description'] ?? '')),
         'project_summary' => $projectSummary,
         'type' => $playlist->type,
         'total_items' => count($items),
@@ -657,7 +660,7 @@ public function buildPlaybackPlanFromProjectExperience(
         $projectRepo = new PdoProjectRepository($this->pdo);
         $project = $projectRepo->findById($projectId);
         if (!$project) {
-            throw new RuntimeException("Project not found: {$projectId}");
+            throw new RexNotFoundException("Project not found: {$projectId}");
         }
         $projectPlaylists = $projectRepo->listPlaylists($projectId);
 
@@ -688,7 +691,7 @@ public function buildPlaybackPlanFromProjectExperience(
         $playlist = $playlistRepo->getById((string)$playlistId, $slideFlag);
         $this->markTiming('load_playlist', $playlistStartedAt);
         if (!$playlist instanceof Playlist) {
-            throw new RuntimeException("Playlist {$playlistId} not found for project {$projectId}");
+            throw new RexNotFoundException("Playlist {$playlistId} not found for project {$projectId}");
         }
 
         $itemsStartedAt = microtime(true);

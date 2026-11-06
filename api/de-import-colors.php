@@ -1,6 +1,9 @@
 <?php
 // import_colors_web.php — run from browser to upsert colors from /data/de-details.json
 declare(strict_types=1);
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 error_reporting(E_ALL);
 
 require_once 'db.php'; // must define $pdo (PDO)

@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 /**
  * import-ppg-friends.php
  * Reads: data/ppg-colors-details.csv

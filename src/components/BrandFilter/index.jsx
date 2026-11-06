@@ -1,5 +1,5 @@
 import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppState } from '@context/AppStateContext';
 import './brandfilter.css';
@@ -16,26 +16,20 @@ const BRANDS = [
   { code: 'vist',  label: 'Vista Paint' },
 ];
 
+// Mount a fresh editing session on each open, without updating application filters.
 export default function BrandFilterModal({ open, onClose }) {
+  return open ? <BrandFilterEditor onClose={onClose} /> : null;
+}
 
-  const { searchFilters, toggleFilter, applyBrandFilters } = useAppState();
+function brandCodes(brands) {
+  const values = brands instanceof Set ? [...brands] : Array.isArray(brands) ? brands : [];
+  return [...new Set(values.filter(Boolean).map(String))].sort();
+}
 
+function BrandFilterEditor({ onClose }) {
+  const { searchFilters, applyBrandFilters } = useAppState();
+  const [draft, setDraft] = useState(() => new Set(brandCodes(searchFilters?.brands)));
   const armRef = useRef(false); // prevent instant close from opener tap
-  const appliedBrandsRef = useRef(null);
-
-  // Normalize active selections from AppState to a Set of codes
-  const activeSet =
-    searchFilters?.brands instanceof Set
-      ? searchFilters.brands
-      : Array.isArray(searchFilters?.brands)
-      ? new Set(searchFilters.brands.filter(Boolean))
-      : new Set();
-
-  const selectedBrands = [...activeSet].map(String).sort();
-  const selectionKey = selectedBrands.join('|');
-  if (appliedBrandsRef.current === null) {
-    appliedBrandsRef.current = selectionKey;
-  }
 
   // Sort our hardcoded brands alphabetically by LABEL for display
   const list = [...BRANDS].sort((a, b) =>
@@ -43,22 +37,22 @@ export default function BrandFilterModal({ open, onClose }) {
   );
 
   function handleToggle(code) {
-    // Toggle the CODE in AppState (unchanged behavior)
-    toggleFilter?.('brands', code);
+    setDraft((previous) => {
+      const next = new Set(previous);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
   }
 
   function handleClear() {
-    // Clear all brands and issue one unfiltered Gallery request.
-    if (appliedBrandsRef.current !== '') {
-      applyBrandFilters?.([]);
-      appliedBrandsRef.current = '';
-    }
+    setDraft(new Set());
   }
 
   function handleDone() {
-    if (selectionKey !== appliedBrandsRef.current) {
+    const selectedBrands = brandCodes(draft);
+    if (JSON.stringify(selectedBrands) !== JSON.stringify(brandCodes(searchFilters?.brands))) {
       applyBrandFilters?.(selectedBrands);
-      appliedBrandsRef.current = selectionKey;
     }
     onClose?.();
   }
@@ -75,8 +69,7 @@ export default function BrandFilterModal({ open, onClose }) {
     if (e.target === e.currentTarget) onClose?.();
   }
 
-  const overlayRef = useOverlayLifecycle({ open, layer: "dialog", onEscape: onClose });
-  if (!open) return null;
+  const overlayRef = useOverlayLifecycle({ layer: "dialog", onEscape: onClose });
 
   return createPortal(
     <div className="bf-backdrop" ref={overlayRef} onClick={handleBackdropClick}>
@@ -88,7 +81,7 @@ export default function BrandFilterModal({ open, onClose }) {
         <div className="bf-body">
           <ul className="bf-list" role="listbox" aria-label="Brands">
             {list.map(({ code, label }) => {
-              const checked = activeSet.has(code);
+              const checked = draft.has(code);
               return (
                 <li key={code} className="bf-item">
                   <label className={`bf-row ${checked ? 'is-checked' : ''}`}>

@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // OPTIONS preflight (same as your other simple endpoints)
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(200);

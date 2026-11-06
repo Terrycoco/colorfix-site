@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/auth.php'; // SYSTEM admin validation
+
 header('Content-Type: text/plain; charset=UTF-8');
 
 echo "extension_loaded(imagick): " . (extension_loaded('imagick') ? "yes" : "no") . PHP_EOL;

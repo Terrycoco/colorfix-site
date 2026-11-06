@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
 import { resolveAppPath } from '@helpers/routingHelper';
+import { colorSearchTarget } from '@helpers/colorSearch';
 import './searchitem.css';
 
 export default function NameSearchItem({ item }) {
@@ -71,7 +72,7 @@ export default function NameSearchItem({ item }) {
     submittingRef.current = true;
     setNoResults(false);
     setDidSubmit(true);
-    const target = `/results/18?name=${encodeURIComponent('%' + term + '%')}&code=${encodeURIComponent('%' + term + '%')}`;
+    const target = colorSearchTarget(term);
     navigate(resolveAppPath(target, location.pathname));
   };
 
@@ -142,7 +143,7 @@ export default function NameSearchItem({ item }) {
             {isColorFixBrand ? (
               <img src={colorfixLightBgUrl} alt="ColorFix" className="search-display__brand-image" />
             ) : (
-              item.display
+              'Search by Name or Hex'
             )}
           </div>
           <div className="search-descr">{item.description}</div>
@@ -163,7 +164,7 @@ export default function NameSearchItem({ item }) {
             {isColorFixBrand ? (
               <img src={colorfixLightBgUrl} alt="ColorFix" className="search-display__brand-image" />
             ) : (
-              item.display
+              'Search by Name or Hex'
             )}
           </div>
 
@@ -177,7 +178,8 @@ export default function NameSearchItem({ item }) {
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
                 className="search-input"
-                placeholder="Search by name or code"
+                placeholder="Search by name or hex"
+                aria-label="Search by Name or Hex"
               />
 
               <button

@@ -46,7 +46,7 @@ final class BeforeAfterVideoRecipe
 
     /* TIMING — seconds */
     public const BEFORE_SECONDS = 1.5;
-    public const DISSOLVE_SECONDS = 2.0;
+    public const DISSOLVE_SECONDS = 2.0; // Reveal After over a fully visible Before.
     public const AFTER_SECONDS = 3.0;
     public const END_SCREEN_SECONDS = 4.0;
 
@@ -145,8 +145,14 @@ final class BeforeAfterVideoRecipe
 
         $dissolveEnd =
             $tools->secondsToFrames(
-                self::BEFORE_SECONDS
-                + self::DISSOLVE_SECONDS,
+                self::BEFORE_SECONDS + self::DISSOLVE_SECONDS,
+                self::FPS
+            );
+
+        // Wait until the After is almost fully visible before fading Before.
+        $beforeFadeStart =
+            $tools->secondsToFrames(
+                self::BEFORE_SECONDS + self::DISSOLVE_SECONDS * 0.8,
                 self::FPS
             );
 
@@ -395,13 +401,7 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 animations: [
-                    $tools->opacityAnimation(
-                        1,
-                        0,
-                        $dissolveStart,
-                        $dissolveEnd
-                    ),
-
+                    $tools->opacityAnimation(1, 0, $beforeFadeStart, $dissolveEnd),
                     $mainFade,
                 ]
             ),
@@ -410,8 +410,8 @@ final class BeforeAfterVideoRecipe
             /*
              * After image.
              *
-             * It sits above the before image and the Chef tells
-             * the oven exactly when to dissolve its opacity.
+             * Fade this in OVER the fully visible Before image, rather than
+             * fading both layers simultaneously (which darkens the picture).
              */
             $tools->imageLayer(
                 id:
@@ -439,18 +439,11 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 style: [
-                    'opacity' =>
-                        0,
+                    'opacity' => 0,
                 ],
 
                 animations: [
-                    $tools->opacityAnimation(
-                        0,
-                        1,
-                        $dissolveStart,
-                        $dissolveEnd
-                    ),
-
+                    $tools->opacityAnimation(0, 1, $dissolveStart, $dissolveEnd),
                     $mainFade,
                 ]
             ),
@@ -485,12 +478,7 @@ final class BeforeAfterVideoRecipe
                     self::phaseLabelStyle(),
 
                 animations: [
-                    $tools->opacityAnimation(
-                        1,
-                        0,
-                        $dissolveStart,
-                        $dissolveEnd
-                    ),
+                    $tools->opacityAnimation(1, 0, $dissolveStart, $dissolveEnd),
                 ]
             ),
 
@@ -521,19 +509,10 @@ final class BeforeAfterVideoRecipe
                     ),
 
                 style:
-                    array_merge(
-                        self::phaseLabelStyle(),
-                        ['opacity' => 0]
-                    ),
+                    array_merge(self::phaseLabelStyle(), ['opacity' => 0]),
 
                 animations: [
-                    $tools->opacityAnimation(
-                        0,
-                        1,
-                        $dissolveStart,
-                        $dissolveEnd
-                    ),
-
+                    $tools->opacityAnimation(0, 1, $dissolveStart, $dissolveEnd),
                     $mainFade,
                 ]
             ),
@@ -634,17 +613,13 @@ final class BeforeAfterVideoRecipe
 
                 box:
                     $tools->box(
-                        (
-                            self::WIDTH
-                            - self::LOGO_SIZE_PX
-                        )
-                        / 2,
+                        0,
                         (
                             self::HEIGHT
                             / 2
                         )
                         + self::LOGO_MARGIN_TOP,
-                        self::LOGO_SIZE_PX,
+                        self::WIDTH,
                         self::LOGO_SIZE_PX,
                         31
                     ),
@@ -661,8 +636,10 @@ final class BeforeAfterVideoRecipe
                 ],
 
                 style: [
-                    'opacity' =>
-                        0,
+                    'display' => 'flex',
+                    'alignItems' => 'center',
+                    'justifyContent' => 'center',
+                    'opacity' => 0,
                 ],
 
                 animations: [

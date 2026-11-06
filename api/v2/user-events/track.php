@@ -21,23 +21,6 @@ function cf_truthy(mixed $value): bool
     return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
 }
 
-function cf_known_admin_device_token(): bool
-{
-    $token = trim((string)($_COOKIE['cf_device_token'] ?? ''));
-    if ($token === '') {
-        return false;
-    }
-
-    $tokenFile = dirname(__DIR__, 2) . '/data/device_tokens.json';
-    if (!is_file($tokenFile)) {
-        return false;
-    }
-
-    $raw = @file_get_contents($tokenFile);
-    $decoded = $raw ? json_decode($raw, true) : null;
-    return is_array($decoded) && isset($decoded[$token]);
-}
-
 function respond(array $payload, int $status = 200): void
 {
     http_response_code($status);
@@ -72,9 +55,7 @@ $payload['user_agent'] = $payload['user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] 
 $payload['is_internal'] = (
     cf_truthy($payload['is_internal'] ?? false)
     || cf_truthy($_COOKIE['cf_internal_viewer'] ?? false)
-    || (isset($_COOKIE['cf_admin']) && $_COOKIE['cf_admin'] === '1')
-    || (isset($_COOKIE['cf_admin_global']) && $_COOKIE['cf_admin_global'] === '1')
-    || cf_known_admin_device_token()
+    || \App\SYSTEM\Services\AdminAuthService::fromPdo($pdo)->currentUser(true) !== null
 );
 
 try {

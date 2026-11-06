@@ -1,17 +1,24 @@
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAppState } from '@/context/AppStateContext'; // ✅ global context
 import './login.css';
 import {API_FOLDER} from '@helpers/config';
+import { clearLegacyAdminState, setAdmin } from '@helpers/authHelper';
 
 function LoginPage() {
-  const { setUser, setLoggedIn } = useAppState();
+  const { user: currentUser, authReady, authError, setUser, setLoggedIn } = useAppState();
   const navigate = useNavigate();
-  const location = useLocation();
+
+  useEffect(() => {
+    if (authReady && currentUser?.is_admin) navigate('/admin/', { replace: true });
+  }, [authReady, currentUser, navigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false); // ✅ prevent double submits
 
 const handleSubmit = async (e) => {
@@ -24,20 +31,11 @@ const handleSubmit = async (e) => {
     const res = await fetch(`${API_FOLDER}/login.php`, {
       method: 'POST',
       credentials: 'include',
-      body: new URLSearchParams({ email, password }), // don't set Content-Type manually
+      body: new URLSearchParams({ email, password, remember: String(remember) }), // don't set Content-Type manually
     });
     
 
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      const text = await res.text();
-      console.error('Non-JSON response:', res.status, text);
-      setError(`Login failed (${res.status})`);
-      setLoading(false);
-      return;
-    }
+    const data = await res.json().catch(() => null);
 
     if (!res.ok || !data?.success) {
       setError(data?.message || `Login failed (${res.status})`);
@@ -45,70 +43,23 @@ const handleSubmit = async (e) => {
       return;
     }
 
+    clearLegacyAdminState();
     const user = data.user || {};
-    let deviceToken = data.device_token || '';
+    setAdmin(Boolean(user.is_admin));
     setUser(user);
     setLoggedIn(true);
 
-    if (user.is_admin) {
-      localStorage.setItem('isAdmin', 'true');
-      localStorage.setItem('isTerry', 'true'); // if other code checks it
-      const host = window.location.hostname;
-      const isPrimaryDomain = host.endsWith('terrymarr.com');
-      const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
-      if (!deviceToken && window.crypto?.getRandomValues) {
-        const bytes = new Uint8Array(24);
-        window.crypto.getRandomValues(bytes);
-        deviceToken = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
-        try {
-          await fetch(`${API_FOLDER}/device-register.php`, {
-            method: 'POST',
-            credentials: 'include',
-            body: new URLSearchParams({ token: deviceToken }),
-          });
-        } catch {}
-      }
-      if (deviceToken) {
-        try {
-          localStorage.setItem('cf_device_token', deviceToken);
-        } catch {}
-        document.cookie = `cf_device_token=${encodeURIComponent(deviceToken)}; Max-Age=31536000; path=/; SameSite=Lax${securePart}`;
-        if (isPrimaryDomain) {
-          document.cookie = `cf_device_token=${encodeURIComponent(deviceToken)}; Max-Age=31536000; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-        }
-      }
-      document.cookie = `cf_admin=1; Max-Age=31536000; path=/; SameSite=Lax${securePart}`;
-      if (isPrimaryDomain) {
-        document.cookie = `cf_admin_global=1; Max-Age=31536000; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-      }
-    } else {
-      localStorage.removeItem('isAdmin');
-      localStorage.removeItem('isTerry');
-      const host = window.location.hostname;
-      const isPrimaryDomain = host.endsWith('terrymarr.com');
-      const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `cf_admin=; Max-Age=0; path=/; SameSite=Lax${securePart}`;
-      if (isPrimaryDomain) {
-        document.cookie = `cf_admin_global=; Max-Age=0; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-      }
-    }
-
-    if (deviceToken) {
-      const params = new URLSearchParams(window.location.search || '');
-      if (!params.get('device_token')) {
-        const adminLogin = location.pathname === '/admin/login' || location.pathname.startsWith('/admin/');
-        const targetPath = adminLogin ? '/admin/' : '/';
-        window.location.replace(`${targetPath}?device_token=${encodeURIComponent(deviceToken)}`);
-        return;
-      }
-    }
-    navigate(location.pathname === '/admin/login' || location.pathname.startsWith('/admin/') ? '/admin/' : '/');
+    navigate(user.is_admin ? '/admin/' : '/', { replace: true });
   } catch (err) {
     console.error('Login error:', err);
     setError('Something went wrong');
     setLoading(false);
   }
 };
+
+  if (!authReady || currentUser?.is_admin) {
+    return <p className="login-form" role="status">{currentUser?.is_admin ? 'Opening admin…' : authError || 'Checking your saved login…'}</p>;
+  }
 
   return (
     <form className="login-form" onSubmit={handleSubmit} aria-busy={loading}>
@@ -128,15 +79,31 @@ const handleSubmit = async (e) => {
       />
 
       <label htmlFor="password">Password:</label>
+      <div className="login-password-field">
       <input
         id="password"
-        type="password"
+        type={showPassword ? 'text' : 'password'}
         autoComplete="current-password" // ✅ helps autofill
         value={password}
         onChange={e => setPassword(e.target.value)}
         required
         disabled={loading}
       />
+      <button
+        type="button"
+        className="login-password-toggle"
+        aria-label={showPassword ? 'Hide password' : 'Show password'}
+        aria-pressed={showPassword}
+        onClick={() => setShowPassword(value => !value)}
+      >
+        {showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}
+      </button>
+      </div>
+
+      <label>
+        <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} disabled={loading} />
+        Remember this personal device for 30 days
+      </label>
 
       <button type="submit" disabled={loading}>
         {loading ? 'Logging in…' : 'Log In'}

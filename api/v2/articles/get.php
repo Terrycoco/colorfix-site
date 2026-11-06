@@ -28,10 +28,7 @@ if ($id <= 0) {
     respond(['ok' => false, 'error' => 'id required'], 400);
 }
  
-$adminOverride = isset($_GET['admin']) && (string)$_GET['admin'] === '1';
-$isAdmin = $adminOverride
-    || (isset($_COOKIE['cf_admin']) && $_COOKIE['cf_admin'] === '1')
-    || (isset($_COOKIE['cf_admin_global']) && $_COOKIE['cf_admin_global'] === '1');
+$isAdmin = \App\SYSTEM\Services\AdminAuthService::fromPdo($pdo)->currentUser(true) !== null;
 
 try {
     $repo = new PdoArticleRepository($pdo);

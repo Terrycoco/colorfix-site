@@ -6,10 +6,6 @@ source "$SCRIPT_DIR/deploy-env.sh"
 echo "🧱 Regenerating front-page payload..."
 npm run prebuild-front-page
 
-echo "🏗️  Building site..."
-npm run build
-
-
 
 echo "🚀 Uploading front-page cache payloads..."
 deploy_ssh "mkdir -p public_html/colorfix/api/cache"

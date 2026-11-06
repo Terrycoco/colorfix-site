@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 require_once 'db.php'; // uses existing PDO connection in $pdo
 
 $filename = __DIR__ . '/data/swatches_checkpoint.csv';

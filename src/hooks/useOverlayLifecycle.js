@@ -134,9 +134,17 @@ export default function useOverlayLifecycle({ open = true, layer, ...settings } 
 
     const owner = topOverlay();
     if (layer) root.style.zIndex = `var(--z-${layer})`;
-    if (layer && owner) {
-      const ownerLevel = owner.root.style.zIndex || getComputedStyle(owner.root).zIndex;
-      root.style.zIndex = `min(calc(var(--z-toast) - var(--z-above)), max(var(--z-${layer}), calc(${ownerLevel} + var(--z-above))))`;
+    const parentLevels = owner ? [owner.root.style.zIndex || getComputedStyle(owner.root).zIndex] : [];
+    // Some existing drawers are inline surfaces rather than registered modals.
+    // Their body-portaled controls still need to rise above the anchor's context.
+    let anchorLevel = null;
+    for (let node = options.current.anchorRef?.current; node; node = node.parentElement) {
+      const value = Number.parseFloat(getComputedStyle(node).zIndex);
+      if (Number.isFinite(value) && (anchorLevel === null || value > anchorLevel)) anchorLevel = value;
+    }
+    if (anchorLevel !== null) parentLevels.push(String(anchorLevel));
+    if (layer && parentLevels.length) {
+      root.style.zIndex = `min(calc(var(--z-toast) - var(--z-above)), max(var(--z-${layer}), calc(max(${parentLevels.join(", ")}) + var(--z-above))))`;
     }
     const entry = { root, options, owner };
     overlays.push(entry);

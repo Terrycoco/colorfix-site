@@ -13,62 +13,24 @@ final class PdoAnalyticsEventRepository implements AnalyticsEventRepositoryInter
 
     public function record(AnalyticsEvent $event): int
     {
-        $payloadJson = $event->payload !== []
-            ? json_encode($event->payload, JSON_UNESCAPED_SLASHES)
-            : null;
-
-        if ($payloadJson === false) {
-            throw new \RuntimeException('Analytics payload could not be encoded.');
-        }
-
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO analytics_events (
-                event_key,
-                is_test,
-                reservation_id,
-                reservation_token,
-                resolver_key,
-                resource_type,
-                resource_id,
-                experience_key,
-                source_key,
-                viewer_id,
-                path,
-                payload_json,
-                created_at
-            ) VALUES (
-                :event_key,
-                :is_test,
-                :reservation_id,
-                :reservation_token,
-                :resolver_key,
-                :resource_type,
-                :resource_id,
-                :experience_key,
-                :source_key,
-                :viewer_id,
-                :path,
-                :payload_json,
-                NOW()
-            )"
+        // Legacy callers share the ANA recording policy and persistence path.
+        // Reporting methods below retain their existing behavior.
+        return \App\ANA\Services\ANAService::fromPdo($this->pdo)->record(
+            new \App\ANA\DTO\ANAEvent(
+                eventKey: $event->eventKey,
+                isTest: $event->isTest,
+                reservationId: $event->reservationId,
+                resolverKey: $event->resolverKey,
+                resourceType: $event->resourceType,
+                resourceId: $event->resourceId,
+                experienceKey: $event->experienceKey,
+                src: $event->src,
+                viewerId: $event->viewerId,
+                path: $event->path,
+                payload: $event->payload,
+                reservationToken: $event->reservationToken,
+            )
         );
-
-        $stmt->execute([
-            ':event_key' => trim($event->eventKey),
-            ':is_test' => $event->isTest ? 1 : 0,
-            ':reservation_id' => $event->reservationId,
-            ':reservation_token' => $event->reservationToken,
-            ':resolver_key' => $event->resolverKey,
-            ':resource_type' => $event->resourceType,
-            ':resource_id' => $event->resourceId,
-            ':experience_key' => $event->experienceKey,
-            ':source_key' => $event->src,
-            ':viewer_id' => $event->viewerId,
-            ':path' => $event->path,
-            ':payload_json' => $payloadJson,
-        ]);
-
-        return (int)$this->pdo->lastInsertId();
     }
 
     public function countEventsByResourceType(

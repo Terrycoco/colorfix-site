@@ -19,6 +19,22 @@
   text-decoration: none;
 }
 
+.pals-swatch.pals-reference-swatch {
+  max-width: 240px;
+  flex: 0 1 240px;
+  cursor: default;
+}
+
+.pals-reference-swatch .pals-fill .pals-label {
+  position: absolute;
+  right: var(--pad);
+}
+
+.pals-swatch.pals-reference-swatch:hover .pals-fill {
+  transform: none;
+  filter: none;
+}
+
 /* fill block */
 .pals-fill {
   position: absolute;

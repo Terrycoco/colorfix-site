@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 

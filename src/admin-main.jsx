@@ -29,7 +29,8 @@ createRoot(document.getElementById('root')).render(
 
 function AdminRouteNormalizer() {
   const location = useLocation();
-  const { user } = useAppState();
+  const { user, authReady, authError } = useAppState();
+  if (!authReady) return <p role="status">{authError || 'Checking admin session…'}</p>;
   const adminAllowed = Boolean(user?.is_admin) || isAdmin();
   const target = `${location.pathname}${location.search}${location.hash}`;
 

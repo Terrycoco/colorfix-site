@@ -22,5 +22,12 @@ final readonly class ANAEvent
         public ?string $path = null,
 
         public array $payload = [],
+        public ?string $userAgent = null,
+        public ?string $reservationToken = null,
     ) {}
+
+    public function withUserAgent(?string $userAgent): self
+    {
+        return new self(...array_replace(get_object_vars($this), ['userAgent' => $userAgent]));
+    }
 }

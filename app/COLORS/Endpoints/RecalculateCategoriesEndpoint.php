@@ -53,12 +53,14 @@ final class RecalculateCategoriesEndpoint
             $started = microtime(true);
             $result = (new CategoryRecalcManager($pdo))->rebuild($batchSize);
             self::respond(200, [
-                'status' => 'success',
+                'status' => $result['swatches']['ok'] ? 'success' : 'warning',
+                'message' => $result['swatches']['message'] ?? null,
                 'summary' => [
                     'processed' => $result['processed'],
                     'total_colors' => $result['processed'],
                     'materialized' => $result['materialized'],
                     'clusters' => $result['clusters'],
+                    'swatches' => $result['swatches'],
                     'seconds' => round(microtime(true) - $started, 2),
                     'legacy_color_caches_updated' => false,
                 ],

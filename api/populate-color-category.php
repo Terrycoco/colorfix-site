@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 file_put_contents(__DIR__ . '/assign.log', "[" . date('Y-m-d H:i:s') . "] → entered populate-color-category.php\n", FILE_APPEND);
 
 ini_set('display_errors', 1);

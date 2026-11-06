@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // Parse JSON or x-www-form-urlencoded
 require_once 'db.php';
 header('Content-Type: application/json; charset=utf-8');

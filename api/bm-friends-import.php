@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // import-bm-friends.php
 // Reads bm-friends-output.csv and inserts into color_friends
 // Writes skipped rows to bm-friends-skipped.csv for manual review

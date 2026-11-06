@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/auth.php'; // SYSTEM admin validation
+
+
 // TEMP: show real errors while we fix 500s (remove later)
 ini_set('display_errors', '1');
 error_reporting(E_ALL);

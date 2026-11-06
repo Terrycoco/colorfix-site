@@ -2,7 +2,7 @@ import { useCallback, useContext } from "react";
 import { getCurrentSourceParam } from "@helpers/sourceParam";
 import { recordAnalyticsEvent } from "./analyticsClient";
 import { AnalyticsContext } from "./AnalyticsProvider";
-import { isAdmin, isAnalyticsTestMode } from "@helpers/authHelper";
+import { shouldIgnoreAnalytics, isAnalyticsTestMode } from "@helpers/authHelper";
 
 export function useAnalytics() {
   const context = useContext(AnalyticsContext);
@@ -10,7 +10,7 @@ export function useAnalytics() {
 
   const track = useCallback(
    async (eventKey, payload = {}, resource = {}) => {
-      if (isAdmin() && !isAnalyticsTestMode()) return null;
+      if (shouldIgnoreAnalytics()) return null;
       const event = {
         event_key: eventKey,
         is_test: isAnalyticsTestMode() ? 1 : 0,

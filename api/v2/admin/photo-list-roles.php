@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/auth.php'; // SYSTEM admin validation
+
 header('Content-Type: application/json; charset=UTF-8');
 
 require_once __DIR__ . '/../../autoload.php';

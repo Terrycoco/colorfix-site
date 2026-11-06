@@ -169,13 +169,16 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
     try {
 
-      const v2 = `${API_FOLDER}/v2/run-query.php?t=${Date.now()}`;
+      const hexSearch = Number(query_id) === 18 && Object.prototype.hasOwnProperty.call(params, 'hex');
+      const v2 = hexSearch
+        ? `${API_FOLDER}/v2/hex-search.php`
+        : `${API_FOLDER}/v2/run-query.php?t=${Date.now()}`;
 
       // Keep the current Gallery (including the hero wheel) visible while
       // a replacement request is in flight. The successful response replaces it.
       setNoResults(false);
 
-      const serverFilters = makeServerFilters(searchFilters);
+      const serverFilters = hexSearch ? {} : makeServerFilters(searchFilters);
 
       res = await fetch(v2, {
 
@@ -227,7 +230,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
       }
 
-      const brandCodes = Array.isArray(searchFilters?.brands)
+      const brandCodes = !hexSearch && Array.isArray(searchFilters?.brands)
 
         ? searchFilters.brands
 
@@ -378,6 +381,10 @@ const GalleryPage = ({ defaultQueryId = null }) => {
                 hcl_c: row.hcl_c ?? null,
 
                 hcl_l: row.hcl_l ?? null,
+
+                hex_match_type: row.hex_match_type,
+
+                match_delta_e: row.match_delta_e,
 
               });
 
@@ -705,7 +712,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
       <TopSpacer disabled={isMobile} />
 
-      {isSwatch && (
+      {isSwatch && meta?.search_mode !== 'hex' && (
 
         <div
 

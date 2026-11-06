@@ -136,7 +136,23 @@ final class PdoRexReservationRepository implements RexReservationRepositoryInter
         string $resourceType,
         int $resourceId,
         int $limit = 100,
+        bool $forUpdate = false,
     ): array {
+        if ($forUpdate && $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') {
+            // A current read is essential after waiting for the playlist lock:
+            // an enclosing save transaction may already have an older snapshot.
+            $limit = max(1, min(500, $limit));
+            $stmt = $this->pdo->prepare(
+                "SELECT * FROM rex_reservations
+                 WHERE resource_type = :resource_type AND resource_id = :resource_id
+                 ORDER BY id ASC LIMIT {$limit} FOR UPDATE"
+            );
+            $stmt->execute([':resource_type' => $resourceType, ':resource_id' => $resourceId]);
+            return array_map(
+                fn(array $row): RexReservation => $this->rowToReservation($row),
+                $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            );
+        }
         return $this->search(new RexReservationSearchCriteria(
             resourceType: $resourceType,
             resourceId: $resourceId,

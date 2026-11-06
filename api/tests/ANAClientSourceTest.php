@@ -17,10 +17,10 @@ test('client source migration allows tagged playlist visits and is repeatable', 
     )');
     $pdo->exec('CREATE TABLE analytics_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT, is_test INTEGER,
-        reservation_id INTEGER, resolver_key TEXT, resource_type TEXT,
+        reservation_id INTEGER, reservation_token TEXT, resolver_key TEXT, resource_type TEXT,
         resource_id INTEGER, experience_key TEXT, source_key TEXT,
         session_id TEXT, referrer TEXT, viewer_id TEXT, path TEXT,
-        payload_json TEXT, created_at TEXT,
+        payload_json TEXT, user_agent TEXT, created_at TEXT,
         FOREIGN KEY (source_key) REFERENCES analytics_sources(source_key)
     )');
     // This historical test exercises the old FK migration, not current source lookup.

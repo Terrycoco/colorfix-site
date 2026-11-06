@@ -77,3 +77,25 @@ body { margin: 0; }
 .sas-quick-item span { display: flex; flex-direction: column; gap: 6px; }
 .sas-quick-item small { color: #66717a; font-size: 13px; }
 .sas-quick-item:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Reuse SYSTEM authentication without leaving the standalone SAS app. */
+.sas-sign-in { display: grid; gap: 12px; }
+.sas-sign-in p { margin: 0 0 8px; line-height: 1.5; }
+.sas-sign-in > input, .sas-sign-in-password input { width: 100%; min-width: 0; min-height: 48px; padding: 12px; border: 1px solid #cbd4d9; border-radius: 6px; background: #fff; }
+.sas-sign-in-password { display: flex; align-items: center; gap: 8px; }
+.sas-sign-in-password input { flex: 1; }
+.sas-sign-in-password button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; min-height: 48px; border: 1px solid #cbd4d9; border-radius: 6px; background: #fff; cursor: pointer; }
+
+/* REX-backed playlist selection. */
+.sas-playlist-list { margin-top: 18px; }
+.sas-playlist-item { border: 1px solid #cad4d8; border-radius: 9px; background: #fff; padding: 16px; display: grid; gap: 12px; }
+.sas-playlist-experiences { display: flex; flex-wrap: wrap; gap: 8px; }
+.sas-playlist-experiences button { border: 1px solid #007f84; border-radius: 6px; padding: 11px 14px; color: #00686d; background: #fff; font-size: 14px; cursor: pointer; text-transform: capitalize; }
+.sas-playlist-experiences button:active { background: #e6f4f4; }
+
+/* Compact playlist link only; photo sharing and Quick Links keep their layouts. */
+.sas-playlist-url-control { display: flex; align-items: stretch; min-width: 0; width: 100%; border: 1px solid #cbd4d9; border-radius: 6px; background: #fff; overflow: hidden; }
+.sas-playlist-url-control button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; min-height: 44px; padding: 10px 12px; border: 0; border-right: 1px solid #cbd4d9; background: #fff; color: #00686d; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.sas-playlist-url-control input { flex: 1; min-width: 0; width: 0; border: 0; padding: 10px; background: #fff; font-size: 13px; text-overflow: ellipsis; }
+.sas-playlist-copy-status { display: block; min-height: 20px; margin-top: 6px; font-size: 13px; color: #00686d; }
+.sas-playlist-experiences button:disabled { opacity: .5; cursor: wait; }

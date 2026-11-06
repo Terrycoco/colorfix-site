@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json');

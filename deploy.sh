@@ -2,8 +2,12 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/deploy-env.sh"
+cd "$SCRIPT_DIR"
 
-echo "🚀 Deploying site build (dist/) via SSH..."
+echo "🏗️ Building the current frontend before deployment..."
+npm run build
+
+echo "🚀 Deploying the fresh site build (dist/) via SSH..."
 
 # Configuration
 LOCAL_DIR="dist/"
@@ -22,16 +26,15 @@ npm run prebuild-homepage-html
 echo "📂 Contents of ${LOCAL_DIR}"
 ls -l "$LOCAL_DIR"
 
-# 🧹 Clean old hashed files only in assets/
-echo "🧹 Cleaning old hashed files in assets/ on remote..."
-deploy_ssh "
-  cd "$REMOTE_PATH/assets" || exit
-  rm -f *.js *.css
-"
+# Keep fingerprinted assets so open tabs can finish loading their original build.
+# New HTML points to the fresh build; old assets can be retired separately.
+echo "🚀 Uploading fingerprinted assets before publishing their HTML..."
+deploy_rsync -az --delay-updates \
+  -e "$RSYNC_SSH" \
+  "${LOCAL_DIR}assets/" "$REMOTE_TARGET:$REMOTE_PATH/assets/"
 
-# 🚀 Upload everything from dist/ but DO NOT delete remote files outside of dist/assets
 echo "🚀 Uploading files via rsync..."
-deploy_rsync -avz \
+deploy_rsync -avz --delay-updates --exclude='/assets/' \
   -e "$RSYNC_SSH" \
   "$LOCAL_DIR" "$REMOTE_TARGET:$REMOTE_PATH"
 

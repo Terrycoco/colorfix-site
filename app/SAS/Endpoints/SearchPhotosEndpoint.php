@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\SAS\Endpoints;
 
 use App\SAS\Services\PhotoSearchService;
+use App\SYSTEM\Services\AdminAuthService;
 use InvalidArgumentException;
 use PDO;
 use Throwable;
@@ -22,6 +23,12 @@ final class SearchPhotosEndpoint
         }
 
         try {
+            // Reuse any verified ColorFix login; SAS device access has no timed
+            // expiry, while the SYSTEM account/session-version checks remain.
+            if (!AdminAuthService::fromPdo($pdo)->rememberDevice()) {
+                self::respond(401, ['ok' => false, 'error' => 'Unauthorized']);
+                return;
+            }
             $q = $_GET['q'] ?? '';
             $page = $_GET['page'] ?? '1';
             $perPage = $_GET['per_page'] ?? '30';

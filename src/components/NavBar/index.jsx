@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppState } from '@context/AppStateContext';
-import { isAdmin } from '@helpers/authHelper';
+import { isAdmin, setAdmin, clearLegacyAdminState } from '@helpers/authHelper';
+import { API_FOLDER } from '@helpers/config';
 import { Menu, X } from 'lucide-react';
 
 function NavBar() {
@@ -25,27 +26,18 @@ function NavBar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [hamburgerOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const response = await fetch(`${API_FOLDER}/logout.php`, { method: 'POST', credentials: 'include' });
+      if (!response.ok) throw new Error('Logout failed');
+    } catch {
+      window.alert('Could not sign out. Please try again.');
+      return;
+    }
+    setAdmin(false);
+    clearLegacyAdminState();
     setLoggedIn(false);
     setUser(null);
-    try {
-      localStorage.removeItem('cf_logged_in');
-      localStorage.removeItem('cf_user');
-      localStorage.removeItem('cf_device_token');
-      localStorage.removeItem('isAdmin');
-      localStorage.removeItem('isTerry');
-    } catch {
-      // local storage may be unavailable in some embedded contexts
-    }
-    const host = window.location.hostname;
-    const isPrimaryDomain = host.endsWith('terrymarr.com');
-    const securePart = window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `cf_admin=; Max-Age=0; path=/; SameSite=Lax${securePart}`;
-    document.cookie = `cf_device_token=; Max-Age=0; path=/; SameSite=Lax${securePart}`;
-    if (isPrimaryDomain) {
-      document.cookie = `cf_admin_global=; Max-Age=0; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-      document.cookie = `cf_device_token=; Max-Age=0; path=/; SameSite=None; domain=.terrymarr.com; Secure`;
-    }
     navigate('/');
     setHamburgerOpen(false);
   };

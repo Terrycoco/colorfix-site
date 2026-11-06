@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../autoload.php';
+require_once __DIR__ . '/fixtures/ANAFixtureDatabase.php';
 
 use App\ANA\DTO\ANAEvent;
 use App\ANA\Repos\PdoANAEventRepository;
@@ -10,7 +11,7 @@ use App\ANA\Repos\PdoANASourceRepository;
 use App\ANA\Services\ANAService;
 
 test('ANA src_params preserves sources and reports, with immediate database updates', function () {
-    $pdo = new PDO('sqlite::memory:');
+    $pdo = new ANAFixturePDO();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->exec('PRAGMA foreign_keys = ON');
     $pdo->sqliteCreateFunction('NOW', fn () => '2026-10-08 12:00:00');
@@ -44,14 +45,16 @@ test('ANA src_params preserves sources and reports, with immediate database upda
 
     $pdo->exec('CREATE TABLE analytics_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT, is_test INTEGER,
-        reservation_id INTEGER, resolver_key TEXT, resource_type TEXT,
+        reservation_id INTEGER, reservation_token TEXT, resolver_key TEXT, resource_type TEXT,
         resource_id INTEGER, experience_key TEXT, source_key TEXT,
         session_id TEXT, referrer TEXT, viewer_id TEXT, path TEXT,
-        payload_json TEXT, created_at TEXT,
+        payload_json TEXT, user_agent TEXT, created_at TEXT,
         FOREIGN KEY (source_key) REFERENCES src_params(src)
     )');
     $sources = new PdoANASourceRepository($pdo);
-    $service = new ANAService(new PdoANAEventRepository($pdo, $sources));
+    $pdo->exec('CREATE TABLE app_configs (config_key TEXT UNIQUE, config_json TEXT)');
+    $service = new ANAService(new PdoANAEventRepository($pdo, $sources),
+        new \App\ANA\Services\ANAIgnoreService(new \App\Repos\PdoAppConfigRepository($pdo)));
     $event = fn (?string $src) => new ANAEvent(
         eventKey: 'visit', reservationId: 162, resolverKey: 'playlist_experience',
         resourceType: 'playlist', resourceId: 56, experienceKey: 'client', src: $src,
@@ -93,7 +96,7 @@ test('ANA src_params preserves sources and reports, with immediate database upda
     assert_equals(10, (int)$pdo->query('SELECT COUNT(*) FROM analytics_events')->fetchColumn());
     $after = array_values(array_filter(
         $report->countEventsByResourceType('playlist', 'visit'),
-        fn (array $group) => $group['source_key'] !== 'new_fixture'
+        fn (array $group) => $group['source_label'] !== 'New fixture'
     ));
     assert_equals($before, $after);
     assert_equals(1, (int)$pdo->query('SELECT COUNT(*) FROM analytics_events WHERE source_key IS NULL')->fetchColumn());

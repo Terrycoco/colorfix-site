@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Check, Images, Search, X } from 'lucide-react';
 import { photoImageUrl, searchPhotos } from '../services/photosApi';
 import SharePhotos from './SharePhotos';
+import SASSignIn from './SASSignIn';
 
 export default function Photos() {
   const [query, setQuery] = useState('');
@@ -11,6 +12,7 @@ export default function Photos() {
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [authRequired, setAuthRequired] = useState(false);
   const [retry, setRetry] = useState(0);
   const [selected, setSelected] = useState(() => new Map());
   const [sharing, setSharing] = useState(false);
@@ -19,7 +21,7 @@ export default function Photos() {
   useEffect(() => {
     const controller = new AbortController();
     const request = ++generation.current;
-    if (!query.trim()) {
+    if (!query.trim() || authRequired) {
       setResults([]);
       setTotal(0);
       setBusy(false);
@@ -40,13 +42,17 @@ export default function Photos() {
         setTotal(result.total);
       } catch (err) {
         if (controller.signal.aborted || generation.current !== request) return;
+        if (err.status === 401) {
+          setAuthRequired(true);
+          return;
+        }
         setError(err.message || 'Could not load photos');
       } finally {
         if (generation.current === request) setBusy(false);
       }
     }, page === 1 ? 180 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [query, page, retry]);
+  }, [query, page, retry, authRequired]);
 
   const changeQuery = (value) => {
     setQuery(value);
@@ -65,6 +71,15 @@ export default function Photos() {
   };
   const displayed = results;
   const hasMore = results.length < total;
+
+  if (authRequired) return <main className="sas-content sas-content--photos">
+    <Link className="sas-back" to="/"><ArrowLeft size={20} aria-hidden="true"/>Back</Link>
+    <SASSignIn onSignedIn={() => {
+      setPage(1);
+      setError('');
+      setAuthRequired(false);
+    }} />
+  </main>;
 
   if (sharing) return <main className="sas-content sas-content--photos"><SharePhotos photoIds={Array.from(selected.keys())} onBack={() => setSharing(false)} /></main>;
 

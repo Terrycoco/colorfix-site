@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 require_once 'db.php'; // Ensure this sets $pdo
 require_once __DIR__ . '/functions/HCLtoRGB.php';
 

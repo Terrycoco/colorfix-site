@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 error_reporting(E_ALL);
 
 header("Access-Control-Allow-Methods: DELETE, OPTIONS, POST");

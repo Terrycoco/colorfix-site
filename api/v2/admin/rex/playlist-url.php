@@ -50,9 +50,10 @@ function rex_playlist_url_matches_experience(
 ): bool {
     return strtolower(trim($reservation->resolverKey)) === 'playlist_experience'
         && strtolower(trim($reservation->resourceType)) === 'playlist'
-        && strtolower(trim((string)($reservation->experienceKey ?? '')))
+        && strtolower(trim((string)($reservation->experienceKey ?: ($reservation->context['experience_key'] ?? ''))))
             === $experienceKey
-        && strtolower(trim($reservation->status)) === 'active';
+        && strtolower(trim($reservation->status)) === 'active'
+        && $reservation->revokedAt === null;
 }
 
 
@@ -124,7 +125,6 @@ function rex_playlist_url_find(
             resourceId: $playlistId,
             status: 'active',
             limit: 500,
-            experienceKey: $experienceKey,
         )
     );
 
@@ -179,7 +179,7 @@ try {
      */
     if (!$selected) {
         $sync = new RexPlaylistExperienceSyncService($pdo);
-        $sync->syncPlaylist($playlistId);
+        $sync->syncPlaylist($playlistId, $experienceKey);
 
         $selected = rex_playlist_url_find(
             $repo,

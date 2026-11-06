@@ -361,7 +361,7 @@ export default function ColorDetailPage() {
               <>  <p
                   className="text-sm mt-2"
                   dangerouslySetInnerHTML={{
-                    __html: `Because of the low chroma values, this color is also considered a neutral, in the ${formatCategoryList(currentColorDetail.neutral_cats)}.`
+                    __html: `This color is also considered a neutral, in the ${formatCategoryList(currentColorDetail.neutral_cats)}.`
                   }}
                 ></p>
                 <p className="text-sm mt-2">

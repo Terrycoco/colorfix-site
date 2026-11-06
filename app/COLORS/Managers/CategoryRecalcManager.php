@@ -7,6 +7,7 @@ use App\COLORS\Repos\PdoCategoryDefinitionRepository;
 use App\COLORS\Repos\PdoColorRepository;
 use App\COLORS\Repos\PdoColorClassificationRepository;
 use App\COLORS\Repos\PdoMaterializedCategoriesRepository;
+use App\COLORS\Repos\PdoMaterializedSwatchRepository;
 use App\COLORS\Repos\PdoClusterCategoryRepository;
 use App\COLORS\Services\ColorClassifier;
 use PDO;
@@ -169,7 +170,19 @@ final class CategoryRecalcManager
             throw new RuntimeException('Another COLORS rebuild holds the advisory lock. No changes made.');
         }
         try {
-            return $this->rebuildWithLock($batchSize, $progress, $testRollback);
+            $result = $this->rebuildWithLock($batchSize, $progress, $testRollback);
+            // Categories, category MV and clusters must commit before the
+            // swatch snapshot is built/published. Rollback tests never get here.
+            try {
+                $result['swatches'] = ['ok' => true, ...(new PdoMaterializedSwatchRepository($this->pdo))->refresh()];
+            } catch (\Throwable $e) {
+                error_log('COLORS categories committed; swatch refresh failed: ' . $e->getMessage());
+                $result['swatches'] = [
+                    'ok' => false,
+                    'message' => 'Categories and clusters were updated, but swatch refresh failed. Use Refresh Swatches on the Colors screen to retry.',
+                ];
+            }
+            return $result;
         } finally {
             $release = $this->pdo->prepare('SELECT RELEASE_LOCK(?)');
             $release->execute([$lockName]);

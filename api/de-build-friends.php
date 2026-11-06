@@ -4,6 +4,9 @@
 // Output: __DIR__/data/de-friends.csv
 declare(strict_types=1);
 
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
+
 // --- harden + debug ---
 error_reporting(E_ALL);
 ini_set('display_errors', '1');

@@ -57,6 +57,7 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
                 event_key,
                 is_test,
                 reservation_id,
+                reservation_token,
               
                 resolver_key,
                 resource_type,
@@ -68,11 +69,13 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
                 viewer_id,
                 path,
                 payload_json,
+                user_agent,
                 created_at
             ) VALUES (
                 :event_key,
                 :is_test,
                 :reservation_id,
+                :reservation_token,
      
                 :resolver_key,
                 :resource_type,
@@ -84,6 +87,7 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
                 :viewer_id,
                 :path,
                 :payload_json,
+                :user_agent,
                 NOW()
             )"
         );
@@ -92,6 +96,7 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
             ':event_key' => trim($event->eventKey),
             ':is_test' => $event->isTest ? 1 : 0,
             ':reservation_id' => $event->reservationId,
+            ':reservation_token' => $event->reservationToken,
             ':resolver_key' => $event->resolverKey,
             ':resource_type' => $event->resourceType,
             ':resource_id' => $resolvedPageId ?? $event->resourceId,
@@ -102,6 +107,7 @@ final class PdoANAEventRepository implements ANAEventRepositoryInterface
             ':viewer_id' => $event->viewerId,
             ':path' => $event->path,
             ':payload_json' => $payloadJson,
+            ':user_agent' => $event->userAgent,
         ]);
 
         return (int)$this->pdo->lastInsertId();

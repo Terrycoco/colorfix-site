@@ -1,5 +1,11 @@
 php_value auto_prepend_file "/home1/shortgal/public_html/colorfix/app/bootstrap.php"
 
+# This legacy maintenance file is truncated and cannot execute safely.
+# Keep its source intact while denying direct web access.
+<Files "update-hcl-rgb-lookup.php">
+  Require all denied
+</Files>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteRule ^pinterest/connect/?$ pinterest-connect.php [L,QSA]

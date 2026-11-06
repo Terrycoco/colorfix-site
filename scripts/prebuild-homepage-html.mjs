@@ -319,7 +319,7 @@ function renderItem(item) {
 
   if (type === "front-page-playlist-set") return renderPlaylistSet(item);
 
-  if (type === "name-search") return renderTextCard(item.display || item.title, "", "cf-static-card--name", item.target_url || "");
+  if (type === "name-search") return renderTextCard("Search by Name or Hex", "", "cf-static-card--name", item.target_url || "");
 
   if (type === "search" || type === "brand" || type === "button") {
 
@@ -520,6 +520,10 @@ function renderStaticFooter(content) {
           <span aria-hidden="true">·</span>
 
           <a href="/terms">Terms of Service</a>
+
+          <span aria-hidden="true">·</span>
+
+          <a href="/login">Login</a>
 
           <span aria-hidden="true">·</span>
 

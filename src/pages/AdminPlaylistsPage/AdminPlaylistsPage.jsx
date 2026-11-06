@@ -64,6 +64,8 @@ const LIST_URL =
 
   `${API_FOLDER}/v2/admin/playlists/list.php`;
 
+const EMPTY_COPIED_SLIDES = [];
+
 
 
 
@@ -149,6 +151,8 @@ export default function AdminPlaylistsPage() {
   ] = useState("title");
 
 
+
+  const [activityFilter, setActivityFilter] = useState("active");
 
   const [
 
@@ -344,11 +348,15 @@ export default function AdminPlaylistsPage() {
 
 
 
+        const matchingActivity = playlists.filter(
+          (row) => (Number(row.is_active) !== 0) === (activityFilter === "active")
+        );
+
         const rows =
 
           needle
 
-            ? playlists.filter(
+            ? matchingActivity.filter(
 
                 (row) => {
 
@@ -404,7 +412,7 @@ export default function AdminPlaylistsPage() {
 
             : [
 
-                ...playlists,
+                ...matchingActivity,
 
               ];
 
@@ -485,6 +493,8 @@ export default function AdminPlaylistsPage() {
       [
 
         playlists,
+
+        activityFilter,
 
         query,
 
@@ -788,7 +798,7 @@ export default function AdminPlaylistsPage() {
 
       ? location.state.copiedSlides
 
-      : [];
+      : EMPTY_COPIED_SLIDES;
 
 
 
@@ -925,6 +935,27 @@ export default function AdminPlaylistsPage() {
           }
 
         >
+          <div className="admin-list-pane__toolbar">
+            <div className="admin-list-pane__sort" role="group" aria-label="Playlist activity">
+              {["active", "inactive"].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`admin-list-pane__sort-button${activityFilter === value ? " is-active" : ""}`}
+                  aria-pressed={activityFilter === value}
+                  onClick={() => setActivityFilter(value)}
+                >
+                  {value === "active" ? "Active" : "Inactive"}
+                </button>
+              ))}
+            </div>
+          </div>
+          {!listLoading && !listError && visiblePlaylists.length === 0 && (
+            <AdminEmptyState
+              title="Playlists"
+              message={`No ${activityFilter} playlists${query.trim() ? " match your search" : ""}.`}
+            />
+          )}
 
           {
 

@@ -9,6 +9,7 @@ import GalleryGrid from './GalleryGrid';
 import GalleryItem from './GalleryItem';
 
 import SwatchItem from '../GalleryItems/SwatchItem';
+import ReferenceSwatch from '../Swatches/ReferenceSwatch';
 
 import ImageItem from '../GalleryItems/ImageItem';
 
@@ -60,6 +61,7 @@ export const renderContent = (item) => {
   switch (type) {
 
     case 'swatch':      return <SwatchItem key={key} item={item} />;
+    case 'reference-swatch': return <ReferenceSwatch key={key} color={item} />;
 
     case 'picture-swatch': return <PictureSwatchItem key={key} item={item} />;
 
@@ -184,6 +186,8 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
 
   // Mode decided by runner; default to hue
 
+  const preserveMatchOrder = meta?.preserve_match_order === true;
+
   const groupMode = ['lightness', 'chroma'].includes(meta?.params?.group_mode)
 
     ? meta.params.group_mode
@@ -195,6 +199,10 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
   // Pick label field per mode (fallbacks included)
 
   const getGroupLabel = (item) => {
+
+    if (preserveMatchOrder) {
+      return item.hex_match_type === 'exact' ? 'Exact matches' : 'Closest matches';
+    }
 
     if (groupMode === 'lightness') {
 
@@ -384,7 +392,7 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
 
   // Force section order in lightness mode: Light → Medium → Dark
 
-  if (groupMode === 'lightness' || groupMode === 'hue') {
+  if (!preserveMatchOrder && (groupMode === 'lightness' || groupMode === 'hue')) {
 
     sections.sort((a, b) => {
 
@@ -433,6 +441,8 @@ function Gallery({ items, meta, heroItems = [], breakpointCols, className = '' }
   // slicing, otherwise the later batches would be in the wrong order.
 
   const sortedSectionItems = (section) => {
+
+    if (preserveMatchOrder) return section.items;
 
     if (groupMode === 'lightness') {
 

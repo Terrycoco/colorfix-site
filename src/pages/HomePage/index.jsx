@@ -365,10 +365,6 @@ const HomePage = () => {
 
   const isPublicFrontPage =
     Number(effectiveQueryId) === FRONT_PAGE_QUERY_ID &&
-    isPrebuiltFrontPageRequest(
-      Number(effectiveQueryId),
-      paramObj
-    ) &&
     getFrontPageVariant() === "public";
 
   const isFrontPageDesktop = Number(effectiveQueryId) === FRONT_PAGE_QUERY_ID && !isMobile;
@@ -470,6 +466,15 @@ const HomePage = () => {
             }}
           >
             Terms of Service
+          </a>
+
+          <span aria-hidden="true">·</span>
+
+          <a
+            href="/login"
+            style={{ color: "inherit", textDecoration: "underline" }}
+          >
+            Login
           </a>
 
           <span aria-hidden="true">·</span>

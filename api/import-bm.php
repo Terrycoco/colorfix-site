@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 // import-bm.php — Base import for BM colors (no HCL here)
 // - Reads bm-details.csv
 // - Parses rgb(...) -> r,g,b and hex6

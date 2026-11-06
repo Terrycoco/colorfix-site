@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 header('Content-Type: text/plain; charset=utf-8');
 $here = __DIR__;
 $cmd  = 'php -l ' . escapeshellarg($here . '/browse-palettes.php') . ' 2>&1';

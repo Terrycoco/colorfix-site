@@ -38,14 +38,20 @@ export default function FuzzySearchColorSelect({
   mobileBreakpoint = 768,
   showLabel = true,
   compact = false,
+  autoSearch = false,
+  inlineResults = false,
+  showNameModeToggle = false,
+  clearAfterPick = false,
 }) {
   const initialText = () => (value && (value.name || value.code || value.hex6 || value.hex || '')) || '';
   const [query, setQuery] = useState(initialText);
+  const [startsWith, setStartsWith] = useState(true);
   const [results, setResults] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [open, setOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState(value || null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia(`(max-width: ${mobileBreakpoint}px)`).matches;
@@ -143,6 +149,18 @@ export default function FuzzySearchColorSelect({
     return () => abortActiveSearch();
   }, []);
 
+  // An idle pause triggers search; old responses are invalidated on every edit.
+  useEffect(() => {
+    if (!autoSearch) return;
+    const text = query.trim();
+    if (text.length < 2 || suppressNextSearchRef.current) {
+      suppressNextSearchRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => runSearch(text), 350);
+    return () => clearTimeout(timer);
+  }, [query, autoSearch, startsWith]);
+
 function getFontColor(color) {
   const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l ?? hexLightness(color?.hex6 || color?.hex);
   if (typeof lightness === "number" && !Number.isNaN(lightness)) {
@@ -162,15 +180,16 @@ function colorToHex(color) {
   }
 
 function pick(color) {
-    if (!color) return;
+    if (!color || pickingRef.current) return;
+    abortActiveSearch();
     pickingRef.current = true;
     try {
       onSelect && onSelect(color);
       if (!isControlled) {
-        setSelectedColor(color);
-        setQuery(color.name || color.code || '');
+        setSelectedColor(clearAfterPick ? null : color);
+        setQuery(clearAfterPick ? '' : (color.name || color.code || ''));
       }
-      suppressNextSearchRef.current = true;
+      suppressNextSearchRef.current = !clearAfterPick;
     } finally {
       setResults([]);
       setHighlightedIndex(-1);
@@ -188,6 +207,7 @@ function pick(color) {
   function runSearch(text) {
     const q = (text || '').trim();
     abortActiveSearch();
+    setSearchError("");
     if (q.length < 2) {
       setResults([]);
       setOpen(false);
@@ -197,13 +217,24 @@ function pick(color) {
     const seq = ++reqSeq.current;
     const controller = new AbortController();
     abortRef.current = controller;
-    const url = `${API_FOLDER}/v2/fuzzy-search.php?q=${encodeURIComponent(q)}&ts=${Date.now()}`;
+    // Explicit color lookup always searches all brands, regardless of browsing filters.
+    const nameMode = showNameModeToggle ? (startsWith ? 'starts_with' : 'contains') : 'legacy';
+    const url = `${API_FOLDER}/v2/fuzzy-search.php?q=${encodeURIComponent(q)}&name_mode=${nameMode}&ts=${Date.now()}`;
     fetch(url, { signal: controller.signal })
-      .then(r => r.text())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
       .then(txt => {
         if (seq !== reqSeq.current) return;
         let data;
         try { data = JSON.parse(txt); } catch { data = []; }
+        if (data?._err) {
+          setResults([]);
+          setOpen(false);
+          setSearchError("Color lookup failed. Try again.");
+          return;
+        }
         const raw = Array.isArray(data)
           ? data
           : (Array.isArray(data?.results) ? data.results
@@ -219,6 +250,7 @@ function pick(color) {
         setResults([]);
         setOpen(false);
         setHighlightedIndex(-1);
+        setSearchError("Color lookup failed. Try again.");
       });
   }
 
@@ -342,8 +374,11 @@ function pick(color) {
             }}
             onChange={(e) => {
               const val = e.target.value;
-              setQuery(val);
-              if (val.trim().length === 0 && selectedColor) {
+               abortActiveSearch();
+               suppressNextSearchRef.current = false;
+               setSearchError("");
+               setQuery(val);
+               if (val.trim().length === 0 && selectedColor) {
                 setSelectedColor(null);
                 onSelect && onSelect(null);
               }
@@ -409,7 +444,33 @@ function pick(color) {
         </div>
       )}
 
-      {open && results.length > 0 && !isMobile && createPortal(
+       {showNameModeToggle && (
+         <label className="fuzzy-name-mode">
+           <input type="checkbox" checked={startsWith} onChange={(e) => {
+             abortActiveSearch();
+             setResults([]);
+             setOpen(false);
+             setStartsWith(e.target.checked);
+           }} />
+           Starts With
+         </label>
+       )}
+       {searchError && <span className="fuzzy-error" role="alert">{searchError}</span>}
+       {inlineResults && !isMobile && open && results.length > 0 && (
+         <div className="fuzzy-inline-results" role="listbox" aria-label="Matching colors">
+           {results.map((c, index) => (
+             <button type="button" className="fuzzy-inline-item" role="option"
+               aria-selected={index === highlightedIndex}
+               key={c.id ?? `${c.name}-${index}`}
+               onPointerDown={(e) => e.preventDefault()}
+               onClick={() => pick(c)}>
+               <span className="fuzzy-inline-swatch" style={{ backgroundColor: colorToHex(c) || '#ccc' }} />
+               <span>{c.name} · {String(c.brand || c.brand_name || '').toUpperCase()}</span>
+             </button>
+           ))}
+         </div>
+       )}
+       {open && results.length > 0 && !isMobile && !inlineResults && createPortal(
         <ul ref={popupRef} id="fuzzy-results" className="results" role="listbox">
           {results.map((c, index) => (
             <li
@@ -452,8 +513,10 @@ function pick(color) {
                 enterKeyHint="search"
                 value={query}
                 onChange={(e) => {
-                  setQuery(e.target.value);
-                  setResults([]);
+                   abortActiveSearch();
+                   suppressNextSearchRef.current = false;
+                   setQuery(e.target.value);
+                   setResults([]);
                   setHighlightedIndex(-1);
                 }}
                 onKeyDown={handleKeyDown}

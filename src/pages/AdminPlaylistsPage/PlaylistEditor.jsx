@@ -4,6 +4,7 @@ import {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -184,6 +185,13 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   ref
 ) {
   const isMobile = useAdminMobile();
+  const detailRequestRef = useRef(0);
+  const detailAbortRef = useRef(null);
+
+  useEffect(() => () => {
+    detailRequestRef.current++;
+    detailAbortRef.current?.abort();
+  }, []);
 
   const dialog =
     useAdminDialog();
@@ -529,6 +537,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           return;
         }
 
+        const requestId = ++detailRequestRef.current;
+        detailAbortRef.current?.abort();
+        const controller = new AbortController();
+        detailAbortRef.current = controller;
+        const timeout = window.setTimeout(() => controller.abort(), 30000);
+
         if (showLoading) {
           setDetailLoading(true);
         }
@@ -542,6 +556,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
             await fetch(
               `${GET_URL}?playlist_id=${encodeURIComponent(String(id))}&_=${Date.now()}`,
               {
+                signal: controller.signal,
                 credentials:
                   "include",
               }
@@ -549,6 +564,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
           const data =
             await res.json();
+
+          if (requestId !== detailRequestRef.current) return false;
 
           if (
             !res.ok
@@ -656,15 +673,17 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           return true;
 
         } catch (err) {
+          if (requestId !== detailRequestRef.current) return false;
           setDetailError(
-            err?.message ||
+            (err?.name === 'AbortError' ? 'Loading the playlist timed out. Please try again.' : err?.message) ||
             "Failed to load playlist."
           );
 
           return false;
 
         } finally {
-          if (showLoading) {
+          window.clearTimeout(timeout);
+          if (requestId === detailRequestRef.current) {
             setDetailLoading(false);
           }
         }
@@ -938,6 +957,9 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     if (
       isNewRoute
     ) {
+      detailRequestRef.current++;
+      detailAbortRef.current?.abort();
+      setDetailLoading(false);
       const newPlaylist =
         {
           ...emptyPlaylist,
@@ -1006,6 +1028,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     if (
       routePlaylistId
     ) {
+      // Never expose the previous playlist's editing state under a new URL.
+      setPlaylist({ ...emptyPlaylist });
+      setItems([]);
+      setSelectedSlideKey(null);
+      setBatchSelectedKeys([]);
+      setDirty(false);
       setSaveMessage(
         ""
       );
@@ -3462,12 +3490,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           onJump: onJumpPlaylistId,
         } : null}
         actions={
-          detailLoading && !isNewRoute
+          (detailLoading || detailError) && !isNewRoute
             ? null
             : primaryActions
         }
         subActions={
-          detailLoading && !isNewRoute
+          (detailLoading || detailError) && !isNewRoute
             ? null
             : secondaryActions
         }
@@ -3491,7 +3519,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                     detailError
                       ? (
                           <AdminNotice variant="danger">
-                            {detailError}
+                            <div>{detailError}</div>
+                            <AdminButton onClick={() => fetchPlaylist(routePlaylistId)}>Retry</AdminButton>
                           </AdminNotice>
                         )
                       : null

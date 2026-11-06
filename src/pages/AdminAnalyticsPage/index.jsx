@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import ANAIgnoreSettings from "./ANAIgnoreSettings";
 import { isAnalyticsTestMode } from "@helpers/authHelper";
 
 import {
@@ -184,6 +185,11 @@ function AnalyticsVisitsDrawer({
         key: "source_key",
         label: "Actual src",
         render: (event) => event.source_key ?? "Direct",
+      },
+      {
+        key: "user_agent",
+        label: "User Agent",
+        render: (event) => event.user_agent || "—",
       },
       {
         key: "referrer",
@@ -425,6 +431,7 @@ export default function AdminAnalyticsPage() {
             </div>
 
             <div className="admin-detail-header__actions">
+              <ANAIgnoreSettings />
               <label
                 style={{
                   display: "inline-flex",

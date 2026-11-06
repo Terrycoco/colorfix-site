@@ -1,7 +1,7 @@
 import { useCallback, useContext } from "react";
 import { recordANAEvent } from "./ANAClient";
 import { ANAContext } from "./ANAProvider";
-import { isAdmin, isAnalyticsTestMode } from "@helpers/authHelper";
+import { shouldIgnoreAnalytics, isAnalyticsTestMode } from "@helpers/authHelper";
 import { getCurrentSourceParam } from "@helpers/sourceParam";
 
 export function useANA() {
@@ -10,7 +10,7 @@ export function useANA() {
 
   const track = useCallback(
     async (eventKey, payload = {}, resource = {}) => {
-      if (isAdmin() && !isAnalyticsTestMode()) return null;
+      if (shouldIgnoreAnalytics()) return null;
 
       const event = {
         event_key: eventKey,

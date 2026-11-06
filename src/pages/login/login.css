@@ -32,7 +32,8 @@
 
 /* inputs */
 .login-form input[type="email"],
-.login-form input[type="password"]{
+.login-form input[type="password"],
+.login-form .login-password-field input[type="text"]{
   display: block;
   width: 100%;
   height: var(--field-h);
@@ -43,6 +44,39 @@
   background: #fff;
   color: #111;
   transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.login-password-field {
+  position: relative;
+}
+
+.login-form .login-password-field input {
+  padding-right: 48px;
+}
+
+.login-form .login-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #444;
+  cursor: pointer;
+}
+
+.login-form .login-password-toggle:active {
+  transform: translateY(-50%);
+}
+
+.login-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  border-radius: 4px;
 }
 .login-form input:focus{
   outline: none;

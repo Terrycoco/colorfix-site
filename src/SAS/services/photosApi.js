@@ -1,3 +1,5 @@
+import { markInternalViewer } from '../../helpers/authHelper';
+
 const ENDPOINT = '/api/v2/admin/sas/search-photos.php';
 
 /** The only function the Photos screen needs to search. */
@@ -6,8 +8,11 @@ export async function searchPhotos(query, page = 1, signal) {
   const response = await fetch(`${ENDPOINT}?${params}`, { credentials: 'include', signal });
   const data = await response.json().catch(() => null);
   if (!response.ok || data?.ok !== true) {
-    throw new Error(data?.error || `Photo search failed (HTTP ${response.status})`);
+    const error = new Error(data?.error || `Photo search failed (HTTP ${response.status})`);
+    error.status = response.status;
+    throw error;
   }
+  markInternalViewer(); // A successful private SAS search verifies this device.
   return {
     items: Array.isArray(data.items) ? data.items : [],
     total: Number(data.total || 0),

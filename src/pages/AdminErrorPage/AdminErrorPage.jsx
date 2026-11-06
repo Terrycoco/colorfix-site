@@ -380,6 +380,26 @@ export default function AdminErrorPage() {
     return Number.isSafeInteger(fallback) && fallback > 0 ? fallback : 0;
   };
 
+  // Identify interrupted CREATE work even when the worker readiness gate
+  // stopped the order before an asset or render job could be reserved.
+  const createWorkDetails = (row) => {
+    if (String(row?.department || "").toUpperCase() !== "PUB") return null;
+    const bookmark = parseBookmark(row?.bookmark_json);
+    if (!bookmark || !String(bookmark.operation || "").startsWith("PUB.CREATE.")) return null;
+    const summary = bookmark.summary || {};
+    const assetId = pubAssetId(row);
+    const jobId = Number(summary.job_id || summary.video_job_id || 0);
+    return {
+      assetType: text(summary.asset_type),
+      sourceType: text(summary.source_type),
+      sourceId: text(summary.source_id),
+      title: text(summary.title),
+      assetId,
+      jobId: Number.isSafeInteger(jobId) && jobId > 0 ? jobId : 0,
+      operation: text(bookmark.operation),
+    };
+  };
+
   const openPubAsset = (row) => {
     const id = pubAssetId(row);
     if (!id) return;
@@ -712,6 +732,27 @@ export default function AdminErrorPage() {
 
             </AdminField>
 
+            {createWorkDetails(draft) ? (
+              <>
+                <AdminField label="Attempted asset type">
+                  {label(createWorkDetails(draft).assetType)}
+                </AdminField>
+                <AdminField label="CREATE operation">
+                  {label(createWorkDetails(draft).operation)}
+                </AdminField>
+                <AdminField label="Render job #">
+                  {createWorkDetails(draft).jobId || "Not assigned at interruption"}
+                </AdminField>
+                <AdminField label="PUB asset #">
+                  {createWorkDetails(draft).assetId || "Not reserved at interruption"}
+                </AdminField>
+                <AdminField label="Source">
+                  {[createWorkDetails(draft).sourceType,
+                    createWorkDetails(draft).sourceId ? `#${createWorkDetails(draft).sourceId}` : ""]
+                    .filter(Boolean).join(" ") || "Not recorded"}
+                </AdminField>
+              </>
+            ) : null}
             {readonly("message", "Original error")}
 
             {readonly("step_key", "Recovery step")}

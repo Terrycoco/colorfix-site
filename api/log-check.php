@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 header('Content-Type: text/plain; charset=utf-8');
 
 $paths = [

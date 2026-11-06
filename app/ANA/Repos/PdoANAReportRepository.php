@@ -207,6 +207,7 @@ final class PdoANAReportRepository implements ANAReportRepositoryInterface
                 e.is_test,
                 e.path,
                 e.payload_json,
+                e.user_agent,
                 e.created_at
             FROM analytics_events e
             LEFT JOIN src_params sp ON sp.src = e.source_key

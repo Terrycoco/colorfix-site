@@ -1029,3 +1029,101 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 .controls-grid .hue-stack .hue-btn{
   font-size:0.85rem;
 }
+
+/* ===== MyPalette: mobile-first palette building (scoped; desktop untouched) ===== */
+@media (max-width: 768px) {
+  .mypage .myp-header {
+    justify-content: flex-end;
+    margin: 4px 0 8px;
+  }
+  .mypage .myp-header-actions { width: 100%; justify-content: flex-end; }
+  .mypage .myp-mobile-menu-wrap { position: relative; }
+  .mypage .myp-mobile-menu-trigger {
+    background: #f4f4f4; border: 1px solid #d6d6d6; color: #222;
+    border-radius: 9px; width: 44px; height: 40px;
+    font-size: 26px; line-height: 1; cursor: pointer;
+  }
+  .mypage .myp-mobile-menu {
+    position: absolute; top: calc(100% + 4px); right: 0;
+    z-index: var(--z-dropdown, 1000); width: 190px;
+    background: white; border: 1px solid #ddd; border-radius: 10px;
+    box-shadow: 0 8px 26px rgba(0,0,0,.16); overflow: hidden;
+  }
+  .mypage .myp-mobile-menu button {
+    display: block; width: 100%; min-height: 44px; padding: 10px 14px;
+    background: #fff; border: 0; border-bottom: 1px solid #eee;
+    color: #222; text-align: left; font: inherit;
+  }
+  .mypage .myp-mobile-picker {
+    position: relative; z-index: var(--z-dropdown, 1000);
+    width: min(100% - 24px, 480px); margin: 4px auto 18px;
+  }
+  .mypage .myp-mobile-picker .fuzzy-dropdown.myp-fuzzy {
+    display: flex !important; width: 100% !important;
+    min-width: 0; max-width: none; align-items: stretch !important;
+    justify-content: flex-start;
+  }
+  .mypage .myp-mobile-picker .dropdown-label {
+    font-size: 16px; margin-bottom: 6px;
+  }
+  .mypage .myp-mobile-picker .fuzzy-input-wrap input[type="search"] {
+    width: 100%; min-height: 44px !important; height: 44px !important;
+    font-size: 16px !important; padding: 10px 40px 10px 12px;
+    border-radius: 8px; background: #fff !important;
+    box-shadow: none !important;
+  }
+  .mypage .myp-mobile-picker .fuzzy-name-mode {
+    display: flex; align-items: center; gap: 8px;
+    margin: 8px 0 0; font-size: 14px; color: #333;
+  }
+  .mypage .myp-mobile-picker .fuzzy-name-mode input { width: 18px; height: 18px; }
+  .mypage .myp-mobile-picker .fuzzy-inline-results {
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: #fff; border: 1px solid #ccc; border-radius: 9px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.16);
+    max-height: min(420px, 52vh); overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mypage .myp-mobile-picker .fuzzy-inline-item,
+  .controls-grid .myp-fuzzy .fuzzy-inline-item {
+    display: flex !important; width: 100% !important;
+    align-items: center; justify-content: flex-start;
+    min-height: 44px !important; height: auto !important;
+    padding: 9px 12px !important; gap: 10px;
+    border: 0 !important; border-bottom: 1px solid #eee !important;
+    border-radius: 0; background: #fff !important;
+    font-size: 15px; font-weight: 500; text-align: left;
+    color: #111 !important; cursor: pointer;
+  }
+  .mypage .myp-mobile-picker .fuzzy-inline-item:active { background: #f2f2f2 !important; }
+  .mypage .myp-mobile-picker .fuzzy-inline-swatch {
+    width: 20px; height: 20px; border-radius: 3px;
+    border: 1px solid rgba(0,0,0,.22); flex: 0 0 20px;
+  }
+  .mypage .myp-mobile-picker .fuzzy-error { color: #a32222; font-size: 13px; margin-top: 5px; }
+  .mypage .myp-mobile-tools {
+    width: min(100% - 24px, 480px); margin: 18px auto 20px;
+  }
+  .mypage .myp-mobile-primary-tools {
+    display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas: "primary neutrals" "similar opposites";
+    gap: 10px;
+  }
+  .mypage .myp-mobile-primary-tools .cell { width: 100%; min-width: 0; padding: 0; }
+  .mypage .myp-mobile-primary-tools .cell button {
+    width: 100%; min-height: 48px; height: auto; font-size: 14px;
+    padding: 8px; white-space: normal; line-height: 1.25;
+  }
+  .mypage .myp-mobile-primary-tools .hue-stack {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mypage .myp-mobile-primary-tools .hue-tolerance-wrap {
+    margin: 0; justify-content: flex-start; height: 32px;
+  }
+  .mypage .myp-mobile-primary-tools .hue-tolerance { height: 30px !important; }
+}
+@media (max-width: 768px) {
+  .mypage .myp-mobile-picker .fuzzy-inline-item > span:last-child {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}

@@ -4,6 +4,9 @@
 // CSV format: name, chip_num (NO HEADERS)
 
 declare(strict_types=1);
+
+require_once __DIR__ . '/v2/admin/auth.php'; // SYSTEM admin validation
+
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 set_time_limit(60);

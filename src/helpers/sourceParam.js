@@ -111,6 +111,8 @@ export function initializeSourcePropagation() {
   }
 
   const updateLink = (link) => {
+    // Metadata links (canonical, stylesheets, preloads) are not navigation.
+    if (!link.matches?.("a[href]")) return;
     const href = link.getAttribute("href");
     if (link.hasAttribute("download") || !isNavigationUrl(href)) return;
     const next = withSourceParam(href);

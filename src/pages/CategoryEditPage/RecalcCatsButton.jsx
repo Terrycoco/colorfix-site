@@ -32,7 +32,7 @@ export default function RecalcCatsButton({ batch = 500, canonicalize = true, cla
 
   async function runRecalc() {
     if (inFlightRef.current) return;
-    if (!window.confirm('Recalculate ALL color categories and refresh the MV and clusters?')) return;
+    if (!window.confirm('Recalculate ALL color categories and refresh category data, clusters, and swatches?')) return;
     inFlightRef.current = true;
     setMsg('');
     setElapsed(0);
@@ -45,9 +45,11 @@ export default function RecalcCatsButton({ batch = 500, canonicalize = true, cla
         body: JSON.stringify({ confirm: 'rebuild_categories', batch }),
       });
       const json = await res.json().catch(() => null);
-      if (res.ok && json?.status === 'success') {
+      if (res.ok && ['success', 'warning'].includes(json?.status)) {
         const s = json.summary || {};
-        setMsg(`Recalc complete: ${s.processed ?? 0}/${s.total_colors ?? 0} colors; MV and clusters refreshed.`);
+        setMsg(json.status === 'warning'
+          ? json.message
+          : `Recalc complete: ${s.processed ?? 0}/${s.total_colors ?? 0} colors; categories, clusters, and swatches refreshed.`);
       } else {
         setMsg(`Recalc error: ${json?.message || `HTTP ${res.status}`}`);
       }
