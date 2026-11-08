@@ -1,0 +1,12 @@
+.artwork-dialog__backdrop{position:fixed;inset:0;z-index:960;background:#07101ccc;display:grid;place-items:center;padding:16px}
+.artwork-dialog{width:min(790px,100%);max-height:94dvh;background:#fff;color:#192238;border-radius:11px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 60px #0008}
+.artwork-dialog__header{display:flex;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid #d9e1ec;align-items:center}
+.artwork-dialog__header h2{font-size:20px;margin:0}.artwork-dialog__header button{font-size:23px;border:0;background:none;cursor:pointer}
+.artwork-dialog__form{overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.artwork-dialog__photo{max-width:100%;max-height:210px;object-fit:contain;align-self:center;border-radius:5px;background:#eef0f3}
+.artwork-dialog__fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.artwork-dialog__field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:13px;font-weight:600}
+.artwork-dialog__field input,.artwork-dialog__field textarea{border:1px solid #bccce1;border-radius:5px;padding:8px;font:inherit;font-weight:400;width:100%;box-sizing:border-box}
+.artwork-dialog__wide{grid-column:1/-1}.artwork-dialog__year{display:flex;gap:10px;align-items:end}.artwork-dialog__year>.artwork-dialog__field{flex:1}.artwork-dialog__year>label{white-space:nowrap;padding-bottom:9px}
+.artwork-dialog__error{color:#aa2132;font-weight:600}.artwork-dialog__footer{display:flex;gap:8px;align-items:center;border-top:1px solid #d9e1ec;padding-top:13px}.artwork-dialog__spacer{flex:1}.artwork-dialog__footer button{padding:8px 11px;cursor:pointer;border-radius:5px;border:1px solid #c4ccda;background:#fff}.artwork-dialog__footer .artwork-dialog__save{background:#10264d;color:white;border-color:#10264d}.artwork-dialog__footer .artwork-dialog__delete{color:#a82337;border-color:#daabaf}
+@media(max-width:600px){.artwork-dialog__fields{grid-template-columns:1fr}.artwork-dialog__photo{max-height:150px}.artwork-dialog__footer{flex-wrap:wrap}}

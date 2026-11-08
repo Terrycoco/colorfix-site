@@ -8,6 +8,8 @@ import {
 import ClientPickerModal from "@components/ClientPickerModal";
 import ModalDialog from "@components/ModalDialog";
 import SavedPaletteEditorModal from "@components/SavedPaletteEditorModal";
+import PhotoCropDialog from "@components/PhotoCropDialog/PhotoCropDialog";
+import ArtworkDialog from "@components/ArtworkDialog/ArtworkDialog";
 import "./admin-photo-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
@@ -201,6 +203,8 @@ export default function AdminPhotoLibraryPage() {
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [cropTarget, setCropTarget] = useState(null);
+  const [artworkTarget, setArtworkTarget] = useState(null);
   const [usageModal, setUsageModal] = useState(null);
   const [replaceFiles, setReplaceFiles] = useState({});
   const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
@@ -1475,6 +1479,24 @@ export default function AdminPhotoLibraryPage() {
                         >
                           Copy
                         </button>
+                        <button
+                          type="button"
+                          className="ghost admin-photo-library__crop-button"
+                          title={`Edit crop for photo #${item.photo_library_id}`}
+                          aria-label={`Edit crop for photo #${item.photo_library_id}`}
+                          onClick={() => setCropTarget({
+                            photoLibraryId: item.photo_library_id,
+                            imageUrl: buildAdminImageUrl(
+                              item.raw_rel_path || item.rel_path || item.image_url,
+                              item.updated_at || null
+                            ),
+                          })}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                          </svg>
+                        </button>
                       </div>
                     </td>
                     <td>
@@ -1587,7 +1609,42 @@ export default function AdminPhotoLibraryPage() {
                     </td>
                     <td>
                       <div className="admin-photo-library__meta">
-                        <div>{getDisplaySourceType(item)}</div>
+                        <select
+                          className="admin-photo-library__source-type"
+                          aria-label={`Type for photo #${item.photo_library_id}`}
+                          value={item.source_type || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "source_type", e.target.value)}
+                        >
+                          {!SOURCE_OPTIONS.some((option) => option.value === item.source_type) && (
+                            <option value={item.source_type || ""}>
+                              {item.source_type || "Unknown"} (legacy)
+                            </option>
+                          )}
+                          {SOURCE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                        {item.source_type === "art" && (
+                          <button
+                            type="button"
+                            className="ghost admin-photo-library__artwork-button"
+                            title={`Add or edit artwork information for photo #${item.photo_library_id}`}
+                            aria-label={`Add or edit artwork information for photo #${item.photo_library_id}`}
+                            onClick={() => setArtworkTarget({
+                              photoLibraryId: item.photo_library_id,
+                              imageUrl: buildAdminImageUrl(
+                                item.raw_rel_path || item.rel_path || item.image_url,
+                                item.updated_at || null
+                              ),
+                            })}
+                          >
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+                              <rect x="2.5" y="3" width="19" height="18" rx="1.5" />
+                              <path d="M6 17l4.5-5 3.5 3 2.4-2.5L20 17" />
+                              <circle cx="8.5" cy="8" r="1.5" />
+                            </svg>
+                          </button>
+                        )}
                         {item.source_id && <div className="muted">#{item.source_id}</div>}
                         {item.client_name ? <div className="muted">Client: {item.client_name}</div> : null}
                       </div>
@@ -1805,6 +1862,22 @@ export default function AdminPhotoLibraryPage() {
           </div>
         )}
       </section>
+
+      <ArtworkDialog
+        open={Boolean(artworkTarget)}
+        photoLibraryId={artworkTarget?.photoLibraryId ?? null}
+        imageUrl={artworkTarget?.imageUrl || ""}
+        onClose={() => setArtworkTarget(null)}
+      />
+
+      <PhotoCropDialog
+        open={Boolean(cropTarget)}
+        photoLibraryId={cropTarget?.photoLibraryId ?? null}
+        imageUrl={cropTarget?.imageUrl || ""}
+        cropType="swatch"
+        onClose={() => setCropTarget(null)}
+        onSaved={() => setRefreshKey((previous) => previous + 1)}
+      />
 
       {previewUrl && (
         <div

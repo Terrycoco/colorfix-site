@@ -877,3 +877,31 @@
     max-height: none;
   }
 }
+
+/* Crop opens the shared PHOTOS editor; keep it in the ID column under Copy. */
+.admin-photo-library__crop-button {
+  width: 30px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1b2433;
+  padding: 0;
+  cursor: pointer;
+}
+.admin-photo-library__crop-button:hover {
+  background: #e9eef5;
+}
+.admin-photo-library__crop-button:focus-visible {
+  outline: 2px solid #275fb6;
+  outline-offset: 2px;
+}
+
+/* Artwork metadata button lives under TYPE, not on the photograph or ID column. */
+.admin-photo-library__source-type {width:100%;max-width:220px;min-width:125px;}
+.admin-photo-library__artwork-button {display:inline-flex;align-items:center;justify-content:center;width:34px;height:32px;padding:5px;border:1px solid #cbd7eb;border-radius:7px;background:#fff;color:#142443;cursor:pointer;}
+.admin-photo-library__artwork-button:hover {background:#eaf1ff;}
+.admin-photo-library__artwork-button:focus-visible {outline:2px solid #2a60c4;outline-offset:2px;}
