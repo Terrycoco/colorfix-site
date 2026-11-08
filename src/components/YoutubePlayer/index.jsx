@@ -3,9 +3,9 @@ import AnimatedHueWheel from "../AnimatedHueWheel";
 import BrandBumperLogo from "../BrandBumperLogo";
 import { YOUTUBE_VIDEO_TIMING } from "../../remotion/youtubeVideoTiming.js";
 import {
-  
-  
-  
+
+
+
   parsePhotoRef,
 } from "../../helpers/assetImage";
 import "./youtube-player.css";
@@ -34,10 +34,10 @@ export default function YoutubePlayer({
     () => resolveImmediateImageUrl(currentItem?.image_url || "", isHueWheel),
     [currentItem?.image_url, isHueWheel]
   );
-  
+
   const imageUrl = immediateImageUrl;
 
-  
+
 
   const rootClassName = [
     "youtube-player-root",
@@ -185,7 +185,7 @@ function resolveImmediateImageUrl(value, isHueWheel) {
   if (!raw) return "";
   const parsed = parsePhotoRef(raw);
   if (parsed.url) return parsed.url;
-  
+
   return raw;
 }
 

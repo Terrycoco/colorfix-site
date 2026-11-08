@@ -280,7 +280,7 @@ export default function AdminPhotoLibraryToolsPage() {
     }
   }
 
-  
+
 
   async function handleSaveMissingRetires() {
     const selectedRows = rows.filter((row) => selectedMissingRows[row.key]);
@@ -492,7 +492,7 @@ export default function AdminPhotoLibraryToolsPage() {
               Delete Retired
             </button>
           ) : null}
-          
+
         </div>
       </div>
 

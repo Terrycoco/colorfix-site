@@ -12,6 +12,7 @@ import RexManagementDialog from "@components/REX/RexManagementDialog";
 import KickerDropdown from "@components/KickerDropdown";
 import { buildImageUrl } from "@helpers/assetImage";
 import { API_FOLDER } from "@helpers/config";
+import { filterAdminRecords, parseAdminSearch } from "@components/AdminLayout/adminSearch";
 import "./AdminPaletteViewersPage.css";
 
 const API_URL = `${API_FOLDER}/v2/admin/palette-viewers.php`;
@@ -103,6 +104,7 @@ function photoLabel(photo) {
 
 export default function AdminPaletteViewersPage() {
   const [items, setItems] = useState([]);
+  const [searchValue, setSearchValue] = useState("");
   const [palettes, setPalettes] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -125,6 +127,24 @@ export default function AdminPaletteViewersPage() {
     });
     return map;
   }, [palettes]);
+
+  // Search both viewer and associated palette identifiers, without filtering by status.
+  const visibleItems = useMemo(() => {
+    const query = parseAdminSearch(searchValue);
+    if (query.type === "id") {
+      return items.filter((row) =>
+        [row?.viewer?.palette_viewer_id, row?.viewer?.saved_palette_id, row?.palette?.id]
+          .some((id) => id != null && String(id).replace(/^0+(?=\d)/, "") === query.value)
+      );
+    }
+    return filterAdminRecords(items, searchValue, {
+      idField: "viewer.palette_viewer_id",
+      textFields: [
+        (row) => viewerTitle(row),
+        (row) => paletteLabel(row?.palette),
+      ],
+    });
+  }, [items, searchValue]);
 
   const selectedViewerId = detail?.viewer?.palette_viewer_id
     ? Number(detail.viewer.palette_viewer_id)
@@ -182,7 +202,9 @@ const loadPage = useCallback(async () => {
 
     const params = new URLSearchParams(window.location.search);
     const requestedPaletteId = Number(params.get("palette_id") || 0);
-    const requestedPvId = Number(params.get("pv_id") || rows.find(row=>Number(row?.viewer?.saved_palette_id)===requestedPaletteId)?.viewer?.palette_viewer_id || 0);
+    const requestedPvId = Number(params.get("pv_id") || (requestedPaletteId > 0
+      ? rows.find(row=>Number(row?.viewer?.saved_palette_id)===requestedPaletteId)?.viewer?.palette_viewer_id
+      : 0) || 0);
 
     const requestedExists =
       requestedPvId > 0 &&
@@ -197,8 +219,11 @@ const loadPage = useCallback(async () => {
       setIsNew(true);
       setDetail(normalizeDetail({viewer:{...EMPTY_VIEWER,saved_palette_id:String(requestedPaletteId)},photos:[],members:[]}));
       await loadPaletteDetail(requestedPaletteId);
-    } else if (!selectedId && rows[0]?.viewer?.palette_viewer_id) {
-      await loadDetail(rows[0].viewer.palette_viewer_id);
+    } else if (!selectedId) {
+      // Project Painter viewers do not have a single saved palette and use the
+      // project editor. Do not auto-open one in this single-palette form.
+      const firstEditable = rows.find(row => Number(row?.viewer?.saved_palette_id) > 0);
+      if (firstEditable) await loadDetail(firstEditable.viewer.palette_viewer_id);
     }
   } catch (err) {
     setError(err?.message || "Failed to load Palette Viewers");
@@ -206,10 +231,6 @@ const loadPage = useCallback(async () => {
     setLoading(false);
   }
 }, [loadDetail, loadList, loadPalettes, selectedId]);
-
-useEffect(() => {
-  loadPage();
-}, [loadPage]);
 
   useEffect(() => {
     loadPage();
@@ -393,6 +414,9 @@ useEffect(() => {
       list={
         <AdminListPane
           title="Palette Viewers"
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+          searchPlaceholder="Search viewers, palettes, or #ID..."
           actions={
             <button type="button" className="admin-palette-viewers__new" onClick={startNewViewer}>
               + New Viewer
@@ -400,13 +424,13 @@ useEffect(() => {
           }
           toolbar={
             <div className="admin-palette-viewers__list-meta">
-              {loading ? "Loading..." : `${items.length} canonical viewers`}
+              {loading ? "Loading..." : searchValue.trim() ? `${visibleItems.length} of ${items.length} viewers` : `${items.length} canonical viewers`}
             </div>
           }
         >
-          {items.length ? (
+          {visibleItems.length ? (
             <AdminObjectList ariaLabel="Palette Viewers">
-              {items.map((row) => {
+              {visibleItems.map((row) => {
                 const viewer = row.viewer || {};
                 const palette = row.palette || {};
                 const rexIds = Array.isArray(row.rex) ? row.rex : [];
@@ -417,6 +441,7 @@ useEffect(() => {
                     title={viewerTitle(row)}
                     meta={[
                       paletteLabel(palette),
+                      viewer.saved_palette_id ? `Palette #${viewer.saved_palette_id}` : null,
                       `${row.photo_count || 0} photo${Number(row.photo_count || 0) === 1 ? "" : "s"}`,
                       viewer.is_active ? "Active" : "Inactive",
                     ]}
@@ -440,7 +465,10 @@ useEffect(() => {
               })}
             </AdminObjectList>
           ) : (
-            <AdminEmptyState title="No Palette Viewers" message="Create a viewer after selecting a Saved Palette." />
+            <AdminEmptyState
+              title={searchValue.trim() ? "No matching Palette Viewers" : "No Palette Viewers"}
+              message={searchValue.trim() ? "Try a viewer name, palette name, Viewer ID, or Palette ID." : "Create a viewer after selecting a Saved Palette."}
+            />
           )}
         </AdminListPane>
       }

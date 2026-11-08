@@ -1,0 +1,2 @@
+PASS current image references, thumbnail versioning, palette targets, retired runtime dependency scan, and preservation of CHEF recipes/current thumbnail endpoint.
+PASS retired HTTP route patterns and current URL exclusions (Apache live verification awaits deployment).

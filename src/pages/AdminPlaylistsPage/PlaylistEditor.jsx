@@ -54,6 +54,7 @@ import PlaylistSlideEditor, {
   BRAND_BUMPER_BODY_TEMPLATE,
   HUE_WHEEL_BODY_TEMPLATE,
 } from "./PlaylistSlideEditor";
+import { slideTypeLabel } from "./slideTypes";
 
 
 const LIST_URL =
@@ -140,11 +141,11 @@ const emptyPlaylist = {
 const emptyItem = {
   _clientKey: "",
   playlist_item_id: null,
-  
+
   palette_hash: "",
   image_url: "",
   photo_library_id: "",
-  
+
   title: "",
   subtitle: "",
   subtitle_2: "",
@@ -339,6 +340,27 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     slidePresets,
     setSlidePresets,
   ] = useState([]);
+
+  const insertionPresets = useMemo(() => slidePresets
+    .filter((preset) => preset?.is_enabled !== false)
+    .flatMap((preset) => {
+      // Two UI choices reuse the existing Slide defaults; stored preset rows stay unchanged.
+      if (preset.preset_key === "normal") {
+        return ["palette", "non-palette"].map((type) => ({
+          ...preset,
+          option_key: `${preset.preset_key}:${type}`,
+          item_type: type,
+          label: slideTypeLabel(type),
+        }));
+      }
+      return [{
+        ...preset,
+        option_key: preset.preset_key,
+        label: ["intro", "text", "hue-wheel", "cover-image", "brand-bumper"].includes(preset.preset_key)
+          ? slideTypeLabel(preset.item_type)
+          : preset.label || preset.preset_key,
+      }];
+    }), [slidePresets]);
 
   const [
     slidePresetsLoading,
@@ -1645,7 +1667,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                     : HUE_WHEEL_BODY_TEMPLATE;
               }
 
-              
+
 
               nextItem.palette_hash =
                 "";
@@ -1656,7 +1678,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               nextItem.photo_library_id =
                 "";
 
-              
+
 
               nextItem.is_share_image =
                 false;
@@ -1716,10 +1738,10 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
     presetKey
   ) {
     const preset =
-      slidePresets.find(
+      insertionPresets.find(
         (row) =>
           row
-            ?.preset_key ===
+            ?.option_key ===
           presetKey
       );
 
@@ -1998,14 +2020,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               ? {
                   ...item,
 
-                  
+
 
                   palette_hash:
                     match
                       ?.palette_hash ||
                     "",
 
-                  
+
                 }
               : item)
     );
@@ -3094,7 +3116,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
           value:
             (item) =>
-              humanize(
+              slideTypeLabel(
                 item
                   .item_type
               ),
@@ -3374,16 +3396,12 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           </option>
 
           {
-            slidePresets
-              .filter(
-                (preset) =>
-                  preset?.is_enabled !== false
-              )
+            insertionPresets
               .map(
                 (preset) => (
                   <option
-                    key={preset.preset_key}
-                    value={preset.preset_key}
+                    key={preset.option_key}
+                    value={preset.option_key}
                   >
                     {
                       preset.label ||
@@ -3604,7 +3622,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                                   } · ${
                                     item.title
                                     ||
-                                    humanize(
+                                    slideTypeLabel(
                                       item.item_type
                                     )
                                   }`,
@@ -4336,7 +4354,7 @@ function normalizePlaylistItem(
       ??
       null,
 
-    
+
 
     palette_hash:
       raw
@@ -4363,7 +4381,7 @@ function normalizePlaylistItem(
       ??
       "",
 
-    
+
 
     title:
       raw.title
@@ -4861,7 +4879,7 @@ function serializePlaylistItem(
   return {
     ...rest,
 
-    
+
 
     palette_hash:
       item
@@ -4871,7 +4889,7 @@ function serializePlaylistItem(
         : item
             .palette_hash,
 
-    
+
 
     duration_ms:
       item
@@ -5132,9 +5150,9 @@ function photoInfoFromRow(
       ||
       "",
 
-    
 
-    
+
+
 
     attachedSavedPalettePhotoType:
       row

@@ -52,6 +52,28 @@ test('hash viewer obeys current project selections and never restores retired/ra
     assert_equals([],$result['meta']['inset_photos']);
 });
 
+test('saved palette fallback cannot bypass an inactive current viewer',function(){
+    $pdo=retirement_current_viewer_fixture();
+    $pdo->exec("UPDATE palette_viewers SET is_active=0 WHERE saved_palette_id=11 AND format='public'");
+    foreach (['hash','id'] as $lookup) {
+        try {
+            $service=retirement_viewer_service($pdo);
+            if ($lookup==='hash') {$service->getSaved('current-hash');} else {$service->getSavedById(11);}
+            throw new LogicException('Inactive viewer fallback must be blocked');
+        } catch (RuntimeException $e) {
+            assert_true(str_contains($e->getMessage(),'is inactive'));
+        }
+    }
+    // A genuinely absent Concept viewer may still use the existing palette fallback.
+    $concept=retirement_viewer_service($pdo)->getSaved('current-hash',null,'concept');
+    assert_equals('concept',$concept['meta']['palette_viewer_key']);
+    assert_equals('/photos/library/main.png',$concept['meta']['photo_url']);
+    assert_equals('', $concept['meta']['intro']);
+    assert_equals('', $concept['meta']['playlist_url']);
+    $pdo->exec("INSERT INTO palette_viewers(palette_viewer_id,saved_palette_id,format,title,is_active,created_at) VALUES(89,11,'public','Second active public',1,'2026-11-07')");
+    assert_equals('Second active public',retirement_viewer_service($pdo)->getSavedById(11)['meta']['title']);
+});
+
 test('current lifecycle works after retired tables are absent and retains artwork protections',function(){
     with_lifecycle(function($pdo,$root,$service){
         foreach(['saved_palette_set_photos','saved_palette_sets','saved_palette_photos'] as$table) $pdo->exec('DROP TABLE '.$table);

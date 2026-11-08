@@ -1,3 +1,4 @@
+import { filterAdminRecords } from "@components/AdminLayout/adminSearch";
 import {
 
   useEffect,
@@ -1594,66 +1595,10 @@ export default function AdminTemplatesPage() {
 
       () => {
 
-        const needle =
-
-          query
-
-            .trim()
-
-            .toLowerCase();
-
-        if (!needle) {
-
-          return items;
-
-        }
-
-        return items.filter(
-
-          (item) =>
-
-            item.label
-
-              .toLowerCase()
-
-              .includes(
-
-                needle
-
-              )
-
-            || item.template_key
-
-              .toLowerCase()
-
-              .includes(
-
-                needle
-
-              )
-
-            || item.template_type
-
-              .toLowerCase()
-
-              .includes(
-
-                needle
-
-              )
-
-            || item.description
-
-              .toLowerCase()
-
-              .includes(
-
-                needle
-
-              )
-
-        );
-
+        return filterAdminRecords(items, query, {
+          idField: "id",
+          textFields: ["label", "template_key", "template_type", "description"],
+        });
       },
 
       [

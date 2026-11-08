@@ -1,0 +1,1171 @@
+{
+  "comparison": "Against the pre-Phase-2 source backup; matching rule/message counts ignore line-number shifts.",
+  "totals": {
+    "files": 27,
+    "errors": 27,
+    "introducedErrors": 0,
+    "introducedWarnings": 0
+  },
+  "files": [
+    {
+      "path": "src/RX/Thumbs/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/AdminMenu/adminMenuItems.js",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/Dialogs/PhotoPickerDialog.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/GalleryItems/PictureSwatchItem.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/GalleryItems/PlaylistItem.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/PhotoPickerModal/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/Player/index.jsx",
+      "errors": 5,
+      "warnings": 7,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'withCacheBust'. Either include it or remove the dependency array.",
+          "line": 246,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 246,
+          "endColumn": 58,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [slides, cacheBustEnabled, activeIndex, imageLoaded, withCacheBust]",
+              "fix": {
+                "range": [
+                  7211,
+                  7263
+                ],
+                "text": "[slides, cacheBustEnabled, activeIndex, imageLoaded, withCacheBust]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useMemo has a missing dependency: 'getItemKey'. Either include it or remove the dependency array.",
+          "line": 274,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 274,
+          "endColumn": 40,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [playbackMode, allItems, getItemKey, likedSet]",
+              "fix": {
+                "range": [
+                  8159,
+                  8193
+                ],
+                "text": "[playbackMode, allItems, getItemKey, likedSet]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'updateOverlayPositions'. Either include it or remove the dependency array.",
+          "line": 550,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 550,
+          "endColumn": 81,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [imageLoaded, fadeReady, currentIndex, titleMode, textAfterImageTransition, updateOverlayPositions]",
+              "fix": {
+                "range": [
+                  17577,
+                  17652
+                ],
+                "text": "[imageLoaded, fadeReady, currentIndex, titleMode, textAfterImageTransition, updateOverlayPositions]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'updateOverlayPositions'. Either include it or remove the dependency array.",
+          "line": 564,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 564,
+          "endColumn": 46,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [titleVisible, titleReady, currentIndex, updateOverlayPositions]",
+              "fix": {
+                "range": [
+                  18092,
+                  18132
+                ],
+                "text": "[titleVisible, titleReady, currentIndex, updateOverlayPositions]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'handleAdvance'. Either include it or remove the dependency array.",
+          "line": 600,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 611,
+          "endColumn": 4,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [isBrandBumper, playbackState, imageLoaded, fadeReady, titleVisible, titleReady, currentIndex, currentItem?.duration_ms, brandBumperConfig.duration_ms, brandBumperConfig.requires_tap, handleAdvance]",
+              "fix": {
+                "range": [
+                  19260,
+                  19488
+                ],
+                "text": "[isBrandBumper, playbackState, imageLoaded, fadeReady, titleVisible, titleReady, currentIndex, currentItem?.duration_ms, brandBumperConfig.duration_ms, brandBumperConfig.requires_tap, handleAdvance]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'updateOverlayPositions'. Either include it or remove the dependency array.",
+          "line": 641,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 641,
+          "endColumn": 65,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [currentIndex, imageLoaded, titleVisible, isPortraitMobile, updateOverlayPositions]",
+              "fix": {
+                "range": [
+                  20491,
+                  20550
+                ],
+                "text": "[currentIndex, imageLoaded, titleVisible, isPortraitMobile, updateOverlayPositions]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'queueFadeReady'. Either include it or remove the dependency array.",
+          "line": 650,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 650,
+          "endColumn": 61,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [currentIndex, currentImageUrl, playItems, imageLoaded, queueFadeReady]",
+              "fix": {
+                "range": [
+                  20778,
+                  20833
+                ],
+                "text": "[currentIndex, currentImageUrl, playItems, imageLoaded, queueFadeReady]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "no-constant-binary-expression",
+          "severity": 2,
+          "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+          "line": 738,
+          "column": 12,
+          "nodeType": "LogicalExpression",
+          "messageId": "constantShortCircuit",
+          "endLine": 738,
+          "endColumn": 90
+        },
+        {
+          "ruleId": "no-constant-binary-expression",
+          "severity": 2,
+          "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+          "line": 738,
+          "column": 12,
+          "nodeType": "LogicalExpression",
+          "messageId": "constantShortCircuit",
+          "endLine": 738,
+          "endColumn": 75
+        },
+        {
+          "ruleId": "no-constant-binary-expression",
+          "severity": 2,
+          "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+          "line": 738,
+          "column": 12,
+          "nodeType": "LogicalExpression",
+          "messageId": "constantShortCircuit",
+          "endLine": 738,
+          "endColumn": 60
+        },
+        {
+          "ruleId": "no-constant-binary-expression",
+          "severity": 2,
+          "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+          "line": 738,
+          "column": 12,
+          "nodeType": "LogicalExpression",
+          "messageId": "constantShortCircuit",
+          "endLine": 738,
+          "endColumn": 48
+        },
+        {
+          "ruleId": "no-constant-binary-expression",
+          "severity": 2,
+          "message": "Unexpected constant truthiness on the left-hand side of a `&&` expression.",
+          "line": 738,
+          "column": 12,
+          "nodeType": "Literal",
+          "messageId": "constantShortCircuit",
+          "endLine": 738,
+          "endColumn": 17
+        }
+      ]
+    },
+    {
+      "path": "src/components/SavedPaletteEditorModal/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/Viewers/ClientPaletteViewer/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/Viewers/ConceptPaletteViewer/index.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'resolvedPlaylistLabel' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 54,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 54,
+          "endColumn": 30,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "resolvedPlaylistLabel"
+              },
+              "fix": {
+                "range": [
+                  1741,
+                  1817
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'resolvedPlaylistLabel'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/components/Viewers/PainterPaletteViewer/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/components/Viewers/PaletteViewer/index.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'property' is defined but never used.",
+          "line": 120,
+          "column": 23,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 120,
+          "endColumn": 31,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "property"
+              },
+              "fix": {
+                "range": [
+                  4237,
+                  4246
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'property'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/components/YoutubePlayer/index.jsx",
+      "errors": 1,
+      "warnings": 0,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'ImageComponent' is assigned a value but never used.",
+          "line": 17,
+          "column": 19,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 17,
+          "endColumn": 33,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "ImageComponent"
+              },
+              "fix": {
+                "range": [
+                  394,
+                  436
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'ImageComponent'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/helpers/assetImage.js",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/helpers/ctaActions.js",
+      "errors": 3,
+      "warnings": 0,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'shareFolder' is defined but never used.",
+          "line": 22,
+          "column": 3,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 22,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "shareFolder"
+              },
+              "fix": {
+                "range": [
+                  485,
+                  500
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'shareFolder'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-undef",
+          "severity": 2,
+          "message": "'buildPlayerPath' is not defined.",
+          "line": 220,
+          "column": 27,
+          "nodeType": "Identifier",
+          "messageId": "undef",
+          "endLine": 220,
+          "endColumn": 42
+        },
+        {
+          "ruleId": "no-undef",
+          "severity": 2,
+          "message": "'buildPlayerPath' is not defined.",
+          "line": 276,
+          "column": 5,
+          "nodeType": "Identifier",
+          "messageId": "undef",
+          "endLine": 276,
+          "endColumn": 20
+        }
+      ]
+    },
+    {
+      "path": "src/helpers/playerPaletteItems.js",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/pages/AdminPaletteViewersPage/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/pages/AdminPhotoLibraryPage/index.jsx",
+      "errors": 0,
+      "warnings": 3,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has missing dependencies: 'filters' and 'photoLibraryIdsFilter'. Either include them or remove the dependency array.",
+          "line": 275,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 275,
+          "endColumn": 8,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [filters, photoLibraryIdsFilter]",
+              "fix": {
+                "range": [
+                  10534,
+                  10536
+                ],
+                "text": "[filters, photoLibraryIdsFilter]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'filters'. Either include it or remove the dependency array.",
+          "line": 491,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 491,
+          "endColumn": 155,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey, filters]",
+              "fix": {
+                "range": [
+                  17731,
+                  17880
+                ],
+                "text": "[filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey, filters]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'filters'. Either include it or remove the dependency array.",
+          "line": 1017,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 1024,
+          "endColumn": 4,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [filters.q, filters.source_type, filters.palette_id, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, filters]",
+              "fix": {
+                "range": [
+                  36097,
+                  36249
+                ],
+                "text": "[filters.q, filters.source_type, filters.palette_id, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, filters]"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/pages/AdminPhotoLibraryToolsPage/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/pages/AdminPlayerPage/index.jsx",
+      "errors": 1,
+      "warnings": 1,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'err' is defined but never used.",
+          "line": 104,
+          "column": 18,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 104,
+          "endColumn": 21
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useMemo has a missing dependency: 'data?.hide_stars'. Either include it or remove the dependency array.",
+          "line": 144,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 144,
+          "endColumn": 38,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [ctas, data?.hide_stars, likedCount, paletteCount]",
+              "fix": {
+                "range": [
+                  5071,
+                  5103
+                ],
+                "text": "[ctas, data?.hide_stars, likedCount, paletteCount]"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/pages/AdminPlaylistPresenterPage/index.jsx",
+      "errors": 0,
+      "warnings": 1,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useMemo has a missing dependency: 'data?.hide_stars'. Either include it or remove the dependency array.",
+          "line": 175,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 175,
+          "endColumn": 37,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [data?.items, data?.hide_stars, ctas, likedCount]",
+              "fix": {
+                "range": [
+                  6384,
+                  6415
+                ],
+                "text": "[data?.items, data?.hide_stars, ctas, likedCount]"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/pages/AdminPlaylistsPage/PlaylistEditor.jsx",
+      "errors": 8,
+      "warnings": 1,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'setQuery' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 226,
+          "column": 5,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 226,
+          "endColumn": 13,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "setQuery"
+              },
+              "fix": {
+                "range": [
+                  4364,
+                  4372
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'setQuery'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'setSortMode' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 231,
+          "column": 5,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 231,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "setSortMode"
+              },
+              "fix": {
+                "range": [
+                  4423,
+                  4434
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'setSortMode'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'listLoading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 246,
+          "column": 5,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 246,
+          "endColumn": 16,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "listLoading"
+              },
+              "fix": {
+                "range": [
+                  4603,
+                  4614
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'listLoading'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'listError' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 251,
+          "column": 5,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 251,
+          "endColumn": 14,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "listError"
+              },
+              "fix": {
+                "range": [
+                  4674,
+                  4683
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'listError'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'fetchPlaylists' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 417,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 417,
+          "endColumn": 23,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "fetchPlaylists"
+              },
+              "fix": {
+                "range": [
+                  7551,
+                  8712
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'fetchPlaylists'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'visiblePlaylists' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 1078,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 1078,
+          "endColumn": 25,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "visiblePlaylists"
+              },
+              "fix": {
+                "range": [
+                  20461,
+                  22666
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'visiblePlaylists'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'navigateToPlaylist' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 1493,
+          "column": 18,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 1493,
+          "endColumn": 36,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "navigateToPlaylist"
+              },
+              "fix": {
+                "range": [
+                  28098,
+                  28493
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'navigateToPlaylist'."
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useImperativeHandle has unnecessary dependencies: 'items', 'playlist', and 'selectedSlideKey'. Either exclude them or remove the dependency array.",
+          "line": 3234,
+          "column": 5,
+          "nodeType": "ArrayExpression",
+          "endLine": 3239,
+          "endColumn": 6,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [dirty]",
+              "fix": {
+                "range": [
+                  58710,
+                  58783
+                ],
+                "text": "[dirty]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'close' is defined but never used.",
+          "line": 3677,
+          "column": 35,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 3677,
+          "endColumn": 40,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "close"
+              },
+              "fix": {
+                "range": [
+                  70784,
+                  70825
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'close'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/pages/AdminPlaylistsPage/PlaylistSlideEditor.jsx",
+      "errors": 1,
+      "warnings": 2,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "react-refresh/only-export-components",
+          "severity": 1,
+          "message": "Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.",
+          "line": 54,
+          "column": 14,
+          "nodeType": "Identifier",
+          "messageId": "namedExport",
+          "endLine": 54,
+          "endColumn": 37
+        },
+        {
+          "ruleId": "react-refresh/only-export-components",
+          "severity": 1,
+          "message": "Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.",
+          "line": 56,
+          "column": 14,
+          "nodeType": "Identifier",
+          "messageId": "namedExport",
+          "endLine": 56,
+          "endColumn": 40
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'readJsonResponse' is defined but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 851,
+          "column": 16,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 851,
+          "endColumn": 32,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "readJsonResponse"
+              },
+              "fix": {
+                "range": [
+                  28227,
+                  28716
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'readJsonResponse'."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/pages/AdminSavedPalettesPage/index.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    },
+    {
+      "path": "src/pages/ColorDetailPage/index.jsx",
+      "errors": 3,
+      "warnings": 2,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'previous' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 48,
+          "column": 11,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 48,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "previous"
+              },
+              "fix": {
+                "range": [
+                  2004,
+                  2110
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'previous'."
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'setShowBack'. Either include it or remove the dependency array.",
+          "line": 95,
+          "column": 8,
+          "nodeType": "ArrayExpression",
+          "endLine": 95,
+          "endColumn": 10,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [setShowBack]",
+              "fix": {
+                "range": [
+                  3605,
+                  3607
+                ],
+                "text": "[setShowBack]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'setRecentSwatches'. Either include it or remove the dependency array.",
+          "line": 205,
+          "column": 8,
+          "nodeType": "ArrayExpression",
+          "endLine": 205,
+          "endColumn": 28,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [currentColorDetail, setRecentSwatches]",
+              "fix": {
+                "range": [
+                  6773,
+                  6793
+                ],
+                "text": "[currentColorDetail, setRecentSwatches]"
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'handleAddToPalette' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 215,
+          "column": 11,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 215,
+          "endColumn": 29,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "handleAddToPalette"
+              },
+              "fix": {
+                "range": [
+                  6917,
+                  6997
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'handleAddToPalette'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'handleBack' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 219,
+          "column": 11,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 219,
+          "endColumn": 21
+        }
+      ]
+    },
+    {
+      "path": "src/pages/PlaylistThumbsPage/index.jsx",
+      "errors": 3,
+      "warnings": 1,
+      "introduced": [],
+      "messages": [
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'startParam' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 103,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 103,
+          "endColumn": 19,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "startParam"
+              },
+              "fix": {
+                "range": [
+                  1492,
+                  1543
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'startParam'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'returnToParam' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 127,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 127,
+          "endColumn": 22,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "returnToParam"
+              },
+              "fix": {
+                "range": [
+                  1893,
+                  1951
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'returnToParam'."
+            }
+          ]
+        },
+        {
+          "ruleId": "no-unused-vars",
+          "severity": 2,
+          "message": "'isHoaView' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u.",
+          "line": 151,
+          "column": 9,
+          "nodeType": "Identifier",
+          "messageId": "unusedVar",
+          "endLine": 151,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "messageId": "removeVar",
+              "data": {
+                "varName": "isHoaView"
+              },
+              "fix": {
+                "range": [
+                  2283,
+                  2337
+                ],
+                "text": ""
+              },
+              "desc": "Remove unused variable 'isHoaView'."
+            }
+          ]
+        },
+        {
+          "ruleId": "react-hooks/exhaustive-deps",
+          "severity": 1,
+          "message": "React Hook useEffect has a missing dependency: 'reservationToken'. Either include it or remove the dependency array.",
+          "line": 438,
+          "column": 6,
+          "nodeType": "ArrayExpression",
+          "endLine": 438,
+          "endColumn": 18,
+          "suggestions": [
+            {
+              "desc": "Update the dependencies array to be: [playlistId, reservationToken]",
+              "fix": {
+                "range": [
+                  6085,
+                  6097
+                ],
+                "text": "[playlistId, reservationToken]"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "src/routes/AdminRoutes.jsx",
+      "errors": 0,
+      "warnings": 0,
+      "introduced": [],
+      "messages": []
+    }
+  ]
+}

@@ -1,0 +1,717 @@
+[
+    {
+        "path": ".htaccess",
+        "exists": true,
+        "sha256": "84e195b77b17ae8772ba88b6d5d07ca99cf607a972f791b07bb6385bd4d07e8b"
+    },
+    {
+        "path": "api/services/MaskTrainingService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tests/PhotoModuleSmokeTest.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tests/PhotoRepoCreateUpdateTest.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tests/PhotoRepoVariantsTest.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tools/backfill-mask-target-lightness.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tools/recalc-mask-overlays.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/tools/tag-from-category.php",
+        "exists": true,
+        "sha256": "b156e6fc15c110ac3399902424bd94af2d621696290f9eaeb846c6c879d49a7f"
+    },
+    {
+        "path": "api/v2/admin/mask-blend/delete.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/mask-blend/list.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/mask-blend/save.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/mask-overlay.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/masks-alpha.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/palette-viewer-token.php",
+        "exists": true,
+        "sha256": "063d3aa294e872ecdca5bfb27dab938320a9e76a6d772f29daf56749f96ac775"
+    },
+    {
+        "path": "api/v2/admin/photo-debug.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-library/audit-integrity.php",
+        "exists": true,
+        "sha256": "9915afa6cad6a952b627e19eca7a6cb2718f47456d8d90d6ca0c1bd7bd6e1dd6"
+    },
+    {
+        "path": "api/v2/admin/photo-library/backfill-exteriors.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-library/cleanup-legacy-applied.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-library/dedupe-rel-path-rows.php",
+        "exists": true,
+        "sha256": "76d4598adddaf8fdc369f12be01fc772fe96d4decac11bffa9e6487684f102e3"
+    },
+    {
+        "path": "api/v2/admin/photo-library/dedupe-saved-palette-rows.php",
+        "exists": true,
+        "sha256": "509fd37e125133e19b77e0992523df2401450fabca70bbb33c776f25ef161330"
+    },
+    {
+        "path": "api/v2/admin/photo-library/delete-inactive.php",
+        "exists": true,
+        "sha256": "48f265b15ad4a056637071831569f446eadf33556e217cec79f6b930f563a423"
+    },
+    {
+        "path": "api/v2/admin/photo-library/delete.php",
+        "exists": true,
+        "sha256": "8b3748590358103eb684596950a5d1efdb11f9ab1c9d45fdd38cc735fdb6b42e"
+    },
+    {
+        "path": "api/v2/admin/photo-library/duplicate-candidates.php",
+        "exists": true,
+        "sha256": "74bb07b233214c9d542a129b0d371b9b1db756ba62eac2bd4d8e6c489a8bfa47"
+    },
+    {
+        "path": "api/v2/admin/photo-library/list.php",
+        "exists": true,
+        "sha256": "f95e010444a3ac98aa89f56e20080134afb4354f48a657f109ce3b2b2081b197"
+    },
+    {
+        "path": "api/v2/admin/photo-library/merge.php",
+        "exists": true,
+        "sha256": "eb6b48eccd8d1fed3e1c4a3222b773eca0755ca6cf09ab8828b8920708358e0e"
+    },
+    {
+        "path": "api/v2/admin/photo-library/permission-status.php",
+        "exists": true,
+        "sha256": "b7b36cb3d603b61e9e7f88b7605474604f28bcb9f063e702ee9d439c36c947b5"
+    },
+    {
+        "path": "api/v2/admin/photo-library/reconcile-filesystem.php",
+        "exists": true,
+        "sha256": "6248f1787459e1617fd7cf657d11142204207d29ae439d8397b4e65c62edc1e7"
+    },
+    {
+        "path": "api/v2/admin/photo-library/replace.php",
+        "exists": true,
+        "sha256": "4fc80f5b126ca7e73065246dff7946165cdd1947c331e518a23b0778a393ae9a"
+    },
+    {
+        "path": "api/v2/admin/photo-library/retire-missing.php",
+        "exists": true,
+        "sha256": "85308bc21251d4abebd781472fc017ef2342339bfb7235b2a64f7c9baa3c9951"
+    },
+    {
+        "path": "api/v2/admin/photo-library/series.php",
+        "exists": true,
+        "sha256": "5ab798cc32d5d672110a72578ee1a9554991064bd45d69ca4a45389afe5370d5"
+    },
+    {
+        "path": "api/v2/admin/photo-library/update.php",
+        "exists": true,
+        "sha256": "fafb9475d4c3fab1d7b3839f925b9b02f0b499a802f111e79e47c4bd18243db0"
+    },
+    {
+        "path": "api/v2/admin/photo-library/upload.php",
+        "exists": true,
+        "sha256": "584b9daae657dbcb2b372c6d547c71a211fd3bc73eef0ecbfd64b7ec71e5954e"
+    },
+    {
+        "path": "api/v2/admin/photo-library/usage.php",
+        "exists": true,
+        "sha256": "b3c4360d032478f1472000bba1c65b4df366ad709a825bbc290744d0bb96c4ac"
+    },
+    {
+        "path": "api/v2/admin/photo-list-roles.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-mask-delete.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-search.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-tags/list.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-tags/save.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photo-upload.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/photos-recalc-lm.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/playlist-items/repair-broken-photo-library.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/recalc-mask-overlays.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/reindex-from-fs.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/render-debug.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/roles-masks.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/saved-palette-delete.php",
+        "exists": true,
+        "sha256": "f0171dacfb40fc84a4ce272d7967f7c732605fc55f1af76784a23dfeba35e2a4"
+    },
+    {
+        "path": "api/v2/admin/saved-palette-photos/add-from-library.php",
+        "exists": true,
+        "sha256": "0217be8b025195681da48e36c52316e958186807ed2d92a3091eb1807700da2b"
+    },
+    {
+        "path": "api/v2/admin/saved-palette-photos/by-library.php",
+        "exists": true,
+        "sha256": "1370f88db275f526eb03586a4e3d3c74e69c510e721187703cbc0d6980ee5748"
+    },
+    {
+        "path": "api/v2/admin/saved-palette-photos/delete.php",
+        "exists": true,
+        "sha256": "f37f18e897d7862c8589da0b67faff88eae32506af8a65f4ed9159e3577ac049"
+    },
+    {
+        "path": "api/v2/admin/saved-palette-photos/normalize-links.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/admin/saved-palette-photos/upload.php",
+        "exists": true,
+        "sha256": "fd6de0180f66f0444273d944d8ff4bfb60e56a9153a2dfb519dc01d23886f097"
+    },
+    {
+        "path": "api/v2/admin/saved-palette-problems.php",
+        "exists": true,
+        "sha256": "0c1b3eb4a0882edfd8f59cf3b8c61f6dae6f6f1f44a5ed93eb4f48380c496764"
+    },
+    {
+        "path": "api/v2/admin/saved-palettes.php",
+        "exists": true,
+        "sha256": "bd9a3c5164b1a10e92b4de1cda60908ec7ec317d40554a354a2e72fcd2b7484d"
+    },
+    {
+        "path": "api/v2/admin/share-card-generate.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/mask-training/guess.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/mask-training/tester-colors.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/palette-viewer.php",
+        "exists": true,
+        "sha256": "53c4d80770180fa930d6e21322c2e64c680657403abf2679b519af0aae749f5f"
+    },
+    {
+        "path": "api/v2/photos/check-sizes.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/photos/get.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/photos/render-apply.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/photos/render-color.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/photos/render-which-files.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/photos/search.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "api/v2/playlist-color-search.php",
+        "exists": true,
+        "sha256": "a3f1c8fc6b5459fe00e5bc570d911e12dc172bdcb55494328770a2de47da41e2"
+    },
+    {
+        "path": "api/v2/run-query.php",
+        "exists": true,
+        "sha256": "f67f52e2694e4d2aad7657bab176b91a376f3faa3057debf64234bc7c463344a"
+    },
+    {
+        "path": "app/PHOTOS/Endpoints/PhotoLibraryUploadEndpoint.php",
+        "exists": true,
+        "sha256": "83b8e3ebf13e664cb4fefdc63c5c0c173d3e2248a8fb872bd1d280dd36272e8f"
+    },
+    {
+        "path": "app/PHOTOS/Endpoints/PhotoLifecycleEndpoint.php",
+        "exists": true,
+        "sha256": "ab6d2aeeda5f3d6ac60b2efc7cb7f23b135fd2dc3ca29fcab4711015ca1bf804"
+    },
+    {
+        "path": "app/PHOTOS/Endpoints/PhotoPaletteEndpoint.php",
+        "exists": true,
+        "sha256": "8a2f2f1d9110d742c28c91fb157c82203cc7584ae0000026c1eb8da998485d25"
+    },
+    {
+        "path": "app/PHOTOS/Endpoints/UploadEndpoint.php",
+        "exists": true,
+        "sha256": "77402eeb58bf82cc885a3482a110069e219e300019beeb5a7209fe63f0058c16"
+    },
+    {
+        "path": "app/PHOTOS/Entities/PhotoEntity.php",
+        "exists": true,
+        "sha256": "b268f7451e0021d98eb10036789b505ac29d6a82a2ead83ced726016888ea1e8"
+    },
+    {
+        "path": "app/PHOTOS/Repos/PdoPhotoLibraryRepository.php",
+        "exists": true,
+        "sha256": "d7be16d25e0b5497c48974a28d2737564094c5145a14fe3762b39b78fcacb0a0"
+    },
+    {
+        "path": "app/PHOTOS/Repos/PdoPhotoLifecycleRepository.php",
+        "exists": true,
+        "sha256": "ea10c3e0ea453081033cf4e4745e776ddd8d6a0b6071df198daaaab13f5a23fb"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoDuplicateService.php",
+        "exists": true,
+        "sha256": "d7a2b13a6aafbcd9be3286830388f8fc21c6d82c02406f0e07ba005e72d89c01"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoLibraryUploadService.php",
+        "exists": true,
+        "sha256": "e24c920a59e16b856bb60835d1574c5e214d28f5e0dbbd4e4a93652bc963b46b"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoLibraryUsageService.php",
+        "exists": true,
+        "sha256": "8739637f61936ce05af0e2468dc5d03cfb8a092cfb5517adaca3cac4c2c9e42b"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoLifecycleService.php",
+        "exists": true,
+        "sha256": "2139486af66ac47601d0265f97f940522c0493256a216e704d623538ae05ae0a"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoPaletteAssociationService.php",
+        "exists": true,
+        "sha256": "4d0df4cc52020cfd6a58c6c6aa97fd6bffde4f45df44d7d09f2c1b0ffbae8308"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoReplacementService.php",
+        "exists": true,
+        "sha256": "5a8e2f8805dd0cf554cbb5d9762fe99275b2a0caf50bf26b4e56397d806e579f"
+    },
+    {
+        "path": "app/PHOTOS/Services/PhotoUploadService.php",
+        "exists": true,
+        "sha256": "ff201f3df525509387ebc00bcfea152ec18b7e8a6f8a950f54d5f45fb9d2c4d0"
+    },
+    {
+        "path": "app/PLAYLISTS/Repos/PdoPlaylistRepository.php",
+        "exists": true,
+        "sha256": "83a95136efccea463de90ed34e1b7641dcfacd2680d6e981007bb5484be8f659"
+    },
+    {
+        "path": "app/PLAYLISTS/Services/PlaylistExperienceService.php",
+        "exists": true,
+        "sha256": "8c30646946d6ebdc65f3162d6cf287412ab8d8ffe644d3a2cca2e02871b6796e"
+    },
+    {
+        "path": "app/PLAYLISTS/Services/PlaylistPhotoLibrarySyncService.php",
+        "exists": true,
+        "sha256": "10527c847b68cb84c78ca928f5d709b73e35894c4590c0155baebefc027088c2"
+    },
+    {
+        "path": "app/PROJECTS/Endpoints/PropertyListEndpoint.php",
+        "exists": true,
+        "sha256": "c4810bb21ed6052fba84c13958069849eed1791326b0395ccc2ed039eac78340"
+    },
+    {
+        "path": "app/PUB/Endpoints/PubAssetsEndpoint.php",
+        "exists": true,
+        "sha256": "65d26b70dde7809232e3bade7e9974b476b22b6b6103a5eb349ff83ea2b55c00"
+    },
+    {
+        "path": "app/PUB/Repos/PdoPubAssetRepository.php",
+        "exists": true,
+        "sha256": "1a4df17ca5e67c359cb18057892db9dd2b74b420c3652d531b4ad39bed324c14"
+    },
+    {
+        "path": "app/PUB/Services/PubRunService.php",
+        "exists": true,
+        "sha256": "d693b6e368246fd752fc40eb6e7e95a8833db6a75cda0fedf4d0b8e687865e0a"
+    },
+    {
+        "path": "app/SYSTEM/Resources/admin-route-coverage.json",
+        "exists": true,
+        "sha256": "fc4cfc46639ee080ab8acdb6efaca12ae1bcf2e919101cf4224793e1198d7717"
+    },
+    {
+        "path": "app/controllers/PhotosController.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/controllers/SavedPaletteController.php",
+        "exists": true,
+        "sha256": "fab4b081483f7718a92fd843e46fe08743d024fe83c639c9ea776b0ae77d8f73"
+    },
+    {
+        "path": "app/entities/AppliedPalette.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/repos/PdoAssetLibraryRepository.php",
+        "exists": true,
+        "sha256": "97eb0405b789bae1ca7dae8c3b07f803562434653d9e47a93051ba8bf59a6104"
+    },
+    {
+        "path": "app/repos/PdoClientRepository.php",
+        "exists": true,
+        "sha256": "bc616041d1f3ef7a35203a2a7c5101aa98e83c0b4286ab660f3a7423adb6e81c"
+    },
+    {
+        "path": "app/repos/PdoColorTriggerPhotoRepository.php",
+        "exists": true,
+        "sha256": "b10398289c98f6794f80ad5bc4eb141d5ef265ee74d1426d2ac985683fad0fae"
+    },
+    {
+        "path": "app/repos/PdoMaskBlendSettingRepository.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/repos/PdoPhotoRepository.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/repos/PdoSavedPaletteRepository.php",
+        "exists": true,
+        "sha256": "420bfa02b1878e8f4cbcf94d33d9dd338006d94792229bad06d97e00fa25f368"
+    },
+    {
+        "path": "app/services/AssetLibraryService.php",
+        "exists": true,
+        "sha256": "2d225af9b76439d45ed0de61ee8aa87a2e06cc6f029d59bc1d7499e354528022"
+    },
+    {
+        "path": "app/services/ClientService.php",
+        "exists": true,
+        "sha256": "364256c372347e3a6716ce6de6c615b0ee1949067521eb1691acab8586390c8e"
+    },
+    {
+        "path": "app/services/MaskBlendService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/services/MaskOverlayService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/services/PaletteViewerService.php",
+        "exists": true,
+        "sha256": "225e4155fcee015923ea813a3a77f3f7f565139f2813d292b5d574dc83823d78"
+    },
+    {
+        "path": "app/services/PaletteViewerTokenService.php",
+        "exists": true,
+        "sha256": "3065106dd3de08e61a86bbf78af7b1514d08026bd530c142ac48220626e570fa"
+    },
+    {
+        "path": "app/services/PhotoLibraryService.php",
+        "exists": true,
+        "sha256": "013663fffd4858e46fe8fde4d9e00e82c095e7c064a07ba3d72d8568e624a04e"
+    },
+    {
+        "path": "app/services/PhotoLibraryUsageService.php",
+        "exists": true,
+        "sha256": "baa420e03d3a1e80c7f4f280644fff0d16a898e6fb2fd192c4e2bae9f2d0b2db"
+    },
+    {
+        "path": "app/services/PhotoRenderingService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/services/PhotosUploadService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/services/RetireService.php",
+        "exists": true,
+        "sha256": "5f5d478c6c6f5ee405b90da7cac8801db07ffee4376ffdc12e8a4a82117073ce"
+    },
+    {
+        "path": "app/services/SavedPaletteService.php",
+        "exists": true,
+        "sha256": "4ec1e8aa7d7c7309fdd7c3d08776b514f9d5075829a53cb79576948d565a5c3d"
+    },
+    {
+        "path": "app/services/ShareCardService.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "app/services/ShareService.php",
+        "exists": true,
+        "sha256": "c3977dd901d051ab341e2ae4062d155cf2b61824ff7d3a86d983e54b32b67868"
+    },
+    {
+        "path": "app/services/ViewerService.php",
+        "exists": true,
+        "sha256": "f275bf6241c0b8fccd2daef5dcc1a9f21ada257aa59cf939d3668be6574d3454"
+    },
+    {
+        "path": "mask-export.md",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "pv.php",
+        "exists": true,
+        "sha256": "1f745c8e9939303290d15d0ceacf065626f35d5d326c7b385d6ffa8b070ac264"
+    },
+    {
+        "path": "render_test.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "scripts/convert_masks_alpha.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "scripts/masks_alpha_check.php",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskBlendHistory/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskBlendHistory/maskblendhistory.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskOverlayEditor/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskOverlayEditor/maskoverlayeditor.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskOverlayModal/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskOverlayModal/maskoverlaymodal.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskRoleGrid/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskRoleGrid/mask-role-grid.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskSettingsGrid/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskSettingsTable/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskTable/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MaskTable/mask-table.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MasksPanel/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/MasksPanel/maskspanel.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/PhotoRenderer/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/PhotoRenderer/photorenderer.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/PhotoSearchPicker/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/PhotoSearchPicker/photo-search-picker.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/components/Viewers/appliedpaletteviewer.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/helpers/maskRenderUtils.js",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/pages/AdminPalettePhotosPage/admin-palette-photos.css",
+        "exists": true,
+        "sha256": "8123d84972c51585af037f1523efea0e86cf4b58780beffd8721996cd1613450"
+    },
+    {
+        "path": "src/pages/AdminPalettePhotosPage/index.jsx",
+        "exists": true,
+        "sha256": "3a3c08e24712f197c744b179852a17633730edd04cb3354be2482c19ae45a44e"
+    },
+    {
+        "path": "src/pages/AdminRolesMasksPage/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/pages/AdminRolesMasksPage/rolesmasks.css",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/pages/AdminUploadPhotoPage/PhotoSearcher.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/pages/AdminUploadPhotoPage/index.jsx",
+        "exists": false,
+        "sha256": null
+    },
+    {
+        "path": "src/pages/AdminUploadPhotoPage/uploader.css",
+        "exists": false,
+        "sha256": null
+    }
+]

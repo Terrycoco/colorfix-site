@@ -437,9 +437,9 @@ export default function PhotoPickerModal({
         ||
         "",
 
-      
 
-      
+
+
 
       attached_saved_palette_photo_type:
         item.attached_saved_palette_photo_type

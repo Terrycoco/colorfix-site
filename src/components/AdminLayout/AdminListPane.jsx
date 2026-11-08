@@ -3,6 +3,7 @@ import AdminObjectList from "./AdminObjectList";
 import AdminObjectListItem from "./AdminObjectListItem";
 import useAdminMobile from "./useAdminMobile";
 import MobileListPane from "./mobile/MobileListPane";
+import AdminSearchField from "./AdminSearchField";
 
 
 
@@ -43,6 +44,8 @@ export default function AdminListPane({
         title={title}
         actions={actions}
         searchPlaceholder={searchPlaceholder}
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
         className={className}
       >
         {children}
@@ -63,13 +66,10 @@ export default function AdminListPane({
       {hasSearch || hasSort ? (
         <div className="admin-list-pane__toolbar">
           {hasSearch ? (
-            <input
-              type="search"
-              className="admin-field__control"
+            <AdminSearchField
               value={searchValue ?? ""}
               placeholder={searchPlaceholder}
-              aria-label={searchPlaceholder}
-              onChange={(event) => onSearchChange(event.target.value)}
+              onChange={onSearchChange}
             />
           ) : null}
 

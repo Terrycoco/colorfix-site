@@ -413,7 +413,7 @@ try {
 
         $photoParams = array_keys($colorIds);
 
-      
+
 
       $stmtSaved->execute($photoParams);
 

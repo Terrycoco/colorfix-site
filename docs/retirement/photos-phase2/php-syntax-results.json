@@ -1,0 +1,15 @@
+{
+  "deployment_and_test_php_files_checked": 70,
+  "failures": [],
+  "broader_scan": {
+    "files_checked": 1037,
+    "failures": [
+      {
+        "path": "api/update-hcl-rgb-lookup.php",
+        "error": "\nParse error: Unclosed '[' on line 39 in api/update-hcl-rgb-lookup.php on line 40\nErrors parsing api/update-hcl-rgb-lookup.php\nPHP Parse error:  Unclosed '[' on line 39 in api/update-hcl-rgb-lookup.php on line 40\n"
+      }
+    ]
+  },
+  "preexisting_parse_error_unchanged_from_head": true,
+  "preexisting_parse_error_unchanged_from_initial_phase2": true
+}

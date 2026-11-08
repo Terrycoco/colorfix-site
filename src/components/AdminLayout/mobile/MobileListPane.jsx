@@ -11,6 +11,8 @@ export default function MobileListPane({
   children,
   className = "",
   searchPlaceholder = "Search…",
+  searchValue,
+  onSearchChange,
 }) {
   const nodes = Children.toArray(children);
   const list = nodes.find((node) => isValidElement(node) && node.type === AdminObjectList);
@@ -20,6 +22,7 @@ export default function MobileListPane({
   const selectedIndex = items.findIndex((item) => Boolean(item.props.selected));
   const options = items.map((item, index) => ({
     value: String(index),
+    recordId: item.props.id,
     label: String(item.props.title ?? `Item ${index + 1}`),
     detail: item.props.id != null && item.props.id !== "" ? `#${item.props.id}` : "",
     disabled: !item.props.onSelect,
@@ -33,7 +36,10 @@ export default function MobileListPane({
         options={options}
         value={selectedIndex < 0 ? "" : String(selectedIndex)}
         onChange={(index) => items[Number(index)]?.props.onSelect?.()}
-        searchable={items.length > 8}
+        searchable={typeof onSearchChange === "function" || items.length > 8}
+        recordIdField={items.every((item) => /^[0-9]+$/.test(String(item.props.id))) ? "recordId" : null}
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
         searchPlaceholder={searchPlaceholder}
         placeholder="Choose…"
       />

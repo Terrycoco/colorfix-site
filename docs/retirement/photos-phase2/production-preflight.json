@@ -1,0 +1,1184 @@
+{
+  "captured_at_pacific": "2026-11-08 10:44:47 PST",
+  "read_only": true,
+  "retired_tables": {
+    "render_project_masks": {
+      "count": 0,
+      "ddl": "CREATE TABLE `render_project_masks` (\n  `project_id` bigint(20) unsigned NOT NULL,\n  `mask_slug` varchar(64) NOT NULL,\n  `mode` enum('role','override','off') NOT NULL DEFAULT 'role',\n  `color_id` int(10) unsigned DEFAULT NULL,\n  `overlay_kind` varchar(64) DEFAULT NULL,\n  PRIMARY KEY (`project_id`,`mask_slug`),\n  CONSTRAINT `render_project_masks_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `render_projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "render_projects": {
+      "count": 0,
+      "ddl": "CREATE TABLE `render_projects` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `asset_photo_id` int(10) unsigned NOT NULL,\n  `palette_id` bigint(20) unsigned DEFAULT NULL,\n  `customer_email` varchar(128) DEFAULT NULL,\n  `title` varchar(128) DEFAULT NULL,\n  `notes` text,\n  `is_public` tinyint(1) NOT NULL DEFAULT '0',\n  `finished_photo_id` int(10) unsigned DEFAULT NULL,\n  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  KEY `asset_photo_id` (`asset_photo_id`),\n  KEY `palette_id` (`palette_id`),\n  KEY `finished_photo_id` (`finished_photo_id`),\n  CONSTRAINT `render_projects_ibfk_1` FOREIGN KEY (`asset_photo_id`) REFERENCES `photos` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT `render_projects_ibfk_2` FOREIGN KEY (`palette_id`) REFERENCES `palettes` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,\n  CONSTRAINT `render_projects_ibfk_3` FOREIGN KEY (`finished_photo_id`) REFERENCES `photos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "photos_tags": {
+      "count": 21,
+      "ddl": "CREATE TABLE `photos_tags` (\n  `photo_id` int(10) unsigned NOT NULL,\n  `tag` varchar(64) NOT NULL,\n  PRIMARY KEY (`photo_id`,`tag`),\n  CONSTRAINT `fk_pt_photo` FOREIGN KEY (`photo_id`) REFERENCES `photos` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "photos_variants": {
+      "count": 70,
+      "ddl": "CREATE TABLE `photos_variants` (\n  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,\n  `photo_id` int(10) unsigned NOT NULL,\n  `kind` varchar(64) NOT NULL,\n  `role` varchar(64) NOT NULL DEFAULT '',\n  `original_texture` varchar(64) DEFAULT NULL,\n  `path` varchar(255) NOT NULL,\n  `mime` varchar(64) NOT NULL,\n  `bytes` int(10) unsigned NOT NULL,\n  `width` int(10) unsigned NOT NULL,\n  `height` int(10) unsigned NOT NULL,\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  `overlay_mode_dark` varchar(32) DEFAULT NULL,\n  `overlay_opacity_dark` decimal(4,2) DEFAULT NULL,\n  `overlay_mode_medium` varchar(32) DEFAULT NULL,\n  `overlay_opacity_medium` decimal(4,2) DEFAULT NULL,\n  `overlay_mode_light` varchar(32) DEFAULT NULL,\n  `overlay_opacity_light` decimal(4,2) DEFAULT NULL,\n  `overlay_mode` varchar(32) DEFAULT NULL,\n  `overlay_opacity` decimal(4,2) DEFAULT NULL,\n  `overlay_shadow_l_offset` float DEFAULT NULL,\n  `overlay_shadow_tint` char(7) DEFAULT NULL,\n  `overlay_shadow_tint_opacity` float DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `uniq_photo_kind_role` (`photo_id`,`kind`,`role`),\n  KEY `photo_id` (`photo_id`),\n  CONSTRAINT `fk_pv_photo` FOREIGN KEY (`photo_id`) REFERENCES `photos` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB AUTO_INCREMENT=151 DEFAULT CHARSET=utf8mb4"
+    },
+    "photos_mask_stats": {
+      "count": 54,
+      "ddl": "CREATE TABLE `photos_mask_stats` (\n  `photo_id` int(11) NOT NULL,\n  `role` varchar(40) NOT NULL,\n  `prepared_path` varchar(255) NOT NULL,\n  `mask_path` varchar(255) NOT NULL,\n  `prepared_bytes` int(11) NOT NULL,\n  `mask_bytes` int(11) NOT NULL,\n  `l_avg01` double NOT NULL,\n  `l_p10` double DEFAULT NULL,\n  `l_p90` double DEFAULT NULL,\n  `px_covered` int(11) NOT NULL,\n  `computed_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (`photo_id`,`role`),\n  KEY `by_paths` (`prepared_path`,`mask_path`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "mask_blend_settings": {
+      "count": 514,
+      "ddl": "CREATE TABLE `mask_blend_settings` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `photo_id` bigint(20) unsigned NOT NULL,\n  `asset_id` varchar(32) COLLATE utf8_unicode_ci NOT NULL,\n  `mask_role` varchar(64) COLLATE utf8_unicode_ci NOT NULL,\n  `color_id` bigint(20) unsigned DEFAULT NULL,\n  `color_name` varchar(120) COLLATE utf8_unicode_ci DEFAULT NULL,\n  `color_brand` varchar(10) COLLATE utf8_unicode_ci DEFAULT NULL,\n  `color_code` varchar(50) COLLATE utf8_unicode_ci DEFAULT NULL,\n  `color_hex` char(6) COLLATE utf8_unicode_ci NOT NULL,\n  `base_lightness` decimal(5,2) NOT NULL,\n  `target_lightness` decimal(5,2) NOT NULL,\n  `target_h` decimal(6,2) DEFAULT NULL,\n  `target_c` decimal(6,2) DEFAULT NULL,\n  `blend_mode` varchar(32) COLLATE utf8_unicode_ci NOT NULL,\n  `blend_opacity` decimal(5,2) NOT NULL,\n  `is_preset` tinyint(1) NOT NULL DEFAULT '0',\n  `approved` tinyint(1) NOT NULL DEFAULT '0',\n  `notes` text COLLATE utf8_unicode_ci,\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,\n  `shadow_l_offset` float DEFAULT NULL,\n  `shadow_tint_hex` char(7) COLLATE utf8_unicode_ci DEFAULT NULL,\n  `shadow_tint_opacity` float DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `idx_photo_mask_color` (`photo_id`,`mask_role`,`color_id`),\n  KEY `idx_mask_blend_photo_role` (`photo_id`,`mask_role`),\n  KEY `idx_mask_blend_asset_role` (`asset_id`,`mask_role`),\n  KEY `idx_mask_blend_lightness` (`base_lightness`,`target_lightness`)\n) ENGINE=InnoDB AUTO_INCREMENT=1596 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+    },
+    "master_role_masks": {
+      "count": 16,
+      "ddl": "CREATE TABLE `master_role_masks` (\n  `mask_slug` varchar(64) NOT NULL,\n  `role_id` int(10) unsigned NOT NULL,\n  PRIMARY KEY (`mask_slug`),\n  KEY `role_id` (`role_id`),\n  CONSTRAINT `master_role_masks_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `master_roles` (`id`) ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "saved_palette_viewer_content": {
+      "count": 80,
+      "ddl": "CREATE TABLE `saved_palette_viewer_content` (\n  `saved_palette_viewer_content_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `saved_palette_id` bigint(20) unsigned NOT NULL,\n  `saved_palette_set_id` bigint(20) unsigned NOT NULL,\n  `template_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,\n  `kicker_text` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `title` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `intro` text COLLATE utf8mb4_unicode_ci,\n  `notes` text COLLATE utf8mb4_unicode_ci,\n  `cta_label` varchar(120) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `playlist_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `share_card_template_id` bigint(20) unsigned DEFAULT NULL,\n  `share_card_fields_json` json DEFAULT NULL,\n  `share_card_image_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,\n  `share_card_generated_at` datetime DEFAULT NULL,\n  `is_active` tinyint(1) NOT NULL DEFAULT '1',\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`saved_palette_viewer_content_id`),\n  UNIQUE KEY `uq_spvc_set_template` (`saved_palette_set_id`,`template_key`),\n  KEY `idx_spvc_palette_template` (`saved_palette_id`,`template_key`),\n  KEY `idx_spvc_share_card_template_id` (`share_card_template_id`),\n  CONSTRAINT `fk_spvc_saved_palette` FOREIGN KEY (`saved_palette_id`) REFERENCES `saved_palettes` (`id`) ON DELETE CASCADE,\n  CONSTRAINT `fk_spvc_saved_palette_set` FOREIGN KEY (`saved_palette_set_id`) REFERENCES `saved_palette_sets` (`id`) ON DELETE CASCADE,\n  CONSTRAINT `fk_spvc_share_card_template` FOREIGN KEY (`share_card_template_id`) REFERENCES `share_card_templates` (`share_card_template_id`) ON DELETE SET NULL ON UPDATE CASCADE\n) ENGINE=InnoDB AUTO_INCREMENT=132 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    },
+    "saved_palette_set_photos": {
+      "count": 146,
+      "ddl": "CREATE TABLE `saved_palette_set_photos` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `saved_palette_set_id` bigint(20) unsigned NOT NULL,\n  `photo_library_id` int(10) unsigned DEFAULT NULL,\n  `legacy_saved_palette_photo_id` bigint(20) unsigned DEFAULT NULL,\n  `rel_path` varchar(512) DEFAULT NULL,\n  `photo_type` varchar(16) NOT NULL DEFAULT 'full',\n  `trigger_mode` varchar(10) NOT NULL DEFAULT 'any',\n  `trigger_color_id` bigint(20) unsigned DEFAULT NULL,\n  `show_in_gallery` tinyint(1) NOT NULL DEFAULT '0',\n  `use_palette_default_roles` tinyint(1) NOT NULL DEFAULT '1',\n  `caption` varchar(255) DEFAULT NULL,\n  `alt_text` text,\n  `order_index` int(11) NOT NULL DEFAULT '0',\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `uq_saved_palette_set_photos_legacy` (`legacy_saved_palette_photo_id`),\n  KEY `idx_saved_palette_set_photos_set_order` (`saved_palette_set_id`,`order_index`),\n  KEY `idx_saved_palette_set_photos_set_type` (`saved_palette_set_id`,`photo_type`),\n  KEY `idx_saved_palette_set_photos_photo_library` (`photo_library_id`),\n  KEY `idx_saved_palette_set_photos_trigger` (`trigger_color_id`),\n  CONSTRAINT `fk_saved_palette_set_photos_photo_library` FOREIGN KEY (`photo_library_id`) REFERENCES `photo_library` (`photo_library_id`) ON DELETE SET NULL,\n  CONSTRAINT `fk_saved_palette_set_photos_set` FOREIGN KEY (`saved_palette_set_id`) REFERENCES `saved_palette_sets` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB AUTO_INCREMENT=269 DEFAULT CHARSET=utf8mb4"
+    },
+    "saved_palette_sets": {
+      "count": 79,
+      "ddl": "CREATE TABLE `saved_palette_sets` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `saved_palette_id` bigint(20) unsigned NOT NULL,\n  `slug` varchar(128) NOT NULL,\n  `title` varchar(255) DEFAULT NULL,\n  `is_default` tinyint(1) NOT NULL DEFAULT '0',\n  `order_index` int(11) NOT NULL DEFAULT '0',\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `updated_at` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `uq_saved_palette_sets_palette_slug` (`saved_palette_id`,`slug`),\n  KEY `idx_saved_palette_sets_palette_order` (`saved_palette_id`,`order_index`),\n  CONSTRAINT `fk_saved_palette_sets_palette` FOREIGN KEY (`saved_palette_id`) REFERENCES `saved_palettes` (`id`) ON DELETE CASCADE\n) ENGINE=InnoDB AUTO_INCREMENT=175 DEFAULT CHARSET=utf8mb4"
+    },
+    "saved_palette_photos": {
+      "count": 124,
+      "ddl": "CREATE TABLE `saved_palette_photos` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `saved_palette_id` bigint(20) unsigned NOT NULL,\n  `photo_library_id` int(10) unsigned DEFAULT NULL,\n  `rel_path` varchar(512) COLLATE utf8_unicode_ci NOT NULL,\n  `photo_type` varchar(16) COLLATE utf8_unicode_ci NOT NULL DEFAULT 'full',\n  `trigger_color_id` bigint(20) unsigned DEFAULT NULL,\n  `caption` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,\n  `alt_text` text COLLATE utf8_unicode_ci,\n  `order_index` int(11) NOT NULL DEFAULT '0',\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  `trigger_mode` varchar(10) COLLATE utf8_unicode_ci NOT NULL DEFAULT 'any',\n  PRIMARY KEY (`id`),\n  KEY `idx_saved_palette_photos_palette` (`saved_palette_id`),\n  KEY `idx_saved_palette_photos_trigger` (`trigger_color_id`),\n  KEY `idx_saved_palette_photos_photo_library_id` (`photo_library_id`),\n  CONSTRAINT `fk_saved_palette_photos_photo_library` FOREIGN KEY (`photo_library_id`) REFERENCES `photo_library` (`photo_library_id`) ON DELETE SET NULL\n) ENGINE=InnoDB AUTO_INCREMENT=221 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci"
+    },
+    "photos": {
+      "count": 8,
+      "ddl": "CREATE TABLE `photos` (\n  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,\n  `asset_id` varchar(16) NOT NULL,\n  `style_primary` varchar(40) DEFAULT NULL,\n  `verdict` enum('nope','fan','love-it') DEFAULT NULL,\n  `status` enum('draft','needs-work','keeper') DEFAULT NULL,\n  `lighting` enum('sun','shade','overcast','mixed') DEFAULT NULL,\n  `category_path` varchar(255) DEFAULT NULL,\n  `rights_status` enum('owned','consented','unknown') DEFAULT NULL,\n  `width` int(10) unsigned DEFAULT NULL,\n  `height` int(10) unsigned DEFAULT NULL,\n  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`),\n  UNIQUE KEY `asset_id` (`asset_id`)\n) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8mb4"
+    },
+    "render_project_roles": {
+      "count": 0,
+      "ddl": "CREATE TABLE `render_project_roles` (\n  `project_id` bigint(20) unsigned NOT NULL,\n  `role_id` int(10) unsigned NOT NULL,\n  `color_id` int(10) unsigned NOT NULL,\n  PRIMARY KEY (`project_id`,`role_id`),\n  KEY `role_id` (`role_id`),\n  CONSTRAINT `render_project_roles_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `render_projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT `render_project_roles_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `master_roles` (`id`) ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "tester_colors": {
+      "count": 6,
+      "ddl": "CREATE TABLE `tester_colors` (\n  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  `color_id` bigint(20) unsigned NOT NULL,\n  `name` varchar(120) NOT NULL,\n  `note` varchar(255) DEFAULT NULL,\n  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,\n  PRIMARY KEY (`id`)\n) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4"
+    }
+  },
+  "foreign_keys": [
+    {
+      "TABLE_NAME": "analytics_events",
+      "COLUMN_NAME": "source_key",
+      "CONSTRAINT_NAME": "fk_analytics_events_src_params",
+      "REFERENCED_TABLE_NAME": "src_params",
+      "REFERENCED_COLUMN_NAME": "src",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "article_sections",
+      "COLUMN_NAME": "article_id",
+      "CONSTRAINT_NAME": "fk_article_sections_article",
+      "REFERENCED_TABLE_NAME": "articles",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "article_tag_map",
+      "COLUMN_NAME": "article_id",
+      "CONSTRAINT_NAME": "fk_article_tag_map_article",
+      "REFERENCED_TABLE_NAME": "articles",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "article_tag_map",
+      "COLUMN_NAME": "tag_id",
+      "CONSTRAINT_NAME": "fk_article_tag_map_tag",
+      "REFERENCED_TABLE_NAME": "article_tags",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "clients",
+      "COLUMN_NAME": "mailing_address_id",
+      "CONSTRAINT_NAME": "fk_clients_mailing_address",
+      "REFERENCED_TABLE_NAME": "addresses",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "client_activity",
+      "COLUMN_NAME": "client_id",
+      "CONSTRAINT_NAME": "fk_client_activity_client",
+      "REFERENCED_TABLE_NAME": "clients",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "client_activity",
+      "COLUMN_NAME": "related_client_email_id",
+      "CONSTRAINT_NAME": "fk_client_activity_email",
+      "REFERENCED_TABLE_NAME": "client_emails",
+      "REFERENCED_COLUMN_NAME": "client_email_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "client_emails",
+      "COLUMN_NAME": "client_id",
+      "CONSTRAINT_NAME": "fk_client_emails_client",
+      "REFERENCED_TABLE_NAME": "clients",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "cluster_hex",
+      "COLUMN_NAME": "cluster_id",
+      "CONSTRAINT_NAME": "fk_cluster_hex_cluster",
+      "REFERENCED_TABLE_NAME": "clusters",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "brand",
+      "CONSTRAINT_NAME": "colors_ibfk_1",
+      "REFERENCED_TABLE_NAME": "company",
+      "REFERENCED_COLUMN_NAME": "code",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "chroma_group_id",
+      "CONSTRAINT_NAME": "colors_ibfk_2",
+      "REFERENCED_TABLE_NAME": "color_attribute_groups",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "lightness_group_id",
+      "CONSTRAINT_NAME": "colors_ibfk_3",
+      "REFERENCED_TABLE_NAME": "color_attribute_groups",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "chroma_cat_id",
+      "CONSTRAINT_NAME": "fk_chroma_cat",
+      "REFERENCED_TABLE_NAME": "category_definitions",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "cluster_id",
+      "CONSTRAINT_NAME": "fk_colors_cluster",
+      "REFERENCED_TABLE_NAME": "clusters",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "colors",
+      "COLUMN_NAME": "light_cat_id",
+      "CONSTRAINT_NAME": "fk_light_cat",
+      "REFERENCED_TABLE_NAME": "category_definitions",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "color_category",
+      "COLUMN_NAME": "category_id",
+      "CONSTRAINT_NAME": "fk_cc_category_id",
+      "REFERENCED_TABLE_NAME": "category_definitions",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "color_category",
+      "COLUMN_NAME": "color_id",
+      "CONSTRAINT_NAME": "fk_cc_color_id",
+      "REFERENCED_TABLE_NAME": "colors",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "color_search_presets",
+      "COLUMN_NAME": "category_id",
+      "CONSTRAINT_NAME": "fk_color_search_presets_category",
+      "REFERENCED_TABLE_NAME": "category_definitions",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "color_supercats",
+      "COLUMN_NAME": "supercat_id",
+      "CONSTRAINT_NAME": "color_supercats_ibfk_1",
+      "REFERENCED_TABLE_NAME": "supercats",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "ctas",
+      "COLUMN_NAME": "cta_type_id",
+      "CONSTRAINT_NAME": "fk_ctas_type",
+      "REFERENCED_TABLE_NAME": "cta_types",
+      "REFERENCED_COLUMN_NAME": "cta_type_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "cta_group_items",
+      "COLUMN_NAME": "cta_id",
+      "CONSTRAINT_NAME": "fk_cgi_cta",
+      "REFERENCED_TABLE_NAME": "ctas",
+      "REFERENCED_COLUMN_NAME": "cta_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "cta_group_items",
+      "COLUMN_NAME": "cta_group_id",
+      "CONSTRAINT_NAME": "fk_cgi_group",
+      "REFERENCED_TABLE_NAME": "cta_groups",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "err_external_codes",
+      "COLUMN_NAME": "cf_err_num",
+      "CONSTRAINT_NAME": "fk_external_cf_error",
+      "REFERENCED_TABLE_NAME": "err_codes",
+      "REFERENCED_COLUMN_NAME": "err_num",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "err_working",
+      "COLUMN_NAME": "err_log_id",
+      "CONSTRAINT_NAME": "fk_err_working_log",
+      "REFERENCED_TABLE_NAME": "err_log",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "legacy_project_links",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_project_links_project",
+      "REFERENCED_TABLE_NAME": "legacy_projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "marketing_template_tags",
+      "COLUMN_NAME": "marketing_template_id",
+      "CONSTRAINT_NAME": "fk_marketing_template_tags_template",
+      "REFERENCED_TABLE_NAME": "marketing_templates",
+      "REFERENCED_COLUMN_NAME": "marketing_template_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "marketing_terms",
+      "COLUMN_NAME": "marketing_term_group_id",
+      "CONSTRAINT_NAME": "fk_marketing_terms_group",
+      "REFERENCED_TABLE_NAME": "marketing_term_groups",
+      "REFERENCED_COLUMN_NAME": "marketing_term_group_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "master_role_masks",
+      "COLUMN_NAME": "role_id",
+      "CONSTRAINT_NAME": "master_role_masks_ibfk_1",
+      "REFERENCED_TABLE_NAME": "master_roles",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "milestones",
+      "COLUMN_NAME": "category_id",
+      "CONSTRAINT_NAME": "fk_milestones_category",
+      "REFERENCED_TABLE_NAME": "milestone_categories",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "palette_role_members",
+      "COLUMN_NAME": "palette_id",
+      "CONSTRAINT_NAME": "palette_role_members_ibfk_1",
+      "REFERENCED_TABLE_NAME": "palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_role_members",
+      "COLUMN_NAME": "role_id",
+      "CONSTRAINT_NAME": "palette_role_members_ibfk_2",
+      "REFERENCED_TABLE_NAME": "master_roles",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "palette_tags",
+      "COLUMN_NAME": "palette_id",
+      "CONSTRAINT_NAME": "fk_palette_tags_palette",
+      "REFERENCED_TABLE_NAME": "palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_viewers",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_palette_viewers_project",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_viewers",
+      "COLUMN_NAME": "saved_palette_id",
+      "CONSTRAINT_NAME": "fk_palette_viewers_saved_palette",
+      "REFERENCED_TABLE_NAME": "saved_palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_viewer_photos",
+      "COLUMN_NAME": "palette_viewer_id",
+      "CONSTRAINT_NAME": "fk_palette_viewer_photos_viewer",
+      "REFERENCED_TABLE_NAME": "palette_viewers",
+      "REFERENCED_COLUMN_NAME": "palette_viewer_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_viewer_project_palettes",
+      "COLUMN_NAME": "project_palette_id",
+      "CONSTRAINT_NAME": "fk_pvpp_project_palette",
+      "REFERENCED_TABLE_NAME": "project_palettes",
+      "REFERENCED_COLUMN_NAME": "project_palette_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "palette_viewer_project_palettes",
+      "COLUMN_NAME": "palette_viewer_id",
+      "CONSTRAINT_NAME": "fk_pvpp_viewer",
+      "REFERENCED_TABLE_NAME": "palette_viewers",
+      "REFERENCED_COLUMN_NAME": "palette_viewer_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photos_artwork",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_artwork_photo",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photos_tags",
+      "COLUMN_NAME": "photo_id",
+      "CONSTRAINT_NAME": "fk_pt_photo",
+      "REFERENCED_TABLE_NAME": "photos",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photos_variants",
+      "COLUMN_NAME": "photo_id",
+      "CONSTRAINT_NAME": "fk_pv_photo",
+      "REFERENCED_TABLE_NAME": "photos",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photo_alt_text_jobs",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_photo_alt_text_jobs_photo",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photo_group_items",
+      "COLUMN_NAME": "group_id",
+      "CONSTRAINT_NAME": "fk_photo_group_items_group",
+      "REFERENCED_TABLE_NAME": "photo_groups",
+      "REFERENCED_COLUMN_NAME": "group_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photo_group_items",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_photo_group_items_photo",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "photo_library",
+      "COLUMN_NAME": "client_id",
+      "CONSTRAINT_NAME": "fk_photo_library_client",
+      "REFERENCED_TABLE_NAME": "clients",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "photo_library",
+      "COLUMN_NAME": "palette_id",
+      "CONSTRAINT_NAME": "fk_photo_library_palette",
+      "REFERENCED_TABLE_NAME": "saved_palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "player_experiences",
+      "COLUMN_NAME": "cta_page_id",
+      "CONSTRAINT_NAME": "fk_player_experiences_cta_page",
+      "REFERENCED_TABLE_NAME": "cta_groups",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "playlists",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_playlists_project_id",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "playlist_instances",
+      "COLUMN_NAME": "cta_group_id",
+      "CONSTRAINT_NAME": "fk_playlist_instances_cta_group",
+      "REFERENCED_TABLE_NAME": "cta_groups",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "playlist_instances",
+      "COLUMN_NAME": "kicker_id",
+      "CONSTRAINT_NAME": "fk_playlist_instances_kicker",
+      "REFERENCED_TABLE_NAME": "kickers",
+      "REFERENCED_COLUMN_NAME": "kicker_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "playlist_instances",
+      "COLUMN_NAME": "player_experience_id",
+      "CONSTRAINT_NAME": "fk_playlist_instances_player_experience",
+      "REFERENCED_TABLE_NAME": "player_experiences",
+      "REFERENCED_COLUMN_NAME": "player_experience_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "playlist_instances",
+      "COLUMN_NAME": "playlist_id",
+      "CONSTRAINT_NAME": "fk_playlist_instances_playlist",
+      "REFERENCED_TABLE_NAME": "playlists",
+      "REFERENCED_COLUMN_NAME": "playlist_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "playlist_instance_set_items",
+      "COLUMN_NAME": "playlist_id",
+      "CONSTRAINT_NAME": "fk_playlist_instance_set_items_playlist",
+      "REFERENCED_TABLE_NAME": "playlists",
+      "REFERENCED_COLUMN_NAME": "playlist_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "playlist_instance_set_items",
+      "COLUMN_NAME": "playlist_instance_set_id",
+      "CONSTRAINT_NAME": "fk_playlist_instance_set_items_set",
+      "REFERENCED_TABLE_NAME": "playlist_instance_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "playlist_instance_set_items",
+      "COLUMN_NAME": "target_set_id",
+      "CONSTRAINT_NAME": "fk_playlist_instance_set_items_target_set",
+      "REFERENCED_TABLE_NAME": "playlist_instance_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "playlist_items",
+      "COLUMN_NAME": "playlist_id",
+      "CONSTRAINT_NAME": "fk_playlist_items_playlist",
+      "REFERENCED_TABLE_NAME": "playlists",
+      "REFERENCED_COLUMN_NAME": "playlist_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "playlist_set_items",
+      "COLUMN_NAME": "playlist_id",
+      "CONSTRAINT_NAME": "fk_playlist_set_items_playlist",
+      "REFERENCED_TABLE_NAME": "playlists",
+      "REFERENCED_COLUMN_NAME": "playlist_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "playlist_set_items",
+      "COLUMN_NAME": "playlist_set_id",
+      "CONSTRAINT_NAME": "fk_playlist_set_items_set",
+      "REFERENCED_TABLE_NAME": "playlist_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "playlist_set_items",
+      "COLUMN_NAME": "target_set_id",
+      "CONSTRAINT_NAME": "fk_playlist_set_items_target_set",
+      "REFERENCED_TABLE_NAME": "playlist_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "projects",
+      "COLUMN_NAME": "client_id",
+      "CONSTRAINT_NAME": "fk_projects_client",
+      "REFERENCED_TABLE_NAME": "clients",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "projects",
+      "COLUMN_NAME": "playlist_id",
+      "CONSTRAINT_NAME": "fk_projects_playlist",
+      "REFERENCED_TABLE_NAME": "playlists",
+      "REFERENCED_COLUMN_NAME": "playlist_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "projects",
+      "COLUMN_NAME": "property_id",
+      "CONSTRAINT_NAME": "fk_projects_property",
+      "REFERENCED_TABLE_NAME": "properties",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "project_activity",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_project_activity_project",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "project_documents",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_project_documents_project",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "project_documents",
+      "COLUMN_NAME": "scope_id",
+      "CONSTRAINT_NAME": "fk_project_documents_scope",
+      "REFERENCED_TABLE_NAME": "project_scopes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "project_photos",
+      "COLUMN_NAME": "palette_id",
+      "CONSTRAINT_NAME": "fk_project_photos_palette",
+      "REFERENCED_TABLE_NAME": "saved_palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "project_photos",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_project_photos_photo_library",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "project_photos",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_project_photos_project",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "project_scopes",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "fk_project_scopes_project",
+      "REFERENCED_TABLE_NAME": "projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "properties",
+      "COLUMN_NAME": "address_id",
+      "CONSTRAINT_NAME": "fk_properties_address",
+      "REFERENCED_TABLE_NAME": "addresses",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "properties",
+      "COLUMN_NAME": "client_id",
+      "CONSTRAINT_NAME": "fk_properties_client",
+      "REFERENCED_TABLE_NAME": "clients",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "pub_assets",
+      "COLUMN_NAME": "pub_run_id",
+      "CONSTRAINT_NAME": "fk_pub_assets_run",
+      "REFERENCED_TABLE_NAME": "pub_runs",
+      "REFERENCED_COLUMN_NAME": "pub_run_id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "query_filters",
+      "COLUMN_NAME": "query_id",
+      "CONSTRAINT_NAME": "query_filters_ibfk_1",
+      "REFERENCED_TABLE_NAME": "sql_queries",
+      "REFERENCED_COLUMN_NAME": "query_id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "query_filters",
+      "COLUMN_NAME": "filter_id",
+      "CONSTRAINT_NAME": "query_filters_ibfk_2",
+      "REFERENCED_TABLE_NAME": "filter_definitions",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "render_projects",
+      "COLUMN_NAME": "asset_photo_id",
+      "CONSTRAINT_NAME": "render_projects_ibfk_1",
+      "REFERENCED_TABLE_NAME": "photos",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "render_projects",
+      "COLUMN_NAME": "palette_id",
+      "CONSTRAINT_NAME": "render_projects_ibfk_2",
+      "REFERENCED_TABLE_NAME": "palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "render_projects",
+      "COLUMN_NAME": "finished_photo_id",
+      "CONSTRAINT_NAME": "render_projects_ibfk_3",
+      "REFERENCED_TABLE_NAME": "photos",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "render_project_masks",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "render_project_masks_ibfk_1",
+      "REFERENCED_TABLE_NAME": "render_projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "render_project_roles",
+      "COLUMN_NAME": "project_id",
+      "CONSTRAINT_NAME": "render_project_roles_ibfk_1",
+      "REFERENCED_TABLE_NAME": "render_projects",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "render_project_roles",
+      "COLUMN_NAME": "role_id",
+      "CONSTRAINT_NAME": "render_project_roles_ibfk_2",
+      "REFERENCED_TABLE_NAME": "master_roles",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    },
+    {
+      "TABLE_NAME": "rex_aliases",
+      "COLUMN_NAME": "reservation_id",
+      "CONSTRAINT_NAME": "fk_rex_aliases_reservation",
+      "REFERENCED_TABLE_NAME": "rex_reservations",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "rex_reservations",
+      "COLUMN_NAME": "fallback_rex_id",
+      "CONSTRAINT_NAME": "fk_rex_reservations_fallback",
+      "REFERENCED_TABLE_NAME": "rex_reservations",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "rex_reservation_links",
+      "COLUMN_NAME": "child_reservation_id",
+      "CONSTRAINT_NAME": "fk_rex_reservation_links_child",
+      "REFERENCED_TABLE_NAME": "rex_reservations",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "rex_reservation_links",
+      "COLUMN_NAME": "parent_reservation_id",
+      "CONSTRAINT_NAME": "fk_rex_reservation_links_parent",
+      "REFERENCED_TABLE_NAME": "rex_reservations",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "saved_palettes",
+      "COLUMN_NAME": "brand",
+      "CONSTRAINT_NAME": "fk_saved_palettes_brand",
+      "REFERENCED_TABLE_NAME": "company",
+      "REFERENCED_COLUMN_NAME": "code",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "saved_palettes",
+      "COLUMN_NAME": "kicker_id",
+      "CONSTRAINT_NAME": "fk_saved_palettes_kicker",
+      "REFERENCED_TABLE_NAME": "kickers",
+      "REFERENCED_COLUMN_NAME": "kicker_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "saved_palette_photos",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_saved_palette_photos_photo_library",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "saved_palette_sets",
+      "COLUMN_NAME": "saved_palette_id",
+      "CONSTRAINT_NAME": "fk_saved_palette_sets_palette",
+      "REFERENCED_TABLE_NAME": "saved_palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_set_photos",
+      "COLUMN_NAME": "photo_library_id",
+      "CONSTRAINT_NAME": "fk_saved_palette_set_photos_photo_library",
+      "REFERENCED_TABLE_NAME": "photo_library",
+      "REFERENCED_COLUMN_NAME": "photo_library_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "saved_palette_set_photos",
+      "COLUMN_NAME": "saved_palette_set_id",
+      "CONSTRAINT_NAME": "fk_saved_palette_set_photos_set",
+      "REFERENCED_TABLE_NAME": "saved_palette_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_viewer_content",
+      "COLUMN_NAME": "saved_palette_id",
+      "CONSTRAINT_NAME": "fk_spvc_saved_palette",
+      "REFERENCED_TABLE_NAME": "saved_palettes",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_viewer_content",
+      "COLUMN_NAME": "saved_palette_set_id",
+      "CONSTRAINT_NAME": "fk_spvc_saved_palette_set",
+      "REFERENCED_TABLE_NAME": "saved_palette_sets",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_viewer_content",
+      "COLUMN_NAME": "share_card_template_id",
+      "CONSTRAINT_NAME": "fk_spvc_share_card_template",
+      "REFERENCED_TABLE_NAME": "share_card_templates",
+      "REFERENCED_COLUMN_NAME": "share_card_template_id",
+      "DELETE_RULE": "SET NULL"
+    },
+    {
+      "TABLE_NAME": "supercat_clauses",
+      "COLUMN_NAME": "supercat_id",
+      "CONSTRAINT_NAME": "supercat_clauses_ibfk_1",
+      "REFERENCED_TABLE_NAME": "supercats",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "CASCADE"
+    },
+    {
+      "TABLE_NAME": "url_reservations",
+      "COLUMN_NAME": "reservation_type_id",
+      "CONSTRAINT_NAME": "fk_url_reservations_type",
+      "REFERENCED_TABLE_NAME": "url_reservation_types",
+      "REFERENCED_COLUMN_NAME": "id",
+      "DELETE_RULE": "RESTRICT"
+    }
+  ],
+  "views": [
+    {
+      "TABLE_NAME": "cluster_friends_union",
+      "VIEW_DEFINITION": "select `shortgal_colorfix`.`cluster_friends`.`c_from` AS `cluster_key`,`shortgal_colorfix`.`cluster_friends`.`c_to` AS `friends` from `shortgal_colorfix`.`cluster_friends` union all select `shortgal_colorfix`.`cluster_friends`.`c_to` AS `cluster_key`,`shortgal_colorfix`.`cluster_friends`.`c_from` AS `friends` from `shortgal_colorfix`.`cluster_friends`"
+    },
+    {
+      "TABLE_NAME": "cluster_friends_v",
+      "VIEW_DEFINITION": "select `ch1`.`cluster_id` AS `c_from`,`ch2`.`cluster_id` AS `c_to`,count(0) AS `weight` from ((`shortgal_colorfix`.`friends_union` `fu` join `shortgal_colorfix`.`cluster_hex` `ch1` on((convert(`ch1`.`hex6` using utf8mb4) = convert(`fu`.`key_hex6` using utf8mb4)))) join `shortgal_colorfix`.`cluster_hex` `ch2` on((convert(`ch2`.`hex6` using utf8mb4) = convert(`fu`.`friend_hex6` using utf8mb4)))) where (`ch1`.`cluster_id` <> `ch2`.`cluster_id`) group by `ch1`.`cluster_id`,`ch2`.`cluster_id`"
+    },
+    {
+      "TABLE_NAME": "cluster_union",
+      "VIEW_DEFINITION": "select `shortgal_colorfix`.`cluster_friends`.`c_from` AS `c_from`,`shortgal_colorfix`.`cluster_friends`.`c_to` AS `c_to`,`shortgal_colorfix`.`cluster_friends`.`weight` AS `weight` from `shortgal_colorfix`.`cluster_friends` union all select `shortgal_colorfix`.`cluster_friends`.`c_to` AS `c_from`,`shortgal_colorfix`.`cluster_friends`.`c_from` AS `c_to`,`shortgal_colorfix`.`cluster_friends`.`weight` AS `weight` from `shortgal_colorfix`.`cluster_friends`"
+    },
+    {
+      "TABLE_NAME": "delta_analysis",
+      "VIEW_DEFINITION": "select `cd`.`c_from` AS `c_from`,`cd`.`c_to` AS `c_to`,`cd`.`h_from` AS `h_from`,`cd`.`chroma_from` AS `chroma_from`,`cd`.`light_from` AS `light_from`,`cd`.`h_to` AS `h_to`,`cd`.`chroma_to` AS `chroma_to`,`cd`.`light_to` AS `light_to`,`cd`.`dh_int` AS `dh`,`cd`.`dc_int` AS `dc`,`cd`.`dl_int` AS `dl`,`cd`.`support_hex_pairs` AS `support_hex_pairs`,`s_from`.`deg_total` AS `from_deg_total`,`s_from`.`hue_div` AS `from_hue_div`,`s_to`.`deg_total` AS `to_deg_total`,`s_to`.`hue_div` AS `to_hue_div`,`r_from`.`hex6` AS `sample_hex_from`,`r_to`.`hex6` AS `sample_hex_to` from ((((`shortgal_colorfix`.`cluster_deltas` `cd` left join `shortgal_colorfix`.`v_cluster_stats` `s_from` on((`s_from`.`cluster_id` = `cd`.`c_from`))) left join `shortgal_colorfix`.`v_cluster_stats` `s_to` on((`s_to`.`cluster_id` = `cd`.`c_to`))) left join (select `shortgal_colorfix`.`cluster_hex`.`cluster_id` AS `cluster_id`,min(`shortgal_colorfix`.`cluster_hex`.`hex6`) AS `hex6` from `shortgal_colorfix`.`cluster_hex` group by `shortgal_colorfix`.`cluster_hex`.`cluster_id`) `r_from` on((`r_from`.`cluster_id` = `cd`.`c_from`))) left join (select `shortgal_colorfix`.`cluster_hex`.`cluster_id` AS `cluster_id`,min(`shortgal_colorfix`.`cluster_hex`.`hex6`) AS `hex6` from `shortgal_colorfix`.`cluster_hex` group by `shortgal_colorfix`.`cluster_hex`.`cluster_id`) `r_to` on((`r_to`.`cluster_id` = `cd`.`c_to`)))"
+    },
+    {
+      "TABLE_NAME": "friend_pairs_deltas",
+      "VIEW_DEFINITION": "select `a`.`id` AS `a_id`,`a`.`name` AS `a_name`,`a`.`brand` AS `a_brand`,`a`.`code` AS `a_code`,`a`.`hex6` AS `a_hex`,`b`.`id` AS `b_id`,`b`.`name` AS `b_name`,`b`.`brand` AS `b_brand`,`b`.`code` AS `b_code`,`b`.`hex6` AS `b_hex`,abs((case when ((`b`.`hcl_h` - `a`.`hcl_h`) > 180) then ((`b`.`hcl_h` - `a`.`hcl_h`) - 360) when ((`b`.`hcl_h` - `a`.`hcl_h`) < -(180)) then ((`b`.`hcl_h` - `a`.`hcl_h`) + 360) else (`b`.`hcl_h` - `a`.`hcl_h`) end)) AS `dH_abs`,abs((`b`.`hcl_c` - `a`.`hcl_c`)) AS `dC`,abs((`b`.`hcl_l` - `a`.`hcl_l`)) AS `dL` from ((`shortgal_colorfix`.`friends_union` `fu` join `shortgal_colorfix`.`swatch_view` `a` on((convert(`a`.`hex6` using utf8mb4) = `fu`.`key_hex6`))) join `shortgal_colorfix`.`swatch_view` `b` on((convert(`b`.`hex6` using utf8mb4) = `fu`.`friend_hex6`))) where ((`a`.`hcl_h` is not null) and (`b`.`hcl_h` is not null) and (`fu`.`key_hex6` < `fu`.`friend_hex6`))"
+    },
+    {
+      "TABLE_NAME": "friends_union",
+      "VIEW_DEFINITION": "select `shortgal_colorfix`.`color_friends`.`hex1` AS `key_hex6`,`shortgal_colorfix`.`color_friends`.`hex2` AS `friend_hex6` from `shortgal_colorfix`.`color_friends` union all select `shortgal_colorfix`.`color_friends`.`hex2` AS `key_hex6`,`shortgal_colorfix`.`color_friends`.`hex1` AS `friend_hex6` from `shortgal_colorfix`.`color_friends`"
+    },
+    {
+      "TABLE_NAME": "generated_palette_color_view",
+      "VIEW_DEFINITION": "select `gpc`.`generated_palette_id` AS `generated_palette_id`,`gpc`.`color_id` AS `color_id`,`g`.`recipe_id` AS `recipe_id`,`g`.`anchor_color_id` AS `anchor_color_id`,`g`.`direction` AS `direction`,`g`.`created_at` AS `created_at`,`c`.`hcl_h` AS `hcl_h`,`c`.`hcl_c` AS `hcl_c`,`c`.`hcl_l` AS `hcl_l`,`c`.`hue_cats` AS `hue_cats`,`c`.`neutral_cats` AS `neutral_cats` from ((`shortgal_colorfix`.`generated_palette_colors` `gpc` join `shortgal_colorfix`.`generated_palettes` `g` on((`g`.`id` = `gpc`.`generated_palette_id`))) join `shortgal_colorfix`.`colors` `c` on((`c`.`id` = `gpc`.`color_id`)))"
+    },
+    {
+      "TABLE_NAME": "swatch_enriched",
+      "VIEW_DEFINITION": "select `sv`.`id` AS `id`,`sv`.`name` AS `name`,`sv`.`code` AS `code`,`sv`.`brand` AS `brand`,`sv`.`chip_num` AS `chip_num`,`sv`.`r` AS `r`,`sv`.`g` AS `g`,`sv`.`b` AS `b`,`sv`.`hex6` AS `hex6`,`sv`.`hex` AS `hex`,`sv`.`hcl_l` AS `hcl_l`,`sv`.`hcl_c` AS `hcl_c`,`sv`.`hcl_h` AS `hcl_h`,`sv`.`brand_name` AS `brand_name`,`sv`.`hue_cats` AS `hue_cats`,`sv`.`hue_cat_order` AS `hue_cat_order`,`sv`.`neutral_cats` AS `neutral_cats`,`sv`.`is_stain` AS `is_stain`,`c`.`cluster_id` AS `cluster_id`,`c`.`lab_l` AS `lab_l`,`c`.`lab_a` AS `lab_a`,`c`.`lab_b` AS `lab_b` from (`shortgal_colorfix`.`swatch_view` `sv` left join `shortgal_colorfix`.`colors` `c` on((`c`.`id` = `sv`.`id`)))"
+    },
+    {
+      "TABLE_NAME": "swatch_view",
+      "VIEW_DEFINITION": "select `c`.`id` AS `id`,`c`.`name` AS `name`,`c`.`code` AS `code`,`c`.`brand` AS `brand`,`c`.`chip_num` AS `chip_num`,`c`.`r` AS `r`,`c`.`g` AS `g`,`c`.`b` AS `b`,`c`.`hex6` AS `hex6`,concat('#',`c`.`hex6`) AS `hex`,`c`.`hcl_l` AS `hcl_l`,`c`.`hcl_c` AS `hcl_c`,`c`.`hcl_h` AS `hcl_h`,`co`.`name` AS `brand_name`,coalesce((select `hd`.`display_name` from `shortgal_colorfix`.`hue_display` `hd` where ((`mv`.`hue_cats` is not null) and (((1 + char_length(`hd`.`combo_key`)) - char_length(replace(`hd`.`combo_key`,',',''))) = ((1 + char_length(`mv`.`hue_cats`)) - char_length(replace(`mv`.`hue_cats`,',','')))) and (not(exists(select 1 from `shortgal_colorfix`.`category_definitions` `d` where ((lower(`d`.`type`) = 'hue') and (find_in_set(`d`.`name`,`mv`.`hue_cats`) > 0) and (find_in_set(`d`.`name`,`hd`.`combo_key`) = 0)))))) order by `hd`.`sort_order`,`hd`.`combo_key` limit 1),`mv`.`hue_cats`) AS `hue_cats`,coalesce((select `hd`.`sort_order` from `shortgal_colorfix`.`hue_display` `hd` where ((`mv`.`hue_cats` is not null) and (((1 + char_length(`hd`.`combo_key`)) - char_length(replace(`hd`.`combo_key`,',',''))) = ((1 + char_length(`mv`.`hue_cats`)) - char_length(replace(`mv`.`hue_cats`,',','')))) and (not(exists(select 1 from `shortgal_colorfix`.`category_definitions` `d` where ((lower(`d`.`type`) = 'hue') and (find_in_set(`d`.`name`,`mv`.`hue_cats`) > 0) and (find_in_set(`d`.`name`,`hd`.`combo_key`) = 0)))))) order by `hd`.`sort_order`,`hd`.`combo_key` limit 1),999) AS `hue_cat_order`,replace(`mv`.`neutral_cats`,',','/') AS `neutral_cats`,`c`.`is_stain` AS `is_stain`,`c`.`cluster_id` AS `cluster_id`,(select `cd`.`id` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_id`,(select `cd`.`name` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_name`,(select `cd`.`sort_order` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_order`,if(((`c`.`exterior` = 0) or isnull(`c`.`exterior`)),1,0) AS `int_only` from ((`shortgal_colorfix`.`colors` `c` left join `shortgal_colorfix`.`company` `co` on((`co`.`code` = `c`.`brand`))) left join `shortgal_colorfix`.`mv_color_categories` `mv` on((`mv`.`color_id` = `c`.`id`))) where (`c`.`is_inactive` = 0)"
+    },
+    {
+      "TABLE_NAME": "swatch_view_colors_candidate",
+      "VIEW_DEFINITION": "select `c`.`id` AS `id`,`c`.`name` AS `name`,`c`.`code` AS `code`,`c`.`brand` AS `brand`,`c`.`chip_num` AS `chip_num`,`c`.`r` AS `r`,`c`.`g` AS `g`,`c`.`b` AS `b`,`c`.`hex6` AS `hex6`,concat('#',`c`.`hex6`) AS `hex`,`c`.`hcl_l` AS `hcl_l`,`c`.`hcl_c` AS `hcl_c`,`c`.`hcl_h` AS `hcl_h`,`co`.`name` AS `brand_name`,coalesce((select `hd`.`display_name` from `shortgal_colorfix`.`hue_display` `hd` where ((`mv`.`hue_cats` is not null) and (((1 + char_length(`hd`.`combo_key`)) - char_length(replace(`hd`.`combo_key`,',',''))) = ((1 + char_length(`mv`.`hue_cats`)) - char_length(replace(`mv`.`hue_cats`,',','')))) and (not(exists(select 1 from `shortgal_colorfix`.`category_definitions` `d` where ((lower(`d`.`type`) = 'hue') and (find_in_set(`d`.`name`,`mv`.`hue_cats`) > 0) and (find_in_set(`d`.`name`,`hd`.`combo_key`) = 0)))))) order by `hd`.`sort_order`,`hd`.`combo_key` limit 1),`mv`.`hue_cats`) AS `hue_cats`,coalesce((select `hd`.`sort_order` from `shortgal_colorfix`.`hue_display` `hd` where ((`mv`.`hue_cats` is not null) and (((1 + char_length(`hd`.`combo_key`)) - char_length(replace(`hd`.`combo_key`,',',''))) = ((1 + char_length(`mv`.`hue_cats`)) - char_length(replace(`mv`.`hue_cats`,',','')))) and (not(exists(select 1 from `shortgal_colorfix`.`category_definitions` `d` where ((lower(`d`.`type`) = 'hue') and (find_in_set(`d`.`name`,`mv`.`hue_cats`) > 0) and (find_in_set(`d`.`name`,`hd`.`combo_key`) = 0)))))) order by `hd`.`sort_order`,`hd`.`combo_key` limit 1),999) AS `hue_cat_order`,replace(`mv`.`neutral_cats`,',','/') AS `neutral_cats`,`c`.`is_stain` AS `is_stain`,`c`.`cluster_id` AS `cluster_id`,(select `cd`.`id` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_id`,(select `cd`.`name` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_name`,(select `cd`.`sort_order` from (`shortgal_colorfix`.`color_category` `cc` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `cc`.`category_id`))) where ((`cc`.`color_id` = `c`.`id`) and (lower(`cd`.`type`) = 'lightness')) order by `cd`.`calc_only`,`cd`.`sort_order`,`cd`.`id` limit 1) AS `light_cat_order`,if(((`c`.`exterior` = 0) or isnull(`c`.`exterior`)),1,0) AS `int_only` from ((`shortgal_colorfix`.`colors` `c` left join `shortgal_colorfix`.`company` `co` on((`co`.`code` = `c`.`brand`))) left join `shortgal_colorfix`.`mv_color_categories` `mv` on((`mv`.`color_id` = `c`.`id`))) where (`c`.`is_inactive` = 0)"
+    },
+    {
+      "TABLE_NAME": "twin_rules_overview",
+      "VIEW_DEFINITION": "select `r`.`id` AS `rule_id`,`r`.`name` AS `rule_name`,`r`.`description` AS `description`,`r`.`category_id` AS `cat_id`,`cd`.`name` AS `cat_name`,`cd`.`hue_min` AS `hue_min`,`cd`.`hue_max` AS `hue_max`,`cd`.`chroma_min` AS `chroma_min`,`cd`.`chroma_max` AS `chroma_max`,`cd`.`light_min` AS `light_min`,`cd`.`light_max` AS `light_max`,`r`.`dh_max` AS `dh`,`r`.`dc_max` AS `dc`,`r`.`dl_max` AS `dl`,`r`.`exclude_locked` AS `exclude_locked`,`r`.`is_active` AS `is_active`,`r`.`priority` AS `priority`,`r`.`updated_at` AS `updated_at`,(select count(0) from `shortgal_colorfix`.`colors` `c` where (((isnull(`cd`.`hue_min`) and isnull(`cd`.`hue_max`)) or ((`cd`.`hue_min` <= `cd`.`hue_max`) and (`c`.`hcl_h` >= `cd`.`hue_min`) and (`c`.`hcl_h` < `cd`.`hue_max`)) or ((`cd`.`hue_min` > `cd`.`hue_max`) and ((`c`.`hcl_h` >= `cd`.`hue_min`) or (`c`.`hcl_h` < `cd`.`hue_max`)))) and (isnull(`cd`.`chroma_min`) or (`c`.`hcl_c` >= `cd`.`chroma_min`)) and (isnull(`cd`.`chroma_max`) or (`c`.`hcl_c` <= `cd`.`chroma_max`)) and (isnull(`cd`.`light_min`) or (`c`.`hcl_l` >= `cd`.`light_min`)) and (isnull(`cd`.`light_max`) or (`c`.`hcl_l` <= `cd`.`light_max`)))) AS `anchor_count_total`,(select count(0) from (`shortgal_colorfix`.`colors` `c` left join `shortgal_colorfix`.`cluster_hex` `ch` on((cast(`ch`.`hex6` as char charset binary) = cast(`c`.`hex6` as char charset binary)))) where (isnull(`ch`.`hex6`) and ((isnull(`cd`.`hue_min`) and isnull(`cd`.`hue_max`)) or ((`cd`.`hue_min` <= `cd`.`hue_max`) and (`c`.`hcl_h` >= `cd`.`hue_min`) and (`c`.`hcl_h` < `cd`.`hue_max`)) or ((`cd`.`hue_min` > `cd`.`hue_max`) and ((`c`.`hcl_h` >= `cd`.`hue_min`) or (`c`.`hcl_h` < `cd`.`hue_max`)))) and (isnull(`cd`.`chroma_min`) or (`c`.`hcl_c` >= `cd`.`chroma_min`)) and (isnull(`cd`.`chroma_max`) or (`c`.`hcl_c` <= `cd`.`chroma_max`)) and (isnull(`cd`.`light_min`) or (`c`.`hcl_l` >= `cd`.`light_min`)) and (isnull(`cd`.`light_max`) or (`c`.`hcl_l` <= `cd`.`light_max`)))) AS `anchor_count_unlocked` from (`shortgal_colorfix`.`twin_rules` `r` join `shortgal_colorfix`.`category_definitions` `cd` on((`cd`.`id` = `r`.`category_id`)))"
+    },
+    {
+      "TABLE_NAME": "v_cluster_stats",
+      "VIEW_DEFINITION": "select `e`.`c` AS `cluster_id`,count(distinct `e`.`partner`) AS `deg_total`,count(distinct `clp`.`h_r`) AS `hue_div` from (((select `shortgal_colorfix`.`cluster_friends`.`c_from` AS `c`,`shortgal_colorfix`.`cluster_friends`.`c_to` AS `partner` from `shortgal_colorfix`.`cluster_friends`) union all select `shortgal_colorfix`.`cluster_friends`.`c_to` AS `c`,`shortgal_colorfix`.`cluster_friends`.`c_from` AS `partner` from `shortgal_colorfix`.`cluster_friends`) `e` join `shortgal_colorfix`.`clusters` `clp` on((`clp`.`id` = `e`.`partner`))) group by `e`.`c`"
+    },
+    {
+      "TABLE_NAME": "v_friend_counts",
+      "VIEW_DEFINITION": "select `sw`.`hex6` AS `hex6`,`sw`.`name` AS `name`,`sw`.`hue_cats` AS `hue_cats`,`sw`.`neutral_cats` AS `neutral_cats`,`sw`.`hcl_h` AS `hcl_h`,`sw`.`hcl_c` AS `hcl_c`,`sw`.`hcl_l` AS `hcl_l`,`sw`.`brand` AS `brand`,count(distinct `f`.`friend_hex6`) AS `friends_count` from (`shortgal_colorfix`.`friends_union` `f` join `shortgal_colorfix`.`swatch_view` `sw` on((convert(`sw`.`hex6` using utf8mb4) = `f`.`key_hex6`))) where (`f`.`friend_hex6` <> `f`.`key_hex6`) group by `sw`.`hex6`,`sw`.`name`,`sw`.`hue_cats`,`sw`.`neutral_cats`"
+    },
+    {
+      "TABLE_NAME": "vw_gallery",
+      "VIEW_DEFINITION": "select `s`.`id` AS `id`,`s`.`name` AS `name`,`s`.`code` AS `code`,`s`.`brand` AS `brand`,`s`.`chip_num` AS `chip_num`,`s`.`r` AS `r`,`s`.`g` AS `g`,`s`.`b` AS `b`,`s`.`hex6` AS `hex6`,`s`.`hex` AS `hex`,`s`.`hcl_l` AS `hcl_l`,`s`.`hcl_c` AS `hcl_c`,`s`.`hcl_h` AS `hcl_h`,`s`.`brand_name` AS `brand_name`,`s`.`hue_cats` AS `hue_cats`,`s`.`hue_cat_order` AS `hue_cat_order`,`s`.`neutral_cats` AS `neutral_cats`,`s`.`is_stain` AS `is_stain`,`s`.`cluster_id` AS `cluster_id`,`s`.`light_cat_id` AS `light_cat_id`,`s`.`light_cat_name` AS `light_cat_name`,`s`.`light_cat_order` AS `light_cat_order`,`s`.`int_only` AS `int_only`,`p`.`photo_id` AS `photo_id`,`p`.`rel_path` AS `photo_url`,`p`.`palette_id` AS `photo_palette_id` from (`shortgal_colorfix`.`mv_swatch_view` `s` left join `shortgal_colorfix`.`vw_photo_palette_colors` `p` on((`p`.`color_id` = `s`.`id`)))"
+    },
+    {
+      "TABLE_NAME": "vw_master_mask_blend",
+      "VIEW_DEFINITION": "select `mbs`.`id` AS `id`,`mbs`.`id` AS `mask_blend_id`,`mbs`.`photo_id` AS `photo_id`,`mbs`.`asset_id` AS `asset_id`,`mbs`.`mask_role` AS `mask_role`,`mbs`.`color_id` AS `color_id`,`stats`.`l_avg01` AS `base_lightness`,`mbs`.`blend_mode` AS `blend_mode`,`mbs`.`blend_opacity` AS `blend_opacity`,`mbs`.`shadow_l_offset` AS `shadow_l_offset`,`mbs`.`shadow_tint_hex` AS `shadow_tint_hex`,`mbs`.`shadow_tint_opacity` AS `shadow_tint_opacity`,`mbs`.`is_preset` AS `is_preset`,`mbs`.`approved` AS `approved`,`mbs`.`notes` AS `notes`,`mbs`.`created_at` AS `created_at`,`mbs`.`updated_at` AS `updated_at`,`c`.`name` AS `color_name`,`c`.`brand` AS `color_brand`,`c`.`code` AS `color_code`,`c`.`hex6` AS `color_hex`,`c`.`hcl_l` AS `color_l`,`c`.`hcl_h` AS `color_h`,`c`.`hcl_c` AS `color_c`,`stats`.`l_avg01` AS `mask_base_lightness`,`pv`.`original_texture` AS `mask_original_texture` from ((((`shortgal_colorfix`.`mask_blend_settings` `mbs` left join `shortgal_colorfix`.`colors` `c` on((`c`.`id` = `mbs`.`color_id`))) left join `shortgal_colorfix`.`photos_mask_stats` `stats` on(((`stats`.`photo_id` = `mbs`.`photo_id`) and (`stats`.`role` = convert(`mbs`.`mask_role` using utf8mb4))))) left join (select `pv1`.`photo_id` AS `photo_id`,`pv1`.`role` AS `role`,max(`pv1`.`id`) AS `max_id` from `shortgal_colorfix`.`photos_variants` `pv1` where (`pv1`.`kind` like 'mask%') group by `pv1`.`photo_id`,`pv1`.`role`) `pv_idx` on(((`pv_idx`.`photo_id` = `mbs`.`photo_id`) and (`pv_idx`.`role` = convert(`mbs`.`mask_role` using utf8mb4))))) left join `shortgal_colorfix`.`photos_variants` `pv` on((`pv`.`id` = `pv_idx`.`max_id`)))"
+    },
+    {
+      "TABLE_NAME": "vw_photo_palette_colors",
+      "VIEW_DEFINITION": "select `p`.`photo_library_id` AS `photo_id`,`p`.`rel_path` AS `rel_path`,`p`.`title` AS `photo_title`,`p`.`tags` AS `photo_tags`,`p`.`palette_id` AS `palette_id`,`m`.`color_id` AS `color_id`,`c`.`name` AS `color_name`,`mv`.`hue_cats` AS `hue_cats`,`mv`.`neutral_cats` AS `neutral_cats`,`mv`.`lightness_cats` AS `lightness_cats`,`mv`.`chroma_cats` AS `chroma_cats` from (((`shortgal_colorfix`.`photo_library` `p` left join `shortgal_colorfix`.`saved_palette_members` `m` on((`m`.`saved_palette_id` = `p`.`palette_id`))) left join `shortgal_colorfix`.`colors` `c` on((`c`.`id` = `m`.`color_id`))) left join `shortgal_colorfix`.`mv_color_categories` `mv` on((`mv`.`color_id` = `m`.`color_id`)))"
+    },
+    {
+      "TABLE_NAME": "vw_scheme_mask_blend_settings",
+      "VIEW_DEFINITION": "select `s`.`id` AS `scheme_id`,`s`.`hoa_id` AS `hoa_id`,`s`.`scheme_code` AS `scheme_code`,`mm`.`asset_id` AS `asset_id`,`mm`.`mask_role` AS `mask_role`,`mm`.`scheme_role` AS `scheme_role`,`sc`.`id` AS `scheme_color_id`,`sc`.`color_id` AS `color_id`,`sc`.`allowed_roles` AS `allowed_roles`,`sc`.`notes` AS `scheme_color_notes`,`mbs`.`id` AS `mask_blend_id`,`mbs`.`photo_id` AS `photo_id`,`mbs`.`blend_mode` AS `blend_mode`,`mbs`.`blend_opacity` AS `blend_opacity`,`mbs`.`shadow_l_offset` AS `shadow_l_offset`,`mbs`.`shadow_tint_hex` AS `shadow_tint_hex`,`mbs`.`shadow_tint_opacity` AS `shadow_tint_opacity`,`mbs`.`approved` AS `approved`,`mbs`.`updated_at` AS `updated_at` from (((`shortgal_colorfix`.`hoa_schemes` `s` join `shortgal_colorfix`.`hoa_scheme_colors` `sc` on((`sc`.`scheme_id` = `s`.`id`))) join `shortgal_colorfix`.`hoa_scheme_mask_maps` `mm` on((`mm`.`scheme_id` = `s`.`id`))) left join `shortgal_colorfix`.`mask_blend_settings` `mbs` on(((convert(`mbs`.`asset_id` using utf8mb4) = `mm`.`asset_id`) and (convert(`mbs`.`mask_role` using utf8mb4) = `mm`.`mask_role`) and (`mbs`.`color_id` = `sc`.`color_id`)))) where ((`sc`.`allowed_roles` = 'any') or find_in_set(`mm`.`scheme_role`,`sc`.`allowed_roles`))"
+    }
+  ],
+  "protected_tables": [
+    {
+      "TABLE_NAME": "palette_viewers"
+    },
+    {
+      "TABLE_NAME": "palette_viewer_photos"
+    },
+    {
+      "TABLE_NAME": "photos_artwork"
+    },
+    {
+      "TABLE_NAME": "photo_library"
+    },
+    {
+      "TABLE_NAME": "playlist_instance_sets"
+    },
+    {
+      "TABLE_NAME": "playlist_sets"
+    },
+    {
+      "TABLE_NAME": "project_palettes"
+    },
+    {
+      "TABLE_NAME": "project_photos"
+    },
+    {
+      "TABLE_NAME": "pub_asset_orders"
+    },
+    {
+      "TABLE_NAME": "pub_render_jobs"
+    },
+    {
+      "TABLE_NAME": "pub_video_jobs"
+    },
+    {
+      "TABLE_NAME": "saved_palettes"
+    }
+  ],
+  "palette133": {
+    "palette": [
+      {
+        "id": 133,
+        "nickname": "Old California",
+        "is_public": 1,
+        "palette_hash": "7cee02c16d41f2979261f18252ce5b5026dadab7fdf4b6bb967dedf36ab6e035"
+      }
+    ],
+    "cover": [
+      {
+        "playlist_item_id": 541,
+        "playlist_id": 43,
+        "order_index": 0,
+        "palette_hash": null,
+        "saved_palette_id": null,
+        "saved_palette_set_id": 157
+      }
+    ],
+    "adams_status": [
+      {
+        "playlist_id": 43,
+        "is_active": 0,
+        "is_public": 0,
+        "indexable": 1,
+        "is_retired": 0
+      }
+    ],
+    "operational_playlist_refs": [],
+    "viewers": [
+      {
+        "palette_viewer_id": 56,
+        "format": "public",
+        "is_active": 0
+      }
+    ],
+    "rex": [
+      {
+        "id": 64,
+        "resource_type": "palette_viewer",
+        "resource_id": 56,
+        "status": "active",
+        "locked": 0
+      }
+    ],
+    "other_reference_counts": {
+      "photo_library": 0,
+      "project_palettes": 0,
+      "project_photos": 0,
+      "article_sections": 0
+    },
+    "other_current_metadata_scan": {
+      "captured_at_pacific": "2026-11-08 10:55:14 PST",
+      "other_current_tables_scanned": 98,
+      "hash_or_explicit_palette_id_matches": [],
+      "errors": [],
+      "scope": "Operational IDs/hash fields checked separately; this scan checks the saved hash or explicit palette_id/saved_palette_id JSON in other current tables. Historical analytics/logs/migration maps and retired systems are not classified as current content.",
+      "account_cron_status": 0,
+      "account_cron_targets": [
+        [],
+        [
+          "schedule-clock.php"
+        ]
+      ]
+    }
+  },
+  "palette154_current": [
+    {
+      "palette_viewer_id": 74,
+      "saved_palette_id": 154,
+      "format": "public",
+      "is_active": 1
+    }
+  ],
+  "unmatched_active_legacy_content": [
+    {
+      "saved_palette_viewer_content_id": 62,
+      "saved_palette_id": 133,
+      "template_key": "full_palette"
+    },
+    {
+      "saved_palette_viewer_content_id": 131,
+      "saved_palette_id": 154,
+      "template_key": "concept"
+    }
+  ],
+  "legacy_photo_rows_without_library_record": [
+    {
+      "saved_palette_set_id": 6,
+      "photo_library_id": null,
+      "photo_type": "full"
+    },
+    {
+      "saved_palette_set_id": 7,
+      "photo_library_id": null,
+      "photo_type": "full"
+    },
+    {
+      "saved_palette_set_id": 8,
+      "photo_library_id": null,
+      "photo_type": "full"
+    },
+    {
+      "saved_palette_set_id": 9,
+      "photo_library_id": null,
+      "photo_type": "full"
+    },
+    {
+      "saved_palette_set_id": 10,
+      "photo_library_id": null,
+      "photo_type": "full"
+    }
+  ],
+  "legacy_main_disagreements": [
+    {
+      "saved_palette_set_id": 26,
+      "photo_library_id": 139,
+      "current_palette_id": null,
+      "legacy_palette_id": 30
+    },
+    {
+      "saved_palette_set_id": 27,
+      "photo_library_id": 159,
+      "current_palette_id": null,
+      "legacy_palette_id": 31
+    },
+    {
+      "saved_palette_set_id": 129,
+      "photo_library_id": 389,
+      "current_palette_id": null,
+      "legacy_palette_id": 71
+    },
+    {
+      "saved_palette_set_id": 130,
+      "photo_library_id": 391,
+      "current_palette_id": null,
+      "legacy_palette_id": 72
+    },
+    {
+      "saved_palette_set_id": 131,
+      "photo_library_id": 392,
+      "current_palette_id": null,
+      "legacy_palette_id": 70
+    },
+    {
+      "saved_palette_set_id": 132,
+      "photo_library_id": 393,
+      "current_palette_id": null,
+      "legacy_palette_id": 83
+    },
+    {
+      "saved_palette_set_id": 133,
+      "photo_library_id": 394,
+      "current_palette_id": null,
+      "legacy_palette_id": 73
+    }
+  ],
+  "playlist_items_columns": [
+    {
+      "Field": "ap_id",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "",
+      "Default": null,
+      "Extra": ""
+    },
+    {
+      "Field": "saved_palette_set_id",
+      "Type": "int(11)",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": null,
+      "Extra": ""
+    },
+    {
+      "Field": "saved_palette_id",
+      "Type": "bigint(20)",
+      "Null": "YES",
+      "Key": "MUL",
+      "Default": null,
+      "Extra": ""
+    }
+  ],
+  "events": [],
+  "legacy_host_audit": {
+    "render_project_roles": {
+      "count": 0,
+      "ddl": "CREATE TABLE `render_project_roles` (\n  `project_id` bigint(20) unsigned NOT NULL,\n  `role_id` int(10) unsigned NOT NULL,\n  `color_id` int(10) unsigned NOT NULL,\n  PRIMARY KEY (`project_id`,`role_id`),\n  KEY `role_id` (`role_id`),\n  CONSTRAINT `render_project_roles_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `render_projects` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,\n  CONSTRAINT `render_project_roles_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `master_roles` (`id`) ON UPDATE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    },
+    "captured_at_pacific": "2026-11-08 10:47:03 PST",
+    "deployed_legacy_code": [],
+    "scheduled_tasks": [
+      {
+        "contains_retired_name": false,
+        "known_current_schedule_clock": false
+      },
+      {
+        "contains_retired_name": false,
+        "known_current_schedule_clock": true
+      }
+    ],
+    "account_crontab_status": 0
+  },
+  "related_schema_names": [
+    {
+      "TABLE_NAME": "mask_blend_settings",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "master_role_masks",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "photos_mask_stats",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "photos_variants",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "render_project_masks",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "render_project_roles",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "render_projects",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_set_photos",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "saved_palette_sets",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "tester_colors",
+      "TABLE_TYPE": "BASE TABLE"
+    },
+    {
+      "TABLE_NAME": "vw_master_mask_blend",
+      "TABLE_TYPE": "VIEW"
+    },
+    {
+      "TABLE_NAME": "vw_scheme_mask_blend_settings",
+      "TABLE_TYPE": "VIEW"
+    }
+  ],
+  "account_cron_classification": {
+    "status": 0,
+    "environment_lines": 1,
+    "current_schedule_clock_jobs": 1,
+    "other_jobs": 0,
+    "retired_name_jobs": 0
+  }
+}

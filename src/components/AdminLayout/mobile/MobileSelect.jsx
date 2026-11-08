@@ -2,6 +2,7 @@ import useOverlayLifecycle from "../../../hooks/useOverlayLifecycle";
 import { useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "./MobileSelect.css";
+import { matchesAdminSearch, parseAdminSearch } from "../adminSearch";
 
 /**
  * Generic touch-friendly record/option picker.
@@ -19,20 +20,33 @@ export default function MobileSelect({
   placeholder = "Choose…",
   disabled = false,
   className = "",
+  recordIdField = null,
+  searchValue,
+  onSearchChange,
 }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState("");
+  const search = searchValue ?? localSearch;
+  const setSearch = (next) => { setLocalSearch(next); onSearchChange?.(next); };
   const searchRef = useRef(null);
   const triggerRef = useRef(null);
   const titleId = useId();
 
   const selected = options.find((item) => String(item.value) === String(value));
   const filtered = useMemo(() => {
+    if (recordIdField) {
+      // Parent-controlled searches may include metadata unavailable in this picker.
+      if (onSearchChange && parseAdminSearch(search).type !== "id") return options;
+      return options.filter((item) => matchesAdminSearch(item, search, {
+        idField: recordIdField,
+        textFields: [(option) => `${option.label ?? ""} ${option.detail ?? ""}`],
+      }));
+    }
     const needle = search.trim().toLocaleLowerCase();
     return needle ? options.filter((item) =>
       `${item.label ?? ""} ${item.detail ?? ""}`.toLocaleLowerCase().includes(needle)
     ) : options;
-  }, [options, search]);
+  }, [options, search, recordIdField, onSearchChange]);
 
   const overlayRef = useOverlayLifecycle({
     open, layer: "picker", onEscape: () => { setOpen(false); setSearch(""); },

@@ -1,0 +1,4453 @@
+{
+  "inventory_captured": "2026-11-07 Pacific; historical reference snapshot, not authorization",
+  "approved_existing_asset_removal_paths": [],
+  "requires_fresh_scan_before_any_future_removal": true,
+  "inventory": {
+    "unavailable": [],
+    "legacy_directories": [
+      "/photos/exteriors/adobe/PHO_19XGNY",
+      "/photos/exteriors/cottage/PHO_1L6697",
+      "/photos/exteriors/ranch/PHO_1SQ529",
+      "/photos/exteriors/adobe/PHO_3OPAK0",
+      "/photos/exteriors/hoas/PHO_19YZIK",
+      "/photos/exteriors/late-modern/PHO_PW5F4C",
+      "/photos/exteriors/hoas/PHO_1ISO0U"
+    ],
+    "protected": [
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/textures/overlay.jpg",
+        "exists": true,
+        "bytes": 431301,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 63,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/bellyband.png",
+        "exists": true,
+        "bytes": 2398,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 64,
+            "kind": "masks",
+            "role": "bellyband"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/fascia.png",
+        "exists": true,
+        "bytes": 8775,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 65,
+            "kind": "masks",
+            "role": "fascia"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/frontdoor.png",
+        "exists": true,
+        "bytes": 3951,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 66,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/garage.png",
+        "exists": true,
+        "bytes": 14897,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 67,
+            "kind": "masks",
+            "role": "garage"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/garagetrim.png",
+        "exists": true,
+        "bytes": 5055,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 68,
+            "kind": "masks",
+            "role": "garagetrim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/shutters.png",
+        "exists": true,
+        "bytes": 3968,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 69,
+            "kind": "masks",
+            "role": "shutters"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/stucco.png",
+        "exists": true,
+        "bytes": 69932,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 70,
+            "kind": "masks",
+            "role": "stucco"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/masks/windowtrim.png",
+        "exists": true,
+        "bytes": 10802,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 71,
+            "kind": "masks",
+            "role": "windowtrim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 72,
+            "kind": "prepared_base",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/textures/overlay.png",
+        "exists": true,
+        "bytes": 1399938,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 73,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/masks/body.png",
+        "exists": true,
+        "bytes": 65314,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 74,
+            "kind": "masks",
+            "role": "body"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/masks/frontdoor.png",
+        "exists": true,
+        "bytes": 17823,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 75,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/masks/gutter.png",
+        "exists": true,
+        "bytes": 7776,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 76,
+            "kind": "masks",
+            "role": "gutter"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/masks/shutters.png",
+        "exists": true,
+        "bytes": 31508,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 77,
+            "kind": "masks",
+            "role": "shutters"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/masks/trim.png",
+        "exists": true,
+        "bytes": 75557,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 78,
+            "kind": "masks",
+            "role": "trim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/textures/overlay.jpg",
+        "exists": true,
+        "bytes": 291891,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 94,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/masks/frontdoor.png",
+        "exists": true,
+        "bytes": 2654,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 95,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/masks/shutters.png",
+        "exists": true,
+        "bytes": 2035,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 96,
+            "kind": "masks",
+            "role": "shutters"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/masks/stucco.png",
+        "exists": true,
+        "bytes": 8292,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 97,
+            "kind": "masks",
+            "role": "stucco"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/masks/trim.png",
+        "exists": true,
+        "bytes": 8415,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 98,
+            "kind": "masks",
+            "role": "trim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_3OPAK0/prepared/base.jpg",
+        "exists": true,
+        "bytes": 700992,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 100,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_3OPAK0/textures/overlay.jpg",
+        "exists": true,
+        "bytes": 625108,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 101,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_3OPAK0/masks/stucco.png",
+        "exists": true,
+        "bytes": 22922,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 102,
+            "kind": "masks",
+            "role": "stucco"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_3OPAK0/masks/trim.png",
+        "exists": true,
+        "bytes": 32046,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 103,
+            "kind": "masks",
+            "role": "trim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_3OPAK0/masks/frontdoor.png",
+        "exists": true,
+        "bytes": 4523,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 104,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 108,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/textures/overlay.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 109,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/bellyband.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 110,
+            "kind": "masks",
+            "role": "bellyband"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/fascia.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 111,
+            "kind": "masks",
+            "role": "fascia"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/frontdoor.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 112,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/frontdoortrim.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 113,
+            "kind": "masks",
+            "role": "frontdoortrim"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/garage.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 114,
+            "kind": "masks",
+            "role": "garage"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/garagetrim.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 115,
+            "kind": "masks",
+            "role": "garagetrim"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/porchlintel.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 116,
+            "kind": "masks",
+            "role": "porchlintel"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/shutters.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 118,
+            "kind": "masks",
+            "role": "shutters"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/siding.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 119,
+            "kind": "masks",
+            "role": "siding"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/trim.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 121,
+            "kind": "masks",
+            "role": "trim"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/windowtrim.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 122,
+            "kind": "masks",
+            "role": "windowtrim"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 123,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/textures/overlay.jpg",
+        "exists": true,
+        "bytes": 182604,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 124,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/fascia.png",
+        "exists": true,
+        "bytes": 6260,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 125,
+            "kind": "masks",
+            "role": "fascia"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/frontdoor.png",
+        "exists": true,
+        "bytes": 2490,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 126,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/frontdoortrim.png",
+        "exists": true,
+        "bytes": 1787,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 127,
+            "kind": "masks",
+            "role": "frontdoortrim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/garage.png",
+        "exists": true,
+        "bytes": 4496,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 128,
+            "kind": "masks",
+            "role": "garage"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/garagetrim.png",
+        "exists": true,
+        "bytes": 5952,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 129,
+            "kind": "masks",
+            "role": "garagetrim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/popout.png",
+        "exists": true,
+        "bytes": 2797,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 130,
+            "kind": "masks",
+            "role": "popout"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/porchbeam.png",
+        "exists": true,
+        "bytes": 3583,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 131,
+            "kind": "masks",
+            "role": "porchbeam"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/siding.png",
+        "exists": true,
+        "bytes": 4471,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 132,
+            "kind": "masks",
+            "role": "siding"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/stucco.png",
+        "exists": true,
+        "bytes": 8943,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 133,
+            "kind": "masks",
+            "role": "stucco"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/masks/windowtrim.png",
+        "exists": true,
+        "bytes": 4346,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 134,
+            "kind": "masks",
+            "role": "windowtrim"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/late-modern/PHO_PW5F4C/extras/before.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 135,
+            "kind": "extras",
+            "role": "before"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_19YZIK/masks/body.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 136,
+            "kind": "masks",
+            "role": "body"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/textures/overlay.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 138,
+            "kind": "texture",
+            "role": ""
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/fascia.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 139,
+            "kind": "masks",
+            "role": "fascia"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/frontdoor.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 140,
+            "kind": "masks",
+            "role": "frontdoor"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/gables.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 141,
+            "kind": "masks",
+            "role": "gables"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/garage.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 142,
+            "kind": "masks",
+            "role": "garage"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/postshaft.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 143,
+            "kind": "masks",
+            "role": "postshaft"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/railing.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 144,
+            "kind": "masks",
+            "role": "railing"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/siding.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 145,
+            "kind": "masks",
+            "role": "siding"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/stonecap.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 146,
+            "kind": "masks",
+            "role": "stonecap"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/stringbeam.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 147,
+            "kind": "masks",
+            "role": "stringbeam"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/stucco.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 148,
+            "kind": "masks",
+            "role": "stucco"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/trim.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 149,
+            "kind": "masks",
+            "role": "trim"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/masks/porch-stucco.png",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 150,
+            "kind": "masks",
+            "role": "porch-stucco"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/9/sp_9_95a781f9fac8.png",
+        "exists": true,
+        "bytes": 2037606,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/11/sp_11_53bd2cd2e617.png",
+        "exists": true,
+        "bytes": 2314873,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "palette_viewer_photos.rel_path",
+          "playlist_items.image_url",
+          "palette_viewer_photos.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_43_986df3f2a316.jpg",
+        "exists": true,
+        "bytes": 607682,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_44_192e3b8d6340.jpg",
+        "exists": true,
+        "bytes": 592126,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_54_2d2a3ba0986e.jpg",
+        "exists": true,
+        "bytes": 612464,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/prepared/base_b5d2e3ad1592.jpg",
+        "exists": true,
+        "bytes": 602769,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_render_jobs.props_json (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/28/sp_28_db6df2b12c99.jpg",
+        "exists": true,
+        "bytes": 419197,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_alt_text_jobs.last_error (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/29/sp_29_40490495c045.jpg",
+        "exists": true,
+        "bytes": 416646,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-8-babette-hurley/client_client-8-babette-hurley_580948dd12c7.jpg",
+        "exists": true,
+        "bytes": 435908,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "palette_viewer_photos.rel_path",
+          "playlist_items.image_url",
+          "palette_viewer_photos.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_37_7a892c16555d.jpg",
+        "exists": true,
+        "bytes": 608276,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_render_jobs.props_json (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_53_f4f61ede12a8.jpg",
+        "exists": true,
+        "bytes": 596471,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/108/sp_108_be649f400e5d.jpg",
+        "exists": true,
+        "bytes": 635751,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-22-gomez-steve-kathy/client_client-22-gomez-steve-kathy_cca8b6d4a878.jpg",
+        "exists": true,
+        "bytes": 637752,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/30/sp_30_2ade37824ad9.jpg",
+        "exists": true,
+        "bytes": 412782,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/27/sp_27_09e57905fcc8.jpg",
+        "exists": true,
+        "bytes": 287199,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/27/sp_27_bdbb81bd4143.jpg",
+        "exists": true,
+        "bytes": 539120,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/8/sp_8_9723d8b82683.jpg",
+        "exists": true,
+        "bytes": 456121,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/12/sp_12_ac7c402a425e.jpg",
+        "exists": true,
+        "bytes": 178820,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/13/sp_13_fe3f2460c224.jpg",
+        "exists": true,
+        "bytes": 182608,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/14/sp_14_53dbf976776a.jpg",
+        "exists": true,
+        "bytes": 181736,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/24/sp_24_10a4e51ffe34.jpg",
+        "exists": true,
+        "bytes": 231464,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-8-babette-hurley/client_client-8-babette-hurley_9c66053efa8a.jpg",
+        "exists": true,
+        "bytes": 419340,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "palette_viewer_photos.rel_path",
+          "playlist_items.image_url",
+          "palette_viewer_photos.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_38_4b5a8b70e49c.jpg",
+        "exists": true,
+        "bytes": 612593,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/71/sp_71_6dda89ae7ede.jpg",
+        "exists": true,
+        "bytes": 988099,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_8e8d6c7211a1.jpg",
+        "exists": true,
+        "bytes": 1005087,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_e67679ad65ba.jpg",
+        "exists": true,
+        "bytes": 977729,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_b654e96bf1a9.jpg",
+        "exists": true,
+        "bytes": 981695,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_11a3adbf54ab.jpg",
+        "exists": true,
+        "bytes": 964506,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_c2ec3e4d95fc.jpg",
+        "exists": true,
+        "bytes": 984786,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_bc34b0d087be.jpg",
+        "exists": true,
+        "bytes": 976574,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-23-alex-paredes/client_client-23-alex-paredes_bf4aed42d6b2.jpg",
+        "exists": true,
+        "bytes": 985987,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/8/sp_8_32123924984f.jpg",
+        "exists": true,
+        "bytes": 501687,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/8/sp_8_bd1fd831b44e.jpg",
+        "exists": true,
+        "bytes": 75662,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_39_e2d88fcd187b.jpg",
+        "exists": true,
+        "bytes": 604521,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.metadata_json",
+          "pub_video_jobs.props_json",
+          "asset_library.metadata_json (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/16/sp_16_7fb22b62b8c1.jpg",
+        "exists": true,
+        "bytes": 355022,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_2663bb8de3a1.jpg",
+        "exists": true,
+        "bytes": 386337,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/7/sp_7_c1ae1abadd3c.jpg",
+        "exists": true,
+        "bytes": 510897,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/7/sp_7_c364dfe198e4.jpg",
+        "exists": true,
+        "bytes": 470491,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/7/sp_7_55b2dfcdd35e.jpg",
+        "exists": true,
+        "bytes": 520739,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_1790a4bf92cf.jpg",
+        "exists": true,
+        "bytes": 156958,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/15/sp_15_5ff6e03fb3b9.jpg",
+        "exists": true,
+        "bytes": 570109,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/23/sp_23_95629b86a3ad.jpg",
+        "exists": true,
+        "bytes": 277946,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_9fa45de49d39.jpg",
+        "exists": true,
+        "bytes": 303086,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/23/sp_23_a56534a49dd7.jpg",
+        "exists": true,
+        "bytes": 348352,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/26/sp_26_882497053ae8.jpg",
+        "exists": true,
+        "bytes": 403513,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/26/sp_26_7adc9358d7bc.jpg",
+        "exists": true,
+        "bytes": 628873,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/24/sp_24_96d4a31c043e.jpg",
+        "exists": true,
+        "bytes": 693001,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/25/sp_25_30ea43a17491.jpg",
+        "exists": true,
+        "bytes": 277826,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/25/sp_25_47791ad5b5f9.jpg",
+        "exists": true,
+        "bytes": 579854,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/17/sp_17_d7d9c6df27d7.jpg",
+        "exists": true,
+        "bytes": 413954,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_bab9f5961b19.jpg",
+        "exists": true,
+        "bytes": 421233,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/6/sp_6_2f92519056bf.jpg",
+        "exists": true,
+        "bytes": 227692,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_083880fc4907.jpg",
+        "exists": true,
+        "bytes": 241717,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/20260312/progression_20260312_0fe36b2addda.jpg",
+        "exists": true,
+        "bytes": 1214628,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/6/sp_6_c793abcd3fca.jpg",
+        "exists": true,
+        "bytes": 1054597,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/2/sp_2_e2ea36f66ba0.jpg",
+        "exists": true,
+        "bytes": 225047,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/2/sp_2_9fedd503a379.jpg",
+        "exists": true,
+        "bytes": 229160,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/19/sp_19_04240418fc69.jpg",
+        "exists": true,
+        "bytes": 346371,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/19/sp_19_c28be179b60d.jpg",
+        "exists": true,
+        "bytes": 381596,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/eye-go/progression_eye-go_1333a6a03499.jpg",
+        "exists": true,
+        "bytes": 711186,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/progressions/eye-go/progression_eye-go_fd103d587a99.jpg",
+        "exists": true,
+        "bytes": 711933,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-26-borden-john-yvonne/client_client-26-borden-john-yvonne_6b810032bfbc.jpg",
+        "exists": true,
+        "bytes": 480029,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-26-borden-john-yvonne/client_client-26-borden-john-yvonne_5dad05e54c22.jpg",
+        "exists": true,
+        "bytes": 532679,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/113/sp_113_5d202fbbeb03.jpg",
+        "exists": true,
+        "bytes": 691358,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_8678eaea6539.jpg",
+        "exists": true,
+        "bytes": 692313,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_96efc1e8b0ec.jpg",
+        "exists": true,
+        "bytes": 329205,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-27-lynn-mark-silva/client_client-27-lynn-mark-silva_a742d283c81c.jpg",
+        "exists": true,
+        "bytes": 377436,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-28-may-majid/client_client-28-may-majid_2f8f973a9660.jpg",
+        "exists": true,
+        "bytes": 1028652,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-28-may-majid/client_client-28-may-majid_1c664d9ff96a.jpg",
+        "exists": true,
+        "bytes": 1222776,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/adobes/article_adobes_844a4aa9ac11.jpg",
+        "exists": true,
+        "bytes": 619279,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/adobes/article_adobes_2846c08dcb85.jpg",
+        "exists": true,
+        "bytes": 633711,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-31-wooten/client_client-31-wooten_1f35e528cc63.jpg",
+        "exists": true,
+        "bytes": 1764581,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-31-wooten/client_client-31-wooten_534ce16700f5.jpg",
+        "exists": true,
+        "bytes": 1864410,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-32-lorena-carrasco/client_client-32-lorena-carrasco_52c32633ad76.jpg",
+        "exists": true,
+        "bytes": 422373,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-32-lorena-carrasco/client_client-32-lorena-carrasco_f70eaea16267.jpg",
+        "exists": true,
+        "bytes": 379705,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-35-patricia-tim-geary/client_client-35-patricia-tim-geary_84a06bae4725.jpg",
+        "exists": true,
+        "bytes": 273727,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-30-robert-allison-beam/client_client-30-robert-allison-beam_2c07f52cc2e5.jpg",
+        "exists": true,
+        "bytes": 658977,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-36-renee-jessie/client_client-36-renee-jessie_8e101ec0270e.jpg",
+        "exists": true,
+        "bytes": 655784,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-36-renee-jessie/client_client-36-renee-jessie_ed37dd81f29a.jpg",
+        "exists": true,
+        "bytes": 676501,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-37-bea-al-smith/client_client-37-bea-al-smith_5cf8fc16b728.jpg",
+        "exists": true,
+        "bytes": 684251,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-37-bea-al-smith/client_client-37-bea-al-smith_9a5c418f2036.jpg",
+        "exists": true,
+        "bytes": 698251,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-38-shelly-sanabria/client_client-38-shelly-sanabria_2ead09439f8f.jpg",
+        "exists": true,
+        "bytes": 860291,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-38-shelly-sanabria/client_client-38-shelly-sanabria_40f1e9e2088e.jpg",
+        "exists": true,
+        "bytes": 906634,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-39-jennifer-art-poduska/client_client-39-jennifer-art-poduska_4e779c3af38c.jpg",
+        "exists": true,
+        "bytes": 693047,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-39-jennifer-art-poduska/client_client-39-jennifer-art-poduska_5e45b0793ccc.jpg",
+        "exists": true,
+        "bytes": 745821,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-40-marlene-nuria-lopez/client_client-40-marlene-nuria-lopez_b9f115d1dc1a.jpg",
+        "exists": true,
+        "bytes": 676649,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-40-marlene-nuria-lopez/client_client-40-marlene-nuria-lopez_bdf2a4e60da5.jpg",
+        "exists": true,
+        "bytes": 697920,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-41-carolina-michael-luna/client_client-41-carolina-michael-luna_1a21b6f4121d.jpg",
+        "exists": true,
+        "bytes": 496169,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-41-carolina-michael-luna/client_client-41-carolina-michael-luna_058e069c07fd.jpg",
+        "exists": true,
+        "bytes": 577404,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-42-amy-todd-mortenson/client_client-42-amy-todd-mortenson_77a805a387ba.jpg",
+        "exists": true,
+        "bytes": 981497,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-42-amy-todd-mortenson/client_client-42-amy-todd-mortenson_a659151a9a7a.jpg",
+        "exists": true,
+        "bytes": 1072157,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-42-amy-todd-mortenson/client_client-42-amy-todd-mortenson_cee74619a003.jpg",
+        "exists": true,
+        "bytes": 1863317,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-42-amy-todd-mortenson/client_client-42-amy-todd-mortenson_37e59b1a7e32.jpg",
+        "exists": true,
+        "bytes": 2027803,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-43-pureza-mayol/client_client-43-pureza-mayol_4ad4010f2bcf.jpg",
+        "exists": true,
+        "bytes": 665653,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-43-pureza-mayol/client_client-43-pureza-mayol_671474da9a0c.jpg",
+        "exists": true,
+        "bytes": 598486,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-43-pureza-mayol/client_client-43-pureza-mayol_683380d283aa.jpg",
+        "exists": true,
+        "bytes": 714300,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-43-pureza-mayol/client_client-43-pureza-mayol_565a35e99055.jpg",
+        "exists": true,
+        "bytes": 667061,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-44-helena-johnson/client_client-44-helena-johnson_6567fb326a68.jpg",
+        "exists": true,
+        "bytes": 561198,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-44-helena-johnson/client_client-44-helena-johnson_1a13983ac439.jpg",
+        "exists": true,
+        "bytes": 616782,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-44-helena-johnson/client_client-44-helena-johnson_3107bf994c1c.jpg",
+        "exists": true,
+        "bytes": 390025,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-44-helena-johnson/client_client-44-helena-johnson_00c702d0094d.jpg",
+        "exists": true,
+        "bytes": 341584,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-45-stephen-glenna-adams/client_client-45-stephen-glenna-adams_695cff2a66a4.jpg",
+        "exists": true,
+        "bytes": 587869,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          },
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-45-stephen-glenna-adams/client_client-45-stephen-glenna-adams_47dd5331ddcd.jpg",
+        "exists": true,
+        "bytes": 551230,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-45-stephen-glenna-adams/client_client-45-stephen-glenna-adams_2a054504b420.jpg",
+        "exists": true,
+        "bytes": 549059,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_2d9966a4a0a2.jpg",
+        "exists": true,
+        "bytes": 500834,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_41208d36f54b.jpg",
+        "exists": true,
+        "bytes": 377525,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_73bbcaabf93e.jpg",
+        "exists": true,
+        "bytes": 412432,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_fa1202640291.jpg",
+        "exists": true,
+        "bytes": 457642,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_61fe3280a09e.jpg",
+        "exists": true,
+        "bytes": 393953,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/mom/article_mom_62f6066b214a.jpg",
+        "exists": true,
+        "bytes": 458555,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/18/sp_18_936607c4d68f.jpg",
+        "exists": true,
+        "bytes": 147218,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/145/sp_145_2e3663dfa90f.jpg",
+        "exists": true,
+        "bytes": 293557,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-46-destiny-franco-lizarraga/client_client-46-destiny-franco-lizarraga_d3e37777087c.jpg",
+        "exists": true,
+        "bytes": 580756,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_930ddf1e351a.jpg",
+        "exists": true,
+        "bytes": 563204,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_5276e6675e68.jpg",
+        "exists": true,
+        "bytes": 323327,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_9f2ac3327a09.jpg",
+        "exists": true,
+        "bytes": 611588,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-47-george-megan-larkins/client_client-47-george-megan-larkins_891454d4bc13.jpg",
+        "exists": true,
+        "bytes": 824875,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-46-destiny-franco-lizarraga/client_client-46-destiny-franco-lizarraga_1e161107b947.jpg",
+        "exists": true,
+        "bytes": 604301,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/146/sp_146_656838dc3009.jpg",
+        "exists": true,
+        "bytes": 106669,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/clients/client-46-destiny-franco-lizarraga/client_client-46-destiny-franco-lizarraga_5db813544782.jpg",
+        "exists": true,
+        "bytes": 399690,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/garage/article_garage_6674209035db.jpg",
+        "exists": true,
+        "bytes": 761465,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_asset_orders.ingredients",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_asset_orders.ingredients (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/garage/article_garage_e7a30d4a6192.jpg",
+        "exists": true,
+        "bytes": 767344,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_asset_orders.ingredients",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_asset_orders.ingredients (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/green/article_green_3a9c6b677080.jpg",
+        "exists": true,
+        "bytes": 825829,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/ohn/article_ohn_9661ac2b302d.jpg",
+        "exists": true,
+        "bytes": 646525,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/ohn/article_ohn_4c5c90c216ac.jpg",
+        "exists": true,
+        "bytes": 692240,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/ohn/article_ohn_defcaa602244.jpg",
+        "exists": true,
+        "bytes": 963412,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/ohn/article_ohn_6ef8572410b1.jpg",
+        "exists": true,
+        "bytes": 967262,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/articles/ohn/article_ohn_e5df93a96064.jpg",
+        "exists": true,
+        "bytes": 988084,
+        "provenance": [
+          {
+            "table": "saved_palette_set_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/15/sp_15_417ddef166ff.jpg",
+        "exists": true,
+        "bytes": 150876,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "pub_video_jobs.props_json",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)",
+          "playlist_items.image_url (text reference)",
+          "pub_video_jobs.props_json (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/24/sp_24_837dfef47c7e.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/prepared/base_5c6cc044ce78.jpg",
+        "exists": true,
+        "bytes": 1026177,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_38_c7605d015b7d.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_39.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "playlist_instance_set_items.photo_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_43.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_44.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_45.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_46.jpg",
+        "exists": true,
+        "bytes": 491003,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "generator": "retired-ap-renderer"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_47.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_48.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_49.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_50.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_51.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_52.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_53.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_54.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_55.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_56.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_57.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_58.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_59.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_60.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_61.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_62.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_63.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_64.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_65.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_66.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_67.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_68.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_69.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_70.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_71.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_72.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_73.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_74.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_75.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_76.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/rendered/ap_77.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/29/sp_29_c50521a44340.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/30/sp_30_f82e6e3974ab.jpg",
+        "exists": true,
+        "bytes": 410982,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "playlist_items.image_url",
+          "photo_library.rel_path (text reference)",
+          "playlist_items.image_url (text reference)"
+        ]
+      },
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/textures/overlay.png",
+        "exists": true,
+        "bytes": 1208070,
+        "provenance": [
+          {
+            "directory": "/photos/exteriors/adobe/PHO_19XGNY",
+            "origin": "retired asset tree"
+          }
+        ],
+        "references": [
+          "photo_library.rel_path",
+          "asset_library.rel_path",
+          "asset_library.rel_path (text reference)",
+          "photo_library.rel_path (text reference)"
+        ]
+      }
+    ],
+    "candidates": [
+      {
+        "path": "/photos/exteriors/adobe/PHO_19XGNY/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 62,
+            "kind": "prepared_base",
+            "role": ""
+          },
+          {
+            "table": "photos_variants",
+            "id": 105,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/exteriors/ranch/PHO_1SQ529/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 93,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/exteriors/hoas/PHO_1ISO0U/prepared/base.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "photos_variants",
+            "id": 137,
+            "kind": "prepared",
+            "role": ""
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          },
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/18/sp_18_ad7c70dd4436.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/25/sp_25_1d935c4de39e.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/progressions/befores/progression_befores_b8ccf7c8d4e4.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/uploads/saved-palettes/2/sp_2_4be5835244cd.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/exteriors/cottage/PHO_1L6697/prepared/base_f52bfc8446ea.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      },
+      {
+        "path": "/photos/rendered/ap_37_8c71f6f0e7eb.jpg",
+        "exists": false,
+        "bytes": null,
+        "provenance": [
+          {
+            "table": "saved_palette_photos"
+          }
+        ],
+        "status": "candidate only; recheck code, references and backups after approved database retirement"
+      }
+    ],
+    "retired_sql_query_ids": [],
+    "retired_navigation_items": [],
+    "scheduled_scripts": [
+      "schedule-clock.php"
+    ],
+    "summary": {
+      "legacy_paths": 246,
+      "protected": 237,
+      "candidate_paths": 9,
+      "existing_candidates": 0
+    }
+  }
+}

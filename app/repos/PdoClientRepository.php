@@ -29,13 +29,15 @@ class PdoClientRepository
         }
 
         $like = '%' . $query . '%';
+        $isId = preg_match('/^#?([0-9]+)$/D', $query, $match) === 1;
+        $where = $isId
+            ? 'clients.id = :id'
+            : '(clients.name LIKE :query_name OR clients.email LIKE :query_email OR clients.phone LIKE :query_phone)';
         $stmt = $this->pdo->prepare($this->listSql() . "
-              WHERE clients.name LIKE :query_name
-                 OR clients.email LIKE :query_email
-                 OR clients.phone LIKE :query_phone
+              WHERE {$where}
               ORDER BY clients.last_name ASC, clients.first_name ASC, clients.id ASC
               LIMIT {$limit}");
-        $stmt->execute([
+        $stmt->execute($isId ? [':id' => $match[1]] : [
             ':query_name' => $like,
             ':query_email' => $like,
             ':query_phone' => $like,

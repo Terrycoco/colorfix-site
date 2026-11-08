@@ -233,10 +233,19 @@ class PaletteViewerService
         $paletteViewerKey = $this->normalizePaletteViewerKey($paletteViewerKey);
         if ($full && $this->paletteViewerRepo) {
             $format = $paletteViewerKey === 'full_palette' ? 'public' : $paletteViewerKey;
+            $inactiveViewerId = null;
             foreach ($this->paletteViewerRepo->findBySavedPaletteId((int)$full['palette']['id']) as $viewer) {
-                if ($viewer->isActive && $viewer->format === $format) {
+                if ($viewer->format !== $format) {
+                    continue;
+                }
+                if ($viewer->isActive) {
                     return $this->getCanonicalById($viewer->paletteViewerId);
                 }
+                $inactiveViewerId = $viewer->paletteViewerId;
+            }
+            // A fallback must not bypass an explicitly disabled current viewer.
+            if ($inactiveViewerId !== null) {
+                throw new RuntimeException("Palette Viewer {$inactiveViewerId} is inactive");
             }
         }
         if ($paletteViewerKey === 'none') {

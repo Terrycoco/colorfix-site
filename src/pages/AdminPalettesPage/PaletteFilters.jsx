@@ -1,3 +1,5 @@
+import AdminSearchField from "@components/AdminLayout/AdminSearchField";
+
 const FAMILY_OPTIONS = [
   ["", "All Families"],
   ["white", "Whites"],
@@ -37,11 +39,10 @@ export default function PaletteFilters({
 
   return (
     <div className="admin-palette-filters">
-      <input
+      <AdminSearchField
         className="admin-palette-filters__search"
-        type="search"
         value={query}
-        onChange={(event) => onQueryChange(event.target.value)}
+        onChange={onQueryChange}
         placeholder="Find palette by name or ID…"
         aria-label="Find palette by name or ID"
       />

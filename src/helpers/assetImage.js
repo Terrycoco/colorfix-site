@@ -114,5 +114,3 @@ export function parsePhotoRef(value) {
   const url = rest.slice(splitAt + 1).trim();
   return { photoId, url };
 }
-
-

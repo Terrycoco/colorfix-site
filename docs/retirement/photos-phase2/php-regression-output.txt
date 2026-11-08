@@ -1,0 +1,72 @@
+PASS: all saved playlists; read-only catalogue; standard/custom/empty creation; repeat/existing token reuse; revoked protection; flags/slides unchanged; lock SQL and transaction ownership.
+PASS photo replacement preserves identity and project settings, refreshes references and deletes superseded bytes
+PASS replacement failure preserves the original photo and rolls back references
+PASS a separate library photo sharing the original file is not damaged
+PASS photo delete guard checks disabled Project Photos and current shared client, concept and painter PVs
+PASS photo delete guard catches playlist IDs, encoded references, paths, heroes and current set covers
+PASS photo delete guard catches direct PV links and cached legacy paths without filtering inactive viewers
+PASS photo delete guard preserves saved palette, instance, group and article checks and fails closed on query errors
+PASS unused deletion commits before deleting bytes
+PASS each supported dependency blocks deletion including disabled references and artwork cascade
+PASS bulk uses single deletion safety with mixed artwork and eligible records
+PASS shared physical files survive row deletion for path variants, asset records and symlink aliases
+PASS merge reassigns project, PV, playlist, artwork, articles, compatibility and asset metadata references atomically
+PASS conflicting palettes, artwork, projects, assets and client contexts reject merge without overwriting
+PASS merge transfers a sole direct palette association without changing gallery or PV roles
+PASS failed row deletion and failed merge roll back and leave files untouched
+PASS nested transactions cannot unlink and merge savepoints preserve caller work on failure
+PASS filesystem failure retains bytes and reports committed deletion rather than pretending rollback
+PASS missing core dependency tables fail closed and retain photograph
+PASS candidate detection is read only and dedupe retains retired rows and physical files
+PASS dedupe reports association conflicts and compatibility methods use PHOTOS safety
+PASS palette cleanup preserves independent Art photos and in-use legacy photos with an explanation
+PASS root asset metadata and source IDs are protected and transferred during merge
+PASS PUB production inputs protect deletion and reject unsafe reauthoring through merge
+PASS PUB and ASSETS disposal guards preserve Photo Library bytes
+PASS file disposal catches PV symlink aliases and refuses traversal and external URLs
+PASS saved palette deletion delegates cleanup after commit and rollback never removes photos
+PASS project photos share selections across PV formats while painter excludes before photos
+PASS invalid project photos and stale revisions cannot overwrite a saved collection
+PASS existing PV and playlist photos stage once without changing published sources
+PASS ambiguous shared palettes do not inherit another projects photos
+PASS every PV format follows FINAL and Use live without restoring legacy photos
+PASS project viewers with unavailable selections never restore legacy images while standalone public viewers keep their source
+PASS old project viewers linked through a playlist or REX remain subject to Use instead of becoming standalone
+PASS project save writes Library palettes and independent Before rooms after the old column is dropped
+PASS Library palette changes update project PVs and invalidate stale project saves
+PASS Before photos reject Library palette links and stale Library edits cannot overwrite newer links
+PASS See where used reads Library palettes and Gallery independently of project Use
+PASS room assignment works before the Library palette migration and Before photos need no palette
+PASS photo palette backfill ignores obsolete sets but retains real conflict guards
+PASS project photos include all playlist photos without palette assignments and deduplicate
+PASS playlist additions remain listed after saving while saved tags and viewer selections persist
+PASS painter REX preview describes all selected rooms without a single saved palette
+PASS painter REX resolves a standalone viewer with ordered room specifications
+PASS REX keeps single palette client and painter previews working
+PASS standalone public PV keeps its own photos while project PV cannot restore them without Use selections
+PASS painter editor uses only checked project photos, not raw playlist images
+PASS painter REX preview rejects inactive viewers and empty room selections
+PASS painter room photos use the shared project roles and order without before images
+PASS painter PV automatically follows all FINAL rooms without manual viewer selections
+PASS PV duplicate titles are blocked within an experience and project but copies and other experiences are allowed
+PASS a copied PV creates a new identity with preserved fields and shared palette
+PASS PV deletion removes its REX and presentation rows without deleting project photos or palettes
+PASS locked PV REX prevents deletion and leaves its data intact
+PASS palette membership check does not require swatch_view or color details
+PASS client thumbnails include each client palette once and exclude painter and concept viewers
+PASS client thumbnail REX renders current PV data without falling back
+PASS concept thumbnail REX renders current PV data without falling back
+PASS public thumbnail REX renders current PV data without falling back
+PASS project client sync uses FINAL palettes instead of old concept slide palettes
+PASS set memberships retain independent experiences and defaults through reordering
+PASS invalid experience is rejected before deleting existing membership
+PASS saved palette reads main photograph without any retired tables and keeps current PV metadata
+PASS hash viewer obeys current project selections and never restores retired/raw photographs
+PASS saved palette fallback cannot bypass an inactive current viewer
+PASS current lifecycle works after retired tables are absent and retains artwork protections
+PASS retired relationship rows are protected until separately approved database cleanup
+PASS replacement ignores old source IDs and preserves raw PV path references
+PASS explicit main replacement changes only direct associations and preserves all photographs and Gallery flags
+PASS main replacement rolls back both associations if unlinking the previous main fails
+PASS current Playlist Instance Set raw URLs and retained PUB render inputs protect their images
+70 tests, 0 failures

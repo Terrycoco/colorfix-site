@@ -21,6 +21,7 @@ import PaletteFilters from "./PaletteFilters";
 import PaletteList from "./PaletteList";
 import PalettePhotosDrawer from "./PalettePhotosDrawer";
 import "./admin-palettes.css";
+import { matchesAdminSearch, parseAdminSearch } from "@components/AdminLayout/adminSearch";
 
 const NEUTRAL_FAMILIES = new Set([
   "white",
@@ -154,7 +155,7 @@ function paletteMatchesQuery(
     .filter(Boolean)
     .join(" ");
 
-  return haystack.includes(needle);
+  return matchesAdminSearch(palette, query, { textFields: [() => haystack] });
 }
 
 async function readJson(
@@ -269,8 +270,8 @@ export default function AdminPalettesPage() {
   const photosRef = useRef(null);
 
   const [query, setQuery] = useState("");
-  const idMatch = cleanText(query).match(/^#?([0-9]+)$/);
-  const lookupId = idMatch ? idMatch[1].replace(/^0+(?=[0-9])/, "") : "";
+  const parsedSearch = parseAdminSearch(query);
+  const lookupId = parsedSearch.type === "id" ? parsedSearch.value : "";
   const [idLookup, setIdLookup] = useState({ id: "", items: [], error: "", loading: false });
 
   useEffect(() => {

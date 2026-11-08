@@ -438,9 +438,9 @@ export default function PhotoPickerDialog({
         ||
         "",
 
-      
 
-      
+
+
 
       attached_saved_palette_photo_type:
         item.attached_saved_palette_photo_type

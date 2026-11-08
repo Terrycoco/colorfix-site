@@ -1,3 +1,4 @@
+import { filterAdminRecords } from "@components/AdminLayout/adminSearch";
 import {
 
   useCallback,
@@ -139,16 +140,6 @@ export default function AdminPlaylistsPage() {
     setQuery,
 
   ] = useState("");
-
-
-
-  const [
-
-    sortMode,
-
-    setSortMode,
-
-  ] = useState("title");
 
 
 
@@ -338,85 +329,17 @@ export default function AdminPlaylistsPage() {
 
       () => {
 
-        const needle =
-
-          query
-
-            .trim()
-
-            .toLowerCase();
-
-
-
-        const matchingActivity = playlists.filter(
-          (row) => (Number(row.is_active) !== 0) === (activityFilter === "active")
-        );
-
-        const rows =
-
-          needle
-
-            ? matchingActivity.filter(
-
-                (row) => {
-
-                  const title =
-
-                    String(
-
-                      row?.title ||
-
-                      ""
-
-                    )
-
-                      .toLowerCase();
-
-
-
-                  const id =
-
-                    String(
-
-                      row
-
-                        ?.playlist_id ||
-
-                      ""
-
-                    );
-
-
-
-                  return (
-
-                    title.includes(
-
-                      needle
-
-                    )
-
-                    ||
-
-                    id.includes(
-
-                      needle
-
-                    )
-
-                  );
-
-                }
-
-              )
-
-            : [
-
-                ...matchingActivity,
-
-              ];
-
-
+        // A search covers active AND inactive playlists.
+        // With no query, retain the selected activity filter.
+        const source = query.trim()
+          ? playlists
+          : playlists.filter(
+              (row) => (Number(row.is_active) !== 0) === (activityFilter === "active")
+            );
+        const rows = filterAdminRecords(source, query, {
+          idField: "playlist_id",
+          textFields: ["title"],
+        });
 
         rows.sort(
 
@@ -427,40 +350,6 @@ export default function AdminPlaylistsPage() {
             b
 
           ) => {
-
-            if (
-
-              sortMode ===
-
-              "id"
-
-            ) {
-
-              return (
-
-                Number(
-
-                  b?.playlist_id ||
-
-                  0
-
-                )
-
-                -
-
-                Number(
-
-                  a?.playlist_id ||
-
-                  0
-
-                )
-
-              );
-
-            }
-
-
 
             return String(
 
@@ -498,7 +387,6 @@ export default function AdminPlaylistsPage() {
 
         query,
 
-        sortMode,
 
       ]
 
@@ -846,52 +734,6 @@ export default function AdminPlaylistsPage() {
 
 
 
-          sortValue={
-
-            sortMode
-
-          }
-
-
-
-          onSortChange={
-
-            setSortMode
-
-          }
-
-
-
-          sortOptions={[
-
-            {
-
-              value:
-
-                "title",
-
-              label:
-
-                "Title",
-
-            },
-
-            {
-
-              value:
-
-                "id",
-
-              label:
-
-                "ID",
-
-            },
-
-          ]}
-
-
-
           actions={
 <AdminButton
 
@@ -953,7 +795,7 @@ export default function AdminPlaylistsPage() {
           {!listLoading && !listError && visiblePlaylists.length === 0 && (
             <AdminEmptyState
               title="Playlists"
-              message={`No ${activityFilter} playlists${query.trim() ? " match your search" : ""}.`}
+              message={query.trim() ? "No playlists match your search." : `No ${activityFilter} playlists.`}
             />
           )}
 

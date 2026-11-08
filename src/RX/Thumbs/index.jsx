@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import {
-  
-  
-  
+
+
+
   parsePhotoRef,
 } from "@helpers/assetImage";
 import { withSourceParam } from "@helpers/sourceParam";
@@ -15,9 +14,9 @@ export default function Thumbs({ collection }) {
   );
   const parentUrl = normalizeInternalRexPath(collection?.parent_url || "");
 
-  
 
-  
+
+
 
   if (!collection) {
     return (

@@ -13,10 +13,10 @@ CREATE TABLE saved_palette_members (id INTEGER,saved_palette_id INTEGER,color_id
 CREATE TABLE swatch_view (id INTEGER,name TEXT,brand TEXT,brand_name TEXT,code TEXT,hex6 TEXT,hcl_h REAL,hcl_c REAL,hcl_l REAL,int_only INTEGER,chip_num TEXT,cluster_id INTEGER,hue_cats TEXT,neutral_cats TEXT);
 CREATE TABLE palette_viewers (palette_viewer_id INTEGER,saved_palette_id INTEGER,is_active INTEGER,format TEXT);
 CREATE TABLE photo_library (photo_library_id INTEGER,palette_id INTEGER,is_inactive INTEGER,rel_path TEXT,tags TEXT,updated_at TEXT);
-INSERT INTO saved_palettes VALUES (133,'Hidden Cottage','Cottage Art','art',0,0,NULL,'2000-01-01',NULL), (1330,'Cottage 133','Exterior Cottage','exterior',1,1,NULL,'2026-01-01',NULL), (2,'Ocean Blue','Ocean','interior',1,1,NULL,'2026-01-02',NULL);");
+INSERT INTO saved_palettes VALUES (154,'Foothill Salmon Fix','Salmon','exterior',1,1,NULL,'2000-01-02',NULL), (133,'Hidden Cottage','Cottage Art','art',0,0,NULL,'2000-01-01',NULL), (1330,'Cottage 133','Exterior Cottage','exterior',1,1,NULL,'2026-01-01',NULL), (2,'Ocean Blue','Ocean','interior',1,1,NULL,'2026-01-02',NULL);");
 $before = $pdo->query('SELECT * FROM saved_palettes ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
 $service = new App\\PALETTES\\Services\\AdminPaletteListService($pdo);
-$out = ['list' => $service->list(1), 'all' => $service->list(500), '133' => $service->list(1, '133'), '13' => $service->list(1, '13'), '1330' => $service->list(1, '1330')];
+$out = ['list' => $service->list(1), 'all' => $service->list(500), '133' => $service->list(1, '133'), '154' => $service->list(1, '154'), '13' => $service->list(1, '13'), '1330' => $service->list(1, '1330')];
 if ($before !== $pdo->query('SELECT * FROM saved_palettes ORDER BY id')->fetchAll(PDO::FETCH_ASSOC)) throw new RuntimeException('Search modified palette data');
 try { $service->list(1, '133 OR 1=1'); throw new RuntimeException('Invalid ID accepted'); } catch (InvalidArgumentException $e) {}
 echo json_encode($out);
@@ -25,6 +25,7 @@ assert.equal(php.status, 0, php.stderr);
 const results = JSON.parse(php.stdout);
 assert.deepEqual(results.list.map(p => p.id), [2], 'Older palette is outside the limited inventory');
 assert.deepEqual(results['133'].map(p => p.id), [133]);
+assert.deepEqual(results['154'].map(p => p.id), [154]);
 assert.equal(results['133'][0].is_public, 0, 'Private inactive palette is found without publication');
 assert.deepEqual(results['13'], [], 'Partial ID must not match 133 or 1330');
 console.log('PASS PALETTES service: exact IDs, outside list limit, private/inactive lookup, invalid input, no data changes');
@@ -54,7 +55,7 @@ try {
       if (url.pathname.endsWith('/palettes/list.php')) {
         const id = url.searchParams.get('id');
         requests.push(id);
-        return route.fulfill({json: {ok: true, items: id === null ? results.all.filter(p => p.id !== 133) : results[id] || []}});
+        return route.fulfill({json: {ok: true, items: id === null ? results.all.filter(p => ![133,154].includes(p.id)) : results[id] || []}});
       }
       return route.fulfill({json: {ok: true, items: [], user: {is_admin: true}}});
     });
@@ -80,6 +81,10 @@ try {
     assert.match(await rows.first().innerText(), /Private/i);
     await search.fill('#133');
     await page.getByText('Hidden Cottage · #133', {exact: true}).waitFor();
+    await search.fill('154');
+    await page.getByText('Foothill Salmon Fix · #154', {exact: true}).waitFor();
+    await search.fill('#154');
+    await page.getByText('Foothill Salmon Fix · #154', {exact: true}).waitFor();
     await search.fill('13');
     await page.getByText('No palettes match those filters.', {exact: true}).waitFor();
     await search.fill('1330');
@@ -88,7 +93,7 @@ try {
     await search.fill('Ocean');
     await page.getByText('Ocean Blue · #2', {exact: true}).waitFor();
     assert.deepEqual(errors, []);
-    console.log(`PASS ${width}px editor: name, numeric/# ID, exact match, hidden record beyond inventory, filters bypassed for ID only, IDs displayed, name search restored`);
+    console.log(`PASS ${width}px editor: name, numeric/# ID, exact match, 133/154 beyond inventory, filters bypassed for ID only, IDs displayed, name search restored`);
     await context.close();
   }
 } finally {

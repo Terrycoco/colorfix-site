@@ -15,6 +15,9 @@ import FuzzySearchColorSelect from "@components/FuzzySearchColorSelect";
 import fetchColorDetail from "@data/fetchColorDetail";
 import { API_FOLDER } from "@helpers/config";
 import { parsePhotoRef } from "@helpers/assetImage";
+
+import { SLIDE_TYPE_OPTIONS, slideTypeLabel } from "./slideTypes";
+
 const DEFAULT_HUE_WHEEL_CONFIG = {
   items: [
     { hue: 145, label: "Green", color: "#6F8F72", animate: false },
@@ -118,7 +121,7 @@ export default function PlaylistSlideEditor({
   function setProjectPalette(value) {
     const nextHash = String(value || "").trim();
     onUpdate("palette_hash", nextHash);
-    
+
   }
   const photoId = item?.photo_library_id || parsePhotoRef(item?.image_url || "")?.photoId || "";
   const hueConfig =
@@ -147,13 +150,17 @@ export default function PlaylistSlideEditor({
                   onUpdate("item_type", event.target.value)
                 }
               >
-                <option value="palette">palette</option>
-                <option value="intro">intro</option>
-                <option value="text">text</option>
-                <option value="hue-wheel">hue wheel</option>
-                <option value="brand-bumper">brand bumper</option>
-                <option value="cover-image">cover image</option>
-                <option value="non-palette">no palette</option>
+                {SLIDE_TYPE_OPTIONS.map((option) => (
+                  <option
+                    key={option.value}
+                    value={option.value === "palette" && item.item_type === "normal" ? "normal" : option.value}
+                  >
+                    {option.label}
+                  </option>
+                ))}
+                {item.item_type && item.item_type !== "normal" && !SLIDE_TYPE_OPTIONS.some((option) => option.value === item.item_type) && (
+                  <option value={item.item_type}>{slideTypeLabel(item.item_type)}</option>
+                )}
               </select>
             </AdminField>
             <AdminField label="Analyzer Role" compact>
@@ -490,7 +497,7 @@ export default function PlaylistSlideEditor({
                 <option value="animate">animate</option>
               </select>
             </AdminField>
-            
+
           </AdminToolbar>
           <AdminToolbar compact>
             <AdminCheckboxRow

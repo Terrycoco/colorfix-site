@@ -1,0 +1,62 @@
+{
+  "php_regression": {
+    "command": "php scripts/test-photo-lifecycle.php",
+    "passed": 70,
+    "failed": 0,
+    "production_database_used": false
+  },
+  "php_syntax": {
+    "deployment_and_test_php_files_checked": 70,
+    "failures": [],
+    "broader_scan": {
+      "files_checked": 1037,
+      "failures": [
+        {
+          "path": "api/update-hcl-rgb-lookup.php",
+          "error": "\nParse error: Unclosed '[' on line 39 in api/update-hcl-rgb-lookup.php on line 40\nErrors parsing api/update-hcl-rgb-lookup.php\nPHP Parse error:  Unclosed '[' on line 39 in api/update-hcl-rgb-lookup.php on line 40\n"
+        }
+      ]
+    },
+    "preexisting_parse_error_unchanged_from_head": true,
+    "preexisting_parse_error_unchanged_from_initial_phase2": true
+  },
+  "legacy_dependency_scan": {
+    "command": "node scripts/test-photo-retirement.mjs",
+    "result": "passed; API/CLI/root scans, current recipes/thumbnails and retired/current route checks"
+  },
+  "http_contracts": {
+    "command": "node scripts/test-photo-lifecycle-http.mjs",
+    "result": "passed; disposable SQLite/generated images/test auth"
+  },
+  "art_and_associations": {
+    "command": "node scripts/test-art-repertoire.mjs",
+    "result": "passed; multipart/API and 1280/390px browser fixtures"
+  },
+  "sas": {
+    "command": "node scripts/test-sas-playlists.mjs",
+    "result": "passed; 1280/390/320px, expected injected 503 retry cases"
+  },
+  "rex_loader": {
+    "command": "node scripts/test-rex-loader.mjs",
+    "result": "passed; local challenge/500/network/404/retry fixtures"
+  },
+  "main_build": {
+    "command": "npm run build",
+    "result": "passed"
+  },
+  "sas_build": {
+    "command": "npm run build:sas",
+    "result": "passed after main build"
+  },
+  "lint": {
+    "files": 27,
+    "errors": 27,
+    "introducedErrors": 0,
+    "introducedWarnings": 0
+  },
+  "production_mutations": false,
+  "deployed_this_session": false,
+  "post_deployment_apache_verified": false,
+  "full_pub_video_render_performed": false,
+  "destructive_sql_executed": false
+}

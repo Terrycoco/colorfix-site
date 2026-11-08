@@ -3,10 +3,10 @@ import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import AnimatedHueWheel from "@components/AnimatedHueWheel";
 import BrandBumperLogo from "@components/BrandBumperLogo";
 import {
-  
-  
+
+
   getImageRefreshEnabled,
-  
+
   parsePhotoRef,
   withImageRefresh,
 } from "@helpers/assetImage";
@@ -215,7 +215,6 @@ function queueFadeReady(img, stageEl) {
 
   useEffect(() => {
     if (!imageLoaded) return () => {};
-    let cancelled = false;
     const seen = new Set();
 
     function preload(url) {
@@ -236,17 +235,14 @@ function queueFadeReady(img, stageEl) {
         preload(parsed.url);
         return;
       }
-      
+
         preload(value);
         return;
-      
-      
-      
+
+
+
     });
 
-    return () => {
-      cancelled = true;
-    };
   }, [slides, cacheBustEnabled, activeIndex, imageLoaded]);
 
 
@@ -1041,7 +1037,7 @@ function resolveSchemaImageUrl(value) {
 
   const parsed = parsePhotoRef(raw);
   const resolved = parsed.url || raw;
-  
+
   if (/^https?:\/\//i.test(resolved)) return resolved;
   if (typeof window === "undefined") return resolved;
 

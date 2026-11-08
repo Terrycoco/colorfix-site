@@ -10,7 +10,7 @@
   RewriteRule ^api/v2/admin/photo-library/(?:cleanup-legacy-applied|backfill-exteriors)\.php$ - [G,L]
   RewriteRule ^api/v2/admin/saved-palette-photos/normalize-links\.php$ - [G,L]
   RewriteRule ^api/v2/admin/playlist-items/repair-broken-photo-library\.php$ - [G,L]
-  RewriteRule ^api/tools/(?:recalc-mask-overlays|backfill-mask-target-lightness)\.php$ - [G,L]
+  RewriteRule ^api/tools/(?:recalc-mask-overlays|backfill-mask-target-lightness|tag-from-category)\.php$ - [G,L]
   RewriteRule ^api/tests/(?:PhotoModuleSmokeTest|PhotoRepoVariantsTest|PhotoRepoCreateUpdateTest)\.php$ - [G,L]
   RewriteRule ^scripts/(?:masks_alpha_check|convert_masks_alpha)\.php$ - [G,L]
   RewriteRule ^render_test\.php$ - [G,L]

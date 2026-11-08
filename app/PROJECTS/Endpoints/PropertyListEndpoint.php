@@ -17,9 +17,20 @@ final class PropertyListEndpoint
                 self::respond(['ok' => false, 'error' => 'GET only'], 405);
             }
 
-            $rows = (new PdoPropertyRepository($pdo))->list([], 500);
+            $repo = new PdoPropertyRepository($pdo);
+            $lookupId = isset($_GET['id']) ? trim((string)$_GET['id']) : null;
+            if ($lookupId !== null && !preg_match('/^[0-9]+$/D', $lookupId)) {
+                self::respond(['ok' => false, 'error' => 'A numeric property ID is required.'], 400);
+            }
+            if ($lookupId !== null) {
+                $row = $repo->findById((int)$lookupId);
+                $normalizedId = ltrim($lookupId, '0') ?: '0';
+                $rows = $row && (string)$row['id'] === $normalizedId ? [$row] : [];
+            } else {
+                $rows = $repo->list([], 500);
+            }
             $projects = new ProjectManager($pdo);
-            $query = strtolower(trim((string)($_GET['q'] ?? '')));
+            $query = $lookupId === null ? strtolower(trim((string)($_GET['q'] ?? ''))) : '';
             $items = [];
 
             foreach ($rows as $row) {

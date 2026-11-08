@@ -40,7 +40,7 @@ const SOURCE_OPTIONS = [
 const defaultUpload = {
   source_type: "saved_palette",
   palette_id: "",
-  
+
   photo_type: "full",
   series: "",
   title_prefix: "",
@@ -1069,7 +1069,7 @@ export default function AdminPhotoLibraryPage() {
                 value={uploadForm.palette_id}
                 onChange={(e) => {
                   handleUploadField("palette_id", e.target.value);
-                  
+
                 }}
               >
                 <option value="">Select palette</option>
@@ -1082,9 +1082,9 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
 
-          
 
-          
+
+
 
           {showClientFields && (
             <label>

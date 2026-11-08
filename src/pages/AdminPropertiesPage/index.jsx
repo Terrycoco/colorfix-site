@@ -9,6 +9,8 @@ import {
   AdminObjectListItem,
 } from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
+import AdminSearchField from "@components/AdminLayout/AdminSearchField";
+import { parseAdminSearch } from "@components/AdminLayout/adminSearch";
 import { useAppState } from "@context/AppStateContext";
 import "./admin-properties.css";
 
@@ -145,7 +147,8 @@ export default function AdminPropertiesPage() {
 
       try {
         const params = new URLSearchParams();
-        if (query.trim()) params.set("q", query.trim());
+        const search = parseAdminSearch(query);
+        if (search.type !== "all") params.set(search.type === "id" ? "id" : "q", search.value);
         params.set("_", String(Date.now()));
 
         const res = await fetch(`${LIST_URL}?${params.toString()}`, {
@@ -393,12 +396,11 @@ export default function AdminPropertiesPage() {
         </div>
       }
       toolbar={
-        <input
+        <AdminSearchField
           className="admin-properties__search"
-          type="search"
-          placeholder="Search properties"
+          placeholder="Search properties by name or #ID"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={setQuery}
         />
       }
     >

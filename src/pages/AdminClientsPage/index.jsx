@@ -12,6 +12,8 @@ import {
   AdminWorkbenchAddButton,
 } from "@components/AdminLayout";
 import { API_FOLDER } from "@helpers/config";
+import AdminSearchField from "@components/AdminLayout/AdminSearchField";
+import { parseAdminSearch } from "@components/AdminLayout/adminSearch";
 import { useAppState } from "@context/AppStateContext";
 import { copyShareText, openTextShare } from "@helpers/shareUrls";
 import { BRAND } from "@config/brand";
@@ -493,7 +495,8 @@ export default function AdminClientsPage() {
     setError("");
     try {
       const params = new URLSearchParams();
-      if (query.trim()) params.set("q", query.trim());
+      const search = parseAdminSearch(query);
+      if (search.type !== "all") params.set("q", search.type === "id" ? `#${search.value}` : search.value);
       params.set("limit", "500");
       params.set("_", String(Date.now()));
       const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -650,7 +653,8 @@ export default function AdminClientsPage() {
       setError("");
       try {
         const params = new URLSearchParams();
-        if (query.trim()) params.set("q", query.trim());
+        const search = parseAdminSearch(query);
+        if (search.type !== "all") params.set("q", search.type === "id" ? `#${search.value}` : search.value);
         params.set("limit", "500");
         params.set("_", String(Date.now()));
         const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -1237,12 +1241,11 @@ export default function AdminClientsPage() {
               </div>
             }
             toolbar={
-              <input
+              <AdminSearchField
                 className="admin-clients__search"
-                type="search"
-                placeholder="Search by name, email, or phone"
+                placeholder="Search by name, email, phone, or #ID"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={setQuery}
               />
             }
           >

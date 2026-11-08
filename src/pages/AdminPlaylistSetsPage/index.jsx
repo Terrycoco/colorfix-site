@@ -1,3 +1,4 @@
+import { filterAdminRecords } from "@components/AdminLayout/adminSearch";
 import {
   useEffect,
   useMemo,
@@ -1286,32 +1287,10 @@ export default function AdminPlaylistSetsPage() {
   const filteredSets =
     useMemo(
       () => {
-        const value =
-          query
-            .trim()
-            .toLowerCase();
-
-        if (!value) {
-          return sortedSets;
-        }
-
-        return sortedSets.filter(
-          (
-            set
-          ) =>
-            [
-              set.id,
-              set.handle,
-              set.title,
-              set.subtitle,
-              set.context,
-            ]
-              .join(" ")
-              .toLowerCase()
-              .includes(
-                value
-              )
-        );
+        return filterAdminRecords(sortedSets, query, {
+          idField: "id",
+          textFields: [(set) => [set.id, set.handle, set.title, set.subtitle, set.context].join(" ")],
+        });
       },
       [
         query,

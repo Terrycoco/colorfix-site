@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import AdminSearchField from "@components/AdminLayout/AdminSearchField";
+import { filterAdminRecords } from "@components/AdminLayout/adminSearch";
 import {
   AdminMasterDetail,
   AdminListPane,
@@ -25,16 +27,9 @@ export default function RexResourcesPage() {
   const type = RESOURCE_TYPES.find((item) => item.key === resourceType) || RESOURCE_TYPES[0];
 
   const visibleResources = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return resources;
-
-    return resources.filter((resource) => {
-      const haystack = [resource.id, resource.title, ...(resource.meta || [])]
-        .filter((value) => value !== null && value !== undefined)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(needle);
+    return filterAdminRecords(resources, query, {
+      idField: "id",
+      textFields: [(resource) => [resource.id, resource.title, ...(resource.meta || [])].join(" ")],
     });
   }, [query, resources]);
 
@@ -66,10 +61,9 @@ export default function RexResourcesPage() {
                 </select>
               </label>
 
-              <input
-                type="search"
+              <AdminSearchField
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={setQuery}
                 placeholder={`Search ${type.label.toLowerCase()}…`}
                 aria-label={`Search ${type.label}`}
               />

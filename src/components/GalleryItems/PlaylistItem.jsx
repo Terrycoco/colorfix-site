@@ -57,7 +57,7 @@ const PlaylistItem = ({ item }) => {
         }
       }
 
-      
+
 
       if (!cancelled) setImageSrc(value);
     };

@@ -172,7 +172,7 @@ function normalizePalette(palette) {
     })),
     photos: (palette.photos || []).map((photo, index) => ({
       id: photo.id,
-      
+
       rel_path: photo.rel_path,
       photo_type: photo.photo_type || "full",
       trigger_mode: photo.trigger_mode || "any",
@@ -181,7 +181,7 @@ function normalizePalette(palette) {
       alt_text: photo.alt_text || "",
       order_index: photo.order_index ?? index,
     })),
-    
+
   };
 }
 
@@ -232,7 +232,7 @@ export default function SavedPaletteEditorModal({
   const [editMembers, setEditMembers] = useState([]);
   const [editPhotos, setEditPhotos] = useState([]);
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
-  
+
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "", success: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
   const [existingLinks, setExistingLinks] = useState([]);
@@ -240,9 +240,9 @@ export default function SavedPaletteEditorModal({
   const attachPhotoType = "full";
   const [attachTriggerMode, setAttachTriggerMode] = useState("any");
   const [attachTriggerColorId, setAttachTriggerColorId] = useState(null);
-  
-  
-  
+
+
+
   const [fullAttachMode, setFullAttachMode] = useState("replace");
   const [attachChoiceOpen, setAttachChoiceOpen] = useState(false);
   const [noteEditorIndex, setNoteEditorIndex] = useState(null);
@@ -297,7 +297,7 @@ export default function SavedPaletteEditorModal({
   useEffect(() => {
     if (!open) return;
     setAttachEnabled(!!attachment);
-    
+
     setAttachTriggerMode(
       (attachment?.photo_type || "full") === "before"
         ? "none"
@@ -308,8 +308,8 @@ export default function SavedPaletteEditorModal({
         ? null
         : (attachment?.trigger_color_id ?? null)
     );
-    
-    
+
+
     setFullAttachMode("replace");
     if (paletteId) {
       setMode("edit");
@@ -357,14 +357,14 @@ export default function SavedPaletteEditorModal({
     setEditForm(normalized.form);
     setEditMembers(normalized.members);
     setEditPhotos(normalized.photos);
-    
-    
+
+
     setFullAttachMode("replace");
     setEditStatus({ loading: false, error: "", success: "" });
     setPhotoStatus({ loading: false, error: "" });
   }, [open, items, mode, selectedId, linkOnlyMode]);
 
-  
+
 
   useEffect(() => {
     if (!showPhotoSection || !open || !attachment?.photo_library_id) {
@@ -411,15 +411,15 @@ export default function SavedPaletteEditorModal({
       : null),
     [attachPhotoType, editPhotos]
   );
-  
+
   const attachSubmitLabel = useMemo(() => {
-    
+
     if (attachPhotoType === "full" && currentFullPhoto && fullAttachMode === "replace") {
       return "Replace Full Photo";
     }
-    
+
     return "Save";
-  }, [attachPhotoType, currentFullPhoto, fullAttachMode, attachEnabled, linkOnlyMode]);
+  }, [attachPhotoType, currentFullPhoto, fullAttachMode]);
 
   function handleEditField(name, value) {
     setEditForm((prev) => ({ ...prev, [name]: value }));
@@ -514,8 +514,8 @@ export default function SavedPaletteEditorModal({
       const payload = {
         palette_id: editForm.palette_id,
         photo_library_id: item.photo_library_id || null,
-        
-        
+
+
         raw_rel_path: item.raw_rel_path || "",
         rel_path: item.image_url,
         photo_type: "full",
@@ -532,7 +532,7 @@ export default function SavedPaletteEditorModal({
         throw new Error(json.error || `HTTP ${res.status}`);
       }
       const photo = json.photo || {};
-      
+
       await refreshExistingLinks();
       setEditPhotos((prev) => [
         ...prev,
@@ -593,8 +593,8 @@ export default function SavedPaletteEditorModal({
     const payload = {
       palette_id: nextPaletteId,
       photo_library_id: attachment.photo_library_id || null,
-      
-      
+
+
       replace_existing_full: replaceExistingFull,
       raw_rel_path: rel,
       rel_path: rel,
@@ -616,7 +616,7 @@ export default function SavedPaletteEditorModal({
     }
     const mainPhoto = json.photo || null;
 
-    
+
 
     return mainPhoto;
   }
@@ -627,7 +627,7 @@ export default function SavedPaletteEditorModal({
     return photos.find((photo) => (photo.photo_type || "full") === "full") || null;
   }, [items, selectedId]);
   const existingPaletteFullPhoto = selectedPaletteFullPhoto || currentFullPhoto || null;
-  
+
 
   async function finalizeAttach(nextPaletteId, attachedPhoto) {
     await refreshExistingLinks();
@@ -642,17 +642,6 @@ export default function SavedPaletteEditorModal({
       });
     }
     if (onClose) onClose();
-  }
-
-  async function handleQuickReplace() {
-    if (!editForm.palette_id || !attachment) return;
-    setEditStatus({ loading: true, error: "", success: "" });
-    try {
-      const attachedPhoto = await attachSelectedPhoto(editForm.palette_id, { forceReplace: true });
-      await finalizeAttach(editForm.palette_id, attachedPhoto);
-    } catch (err) {
-      setEditStatus({ loading: false, error: err?.message || "Failed to replace full photo", success: "" });
-    }
   }
 
   async function handleAttachOnlySubmit(event) {
@@ -692,8 +681,7 @@ export default function SavedPaletteEditorModal({
       if (nextSelectedId) {
         setMode("edit");
         setSelectedId(String(nextSelectedId));
-        const current = nextItems.find((row) => String(row.id) === String(nextSelectedId));
-            
+
       }
       return nextItems;
     }
@@ -929,17 +917,17 @@ export default function SavedPaletteEditorModal({
                   <strong>{existingPaletteFullPhoto.caption || existingPaletteFullPhoto.alt_text || existingPaletteFullPhoto.rel_path || `Photo #${existingPaletteFullPhoto.id}`}</strong>
                 </p>
                 <div className="asp-attach-tools">
-                  
-                  
-                  
+
+
+
                   <button
                     type="button"
                     className="ghost"
                     onClick={async () => {
                       setAttachChoiceOpen(false);
-                      
+
                       setFullAttachMode("replace");
-                      
+
                       const nextPaletteId = editForm.palette_id || (selectedId ? Number(selectedId) : null);
                       if (!nextPaletteId) return;
                       setEditStatus({ loading: true, error: "", success: "" });
@@ -947,7 +935,7 @@ export default function SavedPaletteEditorModal({
                         const attachedPhoto = await attachSelectedPhoto(nextPaletteId, {
                           photoType: "full",
                           forceReplace: true,
-                          
+
                         });
                         await finalizeAttach(nextPaletteId, attachedPhoto);
                       } catch (err) {
@@ -1034,7 +1022,7 @@ export default function SavedPaletteEditorModal({
                   ) : null}
                 </div>
 
-                
+
               </div>
 
               {existingLinks.length > 0 ? (
@@ -1085,9 +1073,9 @@ export default function SavedPaletteEditorModal({
                   {editPhotos.map((photo) => (
                     <div key={photo.id} className="asp-photo-card">
                       <img src={photo.rel_path} alt="Palette upload" />
-                      
-                      
-                      
+
+
+
                       <input
                         type="text"
                         placeholder="Alt text (SEO)"
@@ -1110,7 +1098,7 @@ export default function SavedPaletteEditorModal({
                   {editForm.palette_id ? "No photos yet." : "Save the palette first, then attach library photos here."}
                 </div>
               )}
-              
+
             </div>
           )}
 
@@ -1318,7 +1306,7 @@ export default function SavedPaletteEditorModal({
           onClose={() => setPhotoPickerOpen(false)}
           onPick={handlePhotoPickFromLibrary}
         />
-        
+
       </div>
     </div>, document.body
   );
