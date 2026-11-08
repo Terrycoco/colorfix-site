@@ -273,6 +273,7 @@ export default function PaletteDetail({
             <option value="exterior">Exterior</option>
             <option value="interior">Interior</option>
             <option value="hoa">HOA</option>
+            <option value="art">Art</option>
           </select>
         </div>
 

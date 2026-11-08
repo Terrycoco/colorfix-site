@@ -306,6 +306,11 @@ final class PdoAssetLibraryRepository
         return $blockers;
     }
 
+    public function disposePhotoFile(string $rel, string $root): array
+    {
+        return (new \App\PHOTOS\Services\PhotoLifecycleService($this->pdo, $root))->disposeFile($rel);
+    }
+
     public function hardDeleteUnpublished(int $assetLibraryId): array
     {
         $blockers = $this->hardDeleteBlockers($assetLibraryId);
@@ -322,9 +327,7 @@ final class PdoAssetLibraryRepository
         $this->pdo->beginTransaction();
         try {
             if ($this->tableExists('photo_library') && $this->columnExists('photo_library', 'asset_library_id')) {
-                $stmt = $this->pdo->prepare('UPDATE photo_library SET asset_library_id = NULL WHERE asset_library_id = :id');
-                $stmt->execute([':id' => $assetLibraryId]);
-                $counts['photo_library_detached'] = $stmt->rowCount();
+                $counts['photo_library_detached'] = (new \App\PHOTOS\Repos\PdoPhotoLifecycleRepository($this->pdo))->detachAsset($assetLibraryId);
             }
 
             if ($this->tableExists('landing_pages') && $this->columnExists('landing_pages', 'featured_pin_asset_id')) {

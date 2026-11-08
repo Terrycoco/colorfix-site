@@ -46,6 +46,11 @@ use Throwable;
  */
 final class PdoPubAssetRepository
 {
+    public function assertNotPhotoLibraryFile(string $file): void
+    {
+        (new \App\PHOTOS\Services\PhotoLifecycleService($this->pdo))->assertNotLibraryFile($file);
+    }
+
     public function __construct(
         private PDO $pdo
     ) {}

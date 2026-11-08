@@ -673,7 +673,7 @@ const activeBrandCodes = useMemo(() => {
         </button>
       </div>}
 
-      {variant !== "main" && <div className="cell cell--translate">
+     {variant !== "secondary" && <div className="cell cell--translate">
         <button className="myp-secondary-action" type="button" onClick={handleTranslate}>
           See In All Brands
         </button>
@@ -1364,6 +1364,7 @@ const activeBrandCodes = useMemo(() => {
                   <option value="exterior">Exterior</option>
                   <option value="interior">Interior</option>
                   <option value="hoa">HOA</option>
+                  <option value="art">Art</option>
                 </select>
               </label>
               <label className="checkbox-row">

@@ -53,7 +53,6 @@ try {
         $filters['color_family'] = $colorFamily;
     }
     $paletteId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-    $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : 0;
 
     $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 50;
     $limit = max(1, min(200, $limit));
@@ -72,7 +71,7 @@ try {
 
     if (($withMembers || $withPhotos) && $rows) {
         foreach ($rows as &$row) {
-            $full = $controller->getById((int) $row['id'], false, $setId > 0 ? $setId : null);
+            $full = $controller->getById((int) $row['id'], false);
             if ($withMembers) {
                 $row['members'] = $full['members'] ?? [];
             }

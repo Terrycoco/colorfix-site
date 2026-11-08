@@ -63,17 +63,9 @@ try {
             ON spm.saved_palette_id = sp.id
           JOIN colors c
             ON c.id = spm.color_id
-          LEFT JOIN saved_palette_sets sps
-            ON sps.saved_palette_id = sp.id
-          LEFT JOIN saved_palette_set_photos spsp
-            ON spsp.saved_palette_set_id = sps.id
+          LEFT JOIN photo_library palette_photo ON palette_photo.palette_id=sp.id
           JOIN playlist_items pi
-            ON (
-                (sp.palette_hash IS NOT NULL AND sp.palette_hash <> '' AND pi.palette_hash = sp.palette_hash)
-                OR (sps.id IS NOT NULL AND pi.saved_palette_set_id = sps.id)
-                OR (spsp.photo_library_id IS NOT NULL AND pi.photo_library_id = spsp.photo_library_id)
-                OR (spsp.rel_path IS NOT NULL AND spsp.rel_path <> '' AND pi.image_url = spsp.rel_path)
-            )
+            ON (pi.palette_hash=sp.palette_hash OR pi.photo_library_id=palette_photo.photo_library_id)
            AND pi.is_active = 1
           JOIN playlist_instances inst
             ON inst.playlist_id = pi.playlist_id
@@ -89,17 +81,7 @@ try {
            AND (
                 LOWER(COALESCE(pi.analyzer_role, '')) = 'after'
                 OR LOWER(COALESCE(pi.item_type, '')) = 'after'
-                OR (
-                    spsp.photo_library_id IS NOT NULL
-                    AND pi.photo_library_id = spsp.photo_library_id
-                    AND LOWER(COALESCE(spsp.photo_type, '')) = 'after'
-                )
-                OR (
-                    spsp.rel_path IS NOT NULL
-                    AND spsp.rel_path <> ''
-                    AND pi.image_url = spsp.rel_path
-                    AND LOWER(COALESCE(spsp.photo_type, '')) = 'after'
-                )
+
             )
          GROUP BY
             sp.id,

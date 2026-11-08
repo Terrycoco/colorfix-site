@@ -80,11 +80,6 @@ final class ShareService
         }
 
         $path = '/palette/' . rawurlencode($paletteHash) . '/share';
-        $setId = isset($options['set_id']) ? (int)$options['set_id'] : 0;
-        if ($setId > 0) {
-            $path .= '?set_id=' . $setId;
-        }
-
         return $path;
     }
 

@@ -460,6 +460,7 @@ public function replaceMembers(int $savedPaletteId, array $members): void
 
     /**
      * Supported filters:
+     *   - id (exact saved palette ID)
      *   - brand
      *   - terry_fav
      *   - is_public
@@ -474,6 +475,11 @@ public function replaceMembers(int $savedPaletteId, array $members): void
     ): array {
         $where = [];
         $params = [];
+
+        if (array_key_exists('id', $filters)) {
+            $where[] = 'p.id = :palette_id';
+            $params[':palette_id'] = (string)$filters['id'];
+        }
 
         if (!empty($filters['brand'])) {
             $where[] = 'p.brand = :brand';

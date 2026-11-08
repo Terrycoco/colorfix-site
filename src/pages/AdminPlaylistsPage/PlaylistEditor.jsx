@@ -140,11 +140,11 @@ const emptyPlaylist = {
 const emptyItem = {
   _clientKey: "",
   playlist_item_id: null,
-  ap_id: "",
+  
   palette_hash: "",
   image_url: "",
   photo_library_id: "",
-  saved_palette_set_id: "",
+  
   title: "",
   subtitle: "",
   subtitle_2: "",
@@ -1645,8 +1645,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                     : HUE_WHEEL_BODY_TEMPLATE;
               }
 
-              nextItem.ap_id =
-                "";
+              
 
               nextItem.palette_hash =
                 "";
@@ -1657,8 +1656,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               nextItem.photo_library_id =
                 "";
 
-              nextItem.saved_palette_set_id =
-                "";
+              
 
               nextItem.is_share_image =
                 false;
@@ -2000,24 +1998,14 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               ? {
                   ...item,
 
-                  ap_id:
-                    "",
+                  
 
                   palette_hash:
                     match
                       ?.palette_hash ||
                     "",
 
-                  saved_palette_set_id:
-                    match
-                    &&
-                    info
-                      ?.attachedSavedPaletteSetId
-                      ? String(
-                          info
-                            .attachedSavedPaletteSetId
-                        )
-                      : "",
+                  
                 }
               : item)
     );
@@ -4348,10 +4336,7 @@ function normalizePlaylistItem(
       ??
       null,
 
-    ap_id:
-      raw.ap_id
-      ??
-      "",
+    
 
     palette_hash:
       raw
@@ -4378,11 +4363,7 @@ function normalizePlaylistItem(
       ??
       "",
 
-    saved_palette_set_id:
-      raw
-        .saved_palette_set_id
-      ??
-      "",
+    
 
     title:
       raw.title
@@ -4880,11 +4861,7 @@ function serializePlaylistItem(
   return {
     ...rest,
 
-    ap_id:
-      item.ap_id ===
-        ""
-        ? null
-        : item.ap_id,
+    
 
     palette_hash:
       item
@@ -4894,13 +4871,7 @@ function serializePlaylistItem(
         : item
             .palette_hash,
 
-    saved_palette_set_id:
-      item
-        .saved_palette_set_id ===
-        ""
-        ? null
-        : item
-            .saved_palette_set_id,
+    
 
     duration_ms:
       item
@@ -5161,17 +5132,9 @@ function photoInfoFromRow(
       ||
       "",
 
-    attachedSavedPaletteSetId:
-      row
-        ?.attached_saved_palette_set_id
-      ??
-      null,
+    
 
-    attachedSavedPaletteSetLabel:
-      row
-        ?.attached_saved_palette_set_label
-      ||
-      "",
+    
 
     attachedSavedPalettePhotoType:
       row

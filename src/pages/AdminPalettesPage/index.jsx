@@ -269,6 +269,32 @@ export default function AdminPalettesPage() {
   const photosRef = useRef(null);
 
   const [query, setQuery] = useState("");
+  const idMatch = cleanText(query).match(/^#?([0-9]+)$/);
+  const lookupId = idMatch ? idMatch[1].replace(/^0+(?=[0-9])/, "") : "";
+  const [idLookup, setIdLookup] = useState({ id: "", items: [], error: "", loading: false });
+
+  useEffect(() => {
+    if (!lookupId) return undefined;
+    const controller = new AbortController();
+    setIdLookup({ id: lookupId, items: [], error: "", loading: true });
+    async function lookupPalette() {
+      try {
+        const data = await readJson(await fetch(
+          `${API_FOLDER}/v2/admin/palettes/list.php?id=${encodeURIComponent(lookupId)}&limit=1&_=${Date.now()}`,
+          { credentials: "include", cache: "no-store", signal: controller.signal }
+        ), "Failed to find palette");
+        if (!controller.signal.aborted) {
+          setIdLookup({ id: lookupId, items: Array.isArray(data?.items) ? data.items : [], error: "", loading: false });
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setIdLookup({ id: lookupId, items: [], error: error.message || "Failed to find palette.", loading: false });
+        }
+      }
+    }
+    lookupPalette();
+    return () => controller.abort();
+  }, [lookupId]);
   const [
     visibility,
     setVisibility,
@@ -441,8 +467,14 @@ export default function AdminPalettesPage() {
   );
 
   const filteredPalettes = useMemo(
-    () =>
-      palettes.filter((palette) => {
+    () => {
+      // Exact ID lookup is independent of list visibility/type/family filters.
+      if (lookupId) {
+        return idLookup.id === lookupId
+          ? idLookup.items.filter((palette) => String(palette.id) === lookupId)
+          : [];
+      }
+      return palettes.filter((palette) => {
         if (
           !paletteMatchesQuery(
             palette,
@@ -485,9 +517,12 @@ export default function AdminPalettesPage() {
           palette,
           colorFamily
         );
-      }),
+      });
+    },
     [
       palettes,
+      lookupId,
+      idLookup,
       query,
       visibility,
       paletteType,
@@ -957,17 +992,17 @@ export default function AdminPalettesPage() {
             onClear={clearFilters}
           />
 
-          {loadError ? (
+          {(lookupId ? idLookup.id === lookupId && idLookup.error : loadError) ? (
             <AdminEmptyState
               title="Could not load palettes"
-              message={loadError}
+              message={lookupId ? idLookup.error : loadError}
             />
           ) : (
             <PaletteList
               palettes={filteredPalettes}
               selectedId={selectedPaletteId}
               onSelect={selectPalette}
-              loading={loading}
+              loading={lookupId ? idLookup.id !== lookupId || idLookup.loading : loading}
               emptyMessage="No palettes match those filters."
             />
           )}

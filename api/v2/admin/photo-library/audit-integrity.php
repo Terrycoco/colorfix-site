@@ -97,8 +97,8 @@ try {
                  OR pinst.share_image_url LIKE CONCAT('photo:', pl.photo_library_id, '|%')
             ) AS playlist_instance_share_usage_count,
             (
-              SELECT COUNT(*) FROM saved_palette_set_photos spsp
-              WHERE spsp.photo_library_id = pl.photo_library_id
+              SELECT COUNT(*) FROM palette_viewer_photos vp
+              WHERE vp.photo_library_id = pl.photo_library_id
             ) AS viewer_usage_count,
             (
               SELECT COUNT(*) FROM article_sections ars

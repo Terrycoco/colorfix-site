@@ -141,12 +141,12 @@ final class AssetLibraryService
         $relPath = (string)($asset['rel_path'] ?? '');
         $sourceType = (string)($asset['source_type'] ?? '');
         if ($sourceType === 'asset_creator_job' && $relPath !== '') {
-            $abs = $this->diskPathForRelPath($relPath, $rootDir);
-            if (is_file($abs)) {
-                @unlink($abs);
-                $result['file_deleted'] = true;
+            if (str_starts_with('/' . ltrim($relPath, '/'), '/photos/')) {
+                $result = [...$result, ...$this->repo->disposePhotoFile($relPath, $rootDir)];
             } else {
-                $result['file_deleted'] = false;
+                // Non-photo generated assets remain the responsibility of ASSETS.
+                $abs = $this->diskPathForRelPath($relPath, $rootDir);
+                $result['file_deleted'] = is_file($abs) && @unlink($abs);
             }
         }
 

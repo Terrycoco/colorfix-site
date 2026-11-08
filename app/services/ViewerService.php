@@ -7,7 +7,6 @@ use App\REX\DTO\RexReservationDescriptor;
 use App\REX\DTO\RexShareMetadata;
 use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoPaletteViewerRepository;
-use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\PROJECTS\Repos\PdoProjectRepository;
@@ -33,7 +32,7 @@ final class ViewerService
 
     public function __construct(private PDO $pdo)
     {
-        $photoRepo = new PdoPhotoRepository($pdo);
+
         $this->savedPalettes = new PdoSavedPaletteRepository($pdo);
         $this->paletteViewers = new PdoPaletteViewerRepository($pdo);
         $paletteViewerPhotos = new PdoPaletteViewerPhotoRepository($pdo);
@@ -41,7 +40,7 @@ final class ViewerService
         $this->projects = new PdoProjectRepository($pdo);
         $this->paletteViewer = new PaletteViewerService(
             $this->savedPalettes,
-            new PhotoRenderingService($photoRepo, $pdo),
+
             new PdoPlaylistInstanceRepository($pdo),
             $this->colorPlans,
             $this->paletteViewers,
@@ -62,10 +61,9 @@ final class ViewerService
         $viewerKey = $this->paletteViewerKey($format);
 
         if ($resourceType === self::RESOURCE_SAVED_PALETTE) {
-            $setId = $this->optionalPositiveInt($context['set_id'] ?? null);
             $payload = $this->paletteViewer->getSavedById(
                 $resourceId,
-                $setId,
+                null,
                 $viewerKey
             );
 
@@ -156,12 +154,7 @@ final class ViewerService
                         'label' => 'Saved Palette ID',
                         'value' => (string)$resourceId,
                     ],
-                    [
-                        'label' => 'Set ID',
-                        'value' => $this->optionalPositiveInt($context['set_id'] ?? null) !== null
-                            ? (string)$this->optionalPositiveInt($context['set_id'] ?? null)
-                            : '—',
-                    ],
+
                 ],
             );
         }

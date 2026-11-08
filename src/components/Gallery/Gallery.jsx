@@ -35,6 +35,7 @@ import ColorWheelItem from '../GalleryItems/ColorWheelItem';
 import ColorWheelTicked from '../GalleryItems/ColorWheelTicked';
 
 import PictureSwatchItem from '../GalleryItems/PictureSwatchItem';
+import ArtSwatchItem from '../GalleryItems/ArtSwatchItem';
 
 import FeaturedArticleItem from '../GalleryItems/FeaturedArticleItem';
 
@@ -64,6 +65,7 @@ export const renderContent = (item) => {
     case 'reference-swatch': return <ReferenceSwatch key={key} color={item} />;
 
     case 'picture-swatch': return <PictureSwatchItem key={key} item={item} />;
+    case 'art-swatch':  return <ArtSwatchItem key={key} item={item} />;
 
     case 'image':       return <ImageItem key={key} item={item} />;
 

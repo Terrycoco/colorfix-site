@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import AnimatedHueWheel from "../AnimatedHueWheel";
 import BrandBumperLogo from "../BrandBumperLogo";
 import { YOUTUBE_VIDEO_TIMING } from "../../remotion/youtubeVideoTiming.js";
 import {
-  extractAssetId,
-  fetchAssetUrl,
-  isAssetRef,
+  
+  
+  
   parsePhotoRef,
 } from "../../helpers/assetImage";
 import "./youtube-player.css";
@@ -34,30 +34,10 @@ export default function YoutubePlayer({
     () => resolveImmediateImageUrl(currentItem?.image_url || "", isHueWheel),
     [currentItem?.image_url, isHueWheel]
   );
-  const [assetImageUrl, setAssetImageUrl] = useState("");
-  const imageUrl = immediateImageUrl || assetImageUrl;
+  
+  const imageUrl = immediateImageUrl;
 
-  useEffect(() => {
-    let cancelled = false;
-    const value = currentItem?.image_url || "";
-    if (!value || isHueWheel || immediateImageUrl) {
-      setAssetImageUrl("");
-      return () => {};
-    }
-
-    if (!isAssetRef(value)) {
-      setAssetImageUrl("");
-      return () => {};
-    }
-
-    const assetId = extractAssetId(value);
-    fetchAssetUrl(assetId).then((url) => {
-      if (!cancelled) setAssetImageUrl(url || "");
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentItem?.image_url, immediateImageUrl, isHueWheel]);
+  
 
   const rootClassName = [
     "youtube-player-root",
@@ -205,7 +185,7 @@ function resolveImmediateImageUrl(value, isHueWheel) {
   if (!raw) return "";
   const parsed = parsePhotoRef(raw);
   if (parsed.url) return parsed.url;
-  if (isAssetRef(raw)) return "";
+  
   return raw;
 }
 

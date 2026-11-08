@@ -4,7 +4,7 @@ import LogoAnimated from "@components/LogoAnimated";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import { withSourceParam } from "@helpers/sourceParam";
 import ViewerCtaButton from "../ViewerCtaButton";
-import "../appliedpaletteviewer.css";
+import "../paletteviewer.css";
 import "../conceptpaletteviewer.css";
 
 export default function ConceptPaletteViewer({

@@ -172,7 +172,7 @@ function normalizePalette(palette) {
     })),
     photos: (palette.photos || []).map((photo, index) => ({
       id: photo.id,
-      saved_palette_set_id: photo.saved_palette_set_id || null,
+      
       rel_path: photo.rel_path,
       photo_type: photo.photo_type || "full",
       trigger_mode: photo.trigger_mode || "any",
@@ -181,7 +181,7 @@ function normalizePalette(palette) {
       alt_text: photo.alt_text || "",
       order_index: photo.order_index ?? index,
     })),
-    sets: Array.isArray(palette.sets) ? palette.sets : [],
+    
   };
 }
 
@@ -209,13 +209,7 @@ function applyPhotoFieldUpdate(photo, field, value) {
   return next;
 }
 
-function formatViewerLabel(set) {
-  if (!set) return "";
-  const base = set.title || set.slug || `Viewer`;
-  const suffix = set.id ? `#${set.id}` : "";
-  const defaultTag = Number(set.is_default) === 1 ? "Default" : "";
-  return [base, suffix, defaultTag].filter(Boolean).join(" ");
-}
+
 
 export default function SavedPaletteEditorModal({
   open = false,
@@ -238,17 +232,17 @@ export default function SavedPaletteEditorModal({
   const [editMembers, setEditMembers] = useState([]);
   const [editPhotos, setEditPhotos] = useState([]);
   const [photoPickerOpen, setPhotoPickerOpen] = useState(false);
-  const [beforePickerOpen, setBeforePickerOpen] = useState(false);
+  
   const [photoStatus, setPhotoStatus] = useState({ loading: false, error: "", success: "" });
   const [editStatus, setEditStatus] = useState({ loading: false, error: "", success: "" });
   const [existingLinks, setExistingLinks] = useState([]);
   const [attachEnabled, setAttachEnabled] = useState(true);
-  const [attachPhotoType, setAttachPhotoType] = useState("full");
+  const attachPhotoType = "full";
   const [attachTriggerMode, setAttachTriggerMode] = useState("any");
   const [attachTriggerColorId, setAttachTriggerColorId] = useState(null);
-  const [selectedBeforePhoto, setSelectedBeforePhoto] = useState(null);
-  const [activeSetId, setActiveSetId] = useState("");
-  const [createNewGroup, setCreateNewGroup] = useState(false);
+  
+  
+  
   const [fullAttachMode, setFullAttachMode] = useState("replace");
   const [attachChoiceOpen, setAttachChoiceOpen] = useState(false);
   const [noteEditorIndex, setNoteEditorIndex] = useState(null);
@@ -303,7 +297,7 @@ export default function SavedPaletteEditorModal({
   useEffect(() => {
     if (!open) return;
     setAttachEnabled(!!attachment);
-    setAttachPhotoType(attachment?.photo_type || "full");
+    
     setAttachTriggerMode(
       (attachment?.photo_type || "full") === "before"
         ? "none"
@@ -314,8 +308,8 @@ export default function SavedPaletteEditorModal({
         ? null
         : (attachment?.trigger_color_id ?? null)
     );
-    setSelectedBeforePhoto(null);
-    setCreateNewGroup(false);
+    
+    
     setFullAttachMode("replace");
     if (paletteId) {
       setMode("edit");
@@ -363,44 +357,14 @@ export default function SavedPaletteEditorModal({
     setEditForm(normalized.form);
     setEditMembers(normalized.members);
     setEditPhotos(normalized.photos);
-    const defaultSet = (normalized.sets || []).find((set) => Number(set.is_default) === 1) || normalized.sets?.[0] || null;
-    setActiveSetId(defaultSet?.id ? String(defaultSet.id) : "");
-    setCreateNewGroup(linkOnlyMode && normalized.photos.some((photo) => (photo.photo_type || "full") === "full"));
+    
+    
     setFullAttachMode("replace");
     setEditStatus({ loading: false, error: "", success: "" });
     setPhotoStatus({ loading: false, error: "" });
   }, [open, items, mode, selectedId, linkOnlyMode]);
 
-  useEffect(() => {
-    if (!showPhotoSection || !open || !editForm.palette_id || !activeSetId) return;
-    let active = true;
-    async function loadPaletteSet() {
-      try {
-        const params = new URLSearchParams();
-        params.set("id", String(editForm.palette_id));
-        params.set("set_id", String(activeSetId));
-        params.set("with_members", "1");
-        params.set("with_photos", "1");
-        params.set("limit", "1");
-        params.set("_", Date.now().toString());
-        const res = await fetch(`${PALETTE_GET_URL}?${params.toString()}`, { credentials: "include" });
-        const data = await res.json();
-        if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load palette set");
-        const palette = Array.isArray(data.items) ? data.items[0] : null;
-        if (!active || !palette) return;
-        const normalized = normalizePalette(palette);
-        if (!normalized) return;
-        setEditPhotos(normalized.photos);
-      } catch (err) {
-        if (!active) return;
-        setPhotoStatus({ loading: false, error: err?.message || "Failed to load set photos" });
-      }
-    }
-    loadPaletteSet();
-    return () => {
-      active = false;
-    };
-  }, [showPhotoSection, open, editForm.palette_id, activeSetId]);
+  
 
   useEffect(() => {
     if (!showPhotoSection || !open || !attachment?.photo_library_id) {
@@ -442,28 +406,20 @@ export default function SavedPaletteEditorModal({
   );
 
   const currentFullPhoto = useMemo(
-    () => (attachPhotoType === "full" && !createNewGroup
+    () => (attachPhotoType === "full"
       ? (editPhotos.find((photo) => (photo.photo_type || "full") === "full") || null)
       : null),
-    [attachPhotoType, createNewGroup, editPhotos]
+    [attachPhotoType, editPhotos]
   );
-  const selectedSet = useMemo(
-    () => (items.find((row) => String(row.id) === String(editForm.palette_id))?.sets || [])
-      .find((set) => String(set.id) === String(activeSetId)) || null,
-    [items, editForm.palette_id, activeSetId]
-  );
+  
   const attachSubmitLabel = useMemo(() => {
-    if (linkOnlyMode && createNewGroup) {
-      return "Attach Palette";
-    }
-    if (attachPhotoType === "full" && currentFullPhoto && fullAttachMode === "replace" && !createNewGroup) {
+    
+    if (attachPhotoType === "full" && currentFullPhoto && fullAttachMode === "replace") {
       return "Replace Full Photo";
     }
-    if (attachEnabled && createNewGroup) {
-      return "Create Viewer";
-    }
+    
     return "Save";
-  }, [attachPhotoType, currentFullPhoto, fullAttachMode, createNewGroup, attachEnabled, linkOnlyMode]);
+  }, [attachPhotoType, currentFullPhoto, fullAttachMode, attachEnabled, linkOnlyMode]);
 
   function handleEditField(name, value) {
     setEditForm((prev) => ({ ...prev, [name]: value }));
@@ -558,8 +514,8 @@ export default function SavedPaletteEditorModal({
       const payload = {
         palette_id: editForm.palette_id,
         photo_library_id: item.photo_library_id || null,
-        set_id: activeSetId ? Number(activeSetId) : null,
-        create_new_set: !activeSetId && createNewGroup,
+        
+        
         raw_rel_path: item.raw_rel_path || "",
         rel_path: item.image_url,
         photo_type: "full",
@@ -576,10 +532,7 @@ export default function SavedPaletteEditorModal({
         throw new Error(json.error || `HTTP ${res.status}`);
       }
       const photo = json.photo || {};
-      if (photo?.saved_palette_set_id) {
-        setActiveSetId(String(photo.saved_palette_set_id));
-        setCreateNewGroup(false);
-      }
+      
       await refreshExistingLinks();
       setEditPhotos((prev) => [
         ...prev,
@@ -610,7 +563,7 @@ export default function SavedPaletteEditorModal({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photo_id: photoId, unlink_only: unlinkOnly ? 1 : 0 }),
+        body: JSON.stringify({ photo_library_id: photoId, unlink_only: 1 }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) {
@@ -634,20 +587,14 @@ export default function SavedPaletteEditorModal({
     const rel = rawRelPath(attachment.raw_rel_path || attachment.rel_path || attachment.image_url || "");
     if (!rel) return null;
     const effectivePhotoType = options.photoType || attachPhotoType;
-    const shouldCreateNewGroup = options.forceCreateNewGroup === true
-      ? true
-      : createNewGroup;
-    const effectiveSetId = options.setId !== undefined
-      ? options.setId
-      : (activeSetId ? Number(activeSetId) : null);
     const replaceExistingFull = options.forceReplace === true
       ? true
-      : (effectivePhotoType === "full" && !shouldCreateNewGroup && fullAttachMode === "replace");
+      : (effectivePhotoType === "full" && fullAttachMode === "replace");
     const payload = {
       palette_id: nextPaletteId,
       photo_library_id: attachment.photo_library_id || null,
-      set_id: effectiveSetId,
-      create_new_set: shouldCreateNewGroup && !effectiveSetId,
+      
+      
       replace_existing_full: replaceExistingFull,
       raw_rel_path: rel,
       rel_path: rel,
@@ -669,32 +616,7 @@ export default function SavedPaletteEditorModal({
     }
     const mainPhoto = json.photo || null;
 
-    if (
-      mainPhoto?.saved_palette_set_id
-      && effectivePhotoType === "full"
-      && selectedBeforePhoto?.photo_library_id
-    ) {
-      const beforeRes = await fetch(PHOTO_LIBRARY_ADD_URL, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          palette_id: nextPaletteId,
-          set_id: Number(mainPhoto.saved_palette_set_id),
-          photo_library_id: selectedBeforePhoto.photo_library_id,
-          raw_rel_path: rawRelPath(selectedBeforePhoto.raw_rel_path || selectedBeforePhoto.image_url || ""),
-          rel_path: rawRelPath(selectedBeforePhoto.raw_rel_path || selectedBeforePhoto.image_url || ""),
-          photo_type: "before",
-          trigger_mode: "none",
-          caption: "Before",
-          alt_text: selectedBeforePhoto.alt_text || "",
-        }),
-      });
-      const beforeJson = await beforeRes.json().catch(() => ({}));
-      if (!beforeRes.ok || !beforeJson.ok) {
-        throw new Error(beforeJson.error || `HTTP ${beforeRes.status}`);
-      }
-    }
+    
 
     return mainPhoto;
   }
@@ -705,9 +627,7 @@ export default function SavedPaletteEditorModal({
     return photos.find((photo) => (photo.photo_type || "full") === "full") || null;
   }, [items, selectedId]);
   const existingPaletteFullPhoto = selectedPaletteFullPhoto || currentFullPhoto || null;
-  const existingPaletteFullSetId = existingPaletteFullPhoto?.saved_palette_set_id
-    ? Number(existingPaletteFullPhoto.saved_palette_set_id)
-    : null;
+  
 
   async function finalizeAttach(nextPaletteId, attachedPhoto) {
     await refreshExistingLinks();
@@ -773,8 +693,7 @@ export default function SavedPaletteEditorModal({
         setMode("edit");
         setSelectedId(String(nextSelectedId));
         const current = nextItems.find((row) => String(row.id) === String(nextSelectedId));
-        const defaultSet = (current?.sets || []).find((set) => Number(set.is_default) === 1) || current?.sets?.[0] || null;
-        setActiveSetId(defaultSet?.id ? String(defaultSet.id) : "");
+            
       }
       return nextItems;
     }
@@ -958,7 +877,7 @@ export default function SavedPaletteEditorModal({
                   </div>
                   {existingPaletteFullPhoto ? (
                     <div className="asp-attach-rebuilt-note asp-attach-rebuilt-note--stack">
-                      This palette already has a full photo. Choose what this photo should be.
+                      This palette already has a Main photo. Replace it here; use Save as New for a different room or house.
                     </div>
                   ) : null}
                 </div>
@@ -969,7 +888,7 @@ export default function SavedPaletteEditorModal({
                       <div key={link.id} className="asp-member-row">
                         <div>
                           <strong>{link.palette_label || `Saved #${link.saved_palette_id}`}</strong>
-                          <div className="muted">{link.set_label} | {link.photo_type}</div>
+                          <div className="muted">Main photograph</div>
                         </div>
                         <button
                           type="button"
@@ -1010,87 +929,17 @@ export default function SavedPaletteEditorModal({
                   <strong>{existingPaletteFullPhoto.caption || existingPaletteFullPhoto.alt_text || existingPaletteFullPhoto.rel_path || `Photo #${existingPaletteFullPhoto.id}`}</strong>
                 </p>
                 <div className="asp-attach-tools">
+                  
+                  
+                  
                   <button
                     type="button"
                     className="ghost"
                     onClick={async () => {
                       setAttachChoiceOpen(false);
-                      setCreateNewGroup(false);
-                      setActiveSetId(existingPaletteFullSetId ? String(existingPaletteFullSetId) : "");
-                      const nextPaletteId = editForm.palette_id || (selectedId ? Number(selectedId) : null);
-                      if (!nextPaletteId) return;
-                      setEditStatus({ loading: true, error: "", success: "" });
-                      try {
-                        const attachedPhoto = await attachSelectedPhoto(nextPaletteId, {
-                          photoType: "before",
-                          forceCreateNewGroup: false,
-                          setId: existingPaletteFullSetId,
-                        });
-                        await finalizeAttach(nextPaletteId, attachedPhoto);
-                      } catch (err) {
-                        setEditStatus({ loading: false, error: err?.message || "Failed to attach photo", success: "" });
-                      }
-                    }}
-                  >
-                    Make This A Before
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={async () => {
-                      setAttachChoiceOpen(false);
-                      setCreateNewGroup(false);
-                      setActiveSetId(existingPaletteFullSetId ? String(existingPaletteFullSetId) : "");
-                      const nextPaletteId = editForm.palette_id || (selectedId ? Number(selectedId) : null);
-                      if (!nextPaletteId) return;
-                      setEditStatus({ loading: true, error: "", success: "" });
-                      try {
-                        const attachedPhoto = await attachSelectedPhoto(nextPaletteId, {
-                          photoType: "zoom",
-                          forceCreateNewGroup: false,
-                          setId: existingPaletteFullSetId,
-                        });
-                        await finalizeAttach(nextPaletteId, attachedPhoto);
-                      } catch (err) {
-                        setEditStatus({ loading: false, error: err?.message || "Failed to attach photo", success: "" });
-                      }
-                    }}
-                  >
-                    Make This A Zoom
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={async () => {
-                      setAttachChoiceOpen(false);
-                      setCreateNewGroup(true);
-                      setActiveSetId("");
-                      setFullAttachMode("new");
-                      const nextPaletteId = editForm.palette_id || (selectedId ? Number(selectedId) : null);
-                      if (!nextPaletteId) return;
-                      setEditStatus({ loading: true, error: "", success: "" });
-                      try {
-                        const attachedPhoto = await attachSelectedPhoto(nextPaletteId, {
-                          photoType: "full",
-                          forceCreateNewGroup: true,
-                          setId: null,
-                        });
-                        await finalizeAttach(nextPaletteId, attachedPhoto);
-                      } catch (err) {
-                        setEditStatus({ loading: false, error: err?.message || "Failed to attach photo", success: "" });
-                      }
-                    }}
-                  >
-                    Create New Full
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={async () => {
-                      setAttachChoiceOpen(false);
-                      setCreateNewGroup(false);
+                      
                       setFullAttachMode("replace");
-                      setActiveSetId(existingPaletteFullSetId ? String(existingPaletteFullSetId) : "");
+                      
                       const nextPaletteId = editForm.palette_id || (selectedId ? Number(selectedId) : null);
                       if (!nextPaletteId) return;
                       setEditStatus({ loading: true, error: "", success: "" });
@@ -1098,7 +947,7 @@ export default function SavedPaletteEditorModal({
                         const attachedPhoto = await attachSelectedPhoto(nextPaletteId, {
                           photoType: "full",
                           forceReplace: true,
-                          setId: existingPaletteFullSetId,
+                          
                         });
                         await finalizeAttach(nextPaletteId, attachedPhoto);
                       } catch (err) {
@@ -1181,164 +1030,11 @@ export default function SavedPaletteEditorModal({
                     Attach palette?
                   </label>
                   {existingLinks.length > 0 ? (
-                    <div className="asp-member-empty">Linked viewers: {existingLinks.length}</div>
+                    <div className="asp-member-empty">Linked palettes: {existingLinks.length}</div>
                   ) : null}
                 </div>
 
-                <div className="asp-attach-fields">
-                  {attachEnabled ? (
-                    <>
-                      <div className="asp-attach-grid">
-                        <label>
-                          Role
-                          <select
-                            value={attachPhotoType}
-                            onChange={(e) => setAttachPhotoType(e.target.value)}
-                            disabled={!attachEnabled}
-                          >
-                            <option value="full">Full</option>
-                            <option value="before">Before</option>
-                            <option value="zoom">Zoom</option>
-                          </select>
-                        </label>
-
-                        {editForm.palette_id ? (
-                          <label>
-                            Viewer
-                            <select
-                              value={createNewGroup ? "__new__" : activeSetId}
-                              onChange={(e) => {
-                                if (e.target.value === "__new__") {
-                                  setCreateNewGroup(true);
-                                  setActiveSetId("");
-                                  setFullAttachMode("replace");
-                                  return;
-                                }
-                                setCreateNewGroup(false);
-                                setActiveSetId(e.target.value);
-                                setFullAttachMode("replace");
-                              }}
-                              disabled={!attachEnabled}
-                            >
-                              <option value="">Primary / Default Viewer</option>
-                              {(items.find((row) => String(row.id) === String(editForm.palette_id))?.sets || []).map((set) => (
-                                <option key={set.id} value={set.id}>
-                                  {formatViewerLabel(set)}
-                                </option>
-                              ))}
-                              <option value="__new__">New Viewer</option>
-                            </select>
-                          </label>
-                        ) : null}
-                      </div>
-
-                      {attachPhotoType === "full" && currentFullPhoto ? (
-                        <div className="asp-inline-note">
-                          <div>
-                            <strong>Full photo already exists</strong>
-                            {selectedSet ? ` in ${formatViewerLabel(selectedSet)}` : ""}.
-                            {" "}
-                            {currentFullPhoto.caption || currentFullPhoto.alt_text || currentFullPhoto.rel_path || `Photo #${currentFullPhoto.id}`}
-                          </div>
-                          <div className="asp-attach-tools">
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => {
-                                if (currentFullPhoto?.rel_path) {
-                                  window.open(currentFullPhoto.rel_path, "_blank", "noopener,noreferrer");
-                                }
-                              }}
-                            >
-                              View Current
-                            </button>
-                            <button
-                              type="button"
-                              className={`ghost${fullAttachMode === "replace" && !createNewGroup ? " asp-choice-active" : ""}`}
-                              onClick={async () => {
-                                setCreateNewGroup(false);
-                                setFullAttachMode("replace");
-                                await handleQuickReplace();
-                              }}
-                              disabled={editStatus.loading}
-                            >
-                              Replace Now
-                            </button>
-                            <button
-                              type="button"
-                              className={`ghost${createNewGroup || fullAttachMode === "new" ? " asp-choice-active" : ""}`}
-                              onClick={() => {
-                                setCreateNewGroup(true);
-                                setActiveSetId("");
-                                setFullAttachMode("new");
-                              }}
-                            >
-                              New Viewer
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {attachPhotoType === "full" ? (
-                        <div className="asp-inline-note">
-                          <div>
-                            <strong>Before photo</strong>
-                            {" "}
-                            {selectedBeforePhoto
-                              ? `${selectedBeforePhoto.title || "Selected photo"} (#${selectedBeforePhoto.photo_library_id})`
-                              : "Optional shared before photo."}
-                          </div>
-                          <div className="asp-attach-tools">
-                            <button type="button" className="ghost" onClick={() => setBeforePickerOpen(true)}>
-                              {selectedBeforePhoto ? "Change" : "Pick"}
-                            </button>
-                            {selectedBeforePhoto ? (
-                              <button type="button" className="ghost" onClick={() => setSelectedBeforePhoto(null)}>
-                                Clear
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {attachPhotoType !== "before" ? (
-                        <div className="asp-attach-grid">
-                          <label>
-                            Gallery Trigger
-                            <select
-                              value={attachTriggerMode}
-                              onChange={(e) => setAttachTriggerMode(e.target.value)}
-                            >
-                              <option value="any">Any color</option>
-                              <option value="color">Specific color</option>
-                            </select>
-                          </label>
-                          {attachTriggerMode === "color" ? (
-                            <label>
-                              Trigger Color
-                              <select
-                                value={attachTriggerColorId || ""}
-                                onChange={(e) => setAttachTriggerColorId(e.target.value ? Number(e.target.value) : null)}
-                              >
-                                <option value="">Pick color</option>
-                                {editMembers.map((row) => (
-                                  <option
-                                    key={`attach-trigger-${row.color?.id || row.color?.color_id}`}
-                                    value={row.color?.id || row.color?.color_id || ""}
-                                  >
-                                    {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="asp-member-empty">Before photos are viewer companions only.</div>
-                      )}
-                    </>
-                  ) : null}
-                </div>
+                
               </div>
 
               {existingLinks.length > 0 ? (
@@ -1347,7 +1043,7 @@ export default function SavedPaletteEditorModal({
                     <div key={link.id} className="asp-member-row">
                       <div>
                         <strong>{link.palette_label || `Saved #${link.saved_palette_id}`}</strong>
-                        <div className="muted">{link.set_label} | {link.photo_type}</div>
+                        <div className="muted">Main photograph</div>
                       </div>
                       <button
                         type="button"
@@ -1389,43 +1085,9 @@ export default function SavedPaletteEditorModal({
                   {editPhotos.map((photo) => (
                     <div key={photo.id} className="asp-photo-card">
                       <img src={photo.rel_path} alt="Palette upload" />
-                      <select
-                        value={photo.photo_type || "full"}
-                        onChange={(e) => handlePhotoField(photo.id, "photo_type", e.target.value)}
-                      >
-                        <option value="full">Full</option>
-                        <option value="zoom">Zoom</option>
-                        <option value="before">Before</option>
-                      </select>
-                      <select
-                        value={photo.trigger_mode || "any"}
-                        onChange={(e) => handlePhotoField(photo.id, "trigger_mode", e.target.value)}
-                      >
-                        <option value="any">Trigger: any color</option>
-                        <option value="none">Trigger: none</option>
-                        <option value="color">Trigger: specific color</option>
-                      </select>
-                      <select
-                        value={photo.trigger_color_id || ""}
-                        onChange={(e) =>
-                          handlePhotoField(
-                            photo.id,
-                            "trigger_color_id",
-                            e.target.value ? Number(e.target.value) : null
-                          )
-                        }
-                        disabled={(photo.photo_type || "full") === "before" || (photo.trigger_mode || "any") !== "color"}
-                      >
-                        <option value="">Pick color</option>
-                        {editMembers.map((row) => (
-                          <option
-                            key={`trigger-${photo.id}-${row.color?.id || row.color?.color_id}`}
-                            value={row.color?.id || row.color?.color_id || ""}
-                          >
-                            {row.color?.name || row.color?.label || row.color?.code || row.color?.id}
-                          </option>
-                        ))}
-                      </select>
+                      
+                      
+                      
                       <input
                         type="text"
                         placeholder="Alt text (SEO)"
@@ -1448,30 +1110,7 @@ export default function SavedPaletteEditorModal({
                   {editForm.palette_id ? "No photos yet." : "Save the palette first, then attach library photos here."}
                 </div>
               )}
-              {editForm.palette_id && (
-                <div className="asp-photo-actions" style={{ marginTop: 12 }}>
-                  <select
-                    value={createNewGroup ? "__new__" : activeSetId}
-                    onChange={(e) => {
-                      if (e.target.value === "__new__") {
-                        setCreateNewGroup(true);
-                        setActiveSetId("");
-                        return;
-                      }
-                      setCreateNewGroup(false);
-                      setActiveSetId(e.target.value);
-                    }}
-                  >
-                    <option value="">Primary / Default Group</option>
-                    {(items.find((row) => String(row.id) === String(editForm.palette_id))?.sets || []).map((set) => (
-                      <option key={set.id} value={set.id}>
-                        {formatViewerLabel(set)}
-                      </option>
-                    ))}
-                    <option value="__new__">Create New Group</option>
-                  </select>
-                </div>
-              )}
+              
             </div>
           )}
 
@@ -1520,6 +1159,7 @@ export default function SavedPaletteEditorModal({
                 <option value="exterior">Exterior</option>
                 <option value="interior">Interior</option>
                 <option value="hoa">HOA</option>
+                <option value="art">Art</option>
               </select>
             </label>
             <div className="asp-member-rows">
@@ -1678,15 +1318,7 @@ export default function SavedPaletteEditorModal({
           onClose={() => setPhotoPickerOpen(false)}
           onPick={handlePhotoPickFromLibrary}
         />
-        <PhotoPickerModal
-          open={beforePickerOpen}
-          title="Pick Shared Before Photo"
-          onClose={() => setBeforePickerOpen(false)}
-          onPick={(item) => {
-            setSelectedBeforePhoto(item);
-            setBeforePickerOpen(false);
-          }}
-        />
+        
       </div>
     </div>, document.body
   );

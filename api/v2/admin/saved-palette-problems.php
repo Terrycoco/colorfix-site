@@ -55,30 +55,11 @@ try {
         respond(['ok' => false, 'error' => 'GET only'], 405);
     }
 
-    $sql = <<<SQL
-        SELECT
-            sp.id AS photo_id,
-            sp.photo_library_id,
-            sp.photo_type,
-            sp.rel_path AS saved_rel_path,
-            s.id AS saved_palette_set_id,
-            s.title AS set_title,
-            s.slug AS set_slug,
-            s.saved_palette_id,
-            p.nickname AS palette_nickname,
-            p.palette_hash,
-            pl.rel_path AS library_rel_path,
-            pl.title AS library_title,
-            pl.photo_library_id AS joined_photo_library_id
-        FROM saved_palette_set_photos sp
-        JOIN saved_palette_sets s
-          ON s.id = sp.saved_palette_set_id
-        JOIN saved_palettes p
-          ON p.id = s.saved_palette_id
-        LEFT JOIN photo_library pl
-          ON pl.photo_library_id = sp.photo_library_id
-        ORDER BY p.nickname ASC, s.order_index ASC, sp.order_index ASC, sp.id ASC
-    SQL;
+    $sql = "SELECT pl.photo_library_id AS photo_id, pl.photo_library_id, 'full' AS photo_type,
+        pl.rel_path AS saved_rel_path, NULL AS saved_palette_set_id, NULL AS set_title, NULL AS set_slug,
+        pl.palette_id AS saved_palette_id, p.nickname AS palette_nickname, p.palette_hash,
+        pl.rel_path AS library_rel_path, pl.title AS library_title, pl.photo_library_id AS joined_photo_library_id
+        FROM photo_library pl JOIN saved_palettes p ON p.id=pl.palette_id ORDER BY p.nickname,pl.photo_library_id";
 
     $stmt = $pdo->query($sql);
     $rows = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
@@ -115,7 +96,7 @@ try {
         ]);
 
         $paletteLabel = trim((string)($row['palette_nickname'] ?? '')) ?: sprintf('Saved Palette #%d', $paletteId);
-        $setLabel = trim((string)($row['set_title'] ?? '')) ?: trim((string)($row['set_slug'] ?? '')) ?: sprintf('Set #%d', $setId);
+        $setLabel = trim((string)($row['set_title'] ?? '')) ?: trim((string)($row['set_slug'] ?? '')) ?: 'Main photo';
 
         $items[] = [
             'key' => sprintf('saved-problem:%d', (int)$row['photo_id']),
@@ -128,7 +109,7 @@ try {
             'name' => sprintf('%s — %s', $paletteLabel, $setLabel),
             'flagged' => sprintf('%s (%s)', $problem, (string)($row['photo_type'] ?? 'photo')),
             'rel_path' => $libraryRelPath !== '' ? $libraryRelPath : $savedRelPath,
-            'open_path' => '/admin/palette-photos?' . $params,
+            'open_path' => '/admin/palette-viewers?palette_id=' . $paletteId,
         ];
     }
 

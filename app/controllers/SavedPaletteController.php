@@ -205,19 +205,16 @@ class SavedPaletteController
             $this->service->updateSavedPalettePhotos($paletteId, $photos);
         }
 
-        if ($viewerContent !== null) {
-            $this->service->updateSavedPaletteViewerContent($paletteId, $viewerContent);
-        }
 
         return $this->service->getSavedPalette($paletteId) ?? [];
     }
 
-    public function deleteSavedPalette(int $paletteId): void
+    public function deleteSavedPalette(int $paletteId): array
     {
         if ($paletteId <= 0) {
             throw new InvalidArgumentException('palette_id required');
         }
-        $this->service->deleteSavedPalette($paletteId);
+        return $this->service->deleteSavedPalette($paletteId);
     }
 
     public function sendEmail(

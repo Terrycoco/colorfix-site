@@ -29,7 +29,11 @@ final class AdminPaletteListEndpoint
 
             $service = new AdminPaletteListService($pdo);
 
-            $items = $service->list($limit);
+            $paletteId = isset($_GET['id']) ? trim((string)$_GET['id']) : null;
+            if ($paletteId !== null && !preg_match('/^[0-9]+$/D', $paletteId)) {
+                self::respond(['ok' => false, 'error' => 'A numeric palette ID is required.'], 400);
+            }
+            $items = $service->list($limit, $paletteId);
 
             self::respond([
                 'ok' => true,

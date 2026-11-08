@@ -437,15 +437,9 @@ export default function PhotoPickerModal({
         ||
         "",
 
-      attached_saved_palette_set_id:
-        item.attached_saved_palette_set_id
-        ??
-        null,
+      
 
-      attached_saved_palette_set_label:
-        item.attached_saved_palette_set_label
-        ||
-        "",
+      
 
       attached_saved_palette_photo_type:
         item.attached_saved_palette_photo_type

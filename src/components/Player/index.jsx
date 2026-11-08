@@ -3,10 +3,10 @@ import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import AnimatedHueWheel from "@components/AnimatedHueWheel";
 import BrandBumperLogo from "@components/BrandBumperLogo";
 import {
-  extractAssetId,
-  fetchAssetUrl,
+  
+  
   getImageRefreshEnabled,
-  isAssetRef,
+  
   parsePhotoRef,
   withImageRefresh,
 } from "@helpers/assetImage";
@@ -210,7 +210,7 @@ function queueFadeReady(img, stageEl) {
 
   const isPaletteItem = (item) => {
     if (!item) return false;
-    return Boolean(item.ap_id || item.palette_hash);
+    return Boolean(item.palette_hash);
   };
 
   useEffect(() => {
@@ -236,14 +236,12 @@ function queueFadeReady(img, stageEl) {
         preload(parsed.url);
         return;
       }
-      if (!isAssetRef(value)) {
+      
         preload(value);
         return;
-      }
-      const assetId = extractAssetId(value);
-      fetchAssetUrl(assetId).then((url) => {
-        if (!cancelled) preload(url);
-      });
+      
+      
+      
     });
 
     return () => {
@@ -267,9 +265,8 @@ function queueFadeReady(img, stageEl) {
   function getItemKey(item) {
     if (!item) return null;
     if (!isItemStarrable(item)) return null;
-    const apId = item.ap_id ?? null;
-    if (apId === null || apId === undefined || apId === "") return null;
-    return String(apId);
+    if (item.playlist_item_id) return `item:${item.playlist_item_id}`;
+    return item.palette_hash ? `palette:${item.palette_hash}` : null;
   }
 
   const playItems = useMemo(() => {
@@ -390,53 +387,14 @@ function startPlayback(nextMode, nextIndex = 0) {
   );
 
   useEffect(() => {
-    let cancelled = false;
-    if (isHueWheel || isBrandBumper) {
-      setCurrentImageUrl("");
-      return () => { cancelled = true; };
-    }
     const value = currentItem?.image_url || "";
     const parsed = parsePhotoRef(value);
-    if (parsed.url) {
-      setCurrentImageUrl(parsed.url);
-      return () => { cancelled = true; };
-    }
-    if (!value) {
-      setCurrentImageUrl("");
-      return () => {};
-    }
-    if (!isAssetRef(value)) {
-      setCurrentImageUrl(value);
-      return () => {};
-    }
-    const assetId = extractAssetId(value);
-    fetchAssetUrl(assetId).then((url) => {
-      if (!cancelled) setCurrentImageUrl(url || "");
-    });
-    return () => { cancelled = true; };
+    setCurrentImageUrl(isHueWheel || isBrandBumper ? "" : parsed.url || value);
   }, [currentItem?.image_url, isHueWheel, isBrandBumper]);
 
   useEffect(() => {
-    let cancelled = false;
     const value = prevItem?.image_url || "";
-    const parsed = parsePhotoRef(value);
-    if (parsed.url) {
-      setPrevImageUrl(parsed.url);
-      return () => { cancelled = true; };
-    }
-    if (!value) {
-      setPrevImageUrl("");
-      return () => {};
-    }
-    if (!isAssetRef(value)) {
-      setPrevImageUrl(value);
-      return () => {};
-    }
-    const assetId = extractAssetId(value);
-    fetchAssetUrl(assetId).then((url) => {
-      if (!cancelled) setPrevImageUrl(url || "");
-    });
-    return () => { cancelled = true; };
+    setPrevImageUrl(parsePhotoRef(value).url || value);
   }, [prevItem?.image_url]);
 
   function withCacheBust(url) {
@@ -1083,7 +1041,7 @@ function resolveSchemaImageUrl(value) {
 
   const parsed = parsePhotoRef(raw);
   const resolved = parsed.url || raw;
-  if (isAssetRef(resolved)) return "";
+  
   if (/^https?:\/\//i.test(resolved)) return resolved;
   if (typeof window === "undefined") return resolved;
 

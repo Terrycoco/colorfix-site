@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 
 
-import { extractAssetId, fetchAssetUrl, isAssetRef, parsePhotoRef } from "@helpers/assetImage";
+import {    parsePhotoRef } from "@helpers/assetImage";
 
 
 
@@ -571,7 +571,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-            saved_palette_set_id: null,
+            
 
 
 
@@ -667,7 +667,6 @@ export default function PlaylistThumbsPage() {
 
 
 
-      const apId = item?.ap_id ?? null;
 
 
 
@@ -675,7 +674,6 @@ export default function PlaylistThumbsPage() {
 
 
 
-      const savedPaletteSetId = Number(item?.saved_palette_set_id || 0) || null;
 
 
 
@@ -747,7 +745,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-          ap_id: apId,
+          
 
 
 
@@ -755,7 +753,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-          saved_palette_set_id: savedPaletteSetId,
+          
 
 
 
@@ -775,7 +773,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-          is_liked: apId ? likedSet.has(String(apId)) : false,
+          is_liked: item.playlist_item_id ? likedSet.has(`item:${item.playlist_item_id}`) : likedSet.has(`palette:${paletteHash}`),
 
 
 
@@ -795,27 +793,11 @@ export default function PlaylistThumbsPage() {
 
 
 
-      if (!apId && !paletteHash && !savedPaletteSetId) continue;
+      if (!paletteHash) continue;
 
 
 
-      const key = paletteHash
-
-
-
-        ? `saved:${paletteHash}:${savedPaletteSetId || "default"}`
-
-
-
-        : savedPaletteSetId
-
-
-
-          ? `saved-set:${savedPaletteSetId}`
-
-
-
-          : `applied:${apId}`;
+      const key = `saved:${paletteHash}:default`;
 
 
 
@@ -847,7 +829,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-        (paletteHash ? "ColorFix Palette" : `Palette ${apId}`);
+        (paletteHash ? "ColorFix Palette" : "ColorFix Palette");
 
 
 
@@ -859,7 +841,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-        ap_id: apId,
+        
 
 
 
@@ -867,7 +849,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-        saved_palette_set_id: savedPaletteSetId,
+        
 
 
 
@@ -887,7 +869,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-        is_liked: apId ? likedSet.has(String(apId)) : false,
+        is_liked: item.playlist_item_id ? likedSet.has(`item:${item.playlist_item_id}`) : likedSet.has(`palette:${paletteHash}`),
 
 
 
@@ -915,7 +897,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-  const [thumbUrlByKey, setThumbUrlByKey] = useState({});
+  
 
 
 
@@ -935,83 +917,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-  useEffect(() => {
-
-
-
-    let cancelled = false;
-
-
-
-    palettes.forEach((palette) => {
-
-
-
-      const key = palette.color_plan_id
-
-
-
-        ? `color-plan:${palette.color_plan_id}`
-
-
-
-        : palette.palette_hash
-
-
-
-          ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
-
-
-
-          : `applied:${palette.ap_id}`;
-
-
-
-      const value = palette.image_url || "";
-
-
-
-      if (!isAssetRef(value)) return;
-
-
-
-      const assetId = extractAssetId(value);
-
-
-
-      if (!assetId) return;
-
-
-
-      fetchAssetUrl(assetId).then((url) => {
-
-
-
-        if (!cancelled && url) {
-
-
-
-          setThumbUrlByKey((prev) => ({ ...prev, [key]: url }));
-
-
-
-        }
-
-
-
-      });
-
-
-
-    });
-
-
-
-    return () => { cancelled = true; };
-
-
-
-  }, [palettes]);
+  
 
 
 
@@ -1215,7 +1121,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-                  ? `saved:${palette.palette_hash}:${palette.saved_palette_set_id || "default"}`
+                  ? `saved:${palette.palette_hash}:${"default"}`
 
 
 
@@ -1227,7 +1133,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-                  : `applied:${palette.ap_id}`;
+                  : `saved:${palette.palette_hash}:default`;
 
 
 
@@ -1240,14 +1146,6 @@ export default function PlaylistThumbsPage() {
 
 
                 ? parsed.url
-
-
-
-                : isAssetRef(palette.image_url)
-
-
-
-                ? thumbUrlByKey[cardKey] || ""
 
 
 
@@ -1323,15 +1221,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-                if (palette.saved_palette_set_id) {
-
-
-
-                  params.set("set_id", String(palette.saved_palette_set_id));
-
-
-
-                }
+                
 
 
 

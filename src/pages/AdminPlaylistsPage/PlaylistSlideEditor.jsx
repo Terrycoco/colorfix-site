@@ -118,7 +118,7 @@ export default function PlaylistSlideEditor({
   function setProjectPalette(value) {
     const nextHash = String(value || "").trim();
     onUpdate("palette_hash", nextHash);
-    onUpdate("saved_palette_set_id", "");
+    
   }
   const photoId = item?.photo_library_id || parsePhotoRef(item?.image_url || "")?.photoId || "";
   const hueConfig =
@@ -490,14 +490,7 @@ export default function PlaylistSlideEditor({
                 <option value="animate">animate</option>
               </select>
             </AdminField>
-            <AdminField label="AP ID" compact>
-              <input
-                className="admin-field__control"
-                type="number"
-                value={item.ap_id || ""}
-                onChange={(event) => onUpdate("ap_id", event.target.value)}
-              />
-            </AdminField>
+            
           </AdminToolbar>
           <AdminToolbar compact>
             <AdminCheckboxRow

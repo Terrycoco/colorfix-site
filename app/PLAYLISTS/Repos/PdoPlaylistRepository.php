@@ -1339,120 +1339,18 @@ public function saveAdminRow(
      */
 
     public function listSavedPaletteReferencesByPlaylist(?int $playlistId = null): array
-
     {
-
-        $hasSavedPaletteSetId = $this->hasPlaylistItemColumn('saved_palette_set_id');
-
-        $hasPaletteHash = $this->hasPlaylistItemColumn('palette_hash');
-
-
-
-        if (!$hasSavedPaletteSetId && !$hasPaletteHash) {
-
-            return [];
-
-        }
-
-
-
-        $setJoin = $hasSavedPaletteSetId
-
-            ? 'LEFT JOIN saved_palette_sets sps ON sps.id = pi.saved_palette_set_id'
-
-            : '';
-
-        $hashJoin = $hasPaletteHash
-
-            ? 'LEFT JOIN saved_palettes sph ON sph.palette_hash = pi.palette_hash'
-
-            : '';
-
-        $setIdSelect = $hasSavedPaletteSetId ? 'pi.saved_palette_set_id' : 'NULL AS saved_palette_set_id';
-
-        $savedPaletteIdSelect = $hasSavedPaletteSetId && $hasPaletteHash
-
-            ? 'COALESCE(sps.saved_palette_id, sph.id) AS saved_palette_id'
-
-            : ($hasSavedPaletteSetId ? 'sps.saved_palette_id AS saved_palette_id' : 'sph.id AS saved_palette_id');
-
-        $setOrHashWhere = [];
-
-        if ($hasSavedPaletteSetId) {
-
-            $setOrHashWhere[] = '(pi.saved_palette_set_id IS NOT NULL AND pi.saved_palette_set_id > 0 AND sps.saved_palette_id IS NOT NULL)';
-
-        }
-
-        if ($hasPaletteHash) {
-
-            $setOrHashWhere[] = "(pi.palette_hash IS NOT NULL AND pi.palette_hash <> '' AND sph.id IS NOT NULL)";
-
-        }
-
-        $referenceWhere = $this->implodeSqlOr($setOrHashWhere);
-
-
-
-        $sql = <<<SQL
-
-            SELECT
-
-                pi.playlist_item_id,
-
-                pi.playlist_id,
-
-                pi.order_index,
-
-                {$setIdSelect},
-
-                {$savedPaletteIdSelect}
-
-            FROM playlist_items pi
-
-            {$setJoin}
-
-            {$hashJoin}
-
-            WHERE pi.is_active = 1
-
-              AND (
-
-                {$referenceWhere}
-
-              )
-
-            SQL;
-
-
-
-        $params = [];
-
-        if ($playlistId !== null && $playlistId > 0) {
-
-            $sql .= "\n              AND pi.playlist_id = :playlist_id";
-
-            $params['playlist_id'] = $playlistId;
-
-        }
-
-
-
-        $sql .= "\n            ORDER BY pi.playlist_id ASC, pi.order_index ASC, pi.playlist_item_id ASC";
-
-
-
-        $stmt = $this->pdo->prepare($sql);
-
-        $stmt->execute($params);
-
-
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
+        if (!$this->hasPlaylistItemColumn('palette_hash')) { return []; }
+        $sql = "SELECT pi.playlist_item_id, pi.playlist_id, pi.order_index,
+            NULL AS saved_palette_set_id, sp.id AS saved_palette_id
+            FROM playlist_items pi JOIN saved_palettes sp ON sp.palette_hash=pi.palette_hash
+            WHERE pi.is_active=1";
+        $params=[];
+        if ($playlistId !== null && $playlistId > 0) { $sql.=' AND pi.playlist_id=?'; $params[]=$playlistId; }
+        $sql.=' ORDER BY pi.playlist_id,pi.order_index,pi.playlist_item_id';
+        $stmt=$this->pdo->prepare($sql);$stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
-
 
     /**
 
@@ -1587,8 +1485,6 @@ public function saveAdminRow(
               playlist_id,
 
               order_index,
-
-              ap_id,
 
               palette_hash,
 
@@ -1860,10 +1756,6 @@ public function getActivePublishingSlides(
 
             slides.order_index,
 
-
-
-            slides.ap_id,
-
             slides.palette_hash,
 
             slides.photo_library_id,
@@ -1959,10 +1851,6 @@ public function getActivePublishingSlides(
                 playlist_id,
 
                 order_index,
-
-
-
-                ap_id,
 
                 palette_hash,
 
@@ -2374,10 +2262,6 @@ public function getPublicActiveSlides(
 
             slides.order_index,
 
-
-
-            slides.ap_id,
-
             slides.palette_hash,
 
             slides.photo_library_id,
@@ -2473,10 +2357,6 @@ public function getPublicActiveSlides(
                 playlist_id,
 
                 order_index,
-
-
-
-                ap_id,
 
                 palette_hash,
 
@@ -2636,7 +2516,6 @@ public function getPublicActiveSlides(
 
         $hasPhotoLibraryId = $this->hasPlaylistItemColumn('photo_library_id');
 
-        $hasSavedPaletteSetId = $this->hasPlaylistItemColumn('saved_palette_set_id');
 
         $hasColorPlanId = $this->hasPlaylistItemColumn('color_plan_id');
 
@@ -2716,7 +2595,6 @@ public function getPublicActiveSlides(
 
                 'order_index' => $orderIndex,
 
-                'ap_id' => isset($item['ap_id']) && $item['ap_id'] !== '' ? (int)$item['ap_id'] : null,
 
                 'palette_hash' => isset($item['palette_hash']) && $item['palette_hash'] !== '' ? (string)$item['palette_hash'] : null,
 
@@ -2724,7 +2602,6 @@ public function getPublicActiveSlides(
 
                 'photo_library_id' => isset($item['photo_library_id']) && $item['photo_library_id'] !== '' ? (int)$item['photo_library_id'] : null,
 
-                'saved_palette_set_id' => isset($item['saved_palette_set_id']) && $item['saved_palette_set_id'] !== '' ? (int)$item['saved_palette_set_id'] : null,
 
                 'color_plan_id' => isset($item['color_plan_id']) && $item['color_plan_id'] !== '' ? (int)$item['color_plan_id'] : null,
 
@@ -2844,15 +2721,11 @@ public function getPublicActiveSlides(
 
                 'order_index',
 
-                'ap_id',
-
                 'palette_hash',
 
                 'image_url',
 
                 'photo_library_id',
-
-                'saved_palette_set_id',
 
                 'color_plan_id',
 
@@ -2910,13 +2783,7 @@ public function getPublicActiveSlides(
 
             }
 
-            if (!$hasSavedPaletteSetId) {
 
-                $columns = array_values(array_filter($columns, fn($col) => $col !== 'saved_palette_set_id'));
-
-                unset($data['saved_palette_set_id']);
-
-            }
 
             if (!$hasColorPlanId) {
 
@@ -3184,8 +3051,6 @@ public function getPublicActiveSlides(
 
                 order_index,
 
-                ap_id,
-
                 palette_hash,
 
                 image_url,
@@ -3447,38 +3312,10 @@ public function getPublicActiveSlides(
 
 
     private function getSavedPaletteSetIdSelect(): string
-
     {
-
-        static $cached = null;
-
-        if ($cached !== null) return $cached;
-
-        $sql = <<<SQL
-
-            SELECT COUNT(*)
-
-            FROM INFORMATION_SCHEMA.COLUMNS
-
-            WHERE TABLE_SCHEMA = DATABASE()
-
-              AND TABLE_NAME = 'playlist_items'
-
-              AND COLUMN_NAME = 'saved_palette_set_id'
-
-        SQL;
-
-        $stmt = $this->pdo->prepare($sql);
-
-        $stmt->execute();
-
-        $cached = (int)$stmt->fetchColumn() > 0 ? 'saved_palette_set_id' : 'NULL AS saved_palette_set_id';
-
-        return $cached;
-
+        // Inert response alias retained for existing consumers; no retired column is read.
+        return 'NULL AS saved_palette_set_id';
     }
-
-
 
     private function getPlaylistItemFlagSelect(string $column): string
 

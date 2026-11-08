@@ -1019,11 +1019,9 @@ function runToPalette({
 
 
 
-  const apId = targetItem.ap_id;
 
   const paletteHash = targetItem.palette_hash;
 
-  const savedPaletteSetId = Number(targetItem.saved_palette_set_id || 0);
 
 
 
@@ -1051,7 +1049,7 @@ function runToPalette({
 
 
 
-  if (!paletteHash && !savedPaletteSetId) return;
+  if (!paletteHash) return;
 
 
 
@@ -1147,11 +1145,7 @@ function runToPalette({
 
 
 
-  if (savedPaletteSetId > 0) {
 
-    params.set("set_id", String(savedPaletteSetId));
-
-  }
 
 
 

@@ -59,7 +59,6 @@ try {
 
     $where = [];
     $params = [];
-    $needsPaletteJoin = !$exactPhotoIdSearch && ($paletteId > 0 || $sourceType === 'saved_palette_photo');
     if (!$exactPhotoIdSearch && $sourceType !== '' && $sourceType !== 'saved_palette_photo') {
         $where[] = 'source_type = :source_type';
         $params[':source_type'] = $sourceType;
@@ -138,14 +137,10 @@ try {
         || $missingTags;
     $limit = min($limit, $hasNarrowingFilter ? 50 : 5);
 
-    $joins = "";
-    if ($needsPaletteJoin) {
-        $joins .= " JOIN saved_palette_set_photos spsp ON spsp.photo_library_id = photo_library.photo_library_id";
-        $joins .= " JOIN saved_palette_sets sps ON sps.id = spsp.saved_palette_set_id";
-    }
+    $joins = ' LEFT JOIN saved_palettes attached_palette ON attached_palette.id = photo_library.palette_id';
+    if (!$exactPhotoIdSearch && $sourceType === 'saved_palette_photo') { $where[] = 'photo_library.palette_id IS NOT NULL'; }
     if (!$exactPhotoIdSearch && $paletteId > 0) {
-        $where[] = "sps.saved_palette_id = :palette_id";
-        $params[':palette_id'] = $paletteId;
+        $where[] = 'photo_library.palette_id = :palette_id'; $params[':palette_id'] = $paletteId;
     }
 
     $sql = "SELECT photo_library.photo_library_id,
@@ -168,6 +163,7 @@ try {
                    photo_library.note,
                    photo_library.show_in_gallery,
                    photo_library.has_palette,
+                   photo_library.palette_id,
                    photo_library.is_inactive,
                    photo_library.is_retired,
                    photo_library.created_at,
@@ -176,76 +172,14 @@ try {
                    clients.email AS client_email,
                    clients.photo_permission_status AS client_photo_permission_status,
                    COALESCE(NULLIF(photo_library.photo_permission_status, ''), clients.photo_permission_status, 'unknown') AS photo_permission_status,
-                   (
-                     SELECT s.saved_palette_id
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_id,
-                   (
-                     SELECT COALESCE(NULLIF(p.nickname, ''), p.palette_hash, CONCAT('Saved #', p.id))
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                       JOIN saved_palettes p
-                         ON p.id = s.saved_palette_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_label,
-                   (
-                     SELECT s.id
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_set_id,
-                   (
-                     SELECT COALESCE(NULLIF(s.title, ''), s.slug, CONCAT('Set #', s.id))
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_set_label,
-                   (
-                     SELECT sp.photo_type
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_photo_type,
-                   (
-                     SELECT sp.trigger_mode
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_trigger_mode,
-                   (
-                     SELECT sp.trigger_color_id
-                       FROM saved_palette_set_photos sp
-                       JOIN saved_palette_sets s
-                         ON s.id = sp.saved_palette_set_id
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ORDER BY s.is_default DESC, sp.id ASC
-                      LIMIT 1
-                   ) AS attached_saved_palette_trigger_color_id,
-                   (
-                     SELECT COUNT(*)
-                       FROM saved_palette_set_photos sp
-                      WHERE sp.photo_library_id = photo_library.photo_library_id
-                   ) AS attached_saved_palette_link_count
+                   photo_library.palette_id AS attached_saved_palette_id,
+                   COALESCE(NULLIF(attached_palette.nickname,''), attached_palette.palette_hash) AS attached_saved_palette_label,
+                   NULL AS attached_saved_palette_set_id, NULL AS attached_saved_palette_set_label,
+                   CASE WHEN photo_library.palette_id IS NOT NULL THEN 'full' ELSE NULL END AS attached_saved_palette_photo_type,
+                   'any' AS attached_saved_palette_trigger_mode, NULL AS attached_saved_palette_trigger_color_id,
+                   CASE WHEN photo_library.palette_id IS NOT NULL THEN 1 ELSE 0 END AS attached_saved_palette_link_count,
+                   (SELECT pv.palette_viewer_id FROM palette_viewers pv WHERE pv.saved_palette_id=photo_library.palette_id
+                     ORDER BY pv.is_active DESC, (pv.format='public') DESC, pv.palette_viewer_id LIMIT 1) AS attached_palette_viewer_id
             FROM photo_library
             LEFT JOIN clients ON clients.id = photo_library.client_id
             LEFT JOIN photo_alt_text_jobs jobs ON jobs.photo_library_id = photo_library.photo_library_id{$joins}";

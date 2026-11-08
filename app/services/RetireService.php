@@ -358,14 +358,9 @@ final class RetireService
 
     private function countPhotoUsages(int $photoLibraryId): int
     {
-        return
-            (int)$this->fetchValue('SELECT COUNT(*) FROM article_sections WHERE asset_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM articles WHERE hero_asset_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM playlist_items WHERE photo_library_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM playlist_instances WHERE intro_photo_library_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM playlist_instances WHERE share_photo_library_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM saved_palette_set_photos WHERE photo_library_id = :id', ['id' => $photoLibraryId]) +
-            (int)$this->fetchValue('SELECT COUNT(*) FROM photo_group_items WHERE photo_library_id = :id', ['id' => $photoLibraryId]);
+        return count((new \App\PHOTOS\Services\PhotoLibraryUsageService(
+            new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($this->pdo)
+        ))->getUsageSummary($photoLibraryId));
     }
 
     private function normalizeType(string $type): string

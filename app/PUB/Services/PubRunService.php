@@ -333,6 +333,7 @@ final class PubRunService
                     )
                 );
 
+            $this->assetRepository->assertNotPhotoLibraryFile($filePath);
             if (
                 $filePath !== ''
                 && is_file(

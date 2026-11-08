@@ -163,16 +163,6 @@ class PdoClientRepository
         $stmt->execute([':id' => $id]);
     }
 
-    public function deleteAppliedPaletteLinks(int $id): void
-    {
-        // Legacy applied palette tables have been removed.
-    }
-
-    public function deleteAppliedPaletteShares(int $id): void
-    {
-        // Legacy applied palette tables have been removed.
-    }
-
     public function delete(int $id): void
     {
         $stmt = $this->pdo->prepare("DELETE FROM clients WHERE id = :id");

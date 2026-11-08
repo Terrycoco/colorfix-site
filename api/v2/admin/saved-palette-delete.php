@@ -42,9 +42,9 @@ try {
     $service     = new SavedPaletteService($paletteRepo, null, null, $photoLibrary);
     $controller  = new SavedPaletteController($service);
 
-    $controller->deleteSavedPalette($paletteId);
+    $cleanup = $controller->deleteSavedPalette($paletteId);
 
-    echo json_encode(['ok' => true], JSON_UNESCAPED_SLASHES);
+    echo json_encode(['ok' => true, 'photo_cleanup' => $cleanup], JSON_UNESCAPED_SLASHES);
 } catch (\InvalidArgumentException $e) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);

@@ -14,6 +14,9 @@ function photo_library_usage_fixture(): array
     });
     $pdo->exec('DELETE FROM playlist_items');
     $pdo->exec('DELETE FROM project_photos');
+    // Usage fixtures start without the replacement fixture's linked asset.
+    $pdo->exec('DELETE FROM asset_library');
+    $pdo->exec('UPDATE photo_library SET asset_library_id=NULL');
     $pdo->exec('ALTER TABLE playlist_items ADD COLUMN playlist_item_id INTEGER');
     $pdo->exec('ALTER TABLE playlist_items ADD COLUMN playlist_id INTEGER');
     $pdo->exec('ALTER TABLE project_photos ADD COLUMN project_id INTEGER');
@@ -61,7 +64,7 @@ test('photo delete guard checks disabled Project Photos and current shared clien
 test('photo delete guard catches playlist IDs, encoded references, paths, heroes and current set covers', function () {
     [$pdo, $root, $repo] = photo_library_usage_fixture();
     try {
-        foreach (['photo:736|/unrelated.png', '/old.png?v=123', 'old.png', 'https://colorfix.test/old.png#preview'] as $index => $path) {
+        foreach (['photo:736|/unrelated.png', '/photos/old.png?v=123', 'photos/old.png', 'https://colorfix.test/photos/old.png#preview'] as $index => $path) {
             $stmt = $pdo->prepare('INSERT INTO playlist_items VALUES (NULL,?, ?,56)');
             $stmt->execute([$path, $index + 1]);
         }
@@ -79,7 +82,7 @@ test('photo delete guard catches playlist IDs, encoded references, paths, heroes
 test('photo delete guard catches direct PV links and cached legacy paths without filtering inactive viewers', function () {
     [$pdo, $root, $repo] = photo_library_usage_fixture();
     try {
-        $pdo->exec("INSERT INTO palette_viewer_photos VALUES (79,736,NULL,'zoom'), (85,NULL,'/old.png?v=123','main')");
+        $pdo->exec("INSERT INTO palette_viewer_photos VALUES (79,736,NULL,'zoom'), (85,NULL,'/photos/old.png?v=123','main')");
         $usages = $repo->listUsages(736);
         assert_equals(2, count($usages));
         assert_equals(['palette_viewer_photo','palette_viewer_photo'], array_column($usages, 'usage_type'));
@@ -90,10 +93,10 @@ test('photo delete guard catches direct PV links and cached legacy paths without
 test('photo delete guard preserves saved palette, instance, group and article checks and fails closed on query errors', function () {
     [$pdo, $root, $repo] = photo_library_usage_fixture();
     try {
-        $pdo->exec("INSERT INTO playlist_instances VALUES (1,'Legacy Instance','photo:736','/old.png?v=1')");
+        $pdo->exec("INSERT INTO playlist_instances VALUES (1,'Legacy Instance','photo:736','/photos/old.png?v=1')");
         $pdo->exec("INSERT INTO saved_palettes VALUES (162,'Exterior','hash')");
         $pdo->exec("INSERT INTO saved_palette_sets VALUES (1,162,'Blue','blue')");
-        $pdo->exec("INSERT INTO saved_palette_set_photos VALUES (1,NULL,'main','/old.png')");
+        $pdo->exec("INSERT INTO saved_palette_set_photos VALUES (1,NULL,'main','/photos/old.png')");
         $pdo->exec("INSERT INTO photo_groups VALUES (1,'Ulloa')");
         $pdo->exec('INSERT INTO photo_group_items VALUES (1,736)');
         $pdo->exec("INSERT INTO articles VALUES (1,'Example',736,NULL)");

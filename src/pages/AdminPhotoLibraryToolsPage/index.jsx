@@ -9,7 +9,7 @@ const RECONCILE_URL = `${API_FOLDER}/v2/admin/photo-library/reconcile-filesystem
 const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
 const UPDATE_URL = `${API_FOLDER}/v2/admin/photo-library/update.php`;
 const DELETE_INACTIVE_URL = `${API_FOLDER}/v2/admin/photo-library/delete-inactive.php`;
-const BACKFILL_EXTERIORS_URL = `${API_FOLDER}/v2/admin/photo-library/backfill-exteriors.php`;
+
 const RETIRE_MISSING_URL = `${API_FOLDER}/v2/admin/photo-library/retire-missing.php`;
 const DUPLICATES_URL = `${API_FOLDER}/v2/admin/photo-library/duplicate-candidates.php`;
 const MERGE_URL = `${API_FOLDER}/v2/admin/photo-library/merge.php`;
@@ -128,10 +128,10 @@ export default function AdminPhotoLibraryToolsPage() {
       key: `missing:${index}:${item.rel_path}`,
       thumb: item.rel_path || "",
       name: item.title || item.rel_path || "Untitled",
-      flagged: `Missing library row (${item.source_type || "photo_base"})`,
+      flagged: `Missing library row (${item.source_type || "extra_photo"})`,
       photo_library_id: null,
       rel_path: item.rel_path || "",
-      source_type: item.source_type || "photo_base",
+      source_type: item.source_type || "extra_photo",
     }));
   }
 
@@ -280,20 +280,7 @@ export default function AdminPhotoLibraryToolsPage() {
     }
   }
 
-  async function handleSyncBasePhotos() {
-    if (!window.confirm("Scan exterior base photos and add missing Photo Library rows?")) return;
-    setError("");
-    setNotice("");
-    try {
-      const res = await fetch(BACKFILL_EXTERIORS_URL, { method: "POST", credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Sync base photos failed");
-      setNotice(`Added ${Number(data?.added || 0)} base photo row(s). Skipped ${Number(data?.skipped || 0)}.`);
-      await loadMode(mode);
-    } catch (err) {
-      setError(err?.message || "Sync base photos failed");
-    }
-  }
+  
 
   async function handleSaveMissingRetires() {
     const selectedRows = rows.filter((row) => selectedMissingRows[row.key]);
@@ -505,9 +492,7 @@ export default function AdminPhotoLibraryToolsPage() {
               Delete Retired
             </button>
           ) : null}
-          <button type="button" className="admin-photo-library-tools__btn" onClick={handleSyncBasePhotos}>
-            Sync Base Photos
-          </button>
+          
         </div>
       </div>
 

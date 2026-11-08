@@ -3,7 +3,7 @@ import BrandFooterLogo from "@components/BrandFooterLogo";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
 import { withSourceParam } from "@helpers/sourceParam";
 import ViewerCtaButton from "../ViewerCtaButton";
-import "../appliedpaletteviewer.css";
+import "../paletteviewer.css";
 import "./clientpaletteviewer.css";
 
 /**

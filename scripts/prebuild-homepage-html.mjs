@@ -64,7 +64,8 @@ for (const page of pages) {
 
   if (page.path === "/") continue;
 
-  const relativePath = String(page.path || "").replace(/^\/+|\/+$/g, "");
+  // URL query strings/fragments are not filesystem directories.
+  const relativePath = String(page.path || "").split(/[?#]/, 1)[0].replace(/^\/+|\/+$/g, "");
 
   if (!relativePath || relativePath.split("/").some(part => part === "." || part === "..")) {
 

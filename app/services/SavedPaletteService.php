@@ -163,7 +163,7 @@ class SavedPaletteService
         return $full;
     }
 
-    public function deleteSavedPalette(int $savedPaletteId): void
+    public function deleteSavedPalette(int $savedPaletteId): array
     {
         if ($savedPaletteId <= 0) {
             throw new InvalidArgumentException('saved_palette_id required');
@@ -176,39 +176,22 @@ class SavedPaletteService
             );
         }
 
-        $photos = [];
-        $sets = $this->repo->getSetsForPalette($savedPaletteId);
-        if ($sets) {
-            foreach ($sets as $set) {
-                $setId = isset($set['id']) ? (int)$set['id'] : 0;
-                if ($setId <= 0) {
-                    continue;
-                }
-                foreach ($this->repo->getPhotosForPalette($savedPaletteId, $setId) as $photo) {
-                    $photos[] = $photo;
-                }
-            }
-        } else {
-            $photos = $this->repo->getPhotosForPalette($savedPaletteId);
+        $photos = $this->repo->getPhotosForPalette($savedPaletteId);
+        $pdo = $this->repo->connection();
+        if ($pdo->inTransaction()) { throw new \LogicException('Finish the current transaction before deleting a saved palette'); }
+        $pdo->beginTransaction();
+        try {
+            // PALETTES owns its relationships. Physical assets are exclusively PHOTOS-owned.
+            $this->repo->deletePhotosForPalette($savedPaletteId);
+            $this->repo->deleteMembersForPalette($savedPaletteId);
+            $this->repo->deleteViewsForPalette($savedPaletteId);
+            $this->repo->deleteSavedPalette($savedPaletteId);
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) { $pdo->rollBack(); }
+            throw $e;
         }
-        $docRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? __DIR__ . '/../../..'), '/');
-        foreach ($photos as $photo) {
-            if ($this->photoLibrary && !empty($photo['id'])) {
-                $this->photoLibrary->deleteSavedPalettePhoto((int)$photo['id']);
-            }
-            $rel = (string)($photo['rel_path'] ?? '');
-            if ($rel === '' || !str_starts_with($rel, '/photos/')) {
-                continue;
-            }
-            $abs = $docRoot . $rel;
-            if (is_file($abs)) {
-                @unlink($abs);
-            }
-        }
-        $this->repo->deletePhotosForPalette($savedPaletteId);
-        $this->repo->deleteMembersForPalette($savedPaletteId);
-        $this->repo->deleteViewsForPalette($savedPaletteId);
-        $this->repo->deleteSavedPalette($savedPaletteId);
+        return (new \App\PHOTOS\Services\PhotoLifecycleService($pdo))->cleanupDetachedPalettePhotos($photos);
     }
 
     /**
@@ -328,105 +311,9 @@ class SavedPaletteService
                 'caption' => $caption,
                 'alt_text' => $altText,
             ]);
-            if ($this->photoLibrary) {
-                $updatedPhoto = $this->repo->getPhotoById($photoId);
-                if ($updatedPhoto) {
-                    $this->photoLibrary->syncSavedPalettePhoto($updatedPhoto);
-                }
-            }
         }
     }
 
-    public function updateSavedPaletteViewerContent(int $paletteId, array $payload): array
-    {
-        if ($paletteId <= 0) {
-            throw new InvalidArgumentException('palette_id required');
-        }
-        $setId = isset($payload['saved_palette_set_id']) ? (int)$payload['saved_palette_set_id'] : 0;
-        if ($setId <= 0) {
-            throw new InvalidArgumentException('saved_palette_set_id required');
-        }
-        $set = $this->repo->getSetById($setId);
-        if (!$set || (int)($set['saved_palette_id'] ?? 0) !== $paletteId) {
-            throw new InvalidArgumentException('Saved palette set not found for this palette');
-        }
-
-        $templateKey = strtolower(trim((string)($payload['template_key'] ?? 'full_palette')));
-        if (!in_array($templateKey, ['full_palette', 'concept', 'client', 'painter'], true)) {
-            $templateKey = 'full_palette';
-        }
-
-        return $this->repo->upsertViewerContent($paletteId, $setId, $templateKey, [
-            'kicker_text' => $this->nullableText($payload['kicker_text'] ?? null),
-            'title' => $this->nullableText($payload['title'] ?? null),
-            'intro' => $this->nullableText($payload['intro'] ?? null),
-            'notes' => $this->nullableText($payload['notes'] ?? null),
-            'cta_label' => $this->nullableText($payload['cta_label'] ?? null),
-            'playlist_url' => $this->nullableText($payload['playlist_url'] ?? null),
-            'share_card_template_id' => isset($payload['share_card_template_id']) && (int)$payload['share_card_template_id'] > 0
-                ? (int)$payload['share_card_template_id']
-                : null,
-            'share_card_fields_json' => is_array($payload['share_card_fields_json'] ?? null)
-                ? $payload['share_card_fields_json']
-                : null,
-            'is_active' => array_key_exists('is_active', $payload) ? (int)(bool)$payload['is_active'] : 1,
-        ]);
-    }
-
-    public function normalizePhotoLinks(?PdoPhotoLibraryRepository $photoLibraryRepo = null, bool $apply = false): array
-    {
-        $rows = $this->repo->listPhotosNeedingPathNormalization();
-        $result = [
-            'checked' => count($rows),
-            'normalized' => 0,
-            'items' => [],
-        ];
-
-        foreach ($rows as $row) {
-            $photoId = (int)($row['id'] ?? 0);
-            $paletteId = (int)($row['saved_palette_id'] ?? 0);
-            $rawRelPath = trim((string)($row['rel_path'] ?? ''));
-            if ($photoId <= 0 || $paletteId <= 0 || $rawRelPath === '') {
-                continue;
-            }
-
-            $cleanRelPath = (string)(parse_url($rawRelPath, PHP_URL_PATH) ?: $rawRelPath);
-            $nextPhotoLibraryId = null;
-            if ($photoLibraryRepo && $cleanRelPath !== '') {
-                $nextPhotoLibraryId = $photoLibraryRepo->findCanonicalIdByRelPath($cleanRelPath);
-            }
-
-            $changed = $cleanRelPath !== $rawRelPath
-                || (
-                    $nextPhotoLibraryId !== null
-                    && (int)($row['photo_library_id'] ?? 0) !== $nextPhotoLibraryId
-                );
-
-            $result['items'][] = [
-                'photo_id' => $photoId,
-                'palette_id' => $paletteId,
-                'photo_type' => (string)($row['photo_type'] ?? ''),
-                'before_rel_path' => $rawRelPath,
-                'after_rel_path' => $cleanRelPath,
-                'before_photo_library_id' => $row['photo_library_id'] !== null ? (int)$row['photo_library_id'] : null,
-                'after_photo_library_id' => $nextPhotoLibraryId,
-                'changed' => $changed,
-            ];
-
-            if (!$apply || !$changed) {
-                continue;
-            }
-
-            $fields = ['rel_path' => $cleanRelPath];
-            if ($nextPhotoLibraryId !== null) {
-                $fields['photo_library_id'] = $nextPhotoLibraryId;
-            }
-            $this->repo->updatePhoto($photoId, $paletteId, $fields);
-            $result['normalized']++;
-        }
-
-        return $result;
-    }
     /**
      * Normalize color_ids into the shape expected by addMembers():
      *  - always an array of ['color_id' => int, 'order_index' => int, 'role' => ?string, 'sheen' => ?string, 'note' => ?string]
@@ -706,7 +593,7 @@ class SavedPaletteService
     private function normalizePaletteType(?string $value): string
     {
         $type = strtolower(trim((string)($value ?? '')));
-        $allowed = ['interior', 'exterior', 'hoa'];
+        $allowed = ['interior', 'exterior', 'hoa', 'art'];
         if (!in_array($type, $allowed, true)) {
             return 'exterior';
         }

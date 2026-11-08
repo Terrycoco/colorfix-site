@@ -11,7 +11,6 @@ require_once __DIR__ . '/../db.php';
 use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoPaletteViewerPhotoRepository;
 use App\Repos\PdoPaletteViewerRepository;
-use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\REX\Repos\PdoRexReservationRepository;
@@ -19,7 +18,6 @@ use App\REX\Resolvers\PlaylistExperienceResolver;
 use App\REX\Resolvers\RexResolverRegistry;
 use App\REX\Resolvers\ViewerResolver;
 use App\REX\Services\RexResolver;
-use App\Services\PhotoRenderingService;
 use App\Services\PaletteViewerService;
 use App\Services\PaletteViewerTokenService;
 
@@ -35,13 +33,13 @@ try {
     }
 
     $savedRepo = new PdoSavedPaletteRepository($pdo);
-    $photoRepo = new PdoPhotoRepository($pdo);
+
     $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
     $projectColorPlanRepo = new PdoProjectColorPlanRepository($pdo);
-    $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
+
     $svc = new PaletteViewerService(
         $savedRepo,
-        $renderSvc,
+
         $playlistInstanceRepo,
         $projectColorPlanRepo,
         new PdoPaletteViewerRepository($pdo),
@@ -92,8 +90,8 @@ try {
         }
 
         $hash = trim((string)($tokenPayload['hash'] ?? ''));
-        $setId = isset($tokenPayload['set_id']) ? (int)$tokenPayload['set_id'] : null;
-        $data = $svc->getSaved($hash, $setId && $setId > 0 ? $setId : null, $paletteViewerKey);
+
+        $data = $svc->getSaved($hash, null, $paletteViewerKey);
         $data['meta']['playlist_instance_id'] = $tokenPayload['playlist_instance_id'] ?? null;
         $playlistInstanceId = (int)($tokenPayload['playlist_instance_id'] ?? 0);
         if ($playlistInstanceId > 0) {
@@ -120,15 +118,14 @@ try {
         respond(['ok' => false, 'error' => 'source must be saved'], 400);
     }
 
-    $setId = isset($_GET['set_id']) ? (int)$_GET['set_id'] : null;
     $savedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($savedId > 0) {
-        $data = $svc->getSavedById($savedId, $setId && $setId > 0 ? $setId : null);
+        $data = $svc->getSavedById($savedId);
         respond(['ok' => true, 'data' => $data]);
     }
 
     $hash = isset($_GET['hash']) ? trim((string)$_GET['hash']) : '';
-    $data = $svc->getSaved($hash, $setId && $setId > 0 ? $setId : null);
+    $data = $svc->getSaved($hash);
     respond(['ok' => true, 'data' => $data]);
 } catch (\InvalidArgumentException $e) {
     respond(['ok' => false, 'error' => $e->getMessage()], 400);

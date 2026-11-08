@@ -7,18 +7,13 @@ export function isPaletteEligibleItem(item) {
   }
   if (attachedType === "before") return false;
   if (item?.exclude_from_thumbs) return false;
-  return Boolean(item?.ap_id || item?.palette_hash || item?.saved_palette_set_id);
+  return Boolean(item?.palette_hash);
 }
 
 export function getPaletteTargetKey(item) {
   if (!isPaletteEligibleItem(item)) return "";
-  const apId = item?.ap_id ?? null;
-  const paletteHash = item?.palette_hash ?? null;
-  const savedPaletteSetId = Number(item?.saved_palette_set_id || 0) || null;
-  if (paletteHash) return `saved:${paletteHash}:${savedPaletteSetId || "default"}`;
-  if (savedPaletteSetId) return `saved-set:${savedPaletteSetId}`;
-  if (apId) return `applied:${apId}`;
-  return "";
+  const paletteHash = item?.palette_hash;
+  return paletteHash ? `saved:${paletteHash}:default` : '';
 }
 
 export function getPaletteItems(data) {

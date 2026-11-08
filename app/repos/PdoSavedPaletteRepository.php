@@ -9,12 +9,13 @@ use PDOException;
 class PdoSavedPaletteRepository
 {
     private PDO $pdo;
-    private ?bool $hasSetTables = null;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
     }
+
+    public function connection(): PDO { return $this->pdo; }
 
     /**
      * Create a new saved palette row.
@@ -192,200 +193,18 @@ class PdoSavedPaletteRepository
 
     public function getViewerContentForPalette(int $savedPaletteId): array
     {
-        if ($savedPaletteId <= 0 || !$this->tableExists('saved_palette_viewer_content')) {
-            return [];
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT vc.saved_palette_viewer_content_id,
-                    vc.saved_palette_id,
-                    vc.saved_palette_set_id,
-                    vc.template_key,
-                    vc.kicker_text,
-                    vc.title,
-                    vc.intro,
-                    vc.notes,
-                    vc.cta_label,
-                    vc.playlist_url,
-                    vc.share_card_template_id,
-                    vc.share_card_fields_json,
-                    vc.share_card_image_path,
-                    vc.share_card_generated_at,
-                    vc.is_active,
-                    vc.created_at,
-                    vc.updated_at
-               FROM saved_palette_viewer_content vc
-              WHERE vc.saved_palette_id = :id
-           ORDER BY vc.saved_palette_set_id ASC, vc.template_key ASC"
-        );
-        $stmt->execute([':id' => $savedPaletteId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    public function getViewerContentForSet(int $savedPaletteId, int $setId, string $templateKey): ?array
-    {
-        if ($savedPaletteId <= 0 || $setId <= 0 || !$this->tableExists('saved_palette_viewer_content')) {
-            return null;
-        }
-
-        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
-        $stmt = $this->pdo->prepare(
-            "SELECT vc.saved_palette_viewer_content_id,
-                    vc.saved_palette_id,
-                    vc.saved_palette_set_id,
-                    vc.template_key,
-                    vc.kicker_text,
-                    vc.title,
-                    vc.intro,
-                    vc.notes,
-                    vc.cta_label,
-                    vc.playlist_url,
-                    vc.share_card_template_id,
-                    vc.share_card_fields_json,
-                    vc.share_card_image_path,
-                    vc.share_card_generated_at,
-                    vc.is_active,
-                    vc.created_at,
-                    vc.updated_at
-               FROM saved_palette_viewer_content vc
-              WHERE vc.saved_palette_id = :palette_id
-                AND vc.saved_palette_set_id = :set_id
-                AND vc.template_key = :template_key
-              LIMIT 1"
-        );
-        $stmt->execute([
-            ':palette_id' => $savedPaletteId,
-            ':set_id' => $setId,
-            ':template_key' => $templateKey,
-        ]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row !== false ? $row : null;
-    }
-
-    public function getShareCardTemplateByKey(string $templateKey): ?array
-    {
-        if (!$this->tableExists('share_card_templates')) {
-            return null;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT share_card_template_id,
-                    template_key,
-                    name,
-                    svg_template_path,
-                    required_fields_json,
-                    default_fields_json,
-                    is_active,
-                    sort_order,
-                    created_at,
-                    updated_at
-               FROM share_card_templates
-              WHERE template_key = :template_key
-                AND is_active = 1
-              LIMIT 1"
-        );
-        $stmt->execute([':template_key' => $templateKey]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row !== false ? $row : null;
-    }
-
-    public function updateViewerContentShareCardImage(
-        int $savedPaletteId,
-        int $setId,
-        string $templateKey,
-        string $imagePath
-    ): void {
-        if ($savedPaletteId <= 0 || $setId <= 0 || trim($imagePath) === '') {
-            throw new \InvalidArgumentException('share card image update requires palette, set, and image path');
-        }
-
-        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
-        $stmt = $this->pdo->prepare(
-            "UPDATE saved_palette_viewer_content
-                SET share_card_image_path = :image_path,
-                    share_card_generated_at = NOW(),
-                    updated_at = NOW()
-              WHERE saved_palette_id = :palette_id
-                AND saved_palette_set_id = :set_id
-                AND template_key = :template_key"
-        );
-        $stmt->execute([
-            ':image_path' => $imagePath,
-            ':palette_id' => $savedPaletteId,
-            ':set_id' => $setId,
-            ':template_key' => $templateKey,
-        ]);
-    }
-
-    public function upsertViewerContent(int $savedPaletteId, int $setId, string $templateKey, array $fields): array
-    {
-        if ($savedPaletteId <= 0) {
-            throw new \InvalidArgumentException('saved_palette_id required');
-        }
-        if ($setId <= 0) {
-            throw new \InvalidArgumentException('saved_palette_set_id required');
-        }
-        if (!$this->tableExists('saved_palette_viewer_content')) {
-            throw new \RuntimeException('saved_palette_viewer_content table missing');
-        }
-
-        $templateKey = $this->normalizeViewerTemplateKey($templateKey);
-        $isActive = array_key_exists('is_active', $fields) ? (int)(bool)$fields['is_active'] : 1;
-
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO saved_palette_viewer_content
-                (saved_palette_id, saved_palette_set_id, template_key, kicker_text, title, intro, notes, cta_label, playlist_url, share_card_template_id, share_card_fields_json, is_active, created_at, updated_at)
-             VALUES
-                (:palette_id, :set_id, :template_key, :kicker_text, :title, :intro, :notes, :cta_label, :playlist_url,
-                 COALESCE(:share_card_template_id, (SELECT share_card_template_id FROM share_card_templates WHERE template_key = :share_card_template_key LIMIT 1)),
-                 :share_card_fields_json, :is_active, NOW(), NOW())
-             ON DUPLICATE KEY UPDATE
-                saved_palette_id = VALUES(saved_palette_id),
-                kicker_text = VALUES(kicker_text),
-                title = VALUES(title),
-                intro = VALUES(intro),
-                notes = VALUES(notes),
-                cta_label = VALUES(cta_label),
-                playlist_url = VALUES(playlist_url),
-                share_card_template_id = COALESCE(VALUES(share_card_template_id), share_card_template_id),
-                share_card_fields_json = VALUES(share_card_fields_json),
-                is_active = VALUES(is_active),
-                updated_at = NOW()"
-        );
-        $shareCardFieldsJson = null;
-        if (array_key_exists('share_card_fields_json', $fields)) {
-            $value = $fields['share_card_fields_json'];
-            if (is_array($value)) {
-                $shareCardFieldsJson = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            } elseif ($value !== null && trim((string)$value) !== '') {
-                $shareCardFieldsJson = (string)$value;
-            }
-        }
-        $shareCardTemplateKey = $templateKey === 'concept' ? 'concept' : 'palette';
-        $stmt->execute([
-            ':palette_id' => $savedPaletteId,
-            ':set_id' => $setId,
-            ':template_key' => $templateKey,
-            ':kicker_text' => $fields['kicker_text'] ?? null,
-            ':title' => $fields['title'] ?? null,
-            ':intro' => $fields['intro'] ?? null,
-            ':notes' => $fields['notes'] ?? null,
-            ':cta_label' => $fields['cta_label'] ?? null,
-            ':playlist_url' => $fields['playlist_url'] ?? null,
-            ':share_card_template_id' => isset($fields['share_card_template_id']) && (int)$fields['share_card_template_id'] > 0
-                ? (int)$fields['share_card_template_id']
-                : null,
-            ':share_card_template_key' => $shareCardTemplateKey,
-            ':share_card_fields_json' => $shareCardFieldsJson,
-            ':is_active' => $isActive,
-        ]);
-
-        return $this->getViewerContentForSet($savedPaletteId, $setId, $templateKey) ?? [];
+        return array_map(static fn($viewer): array => [
+            'palette_viewer_id'=>$viewer->paletteViewerId, 'saved_palette_id'=>$viewer->savedPaletteId,
+            'template_key'=>$viewer->templateKey, 'format'=>$viewer->format, 'is_active'=>(int)$viewer->isActive,
+            'kicker_text'=>$viewer->kickerText,'title'=>$viewer->title,'intro'=>$viewer->intro,
+            'notes'=>$viewer->notes,'cta_label'=>$viewer->ctaLabel,
+        ], (new \App\Repos\PdoPaletteViewerRepository($this->pdo))->findBySavedPaletteId($savedPaletteId));
     }
 
     public function getFullPaletteByHash(string $hash): ?array
     {
-        return $this->getFullPaletteByHashAndSet($hash, null);
+        $palette=$this->getSavedPaletteByHash($hash);
+        return $palette ? $this->getFullPalette((int)$palette['id']) : null;
     }
 
     /**
@@ -400,67 +219,11 @@ class PdoSavedPaletteRepository
 
     public function countPlaylistUsageForPalette(int $savedPaletteId): int
     {
-        if ($savedPaletteId <= 0 || !$this->tableExists('playlist_items')) {
-            return 0;
-        }
-
-        $queries = [];
-        $params = [];
-
-        if (
-            $this->usesPaletteSets()
-            && $this->columnExists('playlist_items', 'saved_palette_set_id')
-        ) {
-            $queries[] = "
-                SELECT pi.playlist_item_id
-                  FROM saved_palette_sets s
-                  JOIN playlist_items pi
-                    ON pi.saved_palette_set_id = s.id
-                 WHERE s.saved_palette_id = :id_sets
-            ";
-            $params[':id_sets'] = $savedPaletteId;
-        }
-
-        if (
-            $this->usesPaletteSets()
-            && $this->columnExists('playlist_items', 'photo_library_id')
-            && $this->columnExists('saved_palette_set_photos', 'photo_library_id')
-        ) {
-            $queries[] = "
-                SELECT pi.playlist_item_id
-                  FROM saved_palette_sets s
-                  JOIN saved_palette_set_photos sp
-                    ON sp.saved_palette_set_id = s.id
-                  JOIN playlist_items pi
-                    ON pi.photo_library_id = sp.photo_library_id
-                 WHERE s.saved_palette_id = :id_photos
-            ";
-            $params[':id_photos'] = $savedPaletteId;
-        }
-
-        if (
-            !$this->usesPaletteSets()
-            && $this->tableExists('saved_palette_photos')
-            && $this->columnExists('playlist_items', 'photo_library_id')
-            && $this->columnExists('saved_palette_photos', 'photo_library_id')
-        ) {
-            $queries[] = "
-                SELECT pi.playlist_item_id
-                  FROM saved_palette_photos sp
-                  JOIN playlist_items pi
-                    ON pi.photo_library_id = sp.photo_library_id
-                 WHERE sp.saved_palette_id = :id_legacy_photos
-            ";
-            $params[':id_legacy_photos'] = $savedPaletteId;
-        }
-
-        if ($queries === []) {
-            return 0;
-        }
-
-        $sql = 'SELECT COUNT(*) FROM (' . implode(' UNION ', $queries) . ') used_palette_items';
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT pi.playlist_item_id)
+            FROM playlist_items pi JOIN saved_palettes sp ON sp.id = ?
+            LEFT JOIN photo_library pl ON pl.photo_library_id=pi.photo_library_id
+            WHERE pi.palette_hash=sp.palette_hash OR pl.palette_id=sp.id");
+        $stmt->execute([$savedPaletteId]);
         return (int)$stmt->fetchColumn();
     }
 
@@ -471,43 +234,13 @@ class PdoSavedPaletteRepository
             return [];
         }
 
-        $usesSets = $this->usesPaletteSets();
-        $hasLegacyPhotos = $this->tableExists('saved_palette_photos');
-        $playlistItemHasSetId = $this->columnExists('playlist_items', 'saved_palette_set_id');
-        $playlistItemHasPhotoId = $this->columnExists('playlist_items', 'photo_library_id');
-        $playlistItemHasPaletteHash = $this->columnExists('playlist_items', 'palette_hash');
-        $playlistItemHasImageUrl = $this->columnExists('playlist_items', 'image_url');
+        $playlistItemHasIsActive = $this->columnExists('playlist_items', 'is_active');
+        $instanceHasIsActive = $this->columnExists('playlist_instances', 'is_active');
         $playlistItemHasAnalyzerRole = $this->columnExists('playlist_items', 'analyzer_role');
         $playlistItemHasFinderStart = $this->columnExists('playlist_items', 'finder_start');
         $playlistItemHasItemType = $this->columnExists('playlist_items', 'item_type');
-        $playlistItemHasIsActive = $this->columnExists('playlist_items', 'is_active');
-        $instanceHasIsActive = $this->columnExists('playlist_instances', 'is_active');
-        $setPhotosHasPhotoId = $usesSets && $this->columnExists('saved_palette_set_photos', 'photo_library_id');
-        $setPhotosHasRelPath = $usesSets && $this->columnExists('saved_palette_set_photos', 'rel_path');
-        $setPhotosHasPhotoType = $usesSets && $this->columnExists('saved_palette_set_photos', 'photo_type');
-        $legacyPhotosHasPhotoId = $hasLegacyPhotos && $this->columnExists('saved_palette_photos', 'photo_library_id');
-
-        $matches = [];
-        if ($playlistItemHasPaletteHash) {
-            $matches[] = "(sp.palette_hash IS NOT NULL AND sp.palette_hash <> '' AND pi.palette_hash = sp.palette_hash)";
-        }
-        if ($usesSets && $playlistItemHasSetId) {
-            $matches[] = "(sps.id IS NOT NULL AND pi.saved_palette_set_id = sps.id)";
-        }
-        if ($usesSets && $playlistItemHasPhotoId && $setPhotosHasPhotoId) {
-            $matches[] = "(spsp.photo_library_id IS NOT NULL AND pi.photo_library_id = spsp.photo_library_id)";
-        }
-        if ($usesSets && $playlistItemHasImageUrl && $setPhotosHasRelPath) {
-            $matches[] = "(spsp.rel_path IS NOT NULL AND spsp.rel_path <> '' AND pi.image_url = spsp.rel_path)";
-        }
-        if ($hasLegacyPhotos && $playlistItemHasPhotoId && $legacyPhotosHasPhotoId) {
-            $matches[] = "(spp.photo_library_id IS NOT NULL AND pi.photo_library_id = spp.photo_library_id)";
-        }
-
-        if ($matches === []) {
-            return array_fill_keys($savedPaletteIds, []);
-        }
-
+        $matches = ["(sp.palette_hash IS NOT NULL AND sp.palette_hash <> '' AND pi.palette_hash=sp.palette_hash)",
+            "(linked_photo.photo_library_id IS NOT NULL AND pi.photo_library_id=linked_photo.photo_library_id)"];
         $params = [];
         $placeholders = [];
         foreach ($savedPaletteIds as $index => $id) {
@@ -516,35 +249,13 @@ class PdoSavedPaletteRepository
             $params[$key] = $id;
         }
 
-        $joins = [];
-        if ($usesSets) {
-            $joins[] = "LEFT JOIN saved_palette_sets sps ON sps.saved_palette_id = sp.id";
-            $joins[] = "LEFT JOIN saved_palette_set_photos spsp ON spsp.saved_palette_set_id = sps.id";
-        } else {
-            $joins[] = "LEFT JOIN (SELECT NULL AS id, NULL AS saved_palette_id) sps ON 1 = 0";
-            $joins[] = "LEFT JOIN (SELECT NULL AS photo_library_id, NULL AS rel_path, NULL AS photo_type) spsp ON 1 = 0";
-        }
-        if ($hasLegacyPhotos) {
-            $joins[] = "LEFT JOIN saved_palette_photos spp ON spp.saved_palette_id = sp.id";
-        } else {
-            $joins[] = "LEFT JOIN (SELECT NULL AS photo_library_id) spp ON 1 = 0";
-        }
-
+        $joins = ['LEFT JOIN photo_library linked_photo ON linked_photo.palette_id=sp.id'];
         $itemActiveClause = $playlistItemHasIsActive ? 'AND pi.is_active = 1' : '';
         $instanceActiveClause = $instanceHasIsActive ? 'AND inst.is_active = 1' : '';
         $analyzerRoleSelect = $playlistItemHasAnalyzerRole ? 'pi.analyzer_role' : 'NULL AS analyzer_role';
         $finderStartSelect = $playlistItemHasFinderStart ? 'pi.finder_start' : "'auto' AS finder_start";
         $itemTypeSelect = $playlistItemHasItemType ? 'pi.item_type' : 'NULL AS item_type';
-        $photoTypeMatches = [];
-        if ($playlistItemHasPhotoId && $setPhotosHasPhotoId) {
-            $photoTypeMatches[] = "(spsp.photo_library_id IS NOT NULL AND pi.photo_library_id = spsp.photo_library_id)";
-        }
-        if ($playlistItemHasImageUrl && $setPhotosHasRelPath) {
-            $photoTypeMatches[] = "(spsp.rel_path IS NOT NULL AND spsp.rel_path <> '' AND pi.image_url = spsp.rel_path)";
-        }
-        $photoTypeSelect = ($setPhotosHasPhotoType && $photoTypeMatches !== [])
-            ? 'CASE WHEN ' . implode(' OR ', $photoTypeMatches) . ' THEN spsp.photo_type ELSE NULL END AS photo_type'
-            : 'NULL AS photo_type';
+        $photoTypeSelect = "NULL AS photo_type";
 
         $sql = "
             SELECT
@@ -658,26 +369,11 @@ class PdoSavedPaletteRepository
     }
 
     /**
-     * Remove all photos for a palette.
+     * Detach a palette's MAIN associations through PHOTOS; retain Photo Library assets.
      */
     public function deletePhotosForPalette(int $savedPaletteId): void
     {
-        if ($this->usesPaletteSets()) {
-            $sql = "
-                DELETE sp
-                  FROM saved_palette_set_photos sp
-                  JOIN saved_palette_sets s
-                    ON s.id = sp.saved_palette_set_id
-                 WHERE s.saved_palette_id = :id
-            ";
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([':id' => $savedPaletteId]);
-            return;
-        }
-
-        $sql = "DELETE FROM saved_palette_photos WHERE saved_palette_id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':id' => $savedPaletteId]);
+        (new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($this->pdo))->detachPalettePhotos($savedPaletteId);
     }
 
     /**
@@ -685,343 +381,15 @@ class PdoSavedPaletteRepository
      */
     public function getPhotosForPalette(int $savedPaletteId, ?int $setId = null): array
     {
-        if ($this->usesPaletteSets()) {
-            $resolvedSetId = $this->resolveSetIdForPalette($savedPaletteId, $setId);
-            if ($resolvedSetId <= 0) {
-                return [];
-            }
-
-            $sql = "
-                SELECT sp.id,
-                       s.saved_palette_id,
-                       sp.saved_palette_set_id,
-                       s.slug AS set_slug,
-                       s.title AS set_title,
-                       s.is_default AS set_is_default,
-                       sp.photo_library_id,
-                       CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
-                           ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
-                       END AS rel_path,
-                       sp.photo_type,
-                       sp.trigger_mode,
-                       sp.trigger_color_id,
-                       CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
-                           ELSE sp.show_in_gallery
-                       END AS show_in_gallery,
-                       sp.use_palette_default_roles,
-                       sp.caption,
-                       sp.alt_text,
-                       sp.order_index,
-                       sp.created_at
-                  FROM saved_palette_set_photos sp
-                  JOIN saved_palette_sets s
-                    ON s.id = sp.saved_palette_set_id
-             LEFT JOIN photo_library pl
-                    ON pl.photo_library_id = sp.photo_library_id
-                 WHERE sp.saved_palette_set_id = :set_id
-              ORDER BY sp.order_index ASC, sp.id ASC
-            ";
-
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([':set_id' => $resolvedSetId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        }
-
-        $sql = "
-            SELECT id,
-                   saved_palette_id,
-                   rel_path,
-                   photo_type,
-                   trigger_mode,
-                   trigger_color_id,
-                   caption,
-                   alt_text,
-                   order_index,
-                   created_at
-              FROM saved_palette_photos
-             WHERE saved_palette_id = :id
-          ORDER BY order_index ASC, id ASC
-        ";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':id' => $savedPaletteId]);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function listPhotosNeedingPathNormalization(): array
-    {
-        if ($this->usesPaletteSets()) {
-            $stmt = $this->pdo->query(
-                "SELECT sp.id,
-                        s.saved_palette_id,
-                        sp.saved_palette_set_id,
-                        sp.photo_library_id,
-                        sp.rel_path,
-                        sp.photo_type
-                   FROM saved_palette_set_photos sp
-                   JOIN saved_palette_sets s
-                     ON s.id = sp.saved_palette_set_id
-                  WHERE sp.rel_path LIKE '%?%'
-               ORDER BY sp.id ASC"
-            );
-            return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
-        }
-
-        $stmt = $this->pdo->query(
-            "SELECT id,
-                    saved_palette_id,
-                    NULL AS saved_palette_set_id,
-                    NULL AS photo_library_id,
-                    rel_path,
-                    photo_type
-               FROM saved_palette_photos
-              WHERE rel_path LIKE '%?%'
-           ORDER BY id ASC"
-        );
-        return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        return (new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($this->pdo))->listForPalette($savedPaletteId);
     }
 
     /**
-     * Fetch a single photo row.
+     * Describe the current direct association for a Photo Library asset.
      */
-    public function getPhotoById(int $photoId): ?array
-    {
-        if ($this->usesPaletteSets()) {
-            $sql = "
-                SELECT sp.id,
-                       sp.saved_palette_set_id,
-                       sp.photo_library_id,
-                       CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
-                           ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
-                       END AS rel_path,
-                       sp.photo_type,
-                       sp.trigger_mode,
-                       sp.trigger_color_id,
-                       CASE
-                           WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
-                           ELSE sp.show_in_gallery
-                       END AS show_in_gallery,
-                       sp.use_palette_default_roles,
-                       sp.caption,
-                       sp.alt_text,
-                       sp.order_index,
-                       sp.created_at,
-                       sp.updated_at,
-                       s.saved_palette_id,
-                       s.slug AS set_slug,
-                       s.title AS set_title,
-                       s.is_default AS set_is_default
-                  FROM saved_palette_set_photos sp
-                  JOIN saved_palette_sets s
-                    ON s.id = sp.saved_palette_set_id
-             LEFT JOIN photo_library pl
-                    ON pl.photo_library_id = sp.photo_library_id
-                 WHERE sp.id = :id
-                 LIMIT 1
-            ";
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([':id' => $photoId]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row !== false) {
-                return $row;
-            }
-        }
-
-        $sql = "SELECT * FROM saved_palette_photos WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':id' => $photoId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return $row !== false ? $row : null;
-    }
-
     public function listLinksByPhotoLibraryId(int $photoLibraryId): array
     {
-        if (!$this->usesPaletteSets() || $photoLibraryId <= 0) {
-            return [];
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT sp.id,
-                    sp.photo_library_id,
-                    CASE
-                        WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(NULLIF(pl.rel_path, ''), NULLIF(sp.rel_path, ''), '')
-                        ELSE COALESCE(NULLIF(sp.rel_path, ''), '')
-                    END AS rel_path,
-                    sp.photo_type,
-                    sp.trigger_mode,
-                    sp.trigger_color_id,
-                    CASE
-                        WHEN sp.photo_library_id IS NOT NULL THEN COALESCE(pl.show_in_gallery, 0)
-                        ELSE sp.show_in_gallery
-                    END AS show_in_gallery,
-                    sp.caption,
-                    sp.alt_text,
-                    s.id AS saved_palette_set_id,
-                    CONCAT(
-                        COALESCE(NULLIF(s.title, ''), s.slug, 'Viewer'),
-                        ' #',
-                        s.id
-                    ) AS set_label,
-                    s.saved_palette_id,
-                    COALESCE(NULLIF(p.nickname, ''), p.palette_hash, CONCAT('Saved #', p.id)) AS palette_label
-               FROM saved_palette_set_photos sp
-               JOIN saved_palette_sets s
-                 ON s.id = sp.saved_palette_set_id
-               JOIN saved_palettes p
-                 ON p.id = s.saved_palette_id
-          LEFT JOIN photo_library pl
-                 ON pl.photo_library_id = sp.photo_library_id
-              WHERE sp.photo_library_id = :photo_library_id
-           ORDER BY p.nickname ASC, s.is_default DESC, s.order_index ASC, sp.id ASC"
-        );
-        $stmt->execute([':photo_library_id' => $photoLibraryId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    public function hasFullPhotoInPaletteSet(int $savedPaletteId, ?int $setId = null, ?int $excludePhotoId = null): bool
-    {
-        if ($this->usesPaletteSets()) {
-            $resolvedSetId = $this->resolveSetIdForPalette($savedPaletteId, $setId, true);
-            if ($resolvedSetId <= 0) {
-                return false;
-            }
-
-            $sql = "
-                SELECT 1
-                  FROM saved_palette_set_photos
-                 WHERE saved_palette_set_id = :set_id
-                   AND photo_type = 'full'
-            ";
-            $params = [':set_id' => $resolvedSetId];
-            if ($excludePhotoId !== null && $excludePhotoId > 0) {
-                $sql .= " AND id <> :exclude_id";
-                $params[':exclude_id'] = $excludePhotoId;
-            }
-            $sql .= " LIMIT 1";
-
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return (bool)$stmt->fetchColumn();
-        }
-
-        $sql = "
-            SELECT 1
-              FROM saved_palette_photos
-             WHERE saved_palette_id = :palette_id
-               AND photo_type = 'full'
-        ";
-        $params = [':palette_id' => $savedPaletteId];
-        if ($excludePhotoId !== null && $excludePhotoId > 0) {
-            $sql .= " AND id <> :exclude_id";
-            $params[':exclude_id'] = $excludePhotoId;
-        }
-        $sql .= " LIMIT 1";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return (bool)$stmt->fetchColumn();
-    }
-
-    /**
-     * Get the highest order_index for a palette's photos.
-     */
-    public function getMaxPhotoOrder(int $savedPaletteId, ?int $setId = null): int
-    {
-        if ($this->usesPaletteSets()) {
-            $resolvedSetId = $this->resolveSetIdForPalette($savedPaletteId, $setId);
-            if ($resolvedSetId <= 0) {
-                return 0;
-            }
-
-            $sql = "SELECT MAX(order_index) AS max_order FROM saved_palette_set_photos WHERE saved_palette_set_id = :set_id";
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([':set_id' => $resolvedSetId]);
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return (int)($row['max_order'] ?? 0);
-        }
-
-        $sql = "SELECT MAX(order_index) AS max_order FROM saved_palette_photos WHERE saved_palette_id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':id' => $savedPaletteId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        return (int)($row['max_order'] ?? 0);
-    }
-
-    /**
-     * Add a photo row for a palette.
-     */
-    public function addPhoto(int $savedPaletteId, string $relPath, ?string $caption, ?string $altText, int $orderIndex, ?int $setId = null, ?int $photoLibraryId = null): int
-    {
-        if ($this->usesPaletteSets()) {
-            $resolvedSetId = $this->resolveSetIdForPalette($savedPaletteId, $setId, true);
-            $sql = "
-                INSERT INTO saved_palette_set_photos
-                    (saved_palette_set_id, photo_library_id, rel_path, photo_type, trigger_mode, trigger_color_id, show_in_gallery, use_palette_default_roles, caption, alt_text, order_index, created_at, updated_at)
-                VALUES
-                    (:saved_palette_set_id, :photo_library_id, :rel_path, :photo_type, :trigger_mode, :trigger_color_id, :show_in_gallery, :use_palette_default_roles, :caption, :alt_text, :order_index, NOW(), NOW())
-            ";
-
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([
-                ':saved_palette_set_id' => $resolvedSetId,
-                ':photo_library_id' => $photoLibraryId,
-                ':rel_path' => $relPath,
-                ':photo_type' => 'full',
-                ':trigger_mode' => 'any',
-                ':trigger_color_id' => null,
-                ':show_in_gallery' => 0,
-                ':use_palette_default_roles' => 1,
-                ':caption' => $caption,
-                ':alt_text' => $altText,
-                ':order_index' => $orderIndex,
-            ]);
-
-            return (int)$this->pdo->lastInsertId();
-        }
-
-        $sql = "
-            INSERT INTO saved_palette_photos
-                (saved_palette_id, rel_path, photo_type, trigger_mode, trigger_color_id, caption, alt_text, order_index, created_at)
-            VALUES
-                (:saved_palette_id, :rel_path, :photo_type, :trigger_mode, :trigger_color_id, :caption, :alt_text, :order_index, NOW())
-        ";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([
-            ':saved_palette_id' => $savedPaletteId,
-            ':rel_path'         => $relPath,
-            ':photo_type'       => 'full',
-            ':trigger_mode'     => 'any',
-            ':trigger_color_id' => null,
-            ':caption'          => $caption,
-            ':alt_text'         => $altText,
-            ':order_index'      => $orderIndex,
-        ]);
-
-        return (int)$this->pdo->lastInsertId();
-    }
-
-    /**
-     * Delete a single photo row.
-     */
-    public function deletePhoto(int $photoId): void
-    {
-        if ($this->usesPaletteSets()) {
-            $sql = "DELETE FROM saved_palette_set_photos WHERE id = :id";
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([':id' => $photoId]);
-            return;
-        }
-
-        $sql = "DELETE FROM saved_palette_photos WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([':id' => $photoId]);
+        return (new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($this->pdo))->listPaletteLinks($photoLibraryId);
     }
 
     /**
@@ -1029,98 +397,15 @@ class PdoSavedPaletteRepository
      */
     public function updatePhoto(int $photoId, int $savedPaletteId, array $fields): void
     {
-        if (empty($fields)) {
-            return;
+        $repo = new \App\PHOTOS\Repos\PdoPhotoLibraryRepository($this->pdo);
+        $photo = $repo->findById($photoId);
+        if (!$photo || (int)($photo['palette_id'] ?? 0) !== $savedPaletteId) {
+            throw new \InvalidArgumentException('Photo does not belong to this palette');
         }
-
-        if ($this->usesPaletteSets()) {
-            $allowed = [
-                'photo_library_id',
-                'rel_path',
-                'photo_type',
-                'trigger_mode',
-                'trigger_color_id',
-                'show_in_gallery',
-                'use_palette_default_roles',
-                'caption',
-                'alt_text',
-                'order_index',
-            ];
-
-            $setParts = [];
-            $params = [
-                ':id' => $photoId,
-                ':saved_palette_id' => $savedPaletteId,
-            ];
-
-            foreach ($fields as $column => $value) {
-                if (!in_array($column, $allowed, true)) {
-                    continue;
-                }
-
-                $paramKey = ':' . $column;
-                $setParts[] = "sp.{$column} = {$paramKey}";
-                $params[$paramKey] = $value;
-            }
-
-            if (!$setParts) {
-                return;
-            }
-
-            $sql = "
-                UPDATE saved_palette_set_photos sp
-                JOIN saved_palette_sets s
-                  ON s.id = sp.saved_palette_set_id
-                   SET " . implode(', ', $setParts) . ",
-                       sp.updated_at = NOW()
-                 WHERE sp.id = :id
-                   AND s.saved_palette_id = :saved_palette_id
-            ";
-
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return;
-        }
-
-        $allowed = [
-            'rel_path',
-            'photo_type',
-            'trigger_mode',
-            'trigger_color_id',
-            'caption',
-            'alt_text',
-            'order_index',
-        ];
-
-        $setParts = [];
-        $params = [
-            ':id' => $photoId,
-            ':saved_palette_id' => $savedPaletteId,
-        ];
-
-        foreach ($fields as $column => $value) {
-            if (!in_array($column, $allowed, true)) {
-                continue;
-            }
-
-            $paramKey = ':' . $column;
-            $setParts[] = "{$column} = {$paramKey}";
-            $params[$paramKey] = $value;
-        }
-
-        if (!$setParts) {
-            return;
-        }
-
-        $sql = "
-            UPDATE saved_palette_photos
-               SET " . implode(', ', $setParts) . "
-             WHERE id = :id
-               AND saved_palette_id = :saved_palette_id
-        ";
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
+        $metadata = [];
+        if (array_key_exists('alt_text', $fields)) { $metadata['alt_text'] = $fields['alt_text']; }
+        if (array_key_exists('caption', $fields) && $fields['caption'] !== null) { $metadata['title'] = $fields['caption']; }
+        $repo->update($photoId, $metadata);
     }
 
     /**
@@ -1277,7 +562,7 @@ class PdoSavedPaletteRepository
             'palette' => $palette,
             'members' => $members,
             'photos'  => $photos,
-            'sets'    => $this->getSetsForPalette($id),
+            'sets'    => [],
             'viewer_content' => $this->getViewerContentForPalette($id),
         ];
     }
@@ -1478,159 +763,6 @@ class PdoSavedPaletteRepository
         return (bool)$stmt->fetchColumn();
     }
 
-    public function getSetsForPalette(int $savedPaletteId): array
-    {
-        if (!$this->usesPaletteSets()) {
-            return [];
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT id, saved_palette_id, slug, title, is_default, order_index, created_at, updated_at
-               FROM saved_palette_sets
-              WHERE saved_palette_id = :id
-           ORDER BY is_default DESC, order_index ASC, id ASC"
-        );
-        $stmt->execute([':id' => $savedPaletteId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    }
-
-    public function getSetById(int $setId): ?array
-    {
-        if (!$this->usesPaletteSets() || $setId <= 0) {
-            return null;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT id, saved_palette_id, slug, title, is_default, order_index, created_at, updated_at
-               FROM saved_palette_sets
-              WHERE id = :id
-              LIMIT 1"
-        );
-        $stmt->execute([':id' => $setId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $row !== false ? $row : null;
-    }
-
-    public function ensureSetForPalette(int $savedPaletteId, ?string $title = null, ?string $slug = null): int
-    {
-        if (!$this->usesPaletteSets() || $savedPaletteId <= 0) {
-            return 0;
-        }
-
-        $normalizedTitle = trim((string)($title ?? ''));
-        $normalizedSlug = trim((string)($slug ?? ''));
-        if ($normalizedSlug === '' && $normalizedTitle !== '') {
-            $normalizedSlug = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $normalizedTitle), '-'));
-        }
-        if ($normalizedSlug === '') {
-            return $this->resolveSetIdForPalette($savedPaletteId, null, true);
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT id
-               FROM saved_palette_sets
-              WHERE saved_palette_id = :palette_id
-                AND slug = :slug
-              LIMIT 1"
-        );
-        $stmt->execute([
-            ':palette_id' => $savedPaletteId,
-            ':slug' => $normalizedSlug,
-        ]);
-        $existingId = $stmt->fetchColumn();
-        if ($existingId) {
-            return (int)$existingId;
-        }
-
-        $titleValue = $normalizedTitle !== '' ? $normalizedTitle : ucwords(str_replace('-', ' ', $normalizedSlug));
-        $orderStmt = $this->pdo->prepare(
-            "SELECT COALESCE(MAX(order_index), 0) + 1
-               FROM saved_palette_sets
-              WHERE saved_palette_id = :palette_id"
-        );
-        $orderStmt->execute([':palette_id' => $savedPaletteId]);
-        $nextOrder = (int)$orderStmt->fetchColumn();
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO saved_palette_sets
-                (saved_palette_id, slug, title, is_default, order_index, created_at, updated_at)
-             VALUES
-                (:palette_id, :slug, :title, 0, :order_index, NOW(), NOW())"
-        );
-        $stmt->execute([
-            ':palette_id' => $savedPaletteId,
-            ':slug' => $normalizedSlug,
-            ':title' => $titleValue,
-            ':order_index' => $nextOrder,
-        ]);
-        return (int)$this->pdo->lastInsertId();
-    }
-
-    public function createAutoSetForPalette(int $savedPaletteId): int
-    {
-        if (!$this->usesPaletteSets() || $savedPaletteId <= 0) {
-            return 0;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT COUNT(*) + 1
-               FROM saved_palette_sets
-              WHERE saved_palette_id = :palette_id"
-        );
-        $stmt->execute([':palette_id' => $savedPaletteId]);
-        $nextNumber = max(2, (int)$stmt->fetchColumn());
-
-        return $this->ensureSetForPalette(
-            $savedPaletteId,
-            sprintf('Group %d', $nextNumber),
-            sprintf('group-%d', $nextNumber)
-        );
-    }
-
-    public function syncRelPathFromPhotoLibrary(int $photoLibraryId, string $relPath): void
-    {
-        if (!$this->usesPaletteSets() || $photoLibraryId <= 0 || trim($relPath) === '') {
-            return;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "UPDATE saved_palette_set_photos
-                SET rel_path = :rel_path,
-                    updated_at = NOW()
-              WHERE photo_library_id = :photo_library_id"
-        );
-        $stmt->execute([
-            ':rel_path' => $relPath,
-            ':photo_library_id' => $photoLibraryId,
-        ]);
-    }
-
-    public function getFullPaletteByHashAndSet(string $hash, ?int $setId = null): ?array
-    {
-        $palette = $this->getSavedPaletteByHash($hash);
-        if ($palette === null) {
-            return null;
-        }
-
-        return $this->getFullPalette((int)$palette['id'], $setId);
-    }
-
-    private function usesPaletteSets(): bool
-    {
-        if ($this->hasSetTables !== null) {
-            return $this->hasSetTables;
-        }
-
-        try {
-            $hasSets = (bool)$this->pdo->query("SHOW TABLES LIKE 'saved_palette_sets'")?->fetchColumn();
-            $hasSetPhotos = (bool)$this->pdo->query("SHOW TABLES LIKE 'saved_palette_set_photos'")?->fetchColumn();
-            $this->hasSetTables = $hasSets && $hasSetPhotos;
-        } catch (\Throwable) {
-            $this->hasSetTables = false;
-        }
-
-        return $this->hasSetTables;
-    }
-
     private function tableExists(string $table): bool
     {
         $stmt = $this->pdo->prepare(
@@ -1656,60 +788,4 @@ class PdoSavedPaletteRepository
         return (int)$stmt->fetchColumn() > 0;
     }
 
-    private function resolveSetIdForPalette(int $savedPaletteId, ?int $setId = null, bool $createIfMissing = false): int
-    {
-        if (!$this->usesPaletteSets() || $savedPaletteId <= 0) {
-            return 0;
-        }
-
-        if ($setId !== null && $setId > 0) {
-            $stmt = $this->pdo->prepare(
-                "SELECT id
-                   FROM saved_palette_sets
-                  WHERE id = :set_id
-                    AND saved_palette_id = :palette_id
-                  LIMIT 1"
-            );
-            $stmt->execute([
-                ':set_id' => $setId,
-                ':palette_id' => $savedPaletteId,
-            ]);
-            $found = $stmt->fetchColumn();
-            if ($found) {
-                return (int)$found;
-            }
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT id
-               FROM saved_palette_sets
-              WHERE saved_palette_id = :palette_id
-           ORDER BY is_default DESC, order_index ASC, id ASC
-              LIMIT 1"
-        );
-        $stmt->execute([':palette_id' => $savedPaletteId]);
-        $found = $stmt->fetchColumn();
-        if ($found) {
-            return (int)$found;
-        }
-
-        if (!$createIfMissing) {
-            return 0;
-        }
-
-        $stmt = $this->pdo->prepare(
-            "INSERT INTO saved_palette_sets
-                (saved_palette_id, slug, title, is_default, order_index, created_at, updated_at)
-             VALUES
-                (:palette_id, 'primary', 'Primary Set', 1, 0, NOW(), NOW())"
-        );
-        $stmt->execute([':palette_id' => $savedPaletteId]);
-        return (int)$this->pdo->lastInsertId();
-    }
-
-    private function normalizeViewerTemplateKey(string $value): string
-    {
-        $value = strtolower(trim($value));
-        return in_array($value, ['full_palette', 'concept', 'client', 'painter'], true) ? $value : 'full_palette';
-    }
 }

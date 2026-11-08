@@ -34,12 +34,13 @@ const SOURCE_OPTIONS = [
   { value: "client", label: "Client" },
   { value: "article", label: "Article" },
   { value: "pin", label: "Pin" },
+  { value: "art", label: "Art" },
 ];
 
 const defaultUpload = {
   source_type: "saved_palette",
   palette_id: "",
-  set_id: "",
+  
   photo_type: "full",
   series: "",
   title_prefix: "",
@@ -96,22 +97,12 @@ async function parseJsonResponse(res, label) {
   }
 }
 
-function openSavedPaletteViewerSetup(paletteId, setId = null, photoLibraryId = null) {
-  const id = Number(paletteId || 0);
-  if (!id) return;
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams();
-    params.set("type", "saved");
-    params.set("id", String(id));
-    if (Number(setId || 0) > 0) {
-      params.set("set_id", String(setId));
-    }
-    if (Number(photoLibraryId || 0) > 0) {
-      params.set("photo_library_id", String(photoLibraryId));
-    }
-    params.set("return_to", window.location.pathname + window.location.search);
-    window.location.href = `/admin/palette-photos?${params.toString()}`;
-  }
+function openSavedPaletteViewerSetup(paletteId, viewerId = null) {
+  if (!Number(paletteId)) return;
+  const params = new URLSearchParams();
+  if (Number(viewerId) > 0) params.set('pv_id', String(viewerId));
+  else params.set('palette_id', String(paletteId));
+  window.location.href = `/admin/palette-viewers?${params}`;
 }
 
 function formatDeleteUsageMessage(item, usages = []) {
@@ -509,7 +500,12 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const handleUploadField = (key, value) => {
-    setUploadForm((prev) => ({ ...prev, [key]: value }));
+    setUploadForm((prev) => ({
+      ...prev, [key]: value,
+      // Switching from another upload type must not carry Gallery consent
+      // into a new artwork. The user can explicitly enable it afterward.
+      ...(key === "source_type" && value === "art" ? { show_in_gallery: false } : {}),
+    }));
   };
 
   const handleLibraryField = (id, key, value) => {
@@ -684,9 +680,10 @@ export default function AdminPhotoLibraryPage() {
       let res;
       if (uploadForm.source_type === "saved_palette") {
         formData.append("palette_id", String(uploadForm.palette_id));
-        if (uploadForm.set_id && uploadForm.set_id !== "__new__") formData.append("set_id", String(uploadForm.set_id));
-        if (uploadForm.set_id === "__new__") formData.append("create_new_set", "1");
-        formData.append("photo_type", uploadForm.photo_type || "full");
+
+
+        formData.append("photo_type", "full");
+        if (uploadForm.show_in_gallery) formData.append("show_in_gallery", "1");
         formData.append("tags", uploadForm.tags || "");
         formData.append("alt_text", uploadForm.alt_text || "");
         formData.append("photo_permission_status", uploadForm.photo_permission_status || "");
@@ -1072,7 +1069,7 @@ export default function AdminPhotoLibraryPage() {
                 value={uploadForm.palette_id}
                 onChange={(e) => {
                   handleUploadField("palette_id", e.target.value);
-                  handleUploadField("set_id", "");
+                  
                 }}
               >
                 <option value="">Select palette</option>
@@ -1085,37 +1082,9 @@ export default function AdminPhotoLibraryPage() {
             </label>
           )}
 
-          {showSavedFields && uploadForm.palette_id && (
-            <label>
-              Photo Group
-              <select
-                value={uploadForm.set_id}
-                onChange={(e) => handleUploadField("set_id", e.target.value)}
-              >
-                <option value="">Primary / Default Group</option>
-                {(savedPalettes.find((palette) => String(palette.id) === String(uploadForm.palette_id))?.sets || []).map((set) => (
-                  <option key={set.id} value={set.id}>
-                    {set.title || set.slug || `Set #${set.id}`}
-                  </option>
-                ))}
-                <option value="__new__">Create New Group</option>
-              </select>
-            </label>
-          )}
+          
 
-          {showSavedFields && uploadForm.palette_id && (
-            <label>
-              Palette Photo Type
-              <select
-                value={uploadForm.photo_type}
-                onChange={(e) => handleUploadField("photo_type", e.target.value)}
-              >
-                <option value="full">Full</option>
-                <option value="before">Before</option>
-                <option value="zoom">Zoom</option>
-              </select>
-            </label>
-          )}
+          
 
           {showClientFields && (
             <label>
@@ -1286,7 +1255,7 @@ export default function AdminPhotoLibraryPage() {
             <input
               type="file"
               accept="image/*"
-              multiple
+              multiple={!showSavedFields}
               onChange={(e) => setFiles(Array.from(e.target.files || []))}
               disabled={uploading}
             />
@@ -1407,6 +1376,7 @@ export default function AdminPhotoLibraryPage() {
                 <option value="client">Client</option>
                 <option value="article">Article</option>
                 <option value="pin">Pin</option>
+                <option value="art">Art</option>
                 <option value="extra_photo">Extras</option>
               </select>
             </label>
@@ -1661,8 +1631,8 @@ export default function AdminPhotoLibraryPage() {
                                     {linkCount > 1
                                       ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${typeLabel}`
                                       : isBefore
-                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${item.attached_saved_palette_set_label || "Primary"}`
-                                      : `${item.attached_saved_palette_set_label || "Primary"} | ${typeLabel}`}
+                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${"Main"}`
+                                      : `${"Main"} | ${typeLabel}`}
                                   </div>
                                 </>
                               );
@@ -1680,7 +1650,7 @@ export default function AdminPhotoLibraryPage() {
                                 className="ghost"
                                 onClick={() => openSavedPaletteViewerSetup(
                                   item.attached_saved_palette_id,
-                                  item.attached_saved_palette_set_id,
+                                  item.attached_palette_viewer_id,
                                   item.photo_library_id
                                 )}
                               >

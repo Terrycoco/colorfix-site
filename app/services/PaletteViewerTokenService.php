@@ -32,7 +32,6 @@ final class PaletteViewerTokenService
             'v' => 1,
             'source' => 'saved',
             'hash' => $paletteHash,
-            'set_id' => $setId && $setId > 0 ? $setId : null,
             'palette_viewer_key' => $this->normalizePaletteViewerKey($paletteViewerKey),
             'playlist_instance_id' => $playlistInstanceId && $playlistInstanceId > 0 ? $playlistInstanceId : null,
             'iat' => time(),

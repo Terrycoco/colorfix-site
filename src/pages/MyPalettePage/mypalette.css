@@ -1033,6 +1033,9 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 /* ===== MyPalette: mobile-first palette building (scoped; desktop untouched) ===== */
 @media (max-width: 768px) {
   .mypage .myp-header {
+    position: relative;
+    /* Above the inline picker, below the floating palette bar. */
+    z-index: var(--z-control);
     justify-content: flex-end;
     margin: 4px 0 8px;
   }
@@ -1045,7 +1048,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   }
   .mypage .myp-mobile-menu {
     position: absolute; top: calc(100% + 4px); right: 0;
-    z-index: var(--z-dropdown, 1000); width: 190px;
+    z-index: var(--z-dropdown); width: 190px;
     background: white; border: 1px solid #ddd; border-radius: 10px;
     box-shadow: 0 8px 26px rgba(0,0,0,.16); overflow: hidden;
   }
@@ -1055,7 +1058,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
     color: #222; text-align: left; font: inherit;
   }
   .mypage .myp-mobile-picker {
-    position: relative; z-index: var(--z-dropdown, 1000);
+    position: relative; z-index: var(--z-above);
     width: min(100% - 24px, 480px); margin: 4px auto 18px;
   }
   .mypage .myp-mobile-picker .fuzzy-dropdown.myp-fuzzy {
@@ -1106,7 +1109,7 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
   }
   .mypage .myp-mobile-primary-tools {
     display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr);
-    grid-template-areas: "primary neutrals" "similar opposites";
+    grid-template-areas: "primary neutrals" "similar opposites" "translate translate";
     gap: 10px;
   }
   .mypage .myp-mobile-primary-tools .cell { width: 100%; min-width: 0; padding: 0; }
@@ -1125,5 +1128,51 @@ section.myp-top{ display:flex; flex-direction:column; align-items:center; }
 @media (max-width: 768px) {
   .mypage .myp-mobile-picker .fuzzy-inline-item > span:last-child {
     min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+
+/* Mobile MyPalette: align search label and Starts With checkbox on one line. */
+@media (max-width: 768px) {
+  .mypage .myp-mobile-picker .fuzzy-picker-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 6px;
+  }
+  .mypage .myp-mobile-picker .fuzzy-picker-heading .dropdown-label {
+    margin: 0;
+    flex: 0 0 auto;
+  }
+  .mypage .myp-mobile-picker .fuzzy-picker-heading .fuzzy-name-mode {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .mypage .myp-mobile-picker .fuzzy-picker-heading .fuzzy-name-mode input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+  }
+}
+
+/* Mobile MyPalette: fifth exploration action, full-width at bottom. */
+@media (max-width: 768px) {
+  .mypage .myp-mobile-primary-tools .cell--translate {
+    grid-area: translate;
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .mypage .myp-mobile-primary-tools .cell--translate button {
+    width: 100%;
+    min-height: 48px;
   }
 }

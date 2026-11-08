@@ -22,7 +22,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 try {
     $sourceType = trim((string)($_GET['source_type'] ?? ''));
-    $allowed = ['progression', 'article', 'pin', 'client'];
+    $allowed = ['progression', 'article', 'pin', 'client', 'art'];
     if ($sourceType !== '' && !in_array($sourceType, $allowed, true)) {
         respond(['ok' => false, 'error' => 'Invalid source_type'], 400);
     }

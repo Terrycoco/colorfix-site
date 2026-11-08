@@ -9,17 +9,22 @@ class PhotoLibraryService
 {
     public function __construct(private PdoPhotoLibraryRepository $repo) {}
 
+    public function cleanupDetachedPalettePhotos(array $photos): array
+    {
+        return (new \App\PHOTOS\Services\PhotoLifecycleService($this->repo->connection()))->cleanupDetachedPalettePhotos($photos);
+    }
+
     private function guessSourceTypeForRelPath(string $relPath): string
     {
         $path = strtolower($relPath);
         return match (true) {
             str_contains($path, '/photos/articles/') => 'article',
+            str_contains($path, '/photos/art/') => 'art',
             str_contains($path, '/photos/pins/') => 'pin',
             str_contains($path, '/photos/progressions/') => 'progression',
             str_contains($path, '/photos/uploads/saved-palettes/') => 'saved_palette_photo',
-            str_contains($path, '/photos/rendered/') => 'saved_palette_photo',
             str_contains($path, '/photos/clients/') => 'client',
-            default => 'photo_base',
+            default => 'extra_photo',
         };
     }
 
@@ -28,163 +33,6 @@ class PhotoLibraryService
         $name = pathinfo($relPath, PATHINFO_FILENAME);
         $name = preg_replace('/[_-]+/', ' ', (string)$name) ?? '';
         return trim($name);
-    }
-
-    public function syncSavedPalettePhoto(array $photo, array $overrides = []): int
-    {
-        $photoType = strtolower((string)($photo['photo_type'] ?? ''));
-        $triggerMode = strtolower((string)($photo['trigger_mode'] ?? 'any'));
-        if (!in_array($triggerMode, ['any', 'none', 'color'], true)) {
-            $triggerMode = 'any';
-        }
-        $sourceType = $photoType === 'before' ? 'saved_before' : 'saved_palette_photo';
-        $sourceId = isset($photo['id']) ? (int)$photo['id'] : null;
-        $relPath = (string)($photo['rel_path'] ?? '');
-        if ($relPath === '' || !$sourceId) {
-            return 0;
-        }
-
-        $tags = $overrides['tags'] ?? null;
-        if ($photoType === 'before') {
-            $tags = trim((string)($tags ?? ''));
-            $tags = $tags === '' ? 'before' : $tags . ',before';
-        }
-
-        $data = [
-            'source_type' => $sourceType,
-            'source_id' => $sourceId,
-            'rel_path' => $relPath,
-            'title' => $overrides['title'] ?? ($photo['caption'] ?? null),
-            'tags' => $tags ?: null,
-            'alt_text' => $overrides['alt_text'] ?? ($photo['alt_text'] ?? null),
-            'photo_permission_status' => array_key_exists('photo_permission_status', $overrides)
-                ? $overrides['photo_permission_status']
-                : null,
-            'show_in_gallery' => array_key_exists('show_in_gallery', $overrides)
-                ? (int)$overrides['show_in_gallery']
-                : ($triggerMode === 'none' || $photoType === 'before' ? 0 : 1),
-            'has_palette' => array_key_exists('has_palette', $overrides)
-                ? (int)$overrides['has_palette']
-                : ($triggerMode === 'none' || $photoType === 'before' ? 0 : 1),
-        ];
-
-        $canonicalId = $this->repo->findCanonicalIdByRelPath($relPath);
-        if ($canonicalId) {
-            $update = [
-                'source_type' => $sourceType,
-                'rel_path' => $relPath,
-            ];
-            if (array_key_exists('title', $overrides) || array_key_exists('caption', $photo)) {
-                $update['title'] = $data['title'];
-            }
-            if (array_key_exists('tags', $overrides)) {
-                $update['tags'] = $data['tags'];
-            }
-            if (array_key_exists('alt_text', $overrides) || array_key_exists('alt_text', $photo)) {
-                $update['alt_text'] = $data['alt_text'];
-            }
-            if (array_key_exists('photo_permission_status', $overrides)) {
-                $update['photo_permission_status'] = $data['photo_permission_status'];
-            }
-            if (!empty($data['has_palette'])) {
-                $update['has_palette'] = 1;
-            }
-            if (!empty($data['show_in_gallery'])) {
-                $update['show_in_gallery'] = 1;
-            }
-            $this->repo->update($canonicalId, $update);
-            return $canonicalId;
-        }
-
-        $existingId = $this->repo->findIdBySourceAndRel($sourceType, $sourceId, $relPath);
-        if (!$existingId) {
-            $fallbackType = $sourceType === 'saved_before' ? 'saved_palette_photo' : 'saved_before';
-            $existingId = $this->repo->findIdBySourceAndRel($fallbackType, $sourceId, $relPath);
-        }
-        if (!$existingId) {
-            $existingId = $this->repo->findIdBySource($sourceType, $sourceId);
-        }
-        if (!$existingId) {
-            $fallbackType = $sourceType === 'saved_before' ? 'saved_palette_photo' : 'saved_before';
-            $existingId = $this->repo->findIdBySource($fallbackType, $sourceId);
-        }
-        if ($existingId) {
-            $this->repo->update($existingId, $data);
-            return $existingId;
-        }
-        if ($this->repo->paletteColumnAvailable()) {
-            $data['palette_id'] = $photoType === 'before' ? null : ($photo['saved_palette_id'] ?? null);
-            $data['has_palette'] = !empty($data['palette_id']);
-        }
-        return $this->repo->insert($data);
-    }
-
-    public function deleteSavedPalettePhoto(int $photoId): void
-    {
-        if ($photoId <= 0) {
-            return;
-        }
-        $this->repo->deleteBySource('saved_palette_photo', $photoId);
-        $this->repo->deleteBySource('saved_before', $photoId);
-    }
-
-    public function syncExtraPhoto(int $photoId, string $role, string $relPath, array $overrides = []): int
-    {
-        $role = trim($role);
-        $relPath = trim($relPath);
-        if ($photoId <= 0 || $relPath === '') {
-            return 0;
-        }
-        $sourceType = 'extra_photo';
-        $data = [
-            'source_type' => $sourceType,
-            'source_id' => $photoId,
-            'rel_path' => $relPath,
-            'title' => $overrides['title'] ?? ($role !== '' ? $role : null),
-            'tags' => $overrides['tags'] ?? null,
-            'alt_text' => $overrides['alt_text'] ?? null,
-            'show_in_gallery' => array_key_exists('show_in_gallery', $overrides) ? (int)$overrides['show_in_gallery'] : 0,
-            'has_palette' => array_key_exists('has_palette', $overrides) ? (int)$overrides['has_palette'] : 0,
-        ];
-
-        $existingId = null;
-        if (!empty($data['title'])) {
-            $existingId = $this->repo->findIdBySourceAndTitle($sourceType, $photoId, (string)$data['title']);
-        }
-        if (!$existingId) {
-            $existingId = $this->repo->findIdBySourceAndRel($sourceType, $photoId, $relPath);
-        }
-        if ($existingId) {
-            $this->repo->update($existingId, $data);
-            return $existingId;
-        }
-        return $this->repo->insert($data);
-    }
-
-    public function syncAssetPhoto(int $photoId, string $relPath, array $overrides = []): int
-    {
-        $relPath = trim($relPath);
-        if ($photoId <= 0 || $relPath === '') {
-            return 0;
-        }
-        $sourceType = 'photo_asset';
-        $data = [
-            'source_type' => $sourceType,
-            'source_id' => $photoId,
-            'rel_path' => $relPath,
-            'title' => $overrides['title'] ?? null,
-            'tags' => $overrides['tags'] ?? null,
-            'alt_text' => $overrides['alt_text'] ?? null,
-            'show_in_gallery' => array_key_exists('show_in_gallery', $overrides) ? (int)$overrides['show_in_gallery'] : 0,
-            'has_palette' => array_key_exists('has_palette', $overrides) ? (int)$overrides['has_palette'] : 0,
-        ];
-
-        $existingId = $this->repo->findIdBySourceAndRel($sourceType, $photoId, $relPath);
-        if ($existingId) {
-            $this->repo->update($existingId, $data);
-            return $existingId;
-        }
-        return $this->repo->insert($data);
     }
 
     public function createStandalone(string $sourceType, string $relPath, array $overrides = []): int
@@ -246,129 +94,14 @@ class PhotoLibraryService
         return $id;
     }
 
-    public function deleteExtraPhoto(int $photoId, string $role): void
-    {
-        if ($photoId <= 0) {
-            return;
-        }
-        $role = trim($role);
-        if ($role === '') {
-            $this->repo->deleteBySource('extra_photo', $photoId);
-            return;
-        }
-        $this->repo->deleteBySourceAndTitle('extra_photo', $photoId, $role);
-    }
-
     public function dedupeSavedPaletteRows(bool $apply = false): array
     {
-        $rows = $this->repo->listSavedPaletteSourceRows();
-
-        $groups = [];
-        foreach ($rows as $row) {
-            $relPath = (string)($row['rel_path'] ?? '');
-            if ($relPath === '') {
-                continue;
-            }
-            $groups[$relPath][] = $row;
-        }
-
-        $result = [
-            'checked' => count($rows),
-            'deduped' => 0,
-            'deleted' => 0,
-            'items' => [],
-        ];
-
-        foreach ($groups as $relPath => $groupRows) {
-            if (count($groupRows) < 2) {
-                continue;
-            }
-
-            $canonicalId = $this->repo->findCanonicalIdByRelPath($relPath);
-            if (!$canonicalId) {
-                continue;
-            }
-
-            foreach ($groupRows as $row) {
-                $photoLibraryId = (int)($row['photo_library_id'] ?? 0);
-                if ($photoLibraryId <= 0 || $photoLibraryId === $canonicalId) {
-                    continue;
-                }
-
-                $result['items'][] = [
-                    'rel_path' => $relPath,
-                    'from_photo_library_id' => $photoLibraryId,
-                    'to_photo_library_id' => $canonicalId,
-                    'source_type' => (string)($row['source_type'] ?? ''),
-                    'changed' => $photoLibraryId !== $canonicalId,
-                ];
-
-                if ($apply) {
-                    $this->repo->reassignAllUsages($photoLibraryId, $canonicalId);
-                    $this->repo->deleteById($photoLibraryId);
-                    $result['deduped']++;
-                    $result['deleted']++;
-                }
-            }
-        }
-
-        return $result;
+        return (new \App\PHOTOS\Services\PhotoDuplicateService($this->repo->connection()))->dedupeSavedPaletteRows($apply);
     }
 
     public function dedupeAllRelPathRows(bool $apply = false): array
     {
-        $rows = $this->repo->listAllRowsWithRelPath();
-
-        $groups = [];
-        foreach ($rows as $row) {
-            $relPath = trim((string)($row['rel_path'] ?? ''));
-            if ($relPath === '') {
-                continue;
-            }
-            $groups[$relPath][] = $row;
-        }
-
-        $result = [
-            'checked' => count($rows),
-            'deduped' => 0,
-            'deleted' => 0,
-            'items' => [],
-        ];
-
-        foreach ($groups as $relPath => $groupRows) {
-            if (count($groupRows) < 2) {
-                continue;
-            }
-
-            $canonicalId = $this->repo->findCanonicalIdByRelPath($relPath);
-            if (!$canonicalId) {
-                continue;
-            }
-
-            foreach ($groupRows as $row) {
-                $photoLibraryId = (int)($row['photo_library_id'] ?? 0);
-                if ($photoLibraryId <= 0 || $photoLibraryId === $canonicalId) {
-                    continue;
-                }
-
-                $result['items'][] = [
-                    'rel_path' => $relPath,
-                    'from_photo_library_id' => $photoLibraryId,
-                    'to_photo_library_id' => $canonicalId,
-                    'source_type' => (string)($row['source_type'] ?? ''),
-                    'changed' => true,
-                ];
-
-                if ($apply) {
-                    $this->repo->reassignAllUsages($photoLibraryId, $canonicalId);
-                    $this->repo->deleteById($photoLibraryId);
-                    $result['deduped']++;
-                    $result['deleted']++;
-                }
-            }
-        }
-
-        return $result;
+        return (new \App\PHOTOS\Services\PhotoDuplicateService($this->repo->connection()))->dedupeAllRelPathRows($apply);
     }
 
     public function reconcileFilesystemRows(bool $apply = false, ?string $onlyRelPath = null): array
@@ -416,6 +149,8 @@ class PhotoLibraryService
             if ($relPath === '' || !str_starts_with($relPath, '/photos/')) {
                 continue;
             }
+            // Discover current uploads only. Never resurrect retired masks, bases, variants or rendered AP files.
+            if (!preg_match('~^/photos/(?:library|articles|art|pins|progressions|clients|uploads/saved-palettes|replacements)/~', $relPath)) { continue; }
             if ($onlyRelPath !== null && $relPath !== $onlyRelPath) {
                 continue;
             }
@@ -436,7 +171,7 @@ class PhotoLibraryService
                 $createdId = $this->createStandalone($sourceType, $relPath, [
                     'title' => $title !== '' ? $title : null,
                     'show_in_gallery' => 0,
-                    'has_palette' => in_array($sourceType, ['saved_palette_photo'], true) ? 1 : 0,
+                    'has_palette' => 0,
                 ]);
                 if ($createdId > 0) {
                     $result['created']++;

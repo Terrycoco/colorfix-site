@@ -189,8 +189,8 @@ final class ClientService
         $impact = $this->repo->getUsageSummary($id);
         if (!$this->pdo) {
             $this->repo->clearPhotoLibraryClient($id);
-            $this->repo->deleteAppliedPaletteShares($id);
-            $this->repo->deleteAppliedPaletteLinks($id);
+
+
             $this->repo->delete($id);
             return $impact;
         }
@@ -198,8 +198,8 @@ final class ClientService
         $this->pdo->beginTransaction();
         try {
             $this->repo->clearPhotoLibraryClient($id);
-            $this->repo->deleteAppliedPaletteShares($id);
-            $this->repo->deleteAppliedPaletteLinks($id);
+
+
             $this->repo->delete($id);
             $this->pdo->commit();
             return $impact;

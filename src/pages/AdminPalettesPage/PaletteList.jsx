@@ -131,7 +131,7 @@ export default function PaletteList({
             <div className="admin-palette-list__content">
               <div className="admin-palette-list__title-row">
                 <span className="admin-palette-list__title">
-                  {name}
+                  {name} · #{id}
                 </span>
 
                 {!isPublic && (

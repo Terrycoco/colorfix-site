@@ -42,8 +42,8 @@ export default function PaletteFilters({
         type="search"
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
-        placeholder="Find palette…"
-        aria-label="Find palette"
+        placeholder="Find palette by name or ID…"
+        aria-label="Find palette by name or ID"
       />
 
       <div className="admin-palette-filters__grid">

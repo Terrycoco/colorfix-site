@@ -16,7 +16,6 @@ use InvalidArgumentException;
 class PaletteViewerService
 {
     private PdoSavedPaletteRepository $savedRepo;
-    private PhotoRenderingService $renderService;
     private ?PdoPlaylistInstanceRepository $playlistInstanceRepo;
     private ?PdoProjectColorPlanRepository $projectColorPlanRepo;
     private ?PdoPaletteViewerRepository $paletteViewerRepo;
@@ -24,23 +23,16 @@ class PaletteViewerService
 
     public function __construct(
         PdoSavedPaletteRepository $savedRepo,
-        PhotoRenderingService $renderService,
         ?PdoPlaylistInstanceRepository $playlistInstanceRepo = null,
         ?PdoProjectColorPlanRepository $projectColorPlanRepo = null,
         ?PdoPaletteViewerRepository $paletteViewerRepo = null,
         ?PdoPaletteViewerPhotoRepository $paletteViewerPhotoRepo = null
     ) {
         $this->savedRepo = $savedRepo;
-        $this->renderService = $renderService;
         $this->playlistInstanceRepo = $playlistInstanceRepo;
         $this->projectColorPlanRepo = $projectColorPlanRepo;
         $this->paletteViewerRepo = $paletteViewerRepo;
         $this->paletteViewerPhotoRepo = $paletteViewerPhotoRepo;
-    }
-
-    public function getApplied(int $paletteId, ?int $playlistInstanceId = null): array
-    {
-        throw new RuntimeException('Applied palettes have been removed');
     }
 
     public function getSaved(string $hash, ?int $setId = null, string $paletteViewerKey = 'full_palette'): array
@@ -50,7 +42,7 @@ class PaletteViewerService
             throw new InvalidArgumentException('hash required');
         }
 
-        $full = $this->savedRepo->getFullPaletteByHashAndSet($hash, $setId);
+        $full = $this->savedRepo->getFullPaletteByHash($hash);
         return $this->buildSavedPalettePayload($full, $hash, $paletteViewerKey);
     }
 
@@ -239,6 +231,14 @@ class PaletteViewerService
     private function buildSavedPalettePayload(?array $full, string $hash, string $paletteViewerKey): array
     {
         $paletteViewerKey = $this->normalizePaletteViewerKey($paletteViewerKey);
+        if ($full && $this->paletteViewerRepo) {
+            $format = $paletteViewerKey === 'full_palette' ? 'public' : $paletteViewerKey;
+            foreach ($this->paletteViewerRepo->findBySavedPaletteId((int)$full['palette']['id']) as $viewer) {
+                if ($viewer->isActive && $viewer->format === $format) {
+                    return $this->getCanonicalById($viewer->paletteViewerId);
+                }
+            }
+        }
         if ($paletteViewerKey === 'none') {
             throw new RuntimeException('Palette viewer unavailable');
         }
@@ -268,7 +268,6 @@ class PaletteViewerService
         $palette = $full['palette'] ?? [];
         $members = $full['members'] ?? [];
         $photos = $full['photos'] ?? [];
-        $sets = $full['sets'] ?? [];
         $kickerText = !empty($palette['kicker_id'])
             ? $this->savedRepo->getKickerText((int)$palette['kicker_id'])
             : null;
@@ -283,19 +282,7 @@ class PaletteViewerService
         if (!$fullPhoto && !empty($photos)) {
             $fullPhoto = $photos[0];
         }
-        $setId = isset($fullPhoto['saved_palette_set_id'])
-            ? (int)$fullPhoto['saved_palette_set_id']
-            : (isset($sets[0]['id']) ? (int)$sets[0]['id'] : 0);
-
         $viewerContent = null;
-        $paletteId = isset($palette['id']) ? (int)$palette['id'] : 0;
-        if ($paletteId > 0 && $setId > 0) {
-            $viewerContent = $this->savedRepo->getViewerContentForSet($paletteId, $setId, $paletteViewerKey);
-            if (!$viewerContent && $paletteViewerKey !== 'full_palette') {
-                $viewerContent = $this->savedRepo->getViewerContentForSet($paletteId, $setId, 'full_palette');
-            }
-        }
-
         $insets = [];
         foreach ($photos as $photo) {
             if (($photo['photo_type'] ?? '') === 'before' && !empty($photo['rel_path'])) {
@@ -360,13 +347,8 @@ class PaletteViewerService
             'inset_photos' => $insets,
             'kicker_text' => $kickerText,
             'palette_type' => $palette['palette_type'] ?? null,
-            'set_id' => $setId > 0 ? $setId : null,
-            'available_sets' => array_map(fn(array $set): array => [
-                'id' => isset($set['id']) ? (int)$set['id'] : null,
-                'slug' => $set['slug'] ?? null,
-                'title' => $publicTitle,
-                'is_default' => isset($set['is_default']) ? (int)$set['is_default'] : 0,
-            ], $sets),
+            'set_id' => null,
+            'available_sets' => [],
         ];
 
         return (new Palette($meta, $swatches))->toArray();

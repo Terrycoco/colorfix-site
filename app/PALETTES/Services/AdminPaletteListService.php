@@ -23,10 +23,14 @@ final class AdminPaletteListService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function list(int $limit = 500): array
+    public function list(int $limit = 500, ?string $paletteId = null): array
     {
+        // Admin ID lookup deliberately has no public/active restrictions.
+        if ($paletteId !== null && !preg_match('/^[0-9]+$/D', $paletteId)) {
+            throw new \InvalidArgumentException('A numeric palette ID is required.');
+        }
         $rows = $this->palettes->listPalettes(
-            [],
+            $paletteId === null ? [] : ['id' => $paletteId],
             max(1, min(1000, $limit)),
             0
         );

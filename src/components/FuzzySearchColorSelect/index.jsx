@@ -42,6 +42,7 @@ export default function FuzzySearchColorSelect({
   inlineResults = false,
   showNameModeToggle = false,
   clearAfterPick = false,
+  dismissKeyboardOnIdle = false,
 }) {
   const initialText = () => (value && (value.name || value.code || value.hex6 || value.hex || '')) || '';
   const [query, setQuery] = useState(initialText);
@@ -64,6 +65,7 @@ export default function FuzzySearchColorSelect({
   const reqSeq = useRef(0);
   const abortRef = useRef(null);
   const suppressNextSearchRef = useRef(false);
+  const idleKeyboardBlurRef = useRef(false);
 
   const popupRef = useAnchoredPopup({
     open: open && results.length > 0 && !isMobile,
@@ -160,6 +162,23 @@ export default function FuzzySearchColorSelect({
     const timer = setTimeout(() => runSearch(text), 350);
     return () => clearTimeout(timer);
   }, [query, autoSearch, startsWith]);
+
+  // MyPalette only: give the phone keyboard a little longer than the search
+  // debounce before dismissing it. Blur must NOT collapse search results.
+  useEffect(() => {
+    if (!dismissKeyboardOnIdle || !inlineResults || isMobile || !autoSearch) return;
+    if (typeof window === 'undefined') return;
+    const isPhone = window.matchMedia('(max-width: 768px) and (pointer: coarse)').matches;
+    if (!isPhone || query.trim().length < 2) return;
+    const timer = setTimeout(() => {
+      const input = inputRef.current;
+      if (input && document.activeElement === input) {
+        idleKeyboardBlurRef.current = true;
+        input.blur();
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [query, dismissKeyboardOnIdle, inlineResults, isMobile, autoSearch]);
 
 function getFontColor(color) {
   const lightness = color?.lightness ?? color?.hcl_l ?? color?.lab_l ?? hexLightness(color?.hex6 || color?.hex);
@@ -334,10 +353,25 @@ function pick(color) {
       onKeyDownCapture={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
       style={className?.includes("full-width") ? { width: "100%" } : undefined}
     >
-      {showLabel && (
-        <label className="dropdown-label">
-          {label ? label : "Enter A Color"}
-        </label>
+      {(showLabel || (showNameModeToggle && inlineResults)) && (
+        <div className={showNameModeToggle && inlineResults ? "fuzzy-picker-heading" : "fuzzy-picker-heading--label-only"}>
+          {showLabel && (
+            <label className="dropdown-label">
+              {label ? label : "Enter A Color"}
+            </label>
+          )}
+          {showNameModeToggle && inlineResults && (
+            <label className="fuzzy-name-mode">
+              <span>Starts With</span>
+              <input type="checkbox" checked={startsWith} onChange={(e) => {
+                abortActiveSearch();
+                setResults([]);
+                setOpen(false);
+                setStartsWith(e.target.checked);
+              }} />
+            </label>
+          )}
+        </div>
       )}
 
       {isMobile ? (
@@ -406,6 +440,10 @@ function pick(color) {
             placeholder={placeholderText}
             onKeyDown={handleKeyDown}
             onBlur={() => {
+              if (idleKeyboardBlurRef.current) {
+                idleKeyboardBlurRef.current = false;
+                return; // deliberate keyboard dismissal: retain tappable matches
+              }
               setOpen(false);
               if (!selectedColor && query.trim().length === 0) {
                 onEmpty && onEmpty();
@@ -444,7 +482,7 @@ function pick(color) {
         </div>
       )}
 
-       {showNameModeToggle && (
+       {showNameModeToggle && !inlineResults && (
          <label className="fuzzy-name-mode">
            <input type="checkbox" checked={startsWith} onChange={(e) => {
              abortActiveSearch();
@@ -462,8 +500,18 @@ function pick(color) {
              <button type="button" className="fuzzy-inline-item" role="option"
                aria-selected={index === highlightedIndex}
                key={c.id ?? `${c.name}-${index}`}
-               onPointerDown={(e) => e.preventDefault()}
-               onClick={() => pick(c)}>
+               onPointerDown={(e) => {
+                 // Select on pointer-down: preventing its default may suppress
+                 // the subsequent click on touch devices.
+                 e.preventDefault();
+                 e.stopPropagation();
+                 pick(c);
+               }}
+               onClick={(e) => {
+                 // Keyboard activation emits click without a pointer event.
+                 // Pointer activations were already handled above.
+                 if (e.detail === 0) pick(c);
+               }}>
                <span className="fuzzy-inline-swatch" style={{ backgroundColor: colorToHex(c) || '#ccc' }} />
                <span>{c.name} · {String(c.brand || c.brand_name || '').toUpperCase()}</span>
              </button>

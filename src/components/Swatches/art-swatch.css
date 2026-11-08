@@ -1,0 +1,88 @@
+
+/*
+ * ART SWATCH
+ * Ornate gilded museum frame.
+ * Same 5:4 footprint as the existing PictureSwatch.
+ */
+
+.pals-swatch.pals-art {
+  aspect-ratio: 5 / 4;
+  border-radius: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: none;
+  appearance: none;
+  text-align: left;
+}
+
+/* The complete framed painting */
+.pals-art-tile {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: #65421e;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.22),
+    0 0 1px rgba(0, 0, 0, 0.3);
+  z-index: var(--z-above, 1);
+  transition: box-shadow 180ms ease;
+}
+
+/*
+ * Artwork opening.
+ * An 8% inset on every side keeps the opening 5:4.
+ */
+.pals-art-opening {
+  position: absolute;
+  inset: 8%;
+  overflow: hidden;
+  border-radius: 0;
+  background: #382b1d;
+}
+
+/* Crop position and size are supplied by ArtSwatch.jsx */
+.pals-art-image {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+/* Ornate gold molding */
+.pals-art-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  border-radius: 0;
+}
+
+/* Museum frames remain visually rigid on hover */
+.pals-swatch.pals-art:hover .pals-art-tile {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+/* Keyboard accessibility */
+.pals-swatch.pals-art:focus-visible {
+  outline: 3px solid #487eb4;
+  outline-offset: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pals-art-tile {
+    transition: none;
+  }
+}

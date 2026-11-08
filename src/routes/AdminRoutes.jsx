@@ -29,13 +29,10 @@ const FilterEditPage = lazy(() => import('@pages/FilterEditPage'));
 const FriendsEnterPage = lazy(() => import('@pages/FriendsEnterPage'));
 const MissingChipsPage = lazy(() => import('@pages/MissingChipsPage'));
 const WhitesLrvEditorPage = lazy(() => import('@pages/whitesLrvEditorPage'));
-const AdminUploadPhotoPage = lazy(() => import('@pages/AdminUploadPhotoPage'));
-const AdminRolesMasksPage = lazy(() => import('@pages/AdminRolesMasksPage'));
 const AdminSupercatsPage = lazy(() => import('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
 const AdminPalettesPage = lazy(() => import('@pages/AdminPalettesPage'));
 const AdminPaletteViewersPage = lazy(() => import('@pages/AdminPaletteViewersPage'));
-const AdminPalettePhotosPage = lazy(() => import('@pages/AdminPalettePhotosPage'));
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
 const AdminArticlesPage = lazy(() => import('@pages/AdminArticlesPage'));
@@ -128,13 +125,10 @@ export default function AdminRoutes() {
         <Route path="friends" element={renderWithSuspense(FriendsEnterPage, 'Loading friends...')} />
         <Route path="missing-chips" element={renderWithSuspense(MissingChipsPage, 'Loading missing chips...')} />
         <Route path="lrv-editor" element={renderWithSuspense(WhitesLrvEditorPage, 'Loading LRV editor...')} />
-        <Route path="upload-photo" element={renderWithSuspense(AdminUploadPhotoPage, 'Loading upload tool...')} />
-        <Route path="roles-masks" element={renderWithSuspense(AdminRolesMasksPage, 'Loading admin roles/masks...')} />
         <Route path="supercats" element={renderWithSuspense(AdminSupercatsPage, 'Loading supercats...')} />
         <Route path="admin-saved-palettes" element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes...')} />
         <Route path="palettes" element={renderWithSuspense(AdminPalettesPage, 'Loading palettes...')} />
         <Route path="palette-viewers" element={renderWithSuspense(AdminPaletteViewersPage, 'Loading palette viewers...')} />
-        <Route path="palette-photos" element={renderWithSuspense(AdminPalettePhotosPage, 'Loading palette photos...')} />
         <Route path="kickers" element={renderWithSuspense(AdminKickersPage, 'Loading kickers...')} />
         <Route path="ideas" element={renderWithSuspense(AdminIdeasPage, 'Loading ideas...')} />
         <Route path="milestones" element={<Navigate to="/admin/ideas?tab=milestones" replace />} />

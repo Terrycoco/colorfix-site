@@ -4,13 +4,11 @@ declare(strict_types=1);
 require __DIR__ . '/api/autoload.php';
 require __DIR__ . '/api/db.php';
 
-use App\Repos\PdoPhotoRepository;
 use App\Repos\PdoPlaylistInstanceRepository;
 use App\Repos\PdoSavedPaletteRepository;
 use App\PROJECTS\Repos\PdoProjectColorPlanRepository;
 use App\Services\PaletteViewerService;
 use App\Services\PaletteViewerTokenService;
-use App\Services\PhotoRenderingService;
 
 function pv_origin(): string
 {
@@ -60,11 +58,11 @@ try {
         $viewerKey = (string)($payload['palette_viewer_key'] ?? 'full_palette');
 
         $savedRepo = new PdoSavedPaletteRepository($pdo);
-        $photoRepo = new PdoPhotoRepository($pdo);
+
         $playlistInstanceRepo = new PdoPlaylistInstanceRepository($pdo);
         $projectColorPlanRepo = new PdoProjectColorPlanRepository($pdo);
-        $renderSvc = new PhotoRenderingService($photoRepo, $pdo);
-        $viewerSvc = new PaletteViewerService($savedRepo, $renderSvc, $playlistInstanceRepo, $projectColorPlanRepo);
+
+        $viewerSvc = new PaletteViewerService($savedRepo, $playlistInstanceRepo, $projectColorPlanRepo);
 
         if (($payload['source'] ?? 'saved') === 'project_color_plan') {
             $colorPlanId = (int)($payload['color_plan_id'] ?? 0);

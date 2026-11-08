@@ -42,6 +42,7 @@ const PALETTE_TYPE_CHOICES = [
   { value: "interior", label: "Interior" },
   { value: "exterior", label: "Exterior" },
   { value: "hoa", label: "HOA" },
+  { value: "art", label: "Art" },
 ];
 
 const defaultForm = {
@@ -109,17 +110,12 @@ function buildFullUrl(relPath) {
 }
 
 function openViewerSetup(palette) {
-  const paletteId = Number(palette?.id || 0);
-  if (!paletteId) return;
-  const params = new URLSearchParams();
-  params.set("type", "saved");
-  params.set("id", String(paletteId));
-  const preferred = (palette?.photos || []).find((photo) => photo?.photo_type === "full") || palette?.photos?.[0];
-  const setId = Number(preferred?.saved_palette_set_id || preferred?.set_id || 0);
-  if (setId > 0) {
-    params.set("set_id", String(setId));
-  }
-  window.location.href = `/admin/palette-photos?${params.toString()}`;
+  if (!Number(palette?.id)) return;
+  const viewer=(palette.viewer_content || []).find(v=>v.is_active && v.format==='public') || palette.viewer_content?.[0];
+  const params=new URLSearchParams();
+  if (viewer?.palette_viewer_id) params.set('pv_id',String(viewer.palette_viewer_id));
+  else params.set('palette_id',String(palette.id));
+  window.location.href=`/admin/palette-viewers?${params}`;
 }
 
 function collapseMembersByColor(members = []) {

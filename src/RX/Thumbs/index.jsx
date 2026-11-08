@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  extractAssetId,
-  fetchAssetUrl,
-  isAssetRef,
+  
+  
+  
   parsePhotoRef,
 } from "@helpers/assetImage";
 import { withSourceParam } from "@helpers/sourceParam";
@@ -15,33 +15,9 @@ export default function Thumbs({ collection }) {
   );
   const parentUrl = normalizeInternalRexPath(collection?.parent_url || "");
 
-  const [thumbUrlByPvId, setThumbUrlByPvId] = useState({});
+  
 
-  useEffect(() => {
-    let cancelled = false;
-
-    items.forEach((item) => {
-      const value = String(item?.photo_url || "").trim();
-
-      if (!isAssetRef(value)) return;
-
-      const assetId = extractAssetId(value);
-      if (!assetId) return;
-
-      fetchAssetUrl(assetId).then((url) => {
-        if (cancelled || !url) return;
-
-        setThumbUrlByPvId((prev) => ({
-          ...prev,
-          [String(item.pv_id || item.viewer_rex_id || assetId)]: url,
-        }));
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [items]);
+  
 
   if (!collection) {
     return (
@@ -103,9 +79,7 @@ export default function Thumbs({ collection }) {
 
               const resolvedUrl = parsedPhoto.url
                 ? parsedPhoto.url
-                : isAssetRef(photoValue)
-                  ? thumbUrlByPvId[String(cardKey)] || ""
-                  : photoValue;
+                : photoValue;
 
               const viewerUrl = normalizeInternalRexPath(
                 item.viewer_url || ""

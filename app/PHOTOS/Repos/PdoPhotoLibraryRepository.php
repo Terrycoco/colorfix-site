@@ -8,7 +8,41 @@ use PDO;
 class PdoPhotoLibraryRepository
 {
     private ?bool $paletteColumnAvailable = null;
+    private ?PdoPhotoLifecycleRepository $lifecycleReferences = null;
     public function __construct(private PDO $pdo) {}
+
+    public function connection(): PDO { return $this->pdo; }
+
+    /** Main-photo association. Alternate/Before/Zoom presentations belong to Palette Viewers. */
+    public function listForPalette(int $paletteId): array
+    {
+        $stmt = $this->pdo->prepare("SELECT pl.*, pl.photo_library_id AS id, pl.palette_id AS saved_palette_id,
+            'full' AS photo_type, 'any' AS trigger_mode, NULL AS trigger_color_id,
+            pl.title AS caption, pl.photo_library_id AS order_index
+            FROM photo_library pl WHERE pl.palette_id = ? ORDER BY pl.photo_library_id");
+        $stmt->execute([$paletteId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function listPaletteLinks(int $photoId): array
+    {
+        $stmt = $this->pdo->prepare("SELECT pl.photo_library_id AS id, pl.photo_library_id,
+            pl.palette_id AS saved_palette_id, p.palette_hash, p.nickname, p.display_title,
+            COALESCE(NULLIF(p.nickname,''),NULLIF(p.display_title,''),p.palette_hash) AS palette_label,
+            'full' AS photo_type, 'any' AS trigger_mode, NULL AS trigger_color_id, pl.rel_path,
+            NULL AS saved_palette_set_id, NULL AS set_title, NULL AS set_slug
+            FROM photo_library pl JOIN saved_palettes p ON p.id=pl.palette_id
+            WHERE pl.photo_library_id = ?");
+        $stmt->execute([$photoId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function detachPalettePhotos(int $paletteId): void
+    {
+        foreach ($this->listForPalette($paletteId) as $photo) {
+            $this->update((int)$photo['photo_library_id'], ['palette_id' => null]);
+        }
+    }
 
     public function paletteColumnAvailable(): bool
     {
@@ -310,7 +344,6 @@ class PdoPhotoLibraryRepository
         $pvMatch = $this->usagePhotoMatch($photoLibraryId, $path, 'vp.photo_library_id', 'vp.rel_path', 'pv', $params);
         $introMatch = $this->usagePhotoMatch($photoLibraryId, $path, null, 'pi.intro_image_url', 'intro', $params);
         $shareMatch = $this->usagePhotoMatch($photoLibraryId, $path, null, 'pi.share_image_url', 'share', $params);
-        $savedMatch = $this->usagePhotoMatch($photoLibraryId, $path, 'sp.photo_library_id', 'sp.rel_path', 'saved', $params);
         $libraryJoin = $this->paletteColumnAvailable() ? 'JOIN photo_library shared_photo ON shared_photo.photo_library_id = pp.photo_library_id' : '';
         $sharedPalette = $this->paletteColumnAvailable() ? 'shared_photo.palette_id' : 'pp.palette_id';
         $beforeMatch = $this->paletteColumnAvailable() ? ' OR pp.`before` = 1' : '';
@@ -472,22 +505,6 @@ class PdoPhotoLibraryRepository
             UNION ALL
 
             SELECT
-                'saved_palette_set_photo' AS usage_type,
-                s.saved_palette_id AS ref_id,
-                {$binary}p.nickname AS ref_title,
-                {$binary}CONCAT('Saved Palette #', s.saved_palette_id, ': ', COALESCE(NULLIF(p.nickname, ''), p.palette_hash)) AS label,
-                {$binary}CONCAT('Set ', COALESCE(NULLIF(s.title, ''), s.slug), ' / ', sp.photo_type) AS detail,
-                '/admin/saved-palettes' AS admin_path
-            FROM saved_palette_set_photos sp
-            LEFT JOIN saved_palette_sets s
-              ON s.id = sp.saved_palette_set_id
-            LEFT JOIN saved_palettes p
-              ON p.id = s.saved_palette_id
-            WHERE {$savedMatch}
-
-            UNION ALL
-
-            SELECT
                 'photo_group' AS usage_type,
                 pg.group_id AS ref_id,
                 {$binary}pg.title AS ref_title,
@@ -513,7 +530,8 @@ class PdoPhotoLibraryRepository
             ':photo_library_id_article_section' => $photoLibraryId,
             ':photo_library_id_group' => $photoLibraryId,
         ]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_merge($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            ($this->lifecycleReferences ??= new PdoPhotoLifecycleRepository($this->pdo))->supplementalUsages($photo));
     }
 
     private function usagePhotoMatch(int $id, string $path, ?string $idColumn, string $urlColumn, string $key, array &$params): string
@@ -578,57 +596,37 @@ class PdoPhotoLibraryRepository
         return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
     }
 
+    /** Compatibility method. PHOTOS validates and transactionally reassigns every supported reference. */
     public function reassignAllUsages(int $fromId, int $toId): void
     {
-        if ($fromId <= 0 || $toId <= 0 || $fromId === $toId) {
-            return;
-        }
-
-        $updates = [
-            "UPDATE playlist_items SET photo_library_id = :to_id WHERE photo_library_id = :from_id",
-            "UPDATE playlist_instance_set_items SET photo_library_id = :to_id WHERE photo_library_id = :from_id",
-            "UPDATE articles SET hero_asset_id = :to_id WHERE hero_asset_id = :from_id",
-            "UPDATE articles SET hero_mobile_asset_id = :to_id WHERE hero_mobile_asset_id = :from_id",
-            "UPDATE article_sections SET asset_id = :to_id WHERE asset_id = :from_id",
-            "UPDATE saved_palette_set_photos SET photo_library_id = :to_id WHERE photo_library_id = :from_id",
-            "UPDATE photo_group_items SET photo_library_id = :to_id WHERE photo_library_id = :from_id",
-        ];
-
-        foreach ($updates as $sql) {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute([
-                ':from_id' => $fromId,
-                ':to_id' => $toId,
-            ]);
-        }
+        (new \App\PHOTOS\Services\PhotoLifecycleService($this->pdo))->merge($fromId, $toId, true, false);
     }
 
     public function deleteById(int $photoLibraryId): void
     {
-        $stmt = $this->pdo->prepare("DELETE FROM photo_library WHERE photo_library_id = :id");
-        $stmt->execute([':id' => $photoLibraryId]);
+        $result = (new \App\PHOTOS\Services\PhotoLifecycleService($this->pdo))->delete($photoLibraryId);
+        if (empty($result['ok'])) { throw new \DomainException($result['error'] ?? 'Photo deletion blocked'); }
     }
 
     public function deleteBySource(string $sourceType, ?int $sourceId): void
     {
-        $stmt = $this->pdo->prepare(
-            "DELETE FROM photo_library WHERE source_type = :source_type AND source_id <=> :source_id"
-        );
-        $stmt->execute([
-            ':source_type' => $sourceType,
-            ':source_id' => $sourceId,
-        ]);
+        $this->deleteMatchingSource($sourceType, $sourceId, null);
     }
 
     public function deleteBySourceAndTitle(string $sourceType, ?int $sourceId, string $title): void
     {
-        $stmt = $this->pdo->prepare(
-            "DELETE FROM photo_library WHERE source_type = :source_type AND source_id <=> :source_id AND title = :title"
-        );
-        $stmt->execute([
-            ':source_type' => $sourceType,
-            ':source_id' => $sourceId,
-            ':title' => $title,
-        ]);
+        $this->deleteMatchingSource($sourceType, $sourceId, $title);
+    }
+
+    private function deleteMatchingSource(string $type, ?int $id, ?string $title): void
+    {
+        $sql = 'SELECT photo_library_id FROM photo_library WHERE source_type = ? AND '
+            . ($id === null ? 'source_id IS NULL' : 'source_id = ?');
+        $args = [$type];
+        if ($id !== null) { $args[] = $id; }
+        if ($title !== null) { $sql .= ' AND title = ?'; $args[] = $title; }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($args);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $photoId) { $this->deleteById((int)$photoId); }
     }
 }

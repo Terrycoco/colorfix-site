@@ -2,10 +2,27 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  # Retired image systems: return Gone even if an old PHP file survives a code-only deployment.
+  # Current /admin/photos/upload.php, Photo Library, image-thumb, PVs and PUB are deliberately excluded.
+  RewriteRule ^api/v2/(?:photos|mask-training)(?:/|$) - [G,L]
+  RewriteRule ^api/v2/admin/(?:mask-blend|photo-tags)(?:/|$) - [G,L]
+  RewriteRule ^api/v2/admin/(?:photo-upload|photo-mask-delete|mask-overlay|recalc-mask-overlays|roles-masks|masks-alpha|render-debug|photo-debug|photo-search|photo-list-roles|photos-recalc-lm|reindex-from-fs|share-card-generate)\.php$ - [G,L]
+  RewriteRule ^api/v2/admin/photo-library/(?:cleanup-legacy-applied|backfill-exteriors)\.php$ - [G,L]
+  RewriteRule ^api/v2/admin/saved-palette-photos/normalize-links\.php$ - [G,L]
+  RewriteRule ^api/v2/admin/playlist-items/repair-broken-photo-library\.php$ - [G,L]
+  RewriteRule ^api/tools/(?:recalc-mask-overlays|backfill-mask-target-lightness)\.php$ - [G,L]
+  RewriteRule ^api/tests/(?:PhotoModuleSmokeTest|PhotoRepoVariantsTest|PhotoRepoCreateUpdateTest)\.php$ - [G,L]
+  RewriteRule ^scripts/(?:masks_alpha_check|convert_masks_alpha)\.php$ - [G,L]
+  RewriteRule ^render_test\.php$ - [G,L]
+  RewriteRule ^admin/(?:roles-masks|upload-photo|palette-photos)/?$ - [G,L]
+
   # Only the site root uses the prebuilt homepage.
   RewriteRule ^$ /index.html [L]
 
   RewriteRule ^pod/?$ /pod.php [L,QSA]
+
+  # Picker is a React route, even when an old static picker/ directory exists.
+  RewriteRule ^picker/?$ /app-shell.html [L,QSA]
   RewriteRule ^index\.html$ - [L]
   RewriteRule ^colorfix/index\.html$ - [L]
   RewriteRule ^qr/?$ /qr.php [L,QSA]

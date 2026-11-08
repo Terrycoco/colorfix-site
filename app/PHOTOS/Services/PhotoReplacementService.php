@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace App\PHOTOS\Services;
 
 use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
-use App\Repos\PdoSavedPaletteRepository;
 use App\Repos\PdoAssetLibraryRepository;
 use InvalidArgumentException;
 use PDO;
@@ -44,12 +43,6 @@ final class PhotoReplacementService
                 if (trim((string)($metadata[$key] ?? '')) !== '') { $fields[$key] = trim((string)$metadata[$key]); }
             }
             $repo->update($id, $fields);
-            $saved = new PdoSavedPaletteRepository($this->pdo);
-            if ((int)($row['source_id'] ?? 0) > 0 && in_array($row['source_type'], ['saved_palette_photo', 'saved_before'], true)) {
-                $photo = $saved->getPhotoById((int)$row['source_id']);
-                if ($photo) { $saved->updatePhoto((int)$row['source_id'], (int)$photo['saved_palette_id'], ['rel_path' => $relPath]); }
-            }
-            $saved->syncRelPathFromPhotoLibrary($id, $relPath);
             if ((int)($row['asset_library_id'] ?? 0) > 0) {
                 (new PdoAssetLibraryRepository($this->pdo))->update((int)$row['asset_library_id'], [
                     'rel_path' => $relPath, 'mime_type' => $info['mime'], 'width' => $info[0], 'height' => $info[1],
@@ -67,20 +60,10 @@ final class PhotoReplacementService
             throw $e;
         }
 
-        // Remove superseded bytes only after all references have been committed.
-        $oldPath = (string)(parse_url((string)$row['rel_path'], PHP_URL_PATH) ?: '');
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM photo_library WHERE rel_path IN (?, ?)');
-        $stmt->execute([$oldPath, ltrim($oldPath, '/')]);
-        $shared = (int)$stmt->fetchColumn();
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM asset_library WHERE rel_path IN (?, ?)');
-        $stmt->execute([$oldPath, ltrim($oldPath, '/')]);
-        $shared += (int)$stmt->fetchColumn();
-        if (!$shared) {
-            $old = $this->localPath((string)$row['rel_path']);
-            if ($old && !unlink($old)) { error_log('Could not remove superseded photo: ' . $old); }
-        }
+        // Current consumers resolve Photo Library IDs. Raw path/shared consumers keep their original bytes.
+        $disposal = (new PhotoLifecycleService($this->pdo, $this->root))->disposeFile((string)$row['rel_path']);
         foreach (glob($this->root . '/photos/cache/thumbs/pl-' . $id . '-*') ?: [] as $thumb) { @unlink($thumb); }
-        return [...$fresh, 'image_url' => $imageUrl, 'file_path' => $imageUrl, 'raw_rel_path' => $relPath];
+        return [...$fresh, 'old_file_cleanup' => $disposal, 'image_url' => $imageUrl, 'file_path' => $imageUrl, 'raw_rel_path' => $relPath];
     }
 
     public function localPath(string $relPath): ?string

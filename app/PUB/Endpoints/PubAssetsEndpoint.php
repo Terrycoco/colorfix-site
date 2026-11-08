@@ -736,6 +736,7 @@ final class PubAssetsEndpoint
             )
             as $physicalFile
         ) {
+            $repo->assertNotPhotoLibraryFile($physicalFile);
             if (
                 is_file(
                     $physicalFile

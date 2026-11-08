@@ -181,7 +181,8 @@ const loadPage = useCallback(async () => {
     const rows = await loadList();
 
     const params = new URLSearchParams(window.location.search);
-    const requestedPvId = Number(params.get("pv_id") || 0);
+    const requestedPaletteId = Number(params.get("palette_id") || 0);
+    const requestedPvId = Number(params.get("pv_id") || rows.find(row=>Number(row?.viewer?.saved_palette_id)===requestedPaletteId)?.viewer?.palette_viewer_id || 0);
 
     const requestedExists =
       requestedPvId > 0 &&
@@ -192,6 +193,10 @@ const loadPage = useCallback(async () => {
 
     if (requestedExists && Number(selectedId) !== requestedPvId) {
       await loadDetail(requestedPvId);
+    } else if (!selectedId && requestedPaletteId > 0) {
+      setIsNew(true);
+      setDetail(normalizeDetail({viewer:{...EMPTY_VIEWER,saved_palette_id:String(requestedPaletteId)},photos:[],members:[]}));
+      await loadPaletteDetail(requestedPaletteId);
     } else if (!selectedId && rows[0]?.viewer?.palette_viewer_id) {
       await loadDetail(rows[0].viewer.palette_viewer_id);
     }

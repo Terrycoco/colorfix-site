@@ -1159,7 +1159,6 @@ public function buildPlaybackPlanFromProjectExperience(
     protected function hydrateItemImages(array $items): void
     {
         $photoIds = [];
-        $assetIds = [];
         $savedPaletteHashes = [];
 
         foreach ($items as $item) {
@@ -1180,19 +1179,11 @@ public function buildPlaybackPlanFromProjectExperience(
                 continue;
             }
 
-            $assetId = $this->extractAssetId($imageUrl);
 
-            if ($assetId !== '') {
-                $assetIds[$assetId] = true;
-            }
         }
 
         $photoMetaMap = $this->loadPhotoLibraryMeta(
             array_keys($photoIds)
-        );
-
-        $assetUrlMap = $this->loadAssetVariantUrls(
-            array_keys($assetIds)
         );
 
         $savedPaletteTitleMap = $this->loadSavedPaletteTitles(
@@ -1246,17 +1237,7 @@ public function buildPlaybackPlanFromProjectExperience(
                 continue;
             }
 
-            $assetId = $this->extractAssetId($imageUrl);
 
-            if ($assetId === '') {
-                continue;
-            }
-
-            $resolved = $assetUrlMap[$assetId] ?? '';
-
-            if ($resolved !== '') {
-                $item->image_url = $resolved;
-            }
         }
     }
 
@@ -1409,62 +1390,6 @@ public function buildPlaybackPlanFromProjectExperience(
      * @param string[] $assetIds
      * @return array<string, string>
      */
-    private function loadAssetVariantUrls(array $assetIds): array
-    {
-        $ids = array_values(array_filter(array_map(
-            static fn($id) => trim((string)$id),
-            $assetIds
-        )));
-        if (!$ids) return [];
-
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $sql = <<<SQL
-            SELECT
-                p.asset_id,
-                v.path,
-                v.kind,
-                v.role
-            FROM photos p
-            JOIN photos_variants v
-              ON v.photo_id = p.id
-            WHERE p.asset_id IN ({$placeholders})
-              AND (
-                v.kind = 'thumb'
-                OR (v.kind = 'prepared' AND v.role = '')
-                OR v.kind = 'prepared_base'
-                OR (v.kind = 'repaired' AND v.role = '')
-                OR v.kind = 'repaired_base'
-              )
-            ORDER BY
-                CASE
-                    WHEN v.kind = 'thumb' THEN 0
-                    WHEN v.kind = 'prepared' AND v.role = '' THEN 1
-                    WHEN v.kind = 'prepared_base' THEN 2
-                    WHEN v.kind = 'repaired' AND v.role = '' THEN 3
-                    ELSE 4
-                END ASC,
-                v.id ASC
-            SQL;
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($ids);
-
-        $map = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $assetId = trim((string)($row['asset_id'] ?? ''));
-            if ($assetId === '' || isset($map[$assetId])) continue;
-            $path = trim((string)($row['path'] ?? ''));
-            if ($path === '') continue;
-            $map[$assetId] = $path;
-        }
-        return $map;
-    }
-
-    private function extractAssetId(string $value): string
-    {
-        if (!str_starts_with($value, 'asset:')) return '';
-        return trim(substr($value, strlen('asset:')));
-    }
-
     private function isPhotoRefWithoutUrl(string $value): bool
     {
         if (!str_starts_with($value, 'photo:')) return false;

@@ -24,16 +24,13 @@ const PictureSwatchItem = ({ item }) => {
 };
 
 function buildPaletteViewerUrl(item) {
-  const setId = Number(item?.saved_palette_set_id || 0);
-  const query = setId > 0 ? `?set_id=${encodeURIComponent(String(setId))}` : "";
-
   if (item?.palette_hash) {
-    return `/palette/${encodeURIComponent(item.palette_hash)}/share${query}`;
+    return `/palette/${encodeURIComponent(item.palette_hash)}/share`;
   }
 
   const savedPaletteId = Number(item?.saved_palette_id || item?.palette_id || 0);
   if (savedPaletteId > 0) {
-    return `/palette/${savedPaletteId}/share${query}`;
+    return `/palette/${savedPaletteId}/share`;
   }
 
   return undefined;
