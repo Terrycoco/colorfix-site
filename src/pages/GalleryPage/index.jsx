@@ -172,7 +172,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
       const hexSearch = Number(query_id) === 18 && Object.prototype.hasOwnProperty.call(params, 'hex');
       const v2 = hexSearch
         ? `${API_FOLDER}/v2/hex-search.php`
-        : `${API_FOLDER}/v2/run-query.php?t=${Date.now()}`;
+        : `${API_FOLDER}/v2/gallery/run-query.php?t=${Date.now()}`;
 
       // Keep the current Gallery (including the hero wheel) visible while
       // a replacement request is in flight. The successful response replaces it.
@@ -280,7 +280,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
         rowsWithGallery
 
-          .filter((row) => row?.item_type !== 'picture-swatch')
+          .filter((row) => !['picture-swatch', 'art-swatch'].includes(row?.item_type))
 
           .map((row) => Number(row?.id ?? row?.color_id))
 
@@ -358,7 +358,7 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
           for (const row of data.results || []) {
 
-            if (row?.item_type === 'picture-swatch') continue;
+            if (['picture-swatch', 'art-swatch'].includes(row?.item_type)) continue;
 
             rowsWithGallery.push(row);
 
@@ -412,11 +412,11 @@ const GalleryPage = ({ defaultQueryId = null }) => {
 
           ? rowsWithGallery.filter((row) => {
 
-            if (row?.item_type === 'picture-swatch') {
+            if (['picture-swatch', 'art-swatch'].includes(row?.item_type)) {
 
               const source = rowsWithGallery.find((swatch) =>
 
-                swatch?.item_type !== 'picture-swatch' &&
+                !['picture-swatch', 'art-swatch'].includes(swatch?.item_type) &&
 
                 Number(swatch?.id ?? swatch?.color_id) === Number(row.source_color_id)
 

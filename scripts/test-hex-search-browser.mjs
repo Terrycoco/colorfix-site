@@ -68,7 +68,7 @@ try {
       const response = await route.fetch({ url: backend });
       return route.fulfill({ response });
     }
-    if (url.pathname === '/api/v2/run-query.php') {
+    if (url.pathname === '/api/v2/gallery/run-query.php') {
       requests.push(route.request().postDataJSON());
       return route.fulfill({ json: { meta: { meta_id: 18, item_type: 'swatch' }, results: [{ id: 9, name: 'Name result', hex6: 'FFFFFF', brand: 'sw', item_type: 'swatch' }], inserts: [] } });
     }

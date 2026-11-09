@@ -158,7 +158,7 @@ const HomePage = () => {
 
     let res;
     try {
-      const v2 = `${API_FOLDER}/v2/run-query.php?t=${Date.now()}`;
+      const v2 = `${API_FOLDER}/v2/gallery/run-query.php?t=${Date.now()}`;
 
       // reset view while loading
       frontPageGeneratedAtRef.current = '';

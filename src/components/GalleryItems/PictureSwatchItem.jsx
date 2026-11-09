@@ -15,6 +15,10 @@ const PictureSwatchItem = ({ item }) => {
       photoUrl={item?.photo_url}
       photoLibraryId={item?.photo_library_id || item?.photo_id}
       name={name}
+      cropX={item?.crop_x}
+      cropY={item?.crop_y}
+      cropWidth={item?.crop_width}
+      cropHeight={item?.crop_height}
       meta={meta}
       to={to}
       onClick={handleClick}

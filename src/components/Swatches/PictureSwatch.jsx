@@ -1,5 +1,6 @@
 import { photoThumbUrl } from "@helpers/imageThumb";
 import "./swatches.css";
+import { hasSavedSwatchCrop, swatchCropStyle } from "./swatchCropStyle";
 
 export default function PictureSwatch({
   photoUrl,
@@ -10,13 +11,20 @@ export default function PictureSwatch({
   onClick,
   markerId,
   widthPercent = 20,
+  cropX = null,
+  cropY = null,
+  cropWidth = null,
+  cropHeight = null,
 }) {
+  const crop = { cropX, cropY, cropWidth, cropHeight };
+  const hasCustomCrop = hasSavedSwatchCrop(crop);
   const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
   const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
-  const imageUrl = smallImageUrl || photoUrl;
-  const imageSrcSet = smallImageUrl && largeImageUrl
+  const imageUrl = hasCustomCrop ? (photoUrl || smallImageUrl) : (smallImageUrl || photoUrl);
+  const imageSrcSet = !hasCustomCrop && smallImageUrl && largeImageUrl
     ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
     : undefined;
+  const cropStyle = hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
   const href = to || photoUrl || "";
 
   const go = () => {
@@ -32,6 +40,7 @@ export default function PictureSwatch({
         {imageUrl && (
           <img
             className="pals-photo-img"
+            style={cropStyle}
             src={imageUrl}
             srcSet={imageSrcSet}
             sizes="(min-width: 560px) 260px, 50vw"

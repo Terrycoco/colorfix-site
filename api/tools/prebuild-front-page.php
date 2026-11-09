@@ -22,7 +22,7 @@ if (!is_dir($outDir) && !mkdir($outDir, 0775, true) && !is_dir($outDir)) {
 }
 
 $runQuery = httpJson(
-    "{$baseUrl}/api/v2/run-query.php?t=" . time(),
+    "{$baseUrl}/api/v2/gallery/run-query.php?t=" . time(),
     'POST',
     [
         'query_id' => $queryId,

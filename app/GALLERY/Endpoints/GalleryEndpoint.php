@@ -85,6 +85,10 @@ final class GalleryEndpoint
                     // obtain visibility flags and palette display metadata.
                     $sql .= ' LEFT JOIN photo_library gallery_photo '
                         . 'ON gallery_photo.photo_library_id = q.photo_id '
+                        . 'LEFT JOIN photo_crops gallery_crop '
+                        . "ON gallery_crop.photo_library_id = q.photo_id AND gallery_crop.crop_type = 'swatch' "
+                        . 'LEFT JOIN photos_artwork gallery_art '
+                        . 'ON gallery_art.photo_library_id = q.photo_id '
                         . 'LEFT JOIN saved_palettes gallery_palette '
                         . 'ON gallery_palette.id = q.photo_palette_id';
                     $sql = preg_replace('/^SELECT q\.\*,/i',
@@ -92,6 +96,11 @@ final class GalleryEndpoint
                         . 'gallery_photo.show_in_gallery AS __photo_visible, '
                         . 'gallery_photo.is_inactive AS __photo_inactive, '
                         . 'gallery_photo.is_retired AS __photo_retired, '
+                        . 'gallery_photo.source_type AS __photo_source_type, '
+                        . 'gallery_crop.crop_x AS __crop_x, gallery_crop.crop_y AS __crop_y, '
+                        . 'gallery_crop.crop_width AS __crop_width, gallery_crop.crop_height AS __crop_height, '
+                        . 'gallery_art.artwork_id AS __artwork_id, gallery_art.artist AS __artist, '
+                        . 'gallery_art.official_title AS __official_title, gallery_art.display_title AS __display_title, '
                         . 'gallery_palette.palette_hash AS __palette_hash, '
                         . 'gallery_palette.nickname AS __palette_name, '
                         . 'gallery_palette.brand AS __palette_brand,', $sql, 1);
@@ -141,7 +150,9 @@ final class GalleryEndpoint
                         $swatch = array_replace($row, Swatch::fromRow($row)->toArray());
                         unset($swatch['photo_id'], $swatch['photo_url'], $swatch['photo_palette_id']);
                         foreach (array_keys($swatch) as $key) {
-                            if (str_starts_with($key, '__photo_') || str_starts_with($key, '__palette_')) {
+                            if (str_starts_with($key, '__photo_') || str_starts_with($key, '__palette_')
+                                || str_starts_with($key, '__crop_')
+                                || in_array($key, ['__artwork_id', '__artist', '__official_title', '__display_title'], true)) {
                                 unset($swatch[$key]);
                             }
                         }
@@ -163,7 +174,16 @@ final class GalleryEndpoint
                     $paletteId = (int) ($row['photo_palette_id'] ?? 0);
                     $combined[] = [
                         'id' => 'ps_' . $id . '_' . $photoId,
-                        'item_type' => 'picture-swatch',
+                        'item_type' => ($row['__photo_source_type'] ?? '') === 'art' ? 'art-swatch' : 'picture-swatch',
+                        'source_type' => $row['__photo_source_type'] ?? null,
+                        'crop_x' => isset($row['__crop_x']) ? (float)$row['__crop_x'] : null,
+                        'crop_y' => isset($row['__crop_y']) ? (float)$row['__crop_y'] : null,
+                        'crop_width' => isset($row['__crop_width']) ? (float)$row['__crop_width'] : null,
+                        'crop_height' => isset($row['__crop_height']) ? (float)$row['__crop_height'] : null,
+                        'artwork_id' => isset($row['__artwork_id']) ? (int)$row['__artwork_id'] : null,
+                        'artist' => $row['__artist'] ?? null,
+                        'official_title' => $row['__official_title'] ?? null,
+                        'display_title' => $row['__display_title'] ?? null,
                         'photo_library_id' => $photoId,
                         'photo_url' => $row['photo_url'],
                         'photo_type' => 'main',
@@ -212,6 +232,7 @@ final class GalleryEndpoint
                     'header_subtitle' => $queryRow['header_subtitle'] ?? '',
                     'header_content' => $queryRow['header_content'] ?? '',
                     'params' => $params,
+                    'gallery_owns_photos' => $usesGalleryView,
                 ],
                 'results' => $rows,
                 'inserts' => $inserts,

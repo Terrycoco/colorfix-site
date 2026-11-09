@@ -1,62 +1,14 @@
 
-import { useId, useState } from "react";
+import { useId } from "react";
+import { hasSavedSwatchCrop, swatchCropStyle } from "./swatchCropStyle";
 import { photoThumbUrl } from "@helpers/imageThumb";
 import "./swatches.css";
 import "./art-swatch.css";
 
-const FRAME_RATIO = 5 / 4;
-
-function getCropStyle(width, height, cropX, cropY, cropSize) {
-  if (!width || !height) return undefined;
-
-  const shortSide = Math.min(width, height);
-
-  // cropSize is the crop WIDTH relative to the
-  // shorter dimension of the original photograph.
-  const requestedSize = Number(cropSize);
-  const size =
-    Number.isFinite(requestedSize) && requestedSize > 0
-      ? Math.min(requestedSize, 1)
-      : 1;
-
-  const cropWidth = Math.min(
-    size * shortSide,
-    width,
-    height * FRAME_RATIO
-  );
-  const cropHeight = cropWidth / FRAME_RATIO;
-
-  const maxX = Math.max(0, width - cropWidth);
-  const maxY = Math.max(0, height - cropHeight);
-
-  const hasSavedCrop =
-    Number.isFinite(Number(cropX)) &&
-    Number.isFinite(Number(cropY)) &&
-    !(Number(cropX) === 0 &&
-      Number(cropY) === 0 &&
-      size === 1);
-
-  const x = hasSavedCrop
-    ? Math.max(0, Math.min(Number(cropX) * width, maxX))
-    : maxX / 2;
-
-  const y = hasSavedCrop
-    ? Math.max(0, Math.min(Number(cropY) * height, maxY))
-    : maxY / 2;
-
-  return {
-    width: `${(width / cropWidth) * 100}%`,
-    height: `${(height / cropHeight) * 100}%`,
-    left: `${(-x / cropWidth) * 100}%`,
-    top: `${(-y / cropHeight) * 100}%`,
-  };
-}
-
 function MuseumFrame() {
   const rawId = useId().replace(/:/g, "");
-  const goldId = `art-gold-${rawId}`;
-  const innerId = `art-inner-${rawId}`;
-
+  // A frame's profile is modeled by concentric bands rather than
+  // screen-wide directional gradients. Every corner receives equal light.
   const corners = [
     "translate(0 0)",
     "translate(500 0) scale(-1 1)",
@@ -72,61 +24,51 @@ function MuseumFrame() {
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id={goldId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#F8DE9C" />
-          <stop offset="18%" stopColor="#C7994C" />
-          <stop offset="40%" stopColor="#80501D" />
-          <stop offset="63%" stopColor="#EDC982" />
-          <stop offset="82%" stopColor="#AD7834" />
-          <stop offset="100%" stopColor="#F4D58B" />
-        </linearGradient>
-        <linearGradient id={innerId} x1="0" y1="0" x2="0.7" y2="1">
-          <stop offset="0%" stopColor="#5B381A" />
-          <stop offset="45%" stopColor="#B98842" />
-          <stop offset="100%" stopColor="#F1CF84" />
-        </linearGradient>
-      </defs>
-
-      {/* Solid molding, with transparent artwork opening */}
+      {/* Solid gilded ground. The cutout leaves the painting unobscured. */}
       <path
         d="M0 0H500V400H0Z M40 32H460V368H40Z"
-        fill={`url(#${goldId})`}
+        fill="#DDBB70"
         fillRule="evenodd"
       />
 
-      {/* Layered gilded profiles */}
-      <rect
-        x="5" y="5" width="490" height="390"
-        fill="none" stroke="#6E461F" strokeWidth="8"
-      />
-      <rect
-        x="12" y="12" width="476" height="376"
-        fill="none" stroke="#F9DE9C" strokeWidth="3"
-      />
-      <rect
-        x="19" y="19" width="462" height="362"
-        fill="none" stroke="#785022" strokeWidth="7"
-      />
-      <rect
-        x="27" y="27" width="446" height="346"
-        fill="none" stroke="#E8B969" strokeWidth="3"
-      />
-      <rect
-        x="34" y="34" width="432" height="332"
-        fill="none" stroke={`url(#${innerId})`}
-        strokeWidth="7"
-      />
-      <rect
-        x="40" y="32" width="420" height="336"
-        fill="none" stroke="#38230F" strokeWidth="2"
-      />
+      {/* Even, concentric relief. Each stroke completes the entire rectangle,
+          avoiding the left-bright/right-dark effect of the old gradients. */}
+      {/* Outer rolled crown: glint, raised face, then the fine downturn. */}
+      <rect x="2" y="2" width="496" height="396" rx="4"
+        fill="none" stroke="#F3D98F" strokeWidth="4" />
+      <rect x="6" y="6" width="488" height="388" rx="3"
+        fill="none" stroke="#B78D45" strokeWidth="3" />
+      <rect x="10" y="10" width="480" height="380" rx="2"
+        fill="none" stroke="#E3B964" strokeWidth="9" />
+      <rect x="14" y="14" width="472" height="372" rx="2"
+        fill="none" stroke="#FFE7A1" strokeWidth="2.4" />
+      <rect x="17.5" y="17.5" width="465" height="365"
+        fill="none" stroke="#D0A354" strokeWidth="3" />
+
+      {/* Concave channel. Dark gold is inside the trough only; its rims are
+          identical on all four sides, including at the corner joins. */}
+      <rect x="22" y="22" width="456" height="356"
+        fill="none" stroke="#F2D184" strokeWidth="3" />
+      <rect x="25" y="25" width="450" height="350"
+        fill="none" stroke="#AD843F" strokeWidth="5" />
+      <rect x="28" y="28" width="444" height="344"
+        fill="none" stroke="#D6AE5C" strokeWidth="3" />
+
+      {/* Raised inner bead and narrow bevel into the artwork opening. */}
+      <rect x="32" y="32" width="436" height="336"
+        fill="none" stroke="#B98D43" strokeWidth="3" />
+      <rect x="35" y="35" width="430" height="330"
+        fill="none" stroke="#EBC778" strokeWidth="7" />
+      <rect x="38" y="38" width="424" height="324"
+        fill="none" stroke="#FFF0B7" strokeWidth="1.8" />
+      <rect x="40" y="32" width="420" height="336"
+        fill="none" stroke="#A88140" strokeWidth="1.6" />
 
       {/* Repeating ornamental details */}
       {Array.from({ length: 13 }, (_, i) => {
         const x = 56 + i * 32;
         return (
-          <g key={`horizontal-${i}`} fill="#F5D48A">
+          <g key={`horizontal-${i}`} fill="#F1D185">
             <path d={`M${x} 9 l6 5 -6 5 -6 -5Z`} />
             <path d={`M${x} 381 l6 5 -6 5 -6 -5Z`} />
           </g>
@@ -136,7 +78,7 @@ function MuseumFrame() {
       {Array.from({ length: 8 }, (_, i) => {
         const y = 65 + i * 38;
         return (
-          <g key={`vertical-${i}`} fill="#F5D48A">
+          <g key={`vertical-${i}`} fill="#F1D185">
             <path d={`M9 ${y} l5 -6 5 6 -5 6Z`} />
             <path d={`M481 ${y} l5 -6 5 6 -5 6Z`} />
           </g>
@@ -149,7 +91,7 @@ function MuseumFrame() {
           key={i}
           transform={transform}
           fill="none"
-          stroke="#FFE2A0"
+          stroke="#F2D389"
           strokeWidth="2.4"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -159,7 +101,7 @@ function MuseumFrame() {
           <path d="M15 15 Q45 9 34 38 Q10 45 15 15Z" />
           <path d="M22 28 Q32 23 35 14" />
           <path d="M14 48 Q34 49 42 32" />
-          <circle cx="23" cy="23" r="5" fill="#F6D68C" />
+          <circle cx="23" cy="23" r="5" fill="#EBC574" />
         </g>
       ))}
     </svg>
@@ -175,30 +117,22 @@ export default function ArtSwatch({
   onClick,
   markerId,
   widthPercent = 20,
-  cropX = 0,
-  cropY = 0,
-  cropSize = 1,
+  cropX = null,
+  cropY = null,
+  cropWidth = null,
+  cropHeight = null,
 }) {
-  const [dimensions, setDimensions] = useState(null);
-
+  const crop = { cropX, cropY, cropWidth, cropHeight };
+  const hasCustomCrop = hasSavedSwatchCrop(crop);
   const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
   const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
-  const imageUrl = smallImageUrl || photoUrl;
-
-  const imageSrcSet =
-    smallImageUrl && largeImageUrl
-      ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
-      : undefined;
-
-  const cropStyle = dimensions
-    ? getCropStyle(
-        dimensions.width,
-        dimensions.height,
-        cropX,
-        cropY,
-        cropSize
-      )
+  // Do not apply saved coordinates to a server-generated thumbnail: it may
+  // already have been resized or center-cropped. Use uncropped photo_url.
+  const imageUrl = hasCustomCrop ? (photoUrl || smallImageUrl) : (smallImageUrl || photoUrl);
+  const imageSrcSet = !hasCustomCrop && smallImageUrl && largeImageUrl
+    ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
     : undefined;
+  const cropStyle = hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
 
   const content = (
     <div className="pals-art-tile">
@@ -213,13 +147,6 @@ export default function ArtSwatch({
             loading="lazy"
             decoding="async"
             style={cropStyle}
-            onLoad={(event) => {
-              const img = event.currentTarget;
-              setDimensions({
-                width: img.naturalWidth,
-                height: img.naturalHeight,
-              });
-            }}
           />
         )}
       </div>

@@ -150,7 +150,7 @@ export default function QueryView({ query, onQueryChange, onDirty }) {
     }
 
     try {
-      const response = await fetch(`${API_FOLDER}/run-query.php`, {
+      const response = await fetch(`${API_FOLDER}/v2/gallery/run-query.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

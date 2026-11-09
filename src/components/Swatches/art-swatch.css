@@ -7,7 +7,7 @@
 
 .pals-swatch.pals-art {
   aspect-ratio: 5 / 4;
-  border-radius: 0;
+  border-radius: 5px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -22,8 +22,8 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  border-radius: 0;
-  background: #65421e;
+  border-radius: 5px;
+  background: #E8C576; /* uninterrupted gilded backing; no brown substrate */
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.22),
     0 0 1px rgba(0, 0, 0, 0.3);
@@ -40,7 +40,7 @@
   inset: 8%;
   overflow: hidden;
   border-radius: 0;
-  background: #382b1d;
+  background: #E8C576; /* only visible during image loading */
 }
 
 /* Crop position and size are supplied by ArtSwatch.jsx */
@@ -85,4 +85,10 @@
   .pals-art-tile {
     transition: none;
   }
+}
+
+/* A very small corner radius softens the rigid machined edge.
+   The frame itself remains flush with the Gallery tile boundary. */
+.gallery-item:has(> .pals-swatch.pals-art) {
+  border-radius: 5px;
 }

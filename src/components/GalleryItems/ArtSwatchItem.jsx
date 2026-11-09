@@ -23,7 +23,8 @@ export default function ArtSwatchItem({ item }) {
       meta={meta}
       cropX={item?.crop_x}
       cropY={item?.crop_y}
-      cropSize={item?.crop_size}
+      cropWidth={item?.crop_width}
+      cropHeight={item?.crop_height}
       to={
         artworkId
           ? `/inspired-by/${encodeURIComponent(artworkId)}`
