@@ -21,6 +21,11 @@
 
   RewriteRule ^pod/?$ /pod.php [L,QSA]
 
+  # Serve the registered landing metadata at its clean canonical URL rather
+  # than letting DirectorySlash redirect the generated directory to a slash URL.
+  RewriteCond %{DOCUMENT_ROOT}/browse-playlists/index.html -f
+  RewriteRule ^browse-playlists/?$ /browse-playlists/index.html [L,QSA]
+
   # Picker is a React route, even when an old static picker/ directory exists.
   RewriteRule ^picker/?$ /app-shell.html [L,QSA]
   RewriteRule ^index\.html$ - [L]

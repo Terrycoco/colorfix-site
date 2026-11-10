@@ -1,5 +1,7 @@
 # ARTWORK — Department Manifest
 
+**UPDATED:** 2026-11-10 12:01:04 PM PST
+
 **Department:** `ARTWORK`  
 **Location:** `app/ARTWORK/`  
 **Namespace:** `App\ARTWORK`  
@@ -11,7 +13,7 @@
 
 ARTWORK owns **metadata and interpretation of works of art represented by photographs in the Photo Library**. It records the artist, titles, approximate date, medium, museum/collection, source URL, historical notes, and color analysis. It provides administration operations to create, retrieve, revise, list, and remove those metadata records.
 
-ARTWORK does **not** own the image file, Photo Library row, source-photo crop, photo classification, saved paint palette, or Gallery results. Those remain with their respective departments: PHOTOS, PALETTES, and GALLERY. Do not add duplicate upload, image-cropping, palette-editing, or Gallery-search systems to ARTWORK.
+ARTWORK does **not** own the image file, Photo Library row, source-photo crop, photo classification, saved paint palette, or the shared Gallery rendering/query system. Those remain with PHOTOS, PALETTES, and GALLERY. ARTWORK does own the public artwork-only list interface described below; do not duplicate Gallery rendering or search logic in ARTWORK.
 
 ## 2. Core invariants
 
@@ -33,7 +35,7 @@ ARTWORK does **not** own the image file, Photo Library row, source-photo crop, p
 | `Services/ArtworkService.php` | Artwork rules: require existing PHOTOS record; reject duplicates; coordinate create/read/update/delete. |
 | `Endpoints/ArtworkEndpoint.php` | Admin GET/POST request decoding, action routing, status codes, JSON responses, error mapping. |
 | `api/v2/admin/artwork/index.php` *(outside ARTWORK)* | Thin API doorbell: OPTIONS response, shared autoload/database/admin authentication bootstrap, then calls the ARTWORK endpoint. |
-| `src/components/ArtworkDialog/ArtworkDialog.jsx` *(frontend)* | Reusable modal for adding, viewing, editing, and deleting artwork metadata; displays caller-supplied photo URL. |
+| `src/components/ArtworkDialog/ArtworkDialog.jsx` *(frontend)* | Reusable artwork metadata modal; additionally lists/searches/adds/removes linked design photos through PHOTOS admin inspiration endpoint; displays caller-supplied photo URL. |
 | `src/components/ArtworkDialog/ArtworkDialog.css` *(frontend)* | Dialog presentation and responsive styling. |
 | `AdminPhotoLibraryPage/index.jsx` *(frontend integration)* | Displays Photo Library type dropdown and conditional Artwork icon; opens `ArtworkDialog` with the selected photo. |
 | `AdminPhotoLibraryPage/admin-photo-library.css` *(frontend integration)* | Type selector and Artwork icon presentation. |
@@ -103,7 +105,7 @@ The screenshot establishes column/index structure, not all referential constrain
 - `photo_library` (**PHOTOS**): artwork's photograph; the service reads it through `App\PHOTOS\Repos\PdoPhotoLibraryRepository::findById`. ARTWORK does not write or delete Photo Library rows or files.
 - `photo_crops` (**PHOTOS**): selected non-destructive crop geometries, unchanged by artwork metadata edits.
 - Saved palette records (**PALETTES**, with the current photo-to-palette association represented in PHOTOS): not joined or written by the current ARTWORK code.
-- Gallery eligibility and item composition (**GALLERY**): planned `art-swatch` presentation is a Gallery concern, not implemented by this ARTWORK backend.
+- Gallery display and art-swatch rendering (**GALLERY**): GALLERY owns the visual presentation and mixed-gallery queries. ARTWORK supplies a public, artwork-only list of display-ready art-swatch rows through `ArtworkPageService::listGallery()`.
 
 Artwork records are **not** a replacement for `photo_library.source_type`. The `source_type` dropdown writes classification through the Photo Library's existing update workflow. The `photos_artwork` record stores the painting's metadata.
 
@@ -113,7 +115,7 @@ Artwork records are **not** a replacement for `photo_library.source_type`. The `
 - **Frontend:** React, `createPortal`, shared `API_FOLDER` config, browser `fetch`; reusable `ArtworkDialog` takes `open`, `photoLibraryId`, `imageUrl`, `onClose`, `onSaved`, and `onDeleted` props.
 - **Photo Library:** The upload Type list already offers `Art`. Detail Type is editable, and its Artwork icon is conditional on the current selected `source_type === 'art'`, immediately below Type. Saving the row persists classification via the PHOTOS update API; the ArtworkDialog saves metadata separately via ARTWORK.
 - **PALETTES:** Holds authoritative real-paint approximations and saved palettes. Never create a second color/palette database in ARTWORK.
-- **GALLERY:** Owns whether a photo appears as a `picture-swatch` or `art-swatch`, plus search and display. An art study viewer and framed swatches are **planned**, not established by these files.
+- **GALLERY:** Owns mixed-gallery queries, `art-swatch` rendering (including frames), and artwork detail navigation. ARTWORK supplies artwork-only discovery records through its public list interface; it does not duplicate the Gallery component.
 
 **Known interface gap:** `ArtworkService` directly instantiates the PHOTOS repository for existence checks. This works as written but ties ARTWORK to a lower-level PHOTOS implementation instead of a published PHOTOS service. Evaluate against PHOTOS' public service contracts before changing; do not silently replace it with new cross-department SQL.
 
@@ -126,7 +128,7 @@ Artwork records are **not** a replacement for `photo_library.source_type`. The `
 5. Saving posts `action=create` if no record exists, otherwise `action=update`. The service verifies that PHOTOS contains the photograph; the repository writes only `photos_artwork`.
 6. Opening the dialog later loads the saved row for editing. Deleting requires a second confirmation click and calls `action=delete`, leaving the photo/palette/crops untouched.
 
-**Current limitations:** The UI shows an image passed in by its caller, but does not own a separate image picker or upload. There is no art study publication workflow, `art-swatch` rendering, artwork-specific search, or linked palette editing in these supplied ARTWORK files. Metadata save is distinct from the Photo Library row-save; do not assume that selecting Art has already persisted before opening the dialog.
+**Ownership limitation:** ARTWORK metadata editing does not own photo uploading or saved-palette editing. Its public list endpoint supplies artwork data to the shared Gallery renderer; publication/visibility rules belong in the public data access path. Metadata save remains distinct from the Photo Library row-save.
 
 ## 9. Security and deletion rules
 
@@ -146,7 +148,7 @@ Before modifying ARTWORK:
 3. Inspect callers and real database schema; keep `api/v2/admin/artwork/index.php` a thin doorbell.
 4. Preserve current API request/response contracts unless a change and migration are approved.
 5. Validate PHP syntax and run live authenticated API tests: get missing metadata (`null`), create, reopen, edit, duplicate rejection, delete, and confirm photo/crop/palette survival. Validate source-type dropdown persistence separately. Test invalid IDs, unknown fields, unauthenticated requests, and all error status codes.
-6. Update this manifest in the same change whenever files, interfaces, ownership, schema, workflow, or dependencies change. Record the revision below.
+6. Update this manifest only when departmental responsibilities, published interfaces, data relationships, significant workflows, or dependencies change. Record the revision below.
 
 ### Change log
 
@@ -159,3 +161,23 @@ Before modifying ARTWORK:
 ## Template rule for other departments
 
 Keep the **same numbered structure and evidence standard** as PHOTOS and ARTWORK. Inventory real files and method signatures; document ownership, interfaces, related tables, callers, workflows, security, tests, and a change log. Mark unknown or future capabilities explicitly; never claim a feature is implemented solely because it is planned in `SystemManifest.md`. Do not alter application code during a documentation-only assignment.
+
+## Public ArtworkPage and Art Gallery — departmental interfaces
+
+- **Contextual Art Study CTA:** `ArtworkService::publicStudyUrlForPhotos(array $photoIds): ?string` accepts explicit Photo Library IDs and returns `/inspired-by/{artwork_id}` only for one unambiguous, publicly available artwork, otherwise `null`. `PdoArtworkRepository::findArtworkCandidatesForPhotos(array $photoIds): array` performs one parameterized, read-only batch lookup through direct Art photos or design `inspiration_photo_id` links; missing metadata is retained as an unresolved candidate so conflicting links cannot be silently ignored. PHOTOS' `findPublicArtworkPhoto()` remains authoritative for destination visibility. No records, tokens, flags, or associations are created or changed.
+- **PLAYLISTS consumer:** `PlaylistExperienceService` resolves `{artwork_id}` only in opted-in existing `navigate` CTA URL parameters, during both public and project playback-plan assembly. Context includes the current experience's selected source slides (including its cover), not unrelated playlists or title/tag guesses. Missing, ambiguous, or unavailable artwork omits that CTA. Other CTA parameters, order, analytics identity, source tracking, and remaining player placeholders are preserved. Configure one reusable Navigate CTA in `/admin/ctas`, then add it to the appropriate existing CTA Pages; Public REX's existing public/default page selection and other experiences' page assignments remain unchanged. This extends the existing CTA pipeline without a new action, API, or frontend resolver.
+- **Verification:** `php api/tests/ArtworkCtaTest.php` uses in-memory SQLite fixtures for direct/inspired links, another artwork, ambiguity including missing metadata, unavailable public destinations, unchanged normal CTAs and tracking parameters, and read-only behavior. This contract is local until deployed; CTA records/page memberships are configured separately through existing Admin interfaces.
+- `app/ARTWORK/Endpoints/ArtworkPageEndpoint.php`: public GET JSON endpoint invoked through the thin `api/v2/artwork/page.php` doorbell. Accepts `artwork_id` or `photo_library_id`; responds `{ok:true,data:{artwork,photo,paint_approximations,inspired_designs}}`. Invalid input returns 400, unavailable artwork 404, unexpected failures 503 without disclosing exception details.
+- `app/ARTWORK/Services/ArtworkPageService.php`: read-only composition of ARTWORK metadata, PHOTOS public artwork/inspired-design retrieval, and PALETTES saved-palette retrieval. ARTWORK does not own image files, photo-to-artwork inspiration links, or paint-color records.
+- **Public artwork discovery:** `GET /api/v2/artwork/page.php?action=list` returns `{ok:true,items:[...]}` without admin authentication. `ArtworkPageEndpoint` dispatches to `ArtworkPageService::listGallery()`, which uses `PdoArtworkRepository::listPublicGallery()`. Rows are `art-swatch` items containing artwork/photo identifiers, titles, artist, safe local photo URL, and crop geometry for the existing Gallery renderer. Public query filters must prevent exposure of non-public photos.
+- **Frontend consumer:** `/art-gallery` uses `src/pages/ArtGalleryPage/index.jsx`, which consumes the public list response and passes its rows to the existing Gallery component. The Gallery/ArtSwatch component owns gold-frame presentation, hover treatment, and links to `/inspired-by/:artworkId`. This is not a new Gallery query engine. The implementation was prepared locally; deployment and browser behavior are not established by this manifest.
+- PHOTOS must enforce suitable public visibility and permission checks on artwork and inspired-design images. Public interfaces must not use the unrestricted administrative inspiration reverse lookup.
+
+- **Frontend routes:** `src/Router.jsx` renders `/inspired-by/:artworkId`. The separately bootstrapped `src/routes/AdminRoutes.jsx` also renders the same ArtworkPage at `/admin/inspired-by/:artworkId` inside its existing authenticated `AdminPublicPage` wrapper. Both use the existing public artwork API and its visibility checks; the admin route is not a private-artwork preview API. Shared navigation/layout remains owned by the app shells.
+
+- **Artwork display image delivery:** `ArtworkPage.jsx` uses the existing `photoThumbUrl()` / `/api/v2/image-thumb.php` path for 960px hero and 480px design images. The endpoint preserves original aspect ratio; designs retain lazy loading. A failed thumbnail falls back to the original URL. API `photo.image_url` / design `image_url` values and lightbox enlargement remain original-file URLs. No new image endpoint, crop or asset store is introduced.
+- **Palette read dependency:** The existing PALETTES repository now enriches saved-palette members from `mv_swatch_view` with `is_inactive=0` in the LEFT JOIN. Membership/order/roles/notes remain PALETTES-owned; missing/inactive display rows do not remove memberships. Snapshot freshness depends on the existing explicit COLORS refresh workflow. This optimization is local; the measured live SQL comparison is not a claim that the Artwork API has been deployed.
+
+## Completed Improvements
+
+- **2026-11-10 — Contextual Art Study destination contract (local):** ARTWORK supplies one read-only public destination from explicit slide-photo/inspiration relationships; PLAYLISTS reuses it in the existing Navigate CTA preparation. Verified by 24 SQLite fixture checks, PHP syntax validation, existing artwork composition/visibility tests, REX failure-response tests, and the client viewer-target regression. No production CTA configuration or deployment was performed.

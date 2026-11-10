@@ -1,7 +1,10 @@
 
 import ArtSwatch from "@components/Swatches/ArtSwatch";
+import { useLocation } from "react-router-dom";
 
 export default function ArtSwatchItem({ item }) {
+  const { pathname } = useLocation();
+  const inArtGallery = pathname === "/art-gallery";
   const photoLibraryId =
     item?.photo_library_id || item?.photo_id;
 
@@ -13,13 +16,16 @@ export default function ArtSwatchItem({ item }) {
     item?.title ||
     "Artwork";
 
-  const meta = item?.artist || "";
+  const artist = String(item?.artist || "").trim();
+  const surname = artist.split(/\s+/).at(-1) || "";
+  const displayName = inArtGallery ? surname : name;
+  const meta = inArtGallery ? name : artist;
 
   return (
     <ArtSwatch
       photoLibraryId={photoLibraryId}
       photoUrl={item?.photo_url}
-      name={name}
+      name={displayName}
       meta={meta}
       cropX={item?.crop_x}
       cropY={item?.crop_y}

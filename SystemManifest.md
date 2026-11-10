@@ -1,5 +1,5 @@
 ColorFix — System Manifest
-UPDATED: 2026-11-08 6:46 PM PST
+UPDATED: 2026-11-09 8:05 AM PST
 STATUS: Foundational Architecture Contract — Version 1
 AUTHORITY: Owner-approved architectural decisions
 SCOPE: Entire ColorFix application
@@ -76,6 +76,12 @@ Every persistent data model and authoritative write operation has an identified 
 - Schema: New tables/columns must have a justified purpose, defined owner, and reviewed effects on callers and constraints.
 - Deletion: Never assume a record or asset has no other consumers. Check references and preserve shared files.
 Photo Library owns photo_library.crop_x, crop_y, and crop_size. photos_artwork is for artwork-specific metadata, not the Gallery crop. Existing schema, migrations, and code must be checked before assuming any field is deployed.
+One-time database maintenance and data corrections
+- Distinguish operational application SQL from one-time administrative SQL. Repository ownership rules apply to SQL executed by the running application.
+- If a requested change only requires a one-time SQL statement (for example, correcting an existing row or updating configuration), DO NOT add a repository method, PHP migration wrapper, API endpoint, migration-runner feature, or other permanent application code to perform it.
+- Instead, report the exact SQL for the owner to review and execute manually in Bluehost phpMyAdmin. Identify the database, give read-only before/after verification queries and appropriate safety conditions, and state explicitly that the statement must be run only once.
+- Never execute production SQL or apply a database change on the owner's behalf without explicit authorization. Do not instruct the owner to run a second migration after the change has been applied manually.
+- Genuine schema changes, repeatable deployment migrations, and data migrations that require application logic may warrant a versioned migration; justify that need and obtain owner approval rather than treating every one-time data edit as application functionality.
 8. Department manifests
 Each DeptManifest.md must be a concise, accurate contract for coding agents, containing:
 1. Purpose and ownership: domain responsibilities, owned records, and invariants.

@@ -1,0 +1,10 @@
+/* Only artwork-specific list presentation. AdminLayout owns panel sizing/chrome. */
+.admin-artwork-page { min-width: 0; height: 100%; }
+.admin-artwork-page__notice, .admin-artwork-page__error { padding: 12px; margin: 0; }
+.admin-artwork-page__error { color: #ad293b; }
+.admin-artwork-page__item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: 0; border-bottom: 1px solid rgba(128,128,128,.18); background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+.admin-artwork-page__item.is-selected { background: rgba(70,118,184,.15); }
+.admin-artwork-page__item:hover { background: rgba(70,118,184,.09); }
+.admin-artwork-page__item:focus-visible { outline: 2px solid #457dbb; outline-offset: -2px; }
+.admin-artwork-page__item img, .admin-artwork-page__placeholder { flex: 0 0 48px; width: 48px; height: 55px; object-fit: cover; border-radius: 3px; background: rgba(120,120,120,.2); }
+.admin-artwork-page__item span:last-child { min-width: 0; overflow-wrap: anywhere; }

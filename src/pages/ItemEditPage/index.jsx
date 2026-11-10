@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppState } from '@context/AppStateContext';
 import {API_FOLDER} from '@helpers/config';
 import { makePhotoRef, parsePhotoRef } from '@helpers/assetImage';
@@ -32,10 +32,12 @@ export default function ItemEditPage() {
   const [items, setItems] = useState([]);
   const [queries, setQueries] = useState([]);
   const [formData, setFormData] = useState(emptyItem);
+  const [busy, setBusy] = useState(false);
+  const requestPending = useRef(false);
   const {setMessage} = useAppState();
 
   const fetchAllItems = () => {
-    fetch(`${API_FOLDER}/get-all-items.php?cb=${Date.now()}`)
+    return fetch(`${API_FOLDER}/get-all-items.php?cb=${Date.now()}`)
       .then(res => res.json())
       .then(data => {
         console.log('item data:', data);
@@ -47,9 +49,10 @@ export default function ItemEditPage() {
 
 
   const handleEdit = (item) => {
+      if (requestPending.current) return;
       setFormData({
         id: item.id,
-        handle: item.handle || 'no handle',
+        handle: item.handle || '',
         title: item.title || '',
         subtitle: item.subtitle || '',
         display: item.display || '',
@@ -86,6 +89,9 @@ export default function ItemEditPage() {
 
   const handleSave = (e) => {
     e.preventDefault();
+    if (requestPending.current) return;
+    requestPending.current = true;
+    setBusy(true);
     console.log('Submitting this formData:', formData);
     const parsedImage = parsePhotoRef(formData.image_url || '');
     const normalizedInsertPosition = formData.insert_position === '' || formData.insert_position == null
@@ -108,9 +114,12 @@ export default function ItemEditPage() {
       .then(data => {
         console.log('data returned: ', data);
         if (data.success) {
+          if (!data.item?.id) throw new Error('Saved item ID was not returned. Reload the list before saving again.');
+          // Keep the saved ID: subsequent saves update this record.
+          setFormData(previous => ({ ...previous, id: data.item.id }));
           setMessage('Item saved');
            // ⬇️ Always go back to database for fresh items
-           fetchAllItems();
+           return fetchAllItems();
 
         //setFormData(emptyItem);
 
@@ -118,7 +127,32 @@ export default function ItemEditPage() {
           setMessage('Error saving item');
         }
       })
-      .catch(err => console.error('Error saving item:', err));
+      .catch(err => setMessage(err.message || 'Error saving item'))
+      .finally(() => { requestPending.current = false; setBusy(false); });
+  };
+
+  const handleDelete = async () => {
+    if (!formData.id || requestPending.current) return;
+    if (!window.confirm(`Delete item #${formData.id} (${formData.handle || formData.title || 'Untitled item'})? This permanently removes this item.`)) return;
+    requestPending.current = true;
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_FOLDER}/delete-item.php`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: formData.id }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Error deleting item');
+      setItems(previous => previous.filter(item => String(item.id) !== String(formData.id)));
+      setFormData({ ...emptyItem });
+      setMessage('Item deleted');
+    } catch (error) {
+      setMessage(error.message || 'Error deleting item');
+    } finally {
+      requestPending.current = false;
+      setBusy(false);
+    }
   };
 
 
@@ -135,7 +169,8 @@ export default function ItemEditPage() {
             onClick={() => handleEdit(item)}
             className="cursor-pointer rounded px-2 py-1 hover:bg-gray-100"
           >
-            {item.handle || item.display || item.name}
+            {item.handle || item.display || item.name || '(Untitled item)'}
+            <span className="ml-2 text-xs text-gray-500">#{item.id}</span>
             <span className="ml-2 text-xs text-gray-500">
               [{item.insert_position ?? 'none'}]
             </span>
@@ -164,7 +199,9 @@ export default function ItemEditPage() {
             }}
             handleSubmit={handleSave}
             queries={queries}
-            onNew={() => setFormData(emptyItem)}
+            onNew={() => setFormData({ ...emptyItem })}
+            onDelete={handleDelete}
+            busy={busy}
         />
           </div>
 

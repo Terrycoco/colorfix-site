@@ -1,3 +1,4 @@
+import { resolveBrowsePlaylistsMarketingUrl } from "../src/helpers/routingHelper.js";
 import fs from "node:fs";
 
 import path from "node:path";
@@ -324,7 +325,7 @@ function renderItem(item) {
 
   if (type === "search" || type === "brand" || type === "button") {
 
-    return renderTextCard(item.display || item.title, item.description || "", "", item.target_url || "");
+    return renderTextCard(item.display || item.title, item.description || "", "", resolveBrowsePlaylistsMarketingUrl(item.target_url || "", item.handle));
 
   }
 
@@ -677,6 +678,8 @@ function applyBuildContentToHead(html, content) {
   next = upsertMetaName(next, "robots", robots);
 
   next = upsertCanonical(next, canonicalUrl);
+
+  next = upsertMetaProperty(next, "og:url", canonicalUrl);
 
   next = upsertMetaProperty(next, "og:title", ogTitle);
 

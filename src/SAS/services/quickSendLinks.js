@@ -11,7 +11,7 @@ export const QUICK_SEND_LINKS = [
   id: 'browse-playlists',
   title: 'Browse Playlists',
   description: 'Explore ColorFix makeovers and color lessons',
-  url: 'https://colorfix.terrymarr.com/picker?set=11&src=sas',
+  url: 'https://colorfix.terrymarr.com/browse-playlists?src=sas',
 },
 {
   id: 'sign1',

@@ -1,5 +1,6 @@
 
 import { useId } from "react";
+import { Link } from "react-router-dom";
 import { hasSavedSwatchCrop, swatchCropStyle } from "./swatchCropStyle";
 import { photoThumbUrl } from "@helpers/imageThumb";
 import "./swatches.css";
@@ -169,15 +170,15 @@ export default function ArtSwatch({
     }
 
     if (markerId && typeof window !== "undefined") {
-      window.history.replaceState(null, "", `#${markerId}`);
+      window.history.replaceState(window.history.state, "", `#${markerId}`);
     }
   }
 
   if (to) {
     return (
-      <a {...commonProps} href={to} onClick={handleClick}>
+      <Link {...commonProps} to={to} onClick={handleClick}>
         {content}
-      </a>
+      </Link>
     );
   }
 

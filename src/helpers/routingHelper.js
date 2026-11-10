@@ -3,51 +3,28 @@ export function buildResultsUrl(queryId, paramObj = {}) {
   return `/results/${queryId}${search ? `?${search}` : ''}`;
 }
 
-const ADMIN_PUBLIC_ROUTE_PREFIXES = [
-  "/results/",
-  "/color/",
-  "/articles/",
-  "/palette/",
-];
-
-const ADMIN_PUBLIC_ROUTES = new Set([
-  "/search",
-  "/quick-find",
-  "/browse-palettes",
-  "/matches",
-  "/sbs",
-  "/adv-search",
-  "/adv-results",
-  "/my-palette",
-  "/login",
-]);
-
 export function isAdminPath(pathname) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-export function hasAdminPublicRoute(pathname) {
-  if (ADMIN_PUBLIC_ROUTES.has(pathname)) return true;
-  return ADMIN_PUBLIC_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+// Root-relative destinations belong to the site root, regardless of the
+// current app. Admin navigation must explicitly target /admin/....
+export function resolveAppPath(target) {
+  return String(target || '').trim();
 }
 
-export function resolveAppPath(target, currentPathname) {
-  const value = String(target || "").trim();
-  if (!value) return value;
-
-  if (
-    !value.startsWith("/") ||
-    value.startsWith("/admin") ||
-    value.startsWith("//") ||
-    !isAdminPath(currentPathname)
-  ) {
-    return value;
-  }
-
-  const suffixIndex = value.search(/[?#]/);
-  const pathname = suffixIndex >= 0 ? value.slice(0, suffixIndex) : value;
-  const suffix = suffixIndex >= 0 ? value.slice(suffixIndex) : "";
-
-  if (!hasAdminPublicRoute(pathname)) return value;
-  return `/admin${pathname}${suffix}`;
+// The existing homepage marketing tile now has a permanent public address.
+// Other picker contexts (versions, returns, audiences, other sets) stay intact.
+export function resolveBrowsePlaylistsMarketingUrl(url, handle) {
+  if (handle !== "BrowsePlaylistsTile") return url;
+  try {
+    const parsed = new URL(url, "https://colorfix.terrymarr.com");
+    if (!String(url).startsWith("/") || String(url).startsWith("//")
+      || !["/picker", "/picker/"].includes(parsed.pathname)
+      || parsed.searchParams.get("set") !== "11"
+      || [...parsed.searchParams.keys()].some(key => !["set", "src"].includes(key))) return url;
+    parsed.pathname = "/browse-playlists";
+    parsed.searchParams.delete("set");
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return url; }
 }

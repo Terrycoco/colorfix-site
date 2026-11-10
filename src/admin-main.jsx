@@ -1,12 +1,13 @@
 import './styles/ZIndex.css';
-import { StrictMode } from 'react';
+import { StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AppStateProvider } from '@context/AppStateContext.jsx';
-import { useAppState } from '@context/AppStateContext.jsx';
-import { isAdmin } from '@helpers/authHelper';
 import ScrollToTop from '@layout/ScrollToTop';
 import AdminApp from './AdminApp.jsx';
+
+// Reuse the public app's route tree within this existing BrowserRouter.
+const PublicAppRoutes = lazy(() => import('./Router.jsx').then(module => ({ default: module.PublicAppRoutes })));
 
 import '@styles/global.css';
 import '@styles/reset.css';
@@ -20,37 +21,9 @@ createRoot(document.getElementById('root')).render(
         <ScrollToTop smooth={true} ignoreWhenHash={true} />
         <Routes>
           <Route path="/admin/*" element={<AdminApp />} />
-          <Route path="*" element={<AdminRouteNormalizer />} />
+          <Route path="*" element={<Suspense fallback={<p role="status">Loading page…</p>}><PublicAppRoutes /></Suspense>} />
         </Routes>
       </BrowserRouter>
     </AppStateProvider>
   </StrictMode>
 );
-
-function AdminRouteNormalizer() {
-  const location = useLocation();
-  const { user, authReady, authError } = useAppState();
-  if (!authReady) return <p role="status">{authError || 'Checking admin session…'}</p>;
-  const adminAllowed = Boolean(user?.is_admin) || isAdmin();
-  const target = `${location.pathname}${location.search}${location.hash}`;
-
-  if (isPublicPlaylistRoute(location.pathname)) {
-    window.location.replace(target || "/");
-    return null;
-  }
-
-  if (!adminAllowed) {
-    window.location.replace(target || "/");
-    return null;
-  }
-
-  return <Navigate to={`/admin${target}`} replace />;
-}
-
-function isPublicPlaylistRoute(pathname) {
-  return pathname === "/picker"
-    || pathname === "/playlist-color-search"
-    || pathname.startsWith("/p/")
-    || pathname.startsWith("/playlist/")
-    || pathname.startsWith("/playlist-thumbs/");
-}

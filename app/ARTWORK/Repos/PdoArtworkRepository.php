@@ -49,6 +49,24 @@ final class PdoArtworkRepository
         return $row === false ? null : $row;
     }
 
+    /** Read-only context lookup; retain missing metadata so ambiguity cannot be hidden. */
+    public function findArtworkCandidatesForPhotos(array $photoIds): array
+    {
+        $photoIds = array_values(array_unique(array_filter(array_map('intval', $photoIds), fn(int $id): bool => $id > 0)));
+        if (!$photoIds) { return []; }
+        $placeholders = implode(',', array_fill(0, count($photoIds), '?'));
+        $artPhoto = "CASE WHEN p.source_type = 'art' THEN p.photo_library_id ELSE p.inspiration_photo_id END";
+        $stmt = $this->pdo->prepare(
+            "SELECT DISTINCT {$artPhoto} AS photo_library_id, a.artwork_id
+               FROM photo_library p
+               LEFT JOIN photos_artwork a ON a.photo_library_id = {$artPhoto}
+              WHERE p.photo_library_id IN ({$placeholders})
+                AND (p.source_type = 'art' OR p.inspiration_photo_id IS NOT NULL)"
+        );
+        $stmt->execute($photoIds);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     /**
      * Browse existing artwork records (newest first). Read-only, with bounded pagination.
      * This returns artwork fields; callers may join photo_library read-only for thumbnails.
@@ -64,6 +82,35 @@ final class PdoArtworkRepository
         );
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Public gallery: artwork metadata plus PHOTOS-owned, visible image/crop data.
+     * This is a bounded, read-only cross-department presentation join.
+     */
+    public function listPublicGallery(int $limit = 500): array
+    {
+        if ($limit < 1 || $limit > 500) {
+            throw new InvalidArgumentException('Invalid gallery limit.');
+        }
+        $stmt = $this->pdo->prepare(
+            "SELECT a.artwork_id, a.photo_library_id, a.artist, a.official_title,
+                    a.display_title, p.rel_path AS photo_url, p.title AS title,
+                    pc.crop_x, pc.crop_y, pc.crop_width, pc.crop_height
+               FROM photos_artwork a
+               JOIN photo_library p ON p.photo_library_id = a.photo_library_id
+               LEFT JOIN photo_crops pc
+                 ON pc.photo_library_id = p.photo_library_id AND pc.crop_type = 'swatch'
+              WHERE p.source_type = 'art'
+                AND p.show_in_gallery = 1
+                AND COALESCE(p.is_inactive, 0) = 0
+                AND COALESCE(p.is_retired, 0) = 0
+                AND p.rel_path IS NOT NULL AND p.rel_path <> ''
+              ORDER BY a.artwork_id DESC
+              LIMIT :max_rows"
+        );
+        $stmt->bindValue(':max_rows', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

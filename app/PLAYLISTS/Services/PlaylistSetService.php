@@ -115,7 +115,8 @@ final class PlaylistSetService
      */
     public function getPublicSet(
         ?int $setId = null,
-        ?string $handle = null
+        ?string $handle = null,
+        bool $marketingOnly = false
     ): ?array {
         $set = null;
 
@@ -152,7 +153,8 @@ final class PlaylistSetService
                     ->listItems(
                         (int)$set->id
                     ),
-                true
+                true,
+                $marketingOnly
             );
 
         $updatedAt =
@@ -493,7 +495,8 @@ final class PlaylistSetService
      */
     private function hydrateItems(
         array $items,
-        bool $publicOnly
+        bool $publicOnly,
+        bool $marketingOnly = false
     ): array {
         $playlistRepresentations = [];
         $playlistIds = [];
@@ -656,6 +659,15 @@ final class PlaylistSetService
                 continue;
             }
 
+            // Opt-in marketing discovery only. Existing picker memberships and
+            // direct/client access remain governed by their existing contracts.
+            if ($marketingOnly && (
+                !$playlist['indexable']
+                || !in_array($item->experienceKey, ['public', 'showcase'], true)
+            )) {
+                continue;
+            }
+
             if (
                 $publicOnly
                 && (
@@ -677,7 +689,7 @@ final class PlaylistSetService
 
             if (
                 $publicOnly
-                && $publicRex === null
+                && ($publicRex === null || ($marketingOnly && $publicRex->revokedAt !== null))
             ) {
                 continue;
             }
@@ -868,6 +880,8 @@ final class PlaylistSetService
                         ?? 0
                     )
                 ),
+
+            'indexable' => (int)($playlist['indexable'] ?? 0) === 1,
 
             'cover_photo_library_id' =>
                 $coverPhotoLibraryId,

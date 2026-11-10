@@ -19,7 +19,7 @@ const ITEM_TYPE_OPTIONS = [
   'youtube'
 ];
 
-export default function ItemEditForm ({formData, updateField, handleSubmit, queries, onNew}) {
+export default function ItemEditForm ({formData, updateField, handleSubmit, queries, onNew, onDelete, busy = false}) {
 
 const handleNew = () => {
   onNew();
@@ -181,14 +181,25 @@ return (
   <div className="flex gap-2 col-span-2 mt-4">
     <button 
       type="submit" 
+      disabled={busy}
       className="bg-orange-500 text-white px-4 py-2 rounded">
         Save Item
     </button>
     <button
+      type="button"
       onClick={handleNew}
+      disabled={busy}
       className="mb-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
     >
       + New Item
+    </button>
+    <button
+      type="button"
+      onClick={onDelete}
+      disabled={busy || !formData.id}
+      className="px-4 py-2 bg-red-700 text-white rounded disabled:opacity-50"
+    >
+      Delete Item
     </button>
 
   </div>

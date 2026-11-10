@@ -159,6 +159,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         $colorsUsedDestination
     );
     if (!empty($ctas)) {
+        $ctas = $this->hydrateArtworkCtas($ctas, $sourceItems);
         $ctas = $this->hydrateArticleCtas($ctas);
     }
     $this->markTiming('load_ctas', $ctaStartedAt);
@@ -750,6 +751,7 @@ public function buildPlaybackPlanFromProjectExperience(
             $colorsUsedDestination
         );
         if (!empty($ctas)) {
+            $ctas = $this->hydrateArtworkCtas($ctas, $sourceItems);
             $ctas = $this->hydrateArticleCtas($ctas);
         }
         $this->markTiming('load_ctas', $ctaStartedAt);
@@ -1417,6 +1419,39 @@ public function buildPlaybackPlanFromProjectExperience(
     /**
      * @param PlaylistItem[] $items
      */
+    /** Resolve only opted-in Navigate CTAs, using this experience's selected slides. */
+    private function hydrateArtworkCtas(array $ctas, array $items): array
+    {
+        $resolved = false;
+        $studyUrl = null;
+        $result = [];
+        foreach ($ctas as $cta) {
+            $action = strtolower(trim((string)($cta['action_key'] ?? $cta['action'] ?? $cta['key'] ?? '')));
+            $params = $this->decodeParams($cta['params'] ?? null);
+            $url = $params['url'] ?? null;
+            if ($action === 'navigate' && is_string($url) && str_contains($url, '{artwork_id}')) {
+                if (!$resolved) {
+                    $photoIds = [];
+                    foreach ($items as $item) {
+                        if ($item instanceof PlaylistItem && (int)$item->photo_library_id > 0) {
+                            $photoIds[] = (int)$item->photo_library_id;
+                        }
+                    }
+                    $studyUrl = (new \App\ARTWORK\Services\ArtworkService($this->pdo))->publicStudyUrlForPhotos($photoIds);
+                    $resolved = true;
+                }
+                if ($studyUrl === null) { continue; }
+                $artworkId = substr($studyUrl, strlen('/inspired-by/'));
+                $params['url'] = str_replace('{artwork_id}', $artworkId, $url);
+                $cta['params'] = is_array($cta['params'] ?? null)
+                    ? $params
+                    : json_encode($params, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            }
+            $result[] = $cta;
+        }
+        return $result;
+    }
+
     private function hydrateArticleCtas(array $ctas): array
     {
         $repo = new PdoArticleRepository($this->pdo);

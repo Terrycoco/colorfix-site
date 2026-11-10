@@ -1,5 +1,5 @@
 import colorfixLightBgUrl from "../../assets/brand/colorfix_lightbg.png";
-import { buildResultsUrl, resolveAppPath } from '@helpers/routingHelper';
+import { buildResultsUrl, resolveAppPath, resolveBrowsePlaylistsMarketingUrl } from '@helpers/routingHelper';
 import { PaletteOutlineIcon } from '../Icons/PaletteIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -32,7 +32,7 @@ const SearchItem = ({ item }) => {
   const displayIcon = getDisplayIcon(item?.display);
 
   const goToTarget = (url) => {
-    const target = String(url || '').trim();
+    const target = resolveBrowsePlaylistsMarketingUrl(String(url || '').trim(), item.handle);
     if (!target) return;
     navigate(resolveAppPath(target, location.pathname));
   };

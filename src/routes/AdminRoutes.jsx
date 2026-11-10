@@ -9,6 +9,7 @@ const HomePage = lazy(() => import('@pages/HomePage'));
 const AdminLayout = lazy(() => import('@layout/AdminLayout'));
 const LoginPage = lazy(() => import('@pages/login/LoginPage'));
 const GalleryPage = lazy(() => import('@pages/GalleryPage'));
+const ArtworkPage = lazy(() => import('@pages/ArtworkPage/ArtworkPage'));
 const ColorDetailPage = lazy(() => import('@pages/ColorDetailPage'));
 const SearchPage = lazy(() => import('@pages/SearchPage'));
 const QuickFindPage = lazy(() => import('@pages/QuickFindPage'));
@@ -32,6 +33,7 @@ const WhitesLrvEditorPage = lazy(() => import('@pages/whitesLrvEditorPage'));
 const AdminSupercatsPage = lazy(() => import('@pages/AdminSupercatsPage'));
 const AdminSavedPalettesPage = lazy(() => import('@pages/AdminSavedPalettesPage'));
 const AdminPalettesPage = lazy(() => import('@pages/AdminPalettesPage'));
+const AdminArtworkPage = lazy(() => import('@pages/AdminArtworkPage'));
 const AdminPaletteViewersPage = lazy(() => import('@pages/AdminPaletteViewersPage'));
 const AdminKickersPage = lazy(() => import('@pages/AdminKickersPage'));
 const AdminIdeasPage = lazy(() => import('@pages/AdminIdeasPage'));
@@ -102,6 +104,7 @@ export default function AdminRoutes() {
       <Route path="login" element={<Navigate to="/admin/" replace />} />
       <Route index element={<AdminHomePage />} />
       <Route path="results/:queryId" element={<AdminGalleryRoute />} />
+      <Route path="inspired-by/:artworkId" element={<AdminPublicPage><ArtworkPage /></AdminPublicPage>} />
       <Route path="youtube-player/:playlistId" element={renderWithSuspense(YoutubePlayerPage, 'Loading YouTube player...')} />
       <Route path="color/:id" element={<AdminPublicPage><ColorDetailPage /></AdminPublicPage>} />
       <Route path="search" element={<AdminPublicPage><SearchPage /></AdminPublicPage>} />
@@ -128,6 +131,7 @@ export default function AdminRoutes() {
         <Route path="supercats" element={renderWithSuspense(AdminSupercatsPage, 'Loading supercats...')} />
         <Route path="admin-saved-palettes" element={renderWithSuspense(AdminSavedPalettesPage, 'Loading saved palettes...')} />
         <Route path="palettes" element={renderWithSuspense(AdminPalettesPage, 'Loading palettes...')} />
+        <Route path="artworks" element={renderWithSuspense(AdminArtworkPage, 'Loading artworks...')} />
         <Route path="palette-viewers" element={renderWithSuspense(AdminPaletteViewersPage, 'Loading palette viewers...')} />
         <Route path="kickers" element={renderWithSuspense(AdminKickersPage, 'Loading kickers...')} />
         <Route path="ideas" element={renderWithSuspense(AdminIdeasPage, 'Loading ideas...')} />

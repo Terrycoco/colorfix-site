@@ -52,6 +52,9 @@ const SearchPage = lazy(() => import('@pages/SearchPage'));
 const ColorDetailPage = lazy(() => import('@pages/ColorDetailPage'));
 
 const GalleryPage = lazy(() => import('@pages/GalleryPage'));
+const ArtGalleryPage = lazy(() => import('@pages/ArtGalleryPage'));
+
+const ArtworkPage = lazy(() => import('@pages/ArtworkPage/ArtworkPage'));
 
 const SideBySidePage = lazy(() => import('@pages/SideBySidePage'));
 
@@ -95,7 +98,7 @@ const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
 
 
 
-function AppRouter() {
+export function PublicAppRoutes() {
 
   const renderWithSuspense = (Component, label) => (
 
@@ -111,7 +114,7 @@ function AppRouter() {
 
   return (
 
-    <BrowserRouter basename="/">
+    <>
       <SourceNavigation />
 
       <ANAProvider>
@@ -168,11 +171,16 @@ function AppRouter() {
 
             <Route element={<MainLayout />}>
 
+              <Route path="browse-playlists" element={<Suspense fallback={<RouteFallback label="Loading playlists…" />}><PlaylistPickerPage landing /></Suspense>} />
+
               <Route index element={renderWithSuspense(HomePage, 'Loading home…')} />
 
               <Route path="search" element={renderWithSuspense(SearchPage, 'Loading search…')} />
 
               <Route path="results/:queryId" element={<GalleryRoute />} />
+              <Route path="art-gallery" element={renderWithSuspense(ArtGalleryPage, 'Loading art gallery…')} />
+
+              <Route path="inspired-by/:artworkId" element={renderWithSuspense(ArtworkPage, 'Loading artwork…')} />
 
               <Route path="color/:id" element={renderWithSuspense(ColorDetailPage, 'Loading color…')} />
 
@@ -224,13 +232,17 @@ function AppRouter() {
 
       </ANAProvider>
 
-    </BrowserRouter>
+    </>
 
   );
 
 }
 
 
+
+function AppRouter() {
+  return <BrowserRouter basename="/"><PublicAppRoutes /></BrowserRouter>;
+}
 
 // Centralized direct-page visit tracking. The server resolves the resource ID
 // from ana_pages by pathname and ignores unregistered/disabled paths.

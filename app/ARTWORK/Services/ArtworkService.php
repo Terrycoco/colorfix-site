@@ -40,6 +40,19 @@ final class ArtworkService
         return $this->artwork->list($limit, $offset);
     }
 
+    /** Resolve one public Art Study from explicit photo/inspiration links; never guess. */
+    public function publicStudyUrlForPhotos(array $photoIds): ?string
+    {
+        $candidates = $this->artwork->findArtworkCandidatesForPhotos($photoIds);
+        if (count($candidates) !== 1) { return null; }
+        $candidate = $candidates[0];
+        $artworkId = (int)($candidate['artwork_id'] ?? 0);
+        if ($artworkId <= 0 || !$this->photos->findPublicArtworkPhoto((int)$candidate['photo_library_id'])) {
+            return null;
+        }
+        return '/inspired-by/' . $artworkId;
+    }
+
     /** A photo may have at most one ARTWORK metadata record. */
     public function create(int $photoLibraryId, array $fields): array
     {

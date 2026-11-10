@@ -82,7 +82,8 @@ final class PlaylistSetGetEndpoint
                             : null,
                         $handle !== ''
                             ? $handle
-                            : null
+                            : null,
+                        ($_GET['marketing'] ?? '') === '1'
                     );
 
             if ($set === null) {

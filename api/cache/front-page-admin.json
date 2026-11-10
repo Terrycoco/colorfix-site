@@ -3,7 +3,7 @@
     "success": true,
     "variant": "admin",
     "build_key": "admin_home",
-    "generated_at": "2026-10-28T19:39:44+00:00",
+    "generated_at": "2026-11-10T18:48:52+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -39,7 +39,7 @@
             "sort_order": "8.00",
             "query": "SELECT *, query_id as on_click_query\n FROM sql_queries\n WHERE type='family'\nORDER BY name",
             "notes": "",
-            "created_at": "2025-07-21 18:34:43",
+            "created_at": "2025-07-21 17:34:43",
             "item_type": "search",
             "on_click_query": 2,
             "on_click_url": "",
@@ -69,7 +69,7 @@
             "is_clickable": 0,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-04-11 10:25:26",
+            "created_at": "2026-04-11 09:25:26",
             "color": "",
             "insert_position": "0.00"
         },
@@ -88,7 +88,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-02-27 08:15:27",
+            "created_at": "2026-02-27 07:15:27",
             "color": "",
             "insert_position": "1.00",
             "featured_payload": {
@@ -141,7 +141,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-03-23 13:47:16",
+            "created_at": "2026-03-23 12:47:16",
             "color": "",
             "insert_position": "2.00"
         },
@@ -160,7 +160,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-13 18:20:45",
+            "created_at": "2025-09-13 17:20:45",
             "color": "",
             "insert_position": "4.00"
         },
@@ -179,7 +179,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-07-31 07:59:12",
+            "created_at": "2025-07-31 06:59:12",
             "color": "",
             "insert_position": "5.00"
         },
@@ -198,7 +198,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-07 14:59:11",
+            "created_at": "2025-09-07 13:59:11",
             "color": "",
             "insert_position": "5.00"
         },
@@ -217,7 +217,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-10-17 20:41:32",
+            "created_at": "2026-10-17 19:41:32",
             "color": "",
             "insert_position": "5.00"
         },
@@ -236,7 +236,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-07-25 09:01:02",
+            "created_at": "2025-07-25 08:01:02",
             "color": "",
             "insert_position": "6.00"
         },
@@ -255,7 +255,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-24 00:52:05",
+            "created_at": "2025-08-23 23:52:05",
             "color": "",
             "insert_position": "9.00"
         },
@@ -274,7 +274,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-09-05 06:28:08",
+            "created_at": "2025-09-05 05:28:08",
             "color": "",
             "insert_position": "10.00"
         },
@@ -293,7 +293,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-05 10:17:43",
+            "created_at": "2025-08-05 09:17:43",
             "color": "",
             "insert_position": "11.00"
         },
@@ -312,9 +312,28 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-07 09:26:26",
+            "created_at": "2025-08-07 08:26:26",
             "color": "",
             "insert_position": "12.00"
+        },
+        {
+            "id": 80,
+            "handle": "Art Gallery",
+            "item_type": "search",
+            "query_id": 4,
+            "title": "Art Gallery",
+            "subtitle": "",
+            "display": "Art Gallery",
+            "description": "Palettes inspired by great works of art",
+            "image_url": "",
+            "body": "",
+            "target_url": "/art-gallery",
+            "is_clickable": 1,
+            "is_pinnable": 0,
+            "is_active": 1,
+            "created_at": "2026-11-10 10:35:50",
+            "color": "",
+            "insert_position": "13.00"
         },
         {
             "id": 75,
@@ -331,7 +350,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2026-06-15 11:08:45",
+            "created_at": "2026-06-15 10:08:45",
             "color": "",
             "insert_position": "5000.00"
         },
@@ -350,7 +369,7 @@
             "is_clickable": 1,
             "is_pinnable": 0,
             "is_active": 1,
-            "created_at": "2025-08-23 07:05:04",
+            "created_at": "2025-08-23 06:05:04",
             "color": "",
             "insert_position": "9999.00"
         }
@@ -396,5 +415,5 @@
         "/api/v2/image-thumb.php?id=581&w=520&q=72"
     ],
     "rowCount": 1,
-    "insertCount": 14
+    "insertCount": 15
 }

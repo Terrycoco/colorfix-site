@@ -40,6 +40,17 @@ try {
  const listing=await call('photo-library/list.php',{query:'?source_type=art'});
  assert.equal(listing.items.length,1);assert.equal(listing.items[0].palette_id,palette.id);assert.equal(listing.items[0].has_palette,true);assert.equal(listing.items[0].show_in_gallery,false);
  const series=await call('photo-library/series.php',{query:'?source_type=art'});assert(series.items.includes('fixture-art'));
+ const inspired=await upload('art_inspired');
+ assert((await readFile(path.join(root,inspired.rel_path))).equals(png),'Art Inspired upload preserves original bytes');
+ const inspiredList=await call('photo-library/list.php',{query:'?source_type=art_inspired'});
+ assert.equal(inspiredList.items.length,1);assert.equal(inspiredList.items[0].source_type,'art_inspired');
+ assert.equal(inspiredList.items[0].show_in_gallery,false,'Art Inspired upload preserves unchecked Gallery default');
+ assert((await call('photo-library/series.php',{query:'?source_type=art_inspired'})).items.includes('fixture-art'));
+ await call('photo-library/update.php',{body:{photo_library_id:inspired.photo_library_id,source_type:'progression'}});
+ assert.equal((await call('photo-library/list.php',{query:'?source_type=art_inspired'})).items.length,0);
+ await call('photo-library/update.php',{body:{photo_library_id:inspired.photo_library_id,source_type:'art_inspired'}});
+ assert.equal((await call('photo-library/list.php',{query:'?source_type=art_inspired'})).items.length,1);
+ console.log('PASS: Art Inspired multipart upload, bytes, retrieval, exact filtering, series and editable classification.');
  for(const type of ['progression','article','pin'])await upload(type);
  for(const type of ['interior','exterior','hoa']){
   const p=(await call('saved-palette-save.php',{body:{brand:'sw',color_ids:[2,1],nickname:'Existing '+type,palette_type:type}})).data.palette;assert.equal(p.palette_type,type);
@@ -101,8 +112,12 @@ try {
   assert.equal(await form.getByLabel('Show in gallery',{exact:true}).isChecked(),true,'Art permits explicit Gallery opt-in');
   await form.getByLabel('Show in gallery',{exact:true}).uncheck();
   assert.equal(await page.locator('select option[value="art"]').count(),2,'Art is available in upload and library filter');
+  await form.locator('select').first().selectOption('art_inspired');
+  assert.equal(await form.locator('select').first().inputValue(),'art_inspired');
+  assert.equal(await page.locator('select option[value="art_inspired"]').count(),2,'Art Inspired is available in upload and library filter');
   assert.deepEqual(errors,[],'Photo Library renders without JavaScript errors');
-  await context.close();console.log(`PASS: ${width}px Photo Library Art options, default Gallery exclusion and explicit opt-in.`);
+  await context.unrouteAll({behavior:'wait'});
+  await context.close();console.log(`PASS: ${width}px Photo Library Art and Art Inspired options, default Gallery exclusion and explicit opt-in.`);
  }
 
 } catch(error){console.error(output);throw error;}finally{await browser?.close();await vite?.close();php?.kill();await rm(root,{recursive:true,force:true});}

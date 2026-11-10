@@ -58,3 +58,44 @@
     justify-content: center;
   }
 }
+
+/* MainLayout owns the public page container. Only neutralize picker-modal
+   constraints here; keep stronger specificity than shared Thumbs CSS. */
+.playlist-thumbs.playlist-picker--landing {
+  box-sizing: border-box;
+  display: block;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  background: transparent;
+  padding: 0;
+}
+.playlist-picker--landing .playlist-thumbs__panel {
+  box-sizing: border-box;
+  display: block;
+  width: auto;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+.playlist-picker--landing .playlist-thumbs__header { max-width: none; }
+.playlist-picker--landing .playlist-thumbs__grid-wrap {
+  overflow: visible;
+  padding-inline: 0;
+}
+.playlist-picker--landing .playlist-thumbs__grid {
+  max-width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+}
+.playlist-picker--landing .playlist-thumbs__card { width: auto; }
+.playlist-picker--landing .playlist-picker__tagline {
+  font-size: 18px;
+  font-weight: 700;
+  color: #222;
+  margin: 8px 0;
+}

@@ -154,7 +154,7 @@
 }
 
 .fade-out.is-ready {
-  opacity: 1;
+  opacity: 0;
 }
 
 .fade-cut {
@@ -255,6 +255,7 @@
   inset: 0;
   margin: auto;
   z-index: var(--z-above);
+  transition: opacity 2000ms ease-in-out;
 }
 
 .player-image.is-prev.is-exiting-to-text {

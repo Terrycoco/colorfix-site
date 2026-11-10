@@ -13,7 +13,7 @@ use PDO;
  *   - saved_palettes
  *   - saved_palette_members
  *
- * Reads swatch_view only to enrich member/color data and support filtering.
+ * Reads mv_swatch_view for member display data; family filtering still uses swatch_view.
  *
  * It intentionally does NOT know about:
  *   - PVs / palette_viewers
@@ -265,8 +265,8 @@ final class PdoSavedPaletteRepository
 
             FROM saved_palette_members m
 
-            LEFT JOIN swatch_view c
-              ON c.id = m.color_id
+            LEFT JOIN mv_swatch_view c
+              ON c.id = m.color_id AND c.is_inactive = 0
 
             WHERE m.saved_palette_id = :id
 

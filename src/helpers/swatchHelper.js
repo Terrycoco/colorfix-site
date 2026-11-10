@@ -1,5 +1,35 @@
 import { API_FOLDER } from '@helpers/config';
 
+const normStain = (value) => (value == null ? 0 : Number(value) ? 1 : 0);
+
+function displaySwatch(raw) {
+  const hex = String(raw.hex ?? raw.hex6 ?? '').replace(/^#/, '');
+  const rgb = /^[0-9a-f]{6}$/i.test(hex)
+    ? [0, 2, 4].map(offset => parseInt(hex.slice(offset, offset + 2), 16))
+    : [0, 0, 0];
+  return {
+    ...raw, // Preserve DTO fields and UI metadata already returned by GALLERY.
+    id: raw.id,
+    name: raw.name,
+    code: raw.code ?? '',
+    brand: raw.brand ?? '',
+    r: raw.r ?? rgb[0],
+    g: raw.g ?? rgb[1],
+    b: raw.b ?? rgb[2],
+    hex: raw.hex ?? raw.hex6 ?? '',
+    hcl_l: raw.hcl_l ?? 0,
+    hcl_c: raw.hcl_c ?? 0,
+    hcl_h: raw.hcl_h ?? 0,
+    brand_name: raw.brand_name ?? '',
+    hue_cats: raw.hue_cats ?? '',
+    hue_cat_order: raw.hue_cat_order ?? 99,
+    neutral_cats: raw.neutral_cats ?? '',
+    is_stain: normStain(raw.is_stain),
+    chip_num: raw.chip_num ?? '',
+    cluster_id: raw.cluster_id ?? 0,
+  };
+}
+
 export async function normalizeSwatch(raw) {
   const requiredKeys = ['id', 'name', 'hcl_h', 'hcl_c', 'hcl_l', 'brand'];
   const isObject = raw !== null && typeof raw === 'object' && !Array.isArray(raw);
@@ -7,34 +37,9 @@ export async function normalizeSwatch(raw) {
     requiredKeys.every(k => raw[k] !== undefined && raw[k] !== null) &&
     (raw.hex != null || raw.hex6 != null);
 
-  const normStain = (v) => (v == null ? 0 : Number(v) ? 1 : 0);
+  if (hasAllCoreFields) return displaySwatch(raw);
 
-  if (hasAllCoreFields) {
-    return {
-      ...raw, // Preserve DTO fields and UI metadata already returned by GALLERY.
-      id: raw.id,
-      name: raw.name,
-      code: raw.code ?? '',
-      brand: raw.brand ?? '',
-      r: raw.r ?? 0,
-      g: raw.g ?? 0,
-      b: raw.b ?? 0,
-      hex: raw.hex ?? raw.hex6 ?? '',
-      hcl_l: raw.hcl_l ?? 0,
-      hcl_c: raw.hcl_c ?? 0,
-      hcl_h: raw.hcl_h ?? 0,
-      brand_name: raw.brand_name ?? '',
-      hue_cats: raw.hue_cats ?? '',
-      hue_cat_order: raw.hue_cat_order ?? 99,
-      neutral_cats: raw.neutral_cats ?? '',
-      is_stain: normStain(raw.is_stain),
-      chip_num: raw.chip_num ?? '',
-      cluster_id: raw.cluster_id ?? 0,
-    };
-  }
-
-  // Persisted personal palettes store IDs, not full objects.
-  // Keep the existing object-input path, but also accept a bare ID.
+  // Legacy persisted entries and newly added bare IDs may need detail lookup.
   const swatchId = isObject ? (raw.id ?? raw.color_id ?? null) : raw;
   if (swatchId === null || swatchId === undefined || String(swatchId).trim() === '') {
     console.warn('normalizeSwatch: no ID provided', raw);
@@ -52,11 +57,11 @@ export async function normalizeSwatch(raw) {
       throw new Error(`Bad swatch JSON (${res.status}): ${rawBody.slice(0, 120)}`);
     }
 
-    return {
+    return displaySwatch({
       ...full,
       ...(isObject ? raw : {}),
       is_stain: normStain(isObject ? (raw.is_stain ?? full.is_stain) : full.is_stain),
-    };
+    });
   } catch (err) {
     console.error('normalizeSwatch error:', err);
     return null;

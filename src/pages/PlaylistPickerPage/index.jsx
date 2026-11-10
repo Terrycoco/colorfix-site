@@ -9,12 +9,13 @@ import "./playlist-picker.css";
 
 const SET_URL = "/api/v2/playlist-sets/get.php";
 
-export default function PlaylistPickerPage() {
+export default function PlaylistPickerPage({ landing = false }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { adminExitPath, clearAdminExitPath } = useAppState();
-const setId = Number(searchParams.get("set") || 0);
+  const setId = landing ? 11 : Number(searchParams.get("set") || 0);
+  const marketingOnly = landing || searchParams.get("marketing") === "1";
   const ctaAudience = searchParams.get("aud") ?? "";
   const addCtaGroup = searchParams.get("add_cta_group") ?? "";
   const demoParam = searchParams.get("demo") ?? "";
@@ -47,7 +48,8 @@ const setId = Number(searchParams.get("set") || 0);
       params.set("_", String(Date.now()));
     }
     if (ctaAudience) params.set("aud", ctaAudience);
-    if (adminExitPath || includePrivateParam === "1") params.set("include_private", "1");
+    if (!marketingOnly && (adminExitPath || includePrivateParam === "1")) params.set("include_private", "1");
+    if (marketingOnly) params.set("marketing", "1");
     applySourceToParams(params, sourceParam);
     fetchPlaylistSet(`${SET_URL}?${params.toString()}`)
       .then((payload) => {
@@ -63,7 +65,7 @@ const setId = Number(searchParams.get("set") || 0);
         setError(err?.message || "Failed to load playlist set");
       })
       .finally(() => setLoading(false));
-  }, [setId, ctaAudience, adminExitPath, includePrivateParam, setVersionParam, sourceParam]);
+  }, [setId, ctaAudience, adminExitPath, includePrivateParam, setVersionParam, sourceParam, marketingOnly]);
 
 
 
@@ -90,7 +92,7 @@ const setId = Number(searchParams.get("set") || 0);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
-    if (includePrivateParam === "1") params.set("include_private", "1");
+    if (!marketingOnly && includePrivateParam === "1") params.set("include_private", "1");
     if (effectiveSetVersion !== "") params.set("set_v", effectiveSetVersion);
     applySourceToParams(params, sourceParam);
     if (closeParam === "1") params.set("close", "1");
@@ -113,12 +115,13 @@ const setId = Number(searchParams.get("set") || 0);
     if (addCtaGroup !== "") params.set("add_cta_group", addCtaGroup);
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
-    if (includePrivateParam === "1") params.set("include_private", "1");
+    if (!marketingOnly && includePrivateParam === "1") params.set("include_private", "1");
     applySourceToParams(params, sourceParam);
     if (tile?.target_set_version) params.set("set_v", tile.target_set_version);
     const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
     if (returnTo) params.set("return_to", returnTo);
     params.set("set", String(targetSetId));
+    if (marketingOnly) params.set("marketing", "1");
     const qs = params.toString();
     return withSourceParam(`/picker${qs ? `?${qs}` : ""}`, sourceParam);
   };
@@ -127,7 +130,7 @@ const setId = Number(searchParams.get("set") || 0);
     const params = new URLSearchParams();
     if (ctaAudience !== "") params.set("aud", ctaAudience);
     if (demoParam !== "") params.set("demo", demoParam);
-    if (includePrivateParam === "1") params.set("include_private", "1");
+    if (!marketingOnly && includePrivateParam === "1") params.set("include_private", "1");
     applySourceToParams(params, sourceParam);
     if (setId) params.set("set", String(setId));
     const returnTo = withSourceParam(buildReturnTo(location, searchParams), sourceParam);
@@ -150,7 +153,7 @@ const setId = Number(searchParams.get("set") || 0);
   };
 
   const handleExit = () => {
-    if (adminExitPath) {
+    if (!landing && adminExitPath) {
       const target = adminExitPath;
       clearAdminExitPath();
       window.location.href = withSourceParam(target, sourceParam);
@@ -159,35 +162,40 @@ const setId = Number(searchParams.get("set") || 0);
     navigate(withSourceParam("/", sourceParam));
   };
 
-  if (loading) return <div className="playlist-thumbs__status">Loading…</div>;
-  if (error) return <div className="playlist-thumbs__status error">{error}</div>;
+  if (loading && !landing) return <div className="playlist-thumbs__status">Loading…</div>;
+  if (error && !landing) return <div className="playlist-thumbs__status error">{error}</div>;
   const safeReturn = resolveReturnTo(searchParams.get("return_to") ?? "");
   const showBackButton = Boolean(safeReturn);
   const backLabel = safeReturn.startsWith("/picker") ? "Back to previous set" : "Back to playlist";
 
   return (
-    <div className="playlist-thumbs playlist-thumbs--end playlist-picker">
-      <button
+    <div className={`playlist-thumbs playlist-thumbs--end playlist-picker${landing ? " playlist-picker--landing" : ""}`}>
+      {!landing && <button
         type="button"
         className="playlist-thumbs__exit"
         onClick={handleExit}
         aria-label="Exit picker"
       >
         ×
-      </button>
+      </button>}
       <div className="playlist-thumbs__panel">
         <header className="playlist-thumbs__header">
           <div className="playlist-thumbs__header-row">
             <div>
-              <h1>{title}</h1>
-              {subtitle && <p>{subtitle}</p>}
+              <h1>{landing ? "Browse Playlists" : title}</h1>
+              {landing ? <>
+                <p className="playlist-picker__tagline">What works. What doesn't. And why.</p>
+                <p>Explore color transformations, before-and-afters, and design ideas from ColorFix by Terry.</p>
+              </> : subtitle && <p>{subtitle}</p>}
             </div>
             <Link className="playlist-picker__search-link" to={buildColorSearchUrl()}>
               Search by Color Family
             </Link>
           </div>
         </header>
-        {!tiles.length && (
+        {landing && loading && <div className="playlist-thumbs__status" role="status">Loading playlists…</div>}
+        {landing && error && <div className="playlist-thumbs__status error" role="alert">{error}</div>}
+        {!loading && !error && !tiles.length && (
           <div className="playlist-thumbs__status">No models found in this set.</div>
         )}
         <div className="playlist-thumbs__grid-wrap">

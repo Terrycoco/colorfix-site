@@ -38,7 +38,7 @@ const PLAYER_EXPERIENCE_STORAGE_KEY = "cf.player_experience.v1";
 
 //helpers
 
-const savePaletteIds = (arr = []) => {
+const savePalette = (arr = []) => {
 
   try {
 
@@ -46,7 +46,7 @@ const savePaletteIds = (arr = []) => {
 
       PALETTE_STORAGE_KEY,
 
-      JSON.stringify(arr.map(s => s?.id).filter(Boolean))
+      JSON.stringify(arr.filter(s => s?.id))
 
     );
 
@@ -118,7 +118,7 @@ const initialAdvancedSearch = {
 
   // keep only one entry per id
 
-  const dedupeById = (arr) => Array.from(new Map(arr.map(x => [x.id, x])).values());
+  const dedupeById = (arr) => Array.from(new Map(arr.map(x => [String(x.id), x])).values());
 
 
 
@@ -488,15 +488,33 @@ const [searchFilters, setSearchFilters] = useState(() => {
 
   const [advancedSearch, setAdvancedSearch] = useState(initialAdvancedSearch);
 
-const [savedPaletteIds, setSavedPaletteIds] = useState([]);
 
 
 
 
 
-const [palette, setPalette] = useState([]); // array of full swatch objects
 
-const [hydrated, setHydrated] = useState(false);
+const [palette, setPaletteState] = useState([]); // array of full swatch objects
+const paletteRef = useRef(palette);
+const paletteRevision = useRef(0);
+const paletteRestore = useRef(null);
+
+// Keep the existing public setter and every palette operation persisted together.
+function setPalette(update) {
+  paletteRevision.current += 1;
+  setPaletteState(previous => {
+    const next = typeof update === 'function' ? update(previous) : update;
+    paletteRef.current = next;
+    savePalette(next);
+    return next;
+  });
+}
+
+function resolvePaletteSwatch(raw) {
+  const id = raw && typeof raw === 'object' ? (raw.id ?? raw.color_id) : raw;
+  const existing = paletteRef.current.find(color => String(color.id) === String(id));
+  return normalizeSwatch(existing ? { ...existing, ...(raw && typeof raw === 'object' ? raw : {}) } : raw);
+}
 
 
 
@@ -584,192 +602,59 @@ useEffect(() => {
 
 
 
-// 1) Load once: read ids -> hydrate with normalizeSwatch (MERGE + DEDUPE)
-
-// Hydrate palette once from localStorage via normalizeSwatch (no writes here)
-
-// Hydrate palette from localStorage once, with retries + numeric/string id handling
-
+// Restore complete objects directly; fetch only legacy/incomplete entries.
+// Reuse the same restore operation during StrictMode effect replay.
 useEffect(() => {
-
   let cancelled = false;
-
-
-
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-
-
-  async function normalizeWithRetry(id, tries = 5, delay = 120) {
-
-    for (let i = 0; i < tries; i++) {
-
-      try {
-
-        // try as-is (number or string), then as string, then as number
-
-        let sw = await normalizeSwatch(id);
-
-        if (!sw || !sw.id) sw = await normalizeSwatch(String(id));
-
-        if (!sw || !sw.id) sw = await normalizeSwatch(Number(id));
-
-
-
-
-        if (sw && sw.id) return sw;
-
-      } catch (_) {}
-
-      await sleep(delay);
-
-    }
-
-    return null;
-
+  const revision = paletteRevision.current;
+  if (!paletteRestore.current) {
+    let entries = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem(PALETTE_STORAGE_KEY) || '[]');
+      if (Array.isArray(parsed)) {
+        entries = [...new Map(parsed.filter(entry => {
+          const id = entry && typeof entry === 'object' ? entry.id : entry;
+          return id !== null && id !== undefined && id !== '';
+        }).map(entry => [String(entry && typeof entry === 'object' ? entry.id : entry), entry])).values()];
+      }
+    } catch { /* Invalid or unavailable storage starts with an empty palette. */ }
+    paletteRestore.current = Promise.all(entries.map(entry => normalizeWithRetry(entry)));
   }
-
-
-
-  (async () => {
-
-    let ids = [];
-
-    try {
-
-      const raw = localStorage.getItem(PALETTE_STORAGE_KEY);
-
-      const parsed = raw ? JSON.parse(raw) : [];
-
-      ids = Array.isArray(parsed)
-
-        ? parsed.map(x => (x && typeof x === 'object' ? x.id : x))
-
-              .filter(v => v !== null && v !== undefined && v !== '')
-
-        : [];
-
-    } catch (_) {}
-
-
-
-    if (!ids.length) return;
-
-
-
-    const swatches = await Promise.all(ids.map(id => normalizeWithRetry(id)));
-
-    if (cancelled) return;
-
-
-
-    const clean = swatches.filter(Boolean);
-
-    if (clean.length) {
-
-      setPalette(clean);      // full swatch objects
-
-    }
-
-  })();
-
-
-
+  paletteRestore.current.then(swatches => {
+    if (cancelled || revision !== paletteRevision.current) return;
+    const clean = dedupeById(swatches.filter(Boolean));
+    paletteRef.current = clean;
+    setPaletteState(clean);
+    if (swatches.every(Boolean)) savePalette(clean); // Keep legacy IDs if a lookup failed.
+  });
   return () => { cancelled = true; };
-
-}, []); // Hydrate saved IDs independently of the global color catalog
-
-
-
-
-
-
-
-
-
-// 4) Hydrate the palette from saved IDs via normalizeSwatch (with retry)
-
-useEffect(() => {
-
-  if (!savedPaletteIds.length) return;   // need IDs
-
-  if (palette.length) return;            // already hydrated
-
-
-
-  let cancelled = false;
-
-  (async () => {
-
-    const swatches = await Promise.all(
-
-      savedPaletteIds.map(id => normalizeWithRetry(id)) // uses helper from #2
-
-    );
-
-    if (cancelled) return;
-
-    const clean = swatches.filter(Boolean);
-
-    if (clean.length) setPalette(clean);
-
-  })();
-
-
-
-  return () => { cancelled = true; };
-
-}, [savedPaletteIds.join(','), palette.length]);
-
-
-
-
-
-
-
-
-
- // 3) Cross-tab sync: rehydrate if another tab updates (MERGE + DEDUPE)
-
-useEffect(() => {
-
-  const onStorage = (e) => {
-
-    if (e.key !== PALETTE_STORAGE_KEY) return;
-
-    try {
-
-      const ids = e.newValue ? JSON.parse(e.newValue) : [];
-
-      if (!Array.isArray(ids)) return;
-
-
-
-      (async () => {
-
-        const swatches = await Promise.all(ids.map(id => normalizeSwatch(id)));
-
-        setPalette(prev => dedupeById([
-
-          ...prev,
-
-          ...swatches.filter(Boolean)
-
-        ]));
-
-      })();
-
-    } catch (_) { /* ignore */ }
-
-  };
-
-  window.addEventListener("storage", onStorage);
-
-  return () => window.removeEventListener("storage", onStorage);
-
 }, []);
 
-
+// Another tab's palette is a replacement, including removals and clears.
+useEffect(() => {
+  let cancelled = false;
+  const onStorage = event => {
+    if (event.key !== PALETTE_STORAGE_KEY) return;
+    let entries;
+    try { entries = JSON.parse(event.newValue || '[]'); } catch { return; }
+    if (!Array.isArray(entries)) return;
+    const revision = ++paletteRevision.current;
+    Promise.all(entries.map(entry => {
+      const id = entry && typeof entry === 'object' ? (entry.id ?? entry.color_id) : entry;
+      const existing = paletteRef.current.find(color => String(color.id) === String(id));
+      return normalizeSwatch(existing ? { ...existing, ...(entry && typeof entry === 'object' ? entry : {}) } : entry);
+    })).then(swatches => {
+      if (cancelled || revision !== paletteRevision.current) return;
+      const clean = dedupeById(swatches.filter(Boolean));
+      paletteRef.current = clean;
+      setPaletteState(clean);
+      // Equal values do not emit storage events in other tabs.
+      if (swatches.every(Boolean) && JSON.stringify(clean) !== event.newValue) savePalette(clean);
+    });
+  };
+  window.addEventListener('storage', onStorage);
+  return () => { cancelled = true; window.removeEventListener('storage', onStorage); };
+}, []);
 
   useEffect(() => {
 
@@ -970,15 +855,14 @@ function isFilterChecked(key, value) {
 
 function addToPalette(rawSwatch) {
 
-  normalizeSwatch(rawSwatch).then((swatch) => {
+  resolvePaletteSwatch(rawSwatch).then((swatch) => {
 
     if (!swatch?.id) return;
 
     setPalette(prev => {
 
-      const next = Array.from(new Map([...prev, swatch].map(x => [x.id, x])).values());
+      const next = dedupeById([...prev, swatch]);
 
-      savePaletteIds(next);              // ✅ write here
 
       return next;
 
@@ -998,7 +882,7 @@ async function addManyToPalette(rawList) {
 
 
 
-  const settled = await Promise.allSettled(rawList.map(normalizeSwatch));
+  const settled = await Promise.allSettled(rawList.map(resolvePaletteSwatch));
 
   const normalized = [];
 
@@ -1012,9 +896,9 @@ async function addManyToPalette(rawList) {
 
     const id = sw?.id;
 
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(String(id))) continue;
 
-    seen.add(id);
+    seen.add(String(id));
 
     normalized.push(sw);
 
@@ -1028,13 +912,13 @@ async function addManyToPalette(rawList) {
 
   setPalette(prev => {
 
-    const prevIds = new Set(prev.map(x => x.id));
+    const prevIds = new Set(prev.map(x => String(x.id)));
 
     const toAdd = [];
 
     for (const sw of normalized) {
 
-      if (!prevIds.has(sw.id)) {
+      if (!prevIds.has(String(sw.id))) {
 
         toAdd.push(sw);
 
@@ -1048,7 +932,7 @@ async function addManyToPalette(rawList) {
 
     const next = prev.concat(toAdd);
 
-    savePaletteIds(next);
+
 
     return next;
 
@@ -1074,15 +958,14 @@ function removeFromPalette(id) {
 
   setPalette(prev => {
 
-    const next = prev.filter(c => c.id !== id);
+    const next = prev.filter(c => String(c.id) !== String(id));
 
-    savePaletteIds(next);                // ✅ write here
 
     return next;
 
   });
 
-  setPaletteActiveColor(prev => (prev?.id === id ? null : prev));
+  setPaletteActiveColor(prev => (String(prev?.id) === String(id) ? null : prev));
 
 }
 
@@ -1094,7 +977,7 @@ function reorderPalette(next) {
 
   setPalette(next);
 
-  savePaletteIds(next);
+
 
 }
 
@@ -1104,7 +987,6 @@ function reorderPalette(next) {
 
   setPalette([]);
 
-  savePaletteIds([]);                    // ✅ write here
 
 };
 

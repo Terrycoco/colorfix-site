@@ -60,12 +60,99 @@ class PdoPhotoLibraryRepository
     {
         $paletteColumn = $this->paletteColumnAvailable() ? ', palette_id' : '';
         $stmt = $this->pdo->prepare(
-            "SELECT photo_library_id, asset_library_id, source_type, source_id, client_id, photo_permission_status, rel_path, title, tags, alt_text, show_in_gallery, has_palette, is_inactive{$paletteColumn}
+            "SELECT photo_library_id, asset_library_id, source_type, source_id, client_id, photo_permission_status, rel_path, title, tags, alt_text, show_in_gallery, has_palette, is_inactive, inspiration_photo_id{$paletteColumn}
                FROM photo_library
               WHERE photo_library_id = :id
               LIMIT 1"
         );
         $stmt->execute([':id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /** Public artwork image: same active/retired/Gallery gates as Gallery, and art-only. */
+    public function findPublicArtworkPhoto(int $photoId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id, source_type, rel_path, title, alt_text, palette_id
+               FROM photo_library
+              WHERE photo_library_id = :id AND source_type = 'art'
+                AND show_in_gallery = 1
+                AND COALESCE(is_inactive, 0) = 0
+                AND COALESCE(is_retired, 0) = 0
+              LIMIT 1"
+        );
+        $stmt->execute([':id' => $photoId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Public inspiration reverse lookup. Private client records remain admin-only. */
+    public function listPublicInspiredDesigns(int $artworkPhotoId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id, rel_path, title, alt_text, palette_id
+               FROM photo_library
+              WHERE inspiration_photo_id = :artwork_id
+                AND source_type <> 'art'
+                AND show_in_gallery = 1
+                AND COALESCE(is_inactive, 0) = 0
+                AND COALESCE(is_retired, 0) = 0
+                AND client_id IS NULL
+                AND rel_path IS NOT NULL AND rel_path <> ''
+              ORDER BY photo_library_id ASC"
+        );
+        $stmt->execute([':artwork_id' => $artworkPhotoId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Link a design photograph to an artwork. Caller must validate both identities.
+     * This does not touch palette_id, has_palette, or Gallery flags.
+     */
+    public function setInspirationPhotoId(int $photoId, ?int $artworkPhotoId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE photo_library SET inspiration_photo_id = :artwork_id, updated_at = NOW() WHERE photo_library_id = :photo_id'
+        );
+        $stmt->bindValue(':artwork_id', $artworkPhotoId, $artworkPhotoId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':photo_id', $photoId, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /** Admin-facing reverse lookup; callers must apply their own public visibility rules. */
+    public function listInspiredDesigns(int $artworkPhotoId): array
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT photo_library_id, source_type, rel_path, title, alt_text,
+                    palette_id, inspiration_photo_id, show_in_gallery, is_inactive,
+                    photo_permission_status, client_id
+               FROM photo_library
+              WHERE inspiration_photo_id = :artwork_id
+              ORDER BY photo_library_id ASC"
+        );
+        $stmt->execute([':artwork_id' => $artworkPhotoId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Admin artwork-picker search uses the canonical Photo Library search. */
+    public function searchInspirationDesigns(string $query, int $limit = 40): array
+    {
+        $query = trim($query);
+        if (mb_strlen($query) < 2) { return []; }
+        return (new \App\PHOTOS\Services\PhotoLibraryListService($this->pdo))->list(
+            ['q' => $query, 'limit' => max(1, min(40, $limit))],
+            ['exclude_art' => true, 'active_only' => true]
+        );
+    }
+
+    /** Consistent row lock for validating and changing a single photo relationship. */
+    public function findForInspirationUpdate(int $photoId): ?array
+    {
+        $lock = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+        $stmt = $this->pdo->prepare(
+            'SELECT photo_library_id, source_type, inspiration_photo_id FROM photo_library WHERE photo_library_id = ?' . $lock
+        );
+        $stmt->execute([$photoId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }

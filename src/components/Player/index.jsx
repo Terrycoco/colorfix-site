@@ -64,6 +64,7 @@ const Player = forwardRef(function Player({
   const didInitRef = useRef(false);
   const endEmitRef = useRef(null);
   const currentImgRef = useRef(null);
+  const prevImgRef = useRef(null);
   const stageRef = useRef(null);
   const playerRootRef = useRef(null);
   const titleRef = useRef(null);
@@ -613,13 +614,25 @@ function startPlayback(nextMode, nextIndex = 0) {
 
   useEffect(() => {
     if (!isFading || !fadeReady || !imageLoaded) return;
-    // Match the CSS dissolve timings (fade-in 1400ms + fade-out 600ms).
+    let frame;
+    const finishWhenTransparent = () => {
+      const outgoing = prevImgRef.current;
+      if (outgoing && Number.parseFloat(getComputedStyle(outgoing).opacity) > 0) {
+        frame = requestAnimationFrame(finishWhenTransparent);
+        return;
+      }
+      // Give opacity zero a painted frame before removing the outgoing image.
+      frame = requestAnimationFrame(() => {
+        setPrevIndex(null);
+        setIsFading(false);
+      });
+    };
+    // Keep the existing two-second dissolve; CSS completion gates removal.
     const timer = setTimeout(() => {
-      setPrevIndex(null);
-      setIsFading(false);
+      frame = requestAnimationFrame(finishWhenTransparent);
     }, 2000);
-    return () => clearTimeout(timer);
-  }, [isFading, fadeReady, imageLoaded]);
+    return () => { clearTimeout(timer); cancelAnimationFrame(frame); };
+  }, [isFading, fadeReady, imageLoaded, currentIndex]);
 
   useEffect(() => {
     function handleResize() {
@@ -704,6 +717,7 @@ function startPlayback(nextMode, nextIndex = 0) {
             <img
               key={`prev-${prevIndex}-${prevImageUrl}`}
               src={withCacheBust(prevImageUrl)}
+              ref={prevImgRef}
               alt=""
               className={`player-image is-prev${textAfterImageTransition ? " is-exiting-to-text" : ""}${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
             />

@@ -8,5 +8,24 @@
 .artwork-dialog__field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:13px;font-weight:600}
 .artwork-dialog__field input,.artwork-dialog__field textarea{border:1px solid #bccce1;border-radius:5px;padding:8px;font:inherit;font-weight:400;width:100%;box-sizing:border-box}
 .artwork-dialog__wide{grid-column:1/-1}.artwork-dialog__year{display:flex;gap:10px;align-items:end}.artwork-dialog__year>.artwork-dialog__field{flex:1}.artwork-dialog__year>label{white-space:nowrap;padding-bottom:9px}
-.artwork-dialog__error{color:#aa2132;font-weight:600}.artwork-dialog__footer{display:flex;gap:8px;align-items:center;border-top:1px solid #d9e1ec;padding-top:13px}.artwork-dialog__spacer{flex:1}.artwork-dialog__footer button{padding:8px 11px;cursor:pointer;border-radius:5px;border:1px solid #c4ccda;background:#fff}.artwork-dialog__footer .artwork-dialog__save{background:#10264d;color:white;border-color:#10264d}.artwork-dialog__footer .artwork-dialog__delete{color:#a82337;border-color:#daabaf}
+.artwork-dialog__error{color:#aa2132;font-weight:600}.artwork-dialog__footer{display:flex;gap:8px;align-items:center;border-top:1px solid #d9e1ec;padding-top:13px}.artwork-dialog__spacer{flex:1}.artwork-dialog__footer button{padding:8px 11px;cursor:pointer;border-radius:5px;border:1px solid #c4ccda;background:#fff;color:#192238}.artwork-dialog__footer .artwork-dialog__save{background:#10264d;color:white;border-color:#10264d}.artwork-dialog__footer .artwork-dialog__delete{color:#a82337;border-color:#daabaf}
 @media(max-width:600px){.artwork-dialog__fields{grid-template-columns:1fr}.artwork-dialog__photo{max-height:150px}.artwork-dialog__footer{flex-wrap:wrap}}
+
+.artwork-dialog__inspired{border-top:1px solid #d9e1ec;padding-top:15px;display:flex;flex-direction:column;gap:10px}
+.artwork-dialog__inspired h3{margin:0;font-size:17px;color:#192238}
+.artwork-dialog__hint{margin:0;color:#536078;font-size:13px;line-height:1.45}
+.artwork-dialog__design-list{max-height:235px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.artwork-dialog__design{display:flex;align-items:center;gap:10px;padding:7px;border:1px solid #d9e1ec;border-radius:7px;min-width:0;background:#fff;color:#192238}
+.artwork-dialog__design img{width:66px;height:53px;object-fit:cover;flex:none;border-radius:4px}
+.artwork-dialog__design span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px;font-weight:600}
+.artwork-dialog__design small{color:#536078;font-weight:400}
+.artwork-dialog__design em{display:block;font-style:normal;font-size:12px;color:#8a4b12;font-weight:400}
+.artwork-dialog__design button{background:#fff;color:#172b51;border:1px solid #8d9cba;padding:7px 10px;border-radius:5px;cursor:pointer;flex:none;font-weight:600}
+.artwork-dialog__design button:disabled{opacity:.55;cursor:wait}
+.artwork-dialog__design button:focus-visible{outline:3px solid #4779c5;outline-offset:2px}
+.artwork-dialog__inspired .artwork-dialog__field input{background:#fff;color:#192238}
+
+/* Keep the existing shared picker above the artwork editor when it is open. */
+.artwork-dialog__backdrop--under-picker{z-index:700;pointer-events:none}
+.artwork-dialog__choose:disabled{opacity:.55;cursor:wait}
+.artwork-dialog__choose:focus-visible{outline:3px solid #4779c5;outline-offset:2px}

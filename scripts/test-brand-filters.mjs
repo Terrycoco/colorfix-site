@@ -126,7 +126,8 @@ try {
     await waitFor(() => window.brandFilterTest.palette.length === 3, 'adding cross-brand fuzzy selection');
     if (width < 721) { await click('.drawer-back'); await delay(300); }
     assert.equal(await page.evaluate(() => Boolean(document.querySelector('.myp-palette-grid #swatch-3'))), true, 'Explicit Behr pick remains visible');
-    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('pals.palette.v1'))), [1, 2, 3]);
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('pals.palette.v1')).map(color => color.id)), [1, 2, 3]);
+    assert(await page.evaluate(() => JSON.parse(localStorage.getItem('pals.palette.v1')).every(color => color.name && color.brand && color.hex)), 'Persist complete palette-bar swatches');
     if (width < 721) { await click('.myp-fab-add'); await delay(300); }
     await click('button', 'What Colors Go?');
     await waitFor(() => window.brandFilterTest.requests.some((url) => url.includes('/get-friends.php')), 'suggestion query');

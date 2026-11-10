@@ -29,7 +29,7 @@ export const adminMenuItems = [
     items: [
       { label: "Photo Library", href: "/admin/photo-library" },
       { label: "Asset Library", href: "/admin/library" },
-      { label: "Photo Collections" },
+      { label: "Artworks", href: "/admin/artworks" },
     ],
   },
   {

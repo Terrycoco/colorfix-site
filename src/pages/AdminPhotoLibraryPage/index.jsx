@@ -37,6 +37,7 @@ const SOURCE_OPTIONS = [
   { value: "article", label: "Article" },
   { value: "pin", label: "Pin" },
   { value: "art", label: "Art" },
+  { value: "art_inspired", label: "Art Inspired" },
 ];
 
 const defaultUpload = {
@@ -1381,6 +1382,7 @@ export default function AdminPhotoLibraryPage() {
                 <option value="article">Article</option>
                 <option value="pin">Pin</option>
                 <option value="art">Art</option>
+                <option value="art_inspired">Art Inspired</option>
                 <option value="extra_photo">Extras</option>
               </select>
             </label>
