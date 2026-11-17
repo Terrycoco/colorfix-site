@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-09 09:16:30 AM PST
+**UPDATED:** 2026-11-17 14:38:02 PST
 
 # ANA — Department Manifest
 
@@ -416,3 +416,5 @@ Before approved changes, characterize both recording aliases and report contract
 * **Files:** `src/pages/PlaylistPickerPage/index.jsx`, its existing CSS, both existing landing browser scripts, and this manifest. PLAYLISTS has no department manifest in this tree; no new manifest was invented. This is a presentation correction only: ANA runtime/database, REX, backend eligibility, SEO/sitemap, SAS and PUB were not modified. Local only; no deployment or production analytics requests.
 
 After separately approved improvements are implemented and verified, record their date, scope, ownership/interface effects, tests and local/deployed status here; update the relevant future item and technical inventory together.
+
+ARTICLES migration (2026-11-17): article title readers now import `App\ARTICLES\Repos\PdoArticleRepository` from `app/ARTICLES/Repos/PdoArticleRepository.php`. Report interfaces and behavior are unchanged.

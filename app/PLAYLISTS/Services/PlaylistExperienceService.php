@@ -6,7 +6,7 @@ namespace App\PLAYLISTS\Services;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PLAYLISTS\Repos\PdoPlayerExperienceRepository;
 use App\Repos\PdoCtaRepository;
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 use App\PROJECTS\Repos\PdoProjectRepository;
 use App\Repos\PdoPaletteViewerRepository;
 use App\Repos\PdoPaletteViewerPhotoRepository;

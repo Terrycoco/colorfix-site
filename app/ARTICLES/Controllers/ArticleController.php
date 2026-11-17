@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace App\Controllers;
+namespace App\ARTICLES\Controllers;
 
-use App\Services\ArticleService;
+use App\ARTICLES\Services\ArticleService;
 
 class ArticleController
 {

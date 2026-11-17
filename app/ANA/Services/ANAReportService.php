@@ -5,7 +5,7 @@ namespace App\ANA\Services;
 
 use App\ANA\Contracts\ANAReportRepositoryInterface;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 
 final class ANAReportService
 {

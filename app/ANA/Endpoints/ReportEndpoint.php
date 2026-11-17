@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../../db.php';
 use App\ANA\Repos\PdoANAReportRepository;
 use App\ANA\Services\ANAReportService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 
 function respond(array $payload, int $status = 200): void
 {

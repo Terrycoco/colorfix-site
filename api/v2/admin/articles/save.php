@@ -12,9 +12,9 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../../autoload.php';
 require_once __DIR__ . '/../../../db.php';
 
-use App\Controllers\ArticleController;
-use App\Repos\PdoArticleRepository;
-use App\Services\ArticleService;
+use App\ARTICLES\Controllers\ArticleController;
+use App\ARTICLES\Repos\PdoArticleRepository;
+use App\ARTICLES\Services\ArticleService;
 use InvalidArgumentException;
 
 function respond(array $payload, int $status = 200): void {

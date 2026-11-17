@@ -6,7 +6,7 @@ namespace App\POD\Managers;
 use App\PLAYLISTS\Entities\PlaylistItem;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PLAYLISTS\Repos\PdoPlayerExperienceRepository;
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 use App\Repos\PdoCtaRepository;
 use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use DomainException;

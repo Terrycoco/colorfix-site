@@ -1,5 +1,5 @@
 ColorFix — System Manifest
-UPDATED: 2026-11-09 8:05 AM PST
+UPDATED: 2026-11-17 14:38:02 PST
 STATUS: Foundational Architecture Contract — Version 1
 AUTHORITY: Owner-approved architectural decisions
 SCOPE: Entire ColorFix application
@@ -14,6 +14,7 @@ Backend departmental umbrellas live directly under app/ and use UPPERCASE direct
 
 Current umbrellas identified in the repository:
 - ANA
+- ARTICLES
 - COLORS
 - DOCUMENTS
 - ERR
@@ -36,6 +37,7 @@ app/SYSTEM/ is a department, distinct from this repository-wide SystemManifest.m
 Every capability must have one authoritative departmental owner. The owner implements domain rules, validation, state changes, and lifecycle decisions. Other departments reuse the owner's published capabilities; they do not implement competing versions.
 
 Established examples:
+- ARTICLES: Article records, sections, tags, creation/editing/retrieval/deletion and publication state; see app/ARTICLES/DeptManifest.md.
 - PHOTOS: Photo Library records, image identity and lifecycle, image metadata including thumbnail crop, replacement, merging, dependency checks, and safe disposal.
 - PALETTES: Saved palettes, palette members, and palette-domain rules.
 - PROJECTS: Projects and project-specific image relationships.

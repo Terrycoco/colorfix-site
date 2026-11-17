@@ -9,7 +9,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 use App\Repos\PdoCtaRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 

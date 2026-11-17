@@ -9,7 +9,7 @@ header('Cache-Control: public, max-age=300, stale-while-revalidate=600');
 require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';
 
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 
 function respond(array $payload, int $status = 200): void {
     http_response_code($status);

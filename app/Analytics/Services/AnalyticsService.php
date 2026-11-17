@@ -6,7 +6,7 @@ namespace App\Analytics\Services;
 use App\Analytics\Contracts\AnalyticsEventRepositoryInterface;
 use App\Analytics\DTO\AnalyticsEvent;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
-use App\Repos\PdoArticleRepository;
+use App\ARTICLES\Repos\PdoArticleRepository;
 use App\REX\Resources\RexRouteCatalog;
 
 final class AnalyticsService
