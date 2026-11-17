@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import ProjectSelect from "@components/Project/ProjectSelect";
 
 
@@ -514,7 +515,7 @@ export default function PlaylistRecordEditor({
 
               {playlist.hero_image_url ? (
 
-                <img
+                <PhotoPreviewImage
 
                   src={playlist.hero_image_url}
 

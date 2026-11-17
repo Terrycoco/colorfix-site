@@ -98,6 +98,7 @@ export default function PaletteDetail({
 
   const [members, setMembers] = useState([]);
   const baselineRef = useRef("");
+  const nextMemberKey = useRef(0);
 
   useEffect(() => {
     const nextForm = {
@@ -158,6 +159,14 @@ export default function PaletteDetail({
       ...current,
       [name]: value,
     }));
+  }
+
+  function addMember() {
+    const key = `new-member-${++nextMemberKey.current}`;
+    setMembers((current) => [
+      ...current,
+      { key, color: null, role: "", sheen: "", note: "" },
+    ]);
   }
 
   function updateMember(index, patch) {
@@ -337,7 +346,7 @@ export default function PaletteDetail({
           <button
             type="button"
             className="admin-button"
-            disabled
+            onClick={addMember}
           >
             Add Color
           </button>

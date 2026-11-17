@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AdminDetailPane,
@@ -620,7 +621,7 @@ const loadPage = useCallback(async () => {
                     {detail.photos.map((photo, index) => (
                       <div key={`${photo.palette_viewer_photo_id || "new"}-${index}`} className="admin-palette-viewers__photo-row">
                         <div className="admin-palette-viewers__photo-thumb">
-                          {photo.rel_path ? <img src={buildImageUrl(photo.rel_path)} alt="" /> : <span>No preview</span>}
+                          {photo.rel_path ? <PhotoPreviewImage src={buildImageUrl(photo.rel_path)} alt="" /> : <span>No preview</span>}
                           <small>{photoLabel(photo)}</small>
                         </div>
                         <select value={photo.photo_type || "inset"} onChange={(event) => updatePhoto(index, "photo_type", event.target.value)}>

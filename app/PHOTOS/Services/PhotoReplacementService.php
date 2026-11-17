@@ -62,7 +62,7 @@ final class PhotoReplacementService
 
         // Current consumers resolve Photo Library IDs. Raw path/shared consumers keep their original bytes.
         $disposal = (new PhotoLifecycleService($this->pdo, $this->root))->disposeFile((string)$row['rel_path']);
-        foreach (glob($this->root . '/photos/cache/thumbs/pl-' . $id . '-*') ?: [] as $thumb) { @unlink($thumb); }
+        PhotoThumbnailService::invalidate($id, $this->root);
         return [...$fresh, 'old_file_cleanup' => $disposal, 'image_url' => $imageUrl, 'file_path' => $imageUrl, 'raw_rel_path' => $relPath];
     }
 

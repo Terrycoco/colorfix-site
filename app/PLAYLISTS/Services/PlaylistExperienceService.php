@@ -105,7 +105,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
     $this->hydrateItemImages($sourceItems);
 
     $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
-    $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
+    $resolvedShareTitle = $playlistRepo->getCoverTitle($playlistId);
 
     $items = $this->filterPlayableItems($sourceItems);
 
@@ -191,7 +191,7 @@ private function buildPublicPlaybackPlanFromPlaylistExperience(
         'total_items' => count($items),
         'start_index' => $startIndex,
         'start_target' => $this->startTargetSummary($startTarget, $startIndex),
-        'items' => $items,
+        'items' => $this->withPhotoDelivery($items),
         'ctas' => $ctas,
         'cta_context_key' => null,
         'audience' => $experienceKey === 'showcase' ? 'public' : $experienceKey,
@@ -700,7 +700,7 @@ public function buildPlaybackPlanFromProjectExperience(
         $this->hydrateItemImages($sourceItems);
 
         $resolvedShareImageUrl = $this->resolvePlaylistShareImageUrl($sourceItems);
-        $resolvedShareTitle = $this->resolvePlaylistCoverTitle($sourceItems);
+        $resolvedShareTitle = $playlistRepo->getCoverTitle($playlistId);
 
         $items = $this->filterPlayableItems($sourceItems);
 
@@ -784,7 +784,7 @@ public function buildPlaybackPlanFromProjectExperience(
             'total_items' => count($items),
             'start_index' => $startIndex,
             'start_target' => $this->startTargetSummary($startTarget, $startIndex),
-            'items' => $items,
+            'items' => $this->withPhotoDelivery($items),
             'ctas' => $ctas,
             'cta_context_key' => null,
             'audience' => $experienceKey,
@@ -1070,36 +1070,6 @@ public function buildPlaybackPlanFromProjectExperience(
         return $this->normalizeShareImageUrl(
             (string)($chosen->image_url ?? '')
         );
-    }
-
-
-    /**
-     * The cover-image title is the authored title for non-playback
-     * representations of this playlist.
-     *
-     * @param PlaylistItem[] $items
-     */
-    private function resolvePlaylistCoverTitle(array $items): string
-    {
-        foreach ($items as $item) {
-            if (!$item instanceof PlaylistItem) {
-                continue;
-            }
-
-            if ($this->playlistItemType($item) !== 'cover-image') {
-                continue;
-            }
-
-            $title = trim(
-                (string)($item->title ?? '')
-            );
-
-            if ($title !== '') {
-                return $title;
-            }
-        }
-
-        return '';
     }
 
 
@@ -1507,4 +1477,17 @@ public function buildPlaybackPlanFromProjectExperience(
     {
         $this->lastTiming[$key] = round((microtime(true) - $startedAt) * 1000, 1);
     }
+    /** Add PHOTOS capabilities only to the already-selected playback response. */
+    private function withPhotoDelivery(array $items): array
+    {
+        foreach ($items as $item) {
+            if ($item instanceof PlaylistItem) {
+                $item->display_image_url = \App\PHOTOS\Services\PhotoDeliveryService::url(
+                    (int)$item->photo_library_id, (string)$item->image_url
+                );
+            }
+        }
+        return $items;
+    }
+
 }

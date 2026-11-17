@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import InsertLinkModal from "@components/InsertLinkModal";
 import LookupTypeManagerModal from "@components/LookupTypeManagerModal";
@@ -1798,7 +1799,7 @@ export default function AdminClientsPage() {
                         rel="noreferrer"
                         className="admin-clients__photo-thumb-link"
                       >
-                        <img
+                        <PhotoPreviewImage
                           src={item.image_url || item.rel_path}
                           alt={item.alt_text || item.title || item.filename || `Photo ${item.photo_library_id}`}
                           className="admin-clients__photo-thumb"

@@ -18,13 +18,13 @@ export default function PictureSwatch({
 }) {
   const crop = { cropX, cropY, cropWidth, cropHeight };
   const hasCustomCrop = hasSavedSwatchCrop(crop);
-  const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
-  const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
-  const imageUrl = hasCustomCrop ? (photoUrl || smallImageUrl) : (smallImageUrl || photoUrl);
-  const imageSrcSet = !hasCustomCrop && smallImageUrl && largeImageUrl
+  const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70, "", "swatch");
+  const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72, "", "swatch");
+  const imageUrl = (smallImageUrl || photoUrl);
+  const imageSrcSet = smallImageUrl && largeImageUrl
     ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
     : undefined;
-  const cropStyle = hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
+  const cropStyle = smallImageUrl ? { objectFit: "contain" } : hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
   const href = to || photoUrl || "";
 
   const go = () => {
@@ -45,6 +45,12 @@ export default function PictureSwatch({
             srcSet={imageSrcSet}
             sizes="(min-width: 560px) 260px, 50vw"
             alt={name || "Palette example"}
+            onError={(event) => {
+              if (!photoUrl || event.currentTarget.getAttribute("src") === photoUrl) return;
+              event.currentTarget.removeAttribute("srcset");
+              if (hasCustomCrop) Object.assign(event.currentTarget.style, swatchCropStyle(crop));
+              event.currentTarget.src = photoUrl;
+            }}
             loading="lazy"
             decoding="async"
           />

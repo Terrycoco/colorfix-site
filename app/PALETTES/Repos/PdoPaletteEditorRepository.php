@@ -182,6 +182,15 @@ final class PdoPaletteEditorRepository
         }
     }
 
+    /** Serialize on-demand public photo experiences without a new schema/index. */
+    public function lockForPhotoViewer(int $paletteId): bool
+    {
+        $sql = 'SELECT id FROM saved_palettes WHERE id = ?';
+        if ($this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) === 'mysql') $sql .= ' FOR UPDATE';
+        $stmt = $this->pdo->prepare($sql); $stmt->execute([$paletteId]);
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function findPublicPVByPaletteId(int $paletteId): ?array
     {
         if ($paletteId <= 0) {

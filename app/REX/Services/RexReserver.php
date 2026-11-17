@@ -6,6 +6,7 @@ namespace App\REX\Services;
 use App\REX\Contracts\RexReservationRepositoryInterface;
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
+use App\REX\DTO\RexReservationSearchCriteria;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -31,6 +32,28 @@ final class RexReserver
         }
 
         throw new RuntimeException('Unable to generate a unique REX token.');
+    }
+
+    /** Same context-sensitive reuse as the admin create interface; caller serializes creation. */
+    public function findReusable(RexCreateReservationRequest $request): ?RexReservation
+    {
+        $matches = $this->reservations->search(new RexReservationSearchCriteria(
+            resolverKey: $request->resolverKey, resourceType: $request->resourceType,
+            resourceId: $request->resourceId, status: self::STATUS_ACTIVE,
+            limit: 500, experienceKey: $request->experienceKey,
+        ));
+        $normalize = static function(array $value) use (&$normalize): array {
+            foreach ($value as &$entry) if (is_array($entry)) $entry = $normalize($entry);
+            unset($entry); ksort($value); return $value;
+        };
+        usort($matches, static fn($a, $b) => $a->id <=> $b->id);
+        foreach ($matches as $reservation) {
+            if ($reservation->revokedAt === null
+                && strtolower(trim((string)$reservation->experienceKey)) === strtolower(trim((string)$request->experienceKey))
+                && $normalize($reservation->context) === $normalize($request->context)) return $reservation;
+        }
+        if (count($matches) >= 500) throw new RuntimeException('REX reuse lookup limit reached; no new token created.');
+        return null;
     }
 
     private function validateCreateRequest(RexCreateReservationRequest $request): void

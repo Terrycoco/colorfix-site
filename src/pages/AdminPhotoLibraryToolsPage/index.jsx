@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl, getImageRefreshEnabled, withImageRefresh } from "@helpers/assetImage";
@@ -429,7 +430,7 @@ export default function AdminPhotoLibraryToolsPage() {
     const base = buildImageUrl(url, updatedAt, imageRefreshEnabled);
     if (!base) return "";
     const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}tools=${thumbNonce}`;
+    return base;
   }
 
   return (
@@ -606,7 +607,7 @@ export default function AdminPhotoLibraryToolsPage() {
                     {row.rel_path ? (
                       <img
                         className="admin-photo-library-tools__thumb"
-                        src={buildToolImageUrl(row.rel_path, row.updated_at || null)}
+                        {...photoImageProps(row.photo_library_id, row.rel_path, { width: 240 })} loading="lazy"
                         alt=""
                         onClick={() => setPreviewUrl(buildToolImageUrl(row.rel_path, row.updated_at || null))}
                       />
@@ -692,7 +693,7 @@ export default function AdminPhotoLibraryToolsPage() {
                   {row.thumb ? (
                     <img
                       className="admin-photo-library-tools__thumb"
-                      src={buildToolImageUrl(row.thumb, null)}
+                      {...photoImageProps(row.photo_library_id, row.thumb, { width: 240 })} loading="lazy"
                       alt=""
                       onClick={() => setPreviewUrl(buildToolImageUrl(row.thumb, null))}
                     />

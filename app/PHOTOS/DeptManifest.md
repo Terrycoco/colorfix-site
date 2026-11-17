@@ -3,13 +3,13 @@
 **Department:** `PHOTOS`  
 **Location:** `app/PHOTOS/`  
 **Namespace:** `App\PHOTOS`  
-**UPDATED:** 2026-11-10 12:31:46 PM PST
+**UPDATED:** 2026-11-13 11:29:26 AM PST
 **Status:** Source inventory with PHOTOS inspiration-link service added  
 **Source reviewed:** `PHOTOS(4).zip` (the department's PHP files only). API doorbells, React pages, migrations, and the shared `SystemManifest.md` were **not** in this archive; their paths and behavior require separate verification.
 
 ## 1. Mission and ownership
 
-PHOTOS owns Photo Library records and source-photo lifecycle: uploads, Photo Library metadata and palette links, usage/dependency checks, duplicate discovery and safe merging, replacement, guarded deletion and managed-file disposal. It also owns **non-destructive crop definitions** for individual photos.
+PHOTOS owns Photo Library records and source-photo lifecycle: uploads, Photo Library metadata and palette links, usage/dependency checks, duplicate discovery and safe merging, replacement, guarded deletion and managed-file disposal. It also owns **non-destructive crop definitions**, optimized display/thumbnail generation, derivative caching and invalidation, and delivery URL/access contracts for individual photos. PUB continues to own its separate production outputs.
 
 Other departments may *reference* Photo Library IDs, resolve photos for display, and own their own business records, but must not independently delete Photo Library source files, bypass usage checks, or create a second canonical crop store.
 
@@ -20,6 +20,8 @@ Other departments may *reference* Photo Library IDs, resolve photos for display,
 **Artwork inspiration:** A design photo may reference one artwork through nullable `photo_library.inspiration_photo_id`; many designs may reference the same artwork. PHOTOS exclusively writes the field. The target must exist with `source_type='art'`; an art photo cannot be used as an inspired design. Reassignment replaces the previous link; removal clears only this field, never the palette association. Artwork-side and design-side editors use the same service.
 
 **Art classifications:** `art` identifies the original artwork; `art_inspired` identifies inspired rooms/designs. Both are available in Photo Library upload, editable type, and source filtering. Upload validation and series discovery accept `art_inspired`; its files use the existing `/photos/progressions/{series}/` storage branch. The classification alone does not set `inspiration_photo_id`, assign/copy a palette, create artwork metadata, or change Gallery eligibility. Existing direct `palette_id` and inspiration links remain independent and use their existing operations. The live `source_type` column is `varchar(40)`; no schema change is required.
+
+**General study material:** `inspiration` classifies collected reference photographs of any subject. Upload, editable Type, source filtering and series discovery support it. It uses the existing `/photos/progressions/{series}/` storage branch, with normal Photo Library metadata and visibility controls. This classification does not create an artwork record or an artwork inspiration relationship; `art_inspired` retains its existing room-to-artwork meaning. No schema change is needed.
 
 3. **Originals remain originals:** crop operations store geometry in `photo_crops`; no image bytes are rewritten.
 4. **Crop keys:** `(photo_library_id, crop_type)` identifies one optional manual crop. **No row means a computed centered crop** using the named preset. Reset deletes that crop row.
@@ -38,15 +40,20 @@ Other departments may *reference* Photo Library IDs, resolve photos for display,
 | `Entities/PhotoEntity.php` | Typed representation and `toArray()` for uploaded extra photographs. |
 | `Endpoints/PhotoInspirationEndpoint.php` | Admin list/search/set/remove request handling; authentication belongs to the thin API doorbell. |
 | `Endpoints/PhotoCropEndpoint.php` | HTTP adapter: crop preset lookup, get, save, reset. |
+| `Endpoints/PhotoThumbnailEndpoint.php` | Existing public image-thumbnail HTTP adapter: image response and status mapping. |
 | `Endpoints/PhotoLibraryListEndpoint.php` | Admin HTTP list/search adapter delegating to the canonical PHOTOS search service. |
 | `Endpoints/PhotoLibraryUploadEndpoint.php` | Multipart Photo Library upload HTTP adapter. |
 | `Endpoints/PhotoLifecycleEndpoint.php` | Delete, delete-inactive, merge, duplicate-candidates HTTP adapter. |
 | `Endpoints/PhotoPaletteEndpoint.php` | Compatibility HTTP adapter for direct palette links, attach, detach. |
 | `Endpoints/UploadEndpoint.php` | Tagged `extra_photo` upload HTTP adapter. |
+| `Repos/PdoPhotoEditorialRepository.php` | Stores the three photo-level editorial fields in `photo_editorial`; one row per canonical Photo Library ID. |
+| `Services/PhotoEditorialService.php` | Validates photo existence, loads and saves full editorial records; does not generate content. |
+| `Endpoints/PhotoEditorialEndpoint.php` | Admin-only GET/POST JSON adapter; requires an authenticated API doorbell outside this package. |
 | `Repos/PdoPhotoCropRepository.php` | Persisted custom crop lookup, list, upsert, deletion. |
 | `Repos/PdoPhotoLibraryRepository.php` | Photo metadata, palette and inspiration links, usage inventory, row lookup/mutation, reference reassignment. |
 | `Repos/PdoPhotoLifecycleRepository.php` | Supplemental dependency checks, reference reassignment, merge conflicts, file references. |
 | `Services/PhotoCropService.php` | Crop validation, default calculation, save, reset. |
+| `Services/PhotoThumbnailService.php` | Source lookup, trusted local-path validation, saved-crop rendering, existing thumbnail cache and image delivery metadata. |
 | `Services/PhotoDuplicateService.php` | Duplicate candidate reporting and data deduplication helpers. |
 | `Services/PhotoLibraryListService.php` | Canonical Photo Library search/filter/pagination and response projection, including title/tags/path/client/ID queries; reused by artwork picker. |
 | `Services/PhotoLibraryUploadService.php` | Current Photo Library multipart upload and metadata/asset integration. |
@@ -104,6 +111,7 @@ Internal repositories provide lower-level persistence. Other departments should 
 **PHOTOS-owned principal tables visible in code**
 
 - `photo_library`: canonical photo identity, metadata, source type/path, palette association, client/asset references, state, permission and gallery flags; `inspiration_photo_id` (nullable, indexed self-reference to an art photo ID, database field added by owner on 2026-11-09).
+- `photo_editorial`: optional one-to-one record keyed by `photo_library_id`, with `design_notes`, `refined_commentary`, `photo_description` as LONGTEXT, and timestamps. Authored/edited text is independent of playlists and must not be overwritten by automated generation.
 - `photo_crops`: optional per-photo/per-preset geometry. Unique `(photo_library_id, crop_type)`; its row is deleted when resetting a crop. The existing schema stores `crop_x`, `crop_y`, `crop_width`, `crop_height` as decimals. The fixed preset ratios do **not** require `aspect_width` or `aspect_height` columns.
 
 **Related tables referenced but not owned by PHOTOS** include `asset_library`, `saved_palettes`, `clients`, `playlist_items`, `playlists`, `playlist_sets`, `project_photos`, `projects`, `palette_viewer_photos`, `palette_viewers`, `project_palettes`, `playlist_instance_set_items`, `playlist_instance_sets`, `playlist_instances`, `articles`, `article_sections`, `photo_group_items`, and `photo_groups`. PHOTOS may read these to identify usages and may perform carefully coordinated reassignment/cleanup operations; the owner department remains responsible for its own business semantics.
@@ -150,6 +158,10 @@ Before modifying this department:
 5. Test PHP syntax; endpoint auth and error cases; crop defaults/save/reopen/reset for all five formats; normalized bounds and source-pixel ratios; upload and palette links; dependency-protected delete, merges, and file sharing.
 6. Update this file when department ownership, published interfaces, significant workflows, dependencies, or database relationships change; do not log ordinary UI changes. Record the change under the log below.
 
+### Photo Editorial interface (2026-11-17)
+
+PHOTOS owns `photo_editorial` and exposes `PhotoEditorialService::get(int $photoId): array`, `getMany(array $photoIds): array`, and `save(int $photoId, array $fields): array`. Fields: `design_notes`, `refined_commentary`, `photo_description` (text or null). `getMany()` returns a sparse photo-ID-keyed map of existing records, using batched queries and no per-photo existence checks; internal read-only consumption only. Save requires all three keys to avoid accidental data loss; absent rows read as empty values. `PhotoEditorialEndpoint::handle(PDO)` accepts admin GET `photo_library_id` and POST JSON with that ID plus the three fields; responses have `{ok:true,editorial:{...}}`. These classes **do not authenticate** requests. An admin-authenticated API doorbell and frontend controls must be wired from the actual API/React source, which was not provided. ANALYZER/ARTICLES/PUB are future read-only consumers through PHOTOS; no outward public exposure is authorized.
+
 ### Inspiration editor interface
 
 `api/v2/admin/photo-library/list.php` is now an authenticated thin doorbell to `PhotoLibraryListEndpoint`; `PhotoLibraryListService::list(array $queryParams, array $options = [])` preserves existing `q`, source/client/palette/status/id filters, sort/pagination, tags and response fields. The ARTWORK picker reuses this search via PHOTOS with admin-only exclude-art/active-only options.
@@ -170,6 +182,10 @@ Photo selection consumers must reuse the PHOTOS-owned `PhotoLibraryListService` 
 
 ### Completed improvements
 
+- **2026-11-12 (local) — PHOTOS optimization/delivery contract:** `PhotoThumbnailService::get(int $photoId, int $width, int $quality, string $root, string $cropType = 'swatch', string $fit = 'width'): array` generates on-demand WebP (PNG fallback) with bounded size/quality variants. `fit=inside` preserves the complete aspect ratio with the requested longest edge; all derivatives are capped at 1920px and never upscale. Explicit saved crops are applied once; `crop_type=original` bypasses every crop. Results add `optimized` and, on failed custom-crop conversion, `requires_crop`. Originals and canonical IDs/associations remain unchanged. JPEG EXIF orientation and alpha are preserved. Tagged/color-sensitive sources require Imagick and, for ICC conversion, a readable sRGB profile configured through `PHOTOS_SRGB_PROFILE`; otherwise original bytes are retained. Source bytes/pixels/memory are bounded, cache generation is locked and atomic, and `invalidate(int $id, string $root)` removes only derivatives on crop edit/reset, replacement and deletion.
+- **Delivery/access:** `PhotoThumbnailEndpoint::handle(PDO, string $root)` remains behind `/api/v2/image-thumb.php`. GET/HEAD checks public eligibility, verified admin session or a signed PHOTOS capability before cache access, including conditional requests. Private/client ID-only requests return 404. ETags with `private, no-cache, must-revalidate` permit browser body reuse while rechecking source/crop/access changes. Invalid input returns 400; failed conversion returns 503 (custom-crop callers can fall back to original pixels with their saved geometry). The root Apache rule blocks direct `/photos/cache/thumbs/` access and is required alongside the endpoint.
+- **Consumer URL interfaces:** PHP `PhotoDeliveryService::thumbnailUrl()` supplies stable admin/public thumbnail URLs. `PhotoDeliveryService::url()` adds a path-bound, expiring capability to an already-authorized playlist or palette response, using a dedicated `PHOTOS_DELIVERY_SIGNING_KEY` of at least 32 characters; no key means no capability and consumers retain original fallback. Grants last at most 24 hours and are invalidated by path replacement; access revocation may therefore wait for grant expiry. Frontend `photoThumbUrl()`, `photoDisplayUrl()` and `photoImageProps()` consume the endpoint. Small lists/pickers use 160–320px, cards 360–520px, previews 800–1200px and Player up to 1920px. Gallery swatches request the saved server crop and do not crop it again in CSS. Artwork detail always requests `original` with `fit=inside` and retains original enlargement. Player preloads at most the next two slides; PUB source assets are unchanged.
+
 - **2026-11-10 (local):** Added `art_inspired` classification to the existing upload/type/filter and series workflow. Real multipart upload, bytes, retrieval, filtering and reclassification passed isolated SQLite/HTTP tests; 1280px and 390px browser checks passed. Original Art, existing photo types, palette save/copy/link flows and 24 contextual artwork CTA checks remain passing. No production data, schema, or deployment change.
 
 - 2026-11-09: Added authenticated inspiration admin doorbell/PHOTOS Endpoint and admin candidate search.
@@ -181,6 +197,7 @@ Photo selection consumers must reuse the PHOTOS-owned `PhotoLibraryListService` 
 
 | Date | Change |
 |---|---|
+| 2026-11-17 | Added PHOTOS-owned photo editorial repository, service and admin endpoint contract. API doorbell and UI remain unwired pending source. |
 | 2026-11-08 | Initial PHOTOS DeptManifest authored from `PHOTOS(2).zip`, documenting current PHP implementation and explicitly marking missing API/frontend/schema evidence. |
 | 2026-11-09 | Added PHOTOS inspiration-link service, repository operations, and noted integration/deletion follow-ups. |
 | 2026-11-09 | Added PHOTOS inspiration admin endpoint consumed by ARTWORK. |
@@ -197,3 +214,9 @@ The bot should create `app/<DEPARTMENT>/DeptManifest.md` using **the same number
 ### Public ArtworkPage read capabilities (2026-11-09)
 
 `PdoPhotoLibraryRepository::findPublicArtworkPhoto(int $photoId): ?array` returns an art photo only when currently Gallery-listed, active, and non-retired. `listPublicInspiredDesigns(int $artworkPhotoId): array` returns linked non-art photos meeting the same gates and **excludes client-associated photos** pending a reviewed public permission policy. Both are read-only; they do not change the existing admin-level `listInspiredDesigns` or inspiration writer. ARTWORK's public page consumes these PHOTOS-owned filters; never expose admin reverse lookup directly. These are conservative privacy filters, not blanket rules for the entire Photo Library or Gallery. Test Gallery and client permissions before relaxing them. No new schema change in this update.
+
+### Public inspiration read interface
+
+`PhotoInspirationService::getPublicInspiration(int $photoId): ?array` returns `{room, artwork_photo}` only for an `art_inspired` room whose explicit `inspiration_photo_id` points to an `art` photo. Both must satisfy PHOTOS public-delivery eligibility (Gallery-visible, active, non-retired, no client, permission not requested/declined) and have local image paths. Otherwise it returns null. PALETTES uses this read-only interface; a shared palette alone does not imply an inspiration relationship.
+
+Photo Editorial consumers: PUB Market Run may obtain a sparse `photo_library_id`-keyed snapshot through `PhotoEditorialService::getMany()` and place it at `items[].photo.editorial` (optional). Photo text is not a Creator ingredient; channel Analyzers independently turn it into publishing proposals.

@@ -1,6 +1,7 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 import { toFastPlayerPath } from "@helpers/playerUrls";
 import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
@@ -158,7 +159,7 @@ export default function PlaylistColorSearchPage() {
                   >
                     <div className="playlist-thumbs__image">
                       {imageUrl ? (
-                        <img src={imageUrl} alt={item.palette_title || "Playlist palette"} loading="lazy" decoding="async" />
+                        <img src={imageUrl} onError={event => fallbackToOriginal(event, item.photo_url)} style={photoThumbStyle(imageUrl)} alt={item.palette_title || "Playlist palette"} loading="lazy" decoding="async" />
                       ) : (
                         <div className="playlist-thumbs__placeholder">No Image</div>
                       )}

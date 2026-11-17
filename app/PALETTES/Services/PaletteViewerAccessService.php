@@ -22,7 +22,7 @@ final class PaletteViewerAccessService
     private RexReservationRelationships $rexRelationships;
     private RexReserver $rexReserver;
 
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
         $this->editor = new PdoPaletteEditorRepository($pdo);
 
@@ -39,6 +39,35 @@ final class PaletteViewerAccessService
                 $this->rexReservations,
                 new RexTokenGenerator()
             );
+    }
+
+    /** Public, photo-specific experience using the existing saved_palette REX destination. */
+    public function openForArtInspiredPhoto(int $photoId): array
+    {
+        $context = (new ArtInspiredPhotoService($this->pdo))->context($photoId);
+        $paletteId = $context['palette_id'];
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) $this->pdo->beginTransaction();
+        try {
+            // All requests for this palette serialize before checking/reserving a room token.
+            if (!$this->editor->lockForPhotoViewer($paletteId)) throw new \OutOfBoundsException('Palette not found.');
+            $request = new RexCreateReservationRequest(
+                label: trim((string)($context['room']['title'] ?? '')) ?: 'Art-inspired photo #' . $photoId,
+                resolverKey: 'viewer', resourceType: 'saved_palette', resourceId: $paletteId,
+                context: ['format' => 'public', 'art_inspired_photo_id' => $photoId],
+                experienceKey: 'public',
+            );
+            $reservation = $this->rexReserver->findReusable($request);
+            $reused = $reservation !== null;
+            $reservation ??= $this->rexReserver->reserve($request);
+            if ($ownsTransaction) $this->pdo->commit();
+            return ['public_url' => $this->rexRelationships->publicUrl($reservation),
+                'reservation_id' => $reservation->id, 'token' => $reservation->token,
+                'photo_library_id' => $photoId, 'palette_id' => $paletteId, 'reused' => $reused];
+        } catch (\Throwable $e) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) $this->pdo->rollBack();
+            throw $e;
+        }
     }
 
     public function openForPalette(int $paletteId): array

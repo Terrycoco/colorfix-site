@@ -17,6 +17,7 @@ use App\PUB\Repos\PdoPubAssetRepository;
 use App\PUB\Repos\PdoPubRunRepository;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PALETTES\PV\PVService;
+use App\PHOTOS\Services\PhotoEditorialService;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReservationRelationships;
 use App\PUB\PubCom\PubComChannel;
@@ -930,7 +931,8 @@ final class AnalyzeManager implements PubComManagerContract
         new PdoRexReservationRepository(
             $this->pdo
         )
-    )
+    ),
+    new PhotoEditorialService($this->pdo)
 );
         }
 

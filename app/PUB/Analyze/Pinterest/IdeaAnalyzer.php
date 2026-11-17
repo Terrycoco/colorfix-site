@@ -341,6 +341,34 @@ final class IdeaAnalyzer implements PubComWorkerContract
             }
 
 
+            /*
+             * Photo Editorial takes priority over palette-viewer copy.
+             * The description describes the image; the approved commentary
+             * explains the design. Never publish raw design notes by default.
+             */
+            $editorial = is_array($photo['editorial'] ?? null)
+                ? $photo['editorial']
+                : [];
+            $photoDescription = trim((string)($editorial['photo_description'] ?? ''));
+            $commentary = trim((string)($editorial['refined_commentary'] ?? ''));
+            if ($photoDescription !== '') {
+                // A short proposed heading, not the whole alt-style description.
+                // The admin can refine this before it is baked into the JPEG.
+                $title = preg_split('/[.!?;\n]/u', $photoDescription, 2)[0] ?? '';
+                $title = trim($title);
+                if (mb_strlen($title, 'UTF-8') > 90) {
+                    $title = mb_substr($title, 0, 90, 'UTF-8');
+                    $title = preg_replace('/\s+\S*$/u', '', $title) ?: $title;
+                }
+                if ($title !== '') {
+                    $proposal['search_title'] = $title;
+                    $proposal['ingredients']['search_title'] = $title;
+                }
+            }
+            if ($commentary !== '') {
+                $proposal['description'] = $commentary;
+            }
+
             $proposals[] =
                 $proposal;
         }

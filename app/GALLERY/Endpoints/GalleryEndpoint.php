@@ -93,6 +93,7 @@ final class GalleryEndpoint
                         . 'ON gallery_palette.id = q.photo_palette_id';
                     $sql = preg_replace('/^SELECT q\.\*,/i',
                         'SELECT q.*, '
+                        . 'gallery_photo.inspiration_photo_id AS __inspiration_photo_id, '
                         . 'gallery_photo.show_in_gallery AS __photo_visible, '
                         . 'gallery_photo.is_inactive AS __photo_inactive, '
                         . 'gallery_photo.is_retired AS __photo_retired, '
@@ -176,6 +177,7 @@ final class GalleryEndpoint
                         'id' => 'ps_' . $id . '_' . $photoId,
                         'item_type' => ($row['__photo_source_type'] ?? '') === 'art' ? 'art-swatch' : 'picture-swatch',
                         'source_type' => $row['__photo_source_type'] ?? null,
+                        'inspiration_photo_id' => $row['__inspiration_photo_id'] ?? null,
                         'crop_x' => isset($row['__crop_x']) ? (float)$row['__crop_x'] : null,
                         'crop_y' => isset($row['__crop_y']) ? (float)$row['__crop_y'] : null,
                         'crop_width' => isset($row['__crop_width']) ? (float)$row['__crop_width'] : null,

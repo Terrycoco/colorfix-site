@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { createPortal } from "react-dom";
 import useOverlayLifecycle from "../../hooks/useOverlayLifecycle";
 import { useEffect, useMemo, useState } from "react";
@@ -830,7 +831,7 @@ export default function SavedPaletteEditorModal({
           <form className="asp-attach-rebuilt-form" onSubmit={handleAttachOnlySubmit}>
             <div className="asp-attach-rebuilt-main">
               <div className="asp-attach-rebuilt-photo">
-                <img src={attachmentPreview} alt="Photo to attach" />
+                <PhotoPreviewImage src={attachmentPreview} alt="Photo to attach" />
                 {existingLinks.length > 0 ? (
                   <div className="asp-member-empty">Already linked to {existingLinks.length} viewer{existingLinks.length === 1 ? "" : "s"}.</div>
                 ) : null}
@@ -1008,7 +1009,7 @@ export default function SavedPaletteEditorModal({
 
               <div className="asp-attach-form">
                 <div className="asp-attach-preview">
-                  <img src={attachmentPreview} alt="Photo to attach" />
+                  <PhotoPreviewImage src={attachmentPreview} alt="Photo to attach" />
                   <label className="asp-modal-checkbox">
                     <input
                       type="checkbox"
@@ -1072,7 +1073,7 @@ export default function SavedPaletteEditorModal({
                 <div className="asp-photo-grid">
                   {editPhotos.map((photo) => (
                     <div key={photo.id} className="asp-photo-card">
-                      <img src={photo.rel_path} alt="Palette upload" />
+                      <PhotoPreviewImage src={photo.rel_path} alt="Palette upload" />
 
 
 

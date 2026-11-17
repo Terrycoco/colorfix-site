@@ -3,12 +3,20 @@
  *
  * - A whole number ("133") or hash-prefixed whole number ("#133") means an
  *   EXACT record-ID lookup.
- * - Other input is a case-insensitive substring search of configured text fields.
+ * - Other input is an accent-insensitive, case-insensitive substring search of configured text fields.
  * - Empty input matches all records.
  *
  * These helpers are also safe for server-backed lists: parseAdminSearch() tells
  * the page what to send to its department-owned search endpoint.
  */
+
+/** Normalize text for accent-insensitive Admin search without changing displayed values. */
+export function normalizeAdminSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
 export function parseAdminSearch(value) {
   const raw = String(value ?? "").trim();
@@ -48,10 +56,10 @@ export function matchesAdminSearch(record, query, {
     return normalized === parsed.value;
   }
 
-  const needle = String(parsed.value).toLocaleLowerCase();
+  const needle = normalizeAdminSearchText(parsed.value);
   return textFields.some((field) => {
     const value = readField(record, field);
-    return value != null && String(value).toLocaleLowerCase().includes(needle);
+    return value != null && normalizeAdminSearchText(value).includes(needle);
   });
 }
 

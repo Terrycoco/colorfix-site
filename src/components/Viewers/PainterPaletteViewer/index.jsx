@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import { copyShareText, openNativeShare, openTextShare } from "@helpers/shareUrls";
@@ -365,7 +366,7 @@ export default function PainterPaletteViewer({
                             onClick={() => openPhoto(photo.url, photo.alt_text || plan.title)}
                           >
                             <img
-                              src={photo.url}
+                              {...photoImageProps(photo.photo_library_id, photo.url, { width: 520, display: true, deliveryUrl: photo.display_image_url })}
                               alt={photo.alt_text || plan.title || "Project photo"}
                               loading="lazy"
                             />
@@ -420,7 +421,7 @@ export default function PainterPaletteViewer({
               className="apv-photo-wrap"
               onClick={() => openPhoto(photoUrl, photoAlt)}
             >
-              <img src={photoUrl} alt={photoAlt} className="apv-photo" />
+              <img {...photoImageProps(meta?.photo_library_id, photoUrl, { width: 1200, display: true, deliveryUrl: meta?.display_image_url })} alt={photoAlt} className="apv-photo" />
             </div>
 
             {insetPhotos.length > 0 && (
@@ -442,7 +443,7 @@ export default function PainterPaletteViewer({
                       onClick={() => openPhoto(url, alt)}
                     >
                       <img
-                        src={url}
+                        {...photoImageProps(photo?.photo_library_id, url, { width: 800, display: true, deliveryUrl: photo?.display_image_url })}
                         alt={alt}
                         className="apv-photo-inset"
                         loading="lazy"

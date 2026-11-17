@@ -125,15 +125,14 @@ export default function ArtSwatch({
 }) {
   const crop = { cropX, cropY, cropWidth, cropHeight };
   const hasCustomCrop = hasSavedSwatchCrop(crop);
-  const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70);
-  const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72);
-  // Do not apply saved coordinates to a server-generated thumbnail: it may
-  // already have been resized or center-cropped. Use uncropped photo_url.
-  const imageUrl = hasCustomCrop ? (photoUrl || smallImageUrl) : (smallImageUrl || photoUrl);
-  const imageSrcSet = !hasCustomCrop && smallImageUrl && largeImageUrl
+  const smallImageUrl = photoThumbUrl(photoLibraryId, 360, 70, "", "swatch");
+  const largeImageUrl = photoThumbUrl(photoLibraryId, 520, 72, "", "swatch");
+  // PHOTOS applies the saved crop. CSS must not crop the derivative a second time.
+  const imageUrl = (smallImageUrl || photoUrl);
+  const imageSrcSet = smallImageUrl && largeImageUrl
     ? `${smallImageUrl} 360w, ${largeImageUrl} 520w`
     : undefined;
-  const cropStyle = hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
+  const cropStyle = smallImageUrl ? { objectFit: "contain" } : hasCustomCrop && photoUrl ? swatchCropStyle(crop) : undefined;
 
   const content = (
     <div className="pals-art-tile">
@@ -145,6 +144,12 @@ export default function ArtSwatch({
             srcSet={imageSrcSet}
             sizes="(min-width: 560px) 260px, 50vw"
             alt={name || "Artwork"}
+            onError={(event) => {
+              if (!photoUrl || event.currentTarget.getAttribute("src") === photoUrl) return;
+              event.currentTarget.removeAttribute("srcset");
+              if (hasCustomCrop) Object.assign(event.currentTarget.style, swatchCropStyle(crop));
+              event.currentTarget.src = photoUrl;
+            }}
             loading="lazy"
             decoding="async"
             style={cropStyle}

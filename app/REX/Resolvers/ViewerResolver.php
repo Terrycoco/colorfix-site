@@ -98,6 +98,12 @@ final class ViewerResolver implements RexResolverInterface
             );
         }
 
+        if ($request->resourceType === 'saved_palette' && isset($request->context['art_inspired_photo_id'])) {
+            $viewer = (new \App\PALETTES\Services\ArtInspiredPhotoService($this->pdo))->apply(
+                $viewer, (int)$request->context['art_inspired_photo_id'], $request->resourceId
+            );
+        }
+
         return new RexResolutionResult(
             resolverKey: 'viewer',
             resourceType: $request->resourceType,

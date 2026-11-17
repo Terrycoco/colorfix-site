@@ -26,6 +26,7 @@ function photo_replacement_fixture(): array
     $pdo->exec("INSERT INTO playlist_items VALUES (736,'photo:736|/photos/old.png'), (NULL,'photo:736|/photos/old.png'), (900,'photo:900|/photos/source.png')");
     $pdo->exec('CREATE TABLE project_photos (photo_library_id INTEGER, palette_id INTEGER, `use` INTEGER, zoom INTEGER, main INTEGER, `before` INTEGER, sort_order INTEGER)');
     $pdo->exec('INSERT INTO project_photos VALUES (736, 162, 1, 1, 0, 0, 5)');
+    $pdo->exec('ALTER TABLE photo_library ADD COLUMN inspiration_photo_id INTEGER');
     return [$pdo, $root, new PhotoReplacementService($pdo, $root)];
 }
 

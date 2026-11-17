@@ -281,6 +281,33 @@ final class PdoSavedPaletteRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    /**
+     * Fetch ordered, active, render-ready swatch rows in a single query.
+     * The COLORS Swatch DTO defines their public shape; this repository only
+     * knows palette membership and ordering.
+     * Missing/inactive catalog entries are excluded from display.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function getDisplaySwatchRows(int $savedPaletteId): array
+    {
+        if ($savedPaletteId <= 0) return [];
+
+        $stmt = $this->pdo->prepare("
+            SELECT
+                c.id, c.name, c.brand, c.brand_name, c.hex, c.hex6,
+                c.r, c.g, c.b, c.hcl_h, c.hcl_c, c.hcl_l,
+                c.hue_cats, c.chip_num, c.is_stain
+            FROM saved_palette_members m
+            INNER JOIN mv_swatch_view c
+                ON c.id = m.color_id AND c.is_inactive = 0
+            WHERE m.saved_palette_id = :palette_id
+            ORDER BY m.order_index ASC, m.id ASC
+        " );
+        $stmt->execute([':palette_id' => $savedPaletteId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     public function addMember(
         int $savedPaletteId,
         int $colorId,

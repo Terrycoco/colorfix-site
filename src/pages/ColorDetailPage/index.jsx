@@ -1,3 +1,5 @@
+import { artInspiredPhotoViewerUrl } from "@helpers/photoViewerUrl";
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import MobileLayout from '@layout/MobileLayout';
 import {API_FOLDER} from '@helpers/config';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -8,7 +10,7 @@ import fetchColorDetail from '@data/fetchColorDetail';
 import fetchColorTriggerPhotos from '@data/fetchColorTriggerPhotos';
 import AnimatedHueWheel from '@components/AnimatedHueWheel';
 import {getColorUrl} from '@helpers/colorUrlHelper';
-import {photoThumbUrl} from '@helpers/imageThumb';
+import {photoThumbUrl, photoThumbStyle} from '@helpers/imageThumb';
 import { resolveAppPath } from '@helpers/routingHelper';
 import './detailpage.css';
 import {PaletteToggleIcon} from '@components/Icons/PaletteIcons';
@@ -418,12 +420,13 @@ export default function ColorDetailPage() {
       <div className="detail-trigger-gallery__grid">
         {triggerPhotos.map((item) => {
           const key = `${item.palette_hash || item.palette_id}-${item.photo_library_id || 'photo'}-${item.photo_type}-${item.photo_url}`;
-          const href = item.rex_url || undefined;
+          const href = artInspiredPhotoViewerUrl(item) || item.rex_url || undefined;
           const imageUrl = photoThumbUrl(item.photo_library_id, 520, 72) || item.photo_url;
 
           const content = (
             <img
-              src={imageUrl}
+              src={imageUrl} onError={event => fallbackToOriginal(event, item.photo_url)}
+              style={photoThumbStyle(imageUrl)}
               alt={item.palette_name || `Trigger photo for ${currentColorDetail.name}`}
               className="detail-trigger-gallery__img"
               loading="lazy"

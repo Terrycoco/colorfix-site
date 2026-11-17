@@ -456,8 +456,9 @@ final class PdoPVRepository
 
              FROM saved_palette_members m
 
-             LEFT JOIN swatch_view c
+             LEFT JOIN mv_swatch_view c
                ON c.id = m.color_id
+              AND c.is_inactive = 0
 
              WHERE m.saved_palette_id IN (" .
                 implode(', ', $palettePlaceholders) .

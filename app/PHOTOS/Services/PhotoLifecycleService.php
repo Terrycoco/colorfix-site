@@ -51,6 +51,7 @@ final class PhotoLifecycleService
             if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
             throw $e;
         }
+        PhotoThumbnailService::invalidate($id, $this->root);
         return ['ok' => true, ...$this->disposeFile((string)($row['rel_path'] ?? ''))];
     }
 

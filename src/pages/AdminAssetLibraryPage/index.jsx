@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import PermissionStatus from "@components/PermissionStatus";
@@ -385,7 +386,7 @@ export default function AdminAssetLibraryPage() {
 function AssetPreview({ item }) {
   const isImage = String(item.asset_kind || "").toLowerCase() === "image";
   if (isImage && item.public_url) {
-    return <img className="assetlib-thumb" src={item.public_url} alt={item.title || ""} loading="lazy" />;
+    return <PhotoPreviewImage className="assetlib-thumb" src={item.public_url} alt={item.title || ""} loading="lazy" />;
   }
   return <span className="assetlib-file-badge">{String(item.asset_kind || "file").toUpperCase()}</span>;
 }

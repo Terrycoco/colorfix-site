@@ -506,6 +506,37 @@ final class PubContract
                                                 'required' =>
                                                     false,
                                             ],
+                                            [
+                                                'key' =>
+                                                    'editorial',
+
+                                                'type' =>
+                                                    'object',
+
+                                                'required' =>
+                                                    false,
+
+                                                'note' =>
+                                                    'Optional PHOTOS-owned factual and authored editorial snapshot; supplied without publication or channel selection.',
+
+                                                'fields' => [
+                                                    [
+                                                        'key' => 'photo_description',
+                                                        'type' => 'text',
+                                                        'required' => false,
+                                                    ],
+                                                    [
+                                                        'key' => 'design_notes',
+                                                        'type' => 'text',
+                                                        'required' => false,
+                                                    ],
+                                                    [
+                                                        'key' => 'refined_commentary',
+                                                        'type' => 'text',
+                                                        'required' => false,
+                                                    ],
+                                                ],
+                                            ],
                                         ],
                                     ],
 
@@ -1429,6 +1460,11 @@ final class PubContract
                             'pairs PV with source photo',
                     ],
                 ],
+            ],
+            [
+                'key' => 'items[].photo.editorial',
+                'required' => false,
+                'note' => 'Read-only Photo Editorial source copy for proposing title and description; not a Creator ingredient. Any title passed to Creator must also appear in ingredients.search_title.',
             ],
         ],
 

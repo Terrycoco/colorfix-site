@@ -13,6 +13,7 @@ export default function AdminObjectListItem({
   id,
   title,
   meta = [],
+  thumbnail = null,
   selected = false,
   status = null,
   onSelect,
@@ -41,6 +42,7 @@ export default function AdminObjectListItem({
     <div
       className={[
         "admin-object-list-item",
+        thumbnail ? "admin-object-list-item--with-thumbnail" : "",
         selected ? "is-selected" : "",
         className,
       ].filter(Boolean).join(" ")}
@@ -55,6 +57,8 @@ export default function AdminObjectListItem({
         onClick={onSelect}
         onKeyDown={handleKeyDown}
       >
+        {thumbnail ? <div className="admin-object-list-item__thumbnail">{thumbnail}</div> : null}
+        <div className="admin-object-list-item__content">
         <div className="admin-object-list-item__topline">
           <div className="admin-object-list-item__title-wrap">
             <span className="admin-object-list-item__title">
@@ -108,6 +112,7 @@ export default function AdminObjectListItem({
             ))}
           </div>
         ) : null}
+        </div>
       </div>
     </div>
   );

@@ -290,3 +290,16 @@
   flex: 1 1 auto;
   min-width: 8px;
 }
+
+/* Left-hand navigation is consistently left aligned, including custom list buttons. */
+.admin-list-pane,
+.admin-list-pane :is(button, input, select, .admin-object-list-item__main, .admin-empty-state) {
+  text-align: left;
+}
+.admin-list-pane .admin-object-list :is(button, [role="button"]) {
+  justify-content: flex-start;
+}
+.admin-list-pane .admin-empty-state {
+  justify-items: start;
+  justify-content: start;
+}

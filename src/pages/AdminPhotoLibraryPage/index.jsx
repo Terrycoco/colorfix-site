@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
+import PhotoPreview from "@components/PhotoPreview";
+import { photoImageProps } from "@helpers/imageThumb";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import {
   buildImageUrl,
@@ -10,6 +13,13 @@ import ModalDialog from "@components/ModalDialog";
 import SavedPaletteEditorModal from "@components/SavedPaletteEditorModal";
 import PhotoCropDialog from "@components/PhotoCropDialog/PhotoCropDialog";
 import ArtworkDialog from "@components/ArtworkDialog/ArtworkDialog";
+import {
+  AdminMasterDetail, AdminListPane, AdminObjectList, AdminObjectListItem,
+  AdminDetailPane, AdminPanel, AdminField, AdminButton, AdminToolbar,
+  AdminEmptyState, AdminNotice, AdminSearchField, AdminDialog,
+} from "@components/AdminLayout";
+import PhotoDetailEditor from "./PhotoDetailEditor";
+import PhotoEditorialDialog from "@components/PhotoEditorialDialog";
 import "./admin-photo-library.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/photo-library/list.php`;
@@ -38,6 +48,7 @@ const SOURCE_OPTIONS = [
   { value: "pin", label: "Pin" },
   { value: "art", label: "Art" },
   { value: "art_inspired", label: "Art Inspired" },
+  { value: "inspiration", label: "Inspiration" },
 ];
 
 const defaultUpload = {
@@ -199,6 +210,15 @@ export default function AdminPhotoLibraryPage() {
   const [searchInput, setSearchInput] = useState(initialUrlState.searchInput);
   const [photoLibraryIdsFilter, setPhotoLibraryIdsFilter] = useState(initialUrlState.photoLibraryIds);
   const [items, setItems] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [pendingSelection, setPendingSelection] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [pageOffset, setPageOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const originals = useRef({});
+  const drafts = useRef({});
+  const records = useRef({});
   const [dirtyIds, setDirtyIds] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -206,6 +226,7 @@ export default function AdminPhotoLibraryPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [cropTarget, setCropTarget] = useState(null);
   const [artworkTarget, setArtworkTarget] = useState(null);
+  const [editorialTarget, setEditorialTarget] = useState(null);
   const [usageModal, setUsageModal] = useState(null);
   const [replaceFiles, setReplaceFiles] = useState({});
   const [expandedPathIds, setExpandedPathIds] = useState(() => new Set());
@@ -473,14 +494,22 @@ export default function AdminPhotoLibraryPage() {
         if (filters.sort) params.set("sort", filters.sort);
         if (filters.include_inactive) params.set("include_inactive", "1");
         if (filters.missing_tags) params.set("missing_tags", "1");
-        params.set("limit", "200");
+        params.set("limit", "50");
+        params.set("offset", String(pageOffset));
         params.set("_", Date.now().toString());
         const url = `${LIST_URL}?${params.toString()}`;
         const res = await fetch(url, { credentials: "include" });
         const data = await parseJsonResponse(res, url);
         if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load photo library");
         if (!active) return;
-        setItems(Array.isArray(data.items) ? data.items : []);
+        const rows = Array.isArray(data.items) ? data.items : [];
+        rows.forEach((row) => { records.current[row.photo_library_id] = row; });
+        setHasMore(rows.length === 50);
+        setItems((previous) => {
+          const merged = pageOffset ? [...previous, ...rows] : rows;
+          return [...new Map(merged.map((row) => [row.photo_library_id,
+            drafts.current[row.photo_library_id] || row])).values()];
+        });
       } catch (err) {
         if (!active) return;
         setItems([]);
@@ -493,7 +522,7 @@ export default function AdminPhotoLibraryPage() {
     return () => {
       active = false;
     };
-  }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey]);
+  }, [filters.q, filters.source_type, filters.palette_id, filters.sort, filters.include_inactive, filters.missing_tags, photoLibraryIdsFilter, refreshKey, pageOffset]);
 
   const hasLibrarySearch = hasActiveLibrarySearch(filters, photoLibraryIdsFilter);
 
@@ -501,7 +530,7 @@ export default function AdminPhotoLibraryPage() {
     const base = buildImageUrl(url, updatedAt, imageRefreshEnabled);
     if (!base) return "";
     const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}admin=${thumbNonce}`;
+    return base;
   };
 
   const handleUploadField = (key, value) => {
@@ -514,14 +543,16 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const handleLibraryField = (id, key, value) => {
-    setItems((prev) =>
-      prev.map((item) => (item.photo_library_id === id ? {
-        ...item,
-        ...(key === "palette_id" ? { palette_changed: true,
-          expected_palette_id: item.palette_changed ? item.expected_palette_id : item.palette_id } : {}),
-        [key]: value,
-      } : item))
-    );
+    const current = drafts.current[id] || items.find((item) => item.photo_library_id === id) || records.current[id];
+    if (!current) return;
+    if (!originals.current[id]) originals.current[id] = { ...current };
+    drafts.current[id] = {
+      ...current,
+      ...(key === "palette_id" ? { palette_changed: true,
+        expected_palette_id: current.palette_changed ? current.expected_palette_id : current.palette_id } : {}),
+      [key]: value,
+    };
+    setItems((prev) => prev.map((item) => item.photo_library_id === id ? drafts.current[id] : item));
     setDirtyIds((prev) => {
       const next = new Set(prev);
       next.add(id);
@@ -530,18 +561,7 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const patchLibraryItem = (id, fields) => {
-    setItems((prev) =>
-      prev.map((item) => (
-        item.photo_library_id === id
-          ? { ...item, ...fields }
-          : item
-      ))
-    );
-    setDirtyIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
+    Object.entries(fields).forEach(([key, value]) => handleLibraryField(id, key, value));
   };
 
   const openPaletteModalForItem = (item) => {
@@ -649,6 +669,7 @@ export default function AdminPhotoLibraryPage() {
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
       setError(err?.message || "Replace failed");
+      throw err;
     }
   };
 
@@ -719,8 +740,8 @@ export default function AdminPhotoLibraryPage() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
-      setUploadStatus({ error: "", success: "Upload complete." });
       resetUpload();
+      setUploadStatus({ error: "", success: "Upload complete." });
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
       setUploadStatus({ error: err?.message || "Upload failed", success: "" });
@@ -730,6 +751,9 @@ export default function AdminPhotoLibraryPage() {
   };
 
   const handleLibrarySave = async (item) => {
+    if (saving) return false;
+    setSaving(true);
+    setSaveStatus("");
     setError("");
     try {
       if (replaceFiles[item.photo_library_id]) {
@@ -763,56 +787,23 @@ export default function AdminPhotoLibraryPage() {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || "Save failed");
       }
+      records.current[item.photo_library_id] = { ...item, palette_changed: false };
+      setItems((previous) => previous.map((row) => row.photo_library_id === item.photo_library_id ? records.current[item.photo_library_id] : row));
+      delete drafts.current[item.photo_library_id];
+      delete originals.current[item.photo_library_id];
       setRefreshKey((prev) => prev + 1);
+      setSaveStatus("Photo saved.");
       setDirtyIds((prev) => {
         const next = new Set(prev);
         next.delete(item.photo_library_id);
         return next;
       });
+      return true;
     } catch (err) {
-      setError(err?.message || "Failed to save row");
-    }
-  };
-
-  const handleSaveAll = async () => {
-    if (!dirtyIds.size) return;
-    setError("");
-    const dirtyItems = items.filter((row) => dirtyIds.has(row.photo_library_id));
-    try {
-      for (const item of dirtyItems) {
-        const payload = {
-          photo_library_id: item.photo_library_id,
-          source_type: item.source_type,
-          title: item.title,
-          tags: item.tags,
-          alt_text: item.alt_text,
-          note: item.note,
-          photo_permission_status: item.photo_permission_override_status || "",
-          show_in_gallery: !!item.show_in_gallery,
-          has_palette: !!item.has_palette,
-          ...(item.palette_owned_by_library && item.palette_changed
-            ? { palette_id: item.palette_id, expected_palette_id: item.expected_palette_id } : {}),
-          is_inactive: !!item.is_inactive,
-        };
-        if (item.source_type === "client" || item.client_id) {
-          payload.client_name = item.client_name || "";
-          payload.client_email = item.client_email || "";
-        }
-        const res = await fetch(UPDATE_URL, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.ok) {
-          throw new Error(data?.error || `Save failed for #${item.photo_library_id}`);
-        }
-      }
-      setDirtyIds(new Set());
-      setRefreshKey((prev) => prev + 1);
-    } catch (err) {
-      setError(err?.message || "Failed to save rows");
+      setError(err?.message || "Failed to save photo");
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -847,6 +838,10 @@ export default function AdminPhotoLibraryPage() {
         }
         throw new Error(data?.error || "Delete failed");
       }
+      delete drafts.current[item.photo_library_id];
+      delete originals.current[item.photo_library_id];
+      delete records.current[item.photo_library_id];
+      setSelectedId(null);
       setItems((prev) => prev.filter((row) => row.photo_library_id !== item.photo_library_id));
       setRefreshKey((prev) => prev + 1);
     } catch (err) {
@@ -1013,46 +1008,622 @@ export default function AdminPhotoLibraryPage() {
     }
   }, [uploadForm.source_type, uploadForm.palette_id]);
 
+  const selectedPhoto = drafts.current[selectedId] || items.find((item) => item.photo_library_id === selectedId) || records.current[selectedId];
+  const selectedDirty = Boolean(dirtyIds.has(selectedId) || replaceFiles[selectedId]);
+
+  function discardPhoto(id) {
+    const original = originals.current[id] || records.current[id];
+    delete drafts.current[id];
+    delete originals.current[id];
+    setItems((previous) => previous.map((item) => item.photo_library_id === id ? original || item : item));
+    setDirtyIds((previous) => { const next = new Set(previous); next.delete(id); return next; });
+    setReplaceFiles((previous) => { const next = { ...previous }; delete next[id]; return next; });
+    setError("");
+  }
+
+  function selectPhoto(id) {
+    if (saving || id === selectedId) return;
+    if (selectedDirty) { setPendingSelection(id); return; }
+    setSelectedId(id);
+    setSaveStatus("");
+    setError("");
+  }
+
   useEffect(() => {
-    if (!hasActiveLibrarySearch(filters, photoLibraryIdsFilter)) return;
-    setExpandedSections((prev) => ({
-      ...prev,
-      upload: false,
-    }));
-  }, [
-    filters.q,
-    filters.source_type,
-    filters.palette_id,
-    filters.include_inactive,
-    filters.missing_tags,
-    photoLibraryIdsFilter,
-  ]);
+    setPageOffset(0);
+  }, [filters, photoLibraryIdsFilter]);
+
+  useEffect(() => {
+    function warnOnLeave(event) {
+      if (!dirtyIds.size && !Object.values(replaceFiles).some(Boolean)) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", warnOnLeave);
+    return () => window.removeEventListener("beforeunload", warnOnLeave);
+  }, [dirtyIds, replaceFiles]);
 
   return (
-    <div className="admin-photo-library">
-      <header className="admin-photo-library__header">
-        <h1>Photo Library</h1>
-        <p>Upload and tag photos for playlists, progressions, or saved palettes.</p>
-      </header>
+    <div className="admin-photo-library admin-photo-library--master-detail">
+      <AdminMasterDetail
+        storageKey="admin-photo-library-list-width"
+        defaultListWidth={360} minListWidth={280} maxListWidth={560}
+        selectedId={selectedId}
+        list={
+          <AdminListPane title="Photo Library" actions={
+            <AdminButton type="button" onClick={() => toggleSection("upload")}>+ Upload</AdminButton>
+          } toolbar={
+            <div className="admin-photo-library__list-controls">
+              <form onSubmit={(event) => { event.preventDefault(); setPageOffset(0); setFilters((previous) => ({ ...previous, q: searchInput.trim() })); }}>
+                <AdminSearchField value={searchInput} onChange={setSearchInput} placeholder="Search tags, title, or #ID…" />
+                <AdminToolbar>
+                  <AdminButton type="submit">Search</AdminButton>
+                  <AdminButton type="button" variant="secondary" aria-expanded={mobileFiltersOpen} onClick={() => setMobileFiltersOpen((open) => !open)}>Filters {mobileFiltersOpen ? "−" : "+"}</AdminButton>
+                </AdminToolbar>
+              </form>
+              {mobileFiltersOpen && <div className="admin-photo-library__sidebar-filters">            <div className="admin-photo-library__filters-advanced-actions">
+              <AdminButton
+                type="button"
+                variant="secondary" className="ghost"
+                onClick={() => {
+                  setSearchInput("");
+                  setPhotoLibraryIdsFilter("");
+                  setFilters((prev) => ({ ...prev, q: "" }));
+                }}
+              >
+                Clear Search
+              </AdminButton>
+            </div>
+            <label>
+              Group
+              <select
+                value={groupId}
+                onChange={(e) => {
+                  setGroupId(e.target.value);
+                  setGroupFilterMode("group");
+                }}
+              >
+                <option value="">All photos</option>
+                {groupOptions.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="admin-photo-library__group-actions">
+              <div className="admin-photo-library__group-create">
+                <input
+                  type="text"
+                  value={newGroupTitle}
+                  onChange={(e) => setNewGroupTitle(e.target.value)}
+                  placeholder="New group title"
+                />
+                <AdminButton type="button" onClick={handleCreateGroup} disabled={!newGroupTitle.trim()}>
+                  Add Group
+                </AdminButton>
+              </div>
+              {groupId && !isClientGroupId(groupId) && (
+                <AdminButton
+                  type="button"
+                  variant="secondary" className="ghost"
+                  onClick={() => setGroupFilterMode((prev) => (prev === "group" ? "all" : "group"))}
+                >
+                  {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
+                </AdminButton>
+              )}
+              <AdminButton type="button" variant="secondary" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId || isClientGroupId(groupId)}>
+                Delete Group
+              </AdminButton>
+              {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
+            </div>
+            <label>
+              Type
+              <select
+                value={filters.source_type}
+                onChange={(e) => setFilters((prev) => ({ ...prev, source_type: e.target.value }))}
+              >
+                <option value="">All</option>
+                <option value="saved_palette_photo">Saved palette</option>
+                <option value="progression">Progression</option>
+                <option value="client">Client</option>
+                <option value="article">Article</option>
+                <option value="pin">Pin</option>
+                <option value="art">Art</option>
+                <option value="art_inspired">Art Inspired</option>
+                <option value="inspiration">Inspiration</option>
+                <option value="extra_photo">Extras</option>
+              </select>
+            </label>
+            <label>
+              Sort
+              <select
+                value={filters.sort}
+                onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
+              >
+                <option value="newest">Newest uploads</option>
+                <option value="oldest">Oldest uploads</option>
+                <option value="id_desc">ID desc</option>
+                <option value="id_asc">ID asc</option>
+                <option value="title">Title</option>
+              </select>
+            </label>
+            <label className="admin-photo-library__inline-check">
+              <input
+                type="checkbox"
+                checked={!!filters.include_inactive}
+                onChange={(e) => setFilters((prev) => ({ ...prev, include_inactive: e.target.checked }))}
+              />
+              Show retired
+            </label>
+            <label className="admin-photo-library__inline-check">
+              <input
+                type="checkbox"
+                checked={!!filters.missing_tags}
+                onChange={(e) => setFilters((prev) => ({ ...prev, missing_tags: e.target.checked }))}
+              />
+              Missing tags
+            </label>
+            {filters.source_type === "saved_palette_photo" && (
+              <label>
+                Palette
+                <select
+                  value={filters.palette_id}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, palette_id: e.target.value }))}
+                >
+                  <option value="">All palettes</option>
+                  {paletteOptions.map((palette) => (
+                    <option key={palette.id} value={palette.id}>
+                      {palette.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="admin-photo-library__filters-extra-actions">
+              <AdminButton type="button" variant="secondary" className="ghost" onClick={toggleImageRefresh}>
+                {imageRefreshEnabled ? "Image Refresh: On" : "Image Refresh: Off"}
+              </AdminButton>
+              <div className="admin-photo-library__save-all">
+                <a className="admin-photo-library__tools-link" href="/admin/photo-library-tools">
+                  Library Tools
+                </a>
 
-      <section className="admin-photo-library__section admin-photo-library__accordion">
-        <button
-          type="button"
-          className="admin-photo-library__accordion-toggle"
-          onClick={() => toggleSection("upload")}
-          aria-expanded={expandedSections.upload}
-        >
-          <span>Upload Photos</span>
-          <span className="admin-photo-library__accordion-icon" aria-hidden="true">
-            {expandedSections.upload ? "−" : "+"}
-          </span>
-        </button>
-        {expandedSections.upload && (
-          <div className="admin-photo-library__accordion-panel">
-            {uploadStatus.error && <div className="admin-photo-library__error">{uploadStatus.error}</div>}
-            {uploadStatus.success && <div className="admin-photo-library__status">{uploadStatus.success}</div>}
-            {replaceStatus && <div className="admin-photo-library__status">{replaceStatus}</div>}
-            <form className="admin-photo-library__upload" onSubmit={handleUploadSubmit}>
+              </div>
+            </div></div>}
+              {hasLibrarySearch && <span className="admin-meta-text">{filteredItems.length} photos loaded</span>}
+            </div>
+          }>
+            {!hasLibrarySearch ? <AdminEmptyState title="Search your photos" message="Enter a tag, title, or photo ID to find photos." /> : null}
+            {loading && <AdminNotice>Loading photos…</AdminNotice>}
+            {hasLibrarySearch && !loading && !filteredItems.length && <AdminEmptyState title="No matching photos" message="Try another search or change the filters." />}
+            <AdminObjectList ariaLabel="Photos">
+              {filteredItems.map((item) => <AdminObjectListItem
+                key={item.photo_library_id} id={item.photo_library_id}
+                title={item.title || item.filename || "Untitled photo"}
+                thumbnail={<PhotoPreviewImage {...photoImageProps(item.photo_library_id, item.raw_rel_path || item.rel_path || item.image_url, { width: 160 })} alt="" loading="lazy" />}
+                meta={[item.tags, item.is_inactive ? "Retired" : null]}
+                selected={selectedId === item.photo_library_id}
+                onSelect={() => selectPhoto(item.photo_library_id)}
+              />)}
+            </AdminObjectList>
+            {hasMore && hasLibrarySearch && <AdminButton type="button" variant="secondary" disabled={loading} onClick={() => setPageOffset((offset) => offset + 50)}>Load more</AdminButton>}
+          </AdminListPane>
+        }
+        detail={
+          <AdminDetailPane title={selectedPhoto?.title || (selectedPhoto ? "Untitled photo" : "Photo details")}
+            meta={selectedPhoto ? `#${selectedId}${selectedDirty ? " · Unsaved changes" : ""}` : null}
+            actions={selectedPhoto && <AdminToolbar>
+              <AdminButton type="button" disabled={saving || !selectedDirty} onClick={() => handleLibrarySave(selectedPhoto)}>{saving ? "Saving…" : "Save"}</AdminButton>
+              <AdminButton type="button" variant="secondary" disabled={saving || !selectedDirty} onClick={() => discardPhoto(selectedId)}>Cancel</AdminButton>
+            </AdminToolbar>}>
+            {error && <AdminNotice variant="danger">{error}</AdminNotice>}
+            {saveStatus && <AdminNotice>{saveStatus}</AdminNotice>}
+            {replaceStatus && <AdminNotice>{replaceStatus}</AdminNotice>}
+            {selectedPhoto ? (() => { const item = selectedPhoto; return (<PhotoDetailEditor saving={saving} onSave={() => handleLibrarySave(selectedPhoto)}>
+<AdminPanel title="Photo">
+                      <div className="admin-photo-library__id">
+                        <span>{item.photo_library_id}</span>
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost admin-photo-library__copy"
+                          onClick={() => navigator.clipboard.writeText(String(item.photo_library_id))}
+                        >
+                          Copy
+                        </AdminButton>
+                        <AdminButton
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setEditorialTarget({
+                            photoLibraryId: item.photo_library_id,
+                            imageUrl: buildAdminImageUrl(item.raw_rel_path || item.rel_path || item.image_url, item.updated_at || null),
+                          })}
+                        >
+                          Editorial
+                        </AdminButton>
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost admin-photo-library__crop-button"
+                          title={`Edit crop for photo #${item.photo_library_id}`}
+                          aria-label={`Edit crop for photo #${item.photo_library_id}`}
+                          onClick={() => setCropTarget({
+                            photoLibraryId: item.photo_library_id,
+                            imageUrl: buildAdminImageUrl(
+                              item.raw_rel_path || item.rel_path || item.image_url,
+                              item.updated_at || null
+                            ),
+                          })}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                          </svg>
+                        </AdminButton>
+                      </div>
+
+                      {(() => {
+                        const thumbSrc = buildAdminImageUrl(
+                          item.raw_rel_path || item.rel_path || item.image_url,
+                          item.updated_at || null
+                        );
+                        const thumbState = getThumbState(item.photo_library_id);
+                        return (
+                      <AdminButton
+                        type="button"
+                        className="admin-photo-library__thumb"
+                        onClick={() =>
+                          setPreviewUrl(
+                            thumbSrc
+                          )
+                        }
+                      >
+                        {thumbState !== "loaded" ? (
+                          <div
+                            className={`admin-photo-library__thumb-placeholder${thumbState === "error" ? " is-error" : ""}`}
+                          >
+                            {thumbState === "error" ? "Missing" : "Loading..."}
+                          </div>
+                        ) : null}
+                        <img
+                          src={thumbSrc}
+                          alt=""
+                          className={thumbState === "loaded" ? "is-visible" : ""}
+                          onLoad={() => markThumbLoaded(item.photo_library_id)}
+                          onError={() => markThumbError(item.photo_library_id)}
+                        />
+                      </AdminButton>
+                        );
+                      })()}
+                      <div className="admin-photo-library__thumb-name">
+                        {item.filename || ""}
+                      </div>
+                      {item.updated_at ? (
+                        <div className="admin-photo-library__thumb-updated">
+                          Updated: {formatUpdatedAt(item.updated_at)}
+                        </div>
+                      ) : null}
+                      <div className="admin-photo-library__thumb-actions">
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost admin-photo-library__thumb-action"
+                          onClick={() => togglePath(item.photo_library_id)}
+                        >
+                          {expandedPathIds.has(item.photo_library_id) ? "Hide path" : "Path"}
+                        </AdminButton>
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost admin-photo-library__thumb-action"
+                          onClick={() => navigator.clipboard.writeText(item.raw_rel_path || item.rel_path || "")}
+                        >
+                          Copy path
+                        </AdminButton>
+                      </div>
+                      {expandedPathIds.has(item.photo_library_id) && (
+                        <div className="admin-photo-library__thumb-path">
+                          {item.raw_rel_path || item.rel_path || ""}
+                        </div>
+                      )}
+                    </AdminPanel>
+<AdminPanel title="Photo information">
+                      <div className="admin-photo-library__text-stack">
+                        <AdminField label="Title"><input
+                          type="text"
+                          value={item.title || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "title", e.target.value)}
+                          placeholder="title"
+                        /></AdminField>
+                        <AdminField label="Tags"><input
+                          type="text"
+                          value={item.tags || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "tags", e.target.value)}
+                          placeholder="tags"
+                        /></AdminField>
+                        <AdminField label="Alt text"><input
+                          type="text"
+                          value={item.alt_text || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "alt_text", e.target.value)}
+                          placeholder="alt text"
+                        /></AdminField>
+                        {formatAiAltStatus(item) && (
+                          <div className="admin-photo-library__ai-alt-status">
+                            {formatAiAltStatus(item)}
+                            {item.ai_filename_slug ? ` · ${item.ai_filename_slug}` : ""}
+                          </div>
+                        )}
+                        <AdminField label="Notes"><input
+                          type="text"
+                          value={item.note || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "note", e.target.value)}
+                          placeholder="note"
+                        /></AdminField>
+                        {item.source_type === "client" && (
+                          <>
+                            <AdminField label="Client name"><input
+                              type="text"
+                              value={item.client_name || ""}
+                              onChange={(e) => handleLibraryField(item.photo_library_id, "client_name", e.target.value)}
+                              placeholder="client name"
+                            /></AdminField>
+                          </>
+                        )}
+                      </div>
+                    </AdminPanel>
+<AdminPanel title="Source and client">
+                      <div className="admin-photo-library__meta">
+                        <select
+                          className="admin-photo-library__source-type"
+                          aria-label={`Type for photo #${item.photo_library_id}`}
+                          value={item.source_type || ""}
+                          onChange={(e) => handleLibraryField(item.photo_library_id, "source_type", e.target.value)}
+                        >
+                          {!SOURCE_OPTIONS.some((option) => option.value === item.source_type) && (
+                            <option value={item.source_type || ""}>
+                              {item.source_type || "Unknown"} (legacy)
+                            </option>
+                          )}
+                          {SOURCE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                        {item.source_type === "art" && (
+                          <AdminButton
+                            type="button"
+                            variant="secondary" className="ghost admin-photo-library__artwork-button"
+                            title={`Add or edit artwork information for photo #${item.photo_library_id}`}
+                            aria-label={`Add or edit artwork information for photo #${item.photo_library_id}`}
+                            onClick={() => setArtworkTarget({
+                              photoLibraryId: item.photo_library_id,
+                              imageUrl: buildAdminImageUrl(
+                                item.raw_rel_path || item.rel_path || item.image_url,
+                                item.updated_at || null
+                              ),
+                            })}
+                          >
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+                              <rect x="2.5" y="3" width="19" height="18" rx="1.5" />
+                              <path d="M6 17l4.5-5 3.5 3 2.4-2.5L20 17" />
+                              <circle cx="8.5" cy="8" r="1.5" />
+                            </svg>
+                          </AdminButton>
+                        )}
+                        {item.source_id && <div className="muted">#{item.source_id}</div>}
+                        {item.client_name ? <div className="muted">Client: {item.client_name}</div> : null}
+                      </div>
+                    </AdminPanel>
+<AdminPanel title="Palette">
+                      <div className="admin-photo-library__meta">
+                        {item.palette_owned_by_library ? (
+                          <select
+                            aria-label={`Palette for photo ${item.photo_library_id}`}
+                            value={item.palette_id || ""}
+                            onChange={(event) => handleLibraryField(item.photo_library_id, "palette_id", Number(event.target.value) || null)}
+                          >
+                            <option value="">No palette</option>
+                            {item.palette_id && !paletteOptions.some((palette) => Number(palette.id) === Number(item.palette_id)) && (
+                              <option value={item.palette_id}>{item.attached_saved_palette_label || `Palette #${item.palette_id}`}</option>
+                            )}
+                            {paletteOptions.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}
+                          </select>
+                        ) : item.attached_saved_palette_id ? (
+                          <>
+                            {(() => {
+                              const type = String(item.attached_saved_palette_photo_type || "full").toLowerCase();
+                              const isBefore = type === "before";
+                              const linkCount = Number(item.attached_saved_palette_link_count || 0);
+                              const typeLabel =
+                                isBefore
+                                  ? "Before companion"
+                                  : type === "zoom"
+                                    ? "Zoom image"
+                                    : "Main image";
+                              return (
+                                <>
+                                  <div>
+                                    {linkCount > 1
+                                      ? `${linkCount} viewer links`
+                                      : isBefore
+                                      ? typeLabel
+                                      : (item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`)}
+                                  </div>
+                                  <div className="muted">
+                                    {linkCount > 1
+                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${typeLabel}`
+                                      : isBefore
+                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${"Main"}`
+                                      : `${"Main"} | ${typeLabel}`}
+                                  </div>
+                                </>
+                              );
+                            })()}
+                            <div className="admin-photo-library__palette-actions">
+                              <AdminButton
+                                type="button"
+                                variant="secondary" className="ghost"
+                                onClick={() => openPaletteModalForItem(item)}
+                              >
+                                Link…
+                              </AdminButton>
+                              <AdminButton
+                                type="button"
+                                variant="secondary" className="ghost"
+                                onClick={() => openSavedPaletteViewerSetup(
+                                  item.attached_saved_palette_id,
+                                  item.attached_palette_viewer_id,
+                                  item.photo_library_id
+                                )}
+                              >
+                                Viewer
+                              </AdminButton>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="muted">No palette attached</div>
+                            <div className="admin-photo-library__palette-actions">
+                              <AdminButton
+                                type="button"
+                                variant="secondary" className="ghost"
+                                onClick={() => openPaletteModalForItem(item)}
+                              >
+                                Attach
+                              </AdminButton>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </AdminPanel>
+<AdminPanel title="Visibility and permission">
+                      <div className="admin-photo-library__flags">
+                        <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.show_in_gallery}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "show_in_gallery", e.target.checked)}
+                          />
+                          Gallery
+                        </label>
+                        {!item.palette_owned_by_library && <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.has_palette}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "has_palette", e.target.checked)}
+                          />
+                          Palette
+                        </label>}
+                        <label className="admin-photo-library__check">
+                          <input
+                            type="checkbox"
+                            checked={!!item.is_inactive}
+                            onChange={(e) => handleLibraryField(item.photo_library_id, "is_inactive", e.target.checked)}
+                          />
+                          Retired
+                        </label>
+                        <label className="admin-photo-library__permission-select">
+                          Permission
+                          <select
+                            value={item.photo_permission_override_status || ""}
+                            onChange={(e) => {
+                              handleLibraryField(item.photo_library_id, "photo_permission_override_status", e.target.value);
+                              handleLibraryField(item.photo_library_id, "photo_permission_status", e.target.value || item.client_photo_permission_status || "unknown");
+                            }}
+                          >
+                            <option value="">Use client/default</option>
+                            <option value="not_needed">Not needed</option>
+                            <option value="granted">Granted</option>
+                            <option value="requested">Requested</option>
+                            <option value="declined">Declined</option>
+                            <option value="unknown">Unknown</option>
+                          </select>
+                        </label>
+                      </div>
+                    </AdminPanel>
+<AdminPanel title="Photo actions">
+                      <div className="admin-photo-library__row-actions-top">
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost"
+                          onClick={() => {
+                            setClientTargetPhotoId(item.photo_library_id);
+                            setClientPickerOpen(true);
+                          }}
+                        >
+                          Client…
+                        </AdminButton>
+                        <AdminButton
+                          type="button"
+                          variant="secondary" className="ghost admin-photo-library__inspect"
+                          onClick={() => handleInvestigate(item)}
+                          title="Investigate usage"
+                          aria-label={`Investigate photo ${item.photo_library_id}`}
+                        >
+                          🔎
+                        </AdminButton>
+
+                        <a
+                          variant="secondary" className="ghost"
+                          href={buildAdminImageUrl(
+                            item.raw_rel_path || item.rel_path || item.image_url,
+                            item.updated_at || null
+                          )}
+                          download
+                        >
+                          Download
+                        </a>
+                        <AdminButton type="button" variant="secondary" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
+                          Delete
+                        </AdminButton>
+                        {groupId && groupId !== "__ungrouped__" && !isClientGroupId(groupId) && (
+                          inGroup(item.photo_library_id) ? (
+                            <AdminButton
+                              type="button"
+                              variant="secondary" className="ghost danger"
+                              onClick={() => handleRemoveFromGroup(item.photo_library_id)}
+                            >
+                              Remove
+                            </AdminButton>
+                          ) : (
+                            <AdminButton
+                              type="button"
+                              variant="secondary" className="ghost"
+                              onClick={() => handleAddToGroup(item.photo_library_id)}
+                            >
+                              Add
+                            </AdminButton>
+                          )
+                        )}
+                      </div>
+                      <label className="admin-photo-library__replace">
+                        Replace
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            handleReplaceFileChange(
+                              item.photo_library_id,
+                              (e.target.files && e.target.files[0]) || null
+                            )
+                          }
+                        />
+                        <span className="admin-photo-library__replace-name">
+                          {replaceFiles[item.photo_library_id]?.name || "No file chosen"}
+                        </span>
+                      </label>
+                    </AdminPanel>
+</PhotoDetailEditor>); })() : <AdminEmptyState title="Select a photo" message="Choose a thumbnail on the left to edit its details." />}
+          </AdminDetailPane>
+        }
+      />
+      <AdminDialog open={pendingSelection !== null} title="Unsaved photo changes" message="Save your changes before selecting another photo?" onClose={() => { if (!saving) setPendingSelection(null); }} actions={
+        <AdminToolbar>
+          <AdminButton disabled={saving} onClick={async () => { if (await handleLibrarySave(selectedPhoto)) { setSelectedId(pendingSelection); setPendingSelection(null); } }}>Save and continue</AdminButton>
+          <AdminButton variant="secondary" disabled={saving} onClick={() => { discardPhoto(selectedId); setSelectedId(pendingSelection); setPendingSelection(null); }}>Discard</AdminButton>
+          <AdminButton variant="secondary" disabled={saving} onClick={() => setPendingSelection(null)}>Stay</AdminButton>
+        </AdminToolbar>
+      }>{error && <AdminNotice variant="danger">{error}</AdminNotice>}</AdminDialog>
+      <AdminDialog open={expandedSections.upload} title="Upload photos" width={760} onClose={() => { if (!uploading) toggleSection("upload"); }} actions={<AdminButton type="button" variant="secondary" disabled={uploading} onClick={() => toggleSection("upload")}>Close</AdminButton>}>
+        {uploadStatus.error && <AdminNotice variant="danger">{uploadStatus.error}</AdminNotice>}
+        {uploadStatus.success && <AdminNotice>{uploadStatus.success}</AdminNotice>}
+                    <form className="admin-photo-library__upload" onSubmit={handleUploadSubmit}>
           <label>
             Type
             <select
@@ -1106,17 +1677,17 @@ export default function AdminPhotoLibraryPage() {
                   readOnly
                   placeholder="Pick client"
                 />
-                <button
+                <AdminButton
                   type="button"
-                  className="ghost"
+                  variant="secondary" className="ghost"
                   onClick={() => setClientPickerOpen(true)}
                 >
                   Client…
-                </button>
+                </AdminButton>
                 {uploadForm.client_id ? (
-                  <button
+                  <AdminButton
                     type="button"
-                    className="ghost"
+                    variant="secondary" className="ghost"
                     onClick={() => {
                       setUploadForm((prev) => ({
                         ...prev,
@@ -1127,7 +1698,7 @@ export default function AdminPhotoLibraryPage() {
                     }}
                   >
                     Clear
-                  </button>
+                  </AdminButton>
                 ) : null}
               </div>
             </label>
@@ -1267,603 +1838,22 @@ export default function AdminPhotoLibraryPage() {
           </label>
 
               <div className="admin-photo-library__upload-actions">
-                <button type="submit" disabled={uploading}>
+                <AdminButton type="submit" disabled={uploading}>
                   {uploading ? "Uploading…" : "Upload"}
-                </button>
-                <button type="button" className="ghost" onClick={resetUpload} disabled={uploading}>
+                </AdminButton>
+                <AdminButton type="button" variant="secondary" className="ghost" onClick={resetUpload} disabled={uploading}>
                   Clear
-                </button>
+                </AdminButton>
               </div>
             </form>
-          </div>
-        )}
-      </section>
+      </AdminDialog>
 
-      <section className="admin-photo-library__section admin-photo-library__search-strip">
-        {error && <div className="admin-photo-library__error">{error}</div>}
-        <div className="admin-photo-library__filters">
-          <div className="admin-photo-library__filters-main">
-            <form
-              className="admin-photo-library__search-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setFilters((prev) => ({ ...prev, q: searchInput.trim() }));
-              }}
-            >
-              <label className="admin-photo-library__search-label" aria-label="Search photo library">
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="title, tags, path, or photo id"
-                />
-              </label>
-              <div className="admin-photo-library__search-actions">
-                <button type="submit">Search</button>
-                <button
-                  type="button"
-                  className="ghost admin-photo-library__filters-inline-toggle"
-                  onClick={() => setMobileFiltersOpen((prev) => !prev)}
-                  aria-expanded={mobileFiltersOpen}
-                >
-                  {mobileFiltersOpen ? "Filters −" : "Filters +"}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className={`admin-photo-library__filters-advanced${mobileFiltersOpen ? " is-open" : ""}`}>
-            <div className="admin-photo-library__filters-advanced-actions">
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  setSearchInput("");
-                  setPhotoLibraryIdsFilter("");
-                  setFilters((prev) => ({ ...prev, q: "" }));
-                }}
-              >
-                Clear Search
-              </button>
-            </div>
-            <label>
-              Group
-              <select
-                value={groupId}
-                onChange={(e) => {
-                  setGroupId(e.target.value);
-                  setGroupFilterMode("group");
-                }}
-              >
-                <option value="">All photos</option>
-                {groupOptions.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="admin-photo-library__group-actions">
-              <div className="admin-photo-library__group-create">
-                <input
-                  type="text"
-                  value={newGroupTitle}
-                  onChange={(e) => setNewGroupTitle(e.target.value)}
-                  placeholder="New group title"
-                />
-                <button type="button" onClick={handleCreateGroup} disabled={!newGroupTitle.trim()}>
-                  Add Group
-                </button>
-              </div>
-              {groupId && !isClientGroupId(groupId) && (
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => setGroupFilterMode((prev) => (prev === "group" ? "all" : "group"))}
-                >
-                  {groupFilterMode === "group" ? "Show All To Add" : "Show Group Only"}
-                </button>
-              )}
-              <button type="button" className="ghost danger" onClick={handleDeleteGroup} disabled={!groupId || isClientGroupId(groupId)}>
-                Delete Group
-              </button>
-              {groupStatus && <div className="admin-photo-library__group-status">{groupStatus}</div>}
-            </div>
-            <label>
-              Type
-              <select
-                value={filters.source_type}
-                onChange={(e) => setFilters((prev) => ({ ...prev, source_type: e.target.value }))}
-              >
-                <option value="">All</option>
-                <option value="saved_palette_photo">Saved palette</option>
-                <option value="progression">Progression</option>
-                <option value="client">Client</option>
-                <option value="article">Article</option>
-                <option value="pin">Pin</option>
-                <option value="art">Art</option>
-                <option value="art_inspired">Art Inspired</option>
-                <option value="extra_photo">Extras</option>
-              </select>
-            </label>
-            <label>
-              Sort
-              <select
-                value={filters.sort}
-                onChange={(e) => setFilters((prev) => ({ ...prev, sort: e.target.value }))}
-              >
-                <option value="newest">Newest uploads</option>
-                <option value="oldest">Oldest uploads</option>
-                <option value="id_desc">ID desc</option>
-                <option value="id_asc">ID asc</option>
-                <option value="title">Title</option>
-              </select>
-            </label>
-            <label className="admin-photo-library__inline-check">
-              <input
-                type="checkbox"
-                checked={!!filters.include_inactive}
-                onChange={(e) => setFilters((prev) => ({ ...prev, include_inactive: e.target.checked }))}
-              />
-              Show retired
-            </label>
-            <label className="admin-photo-library__inline-check">
-              <input
-                type="checkbox"
-                checked={!!filters.missing_tags}
-                onChange={(e) => setFilters((prev) => ({ ...prev, missing_tags: e.target.checked }))}
-              />
-              Missing tags
-            </label>
-            {filters.source_type === "saved_palette_photo" && (
-              <label>
-                Palette
-                <select
-                  value={filters.palette_id}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, palette_id: e.target.value }))}
-                >
-                  <option value="">All palettes</option>
-                  {paletteOptions.map((palette) => (
-                    <option key={palette.id} value={palette.id}>
-                      {palette.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <div className="admin-photo-library__filters-extra-actions">
-              <button type="button" className="ghost" onClick={toggleImageRefresh}>
-                {imageRefreshEnabled ? "Image Refresh: On" : "Image Refresh: Off"}
-              </button>
-              <div className="admin-photo-library__save-all">
-                <a className="admin-photo-library__tools-link" href="/admin/photo-library-tools">
-                  Library Tools
-                </a>
-                <button type="button" onClick={handleSaveAll} disabled={!dirtyIds.size}>
-                  Save All
-                </button>
-                {dirtyIds.size > 0 && <div className="admin-photo-library__dirty-count">{dirtyIds.size} unsaved</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="admin-photo-library__section admin-photo-library__results-panel">
-        {!hasLibrarySearch ? (
-          <div className="admin-photo-library__empty">Search to load photo library results.</div>
-        ) : loading ? (
-          <div className="admin-photo-library__loading">Loading…</div>
-        ) : (
-          <div className="admin-photo-library__table-wrap">
-            <table className="admin-photo-library__table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Preview</th>
-                  <th>Text</th>
-                  <th>Type</th>
-                  <th>Palette Set</th>
-                  <th>Flags</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {filteredItems.map((item) => (
-                  <tr key={item.photo_library_id} className={dirtyIds.has(item.photo_library_id) ? "is-dirty" : ""}>
-                    <td>
-                      <div className="admin-photo-library__id">
-                        <span>{item.photo_library_id}</span>
-                        <button
-                          type="button"
-                          className="ghost admin-photo-library__copy"
-                          onClick={() => navigator.clipboard.writeText(String(item.photo_library_id))}
-                        >
-                          Copy
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost admin-photo-library__crop-button"
-                          title={`Edit crop for photo #${item.photo_library_id}`}
-                          aria-label={`Edit crop for photo #${item.photo_library_id}`}
-                          onClick={() => setCropTarget({
-                            photoLibraryId: item.photo_library_id,
-                            imageUrl: buildAdminImageUrl(
-                              item.raw_rel_path || item.rel_path || item.image_url,
-                              item.updated_at || null
-                            ),
-                          })}
-                        >
-                          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-                            <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                    <td>
-                      {(() => {
-                        const thumbSrc = buildAdminImageUrl(
-                          item.raw_rel_path || item.rel_path || item.image_url,
-                          item.updated_at || null
-                        );
-                        const thumbState = getThumbState(item.photo_library_id);
-                        return (
-                      <button
-                        type="button"
-                        className="admin-photo-library__thumb"
-                        onClick={() =>
-                          setPreviewUrl(
-                            thumbSrc
-                          )
-                        }
-                      >
-                        {thumbState !== "loaded" ? (
-                          <div
-                            className={`admin-photo-library__thumb-placeholder${thumbState === "error" ? " is-error" : ""}`}
-                          >
-                            {thumbState === "error" ? "Missing" : "Loading..."}
-                          </div>
-                        ) : null}
-                        <img
-                          src={thumbSrc}
-                          alt=""
-                          className={thumbState === "loaded" ? "is-visible" : ""}
-                          onLoad={() => markThumbLoaded(item.photo_library_id)}
-                          onError={() => markThumbError(item.photo_library_id)}
-                        />
-                      </button>
-                        );
-                      })()}
-                      <div className="admin-photo-library__thumb-name">
-                        {item.filename || ""}
-                      </div>
-                      {item.updated_at ? (
-                        <div className="admin-photo-library__thumb-updated">
-                          Updated: {formatUpdatedAt(item.updated_at)}
-                        </div>
-                      ) : null}
-                      <div className="admin-photo-library__thumb-actions">
-                        <button
-                          type="button"
-                          className="ghost admin-photo-library__thumb-action"
-                          onClick={() => togglePath(item.photo_library_id)}
-                        >
-                          {expandedPathIds.has(item.photo_library_id) ? "Hide path" : "Path"}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost admin-photo-library__thumb-action"
-                          onClick={() => navigator.clipboard.writeText(item.raw_rel_path || item.rel_path || "")}
-                        >
-                          Copy path
-                        </button>
-                      </div>
-                      {expandedPathIds.has(item.photo_library_id) && (
-                        <div className="admin-photo-library__thumb-path">
-                          {item.raw_rel_path || item.rel_path || ""}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div className="admin-photo-library__text-stack">
-                        <input
-                          type="text"
-                          value={item.title || ""}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "title", e.target.value)}
-                          placeholder="title"
-                        />
-                        <input
-                          type="text"
-                          value={item.tags || ""}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "tags", e.target.value)}
-                          placeholder="tags"
-                        />
-                        <input
-                          type="text"
-                          value={item.alt_text || ""}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "alt_text", e.target.value)}
-                          placeholder="alt text"
-                        />
-                        {formatAiAltStatus(item) && (
-                          <div className="admin-photo-library__ai-alt-status">
-                            {formatAiAltStatus(item)}
-                            {item.ai_filename_slug ? ` · ${item.ai_filename_slug}` : ""}
-                          </div>
-                        )}
-                        <input
-                          type="text"
-                          value={item.note || ""}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "note", e.target.value)}
-                          placeholder="note"
-                        />
-                        {item.source_type === "client" && (
-                          <>
-                            <input
-                              type="text"
-                              value={item.client_name || ""}
-                              onChange={(e) => handleLibraryField(item.photo_library_id, "client_name", e.target.value)}
-                              placeholder="client name"
-                            />
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="admin-photo-library__meta">
-                        <select
-                          className="admin-photo-library__source-type"
-                          aria-label={`Type for photo #${item.photo_library_id}`}
-                          value={item.source_type || ""}
-                          onChange={(e) => handleLibraryField(item.photo_library_id, "source_type", e.target.value)}
-                        >
-                          {!SOURCE_OPTIONS.some((option) => option.value === item.source_type) && (
-                            <option value={item.source_type || ""}>
-                              {item.source_type || "Unknown"} (legacy)
-                            </option>
-                          )}
-                          {SOURCE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                        {item.source_type === "art" && (
-                          <button
-                            type="button"
-                            className="ghost admin-photo-library__artwork-button"
-                            title={`Add or edit artwork information for photo #${item.photo_library_id}`}
-                            aria-label={`Add or edit artwork information for photo #${item.photo_library_id}`}
-                            onClick={() => setArtworkTarget({
-                              photoLibraryId: item.photo_library_id,
-                              imageUrl: buildAdminImageUrl(
-                                item.raw_rel_path || item.rel_path || item.image_url,
-                                item.updated_at || null
-                              ),
-                            })}
-                          >
-                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
-                              <rect x="2.5" y="3" width="19" height="18" rx="1.5" />
-                              <path d="M6 17l4.5-5 3.5 3 2.4-2.5L20 17" />
-                              <circle cx="8.5" cy="8" r="1.5" />
-                            </svg>
-                          </button>
-                        )}
-                        {item.source_id && <div className="muted">#{item.source_id}</div>}
-                        {item.client_name ? <div className="muted">Client: {item.client_name}</div> : null}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="admin-photo-library__meta">
-                        {item.palette_owned_by_library ? (
-                          <select
-                            aria-label={`Palette for photo ${item.photo_library_id}`}
-                            value={item.palette_id || ""}
-                            onChange={(event) => handleLibraryField(item.photo_library_id, "palette_id", Number(event.target.value) || null)}
-                          >
-                            <option value="">No palette</option>
-                            {item.palette_id && !paletteOptions.some((palette) => Number(palette.id) === Number(item.palette_id)) && (
-                              <option value={item.palette_id}>{item.attached_saved_palette_label || `Palette #${item.palette_id}`}</option>
-                            )}
-                            {paletteOptions.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}
-                          </select>
-                        ) : item.attached_saved_palette_id ? (
-                          <>
-                            {(() => {
-                              const type = String(item.attached_saved_palette_photo_type || "full").toLowerCase();
-                              const isBefore = type === "before";
-                              const linkCount = Number(item.attached_saved_palette_link_count || 0);
-                              const typeLabel =
-                                isBefore
-                                  ? "Before companion"
-                                  : type === "zoom"
-                                    ? "Zoom image"
-                                    : "Main image";
-                              return (
-                                <>
-                                  <div>
-                                    {linkCount > 1
-                                      ? `${linkCount} viewer links`
-                                      : isBefore
-                                      ? typeLabel
-                                      : (item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`)}
-                                  </div>
-                                  <div className="muted">
-                                    {linkCount > 1
-                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${typeLabel}`
-                                      : isBefore
-                                      ? `${item.attached_saved_palette_label || `Saved #${item.attached_saved_palette_id}`} | ${"Main"}`
-                                      : `${"Main"} | ${typeLabel}`}
-                                  </div>
-                                </>
-                              );
-                            })()}
-                            <div className="admin-photo-library__palette-actions">
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => openPaletteModalForItem(item)}
-                              >
-                                Link…
-                              </button>
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => openSavedPaletteViewerSetup(
-                                  item.attached_saved_palette_id,
-                                  item.attached_palette_viewer_id,
-                                  item.photo_library_id
-                                )}
-                              >
-                                Viewer
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="muted">No palette attached</div>
-                            <div className="admin-photo-library__palette-actions">
-                              <button
-                                type="button"
-                                className="ghost"
-                                onClick={() => openPaletteModalForItem(item)}
-                              >
-                                Attach
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="admin-photo-library__flags">
-                        <label className="admin-photo-library__check">
-                          <input
-                            type="checkbox"
-                            checked={!!item.show_in_gallery}
-                            onChange={(e) => handleLibraryField(item.photo_library_id, "show_in_gallery", e.target.checked)}
-                          />
-                          Gallery
-                        </label>
-                        {!item.palette_owned_by_library && <label className="admin-photo-library__check">
-                          <input
-                            type="checkbox"
-                            checked={!!item.has_palette}
-                            onChange={(e) => handleLibraryField(item.photo_library_id, "has_palette", e.target.checked)}
-                          />
-                          Palette
-                        </label>}
-                        <label className="admin-photo-library__check">
-                          <input
-                            type="checkbox"
-                            checked={!!item.is_inactive}
-                            onChange={(e) => handleLibraryField(item.photo_library_id, "is_inactive", e.target.checked)}
-                          />
-                          Retired
-                        </label>
-                        <label className="admin-photo-library__permission-select">
-                          Permission
-                          <select
-                            value={item.photo_permission_override_status || ""}
-                            onChange={(e) => {
-                              handleLibraryField(item.photo_library_id, "photo_permission_override_status", e.target.value);
-                              handleLibraryField(item.photo_library_id, "photo_permission_status", e.target.value || item.client_photo_permission_status || "unknown");
-                            }}
-                          >
-                            <option value="">Use client/default</option>
-                            <option value="not_needed">Not needed</option>
-                            <option value="granted">Granted</option>
-                            <option value="requested">Requested</option>
-                            <option value="declined">Declined</option>
-                            <option value="unknown">Unknown</option>
-                          </select>
-                        </label>
-                      </div>
-                    </td>
-                    <td className="admin-photo-library__row-actions">
-                      <div className="admin-photo-library__row-actions-top">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() => {
-                            setClientTargetPhotoId(item.photo_library_id);
-                            setClientPickerOpen(true);
-                          }}
-                        >
-                          Client…
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost admin-photo-library__inspect"
-                          onClick={() => handleInvestigate(item)}
-                          title="Investigate usage"
-                          aria-label={`Investigate photo ${item.photo_library_id}`}
-                        >
-                          🔎
-                        </button>
-                        <button type="button" className="ghost" onClick={() => handleLibrarySave(item)}>
-                          Save
-                        </button>
-                        <a
-                          className="ghost"
-                          href={buildAdminImageUrl(
-                            item.raw_rel_path || item.rel_path || item.image_url,
-                            item.updated_at || null
-                          )}
-                          download
-                        >
-                          Download
-                        </a>
-                        <button type="button" className="ghost danger" onClick={() => handleLibraryDelete(item)}>
-                          Delete
-                        </button>
-                        {groupId && groupId !== "__ungrouped__" && !isClientGroupId(groupId) && (
-                          inGroup(item.photo_library_id) ? (
-                            <button
-                              type="button"
-                              className="ghost danger"
-                              onClick={() => handleRemoveFromGroup(item.photo_library_id)}
-                            >
-                              Remove
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="ghost"
-                              onClick={() => handleAddToGroup(item.photo_library_id)}
-                            >
-                              Add
-                            </button>
-                          )
-                        )}
-                      </div>
-                      <label className="admin-photo-library__replace">
-                        Replace
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) =>
-                            handleReplaceFileChange(
-                              item.photo_library_id,
-                              (e.target.files && e.target.files[0]) || null
-                            )
-                          }
-                        />
-                        <span className="admin-photo-library__replace-name">
-                          {replaceFiles[item.photo_library_id]?.name || "No file chosen"}
-                        </span>
-                      </label>
-                    </td>
-                  </tr>
-                ))}
-                {!items.length && (
-                  <tr>
-                    <td colSpan={7} className="admin-photo-library__empty">No photos yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <PhotoEditorialDialog
+        open={Boolean(editorialTarget)}
+        photoLibraryId={editorialTarget?.photoLibraryId ?? null}
+        imageUrl={editorialTarget?.imageUrl || ""}
+        onClose={() => setEditorialTarget(null)}
+      />
 
       <ArtworkDialog
         open={Boolean(artworkTarget)}
@@ -1881,19 +1871,7 @@ export default function AdminPhotoLibraryPage() {
         onSaved={() => setRefreshKey((previous) => previous + 1)}
       />
 
-      {previewUrl && (
-        <div
-          className="admin-photo-library__preview"
-          role="button"
-          tabIndex={0}
-          onClick={() => setPreviewUrl("")}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setPreviewUrl("");
-          }}
-        >
-          <img src={previewUrl} alt="" />
-        </div>
-      )}
+      <PhotoPreview src={previewUrl} onClose={() => setPreviewUrl("")} />
 
       <ModalDialog
         open={Boolean(usageModal)}

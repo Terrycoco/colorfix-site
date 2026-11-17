@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { photoImageProps } from "@helpers/imageThumb";
+import { resolvePhotoPalette } from "./photoPalette";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AdminButton,
   AdminCheckboxRow,
@@ -59,6 +61,7 @@ export default function PlaylistSlideEditor({
   item,
   slideNumber,
   photoThumb = "",
+  onPhotoPreview,
   photoInfo = null,
   saving = false,
   saveMessage = "",
@@ -77,11 +80,42 @@ export default function PlaylistSlideEditor({
     uploadOpen,
     setUploadOpen,
   ] = useState(false);
+  const [photoPalette, setPhotoPalette] = useState(null);
+  const [photoPaletteError, setPhotoPaletteError] = useState("");
+  const [photoPaletteLoading, setPhotoPaletteLoading] = useState(false);
+  const paletteCallbacks = useRef({ onUpdate, savedPalettes, item });
+  paletteCallbacks.current = { onUpdate, savedPalettes, item };
+  const attachedPaletteId = Number(photoInfo?.attachedSavedPaletteId || 0);
+  const attachedPhotoId = String(item?.photo_library_id || parsePhotoRef(item?.image_url || "")?.photoId || "");
+  useEffect(() => {
+    let active = true;
+    setPhotoPalette(null);
+    setPhotoPaletteError("");
+    setPhotoPaletteLoading(Boolean(attachedPaletteId));
+    if (attachedPaletteId) {
+      resolvePhotoPalette(attachedPaletteId, paletteCallbacks.current.savedPalettes, API_FOLDER)
+        .then((palette) => {
+          if (!active) return;
+          setPhotoPalette(palette);
+          // Repair previously created slides as well as newly selected photos.
+          // Keep an explicitly selected slide palette intact.
+          if (!paletteCallbacks.current.item?.palette_hash) {
+            paletteCallbacks.current.onUpdate("palette_hash", palette.palette_hash);
+          }
+        })
+        .catch((error) => { if (active) setPhotoPaletteError(error.message); })
+        .finally(() => { if (active) setPhotoPaletteLoading(false); });
+    }
+    return () => { active = false; };
+  }, [attachedPaletteId, attachedPhotoId, item?._clientKey]);
+
   const availablePalettes = useMemo(() => {
     const currentProjectId = Number(projectId || 0);
-    return (Array.isArray(savedPalettes) ? savedPalettes : [])
+    const options = [...(Array.isArray(savedPalettes) ? savedPalettes : [])];
+    if (photoPalette && !options.some((palette) => palette.palette_hash === photoPalette.palette_hash)) options.push(photoPalette);
+    return options
       .filter((palette) => {
-        if (currentProjectId <= 0) return true;
+        if (currentProjectId <= 0 || palette.palette_hash === photoPalette?.palette_hash || palette.palette_hash === item?.palette_hash) return true;
         return Number(palette?.project_id || 0) === currentProjectId;
       })
       .slice()
@@ -102,7 +136,7 @@ export default function PlaylistSlideEditor({
           sensitivity: "base",
         });
       });
-  }, [savedPalettes, projectId]);
+  }, [savedPalettes, projectId, photoPalette, item?.palette_hash]);
   const slidePaletteHash = String(
     item?.palette_hash ||
     ""
@@ -230,8 +264,14 @@ export default function PlaylistSlideEditor({
           >
             <div>
               {photoThumb ? (
+                <button
+                  type="button"
+                  aria-label={`Enlarge ${item.title || "slide photo"}`}
+                  style={{ display: "block", padding: 0, border: 0, background: "transparent", cursor: "zoom-in" }}
+                  onClick={() => onPhotoPreview?.(parsePhotoRef(item.image_url || "").url || photoThumb, item.title || "")}
+                >
                 <img
-                  src={photoThumb}
+                  {...photoImageProps(photoId, photoThumb, { width: 800 })}
                   alt=""
                   loading="lazy"
                   style={{
@@ -241,6 +281,7 @@ export default function PlaylistSlideEditor({
                     height: "auto",
                   }}
                 />
+                </button>
               ) : (
                 <AdminMetaText as="div">
                   No photo
@@ -291,7 +332,8 @@ export default function PlaylistSlideEditor({
               </AdminButton>
             </AdminStack>
           </div>
-          <AdminField label="Palette" compact>
+          {photoPaletteError && <AdminNotice variant="danger">{photoPaletteError}</AdminNotice>}
+          <AdminField label="Palette" compact hint={photoPalette?.palette_hash === slidePaletteHash ? "Palette linked to this photo." : null}>
           <select
             className="admin-field__control"
             value={slidePaletteHash}
@@ -300,7 +342,7 @@ export default function PlaylistSlideEditor({
             }
           >
             <option value="">
-              {availablePalettes.length
+              {photoPaletteLoading ? "Loading photo palette…" : availablePalettes.length
                 ? "No palette attached"
                 : Number(projectId || 0) > 0
                   ? "No project palettes"

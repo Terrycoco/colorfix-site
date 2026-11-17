@@ -22,6 +22,42 @@ class PdoPlaylistRepository
 
 {
 
+    /** Public marketing candidates and all selected photo IDs, for artwork-context verification. */
+    public function findPublicForArtworkPhoto(int $artworkPhotoId, string $slideFlag): array
+    {
+        if ($artworkPhotoId <= 0) { return []; }
+        $slideFlag = strtolower(trim($slideFlag));
+        if (in_array($slideFlag, ['public', 'full_palette'], true)) { $slideFlag = 'site'; }
+        if (!in_array($slideFlag, self::SLIDE_FLAGS, true)) {
+            throw new \DomainException('Unsupported playlist slide flag: ' . $slideFlag);
+        }
+        $stmt = $this->pdo->prepare(
+            "SELECT p.playlist_id, p.title, pi.photo_library_id
+               FROM playlists p
+               JOIN playlist_items pi ON pi.playlist_id = p.playlist_id
+                AND pi.is_active = 1 AND pi.{$slideFlag} = 1
+              WHERE p.is_active = 1 AND p.is_public = 1 AND p.indexable = 1
+                AND COALESCE(p.is_retired, 0) = 0
+                AND EXISTS (
+                    SELECT 1 FROM playlist_items matched
+                    JOIN photo_library photo ON photo.photo_library_id = matched.photo_library_id
+                    WHERE matched.playlist_id = p.playlist_id
+                      AND matched.is_active = 1 AND matched.{$slideFlag} = 1
+                      AND (photo.photo_library_id = :artwork_photo_id
+                           OR photo.inspiration_photo_id = :inspiration_photo_id)
+                )
+              ORDER BY p.title ASC, p.playlist_id ASC, pi.order_index ASC"
+        );
+        $stmt->execute(['artwork_photo_id' => $artworkPhotoId, 'inspiration_photo_id' => $artworkPhotoId]);
+        $playlists = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $id = (int)$row['playlist_id'];
+            $playlists[$id] ??= ['playlist_id' => $id, 'title' => (string)$row['title'], 'photo_ids' => []];
+            if ((int)$row['photo_library_id'] > 0) { $playlists[$id]['photo_ids'][] = (int)$row['photo_library_id']; }
+        }
+        return $playlists;
+    }
+
     private const SLIDE_FLAGS = [
 
         'site',
@@ -47,6 +83,20 @@ class PdoPlaylistRepository
     ) {}
 
 
+
+    /** Authored share title, independent of playback experience flags. */
+    public function getCoverTitle(int $playlistId): string
+    {
+        $stmt = $this->pdo->prepare("SELECT title FROM playlist_items
+            WHERE playlist_id = :playlist_id AND is_active = 1 AND item_type = 'cover-image'
+            ORDER BY order_index ASC, playlist_item_id ASC");
+        $stmt->execute(['playlist_id' => $playlistId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $title) {
+            $title = trim((string)$title);
+            if ($title !== '') return $title;
+        }
+        return '';
+    }
 
     public function getById(string $playlistId, string $venue = 'site'): ?Playlist
 

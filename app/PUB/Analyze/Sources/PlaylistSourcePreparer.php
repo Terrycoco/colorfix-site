@@ -6,6 +6,7 @@ namespace App\PUB\Analyze\Sources;
 use App\PALETTES\PV\PVService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PHOTOS\Entities\PhotoEntity;
+use App\PHOTOS\Services\PhotoEditorialService;
 use App\REX\DTO\RexReservationRelationship;
 use App\REX\Services\RexReservationRelationships;
 use RuntimeException;
@@ -24,6 +25,7 @@ final class PlaylistSourcePreparer
         private PdoPlaylistRepository $playlists,
         private PVService $pvService,
         private RexReservationRelationships $rexRelationships,
+        private PhotoEditorialService $photoEditorial,
     ) {}
 
     /**
@@ -80,6 +82,24 @@ final class PlaylistSourcePreparer
             },
             $items
         );
+
+        // PHOTOS owns the text. Attach a read-only snapshot to each source item.
+        $photoIds = array_values(array_unique(array_filter(array_map(
+            static fn (array $item): int => (int)($item['photo_library_id'] ?? 0),
+            $items
+        ))));
+        $editorials = $this->photoEditorial->getMany($photoIds);
+        foreach ($items as &$item) {
+            $id = (int)($item['photo_library_id'] ?? 0);
+            if ($id > 0 && isset($editorials[$id]) && is_array($item['photo'] ?? null)) {
+                $item['photo']['editorial'] = [
+                    'photo_description' => $editorials[$id]['photo_description'] ?? null,
+                    'design_notes' => $editorials[$id]['design_notes'] ?? null,
+                    'refined_commentary' => $editorials[$id]['refined_commentary'] ?? null,
+                ];
+            }
+        }
+        unset($item);
 
         $linkedPVs = $this->publicLinkedPVData($playlistId);
 

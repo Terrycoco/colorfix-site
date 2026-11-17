@@ -13,6 +13,14 @@ class PdoPhotoLibraryRepository
 
     public function connection(): PDO { return $this->pdo; }
 
+    /** Original source metadata for PHOTOS thumbnail delivery. */
+    public function findThumbnailSource(int $photoId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM photo_library WHERE photo_library_id = :id LIMIT 1');
+        $stmt->execute(['id' => $photoId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
     /** Main-photo association. Alternate/Before/Zoom presentations belong to Palette Viewers. */
     public function listForPalette(int $paletteId): array
     {

@@ -92,6 +92,10 @@ try {
           res.setHeader('Content-Type', 'text/html');
           return res.end(await server.transformIndexHtml(url.pathname, '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module" src="/__gallery-test.js"></script>'));
         }
+        if (url.pathname === '/api/v2/image-thumb.php') {
+          res.setHeader('Content-Type', 'image/svg+xml');
+          return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="500" height="400"><rect width="500" height="400" fill="navy"/></svg>');
+        }
         if (url.pathname.startsWith('/photos/')) {
           res.setHeader('Content-Type', 'image/svg+xml');
           return res.end('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="navy"/></svg>');
@@ -162,17 +166,13 @@ try {
     const shape = await evaluate(`(() => {
       const image=document.querySelector('.pals-art-image'),opening=image.parentElement;
       const box=opening.getBoundingClientRect();
-      return {frame:!!document.querySelector('.pals-art-frame'),width:image.style.width,height:parseFloat(image.style.height),top:parseFloat(image.style.top),left:parseFloat(image.style.left),ratio:box.width/box.height,src:image.getAttribute('src'),srcset:image.getAttribute('srcset'),href:document.querySelector('.pals-photo').getAttribute('href')};
+      return {frame:!!document.querySelector('.pals-art-frame'),fit:getComputedStyle(image).objectFit,width:image.style.width,height:parseFloat(image.style.height),top:parseFloat(image.style.top),left:parseFloat(image.style.left),ratio:box.width/box.height,src:image.getAttribute('src'),srcset:image.getAttribute('srcset'),href:document.querySelector('.pals-photo').getAttribute('href')};
     })()`);
     assert.equal(shape.frame, true);
-    assert.equal(shape.width, '100%');
-    // CSSOM serializes percentages to fewer digits than JavaScript numbers.
-    assert(Math.abs(shape.height - 100 / 0.6) < 0.001, JSON.stringify(shape));
-    assert(Math.abs(shape.top + 100 * 0.083990 / 0.6) < 0.001, JSON.stringify(shape));
-    assert.equal(shape.left, 0);
+    assert.equal(shape.fit, 'contain', 'PHOTOS derivative is not cropped twice');
     assert(Math.abs(shape.ratio - 1.25) < 0.005);
-    assert.equal(shape.src, '/photos/art.svg');
-    assert.equal(shape.srcset, null, 'Manual crop uses the original, not a cropped thumbnail');
+    assert(shape.src.includes('/api/v2/image-thumb.php?'));
+    assert(shape.srcset.includes('520w'), 'Saved crops retain responsive derivatives');
     assert.equal(shape.href, '/t/stable-house-token');
   }
   await evaluate("localStorage.setItem('pals.brand_filters.v1',JSON.stringify(['sw']))");

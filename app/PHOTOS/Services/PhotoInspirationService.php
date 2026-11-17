@@ -39,6 +39,20 @@ final class PhotoInspirationService
         return $this->changeInspiration($photoId, null);
     }
 
+    /** Public room/artwork pair; never expose unpublished or client photographs. */
+    public function getPublicInspiration(int $photoId): ?array
+    {
+        $room = $this->photos->findThumbnailSource($photoId);
+        if (!$room || ($room['source_type'] ?? '') !== 'art_inspired' || !PhotoDeliveryService::isPublic($room)) return null;
+        $art = $this->photos->findThumbnailSource((int)($room['inspiration_photo_id'] ?? 0));
+        if (!$art || ($art['source_type'] ?? '') !== 'art' || !PhotoDeliveryService::isPublic($art)) return null;
+        foreach ([$room, $art] as $photo) {
+            $path = (string)($photo['rel_path'] ?? '');
+            if ($path === '' || !str_starts_with($path, '/') || str_starts_with($path, '//')) return null;
+        }
+        return ['room' => $room, 'artwork_photo' => $art];
+    }
+
     /** Admin-level listing; NOT directly suitable for public display without visibility checks. */
     public function getInspiredDesigns(int $artworkPhotoId): array
     {

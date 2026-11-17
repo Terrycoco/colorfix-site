@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Check, Images, Search, X } from 'lucide-react';
@@ -102,7 +103,7 @@ export default function Photos() {
           const url = photoImageUrl(photo);
           return <label className={`sas-photo-row${checked ? ' is-selected' : ''}`} key={id}>
             <span className="sas-photo-image">
-              {url ? <img loading="lazy" src={url} alt={`Photo ${id}`} /> : <span className="sas-photo-missing"><Images size={24}/>Image unavailable</span>}
+              {url ? <img loading="lazy" {...photoImageProps(id, url)} alt={`Photo ${id}`} /> : <span className="sas-photo-missing"><Images size={24}/>Image unavailable</span>}
               <span className="sas-photo-id">#{id}</span>
             </span>
             <span className="sas-photo-check">

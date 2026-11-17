@@ -10,6 +10,7 @@ export default function MobileWorkbenchDrawer({
   beforeClose = null,
   children,
   footer = null,
+  actions = null,
   padded = false,
   className = "",
 }) {
@@ -49,6 +50,7 @@ export default function MobileWorkbenchDrawer({
           ) : null}
           <strong className="mobile-workbench-drawer__title">{title}</strong>
         </header>
+        {actions ? <div className="admin-workbench-drawer__close-row">{actions}</div> : null}
         <div className={["mobile-workbench-drawer__body", padded ? "is-padded" : ""].filter(Boolean).join(" ")}>
           {children}
         </div>

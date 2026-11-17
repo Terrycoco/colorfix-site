@@ -1,5 +1,5 @@
 import "./cta.css";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 
 export default function WatchNextCta({ cta, onClick, disabled = false }) {
   if (!cta) return null;
@@ -23,7 +23,7 @@ export default function WatchNextCta({ cta, onClick, disabled = false }) {
       <div className="cta-watch-next__body">
         {thumbnailUrl && (
           <div className="cta-watch-next__thumb">
-            <img src={thumbnailUrl} alt="" loading="lazy" decoding="async" />
+            <img src={thumbnailUrl} style={photoThumbStyle(thumbnailUrl)} alt="" loading="lazy" decoding="async" />
           </div>
         )}
         <div className="cta-watch-next__text">

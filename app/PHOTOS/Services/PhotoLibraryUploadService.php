@@ -19,8 +19,8 @@ final class PhotoLibraryUploadService
     {
         $pdo = $this->pdo;
         $sourceType = isset($post['source_type']) ? trim((string)$post['source_type']) : '';
-        if (!in_array($sourceType, ['saved_palette_photo', 'progression', 'article', 'pin', 'client', 'art', 'art_inspired'], true)) {
-            throw new \InvalidArgumentException('source_type must be saved_palette_photo, progression, article, pin, client, art, or art_inspired');
+        if (!in_array($sourceType, ['saved_palette_photo', 'progression', 'article', 'pin', 'client', 'art', 'art_inspired', 'inspiration'], true)) {
+            throw new \InvalidArgumentException('source_type must be saved_palette_photo, progression, article, pin, client, art, art_inspired, or inspiration');
         }
 
         if ($sourceType === 'saved_palette_photo') {

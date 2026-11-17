@@ -14,6 +14,7 @@ try {
   for (const width of before ? [1280] : [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
     let admin = true, artworkStatus = 200, failThumb = false;
+    let linkedPlaylists = [{playlist_id:60,title:'Ingres fixture',rex_url:'/t/stable-artwork'}];
     const imageRequests = [];
     const requests = [], errors = [];
     await context.route('**/*', async route => {
@@ -28,7 +29,7 @@ try {
         if (url.pathname.includes('artwork/page.php')) {
           requests.push(url);
           return route.fulfill({ status: artworkStatus, json: artworkStatus === 200
-            ? { ok: true, data: { artwork: { display_title: 'Artwork fixture' }, photo: {photo_library_id:746,image_url:'/fixture-art.png',alt_text:'Artwork image'}, paint_approximations: { members: [{ color_id: 1, name: 'Saved artwork paint', hex: '123456' }] }, inspired_designs: [{photo_library_id:748,image_url:'/fixture-design.png',title:'Design fixture'}] } }
+            ? { ok: true, data: { artwork: { display_title: 'Artwork fixture' }, photo: {photo_library_id:746,image_url:'/fixture-art.png',alt_text:'Artwork image'}, paint_approximations: { members: [{ color_id: 1, name: 'Saved artwork paint', hex: '123456' }] }, inspired_designs: [{photo_library_id:748,image_url:'/fixture-design.png',title:'Design fixture'}], playlists: linkedPlaylists } }
             : { ok: false, error: artworkStatus === 404 ? 'Artwork not publicly available.' : 'Unable to load artwork.' } });
         }
         if (url.pathname.includes('get-categories')) return route.fulfill({ json: [] });
@@ -57,12 +58,20 @@ try {
       assert.equal(await page.locator('.main-layout').count(), 1);
       assert.equal(new URL(page.url()).searchParams.get('src'), 'sas');
       assert.equal(new URL(page.url()).hash, '#study');
+      const watch = page.getByRole('link', {name:'Watch the Art-Inspired Palette Playlist',exact:true});
+      assert.equal(await watch.getAttribute('href'),'/t/stable-artwork?src=sas','Use existing public REX with source attribution');
+      const watchBox = await watch.boundingBox();
+      const designHeading = await page.getByRole('heading',{name:'Designs Inspired by Artwork fixture'}).boundingBox();
+      assert(watchBox.y < designHeading.y,'Watch link appears above inspired designs');
+      assert.equal(await watch.evaluate(el => el.scrollWidth <= el.clientWidth),true,'Watch link fits on mobile');
       const hero = page.locator('.artwork-page__figure img');
       await hero.evaluate(img => img.decode());
       const thumb = new URL(await hero.getAttribute('src'));
       assert.equal(thumb.pathname, '/api/v2/image-thumb.php');
       assert.equal(thumb.searchParams.get('id'), '746');
-      assert.equal(thumb.searchParams.get('w'), '960');
+      assert.equal(thumb.searchParams.get('w'), '1200');
+      assert.equal(thumb.searchParams.get('crop_type'), 'original');
+      assert.equal(await hero.evaluate(img => getComputedStyle(img).objectFit), 'contain');
       assert.equal(imageRequests.some(url => url.pathname.startsWith('/fixture-')), false, 'Originals are not downloaded for initial display');
       await page.getByRole('button', {name:'Enlarge Artwork fixture',exact:true}).click();
       const lightbox = page.getByRole('dialog', {name:'Enlarged photograph. Click to close.'});
@@ -85,6 +94,16 @@ try {
       failThumb = false;
       await page.reload();
       await page.getByRole('heading', { name: 'Artwork fixture', exact: true }).waitFor();
+      linkedPlaylists = [];
+      await page.reload();
+      await page.getByRole('heading', {name:'Artwork fixture',exact:true}).waitFor();
+      assert.equal(await page.getByRole('navigation',{name:'Artwork playlists'}).count(),0,'No playlist means no watch control');
+      linkedPlaylists = [{playlist_id:60,title:'Ingres fixture',rex_url:'/t/stable-artwork'}, {playlist_id:61,title:'Another study <script>',rex_url:'/t/another-study'}];
+      await page.reload();
+      await page.getByRole('heading', {name:'Artwork fixture',exact:true}).waitFor();
+      assert.equal(await page.getByRole('navigation',{name:'Artwork playlists'}).getByRole('link').count(),2,'Multiple qualified playlists stay distinct');
+      assert.equal(await page.getByRole('link',{name:'Watch: Another study <script>',exact:true}).getAttribute('href'),'/t/another-study?src=sas');
+      assert.equal(await page.locator('.artwork-page__playlists script').count(),0,'Playlist titles render as escaped text');
       for (const status of [404, 503]) {
         artworkStatus = status;
         await page.reload();

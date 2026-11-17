@@ -36,7 +36,8 @@ class PlaylistItem
         public ?string $painter_palette_viewer_url = null,
         public int $version_number = 1,
         public bool $is_final = false,
-        public ?int $color_plan_id = null
+        public ?int $color_plan_id = null,
+        public ?string $display_image_url = null
     ) {
     }
 }

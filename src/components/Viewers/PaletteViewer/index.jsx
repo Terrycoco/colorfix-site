@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import LogoAnimated from "@components/LogoAnimated";
 import BrandFooterLogo from "@components/BrandFooterLogo";
@@ -249,8 +250,18 @@ export default function PaletteViewer({
                 setPhotoExpanded(true);
               }}
             >
-              <img src={photoUrl} alt={photoAlt} className="apv-photo" />
+              <img {...photoImageProps(meta?.photo_library_id, photoUrl, { width: 1200, display: true, deliveryUrl: meta?.display_image_url })} alt={photoAlt} className="apv-photo" />
             </div>
+            {meta?.art_inspiration?.study_url && (
+              <a className="apv-art-inspiration" href={withSourceParam(meta.art_inspiration.study_url)}>
+                <img
+                  {...photoImageProps(meta.art_inspiration.photo_library_id, meta.art_inspiration.url, { width: 240, cropType: "swatch" })}
+                  alt={meta.art_inspiration.alt_text || "Original artwork"}
+                  loading="lazy"
+                />
+                <span>Art Inspiration</span>
+              </a>
+            )}
             {insetPhotos.length > 0 && (
               <div className="apv-photo-insets apv-photo-insets--below">
                 {insetPhotos.map((photo, idx) => {
@@ -268,7 +279,7 @@ export default function PaletteViewer({
                       }}
                     >
                       <img
-                        src={url}
+                        {...photoImageProps(photo?.photo_library_id, url, { width: 800, display: true, deliveryUrl: photo?.display_image_url })}
                         alt={alt}
                         className="apv-photo-inset"
                         loading="lazy"

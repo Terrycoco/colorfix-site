@@ -706,6 +706,9 @@ function DesktopAdminDataGrid({
           onClose={
             requestCloseDrawer
           }
+          actions={typeof drawer?.actions === "function"
+            ? drawer.actions({ item: drawerItem, closing: drawerClosing })
+            : drawer?.actions ?? null}
           footer={
             typeof drawer
               ?.footer ===

@@ -1,5 +1,6 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import './front-page-playlist-set-item.css';
-import { photoThumbUrl } from '@helpers/imageThumb';
+import { photoThumbUrl, photoThumbStyle } from '@helpers/imageThumb';
 import { toFastPlayerPath } from '@helpers/playerUrls';
 import { withSourceParam } from '@helpers/sourceParam';
 
@@ -21,7 +22,8 @@ const FrontPagePlaylistSetItem = ({ item }) => {
             <div className="front-page-playlist-set-item__image">
               {imageSrc ? (
                 <img
-                  src={imageSrc}
+                  src={imageSrc} onError={event => fallbackToOriginal(event, tile.photo_url)}
+                  style={photoThumbStyle(imageSrc)}
                   alt={tile.title || 'Playlist'}
                   loading={index === 0 ? 'eager' : 'lazy'}
                   fetchPriority={index === 0 ? 'high' : 'auto'}

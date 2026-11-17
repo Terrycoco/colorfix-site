@@ -5,7 +5,10 @@ namespace App\ARTWORK\Services;
 
 use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\ARTWORK\Repos\PdoArtworkRepository;
-use App\PALETTES\Managers\SavedPaletteManager;
+use App\PALETTES\Services\PaletteService;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
+use App\PLAYLISTS\Repos\PdoPlayerExperienceRepository;
+use App\REX\Repos\PdoRexReservationRepository;
 use InvalidArgumentException;
 use OutOfBoundsException;
 use PDO;
@@ -60,28 +63,48 @@ final class ArtworkPageService
         if (!$photo) { throw new OutOfBoundsException('Artwork not publicly available.'); }
 
         $paletteId = (int)($photo['palette_id'] ?? 0);
-        $palette = $paletteId > 0 ? (new SavedPaletteManager($this->pdo))->get($paletteId) : null;
+        $swatches = $paletteId > 0 ? (new PaletteService($this->pdo))->getSwatches($paletteId) : [];
         $designs = $photos->listPublicInspiredDesigns((int)$photo['photo_library_id']);
         return [
             'artwork' => $artwork,
             'photo' => $this->photoPayload($photo),
-            'paint_approximations' => $palette ? [
+            'paint_approximations' => $paletteId > 0 ? [
                 'palette_id' => $paletteId,
-                'palette' => $palette['palette'],
-                'members' => array_map(static fn(array $color): array => [
-                    'color_id' => isset($color['color_id']) ? (int)$color['color_id'] : null,
-                    'name' => $color['color_name'] ?? '',
-                    'brand' => $color['color_brand_name'] ?: ($color['color_brand'] ?? ''),
-                    'code' => $color['color_code'] ?? '',
-                    'hex' => $color['color_hex6'] ?? null,
-                    'role' => $color['role'] ?? null,
-                    'note' => $color['note'] ?? null,
-                ], $palette['members']),
+                'members' => $swatches,
             ] : null,
             // Viewer selection/hero override is not yet an ARTWORK responsibility.
             // Return photo IDs so the eventual PV navigation can target each room.
             'inspired_designs' => array_map(fn(array $design): array => $this->photoPayload($design), $designs),
+            'playlists' => $this->publicPlaylists($artworkService, (int)$artwork['artwork_id'], (int)$photo['photo_library_id']),
         ];
+    }
+
+    /** Read-only reverse of the existing contextual Art Study CTA; never reserve a token. */
+    private function publicPlaylists(ArtworkService $artwork, int $artworkId, int $photoId): array
+    {
+        $experience = (new PdoPlayerExperienceRepository($this->pdo))->getByExperienceKey('public');
+        if (!$experience || !$experience->isActive) { return []; }
+        $candidates = (new PdoPlaylistRepository($this->pdo))->findPublicForArtworkPhoto($photoId, $experience->slideFlag);
+        if (!$candidates) { return []; }
+        // This existing lookup also normalizes legacy context.experience_key values.
+        $reservations = (new PdoRexReservationRepository($this->pdo))->findActiveByResourceIds(
+            'playlist_experience', 'playlist', array_keys($candidates)
+        );
+        $links = [];
+        foreach ($candidates as $id => $playlist) {
+            $public = null;
+            foreach ($reservations[$id] ?? [] as $reservation) {
+                if ($reservation->experienceKey === 'public' && $reservation->revokedAt === null && trim($reservation->token) !== '') {
+                    $public = $reservation;
+                    break; // Repository orders oldest stable reservation first.
+                }
+            }
+            if (!$public || $artwork->publicStudyUrlForPhotos($playlist['photo_ids']) !== '/inspired-by/' . $artworkId) {
+                continue;
+            }
+            $links[] = ['playlist_id' => $id, 'title' => $playlist['title'], 'rex_url' => '/t/' . rawurlencode($public->token)];
+        }
+        return $links;
     }
 
     private function photoPayload(array $photo): array

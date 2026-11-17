@@ -36,7 +36,7 @@ try {
       if (url.origin !== origin) return route.abort();
       if (!url.pathname.startsWith('/api/')) return route.continue();
       if (url.pathname.endsWith('/get-search-presets.php')) return route.fulfill({ json: [] });
-      if (url.pathname.includes('image-thumb')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="520" height="390"><rect width="520" height="390" fill="#b5c3b8"/></svg>' });
+      if (url.pathname.includes('image-thumb')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="520" height="416"><rect width="520" height="416" fill="#b5c3b8"/></svg>' });
       if (url.pathname.includes('playlist-sets/get')) return route.fulfill({ json: { ok: true, set: { id: 11, title: 'Legacy fixture set', items: Array.from({ length: 24 }, (_, i) => ({ id: i + 1, title: `Playlist ${i + 1}`, item_type: 'playlist', rex_url: `/t/existing-token-${i + 1}`, photo_library_id: i + 1 })) } } });
       return route.fulfill({ json: { ok: true, event_id: 0, user: null, categories: [], schemes: [], items: [], data: [] } });
     });
@@ -73,6 +73,11 @@ try {
           assert(await page.locator('.board-scroller').isVisible(), 'Standard app navigation remains');
           assert(await page.getByRole('button', { name: 'Go back', exact: true }).isVisible(), 'Standard Back remains');
           assert.equal(initial.horizontalOverflow, false);
+          const preview = page.locator('.playlist-thumbs__image img').first();
+          await preview.evaluate(img => img.decode());
+          assert.equal(await preview.evaluate(img => img.naturalWidth / img.naturalHeight), 1.25, 'Fixture delivers the saved 5:4 crop into a 4:3 card');
+          assert.equal(await preview.evaluate(img => getComputedStyle(img).objectFit), 'contain', 'Keep complete saved crop visible rather than center-cropping it again');
+          assert(!new URL(await preview.getAttribute('src'), origin).searchParams.has('crop_type'), 'Cards use the shared saved-crop default');
           const panel = initial.elements['.playlist-thumbs__panel'];
           const standard = report.find(r => r.width === viewport.width && r.route === '/privacy').initial.elements['.main-layout'];
           const main = initial.elements['.main-layout'];

@@ -22,6 +22,13 @@ final class ArtworkService
         $this->photos = new PdoPhotoLibraryRepository($pdo);
     }
 
+    /** Canonical existing public Art Study route. */
+    public static function studyUrl(int $artworkId): string
+    {
+        if ($artworkId <= 0) throw new InvalidArgumentException('Invalid artwork ID.');
+        return '/inspired-by/' . $artworkId;
+    }
+
     public function findById(int $artworkId): array
     {
         $row = $this->artwork->findById($artworkId);

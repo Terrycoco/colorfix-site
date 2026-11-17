@@ -1,7 +1,8 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAppState } from "@context/AppStateContext";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 import { toFastPlayerPath } from "@helpers/playerUrls";
 import { applySourceToParams, withSourceParam } from "@helpers/sourceParam";
 import "@pages/PlaylistThumbsPage/playlist-thumbs.css";
@@ -214,6 +215,8 @@ export default function PlaylistPickerPage({ landing = false }) {
                   {(photoThumbUrl(tile.photo_library_id, 520, 72, tile.photo_url) || tile.photo_url) ? (
                     <img
                       src={photoThumbUrl(tile.photo_library_id, 520, 72, tile.photo_url) || tile.photo_url}
+                      style={photoThumbStyle(photoThumbUrl(tile.photo_library_id, 520, 72, tile.photo_url))}
+                      onError={event => fallbackToOriginal(event, tile.photo_url)}
                       alt={tile.title}
                       loading="lazy"
                       decoding="async"

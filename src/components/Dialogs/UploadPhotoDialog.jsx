@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import {
   useEffect,
   useMemo,
@@ -286,7 +287,7 @@ export default function UploadPhotoDialog({
       <div className="dialog-layout dialog-layout--preview-form">
         <div className="dialog-preview">
           {previewUrl ? (
-            <img
+            <PhotoPreviewImage
               src={previewUrl}
               alt=""
             />

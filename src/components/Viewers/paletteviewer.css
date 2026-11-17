@@ -620,3 +620,10 @@
     white-space: normal;
   }
 }
+
+/* Secondary artwork reference belongs beneath the room, within the image column. */
+.apv-art-inspiration { display: flex; flex-direction: column; align-items: flex-start; align-self: flex-start; gap: 6px; margin-top: 12px; color: inherit; text-decoration: none; }
+.apv-art-inspiration img { display: block; width: 120px; height: auto; object-fit: contain; border-radius: 4px; }
+.apv-art-inspiration span { font-size: 11px; line-height: 1.4; }
+.apv-art-inspiration:hover span { text-decoration: underline; }
+.apv-art-inspiration:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }

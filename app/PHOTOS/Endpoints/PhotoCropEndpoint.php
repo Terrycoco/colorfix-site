@@ -71,6 +71,7 @@ final class PhotoCropEndpoint
 
             if ($method === 'POST' && $action === 'reset') {
                 $service->resetCrop((int)$id, $type);
+                \App\PHOTOS\Services\PhotoThumbnailService::invalidate((int)$id, $documentRoot);
                 // No crop row => caller uses centered default, without a DB insert.
                 self::respond(['ok' => true, 'photo_library_id' => (int)$id,
                     'crop_type' => $type, 'is_custom' => false, 'reset' => true]);
@@ -96,6 +97,7 @@ final class PhotoCropEndpoint
                     $crop[$key] = $data[$key] ?? null;
                 }
                 $result = $service->saveCrop((int)$id, $type, $crop, $width, $height);
+                \App\PHOTOS\Services\PhotoThumbnailService::invalidate((int)$id, $documentRoot);
             } else {
                 $result = $service->getCrop((int)$id, $width, $height, $type);
             }

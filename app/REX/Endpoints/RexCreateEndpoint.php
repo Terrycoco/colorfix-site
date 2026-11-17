@@ -5,7 +5,6 @@ namespace App\REX\Endpoints;
 
 use App\REX\DTO\RexCreateReservationRequest;
 use App\REX\DTO\RexReservation;
-use App\REX\DTO\RexReservationSearchCriteria;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Services\RexReserver;
 use App\REX\Services\RexTokenGenerator;
@@ -78,10 +77,7 @@ final class RexCreateEndpoint
             );
 
             if (!empty($data['reuse_existing'])) {
-                $reservation = self::findReusableReservation(
-                    $repo,
-                    $request
-                );
+                $reservation = (new RexReserver($repo, new RexTokenGenerator()))->findReusable($request);
 
                 if ($reservation) {
                     (new RexViewerPlaylistLinker($pdo))->link($reservation);
@@ -119,75 +115,6 @@ final class RexCreateEndpoint
                 'error' => $e->getMessage(),
             ], 500);
         }
-    }
-
-    private static function findReusableReservation(
-        PdoRexReservationRepository $repo,
-        RexCreateReservationRequest $request
-    ): ?RexReservation {
-        $matches = $repo->search(
-            new RexReservationSearchCriteria(
-                resolverKey: $request->resolverKey,
-                resourceType: $request->resourceType,
-                resourceId: $request->resourceId,
-                status: RexReserver::STATUS_ACTIVE,
-                limit: 500,
-                experienceKey: $request->experienceKey,
-            )
-        );
-
-        $requestContext = self::normalizedContext(
-            $request->context
-        );
-
-        $requestExperienceKey = self::normalizedExperienceKey(
-            $request->experienceKey
-        );
-
-        $reusable = [];
-
-        foreach ($matches as $reservation) {
-            if (
-                self::normalizedExperienceKey(
-                    $reservation->experienceKey
-                ) !== $requestExperienceKey
-            ) {
-                continue;
-            }
-
-            if (
-                self::normalizedContext(
-                    $reservation->context
-                ) !== $requestContext
-            ) {
-                continue;
-            }
-
-            $reusable[] = $reservation;
-        }
-
-        usort(
-            $reusable,
-            static fn(
-                RexReservation $a,
-                RexReservation $b
-            ): int => $a->id <=> $b->id
-        );
-
-        return $reusable[0] ?? null;
-    }
-
-    private static function normalizedContext(array $context): array
-    {
-        foreach ($context as $key => $value) {
-            if (is_array($value)) {
-                $context[$key] = self::normalizedContext($value);
-            }
-        }
-
-        ksort($context);
-
-        return $context;
     }
 
     private static function normalizedExperienceKey(

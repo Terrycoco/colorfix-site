@@ -1,6 +1,7 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 import "./FeaturedArticleItem.css";
 
 function parseJsonMaybe(text) {
@@ -104,7 +105,9 @@ const FeaturedArticleItem = ({ item = {} }) => {
             ) : null}
             <img
               src={photoThumbUrl(primaryHeroId, 720, 72) || withCacheBuster(primaryHero?.rel_path, primaryHero?.updated_at)}
+              onError={event => fallbackToOriginal(event, primaryHero?.rel_path)}
               srcSet={`${primaryHeroSrc} 520w, ${photoThumbUrl(primaryHeroId, 720, 72) || primaryHeroSrc} 720w`}
+              style={photoThumbStyle(primaryHeroSrc) || photoThumbStyle(mobileHeroSrc)}
               sizes="(max-width: 640px) 90vw, 320px"
               alt={heroMobile?.alt_text || primaryHero?.alt_text || article?.title || ""}
               loading="eager"

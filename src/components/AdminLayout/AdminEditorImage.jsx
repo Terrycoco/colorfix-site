@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 export default function AdminEditorImage({
   src = "",
   alt = "",
@@ -13,7 +14,7 @@ export default function AdminEditorImage({
 
   if (src) {
     return (
-      <img
+      <PhotoPreviewImage
         src={src}
         alt={alt}
         className={classes}

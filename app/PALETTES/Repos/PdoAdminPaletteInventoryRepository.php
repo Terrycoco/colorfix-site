@@ -97,7 +97,7 @@ final class PdoAdminPaletteInventoryRepository
                     $url .= (str_contains($url, '?') ? '&' : '?') . 'v=' . $stamp;
                 }
             }
-            $chosen[$id] = ['priority' => $priority, 'url' => $url];
+            $chosen[$id] = ['priority' => $priority, 'url' => \App\PHOTOS\Services\PhotoDeliveryService::thumbnailUrl((int)$row['photo_library_id'])];
         }
         return array_map(static fn(array $row): string => $row['url'], $chosen);
     }

@@ -1,9 +1,10 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
 import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
 import {    parsePhotoRef } from "@helpers/assetImage";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 import { resolveAppPath } from "@helpers/routingHelper";
 
 const PlaylistItem = ({ item }) => {
@@ -28,14 +29,15 @@ const PlaylistItem = ({ item }) => {
       }
 
       const parsedPhoto = parsePhotoRef(value);
+      const photoId = item?.photo_library_id || parsedPhoto.photoId;
       if (parsedPhoto.url) {
-        if (!cancelled) setImageSrc(photoThumbUrl(parsedPhoto.photoId, 420, 72) || parsedPhoto.url);
+        if (!cancelled) setImageSrc(photoThumbUrl(photoId, 420, 72) || parsedPhoto.url);
         return;
       }
 
-      if (parsedPhoto.photoId) {
+      if (photoId) {
         try {
-          const thumbUrl = photoThumbUrl(parsedPhoto.photoId, 420, 72);
+          const thumbUrl = photoThumbUrl(photoId, 420, 72);
           if (thumbUrl) {
             if (!cancelled) setImageSrc(thumbUrl);
             return;
@@ -66,7 +68,7 @@ const PlaylistItem = ({ item }) => {
     return () => {
       cancelled = true;
     };
-  }, [item?.image_url]);
+  }, [item?.image_url, item?.photo_library_id]);
 
   return (
     <div
@@ -81,7 +83,7 @@ const PlaylistItem = ({ item }) => {
             <div className="playlist-item__play" aria-hidden="true">
               <Play className="playlist-item__play-icon" />
             </div>
-            <img src={imageSrc} alt={item.display || item.title || "Playlist preview"} loading="lazy" decoding="async" />
+            <img src={imageSrc} onError={event => fallbackToOriginal(event, item.image_url)} style={photoThumbStyle(imageSrc)} alt={item.display || item.title || "Playlist preview"} loading="lazy" decoding="async" />
           </div>
         ) : null}
         <div className="playlist-display">

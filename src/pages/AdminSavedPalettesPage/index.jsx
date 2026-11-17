@@ -1,3 +1,5 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
@@ -511,7 +513,7 @@ export default function AdminSavedPalettesPage() {
               <div className="asp-photo-strip">
                 {item.photos.slice(0, 4).map((photo) => (
                   <div key={photo.id} className="asp-photo-thumb">
-                    <img src={photo.rel_path} alt={item.display_title || "Saved palette photo"} loading="lazy" />
+                    <PhotoPreviewImage {...photoImageProps(photo.photo_library_id, photo.rel_path)} alt={item.display_title || "Saved palette photo"} loading="lazy" />
                   </div>
                 ))}
               </div>

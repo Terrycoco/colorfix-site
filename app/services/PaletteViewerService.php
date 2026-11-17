@@ -137,6 +137,8 @@ class PaletteViewerService
             if (in_array($type, ['BEFORE', 'INSET'], true)) {
                 $insets[] = [
                     'url' => $url,
+                    'photo_library_id' => $photo['photo_library_id'] ?? null,
+                    'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)($photo['photo_library_id'] ?? 0), $url, 800),
                     'alt_text' => $photo['photo_title'] ?? null,
                     'caption' => $type === 'BEFORE' ? 'Before' : null,
                 ];
@@ -213,6 +215,8 @@ class PaletteViewerService
             'cta_label' => '',
             'playlist_url' => '',
             'photo_url' => $fullPhoto['rel_path'] ?? '',
+            'photo_library_id' => $fullPhoto['photo_library_id'] ?? null,
+            'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)($fullPhoto['photo_library_id'] ?? 0), (string)($fullPhoto['rel_path'] ?? '')),
             'photo_alt' => $fullPhoto['photo_title'] ?? null,
             'inset_photos' => $insets,
             'kicker_text' => $plan['area_name'] ?? '',
@@ -297,6 +301,8 @@ class PaletteViewerService
             if (($photo['photo_type'] ?? '') === 'before' && !empty($photo['rel_path'])) {
                 $insets[] = [
                     'url' => $photo['rel_path'],
+                    'photo_library_id' => $photo['photo_library_id'] ?? null,
+                    'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)($photo['photo_library_id'] ?? 0), $photo['rel_path'], 800),
                     'alt_text' => $photo['alt_text'] ?? null,
                     'caption' => 'Before',
                 ];
@@ -306,6 +312,8 @@ class PaletteViewerService
             if (($photo['photo_type'] ?? '') === 'zoom' && !empty($photo['rel_path'])) {
                 $insets[] = [
                     'url' => $photo['rel_path'],
+                    'photo_library_id' => $photo['photo_library_id'] ?? null,
+                    'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)($photo['photo_library_id'] ?? 0), $photo['rel_path'], 800),
                     'alt_text' => $photo['alt_text'] ?? null,
                     'caption' => $photo['caption'] ?? null,
                 ];
@@ -352,6 +360,8 @@ class PaletteViewerService
             'cta_label' => $viewerContent['cta_label'] ?? '',
             'playlist_url' => $viewerContent['playlist_url'] ?? '',
             'photo_url' => $fullPhoto['rel_path'] ?? '',
+            'photo_library_id' => $fullPhoto['photo_library_id'] ?? null,
+            'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)($fullPhoto['photo_library_id'] ?? 0), (string)($fullPhoto['rel_path'] ?? '')),
             'photo_alt' => $fullPhoto['alt_text'] ?? null,
             'inset_photos' => $insets,
             'kicker_text' => $kickerText,
@@ -386,6 +396,8 @@ class PaletteViewerService
             if ($type === 'before') {
                 $insets[] = [
                     'url' => $url,
+                    'photo_library_id' => $photo->photoLibraryId,
+                    'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)$photo->photoLibraryId, $url, 800),
                     'alt_text' => $photo->altText,
                     'caption' => 'Before',
                 ];
@@ -395,6 +407,8 @@ class PaletteViewerService
             if (in_array($type, ['zoom', 'inset'], true)) {
                 $insets[] = [
                     'url' => $url,
+                    'photo_library_id' => $photo->photoLibraryId,
+                    'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)$photo->photoLibraryId, $url, 800),
                     'alt_text' => $photo->altText,
                     'caption' => $photo->caption,
                 ];
@@ -449,6 +463,8 @@ class PaletteViewerService
             'cta_label' => $viewer->ctaLabel ?? '',
             'playlist_url' => '',
             'photo_url' => $fullPhoto?->relPath ?? '',
+            'photo_library_id' => $fullPhoto?->photoLibraryId,
+            'display_image_url' => \App\PHOTOS\Services\PhotoDeliveryService::url((int)$fullPhoto?->photoLibraryId, (string)$fullPhoto?->relPath),
             'photo_alt' => $fullPhoto?->altText,
             'inset_photos' => $insets,
             'kicker_text' => $viewer->kickerText ?? '',

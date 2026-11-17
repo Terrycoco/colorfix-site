@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import {
   useCallback,
   useEffect,
@@ -157,7 +158,7 @@ function DraggablePhotoRow({ item, index, busy, onMove, onPreview, children }) {
       <button type="button" className="admin-project-photos__thumb" disabled={busy || !src}
         aria-label={`View photo ${item.photo_library_id}`} title="Click to view full screen"
         onClick={() => onPreview(item)}>
-        {src ? <img src={src} alt="" loading="lazy" draggable={false} /> : null}
+        {src ? <img {...photoImageProps(item.photo_library_id, src, { width: 240 })} alt="" loading="lazy" draggable={false} /> : null}
       </button>
       {children}
     </article>

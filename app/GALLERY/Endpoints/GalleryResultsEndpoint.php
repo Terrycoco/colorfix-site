@@ -57,6 +57,8 @@ final class GalleryResultsEndpoint
                         'id' => 'ps_' . $colorId . '_' . $photoId,
                         'item_type' => 'picture-swatch',
                         'photo_library_id' => $photoId,
+                        'source_type' => $photo['source_type'] ?? null,
+                        'inspiration_photo_id' => $photo['inspiration_photo_id'] ?? null,
                         'photo_url' => $photo['rel_path'],
                         'photo_type' => 'main',
                         'palette_id' => $paletteId,

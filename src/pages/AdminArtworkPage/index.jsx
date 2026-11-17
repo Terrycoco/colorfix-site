@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import {
@@ -6,6 +7,7 @@ import {
   AdminListPane,
   AdminMasterDetail,
   AdminObjectList,
+  normalizeAdminSearchText,
 } from "@components/AdminLayout";
 import { ArtworkInlineEditor } from "@components/ArtworkDialog/ArtworkDialog";
 import "./admin-artwork.css";
@@ -25,6 +27,17 @@ function toImageUrl(photo) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
   return path.startsWith("/") ? path : `/${path}`;
+}
+
+function artistLastNameFirst(value) {
+  const name = String(value || "").trim();
+  if (!name) return "Unknown artist";
+  if (name.includes(",")) return name;
+  const parts = name.split(/\s+/);
+  let surnameStart = parts.length - 1;
+  while (surnameStart > 0 && /^(de|del|della|di|da|dos|du|la|le|van|von|der|den|ten|ter)$/i.test(parts[surnameStart - 1])) surnameStart--;
+  if (surnameStart === 0) return name;
+  return `${parts.slice(surnameStart).join(" ")}, ${parts.slice(0, surnameStart).join(" ")}`;
 }
 
 /** Existing ARTWORK records only; do not duplicate metadata in PHOTOS. */
@@ -73,9 +86,9 @@ export default function AdminArtworkPage() {
   }, [revision]);
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
+    const query = normalizeAdminSearchText(search.trim());
     return query ? artworks.filter((art) =>
-      [art.display_title, art.official_title, art.artist].some((value) => String(value || "").toLowerCase().includes(query))) : artworks;
+      [art.display_title, art.official_title, art.artist].some((value) => normalizeAdminSearchText(value).includes(query))) : artworks;
   }, [artworks, search]);
 
   const selected = artworks.find((art) => String(art.artwork_id) === String(selectedId)) || null;
@@ -104,8 +117,11 @@ export default function AdminArtworkPage() {
                       data-admin-object-id={art.artwork_id}
                       aria-current={String(selectedId) === String(art.artwork_id) ? "true" : undefined}
                       onClick={() => setSelectedId(art.artwork_id)}>
-                      {image ? <img src={image} alt="" loading="lazy" /> : <span className="admin-artwork-page__placeholder" aria-hidden="true" />}
-                      <span>{title}</span>
+                      {image ? <PhotoPreviewImage src={image} alt="" loading="lazy" /> : <span className="admin-artwork-page__placeholder" aria-hidden="true" />}
+                      <span className="admin-artwork-page__item-text">
+                        <span className="admin-artwork-page__artist">{artistLastNameFirst(art.artist)}</span>
+                        <span className="admin-artwork-page__title">{title}</span>
+                      </span>
                     </button>
                   </div>
                 );

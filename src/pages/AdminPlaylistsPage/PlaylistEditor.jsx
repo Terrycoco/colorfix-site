@@ -1,3 +1,7 @@
+import PhotoPreview from "@components/PhotoPreview";
+import PhotoEditorialDialog from "@components/PhotoEditorialDialog";
+import { photoImageProps } from "@helpers/imageThumb";
+import { resolvePhotoPalette } from "./photoPalette";
 import {
   forwardRef,
   useCallback,
@@ -216,6 +220,9 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
           playlistId
         )
       : null;
+
+  const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [editorialPhoto, setEditorialPhoto] = useState(null);
 
   const isNewRoute =
     routePlaylistId === null;
@@ -857,8 +864,6 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
         new URLSearchParams({
           limit:
             "500",
-          with_photos:
-            "1",
           _:
             String(
               Date.now()
@@ -1976,65 +1981,20 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
   }
 
 
-  function applyAttachedPaletteFromPhoto(
-    clientKey,
-    photoLibraryId,
-    attachedInfo = null
-  ) {
-    const info =
-      attachedInfo
-      ||
-      photoInfo[
-        String(
-          photoLibraryId ||
-          ""
-        ).trim()
-      ];
-
-    const attachedPaletteId =
-      Number(
-        info
-          ?.attachedSavedPaletteId ||
-        0
-      );
-
-    const match =
-      attachedPaletteId
-        ? savedOptions.find(
-            (option) =>
-              Number(
-                option.id ||
-                0
-              ) ===
-              attachedPaletteId
-          )
-        : null;
-
-    setItems(
-      (current) =>
-        current.map(
-          (item) =>
-            item
-              ._clientKey ===
-            clientKey
-              ? {
-                  ...item,
-
-
-
-                  palette_hash:
-                    match
-                      ?.palette_hash ||
-                    "",
-
-
-                }
-              : item)
-    );
-
-    markDirty();
+  async function applyAttachedPaletteFromPhoto(clientKey, photoLibraryId, attachedInfo = null) {
+    const info = attachedInfo || photoInfo[String(photoLibraryId || "").trim()];
+    try {
+      const palette = await resolvePhotoPalette(info?.attachedSavedPaletteId, savedOptions, API_FOLDER);
+      if (palette) setSavedOptions((current) => [...current.filter((row) => Number(row.id) !== Number(palette.id)), palette]);
+      setItems((current) => current.map((item) =>
+        item._clientKey === clientKey && Number(getPhotoLibraryId(item)) === Number(photoLibraryId)
+          ? { ...item, palette_hash: palette?.palette_hash || "" }
+          : item));
+      markDirty();
+    } catch (error) {
+      await dialog.alert({ title: "Photo palette could not be loaded", message: error.message });
+    }
   }
-
 
   async function confirmPhotoReplacement(photoId) {
     return dialog.confirm({
@@ -3091,14 +3051,25 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
               return src
                 ? (
-                    <img
-                      src={
-                        src
-                      }
-                      alt=""
-                      width="64"
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      aria-label={`Enlarge ${item.title || "slide photo"}`}
+                      style={{ display: "block", padding: 0, border: 0, background: "transparent", cursor: "zoom-in" }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPreviewPhoto({ url: parsePhotoRef(item.image_url || "").url || src, alt: item.title || "" });
+                      }}
+                    >
+                      <img
+                        {...photoImageProps(getPhotoLibraryId(item), src, { width: 160 })}
+                        alt=""
+                        width="64"
+                        loading="lazy"
+                      />
+                    </button>
                   )
                 : "—";
             },
@@ -3612,6 +3583,20 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
                             }
 
                             drawer={{
+                              actions: ({ item, closing }) => {
+                                const liveItem = items.find(row => row._clientKey === item._clientKey);
+                                const photoId = getPhotoLibraryId(liveItem);
+                                return (
+                                  <button type="button" className="admin-button admin-button--secondary"
+                                    disabled={!photoId || closing}
+                                    onClick={() => setEditorialPhoto({
+                                      id: photoId,
+                                      url: getItemPhotoThumb(liveItem, photoThumbs),
+                                    })}>
+                                    Photo Editorial
+                                  </button>
+                                );
+                              },
                               title:
                                 (item) =>
                                   `Slide ${
@@ -3713,6 +3698,7 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
                                   return (
                                     <PlaylistSlideEditor
+                                      onPhotoPreview={(url, alt) => setPreviewPhoto({ url, alt })}
                                       item={
                                         liveItem
                                       }
@@ -3851,6 +3837,10 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
               )
         }
       </AdminDetailPane>
+
+      <PhotoPreview src={previewPhoto?.url || ""} alt={previewPhoto?.alt || ""} onClose={() => setPreviewPhoto(null)} />
+      <PhotoEditorialDialog open={Boolean(editorialPhoto)} photoLibraryId={editorialPhoto?.id}
+        imageUrl={editorialPhoto?.url || ""} onClose={() => setEditorialPhoto(null)} />
 
       <AdminEditor
         open={
@@ -5140,9 +5130,7 @@ function photoInfoFromRow(
 ) {
   return {
     attachedSavedPaletteId:
-      row
-        ?.attached_saved_palette_id??
-      null,
+      row?.palette_id ?? row?.attached_saved_palette_id ?? null,
 
     attachedSavedPaletteLabel:
       row

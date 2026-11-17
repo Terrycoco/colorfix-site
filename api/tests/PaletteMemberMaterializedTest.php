@@ -44,6 +44,7 @@ $pdo->exec("INSERT INTO photo_library VALUES
  (749,'progression','photos/inactive.png','Inactive design','',2,1,1,0,746,NULL),
  (750,'progression','photos/retired.png','Retired design','',2,1,0,1,746,NULL),
  (751,'progression','photos/hidden.png','Hidden design','',2,0,0,0,746,NULL)");
+$pdo->exec('CREATE TABLE player_experiences (player_experience_id INTEGER PRIMARY KEY,experience_key TEXT,name TEXT,slide_flag TEXT,palette_viewer_key TEXT,rex_parent_experience_key TEXT,cta_page_id INTEGER,is_active INTEGER)');
 $service = new App\ARTWORK\Services\ArtworkPageService($pdo);
 $page = $service->get(1);
 $expect($page['paint_approximations']['members'][0]['name'] === 'Blue', 'Real Artwork composition uses materialized palette members');

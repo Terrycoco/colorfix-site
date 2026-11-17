@@ -2,6 +2,9 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
+  # PHOTOS derivatives are delivered only through the access-checked endpoint.
+  RewriteRule ^photos/cache/thumbs(?:/|$) - [F,L]
+
   # Retired image systems: return Gone even if an old PHP file survives a code-only deployment.
   # Current /admin/photos/upload.php, Photo Library, image-thumb, PVs and PUB are deliberately excluded.
   RewriteRule ^api/v2/(?:photos|mask-training)(?:/|$) - [G,L]

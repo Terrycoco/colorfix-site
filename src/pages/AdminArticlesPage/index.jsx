@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 import { useEffect, useMemo, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
@@ -942,7 +943,7 @@ export default function AdminArticlesPage() {
                     <div className="admin-articles__cta-meta">
                       {section.asset.photo_library_id || section.asset_id}
                     </div>
-                    <img
+                    <PhotoPreviewImage
                       src={buildImageUrl(section.asset.rel_path, section.asset.updated_at || null)}
                       alt={section.asset.alt_text || section.heading || ""}
                       style={{ maxWidth: "220px", borderRadius: "12px", marginTop: "10px" }}

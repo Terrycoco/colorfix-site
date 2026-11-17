@@ -1,3 +1,5 @@
+import { fallbackToOriginal } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 
 
@@ -1141,6 +1143,8 @@ export default function PlaylistThumbsPage() {
 
 
 
+              const previewUrl = photoThumbUrl(parsed.photoId || palette.photo_library_id, 520, 72);
+
               const resolvedUrl = parsed.url
 
 
@@ -1305,7 +1309,7 @@ export default function PlaylistThumbsPage() {
 
 
 
-                      <img src={resolvedUrl} alt={palette.title} loading="lazy" />
+                      <img src={previewUrl || resolvedUrl} onError={event => fallbackToOriginal(event, resolvedUrl)} style={photoThumbStyle(previewUrl)} alt={palette.title} loading="lazy" />
 
 
 

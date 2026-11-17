@@ -382,7 +382,7 @@ final class GalleryRunQueryEndpoint
 
 
 
-                $stmtSaved = $pdo->prepare("SELECT m.color_id, pl.photo_library_id, pl.rel_path, pl.source_type,
+                $stmtSaved = $pdo->prepare("SELECT m.color_id, pl.photo_library_id, pl.rel_path, pl.source_type, pl.inspiration_photo_id,
 
                     pc.crop_x, pc.crop_y, pc.crop_width, pc.crop_height,
 
@@ -392,9 +392,10 @@ final class GalleryRunQueryEndpoint
 
                     sp.id AS saved_palette_id, NULL AS saved_palette_set_id, sp.palette_hash, sp.nickname, sp.brand
 
-                    FROM photo_library pl JOIN saved_palettes sp ON sp.id = pl.palette_id
+                    FROM photo_library pl LEFT JOIN photo_library inspiration ON inspiration.photo_library_id = pl.inspiration_photo_id AND inspiration.source_type = 'art'
+                    JOIN saved_palettes sp ON sp.id = CASE WHEN pl.source_type = 'art_inspired' AND inspiration.photo_library_id IS NOT NULL THEN inspiration.palette_id ELSE pl.palette_id END
 
-                    JOIN saved_palette_members m ON m.saved_palette_id = pl.palette_id
+                    JOIN saved_palette_members m ON m.saved_palette_id = sp.id
 
                     LEFT JOIN photo_crops pc ON pc.photo_library_id = pl.photo_library_id AND pc.crop_type = 'swatch'
 
@@ -473,6 +474,7 @@ final class GalleryRunQueryEndpoint
                     'rel_path' => $row['rel_path'] ?? null,
 
                      'source_type' => $row['source_type'] ?? null,
+                     'inspiration_photo_id' => $row['inspiration_photo_id'] ?? null,
 
                      'crop_x' => $row['crop_x'] ?? null,
 
@@ -803,6 +805,8 @@ final class GalleryRunQueryEndpoint
                          'crop_height' => $photo['crop_height'] === null ? null : (float)$photo['crop_height'],
 
                         'photo_library_id' => (int)($photo['photo_id'] ?? 0),
+                        'source_type' => $photo['source_type'] ?? null,
+                        'inspiration_photo_id' => $photo['inspiration_photo_id'] ?? null,
 
                         'photo_url' => $photo['rel_path'],
 
@@ -883,6 +887,8 @@ final class GalleryRunQueryEndpoint
                          'crop_height' => $zphoto['crop_height'] === null ? null : (float)$zphoto['crop_height'],
 
                         'photo_library_id' => (int)($zphoto['photo_id'] ?? 0),
+                        'source_type' => $zphoto['source_type'] ?? null,
+                        'inspiration_photo_id' => $zphoto['inspiration_photo_id'] ?? null,
 
                         'photo_url' => $zphoto['rel_path'],
 

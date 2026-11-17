@@ -1,0 +1,6 @@
+.photo-editorial { display: grid; gap: 16px; min-width: 0; }
+.photo-editorial__preview { display: block; width: 100%; max-height: 210px; object-fit: contain; border-radius: 6px; }
+.photo-editorial__field { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+.photo-editorial__field textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 65px; padding: 10px; font: inherit; font-weight: 400; }
+.photo-editorial__field small { font-weight: 400; opacity: .75; }
+.photo-editorial__field-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }

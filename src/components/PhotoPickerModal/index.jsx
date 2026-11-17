@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import {
   useCallback,
   useEffect,
@@ -628,18 +629,7 @@ export default function PhotoPickerModal({
                               )
                                 ? (
                                     <img
-                                      src={
-                                        buildPickerImageUrl(
-                                          item.raw_rel_path
-                                          ||
-                                          item.rel_path
-                                          ||
-                                          item.image_url,
-                                          item.updated_at
-                                          ||
-                                          null
-                                        )
-                                      }
+                                      {...photoImageProps(item.photo_library_id, item.raw_rel_path || item.rel_path || item.image_url, { width: 320 })}
                                       alt=""
                                       loading="lazy"
                                     />

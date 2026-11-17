@@ -1,3 +1,4 @@
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useState } from "react";
 import BrandFooterLogo from "@components/BrandFooterLogo";
 import LogoAnimated from "@components/LogoAnimated";
@@ -318,7 +319,7 @@ export default function ConceptPaletteViewer({
                 setPhotoExpanded(true);
               }}
             >
-              <img src={photoUrl} alt={photoAlt} className="apv-photo" />
+              <img {...photoImageProps(meta?.photo_library_id, photoUrl, { width: 1200, display: true, deliveryUrl: meta?.display_image_url })} alt={photoAlt} className="apv-photo" />
             </div>
 
             {insetPhotos.length > 0 && (
@@ -347,7 +348,7 @@ export default function ConceptPaletteViewer({
                       }}
                     >
                       <img
-                        src={url}
+                        {...photoImageProps(photo?.photo_library_id, url, { width: 800, display: true, deliveryUrl: photo?.display_image_url })}
                         alt={alt}
                         className="apv-photo-inset"
                         loading="lazy"

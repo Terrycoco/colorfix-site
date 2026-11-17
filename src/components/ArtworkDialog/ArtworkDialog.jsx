@@ -1,3 +1,5 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
+import { photoImageProps } from "@helpers/imageThumb";
 import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import { API_FOLDER } from "@helpers/config";
@@ -152,7 +154,7 @@ function ArtworkEditorContent({ open, photoLibraryId, imageUrl, onClose, onSaved
   // One set of fields and handlers. Only the modal entry point gets dialog chrome.
   const formContents = (
     <>
-          {imageUrl && <img className="artwork-dialog__photo" src={imageUrl} alt="Artwork photograph" />}
+          {imageUrl && <PhotoPreviewImage className="artwork-dialog__photo" {...photoImageProps(photoLibraryId, imageUrl, { width: 800 })} alt="Artwork photograph" />}
           {loading && <p role="status">Loading artwork…</p>}
           {error && <p className="artwork-dialog__error" role="alert">{error}</p>}
           <div className="artwork-dialog__fields">
@@ -180,7 +182,7 @@ function ArtworkEditorContent({ open, photoLibraryId, imageUrl, onClose, onSaved
                 {designs.length === 0 && <p className="artwork-dialog__hint">No designs linked yet.</p>}
                 {designs.map((design) => (
                   <div className="artwork-dialog__design" key={design.photo_library_id}>
-                    {design.rel_path && <img src={imageSource(design)} alt="" />}
+                    {design.rel_path && <PhotoPreviewImage {...photoImageProps(design.photo_library_id, imageSource(design))} loading="lazy" alt="" />}
                     <span>{design.title || `Photo #${design.photo_library_id}`} <small>#{design.photo_library_id}</small></span>
                     <button type="button" disabled={linkBusy}
                       aria-label={`Edit photo #${design.photo_library_id} in Photo Library`}

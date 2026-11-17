@@ -233,7 +233,7 @@ final class PlaylistThumbsResolver implements RexResolverInterface
             resourceId: $playlistId,
             behavior: RexResolutionBehavior::RENDER,
             shareMetadata: new RexShareMetadata(
-                title: $playlistTitle . ' — Colors Used',
+                title: $this->playlists->getCoverTitle($playlistId) ?: $playlistTitle . ' — Colors Used',
                 description: "Explore the colors used in {$playlistTitle}.",
                 imageUrl: $firstPhotoUrl,
             ),

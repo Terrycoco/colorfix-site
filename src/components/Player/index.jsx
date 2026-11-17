@@ -1,3 +1,4 @@
+import { slidePhotoUrl, nextSlidePhotoUrls, originalPhotoUrl } from "@helpers/imageThumb";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { getIntroLayout } from "../PlayerIntroLayouts/registry";
 import AnimatedHueWheel from "@components/AnimatedHueWheel";
@@ -209,44 +210,6 @@ function queueFadeReady(img, stageEl) {
     didLikeInteractRef.current = false;
   }, [slides, playlistId]);
 
-  const isPaletteItem = (item) => {
-    if (!item) return false;
-    return Boolean(item.palette_hash);
-  };
-
-  useEffect(() => {
-    if (!imageLoaded) return () => {};
-    const seen = new Set();
-
-    function preload(url) {
-      if (!url || seen.has(url)) return;
-      seen.add(url);
-      const img = new Image();
-      img.decoding = "async";
-      img.src = withCacheBust(url);
-    }
-
-    (slides || []).forEach((item, index) => {
-      if (index === activeIndex) return;
-      const value = item?.image_url || "";
-      if (isPaletteItem(item)) return;
-      if (!value) return;
-      const parsed = parsePhotoRef(value);
-      if (parsed.url) {
-        preload(parsed.url);
-        return;
-      }
-
-        preload(value);
-        return;
-
-
-
-    });
-
-  }, [slides, cacheBustEnabled, activeIndex, imageLoaded]);
-
-
   useEffect(() => {
     writeLikedSet(playlistId, likedSet);
   }, [likedSet, playlistId]);
@@ -273,6 +236,17 @@ function queueFadeReady(img, stageEl) {
       return key && likedSet.has(key);
     });
   }, [allItems, playbackMode, likedSet]);
+
+  useEffect(() => {
+    if (!imageLoaded) return;
+    // Follow the actual filtered playback sequence; never warm an entire playlist.
+    for (const url of nextSlidePhotoUrls(playItems, activeIndex)) {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = withCacheBust(url);
+    }
+  }, [playItems, cacheBustEnabled, activeIndex, imageLoaded]);
+
 
 useEffect(() => {
   if (!onLikeChange) return;
@@ -384,15 +358,12 @@ function startPlayback(nextMode, nextIndex = 0) {
   );
 
   useEffect(() => {
-    const value = currentItem?.image_url || "";
-    const parsed = parsePhotoRef(value);
-    setCurrentImageUrl(isHueWheel || isBrandBumper ? "" : parsed.url || value);
-  }, [currentItem?.image_url, isHueWheel, isBrandBumper]);
+    setCurrentImageUrl(isHueWheel || isBrandBumper ? "" : slidePhotoUrl(currentItem));
+  }, [currentItem?.image_url, currentItem?.photo_library_id, currentItem?.display_image_url, isHueWheel, isBrandBumper]);
 
   useEffect(() => {
-    const value = prevItem?.image_url || "";
-    setPrevImageUrl(parsePhotoRef(value).url || value);
-  }, [prevItem?.image_url]);
+    setPrevImageUrl(prevItem ? slidePhotoUrl(prevItem) : "");
+  }, [prevItem?.image_url, prevItem?.photo_library_id, prevItem?.display_image_url]);
 
   function withCacheBust(url) {
     if (!url) return url;
@@ -718,6 +689,7 @@ function startPlayback(nextMode, nextIndex = 0) {
               key={`prev-${prevIndex}-${prevImageUrl}`}
               src={withCacheBust(prevImageUrl)}
               ref={prevImgRef}
+              onError={() => { const original = originalPhotoUrl(prevItem?.image_url || ""); if (original && original !== prevImageUrl) setPrevImageUrl(original); }}
               alt=""
               className={`player-image is-prev${textAfterImageTransition ? " is-exiting-to-text" : ""}${transitionMode === "cut" ? " fade-cut" : ""}${fadeReady ? " fade-out is-ready" : ""}`}
             />
@@ -744,6 +716,8 @@ function startPlayback(nextMode, nextIndex = 0) {
                 queueFadeReady(img, stageRef.current);
               }}
               onError={() => {
+                const original = originalPhotoUrl(currentItem?.image_url || "");
+                if (original && currentImageUrl !== original) { setCurrentImageUrl(original); return; }
                 setImageLoaded(true);
                 setFadeReady(true);
               }}

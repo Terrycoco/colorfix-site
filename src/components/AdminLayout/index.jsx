@@ -1,6 +1,7 @@
 export { default as AdminMasterDetail } from "./AdminMasterDetail";
 export { default as AdminListPane } from "./AdminListPane";
 export { default as AdminSearchField } from "./AdminSearchField";
+export { normalizeAdminSearchText, parseAdminSearch, matchesAdminSearch, filterAdminRecords } from "./adminSearch";
 export { default as AdminDetailPane } from "./AdminDetailPane";
 export { default as AdminObjectList } from "./AdminObjectList";
 export { default as AdminObjectListItem } from "./AdminObjectListItem";

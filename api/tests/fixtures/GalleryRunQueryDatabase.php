@@ -28,6 +28,7 @@ INSERT INTO photo_library VALUES
  (748,165,'/photos/private.svg','art',0,0,0),
  (749,166,'/photos/inactive.svg','art',1,1,0),
  (750,167,'/photos/retired.svg','art',1,0,1);
+ALTER TABLE photo_library ADD COLUMN inspiration_photo_id INTEGER;
 CREATE TABLE saved_palettes (id INTEGER PRIMARY KEY, palette_hash TEXT, nickname TEXT, brand TEXT);
 INSERT INTO saved_palettes VALUES (163,'art-hash','Art palette','sw'),(164,'house-hash','House palette','bm'),(165,'private-hash','Private','sw'),(166,'inactive','Inactive','sw'),(167,'retired','Retired','sw');
 CREATE TABLE saved_palette_members (saved_palette_id INTEGER, color_id INTEGER);

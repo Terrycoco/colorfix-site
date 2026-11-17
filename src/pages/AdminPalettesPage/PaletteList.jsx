@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 function cleanText(value) {
   return String(value ?? "").trim();
 }
@@ -115,8 +116,9 @@ export default function PaletteList({
           >
             <div className="admin-palette-list__thumb">
               {thumbnail ? (
-                <img
+                <PhotoPreviewImage
                   src={thumbnail}
+                  previewSrc={palette.photo_url || palette.image_url || palette.main_photo_url || thumbnail}
                   alt=""
                   loading="lazy"
                 />

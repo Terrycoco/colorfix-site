@@ -1,3 +1,4 @@
+import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
 export default function AdminMediaPreview({
   imageUrl = "",
   label = "",
@@ -10,7 +11,7 @@ export default function AdminMediaPreview({
   return (
     <div className={["admin-media-preview", className].filter(Boolean).join(" ")}>
       {imageUrl ? (
-        <img
+        <PhotoPreviewImage
           className="admin-media-preview__image"
           src={imageUrl}
           alt={alt}

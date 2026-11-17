@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
-import { photoThumbUrl } from "@helpers/imageThumb";
+import { photoThumbUrl, photoThumbStyle, photoDisplayUrl } from "@helpers/imageThumb";
+import { withSourceParam } from "@helpers/sourceParam";
+import PaletteSwatch from "@components/Swatches/PaletteSwatch";
 import "./ArtworkPage.css";
 
 const DISCLAIMER = "These paint colors were selected by comparing physical paint samples with a photographic reproduction of the artwork. Photography, printing, lighting, and digital displays can all affect how colors appear. My selections are intended to capture the overall impression of each color family as it appears in the painting, rather than provide exact color matches.";
 
-function validHex(value) {
-  const hex = String(value || "").trim().replace(/^#/, "");
-  return /^[0-9a-f]{6}$/i.test(hex) ? `#${hex}` : null;
-}
-
 function showOriginalIfThumbnailFails(event, originalUrl) {
   if (event.currentTarget.getAttribute("src") !== originalUrl) {
+    event.currentTarget.removeAttribute("srcset");
     event.currentTarget.src = originalUrl;
   }
 }
@@ -58,8 +56,17 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
   if (status === "loading") return <main className="artwork-page" aria-busy="true"><p>Loading artwork…</p></main>;
   if (status === "error") return <main className="artwork-page" role="alert"><h1>Artwork unavailable</h1><p>{error}</p></main>;
 
-  const { artwork, photo, paint_approximations: palette, inspired_designs: designs } = page;
+  const { artwork, photo, paint_approximations: palette, inspired_designs: designs, playlists = [] } = page;
   const title = artwork.display_title || artwork.official_title || photo.title || "Artwork";
+  const playlistLinks = playlists.length > 0 && (
+    <nav className="artwork-page__playlists" aria-label="Artwork playlists">
+      {playlists.map((playlist) => (
+        <Link className="artwork-page__playlist-link" key={playlist.playlist_id} to={withSourceParam(playlist.rex_url)} title={playlist.title}>
+          {playlists.length === 1 ? "Watch the Art-Inspired Palette Playlist" : `Watch: ${playlist.title}`}
+        </Link>
+      ))}
+    </nav>
+  );
   return (
     <main className="artwork-page">
       <header className="artwork-page__header">
@@ -73,7 +80,8 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
           {photo.image_url && (
             <button type="button" className="artwork-page__image-trigger" onClick={() => setEnlargedImage({ src: photo.image_url, alt: photo.alt_text || title })} aria-label={`Enlarge ${title}`}>
               <img
-                src={photoThumbUrl(photo.photo_library_id, 960, 80, photo.image_url) || photo.image_url}
+                src={photoDisplayUrl(photo.photo_library_id, photo.image_url, "", 1200)}
+                srcSet={photo.photo_library_id ? `${photoDisplayUrl(photo.photo_library_id, photo.image_url, "", 960)} 1x, ${photoDisplayUrl(photo.photo_library_id, photo.image_url, "", 1920)} 2x` : undefined}
                 alt={photo.alt_text || title}
                 decoding="async"
                 fetchPriority="high"
@@ -83,6 +91,7 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
           )}
         </div>
         <div className="artwork-page__details">
+          {playlistLinks}
           <h2>About the artwork</h2>
           <dl>
             {artwork.official_title && artwork.official_title !== title && <><dt>Official title</dt><dd>{artwork.official_title}</dd></>}
@@ -109,11 +118,8 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
         {palette?.members?.length ? (
           <div className="artwork-page__swatches">
             {palette.members.map((color, index) => (
-              <div className="artwork-page__swatch" key={`${color.color_id || 'unknown'}-${index}`}>
-                <div className="artwork-page__swatch-color" style={{ backgroundColor: validHex(color.hex) || "#ddd" }} />
-                <strong>{color.name || "Unnamed paint"}</strong>
-                <span>{[color.brand, color.code].filter(Boolean).join(" · ")}</span>
-                {color.role && <small>{color.role}</small>}
+              <div className="artwork-page__swatch" key={`${color.id}-${index}`}>
+                <PaletteSwatch color={color} />
               </div>
             ))}
           </div>
@@ -122,6 +128,7 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
       </section>
 
       <section className="artwork-page__section">
+        {playlistLinks}
         <h2>Designs Inspired by {title}</h2>
         {designs.length ? (
           <div className="artwork-page__designs">
@@ -130,6 +137,7 @@ export default function ArtworkPage({ artworkId: artworkIdProp, photoLibraryId }
                 <button type="button" className="artwork-page__image-trigger" onClick={() => setEnlargedImage({ src: design.image_url, alt: design.alt_text || design.title || "Inspired design" })} aria-label={`Enlarge ${design.title || "inspired design"}`}>
                   <img
                     src={photoThumbUrl(design.photo_library_id, 480, 72, design.image_url) || design.image_url}
+                    style={photoThumbStyle(photoThumbUrl(design.photo_library_id, 480, 72, design.image_url))}
                     alt={design.alt_text || design.title || "Inspired design"}
                     loading="lazy"
                     decoding="async"

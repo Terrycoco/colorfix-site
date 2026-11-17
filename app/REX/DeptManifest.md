@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-08 06:51:39 PM PST
+**UPDATED:** 2026-11-13 11:01:18 AM PST
 
 # REX — Department Manifest
 
@@ -326,3 +326,13 @@ Before changing REX:
 **No improvements have been implemented under this manifest.** The inventory, architectural findings, prioritized recommendations and Markdown checks are documentation work only. All items in Future Improvements remain proposed and unimplemented; none is authorized for implementation by this document.
 
 After a separately approved improvement is implemented and verified, record its scope, affected files/interfaces, verification evidence, completion date, and local/deployed status here, and update the corresponding current inventory and future item. Do not mark an improvement complete merely because it has been documented, proposed or approved.
+
+## Photo-specific public PV context
+
+The existing `viewer` resolver and `saved_palette` resource type now support `context={format:"public",art_inspired_photo_id:<room Photo Library ID>}`, with first-class `experience_key=public`. Palette ID plus this context identifies the room experience; different rooms sharing a palette have independent stable tokens. No new resource type, tables or token generator is introduced. `ViewerResolver` obtains the normal saved-palette payload and delegates the room/inspiration presentation and visibility checks to PALETTES `ArtInspiredPhotoService` before returning viewer/share metadata. Ordinary reservations without this context are unchanged.
+
+`RexReserver::findReusable(RexCreateReservationRequest): ?RexReservation` exposes the existing admin create path's active, exact destination/experience/recursively-key-normalized-context matching, choosing the oldest unrevoked match. Both the admin endpoint and PALETTES photo entry use it; token creation remains `reserve()`. Callers must serialize check-and-create (the public photo entry locks the owning saved-palette row). A saturated 500-row lookup with no match fails closed instead of creating a possible duplicate.
+
+### Playlist share-title precedence
+
+Playlist Experience and Playlist Thumbs share metadata use PLAYLISTS' `PdoPlaylistRepository::getCoverTitle(int $playlistId): string`: the first nonblank active `cover-image` slide title in authored order, independent of playback inclusion flags. Empty/missing cover titles retain each resolver's existing fallback. Public entry uses the resolved share title for both `og:title` and `twitter:title`; it does not rewrite playlist records or reservation identities.

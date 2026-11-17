@@ -23,6 +23,7 @@ function DesktopWorkbenchDrawer({
   beforeClose = null,
   children,
   footer = null,
+  actions = null,
   portal = false,
   padded = false,
   className = "",
@@ -85,6 +86,7 @@ function DesktopWorkbenchDrawer({
           >
             {closing ? "Closing..." : closeLabel}
           </button>
+          {actions}
         </div>
       ) : null}
 

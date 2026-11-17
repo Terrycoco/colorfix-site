@@ -111,6 +111,8 @@ try {
 
         $items[] = [
             'photo_library_id' => (int)($row['photo_library_id'] ?? 0),
+            'source_type' => $row['source_type'] ?? null,
+            'inspiration_photo_id' => $row['inspiration_photo_id'] ?? null,
             'photo_url' => $photoUrl,
             'photo_type' => (string)($row['photo_type'] ?? 'full'),
             'trigger_color_id' => isset($row['trigger_color_id'])

@@ -1,0 +1,56 @@
+Art-inspired Palette Viewer — local implementation report
+
+Implemented locally only. No production deployment or data changes.
+
+Association: PHOTOS reads the room's explicit inspiration_photo_id, validates both photos as public, and supplies the source art photo. ARTWORK supplies metadata and the existing /inspired-by/{artwork_id} route. The source art photo's palette_id supplies every saved palette member; the room's own palette cannot truncate this palette. No new palette or PV records, resource types or schema are introduced.
+
+REX: existing viewer/saved_palette destination with public experience and art_inspired_photo_id context. Gallery/color links use a narrow public entry that checks/reuses the exact room reservation, creates only missing reservations via RexReserver, and redirects to /t/{token}. PALETTES locks the saved-palette row before check/create. Direct/shared URLs resolve the same room, full palette and source-art inset. Generic reservations remain unchanged. Reuse matching was extracted from the existing admin endpoint into RexReserver.
+
+Presentation: existing PaletteViewer, room main image, complete swatches, 120x96 cropped artwork inset beneath the room with clickable Art Inspiration caption. Enlargement and ordinary viewer controls remain unchanged.
+
+Verification passed:
+- 28 isolated SQLite/backend checks: existing/missing/repeated/distinct room REX, direct resolution, all eight ordered colors, ordinary/artwork PV behavior, gallery/color membership, no palette duplication, privacy checks.
+- Actual React gallery -> REX route -> PV browser checks at 1280px and 390px, using real PHP resolver fixture payloads: correct room, all eight swatches, cropped inset, caption navigation, enlargement, reload and shared links.
+- Existing Gallery HTTP/SQLite and desktop/mobile browser regression: original artwork framing, ordinary REX links, visibility, filters, sorting and errors. Updated its obsolete original-image CSS expectation to the already-implemented PHOTOS derivative contract.
+- Two existing REX viewer/playlist association regressions.
+- Modified PHP syntax, git diff whitespace checks, production build.
+
+Limits:
+- Requires source_type=art_inspired, an explicit valid inspiration_photo_id, saved artwork metadata and the source artwork's palette association. Both photos must be public/active/non-retired and not client-associated.
+- Photo reassignment to a different artwork palette invalidates that old room experience rather than silently substituting a different palette.
+- Bluehost/MySQL concurrency was not exercised; locking logic was reviewed and SQLite transaction/token tests passed.
+- Legacy RexCoreTest could not load: its pre-existing mock omits five required repository-interface methods. Real-repository REX tests above passed; no claim that the full legacy suite passes.
+- A saturated 500-reservation reuse lookup fails closed rather than risking duplicate tokens.
+
+Packages: 01 backend, 02 frontend (requires 01 and the earlier PHOTOS integration), 03 tests (requires both). Source only; no compiled build, secrets, original photos or installation scripts.
+
+Changed files:
+api/tests/ArtInspiredPhotoPVTest.php
+api/tests/fixtures/GalleryRunQueryDatabase.php
+api/v2/colors/trigger-photos.php
+api/v2/palette-viewer-photo.php
+app/ARTWORK/DeptManifest.md
+app/ARTWORK/Services/ArtworkService.php
+app/GALLERY/Endpoints/GalleryEndpoint.php
+app/GALLERY/Endpoints/GalleryResultsEndpoint.php
+app/GALLERY/Endpoints/GalleryRunQueryEndpoint.php
+app/GALLERY/Repos/PdoGalleryResultsRepository.php
+app/PALETTES/DeptManifest.md
+app/PALETTES/Endpoints/ArtInspiredPhotoPVEndpoint.php
+app/PALETTES/Repos/PdoPaletteEditorRepository.php
+app/PALETTES/Services/ArtInspiredPhotoService.php
+app/PALETTES/Services/PaletteViewerAccessService.php
+app/PHOTOS/DeptManifest.md
+app/PHOTOS/Services/PhotoInspirationService.php
+app/REX/DeptManifest.md
+app/REX/Endpoints/RexCreateEndpoint.php
+app/REX/Resolvers/ViewerResolver.php
+app/REX/Services/RexReserver.php
+app/repos/PdoColorTriggerPhotoRepository.php
+scripts/test-art-inspired-pv.mjs
+scripts/test-gallery-run-query.mjs
+src/components/GalleryItems/PictureSwatchItem.jsx
+src/components/Viewers/PaletteViewer/index.jsx
+src/components/Viewers/paletteviewer.css
+src/helpers/photoViewerUrl.js
+src/pages/ColorDetailPage/index.jsx
