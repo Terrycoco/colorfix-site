@@ -6,6 +6,7 @@ namespace App\ARTICLES\Services;
 use App\ARTICLES\Repos\PdoArticleRepository;
 use App\PALETTES\Services\PaletteService;
 use App\PHOTOS\Services\PhotoDeliveryService;
+use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\Repos\PdoCtaRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use PDO;
@@ -118,30 +119,52 @@ class PublicArticleService
 
         $ctaIds = $overrides['_cta_ids'] ?? [];
         $ctaIds = is_array($ctaIds) ? array_values(array_filter(array_map('intval', $ctaIds))) : [];
-        if (!$ctaIds) return [];
-
-        $ctas = (new PdoCtaRepository($this->pdo))->getByIds($ctaIds);
+        $sources = (new PdoPlaylistRepository($this->pdo))->findArticleSources((int)$article['id']);
+        $isArtwork = in_array('artwork', array_column($sources, 'editorial_type'), true);
+        $ctaRepo = new PdoCtaRepository($this->pdo);
+        // An explicit selection (including an empty selection) remains authoritative.
+        if (array_key_exists('_cta_ids', $overrides)) {
+            $ctas = $ctaRepo->getByIds($ctaIds);
+        } else {
+            $group = $isArtwork ? $ctaRepo->findGroupByKey('artwork-article') : null;
+            $ctas = $group ? $ctaRepo->getByGroupId((int)$group['id']) : [];
+        }
         if (!$ctas) return [];
         $rexRepo = new PdoRexReservationRepository($this->pdo);
+        $sourceId = count($sources) === 1 ? (int)$sources[0]['playlist_id'] : 0;
         foreach ($ctas as $idx => $cta) {
             $ctaId = $cta['cta_id'] ?? null;
             if ($ctaId === null) continue;
             $key = (string)$ctaId;
-            if (!isset($overrides[$key]) || !is_array($overrides[$key])) continue;
 
             $base = [];
             if (!empty($cta['params'])) {
                 $parsed = json_decode((string)$cta['params'], true);
                 if (is_array($parsed)) $base = $parsed;
             }
-            $merged = array_merge($base, $overrides[$key]);
-            $playlistId = isset($merged['playlist_id']) ? (int)$merged['playlist_id'] : 0;
-            if ($playlistId > 0) {
+            $merged = array_merge($base, is_array($overrides[$key] ?? null) ? $overrides[$key] : []);
+            $isPlaylist = ($cta['action_key'] ?? '') === 'playlist_link';
+            $hasUrl = trim((string)($merged['url'] ?? '')) !== '';
+            $hasExplicitId = array_key_exists('playlist_id', $merged)
+                || !empty($merged['playlist_instance_id']) || !empty($merged['playlistInstanceId']);
+            $playlistId = (int)($merged['playlist_id'] ?? 0);
+            if ($isPlaylist && !$hasExplicitId) $playlistId = $sourceId;
+            if (!$hasUrl && $playlistId > 0) {
                 $reservations = $rexRepo->findActiveByResourceIdsAndExperience(
                     'playlist_experience', 'playlist', [$playlistId], 'public'
                 );
                 $reservation = $reservations[$playlistId] ?? null;
-                if ($reservation !== null) $merged['url'] = '/t/' . $reservation->token;
+                if ($reservation !== null) {
+                    if ($isPlaylist && !$hasExplicitId) {
+                        $ctas[$idx]['data'] = ['reserved_playlist_url' => '/t/' . $reservation->token];
+                    } else {
+                        $merged['url'] = '/t/' . $reservation->token;
+                    }
+                }
+            }
+            // Do not invoke the legacy player-path fallback without a resolved destination.
+            if ($isPlaylist && empty($merged['url']) && empty($ctas[$idx]['data']['reserved_playlist_url'])) {
+                $ctas[$idx]['enabled'] = false;
             }
             $ctas[$idx]['params'] = json_encode($merged, JSON_UNESCAPED_SLASHES);
         }

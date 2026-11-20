@@ -1,4 +1,4 @@
-UPDATED: 2026-11-18 09:03:53 PST
+UPDATED: 2026-11-20 08:40:47 PST
 
 # PLAYLISTS — Department Manifest
 
@@ -14,6 +14,7 @@ PLAYLISTS does not own Photo Library images/crops, saved palettes, article conte
 
 `Repos/PdoPlaylistRepository.php`, constructed with `PDO`:
 
+- `findArticleSources(int $articleId): array`: read-only lookup of every existing `playlists.article_id` association, returning `playlist_id` and `editorial_type`. ARTICLES uses this to identify artwork context and reject ambiguous implicit slideshow destinations; no new relationship or ownership of article content is introduced.
 - `getAdminRowById(int $playlistId): ?array`: playlist metadata with hero photo enrichment; returns `editorial_type` as stored, including null. Missing record returns null.
 - `listAdminRows(): array`: non-retired admin playlists, now including `editorial_type`.
 - `listAdminRowsByProjectId(int $projectId): array`: non-retired playlists for a project, now including `editorial_type`; invalid project IDs return an empty array.

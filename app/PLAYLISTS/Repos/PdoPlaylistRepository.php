@@ -21,6 +21,14 @@ use PDO;
 class PdoPlaylistRepository
 
 {
+    /** Existing article association; return every match so consumers cannot guess a source. */
+    public function findArticleSources(int $articleId): array
+    {
+        if ($articleId <= 0) return [];
+        $stmt = $this->pdo->prepare('SELECT playlist_id, editorial_type FROM playlists WHERE article_id = :article_id ORDER BY playlist_id');
+        $stmt->execute(['article_id' => $articleId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     /** Public marketing candidates and all selected photo IDs, for artwork-context verification. */
     public function findPublicForArtworkPhoto(int $artworkPhotoId, string $slideFlag): array

@@ -1,4 +1,4 @@
-UPDATED: 2026-11-17 14:39:21 PST
+UPDATED: 2026-11-20 08:40:47 PST
 
 # ARTICLES — Department Manifest
 
@@ -51,7 +51,7 @@ Public `/articles/:id`, admin `/admin/articles` and `/admin/articles/:id`, and p
 ## Dependencies and callers
 
 - PHOTOS owns Photo Library rows and files. Despite legacy names, `hero_asset_id`, `hero_mobile_asset_id` and section `asset_id` are used as Photo Library IDs by current APIs/UI. Admin get and public get/featured perform existing read-only photo joins. PHOTOS lifecycle code also checks/rewires article photo references in its established coordinated operations.
-- CTA configuration stays in article `cta_overrides` JSON (selected `_cta_ids` plus per-CTA overrides). Public get reads `App\Repos\PdoCtaRepository` and resolves selected playlist links through `App\REX\Repos\PdoRexReservationRepository`. CTA definitions and REX identities are not owned here.
+- CTA configuration stays in article `cta_overrides` JSON (selected `_cta_ids` plus per-CTA overrides). `PublicArticleService::resolveCtas()` preserves explicit selections, including an empty selection. Otherwise, articles linked to a playlist with `editorial_type=artwork` use the existing `artwork-article` CTA group (production ID 12), resolved by key through `PdoCtaRepository`. PLAYLISTS supplies all source associations through `findArticleSources()`; only exactly one association can supply an implicit destination. For destination-free `playlist_link` actions, the active public REX becomes `data.reserved_playlist_url`. Explicit URLs win; explicit playlist IDs resolve independently and never fall back to a different article source. Missing/ambiguous sources or unavailable public REX disable the destination-free slideshow; other CTAs remain available. No definitions, associations, or REX records are written. The existing article page renders playlist CTAs in its hero and all available CTAs after Final Thoughts through shared CTA components/actions. Params retain their JSON-string response representation. CTA definitions and REX identities are not owned here.
 - `app/PLAYLISTS/Services/PlaylistExperienceService.php` and `app/POD/Managers/PODManager.php` use the repository for article CTA metadata/links. Only their imports changed.
 - `app/ANA/Services/ANAReportService.php`, `app/ANA/Endpoints/ReportEndpoint.php`, legacy `app/Analytics/Services/AnalyticsService.php`, and `api/v2/admin/analytics/counts.php` depend on the repository for article titles. All imports now use ARTICLES. ANA's manifest records the existing dormant ReportEndpoint/bootstrap issue; this migration does not activate or repair it.
 - Frontend consumers remain `AdminArticlesPage`, `ArticlePage`, `FeaturedArticleItem`, `ArticleLinkCta`, shared CTA actions and playlist pickers. `api/tools/prebuild-front-page.php` consumes the public featured API. No frontend files changed.

@@ -1,0 +1,54 @@
+/* Article-only treatment of the shared CTA components. */
+.cf-article-ctas.cta-section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cf-article-ctas .cta-layout {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.cf-article-ctas .cta-button {
+  min-height: 44px;
+  padding: 11px 18px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--cf-ink);
+  box-shadow: none;
+  font: 500 .85rem/1.4 var(--cf-editorial-sans);
+  text-shadow: none;
+}
+.cf-article-ctas .cta-button:hover {
+  background: rgb(127 127 127 / 12%);
+  color: var(--cf-ink);
+}
+.cf-article-ctas .cta-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+.cf-article-ctas--hero {
+  pointer-events: auto;
+}
+.cf-article-ctas--hero .cta-button,
+.cf-article-ctas--hero .cta-button:hover {
+  color: #fffdf6;
+}
+.cf-article-closing {
+  padding: 0 var(--cf-article-gutter) 64px;
+}
+.cf-article-ctas--closing.cta-section {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-top: 24px;
+  border-top: 1px solid rgb(127 127 127 / 25%);
+}
+.cf-article-ctas--closing .cta-button {
+  flex: 1 1 200px;
+}
+@media (max-width: 639px) {
+  .cf-article-closing { padding: 0 23px 42px; }
+  .cf-article-ctas--hero .cta-button { width: auto; }
+}

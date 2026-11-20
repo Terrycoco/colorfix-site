@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import CTASection from "@components/CTASection";
+import { buildCtaHandlers, getCtaKey } from "@helpers/ctaActions";
+import "./ArticleCtas.css";
 import { API_FOLDER } from "@helpers/config";
 import ArticleContainer from "./ArticleContainer";
 import ArticleHero from "./ArticleHero";
 import ArticleInspiration from "./ArticleInspiration";
 import ArticlePalette from "./ArticlePalette";
 import ArticleRoomStudy from "./ArticleRoomStudy";
+import ArticleFinalThoughts from "./ArticleFinalThoughts";
 
 const GET_URL = `${API_FOLDER}/v2/articles/get.php`;
 const photoId = (photo) => Number(photo?.photo_library_id ?? photo?.id ?? 0);
@@ -13,12 +17,24 @@ const photoId = (photo) => Number(photo?.photo_library_id ?? photo?.id ?? 0);
 /** ArticlePage coordinates fetching and presentation. Other article sections are
  * intentionally excluded until their new presentation components are built. */
 export default function ArticlePage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const adminPreview = searchParams.get("admin") === "1";
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const ctas = useMemo(() => (item?.ctas || []).map((cta) => {
+    let params = cta.params || {};
+    if (typeof params === "string") {
+      try { params = JSON.parse(params); } catch { params = {}; }
+    }
+    params = params && typeof params === "object" ? params : {};
+    return { ...cta, params, label: params.label ?? cta.label, variant: "secondary" };
+  }).filter((cta) => cta.enabled !== false), [item]);
+  const playlistCtas = ctas.filter((cta) => getCtaKey(cta) === "playlist_link");
+  const ctaHandlers = useMemo(() => buildCtaHandlers({ navigate }), [navigate]);
+  const handleCta = (cta) => ctaHandlers[getCtaKey(cta)]?.(cta);
 
   useEffect(() => {
     let active = true;
@@ -117,6 +133,15 @@ export default function ArticlePage() {
     );
   }, [item]);
 
+  // The editor's ordinary text section supplies the author's closing reflection.
+  const finalThoughts = useMemo(() => {
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    return sections.find((section) =>
+      section?.kind === "text" &&
+      /^final\s+thoughts$/i.test(String(section?.heading || "").trim())
+    ) || null;
+  }, [item]);
+
   return (
     <ArticleContainer>
       {loading ? (
@@ -134,7 +159,9 @@ export default function ArticlePage() {
             room={hero.room}
             painting={hero.painting}
             insetPositions={hero.positions}
-          />
+          >
+            <CTASection ctas={playlistCtas} onCtaClick={handleCta} layout="inline" className="cf-article-ctas cf-article-ctas--hero" />
+          </ArticleHero>
           {(introduction || inspiration) ? <ArticleInspiration introduction={introduction} section={inspiration} /> : null}
           {paletteSection ? <ArticlePalette section={paletteSection} /> : null}
           {roomSections.length > 0 ? (
@@ -155,6 +182,12 @@ export default function ArticlePage() {
                 />
               ))}
             </>
+          ) : null}
+          {finalThoughts ? <ArticleFinalThoughts section={finalThoughts} adminPreview={adminPreview} /> : null}
+          {ctas.length > 0 ? (
+            <footer className="cf-article-closing">
+              <CTASection ctas={ctas} onCtaClick={handleCta} layout="inline" className="cf-article-ctas cf-article-ctas--closing" />
+            </footer>
           ) : null}
         </>
       )}

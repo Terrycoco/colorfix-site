@@ -1,0 +1,32 @@
+/* Editorial conclusion: intentionally separate from room-study photography. */
+.cf-article-final {
+  padding: 70px var(--cf-article-gutter) 88px;
+}
+.cf-article-final__inner {
+  max-width: 690px;
+  margin: 0 auto;
+}
+.cf-article-final__heading {
+  margin: 0 0 27px;
+  font: 400 2rem/1.18 var(--cf-editorial-serif);
+  text-align: left;
+}
+.cf-article-final__paragraph {
+  margin: 0 0 1.05em;
+  font: 400 1.125rem/1.55 var(--cf-editorial-serif);
+  text-align: left;
+}
+.cf-article-final__paragraph:last-child { margin-bottom: 0; }
+.cf-article-final__placeholder {
+  font: italic 1rem/1.5 var(--cf-editorial-serif);
+  color: var(--cf-muted);
+}
+@media (min-width: 640px) and (max-width: 1023px) {
+  .cf-article-final { padding-top: 55px; padding-bottom: 75px; }
+  .cf-article-final__inner { max-width: 610px; }
+}
+@media (max-width: 639px) {
+  .cf-article-final { padding: 42px 23px 62px; }
+  .cf-article-final__heading { font-size: 1.8rem; margin-bottom: 20px; }
+  .cf-article-final__paragraph { font-size: 1.09rem; line-height: 1.52; }
+}

@@ -26,7 +26,7 @@ function parsePositions(value) {
 }
 
 /** Article-level editorial opening; all later content is separate. */
-export default function ArticleHero({ title, kicker, dek, room, painting, insetPositions }) {
+export default function ArticleHero({ title, kicker, dek, room, painting, insetPositions, children = null }) {
   const [mainShape, setMainShape] = useState("landscape");
   const roomUrl = photoUrl(room, 1600);
   const paintingUrl = photoUrl(painting, 960);
@@ -38,6 +38,7 @@ export default function ArticleHero({ title, kicker, dek, room, painting, insetP
         {kicker ? <p className="cf-article-hero__eyebrow">{displayText(kicker)}</p> : null}
         <h1 className="cf-article-hero__title">{displayText(title)}</h1>
         {dek ? <p className="cf-article-hero__dek">{displayText(dek)}</p> : null}
+        {children}
       </div>
 
       {roomUrl ? (

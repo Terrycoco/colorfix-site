@@ -45,6 +45,12 @@
   max-width: 590px;
 }
 
+/* Keep the photo and its caption in the same narrow column for portrait rooms. */
+.cf-article-room__figure--portrait {
+  max-width: 420px;
+  justify-self: center;
+}
+
 .cf-article-room__figure img {
   display: block;
   width: 100%;
@@ -54,10 +60,19 @@
   object-position: center;
 }
 
+/* Avoid contain letterboxing: the caption starts at the photo's true left edge. */
+.cf-article-room__figure--portrait img {
+  max-height: none;
+  object-fit: initial;
+}
+
 .cf-article-room__image-missing { min-height: 280px; background: #e7e4dc; }
 
 .cf-article-room__caption {
   margin-top: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   color: var(--cf-muted);
   font: 400 .75rem/1.55 var(--cf-editorial-sans);
 }
@@ -108,6 +123,7 @@
   .cf-article-room--reversed .cf-article-room__figure,
   .cf-article-room--reversed .cf-article-room__copy { grid-column: auto; grid-row: auto; }
   .cf-article-room__figure { order: 1; width: 100%; margin-bottom: 20px; }
+  .cf-article-room__figure--portrait { align-self: center; }
   .cf-article-room__copy { display: contents; }
   .cf-article-room__figure img { max-height: none; }
   .cf-article-room__heading { order: 0; align-self: stretch; width: 100%; margin: 0 0 16px; text-align: left; font-size: 1.65rem; }
