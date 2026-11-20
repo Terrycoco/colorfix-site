@@ -12,6 +12,7 @@ use App\PUB\Create\Pinterest\Support\PinterestCreatorTools;
 use App\PUB\Create\Video\PdoVideoJobRepository;
 use App\PUB\Create\Video\VideoWorkerHealthService;
 use App\PUB\Create\YouTube\PlaylistVideoCreator;
+use App\PUB\Create\Website\ArticleCreator;
 use App\PUB\Errors\PubErrorReporter;
 use App\PUB\Errors\PubErrorHandler;
 use App\ERR\Managers\ErrorManager;
@@ -92,6 +93,7 @@ final class CreateManager implements PubComManagerContract
     private ?VideoWorkerHealthService $videoWorkerHealth = null;
     private ?PubRunService $runService = null;
     private ?string $publicBaseUrl = null;
+    private bool $articleOverwriteAuthorized = false;
 
 
     public function __construct(
@@ -291,6 +293,14 @@ final class CreateManager implements PubComManagerContract
             $this->normalizeExistingPolicy(
                 $existingPolicy
             );
+
+        // Articles have a permanent playlist identity across PUB runs.
+        // Do not reserve or replace PUB assets until this check is resolved.
+        $this->articleOverwriteAuthorized = $existingPolicy['article'] === 'overwrite';
+        $articleCheck = $this->checkArticleOrders($orders, $existingPolicy);
+        if ($articleCheck !== null) {
+            return $articleCheck;
+        }
 
 
         /*
@@ -1415,6 +1425,65 @@ final class CreateManager implements PubComManagerContract
      *   shipped: string
      * }
      */
+    /**
+     * One playlist corresponds to one ARTICLES record. Published articles are
+     * never overwritten here; draft replacements require an explicit reply.
+     * Missing ARTICLES rows (deleted in the editor) may be recreated.
+     */
+    private function checkArticleOrders(array $orders, array $policy): ?array
+    {
+        $matches = [];
+        $published = [];
+        foreach ($orders as $index => $order) {
+            if (!is_array($order)) continue;
+            $box = is_array($order['box'] ?? null) ? $order['box'] : null;
+            $assetId = (int)($order['pub_asset_id'] ?? 0);
+            if ($box !== null) {
+                if (strtolower(trim((string)($box['asset_type'] ?? ''))) !== 'article') continue;
+                $playlistId = (int)($box['source_id'] ?? 0);
+            } elseif ($assetId > 0) {
+                $asset = $this->assets->getById($assetId);
+                if (!is_array($asset) || (string)($asset['asset_type'] ?? '') !== 'article') continue;
+                $playlistId = (int)($asset['source_id'] ?? 0);
+            } else continue;
+            if ($playlistId <= 0) continue;
+            $link = $this->assets->getPlaylistArticle($playlistId);
+            if ($link === null || !$link['article_exists']) continue;
+            $match = [
+                'order_index' => (int)$index,
+                'source_type' => 'playlist',
+                'source_id' => $playlistId,
+                'article_id' => (int)$link['article_id'],
+                'title' => (string)($link['title'] ?? ''),
+                'status' => (string)($link['status'] ?? ''),
+            ];
+            if (strtolower($match['status']) !== 'draft') {
+                $published[] = $match;
+            } else {
+                $matches[] = $match;
+            }
+        }
+        if ($published !== []) {
+            return [
+                'code' => 'article_already_published',
+                'existing_asset_warning' => true,
+                'existing_policy' => $policy,
+                'matches' => $published,
+                'created' => [], 'queued' => [], 'failed' => [],
+            ];
+        }
+        if ($matches !== [] && ($policy['article'] ?? 'check') !== 'overwrite') {
+            return [
+                'code' => 'existing_article_warning',
+                'existing_asset_warning' => true,
+                'existing_policy' => $policy,
+                'matches' => $matches,
+                'created' => [], 'queued' => [], 'failed' => [],
+            ];
+        }
+        return null;
+    }
+
     private function normalizeExistingPolicy(
         array|string $policy
     ): array {
@@ -1424,6 +1493,7 @@ final class CreateManager implements PubComManagerContract
 
             'shipped' =>
                 'check',
+            'article' => 'check',
         ];
 
 
@@ -1451,6 +1521,7 @@ final class CreateManager implements PubComManagerContract
 
                     'shipped' =>
                         'new_version',
+                    'article' => 'check',
                 ];
             }
 
@@ -1518,12 +1589,14 @@ final class CreateManager implements PubComManagerContract
         }
 
 
+        $article = strtolower(trim((string)($policy['article'] ?? 'check')));
+        if (!in_array($article, ['check', 'overwrite'], true)) {
+            throw new RuntimeException('Invalid article overwrite policy.');
+        }
         return [
-            'unshipped' =>
-                $unshipped,
-
-            'shipped' =>
-                $shipped,
+            'unshipped' => $unshipped,
+            'shipped' => $shipped,
+            'article' => $article,
         ];
     }
 
@@ -2433,6 +2506,14 @@ final class CreateManager implements PubComManagerContract
             ]);
 
 
+        if ($resolved['asset_type'] === 'article') {
+            return [
+                'status' => 'blocked',
+                'pub_asset_id' => $pubAssetId,
+                'asset_type' => 'article',
+                'error' => 'Article regeneration requires confirmation through the batch CREATE workflow.',
+            ];
+        }
         $creator =
             $this->creatorForAssetType(
                 $resolved[
@@ -3304,6 +3385,9 @@ final class CreateManager implements PubComManagerContract
                         $this->logoPath()
                     ),
 
+                'article' =>
+                    new ArticleCreator($this->pdo),
+
                 'youtube_video' =>
                     new PlaylistVideoCreator(
                         $this->assets,
@@ -3423,6 +3507,18 @@ final class CreateManager implements PubComManagerContract
             );
 
 
+        if ($assetType === 'article') {
+            $playlistId = (int)($ingredients['playlist_id'] ?? 0);
+            $link = $this->assets->getPlaylistArticle($playlistId);
+            if ($link !== null && $link['article_exists']) {
+                $existingStatus = strtolower((string)($link['status'] ?? ''));
+                if ($existingStatus !== 'draft' || empty($this->articleOverwriteAuthorized)) {
+                    throw new RuntimeException('Article exists; regeneration was not authorized.');
+                }
+                $ingredients['existing_article_id'] = (int)$link['article_id'];
+                $ingredients['overwrite_authorized'] = true;
+            }
+        }
         return $creator->create(
             $pubAssetId,
             $ingredients
@@ -3474,6 +3570,9 @@ final class CreateManager implements PubComManagerContract
          * Every synchronous Creator returns a finished physical asset.
          * CreateManager owns the common lifecycle transition to created.
          */
+        if ($assetType === 'article') {
+            return $this->assets->markArticleCreated($pubAssetId, $asset);
+        }
         return $this->assets
             ->markCreated(
                 $pubAssetId,
@@ -3500,6 +3599,8 @@ final class CreateManager implements PubComManagerContract
 
             'youtube_video' =>
                 'youtube',
+
+            'article' => 'website',
 
             default =>
                 throw new RuntimeException(
@@ -3535,6 +3636,8 @@ final class CreateManager implements PubComManagerContract
 
             'youtube_video' =>
                 'youtube.playlist_video',
+
+            'article' => 'website.article',
 
             default =>
                 throw new RuntimeException(

@@ -163,7 +163,7 @@ final class PhotoThumbnailService
                 throw new RuntimeException('Source color profile requires review');
             }
             if ($crop) { [$x,$y,$sw,$sh]=$this->rectangle($info,$crop); $im->cropImage($sw,$sh,$x,$y); $im->setImagePage(0,0,0,0); }
-            $im->autoOrientImage();
+            $im->autoOrient();
             [$tw,$th]=$this->dimensions($im->getImageWidth(),$im->getImageHeight(),$width,$fit);
             if ($tw !== $im->getImageWidth() || $th !== $im->getImageHeight()) $im->resizeImage($tw,$th,\Imagick::FILTER_LANCZOS,1);
             $im->setImageFormat($format); $im->setImageCompressionQuality($quality);

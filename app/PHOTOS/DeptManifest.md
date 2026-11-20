@@ -3,7 +3,7 @@
 **Department:** `PHOTOS`  
 **Location:** `app/PHOTOS/`  
 **Namespace:** `App\PHOTOS`  
-**UPDATED:** 2026-11-13 11:29:26 AM PST
+**UPDATED:** 2026-11-18 09:10:05 PST
 **Status:** Source inventory with PHOTOS inspiration-link service added  
 **Source reviewed:** `PHOTOS(4).zip` (the department's PHP files only). API doorbells, React pages, migrations, and the shared `SystemManifest.md` were **not** in this archive; their paths and behavior require separate verification.
 
@@ -220,3 +220,9 @@ The bot should create `app/<DEPARTMENT>/DeptManifest.md` using **the same number
 `PhotoInspirationService::getPublicInspiration(int $photoId): ?array` returns `{room, artwork_photo}` only for an `art_inspired` room whose explicit `inspiration_photo_id` points to an `art` photo. Both must satisfy PHOTOS public-delivery eligibility (Gallery-visible, active, non-retired, no client, permission not requested/declined) and have local image paths. Otherwise it returns null. PALETTES uses this read-only interface; a shared palette alone does not imply an inspiration relationship.
 
 Photo Editorial consumers: PUB Market Run may obtain a sparse `photo_library_id`-keyed snapshot through `PhotoEditorialService::getMany()` and place it at `items[].photo.editorial` (optional). Photo text is not a Creator ingredient; channel Analyzers independently turn it into publishing proposals.
+
+### Internal complete-record reader (2026-11-18)
+
+`PdoPhotoLibraryRepository::findManyByIds(array $photoIds): array` returns complete `photo_library` row snapshots keyed by integer ID. It deduplicates positive IDs, queries batches of at most 500 with bound placeholders, returns an empty array for no IDs, and omits missing records. SQL errors propagate; no writes or files are touched. It is an authorized-internal-consumer capability, not a public endpoint or eligibility filter. All database columns are retained; callers must not expose these admin snapshots through public responses.
+
+Current caller: PUB `PlaylistSourcePreparer`, which adds existing delivery fields and nests editorial text from `PhotoEditorialService::getMany()` for ANALYZE collection. PHOTOS remains authoritative for photo data; PUB does not implement its own Photo Library SQL. Validation: `scripts/test-pub-photo-collection.php` covers empty/deduplicated/missing IDs and complete owner-row retention along with the PUB handoff.

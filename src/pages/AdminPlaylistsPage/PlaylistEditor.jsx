@@ -125,6 +125,7 @@ const emptyPlaylist = {
   project_id: "",
   title: "",
   type: "normal",
+  editorial_type: null,
   is_active: true,
   is_public: false,
   slug: "",
@@ -2454,6 +2455,8 @@ const PlaylistEditor = forwardRef(function PlaylistEditor(
 
                 type:
                   playlistToSave.type,
+
+                editorial_type: playlistToSave.editorial_type || null,
 
                 is_active:
                   Boolean(

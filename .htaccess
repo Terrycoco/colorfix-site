@@ -1,3 +1,8 @@
+# Deny HTTP access to environment files; PHP filesystem access is unchanged.
+<FilesMatch "(?i)^(?:\.env(?:[._-].*)?|.*\.env(?:[._-].*)?)$">
+    Require all denied
+</FilesMatch>
+
 # Serve SPA entry point for all routes
 <IfModule mod_rewrite.c>
   RewriteEngine On

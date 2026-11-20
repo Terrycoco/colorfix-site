@@ -1,0 +1,95 @@
+/* An editorial opening: continuous article prose beside the source artwork. */
+.cf-article-inspiration {
+  background: var(--cf-paper);
+  color: var(--cf-ink);
+  padding: clamp(38px, 5vw, 78px) clamp(28px, 5vw, 92px);
+}
+
+.cf-article-inspiration__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .85fr);
+  gap: clamp(32px, 3.5vw, 56px);
+  align-items: start;
+  max-width: 1260px;
+  margin-inline: auto;
+}
+
+.cf-article-inspiration__prose { min-width: 0; }
+.cf-article-inspiration .cf-article-introduction {
+  padding: 0;
+  background: transparent;
+}
+.cf-article-inspiration .cf-article-introduction__inner {
+  max-width: 420px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: 0;
+}
+.cf-article-inspiration .cf-article-introduction__paragraph--lead {
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+.cf-article-inspiration__story {
+  max-width: 420px;
+  width: 100%;
+  margin: 1.9rem 0 0 auto;
+}
+.cf-article-inspiration__heading {
+  margin: 0 0 .75rem;
+  font-family: var(--cf-editorial-serif);
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.cf-article-inspiration__story p {
+  margin: 0 0 1em;
+  font-family: var(--cf-editorial-serif);
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+.cf-article-inspiration__figure {
+  margin: 0;
+  min-width: 0;
+}
+.cf-article-inspiration__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  max-height: 670px;
+  object-fit: contain;
+  object-position: top center;
+}
+.cf-article-inspiration__figure figcaption {
+  margin-top: .8rem;
+  font-family: var(--cf-editorial-sans);
+  color: var(--cf-muted);
+  font-size: .75rem;
+  line-height: 1.55;
+}
+
+/* Tablet: two balanced columns, less space devoted to gutters. */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .cf-article-inspiration { padding: 36px 32px 48px; }
+  .cf-article-inspiration__grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 28px; }
+  .cf-article-inspiration .cf-article-introduction__inner,
+  .cf-article-inspiration__story { max-width: 350px; }
+  .cf-article-inspiration .cf-article-introduction__paragraph--lead { font-size: 1.0625rem; }
+  .cf-article-inspiration__story p { font-size: 1.0625rem; }
+  .cf-article-inspiration__heading { font-size: 1.75rem; }
+}
+
+/* Phone: real reading order, with the artwork just after the first prose. */
+@media (max-width: 639px) {
+  .cf-article-inspiration { padding: 28px 23px 42px; }
+  .cf-article-inspiration__grid { display: flex; flex-direction: column; gap: 18px; }
+  .cf-article-inspiration__prose { display: contents; }
+  .cf-article-inspiration .cf-article-introduction { order: 0; }
+  .cf-article-inspiration .cf-article-introduction__inner { max-width: none; margin: 0; }
+  .cf-article-inspiration__figure { order: 1; width: 100%; }
+  .cf-article-inspiration__story { order: 2; max-width: none; margin: 6px 0 0; }
+  .cf-article-inspiration .cf-article-introduction__paragraph--lead { font-size: 1.14rem; line-height: 1.46; }
+  .cf-article-inspiration__story p { font-size: 1.09rem; line-height: 1.5; }
+  .cf-article-inspiration__heading { font-size: 1.85rem; }
+  .cf-article-inspiration__figure img { max-height: none; }
+}

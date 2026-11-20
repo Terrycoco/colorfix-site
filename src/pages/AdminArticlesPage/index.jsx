@@ -1,15 +1,19 @@
 import PhotoPreviewImage from "@components/PhotoPreview/PhotoPreviewImage";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
 import PhotoPickerModal from "@components/PhotoPickerModal";
 import PlaylistPicker from "@components/PlaylistPicker";
+import {
+  AdminMasterDetail, AdminListPane, AdminObjectList, AdminObjectListItem,
+  AdminDetailPane, AdminPanel, AdminButton, AdminNotice, AdminDialog,
+} from "@components/AdminLayout";
 import "./admin-articles.css";
 
 const LIST_URL = `${API_FOLDER}/v2/admin/articles/list.php`;
 const GET_URL = `${API_FOLDER}/v2/admin/articles/get.php`;
+const AI_EXPORT_URL = `${API_FOLDER}/v2/admin/articles/ai-export.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/articles/save.php`;
-const TAGS_URL = `${API_FOLDER}/v2/admin/articles/tags.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/articles/delete.php`;
 const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
 
@@ -19,6 +23,9 @@ const emptyArticle = {
   status: "draft",
   title: "",
   dek: "",
+  kicker: "",
+  hero_inset_asset_id: "",
+  hero_inset_positions: { desktop: "bottom-right", tablet: "bottom-right", phone: "bottom-right" },
   slug: "",
   meta_description: "",
   hero_asset_id: "",
@@ -60,12 +67,24 @@ function normalizeSectionForEditor(section = {}) {
   };
 }
 
+const insetCornerOptions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+function normalizeInsetPositions(value) {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) parsed = {};
+  return Object.fromEntries(["desktop", "tablet", "phone"].map((device) => [
+    device, insetCornerOptions.includes(parsed[device]) ? parsed[device] : "bottom-right"
+  ]));
+}
+
 function kindUsesImage(kind) {
   return kind === "image" || kind === "image_text";
 }
 
 function kindUsesBody(kind) {
-  return kind === "text" || kind === "image_text" || kind === "embed" || kind === "cta" || kind === "list";
+  return kind === "text" || kind === "image_text" || kind === "embed" || kind === "cta" || kind === "list" || kind === "palette_link";
 }
 
 function slugify(value = "") {
@@ -80,53 +99,44 @@ function slugify(value = "") {
 
 export default function AdminArticlesPage() {
   const [articles, setArticles] = useState([]);
-  const [tags, setTags] = useState([]);
-  const [filters, setFilters] = useState({ q: "", tags: "", type: "", status: "" });
+  const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyArticle);
   const [ctas, setCtas] = useState([]);
   const [showCtaPicker, setShowCtaPicker] = useState(false);
   const [ctaDraft, setCtaDraft] = useState({ ids: [], overrides: {} });
   const [photoPickerTarget, setPhotoPickerTarget] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
-  const [showList, setShowList] = useState(true);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const savedSnapshotRef = useRef(JSON.stringify(emptyArticle));
 
-  const tagOptions = useMemo(() => {
-    return tags.map((tag) => tag.slug).filter(Boolean);
-  }, [tags]);
+  function confirmDiscard() {
+    return JSON.stringify(form) === savedSnapshotRef.current
+      || window.confirm("Discard unsaved article changes?");
+  }
+
+  const visibleArticles = useMemo(() => {
+    const normalize = (value) => String(value || "").normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim();
+    const query = normalize(searchText);
+    return query ? articles.filter((item) =>
+      normalize(`${item.title || ""} ${item.slug || ""}`).includes(query)
+    ) : articles;
+  }, [articles, searchText]);
 
   useEffect(() => {
-    loadTags();
     loadArticles();
     loadCtas();
   }, []);
-
-  async function loadTags() {
-    try {
-      const res = await fetch(`${TAGS_URL}?_=${Date.now()}`, { credentials: "include" });
-      const text = await res.text();
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-      const data = JSON.parse(text);
-      if (!data?.ok) throw new Error(data?.error || "Failed to load tags");
-      setTags(Array.isArray(data.items) ? data.items : []);
-    } catch (err) {
-      setError(err?.message || "Failed to load tags");
-    }
-  }
 
   async function loadArticles() {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams();
-      if (filters.q) params.set("q", filters.q);
-      if (filters.tags) params.set("tags", filters.tags);
-      if (filters.type) params.set("type", filters.type);
-      if (filters.status) params.set("status", filters.status);
       params.set("_", Date.now().toString());
 
       const res = await fetch(`${LIST_URL}?${params.toString()}`, { credentials: "include" });
@@ -155,7 +165,8 @@ export default function AdminArticlesPage() {
     }
   }
 
-  async function loadArticle(id) {
+  async function loadArticle(id, skipGuard = false) {
+    if (!skipGuard && !confirmDiscard()) return;
     setError("");
     try {
       const res = await fetch(`${GET_URL}?id=${id}&_=${Date.now()}`, { credentials: "include" });
@@ -165,12 +176,15 @@ export default function AdminArticlesPage() {
       if (!data?.ok) throw new Error(data?.error || "Failed to load article");
       const item = data.item || {};
       setShowEditor(true);
-      setForm({
+      const nextForm = {
         id: item.id || null,
         type: item.type || "colorfix",
         status: item.status || "draft",
         title: item.title || "",
         dek: item.dek || "",
+        kicker: item.kicker || "",
+        hero_inset_asset_id: item.hero_inset_asset_id || "",
+        hero_inset_positions: normalizeInsetPositions(item.hero_inset_positions),
         slug: item.slug || "",
         meta_description: item.meta_description || "",
         hero_asset_id: item.hero_asset_id || "",
@@ -183,14 +197,19 @@ export default function AdminArticlesPage() {
           ? item.tags.map((tag) => tag.slug || tag.name).filter(Boolean).join(", ")
           : "",
         sections: Array.isArray(item.sections) ? item.sections.map(normalizeSectionForEditor) : [],
-      });
+      };
+      savedSnapshotRef.current = JSON.stringify(nextForm);
+      setForm(nextForm);
     } catch (err) {
       setError(err?.message || "Failed to load article");
     }
   }
 
   function handleNewArticle() {
-    setForm({ ...emptyArticle, tagsText: "" });
+    if (!confirmDiscard()) return;
+    const nextForm = { ...emptyArticle, tagsText: "" };
+    savedSnapshotRef.current = JSON.stringify(nextForm);
+    setForm(nextForm);
     setShowEditor(true);
   }
 
@@ -288,7 +307,7 @@ export default function AdminArticlesPage() {
       setStatus("Article saved.");
       if (newId) {
         await loadArticles();
-        await loadArticle(newId);
+        await loadArticle(newId, true);
       }
     } catch (err) {
       setError(err?.message || "Save failed");
@@ -319,7 +338,9 @@ export default function AdminArticlesPage() {
       const data = JSON.parse(text);
       if (!data?.ok) throw new Error(data?.error || "Delete failed");
       setStatus("Article deleted.");
-      setForm({ ...emptyArticle, tagsText: "" });
+      const nextForm = { ...emptyArticle, tagsText: "" };
+      savedSnapshotRef.current = JSON.stringify(nextForm);
+      setForm(nextForm);
       setShowEditor(false);
       await loadArticles();
     } catch (err) {
@@ -330,6 +351,7 @@ export default function AdminArticlesPage() {
   }
 
   async function handleDuplicateById(articleId) {
+    if (!confirmDiscard()) return;
     setStatus("");
     setError("");
     try {
@@ -362,13 +384,14 @@ export default function AdminArticlesPage() {
       const newId = saveData.article_id;
       setStatus("Article duplicated.");
       await loadArticles();
-      if (newId) await loadArticle(newId);
+      if (newId) await loadArticle(newId, true);
     } catch (err) {
       setError(err?.message || "Duplicate failed");
     }
   }
 
   function handleDuplicateCurrent() {
+    if (!form.id && !confirmDiscard()) return;
     if (form.id) {
       handleDuplicateById(form.id);
     } else {
@@ -425,6 +448,10 @@ export default function AdminArticlesPage() {
     setPhotoPickerTarget({ type: "hero" });
   }
 
+  function openHeroInsetPhotoPicker() {
+    setPhotoPickerTarget({ type: "hero_inset" });
+  }
+
   function openHeroMobilePhotoPicker() {
     setPhotoPickerTarget({ type: "hero_mobile" });
   }
@@ -438,6 +465,8 @@ export default function AdminArticlesPage() {
     const nextId = String(picked.photo_library_id);
     if (photoPickerTarget?.type === "hero") {
       setForm((prev) => ({ ...prev, hero_asset_id: nextId }));
+    } else if (photoPickerTarget?.type === "hero_inset") {
+      setForm((prev) => ({ ...prev, hero_inset_asset_id: nextId }));
     } else if (photoPickerTarget?.type === "hero_mobile") {
       setForm((prev) => ({ ...prev, hero_mobile_asset_id: nextId }));
     } else if (photoPickerTarget?.type === "section" && photoPickerTarget?.sectionId != null) {
@@ -474,6 +503,9 @@ export default function AdminArticlesPage() {
       status: article.status || "draft",
       title: article.title || "",
       dek: article.dek || "",
+      kicker: article.kicker || "",
+      hero_inset_asset_id: article.hero_inset_asset_id ? Number(article.hero_inset_asset_id) : null,
+      hero_inset_positions: normalizeInsetPositions(article.hero_inset_positions),
       slug: article.slug || "",
       meta_description: article.meta_description || "",
       hero_asset_id: article.hero_asset_id ? Number(article.hero_asset_id) : null,
@@ -521,157 +553,60 @@ export default function AdminArticlesPage() {
 
   return (
     <div className="admin-articles">
-      {error && <div className="admin-articles__error">{error}</div>}
-      {status && <div className="admin-articles__status">{status}</div>}
+      {error && <AdminNotice variant="danger">{error}</AdminNotice>}
+      {status && <AdminNotice variant="success">{status}</AdminNotice>}
 
-      <div className={`admin-articles__workspace ${showList ? "" : "admin-articles__workspace--collapsed"}`}>
-        <aside className={`admin-articles__drawer ${showList ? "" : "admin-articles__drawer--collapsed"}`}>
-          <div className="admin-articles__drawer-header">
-            <h2>Articles</h2>
-            <button type="button" onClick={() => setShowList((prev) => !prev)}>
-              {showList ? "<" : ">"}
-            </button>
-          </div>
-          {showList && (
-            <>
-              <section className="admin-articles__filters">
-                <label>
-                  Search
-                  <input
-                    type="text"
-                    value={filters.q}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-                    placeholder="title or slug"
+      <AdminMasterDetail
+        storageKey="admin-articles-list-width"
+        selectedId={showEditor ? form.id : null}
+        list={
+          <AdminListPane
+            title="Articles"
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            searchPlaceholder="Search articles"
+          >
+            {loading ? <div className="admin-articles__loading">Loading…</div> : (
+              <AdminObjectList>
+                {visibleArticles.map((item) => (
+                  <AdminObjectListItem
+                    key={item.id}
+                    id={item.id}
+                    title={item.title || "Untitled article"}
+                    meta={[`${item.type || "—"} · ${item.status === "published" ? "Published" : "Draft"}`]}
+                    selected={showEditor && String(form.id) === String(item.id)}
+                    onSelect={() => loadArticle(item.id)}
                   />
-                </label>
-                <label>
-                  Tags
-                  <input
-                    type="text"
-                    list="article-tag-options"
-                    value={filters.tags}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, tags: e.target.value }))}
-                    placeholder="door, exterior"
-                  />
-                </label>
-                <label>
-                  Type
-                  <input
-                    type="text"
-                    value={filters.type}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, type: e.target.value }))}
-                    placeholder="colorfix"
-                  />
-                </label>
-                <label>
-                  Status
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                  >
-                    <option value="">Any</option>
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                  </select>
-                </label>
-                <div className="admin-articles__filter-actions">
-                  <button type="button" onClick={loadArticles}>
-                    Refresh
-                  </button>
-                </div>
-                <datalist id="article-tag-options">
-                  {tagOptions.map((slug) => (
-                    <option key={slug} value={slug} />
-                  ))}
-                </datalist>
-              </section>
-              {loading ? (
-                <div className="admin-articles__loading">Loading…</div>
-              ) : (
-                <div className="admin-articles__table-wrap">
-                <table className="admin-articles__table">
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {articles.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <button
-                            type="button"
-                            className="admin-articles__title-btn"
-                            title={item.title || ""}
-                            onClick={() => loadArticle(item.id)}
-                          >
-                            {item.title}
-                          </button>
-                          <div className="admin-articles__subtitle">
-                            {item.type || "—"} · {item.status === "published" ? "Published" : "Draft"}
-                          </div>
-                        </td>
-                        <td className="admin-articles__actions">
-                        </td>
-                      </tr>
-                      ))}
-                    {!articles.length && (
-                      <tr>
-                        <td colSpan={2} className="admin-articles__empty">
-                          No articles found.
-                        </td>
-                      </tr>
-                    )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <div className="admin-articles__drawer-footer">
-                <button type="button" onClick={handleNewArticle}>
-                  New Article
-                </button>
-              </div>
-            </>
-          )}
-        </aside>
-
-        <section className={`admin-articles__editor ${showEditor ? "" : "admin-articles__editor--empty"}`}>
-          {!showEditor ? (
-            <div className="admin-articles__empty">Select an article to edit.</div>
-          ) : (
-            <>
-          <div className="admin-articles__editor-header">
-            <h2>{form.id ? `Edit Article #${form.id}` : "New Article"}</h2>
-            <div className="admin-articles__editor-actions">
-              <button type="button" onClick={handleDuplicateCurrent}>
-                Duplicate
-              </button>
-              {form.id && (
-                <a
-                  className="admin-articles__preview"
-                  href={`/articles/${form.id}?admin=1`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Preview
-                </a>
-              )}
-              <button type="button" onClick={handleSave} disabled={saving}>
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                className="admin-articles__delete"
-                onClick={handleDelete}
-                disabled={!form.id || form.status === "published" || deleting}
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </button>
-            </div>
-          </div>
-
-          <div className="admin-articles__grid">
+                ))}
+                {!visibleArticles.length && <div className="admin-articles__empty">No articles found.</div>}
+              </AdminObjectList>
+            )}
+          </AdminListPane>
+        }
+        detail={
+          <AdminDetailPane
+            ariaLabel="Article editor"
+            title={showEditor ? (form.id ? `Edit Article #${form.id}` : "New Article") : "Article Editor"}
+            actions={<div className="admin-articles__editor-actions">
+              <AdminButton type="button" onClick={handleNewArticle}>New</AdminButton>
+              {showEditor && <>
+                <AdminButton type="button" variant="secondary" onClick={handleDuplicateCurrent}>Duplicate</AdminButton>
+                {form.id && <AdminButton type="button" variant="secondary" onClick={() => window.open(`/articles/${form.id}?admin=1`, "_blank", "noopener,noreferrer")}>Preview</AdminButton>}
+                {form.id && form.status === "draft" && <AdminButton type="button" variant="secondary" onClick={() => { window.location.href = `${AI_EXPORT_URL}?id=${encodeURIComponent(form.id)}`; }}>Export for AI</AdminButton>}
+                <AdminButton type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save"}</AdminButton>
+                <AdminButton type="button" variant="danger" onClick={handleDelete}
+                  disabled={!form.id || form.status === "published" || deleting}>
+                  {deleting ? "Deleting…" : "Delete"}
+                </AdminButton>
+              </>}
+            </div>}
+          >
+            {!showEditor ? (
+              <div className="admin-articles__empty">Select an article to edit, or create a new one.</div>
+            ) : (
+              <div className="admin-articles__editor-content">
+                <AdminPanel title="Article details">
+                  <div className="admin-articles__grid">
             <label>
               Title
             <input
@@ -689,7 +624,13 @@ export default function AdminArticlesPage() {
               placeholder="Short subtitle"
             />
           </label>
-            <label>
+          <label>
+            Kicker
+            <input type="text" value={form.kicker || ""}
+              onChange={(e) => setForm((prev) => ({ ...prev, kicker: e.target.value }))}
+              placeholder="Editorial series label" />
+          </label>
+          <label>
               Slug
               <div className="admin-articles__slug">
                 <input
@@ -764,6 +705,26 @@ export default function AdminArticlesPage() {
               </div>
             </label>
             <label>
+              Inset Photo ID (optional)
+              <div className="admin-articles__asset-row">
+                <input type="number" value={form.hero_inset_asset_id || ""}
+                  onChange={(e) => setForm((prev) => ({ ...prev, hero_inset_asset_id: e.target.value }))} />
+                <button type="button" onClick={openHeroInsetPhotoPicker}>Find</button>
+                {form.hero_inset_asset_id && <button type="button" onClick={() => setForm((prev) => ({ ...prev, hero_inset_asset_id: "" }))}>Clear</button>}
+              </div>
+            </label>
+            {form.hero_inset_asset_id && ["desktop", "tablet", "phone"].map((device) => (
+              <label key={device}>
+                {device.charAt(0).toUpperCase() + device.slice(1)} Inset Corner
+                <select value={normalizeInsetPositions(form.hero_inset_positions)[device]}
+                  onChange={(e) => setForm((prev) => ({ ...prev, hero_inset_positions: {
+                    ...normalizeInsetPositions(prev.hero_inset_positions), [device]: e.target.value
+                  } }))}>
+                  {insetCornerOptions.map((corner) => <option key={corner} value={corner}>{corner.replace("-", " ")}</option>)}
+                </select>
+              </label>
+            ))}
+            <label>
               Mobile Hero Image ID
               <div className="admin-articles__asset-row">
                 <input
@@ -789,6 +750,8 @@ export default function AdminArticlesPage() {
             />
           </label>
 
+                </AdminPanel>
+                <AdminPanel title="Calls to action">
           <div className="admin-articles__cta">
             <div className="admin-articles__cta-header">
               <h3>Article CTAs</h3>
@@ -815,6 +778,8 @@ export default function AdminArticlesPage() {
             </div>
           </div>
 
+                </AdminPanel>
+                <AdminPanel title="Classification">
           <label className="admin-articles__field">
             Tags (comma separated)
             <input
@@ -825,6 +790,8 @@ export default function AdminArticlesPage() {
           />
         </label>
 
+                </AdminPanel>
+                <AdminPanel title="Sections">
           <div className="admin-articles__sections">
             <div className="admin-articles__sections-header">
               <h3>Sections</h3>
@@ -989,26 +956,23 @@ export default function AdminArticlesPage() {
               </button>
             </div>
           </div>
-            </>
-          )}
-        </section>
-      </div>
-
-      {showCtaPicker && (
-        <div className="admin-articles__cta-modal" role="dialog" aria-modal="true">
-          <div className="admin-articles__cta-backdrop" onClick={() => setShowCtaPicker(false)} />
-          <div className="admin-articles__cta-panel">
-            <div className="admin-articles__cta-panel-header">
-              <div className="admin-articles__cta-title">Pick CTAs for This Article</div>
-              <div className="admin-articles__cta-actions">
-                <button type="button" onClick={saveCtaPicker}>
-                  Save CTAs
-                </button>
-                <button type="button" onClick={() => setShowCtaPicker(false)}>
-                  Close
-                </button>
+                </AdminPanel>
               </div>
-            </div>
+            )}
+          </AdminDetailPane>
+        }
+      />
+
+      <AdminDialog
+        open={showCtaPicker}
+        title="Pick CTAs for This Article"
+        width="min(980px, 94vw)"
+        onClose={() => setShowCtaPicker(false)}
+        actions={[
+          { key: "close", label: "Close", variant: "secondary", onClick: () => setShowCtaPicker(false) },
+          { key: "save", label: "Save CTAs", onClick: saveCtaPicker },
+        ]}
+      >
             <div className="admin-articles__cta-grid">
               <div className="admin-articles__cta-col">
                 <div className="admin-articles__cta-col-title">All CTAs</div>
@@ -1108,9 +1072,7 @@ export default function AdminArticlesPage() {
                 })}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </AdminDialog>
 
       <PhotoPickerModal
         open={photoPickerTarget != null}

@@ -121,43 +121,64 @@ export default function PlaylistRecordEditor({
 
 
 
-              <AdminField label="Type" compact>
+              <AdminToolbar compact>
+                <AdminField label="Type" compact>
 
-                <input
+                  <input
 
-                  className="admin-field__control"
+                    className="admin-field__control"
 
-                  style={{ width: "240px", maxWidth: "100%" }}
+                    style={{ width: "240px", maxWidth: "100%" }}
 
-                  type="text"
+                    type="text"
 
-                  list="admin-playlist-type-options"
+                    list="admin-playlist-type-options"
 
-                  value={playlist.type || ""}
+                    value={playlist.type || ""}
 
-                  onChange={(event) =>
+                    onChange={(event) =>
 
-                    onChange("type", event.target.value)
+                      onChange("type", event.target.value)
 
-                  }
+                    }
 
-                />
-
-
-
-                <datalist id="admin-playlist-type-options">
-
-                  {playlistTypes.map((type) => (
-
-                    <option key={type} value={type} />
-
-                  ))}
-
-                </datalist>
-
-              </AdminField>
+                  />
 
 
+
+                  <datalist id="admin-playlist-type-options">
+
+                    {playlistTypes.map((type) => (
+
+                      <option key={type} value={type} />
+
+                    ))}
+
+                  </datalist>
+
+                </AdminField>
+
+
+
+                <AdminField label="Editorial Type" compact>
+                  <select
+                    className="admin-field__control"
+                    value={playlist.editorial_type || ""}
+                    disabled={busy}
+                    onChange={(event) => onChange("editorial_type", event.target.value || null)}
+                  >
+                    <option value="">Not set</option>
+                    <option value="makeover">Makeover</option>
+                    <option value="spotlight">Spotlight</option>
+                    <option value="teaching">Teaching</option>
+                    <option value="themed_makeover">Themed Makeover</option>
+                    <option value="palette_ideas">Palette Ideas</option>
+                    <option value="artwork">Artwork</option>
+                    <option value="mistakes_fixes">Mistakes &amp; Fixes</option>
+                    <option value="step_by_step_makeover">Step-by-Step Makeover</option>
+                  </select>
+                </AdminField>
+              </AdminToolbar>
 
               <AdminField label="Project" compact>
 

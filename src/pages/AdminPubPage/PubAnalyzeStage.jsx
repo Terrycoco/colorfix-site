@@ -243,6 +243,28 @@ export default function PubAnalyzeStage({
       ""
   );
 
+  // Sort by title rather than playlist ID. The datalist allows typing
+  // part of a title to locate a playlist without scrolling the full list.
+  const alphabetizedPlaylists = useMemo(
+    () => [...playlists].sort((a, b) =>
+      String(a?.title || "").localeCompare(String(b?.title || ""), undefined, {
+        sensitivity: "base",
+        numeric: true,
+      }) || Number(a?.playlist_id || 0) - Number(b?.playlist_id || 0)
+    ),
+    [playlists]
+  );
+
+  const playlistOptionLabel = (playlist) =>
+    `${playlist.title || "Untitled"} (#${playlist.playlist_id})`;
+
+  const [playlistSearch, setPlaylistSearch] = useState("");
+
+  useEffect(() => {
+    const current = playlists.find((row) => String(row.playlist_id) === String(playlistId));
+    if (current) setPlaylistSearch(playlistOptionLabel(current));
+  }, [playlists, playlistId]);
+
   const [
     loadingPlaylists,
     setLoadingPlaylists,
@@ -669,157 +691,13 @@ export default function PubAnalyzeStage({
       }
 
 
-      const existingAssetMatches =
-        Array.isArray(
-          data
-            ?.existing_asset_matches
-        )
-          ? data
-              .existing_asset_matches
-          : [];
-
-      const nextExistingPolicy = {
-        unshipped:
-          "check",
-        shipped:
-          "check",
-      };
-
-
-      const unshippedMatches =
-        existingAssetMatches.filter(
-          (match) =>
-            String(
-              match
-                ?.existing_state ||
-              ""
-            ).toLowerCase() ===
-            "unshipped"
-        );
-
-
-      if (
-        unshippedMatches.length >
-        0
-      ) {
-        const count =
-          unshippedMatches.length;
-
-        const match =
-          count === 1
-            ? unshippedMatches[0]
-            : null;
-
-        const copyPreview =
-          existingCopyPreview(
-            match
-          );
-
-        const replace =
-          await dialog.confirm({
-            title:
-              count === 1
-                ? "Asset Already Created"
-                : "Assets Already Created",
-            message:
-              (
-                count === 1
-                  ? "This asset combo has already been created. Replace it?"
-                  : `${count} asset combos have already been created. Replace them?`
-              ) +
-              (
-                copyPreview
-                  ? `\n\n${copyPreview}`
-                  : ""
-              ),
-            confirmLabel:
-              count === 1
-                ? "Replace"
-                : "Replace All",
-            cancelLabel:
-              "Cancel",
-          });
-
-
-        if (!replace) {
-          return;
-        }
-
-
-        nextExistingPolicy.unshipped =
-          "replace";
-      }
-
-
-      const shippedMatches =
-        existingAssetMatches.filter(
-          (match) =>
-            String(
-              match
-                ?.existing_state ||
-              ""
-            ).toLowerCase() ===
-            "shipped"
-        );
-
-
-      if (
-        shippedMatches.length >
-        0
-      ) {
-        const count =
-          shippedMatches.length;
-
-        const match =
-          count === 1
-            ? shippedMatches[0]
-            : null;
-
-        const copyPreview =
-          existingCopyPreview(
-            match
-          );
-
-        const createNewVersion =
-          await dialog.confirm({
-            title:
-              count === 1
-                ? "Asset Already Shipped"
-                : "Assets Already Shipped",
-            message:
-              (
-                count === 1
-                  ? "This asset combo has already been shipped. Create a new version?"
-                  : `${count} asset combos have already been shipped. Create new versions?`
-              ) +
-              (
-                copyPreview
-                  ? `\n\n${copyPreview}`
-                  : ""
-              ),
-            confirmLabel:
-              count === 1
-                ? "Create New Version"
-                : "Create New Versions",
-            cancelLabel:
-              "Cancel",
-          });
-
-
-        if (!createNewVersion) {
-          return;
-        }
-
-
-        nextExistingPolicy.shipped =
-          "new_version";
-      }
-
-
-      setAnalyzeExistingPolicy(
-        nextExistingPolicy
-      );
-
+      // ANALYZE is read-only. Existing-asset decisions belong to CREATE,
+      // where only the checked, visible output boxes are submitted.
+      // Keep the policy at "check" so CREATE warns before any replacement.
+      setAnalyzeExistingPolicy({
+        unshipped: "check",
+        shipped: "check",
+      });
 
       /*
        * Resolve the source playlist REX automatically.
@@ -1275,16 +1153,16 @@ export default function PubAnalyzeStage({
   }
 
 
+  // CREATE operates on the current workbench view only. Hidden output
+  // types retain their Use choices for All, but cannot be sent accidentally
+  // while a specific output (such as Article) is selected.
   const selectedProposals =
     useMemo(
       () =>
-        proposals.filter(
-          (proposal) =>
-            proposal.include
+        visibleProposals.filter(
+          (proposal) => proposal.include
         ),
-      [
-        proposals,
-      ]
+      [visibleProposals]
     );
 
   const selectedCount =
@@ -1968,6 +1846,36 @@ export default function PubAnalyzeStage({
         );
 
 
+      // An ARTICLES draft is a separate, permanent playlist product.
+      // Only an explicit confirmation may authorize regeneration.
+      if (data?.code === "article_already_published") {
+        const article = Array.isArray(data?.matches) ? data.matches[0] : null;
+        await dialog.confirm({
+          title: "Article Already Published",
+          message: `This playlist already has an article${article?.title ? `: ${article.title}` : ""}. Published articles can only be changed in ARTICLES.`,
+          confirmLabel: "OK",
+          cancelLabel: "Close",
+        });
+        return;
+      }
+
+      if (data?.code === "existing_article_warning") {
+        const matches = Array.isArray(data?.matches) ? data.matches : [];
+        const list = matches.map((m) => `${m.title || "Untitled article"} (draft #${m.article_id})`).join("\n");
+        const overwrite = await dialog.confirm({
+          title: matches.length === 1 ? "Article Draft Exists" : "Article Drafts Exist",
+          message: `An article draft already exists for this playlist. Overwrite it?\n\n${list}\n\nYour edits to the existing draft will be replaced.`,
+          confirmLabel: matches.length === 1 ? "Overwrite Draft" : "Overwrite Drafts",
+          cancelLabel: "Cancel",
+        });
+        if (!overwrite) return;
+        await submitCreate(sealedBoxes, {
+          ...existingPolicy,
+          article: "overwrite",
+        });
+        return;
+      }
+
       if (
         response.status ===
           409 &&
@@ -1996,6 +1904,7 @@ export default function PubAnalyzeStage({
             existingPolicy
               ?.shipped ||
             "check",
+          article: existingPolicy?.article || "check",
         };
 
 
@@ -2226,27 +2135,37 @@ await submitCreate(
               Source Playlist
             </span>
 
-            <select
+            <input
               className="admin-field__control admin-field__control--full"
-              value={playlistId}
-              onChange={(event) =>
-                changePlaylist(event.target.value)
-              }
+              type="text"
+              list="pub-analyze-playlist-options"
+              placeholder="Type a playlist title…"
+              aria-label="Search source playlist by title"
+              autoComplete="off"
+              value={playlistSearch}
               disabled={loadingPlaylists}
-            >
-              <option value="">
-                Pick playlist
-              </option>
-
-              {playlists.map((playlist) => (
+              onChange={(event) => {
+                const value = event.target.value;
+                setPlaylistSearch(value);
+                const match = alphabetizedPlaylists.find((row) =>
+                  playlistOptionLabel(row).toLowerCase() === value.trim().toLowerCase()
+                );
+                if (match) {
+                  changePlaylist(String(match.playlist_id));
+                } else if (playlistId) {
+                  // Never analyze the previous playlist while a new title is being typed.
+                  changePlaylist("");
+                }
+              }}
+            />
+            <datalist id="pub-analyze-playlist-options">
+              {alphabetizedPlaylists.map((playlist) => (
                 <option
                   key={playlist.playlist_id}
-                  value={playlist.playlist_id}
-                >
-                  #{playlist.playlist_id} {playlist.title}
-                </option>
+                  value={playlistOptionLabel(playlist)}
+                />
               ))}
-            </select>
+            </datalist>
           </label>
 
           {playlistId ? (
@@ -2671,48 +2590,6 @@ function formatEstimatedRuntime(
     2,
     "0"
   )}`;
-}
-
-
-function existingCopyPreview(
-  match
-) {
-  if (!match) {
-    return "";
-  }
-
-
-  const currentTitle =
-    String(
-      match
-        ?.existing_asset
-        ?.search_title ||
-      ""
-    ).trim();
-
-  const currentDescription =
-    String(
-      match
-        ?.existing_asset
-        ?.description ||
-      ""
-    ).trim();
-
-
-  return [
-    currentTitle
-      ? `Current title:\n${currentTitle}`
-      : "",
-    currentDescription
-      ? `Current description:\n${currentDescription}`
-      : "",
-  ]
-    .filter(
-      Boolean
-    )
-    .join(
-      "\n\n"
-    );
 }
 
 

@@ -1,342 +1,163 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { API_FOLDER } from "@helpers/config";
-import { buildImageUrl } from "@helpers/assetImage";
-import { withSourceParam } from "@helpers/sourceParam";
-import "./article-page.css";
+import ArticleContainer from "./ArticleContainer";
+import ArticleHero from "./ArticleHero";
+import ArticleInspiration from "./ArticleInspiration";
+import ArticlePalette from "./ArticlePalette";
+import ArticleRoomStudy from "./ArticleRoomStudy";
 
 const GET_URL = `${API_FOLDER}/v2/articles/get.php`;
+const photoId = (photo) => Number(photo?.photo_library_id ?? photo?.id ?? 0);
 
-const emdashify = (value) => String(value ?? "").replace(/--/g, "—");
-
-function sanitizeInlineHtml(value = "") {
-  const escaped = String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  return escaped.replace(
-    /&lt;\s*(\/?)\s*(strong|b|i|em)\s*&gt;/gi,
-    (_, closing, tag) => `<${closing ? "/" : ""}${String(tag).toLowerCase()}>`
-  );
-}
-
-function formatBody(text = "") {
-  if (!text) return null;
-  return String(text)
-    .split("\n")
-    .map((line, idx) => (
-      <p
-        key={`${line}-${idx}`}
-        dangerouslySetInnerHTML={{ __html: emdashify(sanitizeInlineHtml(line)) }}
-      />
-    ));
-}
-
+/** ArticlePage coordinates fetching and presentation. Other article sections are
+ * intentionally excluded until their new presentation components are built. */
 export default function ArticlePage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const [payload, setPayload] = useState(null);
-  const [error, setError] = useState("");
+  const adminPreview = searchParams.get("admin") === "1";
+  const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(true);
-  const playlistId = searchParams.get("playlist_id") ?? "";
-  const playlistTitle = searchParams.get("playlist_title") ?? "";
-  const returnToParam = searchParams.get("return_to") ?? "";
-  const playlistUrl = withSourceParam(returnToParam || (playlistId ? `/p/${playlistId}` : ""));
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
-    async function loadArticle() {
+    const controller = new AbortController();
+
+    async function load() {
       setLoading(true);
       setError("");
+      setItem(null);
       try {
-        const adminFlag = searchParams.get("admin") === "1" ? "&admin=1" : "";
-        const res = await fetch(`${GET_URL}?id=${id}${adminFlag}&_=${Date.now()}`, {
+        if (!id) throw new Error("Missing article ID.");
+        const qs = new URLSearchParams({ id: String(id), _: String(Date.now()) });
+        if (adminPreview) qs.set("admin", "1");
+        const response = await fetch(`${GET_URL}?${qs}`, {
           credentials: "include",
+          signal: controller.signal,
         });
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
-        }
-        const data = JSON.parse(text);
-        if (!data?.ok) throw new Error(data?.error || "Failed to load article");
-        if (!active) return;
-        setPayload(data.item || null);
+        if (!response.ok) throw new Error(`Article request failed (HTTP ${response.status}).`);
+        const result = await response.json();
+        if (!result?.ok) throw new Error(result?.error || "Article could not be loaded.");
+        if (active) setItem(result.item || null);
       } catch (err) {
-        if (!active) return;
-        setError(err?.message || "Failed to load article");
+        if (active && err?.name !== "AbortError") setError(err?.message || "Article could not be loaded.");
       } finally {
         if (active) setLoading(false);
       }
     }
-    if (id) loadArticle();
-    return () => {
-      active = false;
+
+    load();
+    return () => { active = false; controller.abort(); };
+  }, [id, adminPreview]);
+
+  const hero = useMemo(() => {
+    const article = item?.article || {};
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    const images = sections.filter((s) => s?.asset?.rel_path);
+    const sourcePainting = images.find((s) =>
+      /^(the\s+)?inspiration$/i.test(String(s?.heading || "").trim())
+    )?.asset || null;
+    const firstRoom = images.find((s) => s.asset !== sourcePainting &&
+      (s.kind === "image_text" || s.kind === "image"))?.asset || null;
+
+    const findPhoto = (id) => {
+      const wanted = Number(id);
+      if (!wanted) return null;
+      const candidates = [item?.hero, item?.hero_mobile, item?.hero_inset, ...images.map((s) => s.asset)];
+      return candidates.find((p) => p?.rel_path && photoId(p) === wanted) || null;
     };
-  }, [id, searchParams]);
 
+    // Saved article-level selections win. Don't silently substitute an unrelated
+    // photograph if the API has not enriched the selected Photo Library ID yet.
+    const mainId = Number(article.hero_asset_id || 0);
+    const insetId = Number(article.hero_inset_asset_id || 0);
+    return {
+      room: mainId ? (findPhoto(mainId) || item?.hero || null) : (firstRoom || item?.hero || null),
+      painting: insetId ? findPhoto(insetId) : (Object.prototype.hasOwnProperty.call(article, "hero_inset_asset_id") ? null : sourcePainting),
+      positions: article.hero_inset_positions,
+    };
+  }, [item]);
 
+  // The first unheaded text section is the recipe's authored introduction.
+  // Only the opening section is eligible; later unheaded text is not pulled forward.
+  const introduction = useMemo(() => {
+    const first = Array.isArray(item?.sections) ? item.sections[0] : null;
+    return first?.kind === "text" && !String(first.heading ?? "").trim()
+      ? String(first.body ?? "").trim()
+      : "";
+  }, [item]);
 
-  const article = payload?.article;
-  const hero = payload?.hero;
-  const sections = useMemo(() => payload?.sections || [], [payload]);
-  const ctaList = useMemo(() => {
-    const raw = payload?.ctas || [];
-    if (!Array.isArray(raw)) return [];
-    return raw.map((cta) => {
-      const parsed = (() => {
-        if (!cta?.params) return {};
-        if (typeof cta.params === "object") return cta.params;
-        try {
-          const out = JSON.parse(cta.params);
-          return out && typeof out === "object" ? out : {};
-        } catch {
-          return {};
-        }
-      })();
-      const key =
-        (cta?.action_key || cta?.type_action_key || cta?.key || cta?.action || "").toString();
-      return { ...cta, params: parsed, key };
-    });
-  }, [payload]);
-  const playlistCtas = useMemo(
-    () => ctaList.filter((cta) => String(cta.key || "").toLowerCase() === "playlist_link"),
-    [ctaList]
-  );
-  const otherCtas = useMemo(
-    () => ctaList.filter((cta) => String(cta.key || "").toLowerCase() !== "playlist_link"),
-    [ctaList]
-  );
-  const hasLibraryCtas = ctaList.length > 0;
+  // The recipe's first named Inspiration section supplies the original artwork,
+  // notes and caption. Other sections remain hidden until their components exist.
+  const inspiration = useMemo(() => {
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    return sections.find((section) =>
+      section?.kind === "image_text" &&
+      /^(the\s+)?inspiration$/i.test(String(section?.heading || "").trim())
+    ) || null;
+  }, [item]);
 
-  if (loading) {
-    return <div className="article-page article-page__state">Loading…</div>;
-  }
-  if (error) {
-    return <div className="article-page article-page__state">{error}</div>;
-  }
-  if (!article) {
-    return <div className="article-page article-page__state">Article not found.</div>;
-  }
+  // Palette data is assembled by PALETTES through the ARTICLES public response.
+  const paletteSection = useMemo(() => {
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    return sections.find((section) => section?.kind === "palette_link" && Number(section?.palette_id) > 0) || null;
+  }, [item]);
 
-
-  function handleCtaClick(cta) {
-    if (!cta) return;
-    const key = (cta?.key || "").toLowerCase();
-    const params = cta?.params || {};
-    if (key === "playlist_link") {
-      const pid = params.playlist_id || params.playlistId;
-      const url = withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
-      if (url) {
-        if (url.startsWith("/")) navigate(url);
-        else window.location.href = url;
-      }
-      return;
-    }
-    if (key === "article_link") {
-      const aid = params.article_id || params.articleId;
-      const url = withSourceParam(params.url || (aid ? `/articles/${aid}` : ""));
-      if (url) {
-        if (url.startsWith("/")) navigate(url);
-        else window.location.href = url;
-      }
-      return;
-    }
-    if (key === "navigate") {
-      const url = withSourceParam(params.url || "");
-      if (!url) return;
-      if (url.startsWith("/")) {
-        navigate(url);
-      } else {
-        window.open(url, params.target || "_self", "noopener");
-      }
-      return;
-    }
-    if (params.url) {
-      const url = withSourceParam(params.url);
-      if (url.startsWith("/")) navigate(url);
-      else window.location.href = url;
-    }
-  }
-
-  function resolvePlaylistLink(cta) {
-    const params = cta?.params || {};
-    const pid = params.playlist_id || params.playlistId;
-    return withSourceParam(params.url || (pid ? `/playlist/${pid}` : ""));
-  }
-
-  function resolvePlaylistLabel(cta) {
-    const params = cta?.params || {};
-    return params.label || cta?.label || "";
-  }
-
-  function resolvePlaylistSubtitle(cta) {
-    const params = cta?.params || {};
-    return params.subtitle || params.dek || "";
-  }
+  // Room studies remain in article section order. Alternate the same editorial
+  // component rather than introducing a separate layout for each room.
+  const roomSections = useMemo(() => {
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    const paletteIndex = sections.findIndex((section) => section?.kind === "palette_link");
+    if (paletteIndex < 0) return [];
+    return sections.filter((section, index) =>
+      index > paletteIndex && section?.kind === "image_text" &&
+      Number(section?.asset_id) > 0 &&
+      !/^(the\s+)?inspiration$/i.test(String(section.heading || "").trim())
+    );
+  }, [item]);
 
   return (
-    <div className="article-page">
-      <div className="article-page__header">
-        {hero?.rel_path && (
-          <img
-            className="article-page__hero"
-            src={buildImageUrl(hero.rel_path, hero.updated_at || null)}
-            alt={hero.alt_text || article.title || ""}
+    <ArticleContainer>
+      {loading ? (
+        <p className="cf-article-status" role="status">Loading article…</p>
+      ) : error ? (
+        <p className="cf-article-status" role="alert">{error}</p>
+      ) : !item?.article ? (
+        <p className="cf-article-status">Article not found.</p>
+      ) : (
+        <>
+          <ArticleHero
+            title={item.article.title}
+            kicker={item.article.kicker}
+            dek={item.article.dek}
+            room={hero.room}
+            painting={hero.painting}
+            insetPositions={hero.positions}
           />
-        )}
-        <div className="article-page__headline">
-          <h1>{emdashify(article.title)}</h1>
-          {article.dek && <p className="article-page__dek">{emdashify(article.dek)}</p>}
-        </div>
-      </div>
-
-      <div className="article-page__content">
-        {sections.map((section) => (
-          <div key={section.id} className="article-page__section">
-            {(() => {
-              const kind = String(section.kind || "text");
-              const isImageOnly = kind === "image";
-              const isImageText = kind === "image_text" || (kind === "image" && !!section.body);
-              return (
-                <>
-            {(() => {
-              if (!section.heading) return null;
-              const level = String(section.heading_level || "h2").toLowerCase();
-              const tag = ["h1", "h2", "h3", "h4", "h5", "h6"].includes(level) ? level : "h2";
-              const Tag = tag;
-              const className =
-                section.kind === "header"
-                  ? `article-page__header article-page__header-${tag}`
-                  : `article-page__section-heading article-page__header-${tag}`;
-              return <Tag className={className}>{emdashify(section.heading)}</Tag>;
-            })()}
-
-            {section.kind === "text" && (
-              <div className="article-page__text">{formatBody(section.body || "")}</div>
-            )}
-
-            {section.kind === "list" && (
-              <ul className="article-page__list">
-                {emdashify(section.body || "")
-                  .split("\n")
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-                  .map((line, idx) => (
-                    <li key={`${line}-${idx}`}>{line}</li>
-                  ))}
-              </ul>
-            )}
-
-            {(isImageOnly || isImageText) && section.asset?.rel_path && (
-              <figure className="article-page__figure">
-                <img
-                  src={buildImageUrl(section.asset.rel_path, section.asset.updated_at || null)}
-                  alt={section.asset.alt_text || section.heading || ""}
+          {(introduction || inspiration) ? <ArticleInspiration introduction={introduction} section={inspiration} /> : null}
+          {paletteSection ? <ArticlePalette section={paletteSection} /> : null}
+          {roomSections.length > 0 ? (
+            <>
+              <header className="cf-article-room-collection">
+                <h2 className="cf-article-room-collection__heading">
+                  One Palette, {roomSections.length === 1 ? "One Interpretation" : `${roomSections.length} Interpretations`}
+                </h2>
+                <p className="cf-article-room-collection__dek">
+                  The same colors take on different personalities depending on their proportions, placement, and which one commands attention.
+                </p>
+              </header>
+              {roomSections.map((section, index) => (
+                <ArticleRoomStudy
+                  key={section.id ?? `${section.asset_id}-${index}`}
+                  section={section}
+                  reverse={index % 2 === 1}
                 />
-                {section.caption ? (
-                  <figcaption>{emdashify(section.caption)}</figcaption>
-                ) : (
-                  section.asset.title && <figcaption>{emdashify(section.asset.title)}</figcaption>
-                )}
-              </figure>
-            )}
-            {isImageText && section.body && (
-              <div className="article-page__text">{formatBody(section.body)}</div>
-            )}
-
-            {section.kind === "embed" && section.body && (
-              <div
-                className="article-page__embed"
-                dangerouslySetInnerHTML={{ __html: emdashify(section.body) }}
-              />
-            )}
-
-            {section.kind === "cta" && section.body && (
-              <div className="article-page__cta">
-                {formatBody(section.body)}
-              </div>
-            )}
-
-            {section.kind === "palette_link" && section.palette_id && (
-              <div className="article-page__cta">
-                <span>Palette #{section.palette_id}</span>
-              </div>
-            )}
-                </>
-              );
-            })()}
-          </div>
-        ))}
-      </div>
-
-      {playlistCtas.length > 0 && (
-        <div className="article-cta-group">
-          {playlistCtas.map((cta) => {
-            const href = resolvePlaylistLink(cta);
-            if (!href) return null;
-            return (
-                <a
-                    key={cta.cta_id}
-                    className="article-media-cta"
-                    href={href}
-                  >
-                <div className="article-media-cta__media" aria-hidden="true">
-                  <span className="article-media-cta__play" />
-                </div>
-                <div className="article-media-cta__content">
-                  <div className="article-media-cta__label">{emdashify(resolvePlaylistLabel(cta))}</div>
-                  {resolvePlaylistSubtitle(cta) && (
-                    <p className="article-media-cta__subtitle">
-                      {emdashify(resolvePlaylistSubtitle(cta))}
-                    </p>
-                  )}
-                </div>
-              </a>
-            );
-          })}
-        </div>
+              ))}
+            </>
+          ) : null}
+        </>
       )}
-
-      {otherCtas.length > 0 && (
-        <div className="article-page__cta-list">
-          {otherCtas.map((cta) => (
-            <button
-              key={cta.cta_id}
-              type="button"
-              className="article-page__cta-button"
-              onClick={() => handleCtaClick(cta)}
-            >
-              {cta.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!hasLibraryCtas && playlistUrl && (
-        <div className="article-page__end-cta">
-          {playlistUrl.startsWith("/") ? (
-            <Link className="article-page__end-cta-link" to={playlistUrl}>
-              <div className="article-page__end-cta-title">
-                Back to playlist{playlistTitle ? `: ${emdashify(playlistTitle)}` : ""}
-              </div>
-              <div className="article-page__end-cta-subtitle">
-                Continue exploring the colors from this story.
-              </div>
-            </Link>
-          ) : (
-            <a className="article-page__end-cta-link" href={playlistUrl}>
-              <div className="article-page__end-cta-title">
-                Back to playlist{playlistTitle ? `: ${emdashify(playlistTitle)}` : ""}
-              </div>
-              <div className="article-page__end-cta-subtitle">
-                Continue exploring the colors from this story.
-              </div>
-            </a>
-          )}
-        </div>
-      )}
-    </div>
+    </ArticleContainer>
   );
 }

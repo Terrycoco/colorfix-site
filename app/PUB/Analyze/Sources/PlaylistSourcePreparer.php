@@ -6,6 +6,7 @@ namespace App\PUB\Analyze\Sources;
 use App\PALETTES\PV\PVService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\PHOTOS\Entities\PhotoEntity;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\PHOTOS\Services\PhotoEditorialService;
 use App\REX\DTO\RexReservationRelationship;
 use App\REX\Services\RexReservationRelationships;
@@ -17,7 +18,7 @@ use RuntimeException;
  * Converts a ColorFix Playlist into the canonical
  * source shape consumed by PUB Analyze.
  *
- * PUB deliberately consumes the PUBLIC Playlist experience.
+ * All active slides are collected neutrally; linked PVs use the public experience.
  */
 final class PlaylistSourcePreparer
 {
@@ -26,6 +27,7 @@ final class PlaylistSourcePreparer
         private PVService $pvService,
         private RexReservationRelationships $rexRelationships,
         private PhotoEditorialService $photoEditorial,
+        private PdoPhotoLibraryRepository $photos,
     ) {}
 
     /**
@@ -33,6 +35,7 @@ final class PlaylistSourcePreparer
      *   source_type: string,
      *   source_id: int,
      *   title: string,
+     *   editorial_type: ?string,
      *   items: array<int, array<string, mixed>>,
      *   linked_pvs: array<int, array<string, mixed>>
      * }
@@ -54,52 +57,46 @@ final class PlaylistSourcePreparer
         $items = $this->playlists->getActivePublishingSlides($playlistId);
 
         $projectRoot = dirname(__DIR__, 4);
-
-        $items = array_map(
-            static function (array $item) use ($projectRoot): array {
-                $photoLibraryId = (int)($item['photo_library_id'] ?? 0);
-                $imageUrl = trim((string)($item['image_url'] ?? ''));
-
-                if ($photoLibraryId <= 0 || $imageUrl === '') {
-                    return $item;
-                }
-
-                $filePath =
-                    rtrim($projectRoot, DIRECTORY_SEPARATOR)
-                    . DIRECTORY_SEPARATOR
-                    . ltrim($imageUrl, '/');
-
-                $photo = new PhotoEntity(
-                    photoLibraryId: $photoLibraryId,
-                    imageUrl: $imageUrl,
-                    filePath: $filePath,
-                    title: trim((string)($item['title'] ?? '')) ?: null,
-                );
-
-                $item['photo'] = $photo->toArray();
-
-                return $item;
-            },
-            $items
-        );
-
-        // PHOTOS owns the text. Attach a read-only snapshot to each source item.
         $photoIds = array_values(array_unique(array_filter(array_map(
             static fn (array $item): int => (int)($item['photo_library_id'] ?? 0),
             $items
         ))));
+        $photos = $this->photos->findManyByIds($photoIds);
         $editorials = $this->photoEditorial->getMany($photoIds);
-        foreach ($items as &$item) {
-            $id = (int)($item['photo_library_id'] ?? 0);
-            if ($id > 0 && isset($editorials[$id]) && is_array($item['photo'] ?? null)) {
-                $item['photo']['editorial'] = [
-                    'photo_description' => $editorials[$id]['photo_description'] ?? null,
-                    'design_notes' => $editorials[$id]['design_notes'] ?? null,
-                    'refined_commentary' => $editorials[$id]['refined_commentary'] ?? null,
+
+        $items = array_map(
+            static function (array $item) use ($projectRoot, $photos, $editorials): array {
+                $photoLibraryId = (int)($item['photo_library_id'] ?? 0);
+                if ($photoLibraryId <= 0) return $item;
+                $record = $photos[$photoLibraryId] ?? [];
+                $imageUrl = trim((string)($item['image_url'] ?? ''));
+                if ($imageUrl === '') $imageUrl = trim((string)($record['rel_path'] ?? ''));
+
+                // Keep the full owner record even when no usable image URL exists.
+                $photo = $record;
+                if ($imageUrl !== '') {
+                    $entity = new PhotoEntity(
+                        photoLibraryId: $photoLibraryId,
+                        imageUrl: $imageUrl,
+                        filePath: rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($imageUrl, '/'),
+                        title: array_key_exists('title', $record)
+                            ? $record['title']
+                            : (trim((string)($item['title'] ?? '')) ?: null),
+                    );
+                    $photo = array_replace($record, $entity->toArray());
+                }
+                if ($photo === []) return $item;
+                $editorial = $editorials[$photoLibraryId] ?? [];
+                $photo['editorial'] = [
+                    'photo_description' => $editorial['photo_description'] ?? null,
+                    'design_notes' => $editorial['design_notes'] ?? null,
+                    'refined_commentary' => $editorial['refined_commentary'] ?? null,
                 ];
-            }
-        }
-        unset($item);
+                $item['photo'] = $photo;
+                return $item;
+            },
+            $items
+        );
 
         $linkedPVs = $this->publicLinkedPVData($playlistId);
 
@@ -107,6 +104,7 @@ final class PlaylistSourcePreparer
             'source_type' => 'playlist',
             'source_id' => $playlistId,
             'title' => (string)($playlist['title'] ?? ''),
+            'editorial_type' => $playlist['editorial_type'] ?? null,
             'items' => $items,
             'linked_pvs' => $linkedPVs,
         ];

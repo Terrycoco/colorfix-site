@@ -254,30 +254,6 @@
   flex: 0 0 auto;
 }
 
-.admin-articles__filters {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  align-items: end;
-}
-
-.admin-articles__filters label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 600;
-  color: #1f2937;
-  font-size: 12px;
-}
-
-.admin-articles__filters input,
-.admin-articles__filters select {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
-}
-
 .admin-articles__filter-actions {
   display: flex;
   gap: 8px;
@@ -429,37 +405,6 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
-}
-
-.admin-articles__editor-actions button {
-  margin-left: 10px;
-  border: none;
-  background: #111827;
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.admin-articles__editor-actions .admin-articles__preview {
-  margin-left: 10px;
-  border: 1px solid #111827;
-  background: #111827;
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.admin-articles__editor-actions .admin-articles__delete {
-  background: #b91c1c;
-}
-
-.admin-articles__editor-actions .admin-articles__delete:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .admin-articles__grid {
@@ -677,4 +622,22 @@
     align-items: flex-start;
     gap: 12px;
   }
+}
+
+/* AdminLayout owns the master/detail shell and responsive behavior. */
+.admin-articles { padding: 0; min-width: 0; }
+.admin-articles .admin-master-detail { margin-top: 0; }
+.admin-articles .admin-list-pane__body { min-width: 0; }
+.admin-articles .admin-detail-pane__body { min-width: 0; }
+.admin-articles .admin-articles__editor-content { display: grid; gap: 14px; padding: 12px 0 36px; }
+.admin-articles .admin-articles__editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.admin-articles .admin-articles__editor-actions .admin-button { margin: 0; }
+.admin-articles .admin-articles__grid { padding: 0; }
+.admin-articles .admin-articles__cta { margin: 0; border: 0; padding: 0; }
+.admin-articles .admin-articles__sections { margin: 0; }
+.admin-articles .admin-articles__empty { padding: 16px; }
+.admin-articles .admin-articles__cta-grid { width: 100%; }
+@media (max-width: 700px) {
+  .admin-articles .admin-articles__cta-grid { grid-template-columns: 1fr; }
+  .admin-articles .admin-articles__editor-content { padding: 8px 0 24px; }
 }

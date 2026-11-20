@@ -1,0 +1,115 @@
+/* A single transition introduces the collection, not each individual room. */
+.cf-article-room-collection {
+  background: #faf9f6;
+  color: var(--cf-ink);
+  text-align: center;
+  padding: 76px 28px 36px;
+}
+.cf-article-room-collection__heading {
+  margin: 0 0 18px;
+  font: 400 1.85rem/1.2 var(--cf-editorial-serif);
+}
+.cf-article-room-collection__dek {
+  max-width: 600px;
+  margin: 0 auto;
+  font: 400 1.0625rem/1.45 var(--cf-editorial-serif);
+}
+
+/* A room-study spread: substantial photography, restrained asymmetrical prose. */
+.cf-article-room {
+  background: #faf9f6;
+  color: var(--cf-ink);
+  padding: 30px clamp(38px, 6vw, 110px) 104px;
+}
+
+.cf-article-room__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 590px) minmax(0, 410px);
+  align-items: center;
+  gap: clamp(36px, 4vw, 64px);
+  max-width: 1260px;
+  margin-inline: auto;
+}
+
+/* Second spread: commentary first, room photograph on the right. */
+.cf-article-room--reversed .cf-article-room__inner {
+  grid-template-columns: minmax(0, 410px) minmax(0, 590px);
+}
+.cf-article-room--reversed .cf-article-room__copy { grid-column: 1; grid-row: 1; }
+.cf-article-room--reversed .cf-article-room__figure { grid-column: 2; grid-row: 1; }
+
+.cf-article-room__figure {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+  max-width: 590px;
+}
+
+.cf-article-room__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 670px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.cf-article-room__image-missing { min-height: 280px; background: #e7e4dc; }
+
+.cf-article-room__caption {
+  margin-top: 12px;
+  color: var(--cf-muted);
+  font: 400 .75rem/1.55 var(--cf-editorial-sans);
+}
+
+.cf-article-room__copy {
+  min-width: 0;
+  max-width: 410px;
+  justify-self: start;
+  text-align: left;
+}
+
+.cf-article-room__heading {
+  margin: 0 0 25px;
+  text-align: left;
+  font: 400 1.75rem/1.16 var(--cf-editorial-serif);
+}
+
+.cf-article-room__paragraph {
+  margin: 0 0 22px;
+  font: 400 1.0625rem/1.45 var(--cf-editorial-serif);
+}
+.cf-article-room__paragraph:last-child { margin-bottom: 0; }
+
+/* Tablet: preserve two columns with tighter gutters. */
+@media (min-width: 640px) and (max-width: 1100px) {
+  .cf-article-room-collection { padding: 52px 28px 24px; }
+  .cf-article-room { padding: 25px 32px 72px; }
+  .cf-article-room__inner {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+    align-items: center;
+    gap: 30px;
+  }
+  .cf-article-room--reversed .cf-article-room__inner {
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  }
+  .cf-article-room__heading { font-size: 1.65rem; margin-bottom: 17px; }
+  .cf-article-room__paragraph { font-size: 1rem; line-height: 1.45; }
+}
+
+/* Phone: title introduces the study, then photograph, caption and commentary. */
+@media (max-width: 639px) {
+  .cf-article-room-collection { padding: 42px 23px 22px; }
+  .cf-article-room-collection__heading { font-size: 1.65rem; margin-bottom: 12px; }
+  .cf-article-room-collection__dek { font-size: 1rem; line-height: 1.48; }
+  .cf-article-room { padding: 16px 23px 58px; }
+  .cf-article-room__inner { display: flex; flex-direction: column; gap: 0; }
+  .cf-article-room--reversed .cf-article-room__inner { display: flex; flex-direction: column; }
+  .cf-article-room--reversed .cf-article-room__figure,
+  .cf-article-room--reversed .cf-article-room__copy { grid-column: auto; grid-row: auto; }
+  .cf-article-room__figure { order: 1; width: 100%; margin-bottom: 20px; }
+  .cf-article-room__copy { display: contents; }
+  .cf-article-room__figure img { max-height: none; }
+  .cf-article-room__heading { order: 0; align-self: stretch; width: 100%; margin: 0 0 16px; text-align: left; font-size: 1.65rem; }
+  .cf-article-room__paragraph { order: 2; align-self: stretch; text-align: left; font-size: 1rem; line-height: 1.48; margin-bottom: 17px; }
+}

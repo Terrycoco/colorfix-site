@@ -12,18 +12,21 @@ class PdoArticleRepository
     public function createArticle(array $data): int
     {
         $sql = "INSERT INTO articles
-                (type, status, title, dek, slug, meta_description, hero_asset_id, hero_mobile_asset_id, cta_overrides, featured, published_at, created_at, updated_at)
+                (type, status, title, kicker, dek, slug, meta_description, hero_asset_id, hero_inset_asset_id, hero_inset_positions, hero_mobile_asset_id, cta_overrides, featured, published_at, created_at, updated_at)
                 VALUES
-                (:type, :status, :title, :dek, :slug, :meta_description, :hero_asset_id, :hero_mobile_asset_id, :cta_overrides, :featured, :published_at, NOW(), NOW())";
+                (:type, :status, :title, :kicker, :dek, :slug, :meta_description, :hero_asset_id, :hero_inset_asset_id, :hero_inset_positions, :hero_mobile_asset_id, :cta_overrides, :featured, :published_at, NOW(), NOW())";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':type' => $data['type'],
             ':status' => $data['status'] ?? 'draft',
             ':title' => $data['title'],
+            ':kicker' => $data['kicker'] ?? null,
             ':dek' => $data['dek'] ?? null,
             ':slug' => $data['slug'],
             ':meta_description' => $data['meta_description'] ?? null,
             ':hero_asset_id' => $data['hero_asset_id'] ?? null,
+            ':hero_inset_asset_id' => $data['hero_inset_asset_id'] ?? null,
+            ':hero_inset_positions' => $this->encodeInsetPositions($data['hero_inset_positions'] ?? null),
             ':hero_mobile_asset_id' => $data['hero_mobile_asset_id'] ?? null,
             ':cta_overrides' => $data['cta_overrides'] ?? null,
             ':featured' => !empty($data['featured']) ? 1 : 0,
@@ -39,10 +42,13 @@ class PdoArticleRepository
             'type',
             'status',
             'title',
+            'kicker',
             'dek',
             'slug',
             'meta_description',
             'hero_asset_id',
+            'hero_inset_asset_id',
+            'hero_inset_positions',
             'hero_mobile_asset_id',
             'cta_overrides',
             'featured',
@@ -54,12 +60,25 @@ class PdoArticleRepository
             if (!in_array($column, $allowed, true)) continue;
             $paramKey = ':' . $column;
             $setParts[] = "{$column} = {$paramKey}";
-            $params[$paramKey] = $value;
+            $params[$paramKey] = $column === 'hero_inset_positions'
+                ? $this->encodeInsetPositions($value)
+                : $value;
         }
         if (!$setParts) return;
         $sql = "UPDATE articles SET " . implode(', ', $setParts) . ", updated_at = NOW() WHERE id = :id";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
+    }
+
+    private function encodeInsetPositions(mixed $positions): ?string
+    {
+        if ($positions === null || $positions === '') return null;
+        if (is_string($positions)) {
+            // Validate a JSON string before passing it to the JSON column.
+            json_decode($positions, true, 512, JSON_THROW_ON_ERROR);
+            return $positions;
+        }
+        return json_encode($positions, JSON_THROW_ON_ERROR);
     }
 
     public function deleteArticle(int $id): void

@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-08 07:15:33 PM PST
+**UPDATED:** 2026-11-18 09:10:05 PST
 
 # PUB — Department Manifest
 
@@ -419,3 +419,13 @@ These recommendations are prioritized by risk and operational value. Ownership p
 ## 12. Completed Improvements
 
 No improvements have been implemented under this manifest. This assignment created documentation only. Existing code described above is not being retrospectively claimed as a completed roadmap item.
+
+### Complete ANALYZE photo collection (2026-11-18)
+
+`Analyze/Sources/PlaylistSourcePreparer::prepare(int $playlistId)` now returns top-level nullable `editorial_type` from PLAYLISTS alongside source_type/source_id/title/items/linked_pvs. Allowed stored values are makeover, spotlight, teaching, themed_makeover, palette_ideas, palette_exploration, mistakes_fixes and step_by_step_makeover. This is source context, not a channel/product-routing rule.
+
+The preparer receives `PdoPhotoLibraryRepository` as its fifth constructor dependency, wired by AnalyzeManager. It bulk-loads complete Photo Library records via PHOTOS' `findManyByIds()` and attaches every returned owner column under `items[].photo`. Existing normalized photo_library_id/image_url/file_path fields are retained when an image URL is usable. The library title supplies photo.title; the authored slide title remains items[].title. Existing slide image_url is preferred for delivery, with library rel_path as fallback. A library record with no usable URL still supplies metadata; missing records retain the existing ID/URL delivery fallback when possible; non-photo slides gain no fabricated photo.
+
+Every prepared photo contains `editorial:{photo_description,design_notes,refined_commentary}`, read through PhotoEditorialService::getMany(), with nulls for absent text/rows. No publisher/experience flags filter this collection; every specialist receives the same prepared source via AnalyzeManager. Linked public-PV projection and analyzer selection remain unchanged. These are authenticated internal snapshots, not a new public Photo Library response. Source content is read-only; no editorial text is generated or persisted here.
+
+`Contracts/PubContract.php` documents the expanded source shape. `scripts/test-pub-photo-collection.php` checks full snapshot retention (including extra owner columns), editorial values/nulls, photo versus slide titles, repeated IDs, URL fallback, absent images/records, neutral slide collection and nullable playlist classification using isolated fixtures. Production database/HTTP execution was not performed. No schema, frontend, creation recipes, shipping or alias changes.

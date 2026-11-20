@@ -168,6 +168,8 @@ class PdoPlaylistRepository
 
                 p.type,
 
+            p.editorial_type,
+
                 p.is_active,
 
                 p.is_public,
@@ -260,6 +262,8 @@ public function listAdminRows(): array
 
             p.type,
 
+            p.editorial_type,
+
             p.is_active,
 
             p.is_public,
@@ -347,6 +351,8 @@ public function listAdminRowsByProjectId(
             p.title,
 
             p.type,
+
+            p.editorial_type,
 
             p.is_active,
 
@@ -523,6 +529,12 @@ public function saveAdminRow(
     array $row
 
 ): int {
+    // Omission preserves stored metadata on update and the DB default on insert.
+    $hasEditorialType = array_key_exists('editorial_type', $row);
+    $editorialSet = $hasEditorialType ? 'editorial_type = :editorial_type,' : '';
+    $editorialColumn = $hasEditorialType ? 'editorial_type,' : '';
+    $editorialValue = $hasEditorialType ? ':editorial_type,' : '';
+
 
     if ($playlistId > 0) {
 
@@ -541,6 +553,8 @@ public function saveAdminRow(
             SET {$projectSet}title = :title,
 
                 type = :type,
+
+                {$editorialSet}
 
                 is_active = :is_active,
 
@@ -624,6 +638,8 @@ public function saveAdminRow(
 
             type,
 
+            {$editorialColumn}
+
             is_active,
 
             is_public,
@@ -663,6 +679,8 @@ public function saveAdminRow(
             :title,
 
             :type,
+
+            {$editorialValue}
 
             :is_active,
 
@@ -3554,6 +3572,8 @@ public function getPublicActiveSlides(
             'title' => (string)($row['title'] ?? ''),
 
             'type' => (string)($row['type'] ?? ''),
+
+            ...(array_key_exists('editorial_type', $row) ? ['editorial_type' => $row['editorial_type']] : []),
 
             'is_active' => (int)($row['is_active'] ?? 0),
 

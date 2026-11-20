@@ -10,7 +10,9 @@ use App\PUB\Analyze\Pinterest\PaletteAnalyzer;
 use App\PUB\Analyze\Pinterest\TeaserAnalyzer;
 use App\PUB\Analyze\Support\DefaultPantry;
 use App\PUB\Analyze\Sources\PlaylistSourcePreparer;
+use App\PHOTOS\Repos\PdoPhotoLibraryRepository;
 use App\PUB\Analyze\YouTube\PlaylistVideoAnalyzer;
+use App\PUB\Analyze\Website\ArticleAnalyzer;
 use App\PUB\Contracts\PubContract;
 use App\PUB\Services\PubRunService;
 use App\PUB\Repos\PdoPubAssetRepository;
@@ -932,7 +934,8 @@ final class AnalyzeManager implements PubComManagerContract
             $this->pdo
         )
     ),
-    new PhotoEditorialService($this->pdo)
+    new PhotoEditorialService($this->pdo),
+    new PdoPhotoLibraryRepository($this->pdo)
 );
         }
 
@@ -973,6 +976,9 @@ final class AnalyzeManager implements PubComManagerContract
                 new PlaylistVideoAnalyzer(
                     $this->defaultPantry()
                 ),
+
+            'article' =>
+                new ArticleAnalyzer($this->pdo),
 
             default =>
                 throw new RuntimeException(

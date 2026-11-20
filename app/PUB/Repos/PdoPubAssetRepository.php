@@ -2097,6 +2097,88 @@ public function updateOrder(
     }
 
 
+    /** PUB-owned link; ARTICLES owns article content and status. */
+    public function getPlaylistArticle(int $playlistId): ?array
+    {
+        if ($playlistId <= 0) return null;
+        $stmt = $this->pdo->prepare(<<<SQL
+            SELECT p.article_id, a.title, a.status,
+                   CASE WHEN a.id IS NULL THEN 0 ELSE 1 END AS article_exists
+            FROM playlists p
+            LEFT JOIN articles a ON a.id = p.article_id
+            WHERE p.playlist_id = :playlist_id
+            LIMIT 1
+            SQL);
+        $stmt->execute(['playlist_id' => $playlistId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        $row['article_id'] = (int)($row['article_id'] ?? 0);
+        $row['article_exists'] = (int)$row['article_exists'] === 1;
+        return $row;
+    }
+
+    /**
+     * Record a database-backed Article result without asserting a physical file.
+     * The unique playlist link persists across PUB runs and article revisions.
+     */
+    public function markArticleCreated(int $pubAssetId, array $receipt): array
+    {
+        $fields = ['article_id', 'title', 'status', 'url'];
+        $unknown = array_diff(array_keys($receipt), $fields);
+        if ($unknown !== []) {
+            throw new RuntimeException('Unexpected Article receipt fields: ' . implode(', ', $unknown));
+        }
+        $articleId = (int)($receipt['article_id'] ?? 0);
+        $title = trim((string)($receipt['title'] ?? ''));
+        if ($articleId <= 0 || $title === '' || (string)($receipt['status'] ?? '') !== 'draft') {
+            throw new RuntimeException('Article receipt requires article ID, title and draft status.');
+        }
+        $asset = $this->getById($pubAssetId);
+        if (!$asset || (string)$asset['asset_type'] !== 'article'
+            || (string)$asset['source_type'] !== 'playlist') {
+            throw new RuntimeException('Article completion requires a playlist-backed PUB article asset.');
+        }
+        $playlistId = (int)$asset['source_id'];
+        $url = trim((string)($receipt['url'] ?? ''));
+        if ($url === '') throw new RuntimeException('Article receipt requires URL.');
+
+        $link = $this->getPlaylistArticle($playlistId);
+        if ($link !== null && $link['article_exists']
+            && (int)$link['article_id'] !== $articleId) {
+            throw new RuntimeException('Playlist is already linked to another existing article.');
+        }
+        $stmt = $this->pdo->prepare(<<<SQL
+            UPDATE playlists
+            SET article_id = :article_id
+            WHERE playlist_id = :playlist_id
+            SQL);
+        $stmt->execute(['playlist_id' => $playlistId, 'article_id' => $articleId]);
+        if ($stmt->rowCount() !== 1) {
+            $currentLink = $this->getPlaylistArticle($playlistId);
+            if ($currentLink === null || (int)$currentLink['article_id'] !== $articleId) {
+                throw new RuntimeException('Article could not be linked to its playlist.');
+            }
+        }
+
+        $stmt = $this->pdo->prepare(<<<SQL
+            UPDATE pub_assets
+            SET file_path = '', url = :url, mime_type = 'text/html',
+                search_title = :title, pipeline_stage = 'created',
+                local_file_status = 'present', approved = 0,
+                `package` = NULL, stage_note = NULL,
+                error_stage = NULL, error_code = NULL,
+                error_message = NULL, errored_at = NULL
+            WHERE pub_asset_id = :pub_asset_id
+              AND asset_type = 'article' AND pipeline_stage = 'creating'
+            SQL);
+        $stmt->execute(['url' => $url, 'title' => $title, 'pub_asset_id' => $pubAssetId]);
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException('Could not mark PUB article asset as created.');
+        }
+        return ['pub_asset_id' => $pubAssetId, 'pipeline_stage' => 'created',
+            'article_id' => $articleId, 'article_status' => 'draft'];
+    }
+
     /*
      * ========================================================
      * ASSET — PACKAGE

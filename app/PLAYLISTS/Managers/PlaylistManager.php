@@ -292,6 +292,13 @@ final class PlaylistManager
                 $publishedAt,
         ];
 
+        if (array_key_exists('editorial_type', $payload)) {
+            if ($payload['editorial_type'] !== null && !is_string($payload['editorial_type'])) {
+                throw new InvalidArgumentException('editorial_type must be a string or null');
+            }
+            $row['editorial_type'] = $payload['editorial_type'];
+        }
+
         $savedId =
             $this->playlists
                 ->saveAdminRow(

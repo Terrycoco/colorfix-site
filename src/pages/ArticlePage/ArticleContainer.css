@@ -1,0 +1,95 @@
+/* Local editorial fonts served from src/public/fonts. */
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-VariableFont_wght.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  src: url("/fonts/EBGaramond-Italic-VariableFont_wght.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* Article pages use a full-bleed canvas; do not change shared MainLayout elsewhere. */
+.main-layout:has(> .cf-article-canvas) {
+  width: 100%;
+  max-width: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Fresh ARTICLES visual foundation: no dependency on legacy article-page.css. */
+.cf-article-canvas {
+  --cf-ink: #252622;
+  --cf-muted: #666962;
+  --cf-paper: #faf9f6;
+  --cf-rule: #d9d7d0;
+  --cf-editorial-serif: "EB Garamond", Georgia, serif;
+  --cf-editorial-sans: "Montserrat", Arial, sans-serif;
+  --cf-title-size: 4.125rem;
+  --cf-dek-size: 1.375rem;
+  --cf-text-size: 1.0625rem;
+  --cf-article-gutter: 56px;
+  --cf-article-top: 64px;
+  --cf-article-gap: 34px;
+  color: var(--cf-ink);
+  background: var(--cf-paper);
+  font-family: var(--cf-editorial-sans);
+  min-width: 0;
+}
+
+.cf-article-container {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.cf-article-container *,
+.cf-article-container *::before,
+.cf-article-container *::after { box-sizing: border-box; }
+
+.cf-article-status {
+  font-size: var(--cf-text-size);
+  line-height: 1.6;
+  margin: 0;
+  min-height: 36vh;
+  padding: var(--cf-article-top) var(--cf-article-gutter);
+}
+
+/* Tablet: 640–1023 px */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .cf-article-canvas {
+    --cf-title-size: 3.25rem;
+    --cf-dek-size: 1.1875rem;
+    --cf-text-size: 1rem;
+    --cf-article-gutter: 32px;
+    --cf-article-top: 44px;
+    --cf-article-gap: 26px;
+  }
+}
+
+/* Phone: up to 639 px */
+@media (max-width: 639px) {
+  .cf-article-canvas {
+    --cf-title-size: 2.5rem;
+    --cf-dek-size: 1.0625rem;
+    --cf-text-size: 1rem;
+    --cf-article-gutter: 18px;
+    --cf-article-top: 30px;
+    --cf-article-gap: 22px;
+  }
+}

@@ -64,6 +64,22 @@ class PdoPhotoLibraryRepository
         }
     }
 
+    /** Complete Photo Library snapshots for authorized internal consumers, keyed by ID. */
+    public function findManyByIds(array $photoIds): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $photoIds), static fn(int $id): bool => $id > 0)));
+        $result = [];
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $marks = implode(',', array_fill(0, count($chunk), '?'));
+            $stmt = $this->pdo->prepare("SELECT * FROM photo_library WHERE photo_library_id IN ($marks)");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $result[(int)$row['photo_library_id']] = $row;
+            }
+        }
+        return $result;
+    }
+
     public function findById(int $id): ?array
     {
         $paletteColumn = $this->paletteColumnAvailable() ? ', palette_id' : '';

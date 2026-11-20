@@ -124,6 +124,29 @@ final class CreateEndpoint
                 );
 
 
+            // Article draft/published guards are manager decisions, not
+            // successful empty production batches. Return them unchanged
+            // as conflicts so the admin can ask for explicit authorization.
+            $articleResultCode = (string)($result['code'] ?? '');
+            if (in_array($articleResultCode, [
+                'existing_article_warning',
+                'article_already_published',
+            ], true)) {
+                self::sendJson(409, [
+                    'ok' => false,
+                    'code' => $articleResultCode,
+                    'order_count' => count($orders),
+                    'matches' => is_array($result['matches'] ?? null)
+                        ? array_values($result['matches'])
+                        : [],
+                    'existing_policy' => is_array($result['existing_policy'] ?? null)
+                        ? $result['existing_policy']
+                        : [],
+                ]);
+                return;
+            }
+
+
             if (
                 (
                     $result[

@@ -1,0 +1,45 @@
+/* Editorial introduction: a quiet, readable transition after the full-bleed hero. */
+.cf-article-introduction {
+  background: var(--cf-paper);
+  color: var(--cf-ink);
+  padding: clamp(36px, 4vw, 58px) var(--cf-article-gutter);
+}
+
+.cf-article-introduction__inner {
+  width: min(100%, 700px);
+  margin-inline: auto;
+}
+
+.cf-article-introduction__paragraph {
+  margin: 0;
+  font-family: var(--cf-editorial-serif);
+  font-size: clamp(1.12rem, 1.3vw, 1.25rem);
+  font-weight: 400;
+  line-height: 1.48;
+  letter-spacing: 0;
+}
+
+.cf-article-introduction__paragraph + .cf-article-introduction__paragraph {
+  margin-top: 1.15em;
+}
+
+.cf-article-introduction__paragraph--lead {
+  font-size: clamp(1.25rem, 1.55vw, 1.45rem);
+  line-height: 1.43;
+}
+
+/* Tablet: preserve breathing room while narrowing the reading column. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .cf-article-introduction { padding-block: 40px 48px; }
+  .cf-article-introduction__inner { max-width: 620px; }
+  .cf-article-introduction__paragraph { font-size: 1.14rem; line-height: 1.48; }
+  .cf-article-introduction__paragraph--lead { font-size: 1.3rem; line-height: 1.43; }
+}
+
+/* Phone: single-column reading experience, not a compressed desktop spread. */
+@media (max-width: 639px) {
+  .cf-article-introduction { padding: 28px 23px 36px; }
+  .cf-article-introduction__inner { max-width: 100%; }
+  .cf-article-introduction__paragraph { font-size: 1.08rem; line-height: 1.46; }
+  .cf-article-introduction__paragraph--lead { font-size: 1.18rem; line-height: 1.43; }
+}

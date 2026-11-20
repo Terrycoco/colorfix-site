@@ -199,6 +199,13 @@ final class PubContract
                             ],
 
                             [
+                                'key' => 'editorial_type',
+                                'type' => 'text',
+                                'required' => false,
+                                'note' => 'Nullable playlists.editorial_type: makeover, spotlight, teaching, themed_makeover, palette_ideas, palette_exploration, mistakes_fixes, step_by_step_makeover. Source context only; does not select a channel or product.',
+                            ],
+
+                            [
                                 'key' =>
                                     'items[]',
 
@@ -455,10 +462,10 @@ final class PubContract
                                     ],
 
                                     /*
-                                     * NORMALIZED PHOTOENTITY.
+                                     * COMPLETE PHOTOS RECORD + NORMALIZED DELIVERY FIELDS.
                                      *
                                      * If the source item has a usable photo,
-                                     * procurement resolves it before ANALYZE.
+                                     * procurement resolves it before ANALYZE. All Photo Library columns are retained; photo.title is the library title, while items[].title remains the slide title.
                                      */
                                     [
                                         'key' =>
@@ -470,6 +477,7 @@ final class PubContract
                                         'required' =>
                                             false,
 
+                                        'note' => 'Authorized internal snapshot of the complete PHOTOS row (including tags, alt_text, source, permission, crop, palette, inspiration and timestamp fields when present), plus image_url/file_path and nested editorial. Additional owner-record columns are preserved. Missing editorial text is null. Delivery fields exist only when a usable image URL is available; this is not a public photo response.',
                                         'fields' => [
 
                                             [
@@ -517,7 +525,7 @@ final class PubContract
                                                     false,
 
                                                 'note' =>
-                                                    'Optional PHOTOS-owned factual and authored editorial snapshot; supplied without publication or channel selection.',
+                                                    'PHOTOS-owned factual and authored editorial snapshot on every prepared photo; all three keys are present and nullable. Supplied without publication or channel selection.',
 
                                                 'fields' => [
                                                     [
@@ -1018,6 +1026,40 @@ final class PubContract
 
 
                 'assetTypes' => [
+
+                    /*
+                     * WEBSITE ARTICLE — one collection produces one draft.
+                     * The Sous Chef prepares ingredients; the Chef writes.
+                     */
+                    'article' => [
+                        'label' => 'Article',
+                        'channel' => 'website',
+                        'createsAssetType' => 'article',
+                        'analyzer' => [
+                            'input' => [
+                                ['key' => 'source_type', 'note' => 'playlist'],
+                                ['key' => 'source_id'],
+                                ['key' => 'title'],
+                                ['key' => 'editorial_type'],
+                                ['key' => 'items[]', 'note' => 'All active ordered items; no pin/yt cull. Includes slide type/role/copy and complete photo.editorial objects.'],
+                                ['key' => 'linked_pvs[]', 'required' => false],
+                            ],
+                            'requires' => [
+                                ['key' => 'classified_playlist'],
+                                ['key' => 'at_least_one_prepared_photo'],
+                            ],
+                            'output' => [
+                                ['key' => 'asset_type', 'note' => 'article'],
+                                ['key' => 'ingredients', 'type' => 'object', 'fields' => [
+                                    ['key' => 'playlist_id', 'required' => true],
+                                    ['key' => 'playlist_title', 'required' => true],
+                                    ['key' => 'editorial_type', 'required' => true],
+                                    ['key' => 'slides[]', 'required' => true, 'note' => 'Ordered slide type, role, title, subtitles, body, photo identity/image and full editorial snapshot; omit brand bumper and ignore roles.'],
+                                    ['key' => 'linked_pvs[]', 'required' => false],
+                                ]],
+                            ],
+                        ],
+                    ],
 
                     /*
                      * ----------------------------------------------------
@@ -2668,6 +2710,31 @@ final class PubContract
 
 
                 'assetTypes' => [
+
+                    'article' => [
+                        'label' => 'Article',
+                        'channel' => 'website',
+                        'creator' => [
+                            'input' => [[
+                                'key' => 'ingredients',
+                                'type' => 'object',
+                                'fields' => [
+                                    ['key' => 'playlist_id', 'required' => true],
+                                    ['key' => 'playlist_title', 'required' => true],
+                                    ['key' => 'editorial_type', 'required' => true],
+                                    ['key' => 'slides[]', 'required' => true],
+                                    ['key' => 'linked_pvs[]', 'required' => false],
+                                ],
+                            ]],
+                            'output' => [
+                                ['key' => 'article_id', 'required' => true],
+                                ['key' => 'title', 'required' => true],
+                                ['key' => 'status', 'required' => true, 'note' => 'draft'],
+                                ['key' => 'url', 'required' => true],
+                            ],
+                        ],
+                    ],
+
 
                     /*
                      * ----------------------------------------------------

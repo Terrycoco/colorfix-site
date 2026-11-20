@@ -1,0 +1,186 @@
+/* The hero is one editorial composition, not text followed by a full-size image. */
+.cf-article-hero {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  height: clamp(390px, 49vw, 580px);
+  isolation: isolate;
+  overflow: hidden;
+  background: #242c31;
+  color: #faf8f1;
+}
+
+.cf-article-hero__visual,
+.cf-article-hero__copy {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.cf-article-hero__visual {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #242c31;
+}
+
+/* A gradient protects lettering while leaving the room clearly visible. */
+.cf-article-hero__visual::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgb(10 15 19 / 78%) 0%,
+    rgb(10 15 19 / 58%) 31%,
+    rgb(10 15 19 / 12%) 67%,
+    transparent 100%);
+}
+
+.cf-article-hero__room {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.cf-article-hero__copy {
+  position: relative;
+  z-index: 2;
+  width: min(59%, 620px);
+  align-self: end;
+  justify-self: start;
+  padding: clamp(28px, 4.2vw, 62px);
+  padding-right: 0;
+  text-shadow: 0 1px 14px rgb(0 0 0 / 18%);
+  pointer-events: none;
+  animation: cf-hero-copy-reveal 700ms 180ms ease-out both;
+}
+
+.cf-article-hero__eyebrow {
+  margin: 0 0 17px;
+  color: #efede6;
+  font-family: var(--cf-editorial-sans);
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .15em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.cf-article-hero__title {
+  margin: 0;
+  color: #fffdf6;
+  font-family: var(--cf-editorial-serif);
+  font-size: clamp(2.9rem, 4.3vw, 4.3rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -.023em;
+  text-wrap: balance;
+  overflow-wrap: break-word;
+}
+
+.cf-article-hero__dek {
+  max-width: 460px;
+  margin: 20px 0 0;
+  color: #f0ede5;
+  font-family: var(--cf-editorial-serif);
+  font-size: clamp(1.17rem, 1.6vw, 1.45rem);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.36;
+  text-wrap: pretty;
+}
+
+.cf-article-hero__inset {
+  position: absolute;
+  z-index: 3;
+  width: clamp(115px, 17%, 185px);
+  padding: 8px;
+  background: var(--cf-paper);
+  color: var(--cf-ink);
+  box-shadow: 0 6px 26px rgb(0 0 0 / 24%);
+}
+.cf-article-hero__inset-label {
+  display: block;
+  margin: 0 0 6px;
+  font-family: var(--cf-editorial-sans);
+  font-size: .58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--cf-ink);
+}
+.cf-article-hero__painting {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 185px;
+  object-fit: contain;
+}
+
+/* Keep existing saved corner choices intact. */
+.cf-article-hero__inset[data-desktop="top-left"] { top: 3%; left: 2%; }
+.cf-article-hero__inset[data-desktop="top-right"] { top: 3%; right: 2%; }
+.cf-article-hero__inset[data-desktop="bottom-left"] { bottom: 3%; left: 2%; }
+.cf-article-hero__inset[data-desktop="bottom-right"] { bottom: 3%; right: 2%; }
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .cf-article-hero { height: clamp(360px, 58vw, 500px); }
+  .cf-article-hero__copy { width: min(69%, 550px); padding: 32px; padding-right: 0; }
+  .cf-article-hero__title { font-size: clamp(2.7rem, 5vw, 3.75rem); }
+  .cf-article-hero__dek { max-width: 370px; font-size: clamp(1.08rem, 2vw, 1.3rem); margin-top: 14px; }
+  .cf-article-hero__eyebrow { font-size: .61rem; margin-bottom: 12px; }
+  .cf-article-hero__visual::after {
+    background: linear-gradient(90deg, rgb(10 15 19 / 83%) 0%, rgb(10 15 19 / 45%) 57%, transparent 100%);
+  }
+  .cf-article-hero__inset { width: clamp(100px, 20%, 145px); padding: 6px; top: auto; right: auto; bottom: auto; left: auto; }
+  .cf-article-hero__painting { max-height: 150px; }
+  .cf-article-hero__inset[data-tablet="top-left"] { top: 3%; left: 3%; }
+  .cf-article-hero__inset[data-tablet="top-right"] { top: 3%; right: 3%; }
+  .cf-article-hero__inset[data-tablet="bottom-left"] { bottom: 3%; left: 3%; }
+  .cf-article-hero__inset[data-tablet="bottom-right"] { bottom: 3%; right: 3%; }
+}
+
+@media (max-width: 639px) {
+  .cf-article-hero { height: clamp(430px, 115vw, 550px); }
+  .cf-article-hero__room { object-position: 50% center; }
+  .cf-article-hero__visual::after {
+    background: linear-gradient(180deg,
+      rgb(9 15 20 / 83%) 0%,
+      rgb(9 15 20 / 63%) 39%,
+      rgb(9 15 20 / 12%) 78%,
+      transparent 100%);
+  }
+  .cf-article-hero__copy {
+    width: 100%;
+    align-self: start;
+    padding: 24px 22px 0;
+  }
+  .cf-article-hero__eyebrow { font-size: .55rem; letter-spacing: .1em; line-height: 1.5; margin-bottom: 11px; }
+  .cf-article-hero__title { max-width: 290px; font-size: clamp(2.25rem, 9vw, 3rem); line-height: 1.03; }
+  .cf-article-hero__dek { max-width: 295px; font-size: 1.12rem; line-height: 1.3; margin-top: 12px; }
+  .cf-article-hero__inset { width: clamp(100px, 31%, 140px); padding: 5px; top: auto; right: auto; bottom: auto; left: auto; }
+  .cf-article-hero__inset-label { font-size: .49rem; letter-spacing: .06em; margin-bottom: 4px; }
+  .cf-article-hero__painting { max-height: 170px; }
+  .cf-article-hero__inset[data-phone="top-left"] { top: 3%; left: 3%; }
+  .cf-article-hero__inset[data-phone="top-right"] { top: 3%; right: 3%; }
+  .cf-article-hero__inset[data-phone="bottom-left"] { bottom: 3%; left: 3%; }
+  .cf-article-hero__inset[data-phone="bottom-right"] { bottom: 3%; right: 3%; }
+}
+
+@keyframes cf-hero-image-reveal {
+  from { opacity: .3; transform: scale(1.025); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes cf-hero-copy-reveal {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-article-hero__copy { animation: none; }
+}
