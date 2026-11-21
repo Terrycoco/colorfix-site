@@ -35,7 +35,6 @@ class ArticleService
         $articleId = isset($payload['id']) ? (int)$payload['id'] : 0;
         $data = [
             'type' => trim((string)($payload['type'] ?? 'colorfix')) ?: 'colorfix',
-            'status' => $payload['status'] ?? 'draft',
             'title' => $title,
             'kicker' => $payload['kicker'] ?? null,
             'dek' => $payload['dek'] ?? null,
@@ -47,7 +46,6 @@ class ArticleService
             'hero_mobile_asset_id' => $payload['hero_mobile_asset_id'] ?? null,
             'cta_overrides' => $payload['cta_overrides'] ?? null,
             'featured' => !empty($payload['featured']) ? 1 : 0,
-            'published_at' => $payload['published_at'] ?? null,
         ];
 
         if ($articleId > 0) {

@@ -6,6 +6,7 @@ namespace App\REX\Services;
 use App\REX\Repos\PdoRexReservationRepository;
 use App\REX\Resolvers\RexResolverRegistryFactory;
 use PDO;
+use App\ARTICLES\Repos\PdoArticleRepository;
 use Throwable;
 
 final class RexSitemapService
@@ -26,6 +27,8 @@ final class RexSitemapService
             if (!is_string($path) || !str_starts_with($path, '/') || str_starts_with($path, '//')) {
                 continue;
             }
+            // Article eligibility comes exclusively from ARTICLES, not stale ANA registrations.
+            if (preg_match('~^/articles/~i', $path)) continue;
             $urls[] = self::ORIGIN . $path;
         }
         return array_values(array_unique($urls));
@@ -49,7 +52,10 @@ SQL)->fetchAll(PDO::FETCH_COLUMN);
 
     public function urls(): array
     {
-        $urls = $this->siteUrls();
+        $urls = array_merge($this->siteUrls(), array_map(
+            static fn(int $id) => self::ORIGIN . '/articles/' . $id,
+            (new PdoArticleRepository($this->pdo))->publishedIds()
+        ));
         $resolver = new RexResolver(
             new PdoRexReservationRepository($this->pdo),
             RexResolverRegistryFactory::build($this->pdo)

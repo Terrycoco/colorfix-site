@@ -17,7 +17,7 @@ export default function ArtSwatchItem({ item }) {
     "Artwork";
 
   const artist = String(item?.artist || "").trim();
-  const surname = artist.split(/\s+/).at(-1) || "";
+  const surname = String(item?.artist_last || "").trim() || artist;
   const displayName = inArtGallery ? surname : name;
   const meta = inArtGallery ? name : artist;
 

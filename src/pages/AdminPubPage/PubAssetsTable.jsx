@@ -871,6 +871,8 @@ async function recreateAsset(
           "Valid PUB asset ID required.",
       };
     }
+    const asset = assets.find(item => Number(item.pub_asset_id) === id) || locatedAsset;
+    if (asset?.asset_type === "article") return { ok: false, error: "Use Publish article in the asset details after approval." };
     setSendingToPackaging(
       true
     );
@@ -984,7 +986,7 @@ async function recreateAsset(
     const approvedAssets =
       assets.filter(
         (asset) =>
-          Number(
+          asset.asset_type !== "article" && Number(
             asset?.approved ||
             0
           ) === 1
@@ -1466,7 +1468,7 @@ async function recreateAsset(
   const approvedReadyAssets =
     assets.filter(
       (asset) =>
-        Number(
+        asset.asset_type !== "article" && Number(
           asset?.approved ||
           0
         ) === 1
@@ -1792,6 +1794,21 @@ function PubAssetDetails({
   onEdit,
   onRedo,
 }) {
+  const [publicationMessage, setPublicationMessage] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  async function publishArticle(action) {
+    setPublishing(true);
+    try {
+      const res = await fetch(`${API_FOLDER}/v2/admin/pub/article-publication.php`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pub_asset_id: asset.pub_asset_id, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Publication failed.");
+      setPublicationMessage(data.item.status === "published" ? "Article published." : "Article unpublished.");
+    } catch (err) { setPublicationMessage(err.message); }
+    finally { setPublishing(false); }
+  }
   const sourceType =
     String(
       asset?.source_type ||
@@ -1835,6 +1852,11 @@ function PubAssetDetails({
     );
   return (
     <AdminStack gap="md">
+      {asset.asset_type === "article" && <AdminStack gap="sm">
+        <AdminButton disabled={publishing || !approved || pipelineStage !== "created"} onClick={() => publishArticle("publish")}>Publish article</AdminButton>
+        <AdminButton disabled={publishing} onClick={() => publishArticle("unpublish")}>Unpublish article</AdminButton>
+        <AdminMetaText>{publicationMessage || "Approve this asset before publishing its saved article."}</AdminMetaText>
+      </AdminStack>}
       <AdminField label="Asset ID">
         <div>
           #{asset?.pub_asset_id || "—"}

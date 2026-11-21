@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-13 11:01:18 AM PST
+UPDATED: 2026-11-21 12:05:44 PST
 
 # REX — Department Manifest
 
@@ -336,3 +336,7 @@ The existing `viewer` resolver and `saved_palette` resource type now support `co
 ### Playlist share-title precedence
 
 Playlist Experience and Playlist Thumbs share metadata use PLAYLISTS' `PdoPlaylistRepository::getCoverTitle(int $playlistId): string`: the first nonblank active `cover-image` slide title in authored order, independent of playback inclusion flags. Empty/missing cover titles retain each resolver's existing fallback. Public entry uses the resolved share title for both `og:title` and `twitter:title`; it does not rewrite playlist records or reservation identities.
+
+## Published article sitemap composition (2026-11-21)
+
+`RexSitemapService::urls()` now includes ARTICLES-owned `PdoArticleRepository::publishedIds()` as canonical `/articles/{id}` URLs. `siteUrls()` discards ANA-derived article-detail paths so stale registrations cannot reintroduce drafts. REX token eligibility remains unchanged. Publication state is queried on each sitemap request; ARTICLES owns transitions. Verified with isolated publication and existing RexSitemap tests. No production changes.

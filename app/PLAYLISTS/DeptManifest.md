@@ -1,4 +1,4 @@
-UPDATED: 2026-11-20 08:40:47 PST
+UPDATED: 2026-11-21 12:05:44 PST
 
 # PLAYLISTS — Department Manifest
 
@@ -62,3 +62,7 @@ Future work (not authorized by this change): record the deployed column definiti
 2026-11-18: added existing-column `editorial_type` support to admin metadata reads and optional repository/manager writes; added omission/default regression coverage. No schema/data migration, frontend change or deployment.
 
 2026-11-18: added the Editorial Type select to the playlist record editor and its existing save payload; documented the owner-supplied enum definition.
+
+## Article CTA publication eligibility (2026-11-21)
+
+`PlaylistExperienceService::hydrateArticleCtas()` delegates to ARTICLES `ArticleLinkService::hydrate()`. Unpublished article destinations are removed before public title/dek/URL hydration. Valid published overrides and other CTA actions remain unchanged. ARTICLES owns publication policy; no playlist or CTA definitions are modified.

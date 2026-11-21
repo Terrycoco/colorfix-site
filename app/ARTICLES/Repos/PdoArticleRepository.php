@@ -9,6 +9,34 @@ class PdoArticleRepository
 {
     public function __construct(private PDO $pdo) {}
 
+    public function publishedIds(): array
+    {
+        return array_map('intval', $this->pdo->query("SELECT id FROM articles WHERE status = 'published' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    public function getPublishedArticle(int $id): ?array
+    {
+        $article = $this->getArticleById($id);
+        return ($article['status'] ?? '') === 'published' ? $article : null;
+    }
+
+    public function lockArticle(int $id): ?array
+    {
+        $sql = 'SELECT * FROM articles WHERE id = ?';
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql') $sql .= ' FOR UPDATE';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function setPublication(int $id, bool $published): void
+    {
+        $sql = $published
+            ? "UPDATE articles SET status = 'published', published_at = COALESCE(published_at, ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+            : "UPDATE articles SET status = 'draft', updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+        $this->pdo->prepare($sql)->execute($published ? [gmdate('Y-m-d H:i:s'), $id] : [$id]);
+    }
+
     public function createArticle(array $data): int
     {
         $sql = "INSERT INTO articles
@@ -18,7 +46,7 @@ class PdoArticleRepository
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             ':type' => $data['type'],
-            ':status' => $data['status'] ?? 'draft',
+            ':status' => 'draft',
             ':title' => $data['title'],
             ':kicker' => $data['kicker'] ?? null,
             ':dek' => $data['dek'] ?? null,
@@ -30,7 +58,7 @@ class PdoArticleRepository
             ':hero_mobile_asset_id' => $data['hero_mobile_asset_id'] ?? null,
             ':cta_overrides' => $data['cta_overrides'] ?? null,
             ':featured' => !empty($data['featured']) ? 1 : 0,
-            ':published_at' => $data['published_at'] ?? null,
+            ':published_at' => null,
         ]);
         return (int)$this->pdo->lastInsertId();
     }
@@ -40,7 +68,6 @@ class PdoArticleRepository
         if (empty($fields)) return;
         $allowed = [
             'type',
-            'status',
             'title',
             'kicker',
             'dek',
@@ -52,7 +79,6 @@ class PdoArticleRepository
             'hero_mobile_asset_id',
             'cta_overrides',
             'featured',
-            'published_at',
         ];
         $setParts = [];
         $params = [':id' => $id];

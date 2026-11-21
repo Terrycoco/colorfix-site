@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-17 14:38:02 PST
+UPDATED: 2026-11-21 12:05:44 PST
 
 # ANA — Department Manifest
 
@@ -418,3 +418,7 @@ Before approved changes, characterize both recording aliases and report contract
 After separately approved improvements are implemented and verified, record their date, scope, ownership/interface effects, tests and local/deployed status here; update the relevant future item and technical inventory together.
 
 ARTICLES migration (2026-11-17): article title readers now import `App\ARTICLES\Repos\PdoArticleRepository` from `app/ARTICLES/Repos/PdoArticleRepository.php`. Report interfaces and behavior are unchanged.
+
+## Article publication-aware visit timing (2026-11-21)
+
+ArticleRoute no longer records an article visit before retrieval. ArticlePage mounts existing ANATrack only after a successful published response and outside admin preview mode. Failed/missing/draft loads do not produce article visits. ANAService's verified-admin/internal-device/source policy is unchanged. Browser tests cover desktop/tablet/phone public visits and failed-load/preview exclusion; existing ANA policy tests remain in use. Sitemap article eligibility is supplied by ARTICLES, not ANA registry flags.

@@ -1424,34 +1424,7 @@ public function buildPlaybackPlanFromProjectExperience(
 
     private function hydrateArticleCtas(array $ctas): array
     {
-        $repo = new PdoArticleRepository($this->pdo);
-        foreach ($ctas as $idx => $cta) {
-            $actionKey = (string)($cta['action_key'] ?? $cta['action'] ?? $cta['key'] ?? '');
-            if ($actionKey !== 'article_link') {
-                continue;
-            }
-            $params = $this->decodeParams($cta['params'] ?? null);
-            $articleId = (int)($params['article_id'] ?? $params['articleId'] ?? 0);
-            if ($articleId <= 0) {
-                continue;
-            }
-            $article = $repo->getArticleById($articleId);
-            if (!$article) {
-                continue;
-            }
-            if (empty($params['title']) && !empty($article['title'])) {
-                $params['title'] = $article['title'];
-            }
-            if (empty($params['dek']) && !empty($article['dek'])) {
-                $params['dek'] = $article['dek'];
-            }
-            if (empty($params['url'])) {
-                $params['url'] = "/articles/{$articleId}";
-            }
-            $cta['params'] = json_encode($params, JSON_UNESCAPED_SLASHES);
-            $ctas[$idx] = $cta;
-        }
-        return $ctas;
+        return (new \App\ARTICLES\Services\ArticleLinkService($this->pdo))->hydrate($ctas);
     }
 
     private function decodeParams(mixed $value): array

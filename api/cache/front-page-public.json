@@ -3,7 +3,7 @@
     "success": true,
     "variant": "public",
     "build_key": "public_home",
-    "generated_at": "2026-11-10T18:48:52+00:00",
+    "generated_at": "2026-11-21T20:43:15+00:00",
     "source": {
         "query_id": 4,
         "playlist_set_id": 9,
@@ -95,41 +95,7 @@
             "is_active": 1,
             "created_at": "2026-02-27 07:15:27",
             "color": "",
-            "insert_position": "1.00",
-            "featured_payload": {
-                "article": {
-                    "id": 3,
-                    "type": "guide",
-                    "status": "published",
-                    "is_retired": 0,
-                    "retired_at": null,
-                    "title": "Where Does the Eye Go?",
-                    "dek": "The #1 question that fixes most houses",
-                    "slug": "eye-go",
-                    "meta_description": "Struggling with exterior paint colors? Learn why your house looks off and how focal points and contrast guide the eye\u2014and fix it fast.",
-                    "hero_asset_id": 374,
-                    "hero_mobile_asset_id": 375,
-                    "cta_overrides": "{\"14\":{\"label\":\"Slideshow: Where does the eye go?\",\"playlist_instance_id\":\"21\",\"playlist_id\":22},\"_cta_ids\":[14]}",
-                    "featured": 1,
-                    "created_at": "2026-03-30 13:03:34",
-                    "updated_at": "2026-08-14 14:30:58",
-                    "published_at": "2026-03-30 21:31:05"
-                },
-                "hero": {
-                    "photo_library_id": 374,
-                    "rel_path": "/photos/articles/highlighter-combo/article_highlighter-combo_b942b7663df7.jpg",
-                    "title": "highlighter_yellow_combo",
-                    "alt_text": "Split-view suburban house exterior with terracotta roof, gray-blue walls, and yellow trim before and after repainting.",
-                    "updated_at": "2026-08-04 15:52:08"
-                },
-                "hero_mobile": {
-                    "photo_library_id": 375,
-                    "rel_path": "/photos/articles/eye-go/article_eye-go_ff804a2b5c36.jpg",
-                    "title": "eye-go highlighter_combo_vert",
-                    "alt_text": "Split-view suburban house exterior showing before and after trim color changes, with terracotta roof and desert landscaping.",
-                    "updated_at": "2026-08-04 15:52:13"
-                }
-            }
+            "insert_position": "1.00"
         },
         {
             "id": 72,
@@ -166,6 +132,25 @@
             "is_pinnable": 0,
             "is_active": 1,
             "created_at": "2025-09-13 17:20:45",
+            "color": "",
+            "insert_position": "4.00"
+        },
+        {
+            "id": 81,
+            "handle": "Articles List",
+            "item_type": "search",
+            "query_id": 4,
+            "title": "Articles",
+            "subtitle": "",
+            "display": "Articles",
+            "description": "Color studies, design observations, and the reasoning behind the choices",
+            "image_url": "",
+            "body": "",
+            "target_url": "/articles",
+            "is_clickable": 1,
+            "is_pinnable": 0,
+            "is_active": 1,
+            "created_at": "2026-11-21 12:43:01",
             "color": "",
             "insert_position": "4.00"
         },
@@ -413,12 +398,10 @@
         ]
     },
     "image_preloads": [
-        "/api/v2/image-thumb.php?id=374&w=520&q=72",
-        "/api/v2/image-thumb.php?id=375&w=520&q=72",
         "/api/v2/image-thumb.php?id=160&w=520&q=72",
         "/api/v2/image-thumb.php?id=589&w=520&q=72",
         "/api/v2/image-thumb.php?id=581&w=520&q=72"
     ],
     "rowCount": 1,
-    "insertCount": 15
+    "insertCount": 16
 }

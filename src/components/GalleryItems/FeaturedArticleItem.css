@@ -1,223 +1,136 @@
-/* =========================================
-   Featured Article Tile (Link card)
-   File: FeaturedArticleItem.css
-   Requires JSX wrapper: .featured-content
-   ========================================= */
-
+/* Featured Article: full-bleed editorial cover. Type scales with tile width (cqw), not viewport width. */
 .featured-article {
-  --featured-article-left-inset: 10px;
-
-  display: block;
-  text-decoration: none;
-  color: inherit;
-
-  background: #ffffff;
-  border: 1px solid #e6e7eb;
-  border-radius: 18px;
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 365px;
+  height: 100%;
   overflow: hidden;
-
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  border-radius: 18px;
+  background: #24323a;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .12);
+  transition: transform .18s ease, box-shadow .18s ease;
 }
 
 .featured-article:hover {
-  background: var(--search-item-background-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
-  border-color: #d7dbe3;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .20);
 }
 
-.featured-article:visited {
-  color: inherit;
-  text-decoration: none;
-}
+.featured-article:visited,
+.featured-article:hover { color: #fff; text-decoration: none; }
+.featured-article:focus-visible { outline: 3px solid #008d92; outline-offset: 3px; }
 
-.featured-article:focus-visible {
-  outline: 2px solid #111827;
-  outline-offset: 3px;
-}
-
-/* -----------------------------------------
-   Kicker (editorial label, not CTA)
-   ----------------------------------------- */
-.featured-article .kicker {
-  display: block;
-
-  padding: 14px 16px 10px var(--featured-article-left-inset);
-  margin: 0;
-
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--brand-muted);
-
-  border-bottom: 1px solid #eef0f4;
-
-  /* wrapping safety */
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* -----------------------------------------
-   Image (full-bleed, auto-crop)
-   ----------------------------------------- */
-.featured-article .featured-media {
-  width: calc(100% - (var(--featured-article-left-inset) * 2));
-  margin: 0 var(--featured-article-left-inset);
-  overflow: hidden;
-
-  /* consistent card-like crop */
-  height: 160px;
-  background: #f3f4f6;
-}
-
+/* Fill the card without altering the shared photo-delivery components. */
+.featured-article .featured-media,
 .featured-article .featured-media picture {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
+  margin: 0;
+  overflow: hidden;
 }
-
+.featured-article .featured-media { z-index: -2; }
 .featured-article .featured-media img {
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
-
   object-fit: cover;
   object-position: center;
+  transition: transform .4s ease;
+}
+.featured-article:hover .featured-media img { transform: scale(1.025); }
+
+/* The gradient makes white typography legible over varied interior photos. */
+.featured-article::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+  to bottom,
+  rgba(7, 12, 20, 0) 0%,
+  rgba(7, 12, 20, 0) 35%,
+  rgba(7, 12, 20, .12) 55%,
+  rgba(7, 12, 20, .65) 78%,
+  rgba(7, 12, 20, .90) 100%
+);
 }
 
 .featured-article__image-placeholder {
+  display: flex;
   width: 100%;
   height: 100%;
-
-  display: flex;
   align-items: center;
   justify-content: center;
-
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #9ca3af;
+  font: 500 12px/1.4 "Montserrat", sans-serif;
+  color: #fff;
 }
 
-/* -----------------------------------------
-   Text block (THIS is where padding lives)
-   ----------------------------------------- */
 .featured-article .featured-content {
-  padding: 14px 16px 16px var(--featured-article-left-inset);
+  position: relative;
+  z-index: 1;
+  padding: clamp(11px, 6.5cqw, 21px) clamp(10px, 6.5cqw, 21px) clamp(14px, 7cqw, 23px);
+  min-width: 0;
+  color: #fff;
 }
-
-/* Headline */
-.featured-article h3 {
-  margin: 0 0 6px 0;
-  font-family: "Poppins", system-ui, -apple-system, sans-serif;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.12;
-  color: #111827;
-
-  /* wrapping safety */
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  hyphens: auto;
-}
-
-/* Dek */
-.featured-article .dek {
-  margin: 0 0 12px 0;
-  font-size: 14.5px;
-  font-weight: 520;
-  line-height: 1.35;
-  color: #374151;
-
-  /* never clamp or clip */
+.featured-article .kicker {
   display: block;
-  height: auto;
-  max-height: none;
-  overflow: visible;
-
-  white-space: normal;
+  padding: 0;
+  margin: 0 0 clamp(5px, 2.8cqw, 9px);
+  border: 0;
+  color: rgba(255, 255, 255, .88);
+  font: 600 clamp(8px, 3cqw, 10px)/1.3 "Montserrat", system-ui, sans-serif;
+  letter-spacing: .16em;
+  text-transform: uppercase;
   overflow-wrap: anywhere;
-  word-break: break-word;
-
-  -webkit-line-clamp: unset;
-  -webkit-box-orient: unset;
 }
-
-/* CTA (clearly different from kicker) */
+.featured-article h3 {
+  margin: 0 0 clamp(5px, 2.8cqw, 9px);
+  color: #fff;
+  font: 400 clamp(20px, 11.5cqw, 34.4px)/1.04 "EB Garamond", Georgia, serif;
+  letter-spacing: -.015em;
+  overflow-wrap: break-word;
+}
+.featured-article .dek {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  margin: 0 0 clamp(9px, 4.5cqw, 15px);
+  color: rgba(255, 255, 255, .93);
+  font: 400 clamp(11.5px, 6.7cqw, 15px)/1.28 "EB Garamond", Georgia, serif;
+  overflow-wrap: break-word;
+}
 .featured-article .cta {
   margin: 0;
-  padding: 0;
-
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.2;
-
-  text-transform: none;
-  letter-spacing: 0;
-
-  color: #4b6b8a;
-  font-weight: 600;
-  text-decoration: none;
+  color: #fff;
+  font: 600 clamp(10px, 4.5cqw, 12px)/1.35 "Montserrat", system-ui, sans-serif;
+  letter-spacing: .01em;
 }
+.featured-article:hover .cta { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
 
-.featured-article:hover .cta {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-   color: #2f4f6f;
-}
-
-/* =========================================
-   Mobile tuning
-   ========================================= */
 @media (max-width: 640px) {
-  .featured-article {
-    border-radius: 18px;
-  }
-
-  .featured-article .kicker {
-    padding: 14px 14px 10px var(--featured-article-left-inset);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-  }
-
-  .featured-article .featured-media {
-    height: 190px; /* taller crop for phones */
-  }
-
-  .featured-article .featured-content {
-    padding: 14px 14px 16px var(--featured-article-left-inset);
-  }
-
-  .featured-article h3 {
- 
- 
-    margin-bottom: 6px;
-    font-size: 1.15rem;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-  }
-
-  
-
-  .featured-article .dek {
-    font-size: 15px;
-    line-height: 1.35;
-    margin-bottom: 12px;
-  }
-
-  .featured-article .cta {
-    font-size: 13px;
-  }
+  .featured-article { min-height: 350px; }
 }
-@media (max-width: 700px) {
+@media (prefers-reduced-motion: reduce) {
+  .featured-article, .featured-article .featured-media img { transition: none; }
+}
 
-  .featured-article .kicker {
-    font-size: 0.58rem;
-    letter-spacing: 0.12em;
-    line-height: 1.15;
-  }
+/* Fallback for older browsers without container query length units. */
+@supports not (font-size: 1cqw) {
+  .featured-article .featured-content { padding: 17px; }
+  .featured-article .kicker { font-size: 9px; margin-bottom: 7px; }
+  .featured-article h3 { font-size: 26px; margin-bottom: 7px; }
+  .featured-article .dek { font-size: 13px; margin-bottom: 12px; }
+  .featured-article .cta { font-size: 11px; }
 }

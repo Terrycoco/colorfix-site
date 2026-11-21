@@ -62,6 +62,7 @@ class PublicArticleService
                 'hero_mobile' => $heroMobile,
                 'sections' => $sections,
                 'ctas' => $this->resolveCtas($article),
+                'metadata' => ArticleHtmlService::metadata(['article' => $article, 'hero' => $hero]),
             ],
         ];
     }
@@ -182,6 +183,6 @@ class PublicArticleService
             }
             $ctas[$idx]['params'] = json_encode($merged, JSON_UNESCAPED_SLASHES);
         }
-        return $ctas;
+        return (new ArticleLinkService($this->pdo))->hydrate($ctas);
     }
 }

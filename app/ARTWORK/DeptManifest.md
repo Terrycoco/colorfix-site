@@ -1,6 +1,6 @@
 # ARTWORK — Department Manifest
 
-**UPDATED:** 2026-11-13 11:01:18 AM PST
+**UPDATED:** 2026-11-20 20:10:42 PST
 
 **Department:** `ARTWORK`  
 **Location:** `app/ARTWORK/`  
@@ -51,6 +51,7 @@ ARTWORK does **not** own the image file, Photo Library row, source-photo crop, p
 | `artwork_id` | Unsigned integer, auto-increment primary key. |
 | `photo_library_id` | Unsigned integer, required; unique key `uq_artwork_photo`. References the photograph; confirm foreign-key details in production schema if modifying relationships. |
 | `artist` | Nullable `varchar(255)`; enter names in natural order, e.g. `Jean-Auguste-Dominique Ingres`. |
+| `artist_last` | Existing owner-added field for the authored surname, including compound surnames. Repository reads/create/partial updates support it; public gallery items expose it. Gallery sorting and tooltips use it without splitting the name, falling back to the complete `artist` when blank. No schema change is performed. |
 | `official_title` | Nullable `text`; official artwork title. |
 | `display_title` | Nullable `varchar(255)`; optional user-friendly title. |
 | `year` | Nullable unsigned `smallint`; year if known. |

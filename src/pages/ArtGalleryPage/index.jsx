@@ -6,13 +6,6 @@ import TopSpacer from '@layout/TopSpacer';
 // The Gallery component already owns the gold art frames and detail links.
 const galleryMeta = { item_type: 'art-swatch', has_header: 0 };
 
-function artistSurname(fullName) {
-  const name = String(fullName || '').trim();
-  if (!name) return '';
-  // Last-name wording for the hover tooltip, keeping the full name in metadata.
-  return name.split(/\s+/).at(-1);
-}
-
 export default function ArtGalleryPage() {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -45,11 +38,9 @@ export default function ArtGalleryPage() {
 
   const galleryItems = useMemo(() => {
     const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
-    return items.map(item => ({
-      ...item,
-      artist: artistSurname(item.artist),
-    })).sort((a, b) => {
-      const byArtist = collator.compare(a.artist || '', b.artist || '');
+    return [...items].sort((a, b) => {
+      const artistLabel = item => String(item.artist_last || '').trim() || String(item.artist || '').trim();
+      const byArtist = collator.compare(artistLabel(a), artistLabel(b));
       if (byArtist) return byArtist;
       const titleA = a.display_title || a.official_title || a.title || '';
       const titleB = b.display_title || b.official_title || b.title || '';

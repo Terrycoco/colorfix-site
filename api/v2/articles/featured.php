@@ -4,7 +4,7 @@ declare(strict_types=1);
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') { http_response_code(200); exit; }
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: public, max-age=300, stale-while-revalidate=600');
+header('Cache-Control: no-store, max-age=0');
 
 require_once __DIR__ . '/../../autoload.php';
 require_once __DIR__ . '/../../db.php';

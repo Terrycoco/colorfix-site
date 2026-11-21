@@ -1,7 +1,7 @@
 import { fallbackToOriginal } from "@helpers/imageThumb";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { photoThumbUrl, photoThumbStyle } from "@helpers/imageThumb";
+import { photoThumbUrl } from "@helpers/imageThumb";
 import "./FeaturedArticleItem.css";
 
 function parseJsonMaybe(text) {
@@ -14,7 +14,7 @@ function parseJsonMaybe(text) {
 }
 
 const FeaturedArticleItem = ({ item = {} }) => {
-  const [payload, setPayload] = useState(item?.featured_payload || null);
+  const [payload, setPayload] = useState(null);
   const [error, setError] = useState("");
 
   const metadata = useMemo(() => {
@@ -30,11 +30,6 @@ const FeaturedArticleItem = ({ item = {} }) => {
   const kicker = item.display || item.title || metadata.kicker || "Featured Article";
 
   useEffect(() => {
-    if (item?.featured_payload) {
-      setPayload(item.featured_payload);
-      return undefined;
-    }
-
     let cancelled = false;
     const controller = new AbortController();
 
@@ -45,7 +40,7 @@ const FeaturedArticleItem = ({ item = {} }) => {
         if (type) params.set("type", type);
         const query = params.toString();
         const url = `/api/v2/articles/featured.php${query ? `?${query}` : ""}`;
-        const res = await fetch(url, { signal: controller.signal, cache: "no-cache" });
+        const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load featured article");
         if (!cancelled) setPayload(data.item || null);
@@ -82,6 +77,8 @@ const FeaturedArticleItem = ({ item = {} }) => {
 
   const href = article?.id ? `/articles/${article.id}` : "#";
 
+  if (!article) return null;
+
   return (
     <Link
       className="featured-article"
@@ -90,10 +87,7 @@ const FeaturedArticleItem = ({ item = {} }) => {
         if (!article?.id) e.preventDefault();
       }}
     >
-      {/* Kicker stays above image, magazine style */}
-      <div className="kicker">{kicker}</div>
-
-      {/* Full-bleed image */}
+      {/* Full-bleed editorial image */}
       <div className="featured-media">
         {primaryHeroSrc ? (
           <picture>
@@ -107,7 +101,6 @@ const FeaturedArticleItem = ({ item = {} }) => {
               src={photoThumbUrl(primaryHeroId, 720, 72) || withCacheBuster(primaryHero?.rel_path, primaryHero?.updated_at)}
               onError={event => fallbackToOriginal(event, primaryHero?.rel_path)}
               srcSet={`${primaryHeroSrc} 520w, ${photoThumbUrl(primaryHeroId, 720, 72) || primaryHeroSrc} 720w`}
-              style={photoThumbStyle(primaryHeroSrc) || photoThumbStyle(mobileHeroSrc)}
               sizes="(max-width: 640px) 90vw, 320px"
               alt={heroMobile?.alt_text || primaryHero?.alt_text || article?.title || ""}
               loading="eager"
@@ -120,11 +113,12 @@ const FeaturedArticleItem = ({ item = {} }) => {
         )}
       </div>
 
-      {/* Padded text area (THIS is what you were missing) */}
+      {/* A single readable text overlay over the photograph. */}
       <div className="featured-content">
+        <span className="kicker">{kicker}</span>
         <h3>{article?.title || "Featured article"}</h3>
         <p className="dek">{article?.dek || (error ? error : "Tap to read")}</p>
-        <div className="cta">Read Full Article →</div>
+        <div className="cta">Read Article →</div>
       </div>
     </Link>
   );

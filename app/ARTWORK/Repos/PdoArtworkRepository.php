@@ -17,11 +17,11 @@ use PDO;
 final class PdoArtworkRepository
 {
     private const FIELDS = [
-        'artist', 'official_title', 'display_title', 'year', 'circa', 'medium',
+        'artist', 'artist_last', 'official_title', 'display_title', 'year', 'circa', 'medium',
         'museum', 'source_url', 'historical_notes', 'color_analysis',
     ];
 
-    private const SELECT = 'artwork_id, photo_library_id, artist, official_title, '
+    private const SELECT = 'artwork_id, photo_library_id, artist, artist_last, official_title, '
         . 'display_title, year, circa, medium, museum, source_url, '
         . 'historical_notes, color_analysis, created_at, updated_at';
 
@@ -95,7 +95,7 @@ final class PdoArtworkRepository
             throw new InvalidArgumentException('Invalid gallery limit.');
         }
         $stmt = $this->pdo->prepare(
-            "SELECT a.artwork_id, a.photo_library_id, a.artist, a.official_title,
+            "SELECT a.artwork_id, a.photo_library_id, a.artist, a.artist_last, a.official_title,
                     a.display_title, p.rel_path AS photo_url, p.title AS title,
                     pc.crop_x, pc.crop_y, pc.crop_width, pc.crop_height
                FROM photos_artwork a
@@ -119,7 +119,7 @@ final class PdoArtworkRepository
      * Creates metadata linked to an existing photo. Duplicate photo IDs cause a
      * unique-key exception; use updateByPhotoId() to edit an existing record.
      *
-     * Only the ten explicitly defined metadata fields are accepted.
+     * Only the explicitly defined metadata fields are accepted.
      * Database defaults provide artwork_id, created_at and updated_at.
      */
     public function create(int $photoLibraryId, array $fields = []): int

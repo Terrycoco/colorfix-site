@@ -227,22 +227,9 @@ function buildFrontPageRailItem(array $set, int $setId): array {
 }
 
 function attachFeaturedArticlePayloads(string $baseUrl, array $inserts): array {
+    // Publication can change between builds; retrieve articles at request time.
     foreach ($inserts as &$item) {
-        if (strtolower((string)($item['item_type'] ?? '')) !== 'featured-article') continue;
-        $metadata = parseJsonObject((string)($item['body'] ?? '')) + parseJsonObject((string)($item['description'] ?? ''));
-        $type = trim((string)($metadata['article_type'] ?? $metadata['type'] ?? ''));
-        $url = "{$baseUrl}/api/v2/articles/featured.php";
-        if ($type !== '') {
-            $url .= '?type=' . rawurlencode($type);
-        }
-        try {
-            $featured = httpJson($url);
-            if (!empty($featured['ok'])) {
-                $item['featured_payload'] = $featured['item'] ?? null;
-            }
-        } catch (Throwable $e) {
-            $item['featured_payload_error'] = $e->getMessage();
-        }
+        unset($item['featured_payload'], $item['featured_payload_error']);
     }
     unset($item);
     return $inserts;

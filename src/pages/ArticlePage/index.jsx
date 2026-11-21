@@ -6,6 +6,7 @@ import "./ArticleCtas.css";
 import { API_FOLDER } from "@helpers/config";
 import ArticleContainer from "./ArticleContainer";
 import ArticleHero from "./ArticleHero";
+import ANATrack from "@ANA/ANATrack";
 import ArticleInspiration from "./ArticleInspiration";
 import ArticlePalette from "./ArticlePalette";
 import ArticleRoomStudy from "./ArticleRoomStudy";
@@ -69,6 +70,39 @@ export default function ArticlePage() {
     load();
     return () => { active = false; controller.abort(); };
   }, [id, adminPreview]);
+
+  useEffect(() => {
+    const meta = item?.metadata;
+    const previousTitle = document.title;
+    document.title = meta?.title || (loading ? "Loading article…" : "Article unavailable");
+    const values = {
+      description: meta?.description || "",
+      robots: !adminPreview && meta ? meta.robots : "noindex,nofollow",
+      "og:type": "article", "og:title": meta?.title || "", "og:description": meta?.description || "",
+      "og:url": adminPreview ? "" : meta?.canonical || "", "og:image": meta?.image || "",
+      "twitter:card": meta?.image ? "summary_large_image" : "summary",
+      "twitter:title": meta?.title || "", "twitter:description": meta?.description || "",
+      "twitter:image": meta?.image || "", "article:published_time": meta?.published_time || "",
+    };
+    const nodes = Object.entries(values).map(([key, value]) => {
+      const attr = key.startsWith("og:") || key.startsWith("article:") ? "property" : "name";
+      let node = document.head.querySelector(`meta[${attr}="${key}"]`);
+      if (!node) { node = document.createElement("meta"); node.setAttribute(attr, key); document.head.append(node); }
+      const previous = node.getAttribute("content");
+      node.setAttribute("content", value);
+      return [node, previous];
+    });
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    const previousCanonical = canonical?.getAttribute("href");
+    if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.append(canonical); }
+    if (!adminPreview && meta?.canonical) canonical.href = meta.canonical;
+    else canonical.removeAttribute("href");
+    return () => {
+      document.title = previousTitle;
+      nodes.forEach(([node, previous]) => previous === null ? node.remove() : node.setAttribute("content", previous));
+      if (previousCanonical) canonical.setAttribute("href", previousCanonical); else canonical.remove();
+    };
+  }, [item, loading, adminPreview]);
 
   const hero = useMemo(() => {
     const article = item?.article || {};
@@ -181,6 +215,7 @@ export default function ArticlePage() {
         <p className="cf-article-status">Article not found.</p>
       ) : (
         <>
+          {item.article.status === "published" && !adminPreview && <ANATrack key={item.article.id} resource={{ resource_type: "article", resource_id: Number(item.article.id) }} />}
           <ArticleHero
             title={item.article.title}
             kicker={item.article.kicker}
@@ -211,7 +246,7 @@ export default function ArticlePage() {
                       />;
                 }
                 if (block.kind === "text") {
-                  return <ArticleText key={block.key} section={block.section} concluding={index === editorialBlocks.length - 1} />;
+                  return <ArticleText key={block.key} section={block.section} concluding={index === editorialBlocks.length - 1} publishedAt={index === 0 ? item.article.published_at : undefined} />;
                 }
                 if (block.kind === "palette_link") return <ArticlePalette key={block.key} section={block.section} />;
                 // Unknown section kinds retain their content in admin preview.
@@ -221,7 +256,7 @@ export default function ArticlePage() {
             </>
           ) : (
             <>
-          {(introduction || inspiration) ? <ArticleInspiration introduction={introduction} section={inspiration} /> : null}
+          {(introduction || inspiration) ? <ArticleInspiration introduction={introduction} section={inspiration} publishedAt={item.article.published_at} /> : null}
           {paletteSection ? <ArticlePalette section={paletteSection} /> : null}
           {roomSections.length > 0 ? (
             <>

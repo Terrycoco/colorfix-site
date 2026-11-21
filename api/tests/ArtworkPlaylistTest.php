@@ -6,13 +6,15 @@ use App\ARTWORK\Services\ArtworkPageService;
 
 $pdo = new PDO('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $pdo->exec('CREATE TABLE photo_library (photo_library_id INTEGER PRIMARY KEY,source_type TEXT,inspiration_photo_id INTEGER,show_in_gallery INTEGER DEFAULT 1,is_inactive INTEGER DEFAULT 0,is_retired INTEGER DEFAULT 0,rel_path TEXT,title TEXT,alt_text TEXT,palette_id INTEGER,client_id INTEGER)');
-$pdo->exec('CREATE TABLE photos_artwork (artwork_id INTEGER PRIMARY KEY,photo_library_id INTEGER,artist TEXT,official_title TEXT,display_title TEXT,year INTEGER,circa INTEGER,medium TEXT,museum TEXT,source_url TEXT,historical_notes TEXT,color_analysis TEXT,created_at TEXT,updated_at TEXT)');
+$pdo->exec('CREATE TABLE photos_artwork (artwork_id INTEGER PRIMARY KEY,photo_library_id INTEGER,artist TEXT,artist_last TEXT,official_title TEXT,display_title TEXT,year INTEGER,circa INTEGER,medium TEXT,museum TEXT,source_url TEXT,historical_notes TEXT,color_analysis TEXT,created_at TEXT,updated_at TEXT)');
+$pdo->exec('CREATE TABLE photo_crops (photo_library_id INTEGER,crop_type TEXT,crop_x REAL,crop_y REAL,crop_width REAL,crop_height REAL)');
 $pdo->exec('CREATE TABLE playlists (playlist_id INTEGER PRIMARY KEY,title TEXT,is_active INTEGER DEFAULT 1,is_public INTEGER DEFAULT 1,indexable INTEGER DEFAULT 1,is_retired INTEGER DEFAULT 0)');
 $pdo->exec('CREATE TABLE playlist_items (playlist_item_id INTEGER PRIMARY KEY,playlist_id INTEGER,photo_library_id INTEGER,is_active INTEGER DEFAULT 1,site INTEGER DEFAULT 1,concept INTEGER DEFAULT 0,order_index INTEGER DEFAULT 0)');
 $pdo->exec('CREATE TABLE player_experiences (player_experience_id INTEGER PRIMARY KEY,experience_key TEXT,name TEXT,slide_flag TEXT,palette_viewer_key TEXT,rex_parent_experience_key TEXT,cta_page_id INTEGER,is_active INTEGER)');
 $pdo->exec('CREATE TABLE rex_reservations (id INTEGER PRIMARY KEY,token TEXT,label TEXT,admin_note TEXT,qr_key TEXT,resolver_key TEXT,resource_type TEXT,resource_id INTEGER,context_json TEXT,status TEXT,revoked_at TEXT,created_at TEXT,updated_at TEXT,experience_key TEXT)');
 $pdo->exec("INSERT INTO photo_library (photo_library_id,source_type,inspiration_photo_id,rel_path,title) VALUES (746,'art',NULL,'/art.png','Artwork'),(747,'art_inspired',746,'/design.png','Design'),(800,'art',NULL,'/other.png','Other artwork'),(900,'progression',NULL,'/room.png','Unrelated room')");
 $pdo->exec("INSERT INTO photos_artwork (artwork_id,photo_library_id,display_title) VALUES (1,746,'Art study'),(2,800,'Other study')");
+$pdo->exec("UPDATE photos_artwork SET artist='Vincent van Gogh',artist_last='van Gogh' WHERE artwork_id=1");
 $pdo->exec("INSERT INTO player_experiences VALUES (1,'public','Public','site','default','public',2,1)");
 foreach (range(60,75) as $id) {
     $pdo->prepare('INSERT INTO playlists (playlist_id,title) VALUES (?,?)')->execute([$id,'Playlist '.$id]);
@@ -43,6 +45,9 @@ $snapshot = static function() use ($pdo): array {
 };
 $before=$snapshot();
 $service=new ArtworkPageService($pdo);
+$gallery = array_column($service->listGallery(), null, 'artwork_id');
+$expect($gallery[1]['artist_last'] === 'van Gogh', 'Public gallery preserves the explicit compound surname');
+$expect($gallery[1]['artist'] === 'Vincent van Gogh', 'Public gallery retains the complete artist name');
 $page=$service->get(1);
 $expect(array_column($page['playlists'],'playlist_id') === [60,61,74,75], 'Only eligible, uniquely associated playlists with existing active public REX are discoverable');
 $expect(array_column($page['playlists'],'rex_url') === ['/t/stable-60','/t/stable-61','/t/stable-74','/t/stable-75'], 'Reuse earliest stable token including legacy public context, never client/revoked/duplicate destinations');

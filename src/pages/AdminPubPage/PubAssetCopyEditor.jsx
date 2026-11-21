@@ -569,6 +569,7 @@ export default function PubAssetCopyEditor({
               {recreating ? "Recreating..." : "Redo Asset"}
             </AdminButton>
 
+            {asset?.asset_type !== "article" && (
             <AdminButton
               type="button"
               disabled={busy || approvalSaving || !isApproved}
@@ -581,6 +582,7 @@ export default function PubAssetCopyEditor({
             >
               {sendingToPackaging ? "Sending..." : "Send to Packaging"}
             </AdminButton>
+            )}
           </>
         ) : null}
       </AdminEditorFooter>

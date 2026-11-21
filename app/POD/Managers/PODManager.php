@@ -310,35 +310,6 @@ final class PodManager
     /** Same article-link expansion used by the existing playback service. */
     private function hydrateArticleCtas(array $ctas): array
     {
-        $articles = null;
-        foreach ($ctas as &$cta) {
-            $action = (string)($cta['action_key'] ?? $cta['action'] ?? $cta['key'] ?? '');
-            if ($action !== 'article_link') {
-                continue;
-            }
-            $raw = $cta['params'] ?? null;
-            $params = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : []);
-            $params = is_array($params) ? $params : [];
-            $id = (int)($params['article_id'] ?? $params['articleId'] ?? 0);
-            if ($id <= 0) {
-                continue;
-            }
-            $articles ??= new PdoArticleRepository($this->pdo);
-            $article = $articles->getArticleById($id);
-            if (!$article) {
-                continue;
-            }
-            foreach (['title', 'dek'] as $field) {
-                if (empty($params[$field]) && !empty($article[$field])) {
-                    $params[$field] = $article[$field];
-                }
-            }
-            if (empty($params['url'])) {
-                $params['url'] = '/articles/' . $id;
-            }
-            $cta['params'] = json_encode($params, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        }
-        unset($cta);
-        return $ctas;
+        return (new \App\ARTICLES\Services\ArticleLinkService($this->pdo))->hydrate($ctas);
     }
 }

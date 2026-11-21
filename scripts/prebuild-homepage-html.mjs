@@ -317,7 +317,7 @@ function renderItem(item) {
 
   if (type === "front-blurb") return renderFrontBlurb(item);
 
-  if (type === "featured-article") return renderFeaturedArticle(item);
+  if (type === "featured-article") return "";
 
   if (type === "front-page-playlist-set") return renderPlaylistSet(item);
 

@@ -37,6 +37,7 @@ final class ArtworkPageService
                 'official_title' => $row['official_title'] ?? '',
                 'title' => $row['title'] ?? '',
                 'artist' => $row['artist'] ?? '',
+                'artist_last' => $row['artist_last'] ?? '',
                 'photo_url' => $safePath,
                 'crop_x' => $row['crop_x'] === null ? null : (float)$row['crop_x'],
                 'crop_y' => $row['crop_y'] === null ? null : (float)$row['crop_y'],

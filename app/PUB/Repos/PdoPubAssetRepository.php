@@ -2097,6 +2097,26 @@ public function updateOrder(
     }
 
 
+    /** Coordinator must hold a transaction through approval and article release. */
+    public function lockArticlePublicationAsset(int $id): array
+    {
+        $lock = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql' ? ' FOR UPDATE' : '';
+        $stmt = $this->pdo->prepare('SELECT * FROM pub_assets WHERE pub_asset_id = ?' . $lock);
+        $stmt->execute([$id]);
+        $asset = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$asset || $asset['asset_type'] !== 'article' || $asset['source_type'] !== 'playlist') {
+            throw new RuntimeException('Select a playlist-backed article asset.');
+        }
+        $stmt = $this->pdo->prepare('SELECT article_id FROM playlists WHERE playlist_id = ?' . $lock);
+        $stmt->execute([$asset['source_id']]);
+        $articleId = (int)$stmt->fetchColumn();
+        if ($articleId <= 0 || parse_url((string)$asset['url'], PHP_URL_PATH) !== '/articles/' . $articleId) {
+            throw new RuntimeException('Article receipt no longer matches the source playlist.');
+        }
+        $asset['article_id'] = $articleId;
+        return $asset;
+    }
+
     /** PUB-owned link; ARTICLES owns article content and status. */
     public function getPlaylistArticle(int $playlistId): ?array
     {

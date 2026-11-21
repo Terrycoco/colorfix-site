@@ -29,7 +29,10 @@ $endpoints = array_merge(glob($root . '/api/v2/admin/articles/*.php'), glob($roo
 foreach ($endpoints as $file) {
     $source = file_get_contents($file);
     preg_match_all('/^use (App\\\\ARTICLES\\\\[^;]+);/m', $source, $matches);
-    if (!$matches[1]) throw new RuntimeException("No ARTICLES import: {$file}");
+    if (!$matches[1]) {
+        preg_match_all('/\\\\?(App\\\\ARTICLES\\\\[A-Za-z\\\\]+)::/', $source, $matches);
+    }
+    if (!$matches[1]) throw new RuntimeException("No ARTICLES reference: {$file}");
     foreach ($matches[1] as $class) {
         if (!class_exists($class)) throw new RuntimeException("Unresolved {$class} in {$file}");
     }

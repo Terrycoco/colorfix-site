@@ -1,4 +1,4 @@
-**UPDATED:** 2026-11-18 09:10:05 PST
+UPDATED: 2026-11-21 12:05:44 PST
 
 # PUB — Department Manifest
 
@@ -429,3 +429,9 @@ The preparer receives `PdoPhotoLibraryRepository` as its fifth constructor depen
 Every prepared photo contains `editorial:{photo_description,design_notes,refined_commentary}`, read through PhotoEditorialService::getMany(), with nulls for absent text/rows. No publisher/experience flags filter this collection; every specialist receives the same prepared source via AnalyzeManager. Linked public-PV projection and analyzer selection remain unchanged. These are authenticated internal snapshots, not a new public Photo Library response. Source content is read-only; no editorial text is generated or persisted here.
 
 `Contracts/PubContract.php` documents the expanded source shape. `scripts/test-pub-photo-collection.php` checks full snapshot retention (including extra owner columns), editorial values/nulls, photo versus slide titles, repeated IDs, URL fallback, absent images/records, neutral slide collection and nullable playlist classification using isolated fixtures. Production database/HTTP execution was not performed. No schema, frontend, creation recipes, shipping or alias changes.
+
+## ARTICLES website release (2026-11-21)
+
+Website ArticleCreator creates drafts and retains the existing playlist/article receipt. `Services/ArticlePublicationManager(PDO)::release(int $pubAssetId, string $action)` calls ARTICLES' sole publication service. It locks the PUB asset and source relationship in a shared transaction, checks the receipt URL matches the linked article, and requires approved=1 and pipeline_stage=created for publish. Unpublish does not require approval. Missing/stale relationships fail closed. No website Packager, shipment, queue, or new relationship is invented; article status remains ARTICLES-owned and the PUB production stage remains created.
+
+Authenticated POST `/api/v2/admin/pub/article-publication.php` delegates to `Endpoints/ArticlePublicationEndpoint` with `{pub_asset_id,action:publish|unpublish}` and returns the ARTICLES publication receipt. The Assets detail pane exposes these actions. Articles are excluded from bulk media packaging and the media packaging button. PUB approval remains the existing asset review flag, not a versioned snapshot of article copy. Existing non-article pipelines are unchanged. Tests: ArticlePublicationTest and local HTTP/browser coverage; no production changes.

@@ -93,6 +93,7 @@ const ClientViewerTestPage = lazy(() => import('@pages/Viewers/ClientViewerTestP
 const RexManagementDialogTestPage = lazy(() => import('@pages/REX/RexManagementDialogTestPage'));
 
 const ArticlePage = lazy(() => import('@pages/ArticlePage'));
+const ArticlesPage = lazy(() => import('@pages/ArticlesPage'));
 
 const WatchRedirectPage = lazy(() => import('@pages/WatchRedirectPage'));
 
@@ -222,6 +223,7 @@ export function PublicAppRoutes() {
 
               <Route path="/palette/translate" element={renderWithSuspense(PaletteTranslationPage, 'Loading palette translation…')} />
 
+              <Route path="articles" element={renderWithSuspense(ArticlesPage, 'Loading articles…')} />
               <Route path="articles/:id" element={<ArticleRoute />} />
 
             </Route>
@@ -358,25 +360,7 @@ function ArticleRoute() {
 
 
 
-  return (
-
-    <ANATrack
-
-      resource={{
-
-        resource_type: "article",
-
-        resource_id: articleId,
-
-      }}
-
-    >
-
-      {article}
-
-    </ANATrack>
-
-  );
+  return article;
 
 }
 

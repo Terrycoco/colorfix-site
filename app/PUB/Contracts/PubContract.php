@@ -2714,6 +2714,12 @@ final class PubContract
                     'article' => [
                         'label' => 'Article',
                         'channel' => 'website',
+                        'publication' => [
+                            'endpoint' => '/api/v2/admin/pub/article-publication.php',
+                            'actions' => ['publish', 'unpublish'],
+                            'requires' => 'Publish requires a created, approved article asset with a matching source receipt.',
+                            'owner' => 'ARTICLES ArticlePublicationService; website articles do not enter media packaging.',
+                        ],
                         'creator' => [
                             'input' => [[
                                 'key' => 'ingredients',

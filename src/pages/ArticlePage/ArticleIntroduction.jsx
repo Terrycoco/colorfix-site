@@ -1,7 +1,8 @@
 import "./ArticleIntroduction.css";
+import ArticleByline from "./ArticleByline";
 
 /** First authored text section, following the visual hero. */
-export default function ArticleIntroduction({ body }) {
+export default function ArticleIntroduction({ body, publishedAt }) {
   const paragraphs = String(body ?? "")
     .split(/\n\s*\n/)
     .map((part) => part.trim())
@@ -12,6 +13,7 @@ export default function ArticleIntroduction({ body }) {
   return (
     <section className="cf-article-introduction" aria-label="Introduction">
       <div className="cf-article-introduction__inner">
+        <ArticleByline publishedAt={publishedAt} />
         {paragraphs.map((paragraph, index) => (
           <p
             className={index === 0

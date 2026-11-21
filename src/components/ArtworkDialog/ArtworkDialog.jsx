@@ -10,7 +10,7 @@ import "./ArtworkDialog.css";
 const API_URL = `${API_FOLDER}/v2/admin/artwork/index.php`;
 const INSPIRATION_URL = `${API_FOLDER}/v2/admin/photos/inspiration.php`;
 const BLANK = {
-  artist: "", official_title: "", display_title: "", year: "", circa: false,
+  artist: "", artist_last: "", official_title: "", display_title: "", year: "", circa: false,
   medium: "", museum: "", source_url: "", historical_notes: "", color_analysis: "",
 };
 
@@ -159,6 +159,7 @@ function ArtworkEditorContent({ open, photoLibraryId, imageUrl, onClose, onSaved
           {error && <p className="artwork-dialog__error" role="alert">{error}</p>}
           <div className="artwork-dialog__fields">
             {field("artist", "Artist")}
+            {field("artist_last", "Artist last name", { placeholder: "e.g. van Gogh" })}
             {field("official_title", "Official title")}
             {field("display_title", "Display title")}
             <div className="artwork-dialog__year">

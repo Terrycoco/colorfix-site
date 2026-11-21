@@ -13,6 +13,12 @@ export const QUICK_SEND_LINKS = [
   description: 'Explore ColorFix makeovers and color lessons',
   url: 'https://colorfix.terrymarr.com/browse-playlists?src=sas',
 },
+    {
+  id: 'articles',
+  title: 'Browse Articles',
+  description: 'All Articles',
+  url: 'https://colorfix.terrymarr.com/articles?src=sas',
+},
 {
   id: 'sign1',
   title: 'Sign 1',

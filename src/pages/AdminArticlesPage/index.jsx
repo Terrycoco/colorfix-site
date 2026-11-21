@@ -332,6 +332,28 @@ export default function AdminArticlesPage() {
     }
   }
 
+  async function handlePublication() {
+    if (!form.id || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const action = form.status === "published" ? "unpublish" : "publish";
+      const response = await fetch(`${API_FOLDER}/v2/admin/articles/publication.php`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ article_id: form.id, action }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "Publication failed.");
+      // Keep unsaved editorial fields intact; publication applies to the saved version.
+      setForm(prev => ({ ...prev, status: result.item.status, published_at: result.item.published_at || "" }));
+      const saved = JSON.parse(savedSnapshotRef.current || "{}");
+      savedSnapshotRef.current = JSON.stringify({ ...saved, status: result.item.status, published_at: result.item.published_at || "" });
+      await loadArticles();
+      setStatus(action === "publish" ? "Saved article published." : "Article unpublished.");
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  }
+
   async function handleSave() {
     setStatus("");
     setError("");
@@ -542,18 +564,9 @@ export default function AdminArticlesPage() {
         .join(" "),
     }));
 
-    let publishedAt = article.published_at || null;
-    if (article.status === "published" && !publishedAt) {
-      publishedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
-    }
-    if (article.status !== "published") {
-      publishedAt = null;
-    }
-
     return {
       id: article.id || null,
       type: article.type || "colorfix",
-      status: article.status || "draft",
       title: article.title || "",
       dek: article.dek || "",
       kicker: article.kicker || "",
@@ -565,7 +578,6 @@ export default function AdminArticlesPage() {
       hero_mobile_asset_id: article.hero_mobile_asset_id ? Number(article.hero_mobile_asset_id) : null,
       cta_overrides: article.cta_overrides || "",
       featured: !!article.featured,
-      published_at: publishedAt,
       tags,
       sections: (() => {
         const rawSections = Array.isArray(article.sections) ? article.sections : [];
@@ -643,14 +655,15 @@ export default function AdminArticlesPage() {
             actions={<div className="admin-articles__editor-actions">
               <AdminButton type="button" onClick={handleNewArticle}>New</AdminButton>
               {showEditor && <>
-                <AdminButton type="button" variant="secondary" onClick={handleDuplicateCurrent}>Duplicate</AdminButton>
-                {form.id && <AdminButton type="button" variant="secondary" onClick={() => window.open(`/articles/${form.id}?admin=1`, "_blank", "noopener,noreferrer")}>Preview</AdminButton>}
+                 {/* <AdminButton type="button" variant="secondary" onClick={handleDuplicateCurrent}>Duplicate</AdminButton>
+            form.id &&*/} <AdminButton type="button" variant="secondary" onClick={() => window.open(`/articles/${form.id}?admin=1`, "_blank", "noopener,noreferrer")}>Preview</AdminButton>
                 {form.id && form.status === "draft" && <AdminButton type="button" variant="secondary" onClick={() => { window.location.href = `${AI_EXPORT_URL}?id=${encodeURIComponent(form.id)}`; }}>Export for AI</AdminButton>}
                 {form.id && form.status === "draft" && <>
                   <input type="file" accept=".json,application/json" ref={aiImportFileRef} onChange={handleAiImport} style={{ display: "none" }} aria-label="Select revised article.json" />
                   <AdminButton type="button" variant="secondary" disabled={saving} onClick={() => aiImportFileRef.current?.click()}>Import AI Copy</AdminButton>
                 </>}
                 <AdminButton type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save"}</AdminButton>
+                <AdminButton type="button" disabled={!form.id || saving} onClick={handlePublication} title="Applies to the saved article. Save editorial changes first.">{form.status === "published" ? "Unpublish" : "Publish saved article"}</AdminButton>
                 <AdminButton type="button" variant="danger" onClick={handleDelete}
                   disabled={!form.id || form.status === "published" || deleting}>
                   {deleting ? "Deleting…" : "Delete"}
@@ -716,19 +729,7 @@ export default function AdminArticlesPage() {
                 ))}
               </select>
             </label>
-            <label>
-              Published
-              <input
-                type="checkbox"
-                checked={form.status === "published"}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    status: e.target.checked ? "published" : "draft",
-                  }))
-                }
-              />
-            </label>
+            <p>Status: {form.status === "published" ? "Published" : "Draft"}</p>
             <label className="admin-articles__checkbox">
               <input
                 type="checkbox"
@@ -737,15 +738,7 @@ export default function AdminArticlesPage() {
               />
               Featured article
             </label>
-            <label>
-              Published At
-              <input
-                type="text"
-                value={form.published_at || ""}
-                onChange={(e) => setForm((prev) => ({ ...prev, published_at: e.target.value }))}
-                placeholder="YYYY-MM-DD HH:MM:SS"
-              />
-            </label>
+            {form.published_at && <p>First published: {form.published_at}</p>}
             <label>
               Hero Image ID
               <div className="admin-articles__asset-row">

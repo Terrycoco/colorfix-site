@@ -8,7 +8,7 @@ const paragraphs = (value) => String(value ?? "")
   .filter(Boolean);
 
 /** Presents two existing article sections as one editorial opening. */
-export default function ArticleInspiration({ introduction, section }) {
+export default function ArticleInspiration({ introduction, section, publishedAt }) {
   const image = section?.asset;
   // Match the hero inset's 960px URL to reuse one downloaded painting.
   const src = image?.optimized_urls?.["960"] ||
@@ -20,7 +20,7 @@ export default function ArticleInspiration({ introduction, section }) {
     <section className="cf-article-inspiration" aria-label="Introduction and inspiration">
       <div className="cf-article-inspiration__grid">
         <div className="cf-article-inspiration__prose">
-          {introduction ? <ArticleIntroduction body={introduction} /> : null}
+          {introduction ? <ArticleIntroduction body={introduction} publishedAt={publishedAt} /> : null}
           {section ? (
             <div className="cf-article-inspiration__story">
               <h2 className="cf-article-inspiration__heading">{section.heading || "The Inspiration"}</h2>
