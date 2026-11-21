@@ -10,12 +10,15 @@ import ArticleInspiration from "./ArticleInspiration";
 import ArticlePalette from "./ArticlePalette";
 import ArticleRoomStudy from "./ArticleRoomStudy";
 import ArticleFinalThoughts from "./ArticleFinalThoughts";
+import ArticleComparison from "./ArticleComparison";
+import ArticleImageText from "./ArticleImageText";
+import ArticleImage from "./ArticleImage";
+import ArticleText from "./ArticleText";
 
 const GET_URL = `${API_FOLDER}/v2/articles/get.php`;
 const photoId = (photo) => Number(photo?.photo_library_id ?? photo?.id ?? 0);
 
-/** ArticlePage coordinates fetching and presentation. Other article sections are
- * intentionally excluded until their new presentation components are built. */
+/** ArticlePage assembles editorial components from saved section kinds and structure. */
 export default function ArticlePage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -142,6 +145,32 @@ export default function ArticlePage() {
     ) || null;
   }, [item]);
 
+  // Default editorial assembly: preserve saved order regardless of legacy article type.
+  // A headed image/text section followed by an unheaded one forms a comparison.
+  const editorialBlocks = useMemo(() => {
+    const sections = Array.isArray(item?.sections) ? item.sections : [];
+    const blocks = [];
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      if (!section) continue;
+      const next = sections[i + 1];
+      const paired = section.kind === "image_text" &&
+        String(section.heading ?? "").trim() &&
+        Number(section.asset_id) > 0 &&
+        next?.kind === "image_text" &&
+        !String(next.heading ?? "").trim() &&
+        Number(next.asset_id) > 0;
+      if (paired) {
+        blocks.push({ kind: "comparison", first: section, second: next, key: section.id ?? i });
+        i++;
+      } else {
+        blocks.push({ kind: section.kind, section, key: section.id ?? i });
+      }
+    }
+    return blocks;
+  }, [item]);
+  const hasArtworkStructure = Boolean(inspiration && paletteSection);
+
   return (
     <ArticleContainer>
       {loading ? (
@@ -162,6 +191,36 @@ export default function ArticlePage() {
           >
             <CTASection ctas={playlistCtas} onCtaClick={handleCta} layout="inline" className="cf-article-ctas cf-article-ctas--hero" />
           </ArticleHero>
+          {!hasArtworkStructure ? (
+            <>
+              {editorialBlocks.map((block, index) => {
+                if (block.kind === "comparison") {
+                  return <ArticleComparison key={block.key} before={block.first} after={block.second} />;
+                }
+                if (block.kind === "image_text" || block.kind === "image") {
+                  return block.kind === "image"
+                    ? <ArticleImage
+                        key={block.key}
+                        section={block.section}
+                        align={editorialBlocks.slice(0, index).filter((previous) => previous.kind === "image").length % 2 === 0 ? "right" : "left"}
+                      />
+                    : <ArticleImageText
+                        key={block.key}
+                        section={block.section}
+                        floatSide={editorialBlocks.slice(0, index).filter((previous) => previous.kind === "image_text").length % 2 === 0 ? "right" : "left"}
+                      />;
+                }
+                if (block.kind === "text") {
+                  return <ArticleText key={block.key} section={block.section} concluding={index === editorialBlocks.length - 1} />;
+                }
+                if (block.kind === "palette_link") return <ArticlePalette key={block.key} section={block.section} />;
+                // Unknown section kinds retain their content in admin preview.
+                return adminPreview ? <ArticleText key={block.key}
+                  section={{ heading: block.section?.heading || `Unsupported section: ${block.kind}`, body: block.section?.body || "" }} /> : null;
+              })}
+            </>
+          ) : (
+            <>
           {(introduction || inspiration) ? <ArticleInspiration introduction={introduction} section={inspiration} /> : null}
           {paletteSection ? <ArticlePalette section={paletteSection} /> : null}
           {roomSections.length > 0 ? (
@@ -184,6 +243,8 @@ export default function ArticlePage() {
             </>
           ) : null}
           {finalThoughts ? <ArticleFinalThoughts section={finalThoughts} adminPreview={adminPreview} /> : null}
+            </>
+          )}
           {ctas.length > 0 ? (
             <footer className="cf-article-closing">
               <CTASection ctas={ctas} onCtaClick={handleCta} layout="inline" className="cf-article-ctas cf-article-ctas--closing" />

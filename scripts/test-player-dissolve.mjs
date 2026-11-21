@@ -33,10 +33,22 @@ try {
     const stage = page.locator('.player-stage');
     const startSampler = () => page.evaluate(() => {
       window.outgoingOpacity = [];
+      window.overlapCoverage = [];
       const sample = () => {
         const image = document.querySelector('img.is-prev');
         if (!image) { window.outgoingRemoved = true; return; }
         window.outgoingOpacity.push(Number(getComputedStyle(image).opacity));
+        const incoming = document.querySelector('img.is-current.is-ready');
+        if (incoming) {
+          const outgoingStyle = getComputedStyle(image);
+          const incomingStyle = getComputedStyle(incoming);
+          const outgoingAlpha = Number(outgoingStyle.opacity);
+          const incomingAlpha = Number(incomingStyle.opacity);
+          window.overlapCoverage.push({
+            alpha: outgoingAlpha + (1 - outgoingAlpha) * incomingAlpha,
+            outgoingAbove: Number(outgoingStyle.zIndex) > Number(incomingStyle.zIndex),
+          });
+        }
         requestAnimationFrame(sample);
       };
       window.outgoingRemoved = false; requestAnimationFrame(sample);
@@ -48,6 +60,10 @@ try {
       assert.equal(samples.at(-1), 0, `${label}: outgoing reaches zero before removal`);
       for (let i = 1; i < samples.length; i++) assert(samples[i] <= samples[i - 1] + 0.001, `${label}: no opacity jump/reappearance`);
       assert.equal(await page.locator('img.is-prev').count(), 0);
+      const coverage = await page.evaluate(() => window.overlapCoverage);
+      assert(coverage.length > 0, `${label}: sampled overlapping photographs`);
+      assert(coverage.every(frame => frame.outgoingAbove), `${label}: outgoing photograph dissolves above incoming`);
+      assert(coverage.every(frame => frame.alpha >= 0.999), `${label}: no black background leaks through overlapping photographs`);
     };
     await stage.click();
     await page.locator('img.is-prev').waitFor();
@@ -67,7 +83,7 @@ try {
     await page.waitForFunction(() => !document.querySelector('img.is-prev'));
     assert(await page.getByText('Text slide', { exact: true }).isVisible());
     assert.deepEqual(errors, []);
-    console.log(`PASS ${viewport.width}×${viewport.height}: mixed aspect ratios, zero-opacity painted before removal, slow load, Back, rapid navigation and image-to-text cleanup.`);
+    console.log(`PASS ${viewport.width}×${viewport.height}: no dark dip, mixed aspect ratios, zero-opacity painted before removal, slow load, Back, rapid navigation and image-to-text cleanup.`);
     await page.close();
   }
 } finally { await browser?.close(); await server.close(); }

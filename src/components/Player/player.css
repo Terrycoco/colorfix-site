@@ -254,7 +254,7 @@
   position: absolute;
   inset: 0;
   margin: auto;
-  z-index: var(--z-above);
+  z-index: var(--z-label);
   transition: opacity 2000ms ease-in-out;
 }
 
@@ -271,9 +271,16 @@
   position: absolute;
   inset: 0;
   margin: auto;
-  z-index: var(--z-label);
+  z-index: var(--z-above);
   opacity: 1;
   transition: opacity 2000ms ease-in-out;
+}
+
+/* Dissolve the outgoing photograph over a fully opaque incoming photograph.
+   Fading both layers exposes the black stage at the midpoint. Keep the initial
+   image's fade-in, but reveal subsequent images underneath without fading them. */
+.player-image.is-current.fade-in {
+  transition: none;
 }
 
 .player-image.is-current.is-loading {

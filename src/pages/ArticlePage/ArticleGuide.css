@@ -1,0 +1,187 @@
+/* Guide sections share the artwork articles' type, paper, and negative space. */
+.cf-article-comparison,
+.cf-article-guide-single,
+.cf-article-guide-text {
+  background: #faf9f6;
+  color: var(--cf-ink);
+}
+
+.cf-article-comparison {
+  padding: 65px var(--cf-article-gutter) 95px;
+}
+.cf-article-comparison + .cf-article-comparison {
+  border-top: 1px solid rgba(48, 44, 39, .13);
+}
+.cf-article-comparison__inner,
+.cf-article-guide-single__inner { max-width: 1160px; margin: 0 auto; }
+.cf-article-comparison__heading,
+.cf-article-guide-single__heading {
+  margin: 0 0 36px;
+  font: 400 clamp(1.7rem, 2.6vw, 2.25rem)/1.17 var(--cf-editorial-serif);
+  text-align: left;
+}
+.cf-article-comparison__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(25px, 3.8vw, 60px);
+  align-items: start;
+}
+.cf-article-comparison__panel { min-width: 0; }
+.cf-article-comparison__label {
+  margin: 0 0 15px;
+  font: 500 .73rem/1.3 var(--cf-editorial-sans);
+  letter-spacing: .17em;
+  text-transform: uppercase;
+  color: var(--cf-muted);
+}
+.cf-article-comparison__figure,
+.cf-article-guide-single__figure { margin: 0; width: 100%; min-width: 0; }
+.cf-article-comparison__figure img,
+.cf-article-guide-single__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.cf-article-comparison__figure img { max-height: 590px; }
+.cf-article-comparison__missing { min-height: 270px; background: #e7e4dc; }
+.cf-article-comparison__caption {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  font: 400 .78rem/1.5 var(--cf-editorial-sans);
+  color: var(--cf-muted);
+}
+.cf-article-comparison__copy,
+.cf-article-guide-single__copy {
+  margin-top: 23px;
+  font: 400 1.0625rem/1.55 var(--cf-editorial-serif);
+}
+.cf-article-comparison__copy p,
+.cf-article-guide-single__copy p { margin: 0 0 1.05em; }
+.cf-article-comparison__copy p:last-child,
+.cf-article-guide-single__copy p:last-child { margin-bottom: 0; }
+
+.cf-article-guide-single { padding: 22px var(--cf-article-gutter) 30px; }
+.cf-article-guide-single__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, .85fr);
+  gap: clamp(26px, 4vw, 70px);
+  align-items: center;
+}
+.cf-article-guide-single__figure img { max-height: 650px; }
+.cf-article-guide-single__copy { margin-top: 0; }
+
+.cf-article-guide-text { padding: 16px var(--cf-article-gutter) 24px; }
+.cf-article-guide-text__inner { max-width: 760px; margin: 0 auto; }
+.cf-article-guide-text__heading {
+  margin: 0 0 18px;
+  font: 400 1.7rem/1.22 var(--cf-editorial-serif);
+}
+.cf-article-guide-text__paragraph {
+  margin: 0 0 1.05em;
+  font: 400 1.0625rem/1.55 var(--cf-editorial-serif);
+}
+.cf-article-guide-text__paragraph:last-child { margin-bottom: 0; }
+.cf-article-guide-text--closing { border-top: 1px solid rgba(48, 44, 39, .13); }
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .cf-article-comparison { padding-top: 50px; padding-bottom: 70px; }
+  .cf-article-comparison__grid { gap: 26px; }
+  .cf-article-comparison__copy,
+  .cf-article-guide-single__copy { font-size: 1rem; }
+}
+@media (max-width: 639px) {
+  .cf-article-comparison { padding: 43px 23px 60px; }
+  .cf-article-comparison__heading,
+  .cf-article-guide-single__heading { font-size: 1.65rem; margin-bottom: 26px; }
+  .cf-article-comparison__grid { grid-template-columns: minmax(0, 1fr); gap: 43px; }
+  .cf-article-comparison__figure img { max-height: none; }
+  .cf-article-comparison__copy { font-size: 1rem; margin-top: 18px; }
+  .cf-article-guide-single { padding: 18px 23px 30px; }
+  .cf-article-guide-single__grid { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .cf-article-guide-single__copy { font-size: 1rem; }
+  .cf-article-guide-text { padding: 18px 23px 29px; }
+  .cf-article-guide-text__heading { font-size: 1.55rem; }
+  .cf-article-guide-text__paragraph { font-size: 1rem; }
+}
+
+/* Standalone photos belong to the same editorial column and visual rhythm
+   as floated image_text photos, but stay as independent sections. */
+.cf-article-standalone {
+  background: #faf9f6;
+  color: var(--cf-ink);
+  padding: 14px var(--cf-article-gutter, 32px) 22px;
+}
+.cf-article-standalone__inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flow-root;
+}
+.cf-article-standalone__heading {
+  margin: 0 0 18px;
+  font: 400 clamp(1.5rem, 2.2vw, 1.85rem)/1.23 var(--cf-editorial-serif);
+  text-align: left;
+}
+.cf-article-standalone__figure {
+  display: block;
+  width: 43%;
+  max-width: 350px;
+  min-width: 0;
+  margin: 0;
+}
+.cf-article-standalone--right .cf-article-standalone__figure { margin-left: auto; margin-right: 0; }
+.cf-article-standalone--left .cf-article-standalone__figure { margin-left: 0; margin-right: auto; }
+.cf-article-standalone__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.cf-article-standalone__figure figcaption {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 10px 0 0;
+  padding: 0;
+  font: 400 .78rem/1.5 var(--cf-editorial-sans);
+  color: var(--cf-muted);
+}
+.cf-article-standalone__copy {
+  margin: 18px 0 0;
+  font: 400 1.0625rem/1.55 var(--cf-editorial-serif);
+}
+.cf-article-standalone__copy p { margin: 0 0 1em; }
+.cf-article-standalone__copy p:last-child { margin-bottom: 0; }
+@media (max-width: 639px) {
+  .cf-article-standalone { padding: 18px 23px 26px; }
+  .cf-article-standalone__heading { font-size: 1.65rem; }
+  .cf-article-standalone__figure {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* A heading-only text section introduces the very next section, not a new page. */
+.cf-article-guide-text:has(.cf-article-guide-text__heading):not(:has(.cf-article-guide-text__paragraph)) {
+  padding-bottom: 0;
+}
+.cf-article-guide-text:has(.cf-article-guide-text__heading):not(:has(.cf-article-guide-text__paragraph))
+  .cf-article-guide-text__heading {
+  margin-bottom: 0;
+}
+
+/* The closing thought follows the final photo as part of the same article. */
+.cf-article-standalone + .cf-article-guide-text--closing {
+  padding-top: 24px;
+}
+
+@media (max-width: 639px) {
+  .cf-article-standalone--right .cf-article-standalone__figure,
+  .cf-article-standalone--left .cf-article-standalone__figure {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

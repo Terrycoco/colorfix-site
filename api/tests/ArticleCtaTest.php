@@ -41,6 +41,37 @@ $expect(json_decode($fixed[0]['params'], true)['url'] === '/t/other', 'Explicit 
 $expect(($resolve(4, ['14' => ['playlist_id' => 999]])[0]['enabled'] ?? true) === false, 'Missing explicit destination never falls back to article');
 $expect($resolve(4, ['_cta_ids' => []]) === [], 'Keep intentionally empty CTA selection');
 $expect(array_column($resolve(4, ['_cta_ids' => [23]]), 'cta_id') === [23], 'Keep existing selected CTAs');
+$expect(array_column($resolve(999, ['_cta_group_id' => 12]), 'cta_id') === [14,30,23], 'Explicit CTA page works independently of artwork classification');
+$expect($resolve(999, ['_cta_group_id' => 12])[0]['enabled'] === false, 'CTA page does not guess a missing playlist destination');
+$expect(array_column($resolve(4, ['_cta_group_id' => 12, '_cta_ids' => [23]]), 'cta_id') === [14,30,23], 'CTA page takes precedence over legacy individual selection');
+$expect($resolve(4, ['_cta_group_id' => 0]) === [], 'None disables even the artwork default');
+$expect($resolve(4, ['_cta_group_id' => 999]) === [], 'Missing page does not silently substitute another group');
+$pageOverride = $resolve(4, ['_cta_group_id' => 12, '14' => ['url' => '/custom-slideshow', 'label' => 'Custom label']]);
+$expect(json_decode($pageOverride[0]['params'], true)['url'] === '/custom-slideshow', 'CTA page preserves existing per-CTA overrides');
+$pdo->exec('UPDATE cta_group_items SET order_index=0 WHERE cta_id=23');
+$expect(array_column($resolve(4, ['_cta_group_id' => 12]), 'cta_id') === [23,14,30], 'Page is resolved live rather than copied into article');
+$pdo->exec('UPDATE cta_group_items SET order_index=3 WHERE cta_id=23');
+// Legacy instance-only assignments use the established repository, never guessed URLs.
+$instanceColumns = ['playlist_instance_id', 'playlist_id', 'slug', 'instance_name', 'display_title',
+    'display_subtitle', 'instance_notes', 'intro_layout', 'intro_title', 'intro_subtitle', 'intro_body',
+    'intro_image_url', 'cta_group_id', 'palette_viewer_cta_group_id', 'demo_enabled', 'cta_context_key',
+    'audience', 'player_experience_id', 'cta_overrides', 'share_enabled', 'share_title', 'share_description',
+    'share_image_url', 'skip_intro_on_replay', 'hide_stars', 'is_active', 'created_from_instance', 'kicker_id'];
+$pdo->exec('CREATE TABLE playlist_instances (' . implode(' TEXT, ', $instanceColumns) . ' TEXT)');
+$pdo->exec("INSERT INTO playlist_instances (playlist_instance_id,playlist_id,instance_name,intro_layout,is_active) VALUES (90,61,'Legacy public','default',1)");
+$legacy = $resolve(999, ['_cta_ids' => [14], '14' => ['playlist_instance_id' => '90', 'label' => 'Legacy slideshow', 'subtitle' => 'Existing subtitle']]);
+$legacyParams = json_decode($legacy[0]['params'], true);
+$expect($legacyParams['url'] === '/t/other' && ($legacy[0]['enabled'] ?? true), 'Instance-only article CTA resolves and remains visible without article source');
+$expect($legacyParams['label'] === 'Legacy slideshow' && $legacyParams['subtitle'] === 'Existing subtitle', 'Preserve legacy editorial overrides');
+$expect(json_decode($resolve(4, ['14' => ['playlistInstanceId' => 90]])[0]['params'], true)['url'] === '/t/other', 'Support existing camelCase instance parameter');
+$expect(json_decode($resolve(4, ['14' => ['playlist_instance_id' => 90, 'playlist_id' => 60]])[0]['params'], true)['url'] === '/t/ingres', 'Explicit playlist ID still wins over instance');
+$expect(json_decode($resolve(4, ['14' => ['playlist_instance_id' => 999, 'url' => '/explicit']])[0]['params'], true)['url'] === '/explicit', 'Explicit URL still wins over instance');
+$expect($resolve(4, ['14' => ['playlist_instance_id' => 999]])[0]['enabled'] === false, 'Missing instance does not guess article source');
+$pdo->exec("UPDATE rex_reservations SET status='revoked' WHERE resource_id=61");
+$expect($resolve(4, ['14' => ['playlist_instance_id' => 90]])[0]['enabled'] === false, 'Legacy instance requires active public REX');
+$pdo->exec("UPDATE rex_reservations SET status='active',experience_key='client' WHERE resource_id=61");
+$expect($resolve(4, ['14' => ['playlist_instance_id' => 90]])[0]['enabled'] === false, 'Legacy instance cannot use client-only REX');
+$pdo->exec("UPDATE rex_reservations SET experience_key='public' WHERE resource_id=61");
 $pdo->exec("INSERT INTO playlists VALUES (62,4,'artwork')");
 $expect($resolve()[0]['enabled'] === false, 'Ambiguous source suppresses slideshow');
 $expect(count($resolve()) === 3, 'Ambiguous source retains other group CTAs');

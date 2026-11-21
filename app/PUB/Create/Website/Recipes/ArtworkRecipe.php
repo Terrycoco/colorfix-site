@@ -58,9 +58,11 @@ final class ArtworkRecipe
         // Editorial headline is intentionally unfinished for the article editor.
         $title = 'The Color Of';
         $kicker = 'Color Secrets of Master Artists';
-        $roomPhrase = $roomCount === 1 ? 'one room study' : $roomCount . ' room studies';
-        $dek = 'One painting, one interpreted palette, and ' . $roomPhrase
-            . ' exploring how changes in color placement and proportion transform a space.';
+        $roomWords = [1 => 'One', 2 => 'Two', 3 => 'Three', 4 => 'Four', 5 => 'Five',
+            6 => 'Six', 7 => 'Seven', 8 => 'Eight', 9 => 'Nine', 10 => 'Ten'];
+        $roomPhrase = ($roomWords[$roomCount] ?? (string)$roomCount)
+            . ($roomCount === 1 ? ' room' : ' rooms');
+        $dek = $roomPhrase . '. One extraordinary palette inspired by ' . $artist . '.';
         $heroAssetId = $roomIds[0];
         $insetAssetId = (int)$artwork['photo_library_id'];
         $sections = [];

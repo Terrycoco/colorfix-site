@@ -8,6 +8,7 @@ use App\PALETTES\Services\PaletteService;
 use App\PHOTOS\Services\PhotoDeliveryService;
 use App\PLAYLISTS\Repos\PdoPlaylistRepository;
 use App\Repos\PdoCtaRepository;
+use App\Repos\PdoPlaylistInstanceRepository;
 use App\REX\Repos\PdoRexReservationRepository;
 use PDO;
 
@@ -122,8 +123,12 @@ class PublicArticleService
         $sources = (new PdoPlaylistRepository($this->pdo))->findArticleSources((int)$article['id']);
         $isArtwork = in_array('artwork', array_column($sources, 'editorial_type'), true);
         $ctaRepo = new PdoCtaRepository($this->pdo);
-        // An explicit selection (including an empty selection) remains authoritative.
-        if (array_key_exists('_cta_ids', $overrides)) {
+        // A saved CTA page wins; zero explicitly disables CTAs. Older articles
+        // retain individual selections until an editor chooses a page.
+        if (array_key_exists('_cta_group_id', $overrides)) {
+            $groupId = (int)$overrides['_cta_group_id'];
+            $ctas = $groupId > 0 ? $ctaRepo->getByGroupId($groupId) : [];
+        } elseif (array_key_exists('_cta_ids', $overrides)) {
             $ctas = $ctaRepo->getByIds($ctaIds);
         } else {
             $group = $isArtwork ? $ctaRepo->findGroupByKey('artwork-article') : null;
@@ -148,6 +153,15 @@ class PublicArticleService
             $hasExplicitId = array_key_exists('playlist_id', $merged)
                 || !empty($merged['playlist_instance_id']) || !empty($merged['playlistInstanceId']);
             $playlistId = (int)($merged['playlist_id'] ?? 0);
+            // Older article CTAs selected a playlist instance rather than a playlist.
+            // Recover its existing playlist identity, then use the same public REX lookup.
+            if ($isPlaylist && !$hasUrl && !array_key_exists('playlist_id', $merged)) {
+                $instanceId = (int)($merged['playlist_instance_id'] ?? $merged['playlistInstanceId'] ?? 0);
+                if ($instanceId > 0) {
+                    $instance = (new PdoPlaylistInstanceRepository($this->pdo))->getById($instanceId);
+                    $playlistId = $instance?->playlistId ?? 0;
+                }
+            }
             if ($isPlaylist && !$hasExplicitId) $playlistId = $sourceId;
             if (!$hasUrl && $playlistId > 0) {
                 $reservations = $rexRepo->findActiveByResourceIdsAndExperience(

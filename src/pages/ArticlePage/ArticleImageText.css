@@ -1,0 +1,61 @@
+/* Ordinary image + text: copy flows beside and then below the photograph. */
+.cf-article-flow {
+  padding: 20px var(--cf-article-gutter, 32px) 30px;
+  background: #faf9f6;
+  color: var(--cf-ink);
+}
+
+.cf-article-flow__inner {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.cf-article-flow__heading {
+  margin: 0 0 22px;
+  font: 400 clamp(1.5rem, 2.2vw, 1.85rem)/1.23 var(--cf-editorial-serif);
+  text-align: left;
+}
+
+/* flow-root contains the float so it can never intrude on the next section. */
+.cf-article-flow__content { display: flow-root; }
+
+.cf-article-flow__figure {
+  width: 43%;
+  max-width: 350px;
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+.cf-article-flow__figure--right { float: right; margin-left: clamp(24px, 3.8vw, 52px); margin-right: 0; }
+.cf-article-flow__figure--left { float: left; margin-right: clamp(24px, 3.8vw, 52px); margin-left: 0; }
+
+.cf-article-flow__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.cf-article-flow__missing { width: 100%; min-height: 180px; background: #e7e4dc; }
+.cf-article-flow__caption {
+  width: 100%;
+  margin-top: 10px;
+  font: 400 .78rem/1.5 var(--cf-editorial-sans);
+  color: var(--cf-muted);
+}
+.cf-article-flow__paragraph {
+  margin: 0 0 1.1em;
+  font: 400 1.0625rem/1.55 var(--cf-editorial-serif);
+}
+.cf-article-flow__paragraph:last-child { margin-bottom: 0; }
+
+@media (max-width: 639px) {
+  .cf-article-flow { padding: 20px 23px 30px; }
+  .cf-article-flow__heading { margin-bottom: 24px; font-size: 1.5rem; }
+  .cf-article-flow__figure--left,
+  .cf-article-flow__figure--right {
+    float: none;
+    width: 100%;
+    max-width: none;
+    margin: 0 0 22px;
+  }
+  .cf-article-flow__paragraph { font-size: 1rem; line-height: 1.5; }
+}

@@ -3,10 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { API_FOLDER } from "@helpers/config";
 import { buildImageUrl } from "@helpers/assetImage";
 import PhotoPickerModal from "@components/PhotoPickerModal";
-import PlaylistPicker from "@components/PlaylistPicker";
 import {
   AdminMasterDetail, AdminListPane, AdminObjectList, AdminObjectListItem,
-  AdminDetailPane, AdminPanel, AdminButton, AdminNotice, AdminDialog,
+  AdminDetailPane, AdminPanel, AdminButton, AdminNotice,
 } from "@components/AdminLayout";
 import "./admin-articles.css";
 
@@ -15,7 +14,7 @@ const GET_URL = `${API_FOLDER}/v2/admin/articles/get.php`;
 const AI_EXPORT_URL = `${API_FOLDER}/v2/admin/articles/ai-export.php`;
 const SAVE_URL = `${API_FOLDER}/v2/admin/articles/save.php`;
 const DELETE_URL = `${API_FOLDER}/v2/admin/articles/delete.php`;
-const CTAS_LIST_URL = `${API_FOLDER}/v2/admin/ctas/list.php`;
+const CTA_PAGES_LIST_URL = `${API_FOLDER}/v2/admin/cta-groups/list.php`;
 
 const emptyArticle = {
   id: null,
@@ -36,6 +35,62 @@ const emptyArticle = {
   tags: [],
   sections: [],
 };
+
+/** AI returns the same article.json produced by Export for AI. Import prose only.
+ * Never accept AI-supplied section identities, images, palettes, ordering, CTAs or status. */
+function mergeAiEditorial(current, imported) {
+  if (!imported || typeof imported !== "object" || Array.isArray(imported)) {
+    throw new Error("Expected an article.json object.");
+  }
+  if (Number(imported.id) !== Number(current.id)) {
+    throw new Error(`Wrong article: this editor is #${current.id}, but the file is #${imported.id}.`);
+  }
+  if (!Array.isArray(imported.sections) || !Array.isArray(current.sections)) {
+    throw new Error("The import must contain the full sections array.");
+  }
+  const existing = new Map(current.sections.map((s) => [Number(s.id), s]));
+  if (existing.size !== current.sections.length || imported.sections.length !== current.sections.length) {
+    throw new Error("Section count differs. Re-export the current draft before requesting edits.");
+  }
+  const incoming = new Map();
+  for (const section of imported.sections) {
+    const id = Number(section?.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || incoming.has(id) || !existing.has(id)) {
+      throw new Error(`Unexpected or duplicate section ID: ${section?.id ?? "missing"}.`);
+    }
+    const original = existing.get(id);
+    if (section.kind !== original.kind ||
+        Number(section.asset_id || 0) !== Number(original.asset_id || 0) ||
+        Number(section.palette_id || 0) !== Number(original.palette_id || 0)) {
+      throw new Error(`Section #${id} changed kind, photo, or palette. Import rejected.`);
+    }
+    for (const key of ["heading", "body", "caption"]) {
+      if (!(key in section) || (section[key] !== null && typeof section[key] !== "string")) {
+        throw new Error(`Section #${id} has an invalid ${key} field.`);
+      }
+    }
+    incoming.set(id, section);
+  }
+  for (const field of ["title", "dek", "meta_description"]) {
+    if (typeof imported[field] !== "string") throw new Error(`Invalid ${field} field.`);
+  }
+  if (!imported.title.trim()) throw new Error("Import title cannot be empty.");
+  return {
+    ...current,
+    title: imported.title,
+    dek: imported.dek,
+    meta_description: imported.meta_description,
+    sections: current.sections.map((original) => {
+      const edited = incoming.get(Number(original.id));
+      return {
+        ...original,
+        heading: edited.heading ?? "",
+        body: edited.body ?? "",
+        caption: edited.caption ?? "",
+      };
+    }),
+  };
+}
 
 const sectionKindOptions = [
   { value: "text", label: "Text", help: "Text only" },
@@ -101,9 +156,8 @@ export default function AdminArticlesPage() {
   const [articles, setArticles] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [form, setForm] = useState(emptyArticle);
-  const [ctas, setCtas] = useState([]);
-  const [showCtaPicker, setShowCtaPicker] = useState(false);
-  const [ctaDraft, setCtaDraft] = useState({ ids: [], overrides: {} });
+  const [ctaPages, setCtaPages] = useState([]);
+  const [ctaPagesError, setCtaPagesError] = useState("");
   const [photoPickerTarget, setPhotoPickerTarget] = useState(null);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -112,6 +166,7 @@ export default function AdminArticlesPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const savedSnapshotRef = useRef(JSON.stringify(emptyArticle));
+  const aiImportFileRef = useRef(null);
 
   function confirmDiscard() {
     return JSON.stringify(form) === savedSnapshotRef.current
@@ -129,7 +184,7 @@ export default function AdminArticlesPage() {
 
   useEffect(() => {
     loadArticles();
-    loadCtas();
+    loadCtaPages();
   }, []);
 
   async function loadArticles() {
@@ -152,16 +207,17 @@ export default function AdminArticlesPage() {
     }
   }
 
-  async function loadCtas() {
+  async function loadCtaPages() {
     try {
-      const res = await fetch(`${CTAS_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
+      const res = await fetch(`${CTA_PAGES_LIST_URL}?_=${Date.now()}`, { credentials: "include" });
       const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTAs");
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load CTA pages");
       const items = Array.isArray(data.items) ? data.items : Object.values(data.items || {});
-      items.sort((a, b) => (Number(b.cta_id) || 0) - (Number(a.cta_id) || 0));
-      setCtas(items);
-    } catch {
-      setCtas([]);
+      items.sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0));
+      setCtaPages(items);
+      setCtaPagesError("");
+    } catch (err) {
+      setCtaPagesError(err.message || "Failed to load CTA pages");
     }
   }
 
@@ -214,69 +270,66 @@ export default function AdminArticlesPage() {
   }
 
   function parseCtaOverrides(raw) {
-    if (!raw) return { ids: [], overrides: {} };
-    let obj = raw;
-    if (typeof raw === "string") {
-      try {
-        obj = JSON.parse(raw);
-      } catch {
-        obj = {};
-      }
+    try {
+      const value = typeof raw === "string" ? JSON.parse(raw || "{}") : raw;
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch { return {}; }
+  }
+
+  const ctaSettings = parseCtaOverrides(form.cta_overrides);
+  const ctaPageValue = Object.hasOwn(ctaSettings, "_cta_group_id")
+    ? String(ctaSettings._cta_group_id || 0)
+    : Object.hasOwn(ctaSettings, "_cta_ids") ? "legacy" : "auto";
+
+  function selectCtaPage(value) {
+    setForm((prev) => {
+      const settings = { ...parseCtaOverrides(prev.cta_overrides) };
+      delete settings._cta_ids;
+      delete settings._cta_group_id;
+      if (value !== "auto") settings._cta_group_id = Number(value);
+      return { ...prev, cta_overrides: JSON.stringify(settings) };
+    });
+  }
+
+  async function handleAiImport(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setError("");
+    setStatus("");
+    if (!form.id || form.status !== "draft") {
+      setError("AI import is available only for a saved draft.");
+      return;
     }
-    if (!obj || typeof obj !== "object") return { ids: [], overrides: {} };
-    const ids = Array.isArray(obj._cta_ids)
-      ? obj._cta_ids.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
-      : [];
-    const overrides = { ...obj };
-    delete overrides._cta_ids;
-    return { ids, overrides };
-  }
-
-  function openCtaPicker() {
-    const parsed = parseCtaOverrides(form.cta_overrides);
-    setCtaDraft(parsed);
-    setShowCtaPicker(true);
-  }
-
-  function saveCtaPicker() {
-    const payload = { ...ctaDraft.overrides, _cta_ids: ctaDraft.ids };
-    setForm((prev) => ({ ...prev, cta_overrides: JSON.stringify(payload) }));
-    setShowCtaPicker(false);
-  }
-
-  function addCtaToArticle(ctaId) {
-    setCtaDraft((prev) => {
-      if (prev.ids.includes(ctaId)) return prev;
-      return { ...prev, ids: [...prev.ids, ctaId] };
-    });
-  }
-
-  function removeCtaFromArticle(ctaId) {
-    setCtaDraft((prev) => ({
-      ...prev,
-      ids: prev.ids.filter((id) => id !== ctaId),
-      overrides: Object.fromEntries(
-        Object.entries(prev.overrides).filter(([key]) => String(key) !== String(ctaId))
-      ),
-    }));
-  }
-
-  function updateCtaOverride(ctaId, key, value) {
-    setCtaDraft((prev) => {
-      const next = { ...prev.overrides };
-      const current = { ...(next[ctaId] || {}) };
-      if (value === "" || value === null || value === undefined) {
-        delete current[key];
-      } else {
-        current[key] = value;
+    if (JSON.stringify(form) !== savedSnapshotRef.current) {
+      setError("Save or discard your current edits before importing AI copy.");
+      return;
+    }
+    try {
+      if (file.size > 1024 * 1024) throw new Error("article.json is unexpectedly large (over 1 MB).");
+      const imported = JSON.parse(await file.text());
+      const merged = mergeAiEditorial(form, imported);
+      const fieldsChanged = ["title", "dek", "meta_description"].filter(
+        (field) => merged[field] !== form[field]
+      ).length;
+      const sectionsChanged = merged.sections.filter((section, i) =>
+        ["heading", "body", "caption"].some((field) =>
+          section[field] !== form.sections[i][field]
+        )
+      ).length;
+      if (!fieldsChanged && !sectionsChanged) {
+        setStatus("The imported article contains no editorial changes.");
+        return;
       }
-      if (Object.keys(current).length === 0) {
-        delete next[ctaId];
-      } else {
-        next[ctaId] = current;
-      }
-      return { ...prev, overrides: next };
-    });
+      if (!window.confirm(
+        `Import AI edits for article #${form.id}?\n\n${fieldsChanged} article fields and ${sectionsChanged} sections differ.\n\n` +
+        "This changes only the editor draft, not the database. Review the copy and click Save when ready."
+      )) return;
+      setForm(merged);
+      setStatus(`AI edits loaded: ${fieldsChanged} article fields, ${sectionsChanged} sections. Review and Save to persist.`);
+    } catch (err) {
+      setError(err instanceof SyntaxError ? "Invalid JSON. Select the revised article.json file." : (err?.message || "Import failed."));
+    }
   }
 
   async function handleSave() {
@@ -593,6 +646,10 @@ export default function AdminArticlesPage() {
                 <AdminButton type="button" variant="secondary" onClick={handleDuplicateCurrent}>Duplicate</AdminButton>
                 {form.id && <AdminButton type="button" variant="secondary" onClick={() => window.open(`/articles/${form.id}?admin=1`, "_blank", "noopener,noreferrer")}>Preview</AdminButton>}
                 {form.id && form.status === "draft" && <AdminButton type="button" variant="secondary" onClick={() => { window.location.href = `${AI_EXPORT_URL}?id=${encodeURIComponent(form.id)}`; }}>Export for AI</AdminButton>}
+                {form.id && form.status === "draft" && <>
+                  <input type="file" accept=".json,application/json" ref={aiImportFileRef} onChange={handleAiImport} style={{ display: "none" }} aria-label="Select revised article.json" />
+                  <AdminButton type="button" variant="secondary" disabled={saving} onClick={() => aiImportFileRef.current?.click()}>Import AI Copy</AdminButton>
+                </>}
                 <AdminButton type="button" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Save"}</AdminButton>
                 <AdminButton type="button" variant="danger" onClick={handleDelete}
                   disabled={!form.id || form.status === "published" || deleting}>
@@ -752,31 +809,22 @@ export default function AdminArticlesPage() {
 
                 </AdminPanel>
                 <AdminPanel title="Calls to action">
-          <div className="admin-articles__cta">
-            <div className="admin-articles__cta-header">
-              <h3>Article CTAs</h3>
-              <button type="button" onClick={openCtaPicker}>
-                Pick CTAs
-              </button>
-            </div>
-            <div className="admin-articles__cta-list">
-              {(() => {
-                const parsed = parseCtaOverrides(form.cta_overrides);
-                const selected = parsed.ids
-                  .map((id) => ctas.find((row) => Number(row.cta_id) === Number(id)))
-                  .filter(Boolean);
-                if (selected.length === 0) {
-                  return <div className="admin-articles__cta-empty">No CTAs selected.</div>;
-                }
-                return selected.map((cta) => (
-                  <div key={cta.cta_id} className="admin-articles__cta-item">
-                    <div className="admin-articles__cta-title">{cta.label}</div>
-                    <div className="admin-articles__cta-meta">{cta.type_label}</div>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
+                  <label className="admin-articles__field">
+                    CTA Page
+                    <select aria-label="CTA Page" value={ctaPageValue} onChange={(event) => selectCtaPage(event.target.value)}>
+                      <option value="auto">Automatic (article default)</option>
+                      <option value="0">None</option>
+                      {ctaPageValue === "legacy" && <option value="legacy" disabled>Existing individual selection — choose a CTA Page to replace</option>}
+                      {Number(ctaPageValue) > 0 && !ctaPages.some((page) => Number(page.id) === Number(ctaPageValue)) && (
+                        <option value={ctaPageValue}>CTA Page #{ctaPageValue} (unavailable)</option>
+                      )}
+                      {ctaPages.map((page) => (
+                        <option key={page.id} value={String(page.id)}>{page.label} — #{page.id}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {ctaPagesError && <AdminNotice variant="danger">{ctaPagesError}</AdminNotice>}
+                  <p>The selected page supplies its current group of CTAs. Save the article to apply changes.</p>
 
                 </AdminPanel>
                 <AdminPanel title="Classification">
@@ -962,117 +1010,6 @@ export default function AdminArticlesPage() {
           </AdminDetailPane>
         }
       />
-
-      <AdminDialog
-        open={showCtaPicker}
-        title="Pick CTAs for This Article"
-        width="min(980px, 94vw)"
-        onClose={() => setShowCtaPicker(false)}
-        actions={[
-          { key: "close", label: "Close", variant: "secondary", onClick: () => setShowCtaPicker(false) },
-          { key: "save", label: "Save CTAs", onClick: saveCtaPicker },
-        ]}
-      >
-            <div className="admin-articles__cta-grid">
-              <div className="admin-articles__cta-col">
-                <div className="admin-articles__cta-col-title">All CTAs</div>
-                <div className="admin-articles__cta-listbox">
-                  {ctas
-                    .filter((cta) => !ctaDraft.ids.includes(Number(cta.cta_id)))
-                    .map((cta) => (
-                      <button
-                        key={cta.cta_id}
-                        type="button"
-                        className="admin-articles__cta-row"
-                        onDoubleClick={() => addCtaToArticle(Number(cta.cta_id))}
-                      >
-                        <div className="row-title">{cta.label}</div>
-                        <div className="row-meta">{cta.type_label}</div>
-                      </button>
-                    ))}
-                </div>
-                <div className="admin-articles__cta-hint">Double click to add</div>
-              </div>
-              <div className="admin-articles__cta-col">
-                <div className="admin-articles__cta-col-title">Selected</div>
-                <div className="admin-articles__cta-listbox">
-                  {ctaDraft.ids.length === 0 && (
-                    <div className="admin-articles__cta-empty">No CTAs selected.</div>
-                  )}
-                  {ctaDraft.ids.map((id) => {
-                    const cta = ctas.find((row) => Number(row.cta_id) === Number(id));
-                    if (!cta) return null;
-                    return (
-                      <button
-                        key={cta.cta_id}
-                        type="button"
-                        className="admin-articles__cta-row"
-                        onDoubleClick={() => removeCtaFromArticle(Number(cta.cta_id))}
-                      >
-                        <div className="row-title">{cta.label}</div>
-                        <div className="row-meta">{cta.type_label}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="admin-articles__cta-hint">Double click to remove</div>
-
-                {ctaDraft.ids.map((id) => {
-                  const cta = ctas.find((row) => Number(row.cta_id) === Number(id));
-                  if (!cta) return null;
-                  const actionKey = cta.type_action_key || cta.action_key || "";
-                  if (actionKey !== "playlist_link") return null;
-                  const overrides = ctaDraft.overrides[id] || {};
-                  const baseParams = (() => {
-                    try {
-                      return typeof cta.params === "string" ? JSON.parse(cta.params) : (cta.params || {});
-                    } catch {
-                      return {};
-                    }
-                  })();
-                  const labelValue = overrides.label || cta.label || "";
-                  const titleValue = overrides.title || baseParams.title || "";
-                  const subtitleValue = overrides.subtitle || baseParams.subtitle || baseParams.dek || "";
-                 const playlistValue = overrides.playlist_id || baseParams.playlist_id || "";
-                  return (
-                    <div key={`ov-${cta.cta_id}`} className="admin-articles__cta-override">
-                      <div className="admin-articles__cta-override-title">Playlist Link Overrides</div>
-                      <label>
-                        Label (button text)
-                        <input
-                          type="text"
-                          value={labelValue}
-                          onChange={(e) => updateCtaOverride(cta.cta_id, "label", e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Title (non-button text)
-                        <input
-                          type="text"
-                          value={titleValue}
-                          onChange={(e) => updateCtaOverride(cta.cta_id, "title", e.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Subtitle (non-button text)
-                        <input
-                          type="text"
-                          value={subtitleValue}
-                          onChange={(e) => updateCtaOverride(cta.cta_id, "subtitle", e.target.value)}
-                        />
-                      </label>
-                      <PlaylistPicker
-                        value={playlistValue}
-                        onChange={(playlistId) =>
-                          updateCtaOverride(cta.cta_id, "playlist_id", playlistId)
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-      </AdminDialog>
 
       <PhotoPickerModal
         open={photoPickerTarget != null}
